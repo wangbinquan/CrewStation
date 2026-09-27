@@ -1,12 +1,12 @@
 import { conflict } from '@crewstation/kernel';
-import type { AgentProfile, BusinessTaskState, OutputContract, ProjectId, ReleaseId, ProfileRevisionRef, ServiceId, SubtaskId, SubtaskMode, SubtaskState, TaskId, TraceId, VolumeMode } from '@crewstation/contracts';
+import type { AgentProfile, BusinessTaskState, OutputContract, ProjectId, ProfileRevisionRef, ServiceId, SubtaskId, SubtaskMode, SubtaskState, TaskId, TraceId, VolumeMode } from '@crewstation/contracts';
 import type { Executor } from '@crewstation/persistence';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { BusinessTask } from '../../domain/businessTask';
 
 import type { SubtaskRun } from '../../domain/subtaskRun';
-import type { ContractRepository, SubtaskRepository, TaskRepository } from '../../ports/repositories';
-import { contracts, subtasks, tasks } from './tables';
+import type { SubtaskRepository, TaskRepository } from '../../ports/repositories';
+import { subtasks, tasks } from './tables';
 
 const json = <T>(v: unknown): T => (typeof v === 'string' ? JSON.parse(v) : v) as T;
 
@@ -76,18 +76,5 @@ export function drizzleSubtaskRepository(db: Executor): SubtaskRepository {
     findByExecution: async (executionTaskId) => { const row = (await db.select().from(subtasks).where(sql`${subtasks.spec}->'execution'->>'taskId' = ${executionTaskId}`))[0]; return row ? toRun(row) : undefined; },
     listPendingExecutions: async (limit) => (await db.select().from(subtasks).where(and(eq(subtasks.state, 'pending'), sql`${subtasks.spec}->'execution' IS NOT NULL`)).orderBy(subtasks.createdAt).limit(limit)).map(toRun),
     listUnreleasedExecutions: async (limit) => (await db.select().from(subtasks).where(and(inArray(subtasks.state, ['succeeded', 'failed', 'cancelled']), sql`${subtasks.spec}->'execution' IS NOT NULL`, sql`coalesce(${subtasks.spec}->'execution'->>'released', 'false') <> 'true'`)).orderBy(subtasks.createdAt).limit(limit)).map(toRun),
-  };
-}
-
-export function drizzleContractRepository(db: Executor): ContractRepository {
-  return {
-    save: async (c) => {
-      const values = { releaseId: c.releaseId, serviceId: c.serviceId, tag: c.tag, agentProfiles: c.agentProfiles as unknown, outputContracts: c.outputContracts as unknown, registeredAt: c.registeredAt };
-      await db.insert(contracts).values(values).onConflictDoUpdate({ target: contracts.releaseId, set: values });
-    },
-    latest: async (serviceId) => {
-      const row = (await db.select().from(contracts).where(eq(contracts.serviceId, serviceId)).orderBy(desc(contracts.registeredAt)).limit(1))[0];
-      return row ? { serviceId: row.serviceId as ServiceId, releaseId: row.releaseId as ReleaseId, tag: row.tag, agentProfiles: json<AgentProfile[]>(row.agentProfiles), outputContracts: json<OutputContract[]>(row.outputContracts), registeredAt: row.registeredAt } : undefined;
-    },
   };
 }

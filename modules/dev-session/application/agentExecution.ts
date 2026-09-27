@@ -4,6 +4,7 @@ import { isPlatformError } from '@crewstation/kernel';
 import type { AgentStart, AgentStartRepository } from '../ports/agentStarts';
 import type { EnvironmentView } from '../ports/runtime';
 import type { DevSessionUseCaseDeps } from './dependencies';
+import { restoreDevelopmentImage } from './runtimeImageSelection';
 import { profileLaunchFields } from './profileLaunch';
 
 /** 定性失败：重试也不会成功，记录结束并把原因给用户；其余（网络、Runner 未就绪）留给后台接续。 */
@@ -27,10 +28,11 @@ export class AgentExecutionLifecycle {
   /** 同步受理：额度满、父会话断开等定性原因直接抛给调用方，记录同时结束。 */
   async admit(start: AgentStart): Promise<EnvironmentView> {
     try {
+      await restoreDevelopmentImage(this.deps, start.execution.runtimeImage, start.taskId, start.execution.previousTaskId, start.execution.taskId);
       return await this.deps.environments.createNativeExecution({
         id: start.execution.taskId, parentTaskId: start.taskId, purpose: 'agent', createdBy: start.createdBy, agentId: start.agentId, runnerId: start.execution.runnerId,
         fingerprint: `${start.agentId}:${start.profile.profileId}@${start.profile.revision}`, ...(start.execution.taskProfile ? { profile: start.execution.taskProfile } : {}),
-        image: start.execution.image, computeProfile: { profileId: start.profile.profileId, revision: start.profile.revision },
+        image: start.execution.image, ...(start.execution.runtimeImage ? { runtimeImage: start.execution.runtimeImage } : {}), computeProfile: { profileId: start.profile.profileId, revision: start.profile.revision },
       });
     } catch (error) {
       if (definitive(error)) await this.end(start, { failure: error.message });

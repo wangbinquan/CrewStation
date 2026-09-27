@@ -66,7 +66,7 @@ describe.skipIf(!available)('构建、迁移 Job 由资源中心建出（RFC-025
     expect(k8s.applied.filter((object) => object.kind === 'Job' || object.kind === 'Secret')).toEqual([]);
     const name = `build-${rel.id.replaceAll('-', '')}`, build = (await jobRecord(rel.id, 'build'))!;
     expect(build.spec.children.map((child) => `${child.kind}/${child.name}`)).toEqual([`Job/${name}`, `Secret/${name}-env`]);
-    expect(build.spec['job']).toMatchObject({ releaseId: rel.id, purpose: 'build', image: 'cs-builder:1', env: { REPO_URL: 'http://gitlab.local/crewstation/jobs.git', REF: 'v0.0.1', IMAGE: 'registry/jobs:v0.0.1' }, resources: { cpu: '250m', memory: '512Mi' }, activeDeadlineSeconds: 600, envSecret: `${name}-env` });
+    expect(build.spec['job']).toMatchObject({ releaseId: rel.id, purpose: 'build', image: 'cs-builder:1', env: { REPO_URL: 'http://gitlab.local/crewstation/jobs.git', REF: 'sha-1', IMAGE: 'registry/jobs:v0.0.1' }, resources: { cpu: '250m', memory: '512Mi' }, activeDeadlineSeconds: 600, envSecret: `${name}-env` });
     expect((build.spec['job'] as { command: string[] }).command[2]).toContain('buildctl --addr "tcp://buildkitd:1234"');
     expect(JSON.stringify(build)).not.toContain('token-');
     expect((await release.api.runPipelineStep(rel.id)).done).toBe(false);

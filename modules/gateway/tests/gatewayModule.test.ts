@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import type { AllowlistDocument, ProjectId, ServiceId, WorkloadIdentity } from '@crewstation/contracts';
+import type { AllowlistDocument, ProjectId, ReleaseId, ServiceId, WorkloadIdentity } from '@crewstation/contracts';
 import { DomainTopic } from '@crewstation/contracts';
+import { newResourceId } from '@crewstation/kernel';
 import { eventbusMigrations, publishDomainEvent } from '@crewstation/eventbus';
 import type { FakeK8sClient } from '@crewstation/k8s';
 import { createFakeK8sClient } from '@crewstation/k8s';
@@ -24,6 +25,37 @@ const services = [
 const ingressRoutesOf = (namespace: string): string[] =>
   [...k8s.objects.values()].filter((o) => o.kind === 'IngressRoute' && o.metadata.namespace === namespace).map((o) => o.metadata.name).sort();
 let prodPhysical: 'blue' | 'green' = 'blue';
+
+describe.skipIf(!available)('RFC-027 可信服务 Pod 发布身份', () => {
+  test('观测保留实例 UID、release 和物理槽；同名替换后的旧删除事件不能撤销新实例', async () => {
+    const release = newResourceId() as ReleaseId, ip = '10.244.27.1';
+    const pod = { metadata: { name: 'source-pod', namespace: 'cs-demo', uid: 'uid-first', labels: {
+      'app.kubernetes.io/managed-by': 'crewstation', 'crewstation.io/project': 'demo', 'crewstation.io/service': 'demo',
+      'crewstation.io/workload': 'service', 'crewstation.io/slot': 'green', 'crewstation.io/release': release,
+    } }, status: { podIP: ip, phase: 'Running', conditions: [{ type: 'Ready', status: 'True' }] } };
+    await gateway.api.syncObservedPod(pod, false);
+    expect((await gateway.api.lookupByIp(ip))?.source).toEqual({ podUid: 'uid-first', releaseId: release, ip, physicalSlot: 'green', ready: true });
+    const replacement = { ...pod, metadata: { ...pod.metadata, uid: 'uid-second' } };
+    await gateway.api.syncObservedPod(replacement, false);
+    await gateway.api.syncObservedPod(pod, true);
+    expect((await gateway.api.lookupByIp(ip))?.source?.podUid).toBe('uid-second');
+    await gateway.api.syncObservedPod({ ...replacement, metadata: { ...replacement.metadata, deletionTimestamp: new Date().toISOString() } }, false);
+    expect((await gateway.api.lookupByIp(ip))?.source?.ready).toBe(false);
+    await gateway.api.syncObservedPod(replacement, true);
+    expect(await gateway.api.lookupByIp(ip)).toBeUndefined();
+  });
+
+  test('没有 UID 或合法发布标签的旧 Pod 仍有 v2 身份，但不给 v3 来源证据', async () => {
+    const pod = { metadata: { name: 'legacy-source', namespace: 'cs-demo', labels: {
+      'app.kubernetes.io/managed-by': 'crewstation', 'crewstation.io/project': 'demo', 'crewstation.io/service': 'demo',
+      'crewstation.io/workload': 'service', 'crewstation.io/slot': 'green', 'crewstation.io/release': 'client-supplied',
+    } }, status: { podIP: '10.244.27.2', phase: 'Running' } };
+    await gateway.api.syncObservedPod(pod, false);
+    expect(await gateway.api.lookupByIp('10.244.27.2')).toMatchObject({ identity: 'demo/demo', kind: 'service' });
+    expect((await gateway.api.lookupByIp('10.244.27.2'))?.source).toBeUndefined();
+    await gateway.api.syncObservedPod(pod, true);
+  });
+});
 
 /** 同一个库上的一个新模块实例＝一个刚启动的进程：自己的放行表缓存是空的。 */
 function newGateway(extra: Partial<Pick<Parameters<typeof createGatewayModule>[0], 'ledger' | 'logger' | 'grants'>> = {}): GatewayModule {

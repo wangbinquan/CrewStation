@@ -1,3 +1,5 @@
+import { stopMigrationJob } from './stoppedMigrationJob';
+import { assertPinnedVolume } from './pinnedVolume';
 import type { K8sClient, K8sObject } from '@crewstation/k8s';
 import { LABELS, MANAGED_BY, Resources } from '@crewstation/k8s';
 import type { Logger } from '@crewstation/kernel';
@@ -8,6 +10,7 @@ import { inspectNamespaceRetirement, removeRetiredNamespace } from './namespaceR
 import { rebuildObjects } from './rebuildObjects';
 import { objectCovered } from './coverage';
 import { jobSecretObject, releaseJobObject } from './jobObjects';
+import { imageBuildJobObject, imageBuildSecretObject } from './imageBuildObjects';
 import { middlewareObject } from './middlewareObjects';
 import { namespaceObjectOf, networkPolicyObjectOf, quotaObjectOf } from './namespaceObjects';
 import { routeObject } from './routeObjects';
@@ -38,15 +41,16 @@ export function managedObjectReader(k8s: K8sClient): ManagedObjectReader {
  * 按名字建一个不可改的对象（Pod、PVC、不可变 Secret，RFC-025 I25）：先向 API Server 读，在就返回它的 UID；不在才建（render 在这时才调，
  * Runner Secret 的内容就是这时才向所属模块要）。建时撞上同名的（上一轮建成了、回执丢了）按已在处理。
  */
-async function ensureNamed(k8s: K8sClient, kind: ObservedKind, target: { readonly namespace: string; readonly name: string }, render: () => Promise<K8sObject> | K8sObject): Promise<Ensured> {
-  const found = await k8s.get<K8sObject>(Resources[kind]!, target.name, target.namespace);
+async function ensureNamed(k8s: K8sClient, kind: ObservedKind, target: { readonly namespace: string; readonly name: string }, render: () => Promise<K8sObject> | K8sObject, signal?: AbortSignal): Promise<Ensured> {
+  const found = await k8s.get<K8sObject>(Resources[kind]!, target.name, target.namespace, signal);
   if (found?.metadata.uid) return { uid: found.metadata.uid, created: false };
   try {
-    const created = await k8s.create(await render());
+    const object = await render(); signal?.throwIfAborted();
+    const created = await k8s.create(object, signal);
     return { uid: created.metadata.uid!, created: true };
   } catch (error) {
     if (!isPlatformError(error) || error.kind !== 'conflict') throw error;
-    const existing = await k8s.get<K8sObject>(Resources[kind]!, target.name, target.namespace);
+    const existing = await k8s.get<K8sObject>(Resources[kind]!, target.name, target.namespace, signal);
     if (!existing?.metadata.uid) throw error;
     return { uid: existing.metadata.uid, created: false };
   }
@@ -71,8 +75,8 @@ export function kubernetesClusterWriter(k8s: K8sClient): ClusterWriter {
     applyNamespace: (namespace, current) => apply(namespaceObjectOf(namespace), current),
     applyQuota: (namespace, current) => apply(quotaObjectOf(namespace), current),
     applyNetworkPolicy: (policy, current) => apply(networkPolicyObjectOf(policy), current),
-    ensurePod: (pod) => ensureNamed(k8s, 'Pod', pod, () => workloadPodObject(pod)),
-    ensureRunnerSecret: (pod, values) => ensureNamed(k8s, 'Secret', { namespace: pod.namespace, name: pod.secret }, async () => runnerSecretObject(pod, await values())),
+    ensurePod: async (pod, signal) => { await assertPinnedVolume(k8s, pod, signal); return ensureNamed(k8s, 'Pod', pod, () => workloadPodObject(pod), signal); },
+    ensureRunnerSecret: (pod, values, signal) => ensureNamed(k8s, 'Secret', { namespace: pod.namespace, name: pod.secret }, async () => runnerSecretObject(pod, await values()), signal),
     ensureCheckoutSecret: (pod, values) => ensureNamed(k8s, 'Secret', { namespace: pod.namespace, name: pod.checkout!.credentialSecretName }, async () => checkoutSecretObject(pod, await values())),
     ensureVolume: (volume) => ensureNamed(k8s, 'PersistentVolumeClaim', volume, () => volumeObject(volume)),
     applyPreview: async (preview, current) => {
@@ -87,7 +91,10 @@ export function kubernetesClusterWriter(k8s: K8sClient): ClusterWriter {
       for (const object of [slotSecretObject(slot, values), ...slotWorkloadObjects(slot, generation)]) await k8s.apply(object, { dryRun: true });
     },
     ensureJobSecret: (job, values) => ensureNamed(k8s, 'Secret', { namespace: job.namespace, name: job.secret }, async () => jobSecretObject(job, await values())),
+    stopMigrationJob: (job) => stopMigrationJob(k8s, job),
     ensureJob: (job) => ensureNamed(k8s, 'Job', job, () => releaseJobObject(job)),
+    ensureImageBuildSecret: (plan, values, signal) => ensureNamed(k8s, 'Secret', { namespace: plan.namespace, name: plan.secret }, async () => imageBuildSecretObject(plan, await values()), signal),
+    ensureImageBuildJob: (plan, signal) => ensureNamed(k8s, 'Job', plan, () => imageBuildJobObject(plan), signal),
   };
 }
 

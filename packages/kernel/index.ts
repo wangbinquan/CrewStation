@@ -1,7 +1,7 @@
 export type { Result } from './result';
 export { err, mapResult, ok, unwrap } from './result';
 export type { ErrorKind } from './errors';
-export { PlatformError, conflict, forbidden, isPlatformError, notFound, precondition, quotaExceeded, unauthenticated, validation } from './errors';
+export { PlatformError, payloadTooLarge, gone, conflict, forbidden, isPlatformError, notFound, precondition, quotaExceeded, unauthenticated, validation } from './errors';
 export { newId, newResourceId, newTraceId } from './ids';
 export type { Clock } from './clock';
 export { fixedClock, systemClock } from './clock';

@@ -1,0 +1,56 @@
+[
+  {
+    "key": "python.yaml",
+    "argv": [
+      "/opt/business-tools/python/bin/python",
+      "-c",
+      "import yaml; print(yaml.safe_load(\"status: ready\")[\"status\"])"
+    ],
+    "expected": {
+      "kind": "text",
+      "value": "ready"
+    }
+  },
+  {
+    "key": "node.cjs",
+    "argv": [
+      "node",
+      "/opt/business-tools/node/check.cjs"
+    ],
+    "expected": {
+      "kind": "text",
+      "value": "ready"
+    }
+  },
+  {
+    "key": "node.esm",
+    "argv": [
+      "node",
+      "/opt/business-tools/node/check.mjs"
+    ],
+    "expected": {
+      "kind": "text",
+      "value": "ready"
+    }
+  },
+  {
+    "key": "script",
+    "argv": [
+      "/usr/local/bin/cs-example-script"
+    ],
+    "expected": {
+      "kind": "text",
+      "value": "script-ready"
+    }
+  },
+  {
+    "key": "binary",
+    "argv": [
+      "/usr/local/bin/cs-example-tool"
+    ],
+    "expected": {
+      "kind": "text",
+      "value": "worker:10001"
+    }
+  }
+]

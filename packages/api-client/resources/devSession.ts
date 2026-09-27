@@ -1,6 +1,6 @@
-import type { AgentInstanceDto, BranchDto, DevSessionDto, OpenDevSessionRequest, ReleaseDto, SendAgentMessageRequest, StartDevAgentRequest, WorkspaceStatusDto } from '@crewstation/contracts';
+import type { AgentInstanceDto, BranchDto, DevSessionDto, OpenDevSessionV2Request, ReleaseDto, SendAgentMessageRequest, StartDevAgentV2Request, WorkspaceStatusDto } from '@crewstation/contracts';
 import type { ComparisonDetailQuery, ComparisonDetails, ComparisonTarget, VersionComparisonDto } from '@crewstation/contracts';
-import type { NativeTerminalDto, NativeTerminalList, NativeTerminalSnapshotDto, StartNativeTerminalRequest } from '@crewstation/contracts';
+import type { NativeTerminalDto, NativeTerminalList, NativeTerminalSnapshotDto, StartNativeTerminalV2Request } from '@crewstation/contracts';
 import type { SaveWorkspaceLayoutRequest, WorkspaceLayoutDto } from '@crewstation/contracts';
 import type { AgentActivityPage, AgentActivityQuery, ReadAgentActivityRequest } from '@crewstation/contracts';
 import type { ApiInvocationRequest, ApiInvocationResponse } from '@crewstation/contracts';
@@ -38,7 +38,7 @@ export interface DevSessionResource {
   getWorkspaceLayout(taskId: string, options?: { readonly signal?: AbortSignal }): Promise<WorkspaceLayoutDto>;
   saveWorkspaceLayout(taskId: string, input: SaveWorkspaceLayoutRequest, options?: { readonly signal?: AbortSignal }): Promise<WorkspaceLayoutDto>;
   listNativeTerminals(taskId: string): Promise<NativeTerminalList>;
-  startNativeTerminal(taskId: string, input: StartNativeTerminalRequest): Promise<NativeTerminalDto>;
+  startNativeTerminal(taskId: string, input: StartNativeTerminalV2Request): Promise<NativeTerminalDto>;
   stopNativeTerminal(taskId: string, agentId: string): Promise<void>;
   getNativeTerminalSnapshot(taskId: string, agentId: string): Promise<NativeTerminalSnapshotDto>;
   /** GET /v1/projects/:projectId/dev-session；没有会话时抛 not_found（404）。 */
@@ -58,7 +58,7 @@ export interface DevSessionResource {
   versionComparisonDetails(projectId: string, comparisonId: string, query: ComparisonDetailQuery): Promise<ComparisonDetails>;
   refreshComparisonHistory(projectId: string, target?: ComparisonTarget): Promise<VersionComparisonDto>;
   /** POST /v1/projects/:projectId/dev-session（201） */
-  open(projectId: string, input: OpenDevSessionRequest): Promise<DevSessionDto>;
+  open(projectId: string, input: OpenDevSessionV2Request): Promise<DevSessionDto>;
   /** DELETE /v1/projects/:projectId/dev-session?force=true */
   release(projectId: string, options?: ReleaseDevSessionOptions): Promise<ReleaseDevSessionResult>;
   /** GET /v1/projects/:projectId/branches：各分支 HEAD 与落后两槽的提交数。 */
@@ -68,7 +68,7 @@ export interface DevSessionResource {
   /** GET /v1/tasks/:taskId/agents */
   listAgents(taskId: string): Promise<ItemsPage<AgentInstanceDto>>;
   /** POST /v1/tasks/:taskId/agents（201）：启动一个流式交互 Agent。 */
-  startAgent(taskId: string, input: StartDevAgentRequest): Promise<AgentInstanceDto>;
+  startAgent(taskId: string, input: StartDevAgentV2Request): Promise<AgentInstanceDto>;
   /** POST /v1/tasks/:taskId/agents/:agentId/messages（204） */
   sendMessage(taskId: string, agentId: string, input: SendAgentMessageRequest): Promise<void>;
   /** POST /v1/tasks/:taskId/agents/:agentId/cancel（204） */
@@ -91,7 +91,7 @@ export function devSessionResource(transport: Transport): DevSessionResource {
     getWorkspaceLayout: (taskId, options) => transport.request('GET', `/v1/tasks/${segment(taskId)}/workspace-layout`, { signal: options?.signal }),
     saveWorkspaceLayout: (taskId, input, options) => transport.request('PUT', `/v1/tasks/${segment(taskId)}/workspace-layout`, { body: input, signal: options?.signal }),
     listNativeTerminals: (taskId) => transport.request('GET', terminals(taskId)),
-    startNativeTerminal: (taskId, input) => transport.request('POST', terminals(taskId), { body: input }),
+    startNativeTerminal: (taskId, input) => transport.request('POST', input.runtimeImageVersionId ? terminals(taskId).replace('/v1/', '/v2/') : terminals(taskId), { body: input }),
     stopNativeTerminal: (taskId, agentId) => transport.request('POST', `${terminals(taskId)}/${segment(agentId)}/stop`),
     getNativeTerminalSnapshot: (taskId, agentId) => transport.request('GET', `${terminals(taskId)}/${segment(agentId)}/snapshot`),
     get: (projectId) => transport.request<DevSessionDto>('GET', `${project(projectId)}/dev-session`),
@@ -102,13 +102,13 @@ export function devSessionResource(transport: Transport): DevSessionResource {
     versionComparison: (projectId, target) => transport.request<VersionComparisonDto>('GET', `${project(projectId)}/dev-session/version-comparison`, { query: { target } }),
     versionComparisonDetails: (projectId, comparisonId, query) => transport.request<ComparisonDetails>('GET', `${project(projectId)}/dev-session/version-comparisons/${segment(comparisonId)}`, { query }),
     refreshComparisonHistory: (projectId, target = 'prod') => transport.request<VersionComparisonDto>('POST', `${project(projectId)}/dev-session/version-comparison/refresh-history`, { body: { target } }),
-    open: (projectId, input) => transport.request<DevSessionDto>('POST', `${project(projectId)}/dev-session`, { body: input }),
+    open: (projectId, input) => transport.request<DevSessionDto>('POST', `${input.runtimeImageVersionId ? project(projectId).replace('/v1/', '/v2/') : project(projectId)}/dev-session`, { body: input }),
     release: (projectId, options) =>
       transport.request<ReleaseDevSessionResult>('DELETE', `${project(projectId)}/dev-session`, { query: { force: options?.force ? 'true' : undefined, expectedTaskId: options?.expectedTaskId } }),
     listBranches: (projectId) => transport.request<ItemsPage<BranchDto>>('GET', `${project(projectId)}/branches`),
     publish: (projectId, input) => transport.request<ReleaseDto>('POST', `${project(projectId)}/publish`, { body: input }),
     listAgents: (taskId) => transport.request<ItemsPage<AgentInstanceDto>>('GET', agents(taskId)),
-    startAgent: (taskId, input) => transport.request<AgentInstanceDto>('POST', agents(taskId), { body: input }),
+    startAgent: (taskId, input) => transport.request<AgentInstanceDto>('POST', input.runtimeImageVersionId ? agents(taskId).replace('/v1/', '/v2/') : agents(taskId), { body: input }),
     sendMessage: (taskId, agentId, input) => transport.request<void>('POST', `${agents(taskId)}/${segment(agentId)}/messages`, { body: input }),
     cancelAgent: (taskId, agentId) => transport.request<void>('POST', `${agents(taskId)}/${segment(agentId)}/cancel`),
     touch: (taskId) => transport.request<void>('POST', `/v1/tasks/${segment(taskId)}/touch`),

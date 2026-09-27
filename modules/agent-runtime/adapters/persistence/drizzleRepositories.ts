@@ -1,7 +1,8 @@
+import { credentialVersions } from './credentialVersions';
 import type { AgentProtocol, ProfileTestId, ProfileTestOutcome, ProfileTestState, UserId } from '@crewstation/contracts';
 import { conflict } from '@crewstation/kernel';
 import type { Executor } from '@crewstation/persistence';
-import { and, asc, desc, eq, inArray, lt } from 'drizzle-orm';
+import { sql, and, asc, desc, eq, inArray, lt } from 'drizzle-orm';
 import type { ComputeProfile, ProfileCredential, ProfileRevision } from '../../domain/computeProfile';
 import type { ProfileTest } from '../../domain/profileTest';
 import type { CredentialRepository, ProfileRepository, RevisionRepository, TestRepository } from '../../ports/repositories';
@@ -42,10 +43,18 @@ export function drizzleRevisionRepository(db: Executor): RevisionRepository {
 export function drizzleCredentialRepository(db: Executor): CredentialRepository {
   const toCredential = (r: typeof profileCredentials.$inferSelect): ProfileCredential => ({ id: r.id, profile: r.profile, name: r.name, cipherText: r.cipherText, updatedBy: r.updatedBy as UserId, updatedAt: r.updatedAt });
   return {
+    listForUpdate: async (profile) => (await db.select().from(profileCredentials).where(eq(profileCredentials.profile, profile)).orderBy(asc(profileCredentials.id)).for('update')).map(toCredential),
     list: async (profile) => (await db.select().from(profileCredentials).where(eq(profileCredentials.profile, profile)).orderBy(asc(profileCredentials.name))).map(toCredential),
     upsert: async (c) => { const written = await db.insert(profileCredentials).values({ ...c }).onConflictDoUpdate({ target: profileCredentials.id, set: { name: c.name, cipherText: c.cipherText, updatedBy: c.updatedBy, updatedAt: c.updatedAt }, setWhere: eq(profileCredentials.profile, c.profile) }).returning({ id: profileCredentials.id }); if (!written.length) throw conflict('凭据 ID 已属于其他算力档位'); },
-    remove: async (profile, name, updatedBy, updatedAt) => { await db.update(profileCredentials).set({ cipherText: null, updatedBy, updatedAt }).where(and(eq(profileCredentials.profile, profile), eq(profileCredentials.id, name))); },
-    removeAll: async (profile) => { await db.delete(profileCredentials).where(eq(profileCredentials.profile, profile)); },
+    remove: async (profile, name, updatedBy, updatedAt) => {
+      // Lock the current credential before invalidating versions so a concurrent pin cannot escape revocation.
+      await db.update(profileCredentials).set({ cipherText: null, updatedBy, updatedAt }).where(and(eq(profileCredentials.profile, profile), eq(profileCredentials.id, name)));
+      await db.update(credentialVersions).set({ revoked: true }).where(and(eq(credentialVersions.profileId, profile), sql`${credentialVersions.credentials} @> ${JSON.stringify([{ id: name }])}::jsonb`));
+    },
+    removeAll: async (profile) => {
+      await db.delete(profileCredentials).where(eq(profileCredentials.profile, profile));
+      await db.update(credentialVersions).set({ revoked: true }).where(eq(credentialVersions.profileId, profile));
+    },
   };
 }
 

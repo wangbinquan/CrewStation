@@ -1,7 +1,9 @@
-import type { Actor, ProjectId, RunnerCommand, RunnerEvent, ServiceId, StartupRecord, TaskId, TraceId, UserId } from '@crewstation/contracts';
+import type { RuntimeImageExecutionSnapshot, Actor, ProjectId, RunnerCommand, RunnerEvent, ServiceId, StartupRecord, TaskId, TraceId, UserId } from '@crewstation/contracts';
 import type { DevSessionDto, DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest } from '@crewstation/contracts';
 
 export interface EnvironmentView {
+  image?: string;
+  runtimeImage?: RuntimeImageExecutionSnapshot;
   id: TaskId;
   projectId: ProjectId;
   serviceId: string;
@@ -21,6 +23,7 @@ export interface EnvironmentView {
 
 /** 一个 Agent 的独立执行环境（RFC-006 §5）：「＋ CLI」带 terminalId，headless Agent 没有；image 是档位修订按摘要固定的镜像。 */
 export interface CreateExecutionInput {
+  runtimeImage?: RuntimeImageExecutionSnapshot;
   id: TaskId; parentTaskId: TaskId; purpose: 'cli' | 'agent'; createdBy: UserId; agentId: string; terminalId?: string; runnerId: string; fingerprint: string;
   profile?: string; image?: string; computeProfile?: { profileId: string; revision: number };
 }
@@ -33,7 +36,7 @@ export interface Environments {
   inspectRebuild(projectId: ProjectId): Promise<DevSessionRebuildInspection>;
   requestRebuild(projectId: ProjectId, input: RebuildDevSessionRequest): Promise<DevSessionRebuildDto>;
   getRebuild(taskId: TaskId): Promise<DevSessionRebuildDto | undefined>;
-  createEnvironment(input: { serviceId: ServiceId; kind: 'dev-session'; branch: string; createdBy: UserId; traceId?: TraceId; preview?: { command: string[]; port: number; healthPath: string }; labels?: Record<string, string> }): Promise<EnvironmentView>;
+  createEnvironment(input: { runtimeImageTaskId?: TaskId; runtimeImage?: RuntimeImageExecutionSnapshot; serviceId: ServiceId; kind: 'dev-session'; branch: string; createdBy: UserId; traceId?: TraceId; preview?: { command: string[]; port: number; healthPath: string }; labels?: Record<string, string> }): Promise<EnvironmentView>;
   /** failed：按原分支重新开始时回收失败在检出代码或更早的会话（RFC-022 2026-09-23 修订）。 */
   releaseEnvironment(taskId: TaskId, reason: 'user' | 'owner-force' | 'failed'): Promise<EnvironmentView>;
   getEnvironment(taskId: TaskId): Promise<EnvironmentView | undefined>;

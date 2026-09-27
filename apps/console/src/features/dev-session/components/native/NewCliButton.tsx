@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react';
+import { RuntimeImagePicker } from '../../../../shared/runtime-images/RuntimeImagePicker';
 import { errorMessage } from '../../../../shared/api/useApi';
 import { useT } from '../../../../shared/lib/useT';
 import { Button, buttonClassName } from '../../../../shared/ui/Button';
@@ -27,6 +28,7 @@ function ComputeChooser({ launcher }: { readonly launcher: CliLauncher }): React
     <summary className={buttonClassName('secondary', 'small')} data-button="">{label}</summary>
     <div className={styles.chooserBody}>
       <label>{t('devSession.agents.compute')}<select aria-label={t('devSession.agents.compute')} value={launcher.compute} disabled={launcher.starting} onChange={(event) => launcher.setCompute(event.target.value)}><ComputeOptions items={launcher.items} /></select></label>
+      <RuntimeImagePicker projectId={launcher.projectId} usage="agent" profileId={launcher.profileId} value={launcher.runtimeImageVersionId} onChange={launcher.setRuntimeImageVersionId} disabled={launcher.starting || launcher.retryingOriginal} />
     </div>
   </details>;
 }

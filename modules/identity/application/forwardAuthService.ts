@@ -1,4 +1,5 @@
-import { TOKEN_CLAIMS, TraceIdSchema } from '@crewstation/contracts';
+import { ServiceSourceBindingSchema, TOKEN_CLAIMS, TraceIdSchema } from '@crewstation/contracts';
+import type { WorkloadIdentity } from '@crewstation/contracts';
 import { newTraceId } from '@crewstation/kernel';
 import type { ServiceAuthDecision, ServiceAuthRequest } from '../api/moduleApi';
 import { firstForwardedIp, firstHost, pathOf } from '../domain/forwardedRequest';
@@ -31,6 +32,10 @@ export function forwardAuthServiceUseCase(deps: Deps) {
       [TOKEN_CLAIMS.project]: caller.project,
       ...(caller.slot ? { [TOKEN_CLAIMS.slot]: caller.slot } : {}),
       [TOKEN_CLAIMS.traceId]: traceId,
+      ...(caller.kind === 'service' && caller.source ? {
+        [TOKEN_CLAIMS.sourceIp]: caller.source.ip, [TOKEN_CLAIMS.sourcePodUid]: caller.source.podUid,
+        [TOKEN_CLAIMS.sourceReleaseId]: caller.source.releaseId, [TOKEN_CLAIMS.sourcePhysicalSlot]: caller.source.physicalSlot,
+      } : {}),
     };
     const sourceToken = await deps.tokens.sign({ subject: serviceSubject(caller.identity), audience, expiresInSeconds: SOURCE_TOKEN_TTL_SECONDS, claims });
     return {
@@ -40,6 +45,23 @@ export function forwardAuthServiceUseCase(deps: Deps) {
       traceId,
       injected: { sourceService: caller.identity, ...(caller.slot ? { sourceSlot: caller.slot } : {}), sourceToken, traceId },
     };
+  };
+}
+
+/** v3 执行只信平台受众的签名来源令牌，并重查源 Pod 当前实例，旧 Pod 的令牌不能随 IP 复用继承。 */
+export function resolveServiceSourceUseCase(deps: Pick<Deps, 'tokens' | 'workloads'>) {
+  return async (token: string): Promise<(WorkloadIdentity & { source: NonNullable<WorkloadIdentity['source']> }) | undefined> => {
+    const verified = await deps.tokens.verify(token, { audience: PLATFORM_API_AUDIENCE });
+    if (!verified || verified.claims[TOKEN_CLAIMS.kind] !== 'service') return undefined;
+    const claim = ServiceSourceBindingSchema.safeParse({
+      ip: verified.claims[TOKEN_CLAIMS.sourceIp], podUid: verified.claims[TOKEN_CLAIMS.sourcePodUid],
+      releaseId: verified.claims[TOKEN_CLAIMS.sourceReleaseId], physicalSlot: verified.claims[TOKEN_CLAIMS.sourcePhysicalSlot], ready: false,
+    });
+    if (!claim.success) return undefined;
+    const current = await deps.workloads.byIp(claim.data.ip);
+    if (!current?.source || current.kind !== 'service' || verified.subject !== serviceSubject(current.identity) || verified.claims[TOKEN_CLAIMS.project] !== current.project) return undefined;
+    if (current.source.podUid !== claim.data.podUid || current.source.releaseId !== claim.data.releaseId || current.source.physicalSlot !== claim.data.physicalSlot || current.source.ip !== claim.data.ip) return undefined;
+    return { ...current, source: current.source };
   };
 }
 

@@ -3,11 +3,13 @@ export type AdminPagePath =
   | '/admin'
   | '/admin/requests'
   | '/admin/cluster'
+  | '/admin/business-execution'
   | '/admin/gateway'
   | '/admin/projects'
   | '/admin/capabilities'
   | '/admin/users'
   | '/admin/authentication'
+  | '/admin/runtime-images'
   | '/admin/compute'
   | '/admin/settings';
 
@@ -43,6 +45,7 @@ export const ADMIN_PENDING_PAGES: readonly AdminNavPage[] = [
 export const ADMIN_ENTRY_GROUPS: readonly AdminEntryGroup[] = [
   { id: 'observability', titleKey: 'nav.admin.groupObservability', pages: [
     { to: '/admin/cluster', labelKey: 'cluster.title', hintKey: 'cluster.description' },
+    { to: '/admin/business-execution', labelKey: 'executionRecovery.title', hintKey: 'executionRecovery.hint' },
     { to: '/admin/gateway', labelKey: 'nav.admin.gateway', hintKey: 'admin.overview.gateway' },
   ] },
   { id: 'supply', titleKey: 'nav.admin.groupSupply', pages: [
@@ -55,6 +58,7 @@ export const ADMIN_ENTRY_GROUPS: readonly AdminEntryGroup[] = [
   ] },
   // RFC-018 下线出站白名单后本组只剩算力档位；两类资源规格模板在 /admin/projects 下（RFC-017）。
   { id: 'resources', titleKey: 'nav.admin.groupResources', pages: [
+    { to: '/admin/runtime-images', labelKey: 'images.adminTitle', hintKey: 'images.adminHint' },
     { to: '/admin/compute', labelKey: 'nav.admin.compute', hintKey: 'admin.overview.compute' },
   ] },
   // RFC-021 M28、B10：平台级参数单独成组放在末尾，不改动上面四组；以后其他平台级参数也放这里。

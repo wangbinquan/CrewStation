@@ -1,6 +1,13 @@
 import type { Messages } from '../../../shared/lib/i18n';
 
 export const messages = {
+  'release.handoff.freezing': "正在冻结执行权，等待在途操作收敛。",
+  'release.handoff.preparing': "等待目标应用完成准备与接管。",
+  'release.handoff.routing': "准备已确认，正在切换生产路由。",
+  'release.handoff.activating': "正在确认路由并等待目标应用激活，交接尚未完成。",
+  'release.handoff.complete': "执行交接已完成。",
+  'release.handoff.readError': "无法确认交接状态，请稍后重试。",
+
   'release.title': '发布与上线',
   'release.draft.publish': '发布准备',
   'release.draft.traffic': '切换说明',

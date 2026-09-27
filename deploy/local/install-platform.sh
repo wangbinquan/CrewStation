@@ -72,6 +72,7 @@ kubectl -n $NS create secret generic crewstation-secrets \
 log "配置集群指标凭据"
 bun run "$ROOT/deploy/local/configure-metrics.ts"
 log "应用平台清单"
+kubectl apply -f "$ROOT/deploy/k8s/system/21-image-build-policy.yaml" >/dev/null
 kubectl apply -f "$ROOT/deploy/k8s/platform/00-rbac.yaml" -f "$ROOT/deploy/k8s/platform/10-config.yaml" >/dev/null
 kubectl -n $NS delete job crewstation-migrate --ignore-not-found >/dev/null
 kubectl apply -f "$ROOT/deploy/k8s/platform/20-migrate-job.yaml" >/dev/null

@@ -4,6 +4,9 @@ import type { TaskEnvironment } from '../../domain/taskEnvironment';
 import { taskRuntimeSchema } from './schema';
 
 export const environments = taskRuntimeSchema.table('environments', {
+  businessWorkspace: jsonDocument('business_workspace').$type<TaskEnvironment['businessWorkspace']>(),
+  runtimeInitialization: jsonDocument('runtime_initialization').$type<TaskEnvironment['runtimeInitialization']>(),
+  admissionFingerprint: text('admission_fingerprint'),
   legacyCluster: jsonDocument('legacy_cluster').$type<TaskEnvironment['legacyCluster']>(),
   id: text('id').primaryKey(),
   projectId: text('project_id').notNull(),

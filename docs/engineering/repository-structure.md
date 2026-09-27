@@ -81,7 +81,7 @@ crewstation/
 │  └─ reference-api-proxy/
 ├─ templates/
 │  └─ minimal-sample/            # 业务项目模板
-├─ deploy/                       # Kubernetes 清单、安装器、profiles、镜像清单
+├─ deploy/                       # Kubernetes 清单、安装器、profiles、镜像清单；examples/runtime-tools 为独立构建配方
 ├─ tests/                        # 跨单元的用例层，一层一个目录：contracts、e2e、security、scale、upgrade、architecture（清单外的目录被规则阻断）
 ├─ tools/                        # 仓内工程脚本：arch 规则检查、testguard 用例门禁与报告、代码生成；不被任何应用 import
 ├─ docs/                         # 工程文档
@@ -203,6 +203,7 @@ modules/<name>/
 | L3 | `agent-runtime` | 算力档位（RFC-006）：协议、镜像、二进制、启动前步骤、凭据、修订、测试记录、默认与引用确认、平台仓库推送凭据；TaskProfile 目录、发布引用与测试执行经 ports 由 platform 回填（ADR-0004、ADR-0005） | —（不 import 其他模块） |
 | L4 | `release` | Manifest 校验、Release、构建、迁移、DeploymentSlot、TrafficSwitch、发布并发控制；发布 `release.registered` | project、scm、config、data |
 | L4 | `task-runtime` | TaskEnvironment 生命周期、Pod 与两种持久卷模式、配额原子准入、每个 Agent 一个执行环境（「＋ CLI」／headless／业务子任务）、档位测试执行、TaskRunner 归属与协议服务端语义 | project、config、data |
+| L4 | `runtime-environment` | RFC-028 运行镜像定义、构建与登记、不可变版本、用途／档位组合验证、日志和引用保留；各执行对象独立绑定（ADR-0010） | 通过端口接入 project、scm、config、agent-runtime、resources；不依赖同层模块 |
 | L5 | `dev-session` | 一项目一会话、分支与落后提交数、空闲提醒、强制释放、发布入口 | task-runtime、release、scm |
 | L5 | `business-task` | 业务任务、SubtaskRun 契约层、oneshot／interactive、attempt、契约校验、文件与结果读取 | task-runtime、release |
 | L5 | `session` | TaskRunner 出向连接与浏览器流的中枢：租约、游标、重连、帧路由 | task-runtime |

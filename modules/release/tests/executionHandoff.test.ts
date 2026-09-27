@@ -1,0 +1,85 @@
+import { afterEach, describe, expect, test } from 'bun:test';
+import { newResourceId } from '@crewstation/kernel';
+import { testDatabaseAvailable } from '@crewstation/testkit';
+import { sql } from 'drizzle-orm';
+import { switchTrafficUseCase } from '../application/switchTraffic';
+import { executionHandoffFixture } from './executionHandoffFixture';
+
+const available = await testDatabaseAvailable();
+describe.skipIf(!available)('RFC-027 durable release execution handoff', () => {
+  let f: Awaited<ReturnType<typeof executionHandoffFixture>>;
+  afterEach(async () => { await f?.close(); });
+  test('restarts between every stage; ambiguous freeze retries same operation; late routing and failed activation never report success', async () => {
+    f = await executionHandoffFixture();
+    const operation = await f.start();
+    expect(operation.handoff?.stage).toBe('freezing');
+    expect((await f.start()).id).toBe(operation.id);
+    expect((await f.uow.read.slots.get(f.serviceId))?.active).toBe('blue');
+    f.state.fail = 'freeze receipt lost';
+    await f.worker().progressHandoffs();
+    expect(await f.worker().getHandoff(f.actor, f.serviceId, operation.id)).toMatchObject({ handoff: { stage: 'freezing', message: 'freeze receipt lost' } });
+    const epoch = f.state.authority.epoch; f.state.fail = undefined;
+    await f.worker().progressHandoffs(); expect(f.state.authority.epoch).toBe(epoch);
+    f.state.quiescent = true; await f.worker().progressHandoffs();
+    await f.worker().progressHandoffs(); expect((await f.uow.read.handoffs.get(operation.id))?.stage).toBe('preparing');
+    f.prepared(); await f.worker().progressHandoffs();
+    expect((await f.uow.read.slots.get(f.serviceId))?.active).toBe('blue');
+    await f.worker().progressHandoffs();
+    expect((await f.uow.read.slots.get(f.serviceId))?.active).toBe('green');
+    await f.worker().progressHandoffs(); expect(f.state.routeCalls).toBe(0);
+    f.state.routed = true; await f.worker().progressHandoffs();
+    expect(f.state.routeCalls).toBe(1);
+    expect(await f.uow.read.switches.listByService(f.serviceId, 10)).toHaveLength(0);
+    expect((await f.worker().getHandoff(f.actor, f.serviceId, operation.id)).handoff?.stage).toBe('activating');
+    f.state.authority.stage = 'complete'; await f.worker().progressHandoffs();
+    expect((await f.worker().getHandoff(f.actor, f.serviceId, operation.id)).handoff?.stage).toBe('complete');
+    expect(await f.worker().progressHandoffs()).toBe(0);
+    expect(await f.uow.read.switches.listByService(f.serviceId, 10)).toHaveLength(1);
+    expect((await f.start()).id).toBe(operation.id);
+  });
+  test('incompatible task contracts reject before freeze and same key cannot retarget; concurrent starts have one identity', async () => {
+    f = await executionHandoffFixture(); f.state.compatible = false;
+    await expect(f.start()).rejects.toMatchObject({ details: { code: 'task_contract_unsupported' } });
+    expect(f.state.freezeCalls).toBe(0); expect(await f.uow.read.handoffs.active(f.serviceId)).toBeUndefined();
+    f.state.compatible = true;
+    const [a, b] = await Promise.all([f.start(), f.start()]); expect(a.id).toBe(b.id);
+    await expect(switchTrafficUseCase(f.deps)(f.actor, f.serviceId, { ...f.input, reason: 'changed' })).rejects.toMatchObject({ kind: 'conflict' });
+    await expect(switchTrafficUseCase(f.deps)(f.actor, f.serviceId, { ...f.input, requestKey: newResourceId() })).rejects.toMatchObject({ kind: 'conflict' });
+  });
+  test('expired worker claim cannot advance; another worker resumes its durable stage', async () => {
+    f = await executionHandoffFixture(); const operation = await f.start();
+    const claim = await f.uow.read.handoffs.claim(operation.id, 'old'); expect(claim).toBeDefined();
+    expect(await f.worker().progressHandoffs()).toBe(0);
+    await f.database.db.execute(sql`UPDATE release.execution_handoffs SET lease_until = clock_timestamp() - interval '1 second' WHERE id = ${operation.id}`);
+    expect(await f.uow.read.handoffs.settle(claim!, { stage: 'complete' })).toBe(false);
+    f.state.quiescent = true; await f.worker().progressHandoffs();
+    expect(await f.uow.read.handoffs.settle(claim!, { stage: 'complete' })).toBe(false);
+    expect((await f.uow.read.handoffs.get(operation.id))?.stage).toBe('preparing');
+  });
+  test('new preparation epoch invalidates queued route commit; initial empty production slot also follows handoff', async () => {
+    f = await executionHandoffFixture(true); const operation = await f.start();
+    expect(operation.previousReleaseId).toBeUndefined();
+    f.state.quiescent = true; await f.worker().progressHandoffs(); f.prepared(); await f.worker().progressHandoffs();
+    f.state.authority.epoch++; await f.worker().progressHandoffs();
+    expect((await f.uow.read.handoffs.get(operation.id))?.stage).toBe('preparing');
+    expect((await f.uow.read.slots.get(f.serviceId))?.active).toBe('blue');
+    await f.worker().progressHandoffs(); await f.worker().progressHandoffs();
+    expect((await f.uow.read.slots.get(f.serviceId))?.active).toBe('green');
+  });
+  test('changed target and closed destructive maintenance window retain frozen operation', async () => {
+    f = await executionHandoffFixture(); const operation = await f.start();
+    f.state.quiescent = true; await f.worker().progressHandoffs(); f.prepared(); await f.worker().progressHandoffs();
+    const target = f.target;
+    if (target.manifest?.kind !== 'DigitalWorker') throw new Error('fixture manifest');
+    await f.uow.read.releases.update({ ...target, manifest: { ...target.manifest, spec: { ...target.manifest.spec, release: { ...target.manifest.spec.release, migration: { compatibility: 'destructive', destructive: true, rollback: 'blocked' } } } } });
+    f.state.window = false; await f.worker().progressHandoffs();
+    expect((await f.uow.read.handoffs.get(operation.id))?.message).toContain('维护');
+    expect((await f.uow.read.slots.get(f.serviceId))?.active).toBe('blue');
+    f.state.window = true;
+    const slots = (await f.uow.read.slots.get(f.serviceId))!;
+    await f.uow.read.slots.save({ ...slots, green: { ...slots.green, releaseId: f.old.id } });
+    await f.worker().progressHandoffs();
+    expect((await f.uow.read.handoffs.get(operation.id))?.message).toContain('部署已经变化');
+    expect(f.state.routeCalls).toBe(0);
+  });
+});

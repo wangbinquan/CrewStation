@@ -28,7 +28,7 @@ export function pipelineStepUseCase(deps: ReleaseUseCaseDeps) {
         default: return DONE;
       }
     } catch (error) {
-      return ctx.fail(release, isPlatformError(error) ? error.message : String(error));
+      return ctx.fail(await deps.uow.read.releases.getById(release.id) ?? release, isPlatformError(error) ? error.message : String(error));
     }
   };
 }

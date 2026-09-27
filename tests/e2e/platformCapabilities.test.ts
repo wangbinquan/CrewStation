@@ -23,6 +23,7 @@ const ADMIN_PAGES = [
   { path: '/admin/projects', marker: '项目管理', capability: '项目供给与生命周期' },
   { path: '/admin/users', marker: '用户与权限', capability: '用户目录与管理员裁定' },
   { path: '/admin/compute', marker: '算力档位', capability: '算力档位（RFC-001）' },
+  { path: '/admin/runtime-images', marker: '运行镜像目录', capability: '运行镜像的全平台目录（RFC-028）' },
   { path: '/admin/service-plans', marker: '服务套餐', capability: '数字人服务套餐' },
   { path: '/admin/task-profiles', marker: '任务容器套餐', capability: '任务容器套餐' },
   { path: '/admin/projects/resource-templates?kind=service', marker: '全平台共享模板', capability: '项目管理下的共享资源规格模板' },
@@ -40,6 +41,7 @@ const PROJECT_PAGES = [
   { suffix: '/release', marker: '发布与上线', capability: '发布、上线与回退' },
   { suffix: '/operations', marker: '运行与诊断', capability: '健康、日志、事件投递与调用链' },
   { suffix: '/settings', marker: '项目设置', capability: '成员、可见性、配置与资源' },
+  { suffix: '/settings?tab=runtime-images', marker: '运行镜像目录', capability: '项目构建目录与独立运行镜像配置（RFC-028）' },
 ] as const;
 
 afterAll(async () => {

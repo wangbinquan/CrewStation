@@ -23,6 +23,7 @@ export interface RevisionRepository {
 }
 
 export interface CredentialRepository {
+  listForUpdate(profile: string): Promise<ProfileCredential[]>;
   list(profile: string): Promise<ProfileCredential[]>;
   upsert(credential: ProfileCredential): Promise<void>;
   remove(profile: string, id: string, updatedBy: UserId, updatedAt: Date): Promise<void>;

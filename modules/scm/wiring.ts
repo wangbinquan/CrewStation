@@ -22,6 +22,7 @@ import { queryRepositoryUseCases } from './application/queryRepository';
 import { listTemplatesUseCase } from './application/listTemplates';
 import { previewManifestUpgradeUseCase } from './application/previewManifestUpgrade';
 import { sessionCredentialUseCases } from './application/sessionCredentials';
+import { buildSourceUseCases } from './application/buildSources';
 import { repositoryRoutes } from './http/repositoryRoutes';
 import type { TemplateResourceBindings } from './ports/templateSource';
 import type { ScmSettings } from './ports/scmSettings';
@@ -79,6 +80,7 @@ export function createScmModule(deps: ScmModuleDeps): ScmModule {
     ...queryRepositoryUseCases(useCaseDeps),
     createReleaseTag: createReleaseTagUseCase(useCaseDeps),
     ...sessionCredentialUseCases(useCaseDeps),
+    ...buildSourceUseCases(useCaseDeps),
     pushBranch: pushBranchUseCase(useCaseDeps),
   };
   const resolveActor: ActorResolver = async (userId) => ({ userId, isAdmin: await deps.project.isAdmin(userId) });

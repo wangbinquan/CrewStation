@@ -1,3 +1,4 @@
+import type { BusinessUsage } from '@crewstation/contracts';
 // ← agent-workflow `services/runtime/types.ts:129-220` 的 NormalizedEvent 段。
 // 两个 CLI 的 stdout 先归一成这一种事件，再由 agentEventMapping.ts 映射为契约里的 AgentEvent。
 // 与源的差异：
@@ -33,6 +34,7 @@ export interface NormalizedToolCall {
 }
 
 export interface NormalizedEvent {
+  businessUsage?: BusinessUsage;
   kind: NormalizedEventKind;
   /** 贡献给输出的可见文本；无则 null。 */
   text?: string | null;

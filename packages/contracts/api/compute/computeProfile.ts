@@ -1,3 +1,4 @@
+import { BusinessExecutionProofSchema } from '../business/capabilities';
 import { z } from 'zod';
 import { ProfileTestIdSchema, ResourceIdSchema, TaskIdSchema, UserIdSchema } from '../../ids';
 import { BeforeStartErrorSchema, BeforeStartStepsSchema, ConfigFileBindingSchema, EnvNameSchema, RunnerInterpreterSchema, StepIdSchema } from '../../taskrunner/beforeStart';
@@ -112,6 +113,7 @@ export const ProfileTestStageSchema = StartupStageSchema.omit({ kind: true, deta
 
 /** 测试上下文：平台命名空间可达不等于所有项目可达，结果页必须原样注明。 */
 export const ProfileTestContextSchema = z.object({
+  businessExecution: BusinessExecutionProofSchema.optional(),
   kind: z.literal('platform-namespace'),
   taskId: TaskIdSchema.optional(),
   agentId: ResourceIdSchema.optional(),

@@ -16,7 +16,7 @@ import { createEventStream } from './eventStream';
 export const CANCEL_GRACE_MS = 5000;
 
 export abstract class AgentRunBase implements DriverAgentProcess {
-  readonly events: EventStream<AgentEvent> = createEventStream<AgentEvent>();
+  readonly events: EventStream<AgentEvent>;
   protected readonly event: ReturnType<typeof createAgentEventFactory>;
   protected readonly usage: TokenUsage = emptyTokenUsage();
   protected readonly startedAt = Date.now();
@@ -30,6 +30,7 @@ export abstract class AgentRunBase implements DriverAgentProcess {
     protected readonly prepared: PreparedRuntime,
     protected readonly protocol: KnownAgentProtocol,
   ) {
+    this.events = createEventStream<AgentEvent>(spec.businessEvents ? 4 * 1024 * 1024 : undefined);
     this.event = createAgentEventFactory(spec.agentId);
   }
 
@@ -38,7 +39,7 @@ export abstract class AgentRunBase implements DriverAgentProcess {
   protected abstract settle(): Promise<void>;
 
   async cancel(): Promise<void> {
-    if (this.events.closed) return;
+    if (this.events.closed && !this.child) return;
     this.cancelled = true;
     const child = this.child;
     if (child !== undefined) await this.context.host.killTree(child, CANCEL_GRACE_MS);

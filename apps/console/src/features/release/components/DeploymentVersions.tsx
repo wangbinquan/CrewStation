@@ -1,3 +1,4 @@
+import { useExecutionHandoff } from '../model/useExecutionHandoff';
 import { useEffect, useRef } from 'react';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
@@ -47,6 +48,7 @@ export function DeploymentVersions({ projectId, serviceId, canSwitch, actions, o
   const slots = useApiQuery(queryKeys.slots(serviceId), () => api.services.listSlots(serviceId), { refetchOnWindowFocus: true });
   useRecordRefresh(projectId, SLOT_KINDS, slots.refetch);
   const releases = useApiQuery(queryKeys.releases(serviceId), () => api.services.listReleases(serviceId));
+  const handoff = useExecutionHandoff(serviceId);
   const maintenance = useServiceMaintenance(serviceId), lifecycle = useSlotLifecycle(projectId, serviceId, actions);
   const maintenanceEditor = useMaintenanceEditor(maintenance.current, actions);
   const inProgress = !releases.error ? releases.data?.items.find((release) => isInFlight(release.status)) : undefined;
@@ -58,7 +60,7 @@ export function DeploymentVersions({ projectId, serviceId, canSwitch, actions, o
   // 上线还是回退，在核对前按发布记录的创建时间预判（确认面板以核对快照为准）。
   const items = releases.error ? [] : releases.data?.items ?? [], target = items.find((release) => release.id === versions.preview?.releaseId), current = items.find((release) => release.id === versions.prod?.releaseId);
   const rollbackGuess = !!target && !!current && Date.parse(target.createdAt) < Date.parse(current.createdAt);
-  const lifecycleBlocked = !!actions.busy || !known || releases.isPending || !!releases.error || !!inProgress;
+  const lifecycleBlocked = handoff.pending || !!actions.busy || !known || releases.isPending || !!releases.error || !!inProgress;
   const blocked = lifecycleBlocked || !slotCanOpen(versions.preview);
   const autoDone = useRef(false);
   useEffect(() => { if (!autoCheck || autoDone.current || !canSwitch || blocked || snapshot || p.checking) return; autoDone.current = true; void p.check(); }, [autoCheck, canSwitch, blocked, snapshot, p]);
@@ -85,6 +87,8 @@ export function DeploymentVersions({ projectId, serviceId, canSwitch, actions, o
     {canSwitch && snapshot ? <TrafficSwitchDialog traffic={p} snapshot={snapshot} stale={stale} recheckBlocked={blocked} confirmBlocked={!!actions.busy || !canSwitch} /> : null}
     {actions.busy ? <ActionNote tone="neutral">{t('release.actions.busy')}</ActionNote> : null}
     {p.error && !snapshot ? <ActionNote tone="error">{p.error} {t('release.traffic.recovery')}</ActionNote> : null}
+    {handoff.data?.handoff ? <ActionNote tone={handoff.pending ? 'neutral' : 'success'}>{t(`release.handoff.${handoff.data.handoff.stage}`)} {handoff.data.handoff.message}</ActionNote> : null}
+    {handoff.error ? <ActionNote tone="error">{t('release.handoff.readError')} {errorMessage(handoff.error)}</ActionNote> : null}
     {p.done ? <ActionNote tone="success">{p.done}</ActionNote> : null}
   </section>;
 }

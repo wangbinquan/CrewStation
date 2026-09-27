@@ -187,6 +187,7 @@
         "@crewstation/module-release": "workspace:*",
         "@crewstation/module-task-runtime": "workspace:*",
         "@crewstation/persistence": "workspace:*",
+        "@crewstation/secretbox": "workspace:*",
         "drizzle-orm": "0.45.2",
         "hono": "4.13.7",
         "zod": "4.6.2",
@@ -431,6 +432,7 @@
         "@crewstation/module-provisioning": "workspace:*",
         "@crewstation/module-release": "workspace:*",
         "@crewstation/module-resources": "workspace:*",
+        "@crewstation/module-runtime-environment": "workspace:*",
         "@crewstation/module-scm": "workspace:*",
         "@crewstation/module-session": "workspace:*",
         "@crewstation/module-task-runtime": "workspace:*",
@@ -514,6 +516,26 @@
         "@crewstation/http": "workspace:*",
         "@crewstation/kernel": "workspace:*",
         "@crewstation/persistence": "workspace:*",
+        "drizzle-orm": "0.45.2",
+        "hono": "4.13.7",
+        "zod": "4.6.2",
+      },
+      "devDependencies": {
+        "@crewstation/testkit": "workspace:*",
+      },
+    },
+    "modules/runtime-environment": {
+      "name": "@crewstation/module-runtime-environment",
+      "version": "0.0.0",
+      "dependencies": {
+        "@crewstation/contracts": "workspace:*",
+        "@crewstation/http": "workspace:*",
+        "@crewstation/k8s": "workspace:*",
+        "@crewstation/kernel": "workspace:*",
+        "@crewstation/persistence": "workspace:*",
+        "@crewstation/queue": "workspace:*",
+        "@crewstation/resource-runtime": "workspace:*",
+        "dockerfile-ast": "0.7.1",
         "drizzle-orm": "0.45.2",
         "hono": "4.13.7",
         "zod": "4.6.2",
@@ -654,6 +676,7 @@
       "name": "@crewstation/k8s",
       "version": "0.0.0",
       "dependencies": {
+        "@crewstation/contracts": "workspace:*",
         "@crewstation/kernel": "workspace:*",
       },
     },
@@ -909,6 +932,8 @@
 
     "@crewstation/module-resources": ["@crewstation/module-resources@workspace:modules/resources"],
 
+    "@crewstation/module-runtime-environment": ["@crewstation/module-runtime-environment@workspace:modules/runtime-environment"],
+
     "@crewstation/module-scm": ["@crewstation/module-scm@workspace:modules/scm"],
 
     "@crewstation/module-session": ["@crewstation/module-session@workspace:modules/session"],
@@ -1158,6 +1183,8 @@
     "depd": ["depd@2.0.0", "", {}, "sha512-g7nH6P6dyDioJogAAGprGpCtVImJhpPk/roCzdb3fIh61/s/nPsfR6onyMwkCAR/OlC3yBC0lESvUoQEAssIrw=="],
 
     "detect-libc": ["detect-libc@2.1.2", "", {}, "sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ=="],
+
+    "dockerfile-ast": ["dockerfile-ast@0.7.1", "", { "dependencies": { "vscode-languageserver-textdocument": "^1.0.8", "vscode-languageserver-types": "^3.17.3" } }, "sha512-oX/A4I0EhSkGqrFv0YuvPkBUSYp1XiY8O8zAKc8Djglx8ocz+JfOr8gP0ryRMC2myqvDLagmnZaU9ot1vG2ijw=="],
 
     "drizzle-orm": ["drizzle-orm@0.45.2", "", { "peerDependencies": { "@aws-sdk/client-rds-data": ">=3", "@cloudflare/workers-types": ">=4", "@electric-sql/pglite": ">=0.2.0", "@libsql/client": ">=0.10.0", "@libsql/client-wasm": ">=0.10.0", "@neondatabase/serverless": ">=0.10.0", "@op-engineering/op-sqlite": ">=2", "@opentelemetry/api": "^1.4.1", "@planetscale/database": ">=1.13", "@prisma/client": "*", "@tidbcloud/serverless": "*", "@types/better-sqlite3": "*", "@types/pg": "*", "@types/sql.js": "*", "@upstash/redis": ">=1.34.7", "@vercel/postgres": ">=0.8.0", "@xata.io/client": "*", "better-sqlite3": ">=7", "bun-types": "*", "expo-sqlite": ">=14.0.0", "gel": ">=2", "knex": "*", "kysely": "*", "mysql2": ">=2", "pg": ">=8", "postgres": ">=3", "sql.js": ">=1", "sqlite3": ">=5" }, "optionalPeers": ["@aws-sdk/client-rds-data", "@cloudflare/workers-types", "@electric-sql/pglite", "@libsql/client", "@libsql/client-wasm", "@neondatabase/serverless", "@op-engineering/op-sqlite", "@opentelemetry/api", "@planetscale/database", "@prisma/client", "@tidbcloud/serverless", "@types/better-sqlite3", "@types/pg", "@types/sql.js", "@upstash/redis", "@vercel/postgres", "@xata.io/client", "better-sqlite3", "bun-types", "expo-sqlite", "gel", "knex", "kysely", "mysql2", "pg", "postgres", "sql.js", "sqlite3"] }, "sha512-kY0BSaTNYWnoDMVoyY8uxmyHjpJW1geOmBMdSSicKo9CIIWkSxMIj2rkeSR51b8KAPB7m+qysjuHme5nKP+E5Q=="],
 
@@ -1476,6 +1503,10 @@
     "vary": ["vary@1.1.2", "", {}, "sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg=="],
 
     "vite": ["vite@8.3.0", "", { "dependencies": { "lightningcss": "^1.33.0", "picomatch": "^4.0.7", "postcss": "^8.5.28", "rolldown": "~1.2.6", "tinyglobby": "^0.2.17" }, "optionalDependencies": { "fsevents": "~2.3.3" }, "peerDependencies": { "@types/node": "^20.19.0 || >=22.12.0", "@vitejs/devtools": "^0.7.1", "esbuild": "^0.27.0 || ^0.28.0", "jiti": ">=1.21.0", "less": "^4.0.0", "sass": "^1.70.0", "sass-embedded": "^1.70.0", "stylus": ">=0.54.8", "sugarss": "^5.0.0", "terser": "^5.16.0", "tsx": "^4.8.1", "yaml": "^2.4.2" }, "optionalPeers": ["@types/node", "@vitejs/devtools", "esbuild", "jiti", "less", "sass", "sass-embedded", "stylus", "sugarss", "terser", "tsx", "yaml"], "bin": { "vite": "bin/vite.js" } }, "sha512-lhZBVvEHefgE+HQZC9O7EBJgCU/nVzFNl7vkS4RE0APtWLP02/8QVIkQtzBxPquh7lq5/78NHipTj7ODQ6XuyQ=="],
+
+    "vscode-languageserver-textdocument": ["vscode-languageserver-textdocument@1.0.15", "", {}, "sha512-Gsfr9S8LU3S6885cS+NaleasJ0n3V5y/SOTqHCifQiXWFw3G9w9/YItDfwHrlCz+dSZWWZ8ilYVMcJe7Sz7Sxw=="],
+
+    "vscode-languageserver-types": ["vscode-languageserver-types@3.18.4", "", {}, "sha512-nQsacoiijvl0fRf2q28uFDrAVwRhdCa3QveiF7/CX0r18mLR5FU/1WskSsCKOjmEbtteKUnY8x8Yzxop+k0zwg=="],
 
     "w3c-keyname": ["w3c-keyname@2.2.8", "", {}, "sha512-dpojBhNsCNN7T82Tm7k26A6G9ML3NkhDsnw9n/eoxSRlVBB4CEtIQ/KTCLI2Fwf3ataSXRhYFkQi3SlnFwPvPQ=="],
 

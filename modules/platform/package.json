@@ -34,6 +34,7 @@
     "@crewstation/module-provisioning": "workspace:*",
     "@crewstation/module-release": "workspace:*",
     "@crewstation/module-resources": "workspace:*",
+    "@crewstation/module-runtime-environment": "workspace:*",
     "@crewstation/module-scm": "workspace:*",
     "@crewstation/module-session": "workspace:*",
     "@crewstation/module-task-runtime": "workspace:*",

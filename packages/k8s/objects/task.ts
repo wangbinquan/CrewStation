@@ -5,6 +5,8 @@ import type { MiddlewareRef } from './traefik';
 import { ingressRouteObject } from './traefik';
 import type { ContainerSpec } from './workloads';
 import { podObject } from './workloads';
+import type { BusinessStorage } from '@crewstation/contracts';
+import { businessStorageMounts } from './businessStorage';
 
 /**
  * 显式的 Runner 启动路径与 root 身份（RFC-006 §7.3）：管理员以底座构建的镜像里改过的 USER、ENTRYPOINT、CMD
@@ -24,6 +26,7 @@ export interface TaskCheckout {
  * `workload` 是 Pod 的工作负载标签：网关的 Pod 身份索引与项目网络策略认这个名字（业务任务是 `business-task`）。
  */
 export interface TaskPodInput {
+  readonly runtimeInitialization?: true;
   readonly name: string;
   readonly namespace: string;
   readonly taskId: string;
@@ -36,6 +39,7 @@ export interface TaskPodInput {
   readonly resources: { readonly cpu: string; readonly memory: string; readonly storage: string };
   /** 工作目录的卷：任务用自己的 PVC；档位测试用 Pod 内的临时目录（RFC-006 §5.2）。 */
   readonly workVolume: { readonly pvc: string } | { readonly emptyDir: true };
+  readonly businessStorage?: BusinessStorage;
   /** 明文环境变量（旧形状）；新形状的凭据都在 Runner Secret 里，经 `envFromSecret` 引用。 */
   readonly env?: Readonly<Record<string, string>>;
   readonly envFromSecret?: string;
@@ -76,13 +80,15 @@ function checkoutContainer(image: string, source: TaskCheckout, uid: number): Co
 
 /** 任务容器的 Pod：Runner 作 PID 1 之下的主进程，工作卷挂在 /work，有分支时先由 init 容器检出源码。 */
 export function taskPodObject(input: TaskPodInput): K8sObject {
+  if (input.businessStorage && (input.workload !== 'business-task' || !('pvc' in input.workVolume) || input.checkout)) throw new Error('可靠业务执行需要独立业务 PVC 布局且不得检出源码');
+  const business = input.businessStorage && 'pvc' in input.workVolume ? businessStorageMounts({ taskId: input.taskId, image: input.image, workerUid: input.workerUid, pvc: input.workVolume.pvc, storage: input.businessStorage }) : undefined;
   const pod = podObject({
     name: input.name, namespace: input.namespace, image: input.image, imagePullPolicy: 'IfNotPresent', command: [...TASK_RUNNER_COMMAND], runAsUser: 0,
     labels: { [LABELS.project]: input.project, [LABELS.service]: input.service, [LABELS.workload]: input.workload, [LABELS.task]: input.taskId },
-    env: Object.entries(input.env ?? {}).map(([name, value]) => ({ name, value })),
+    env: [...Object.entries(input.env ?? {}).filter(([name]) => !business?.env.some((entry) => entry.name === name) && name !== 'CS_RUNTIME_POD_UID').map(([name, value]) => ({ name, value })), ...(business?.env ?? []), ...(input.runtimeInitialization ? [{ name: 'CS_RUNTIME_POD_UID', valueFrom: { fieldRef: { fieldPath: 'metadata.uid' } } }] : [])],
     resources: { cpu: input.resources.cpu, memory: input.resources.memory, ephemeralStorage: input.resources.storage },
-    volumes: ['emptyDir' in input.workVolume ? { name: 'work', mountPath: '/work', emptyDir: true } : { name: 'work', mountPath: '/work', pvc: input.workVolume.pvc }],
-    ...(input.checkout ? { initContainers: [checkoutContainer(input.image, input.checkout, input.workerUid)] } : {}),
+    volumes: [...(business?.volumes ?? ['emptyDir' in input.workVolume ? { name: 'work', mountPath: '/work', emptyDir: true } : { name: 'work', mountPath: '/work', pvc: input.workVolume.pvc }]), ...(input.runtimeInitialization ? [{ name: 'runtime-initialization', mountPath: '/run/crewstation/runtime-initialization', emptyDir: true }] : [])],
+    ...(business ? { initContainers: [business.init] } : input.checkout ? { initContainers: [checkoutContainer(input.image, input.checkout, input.workerUid)] } : {}),
   });
   for (const [key, value] of Object.entries(input.labels ?? {})) pod.metadata.labels![key] = value;
   if (input.nodeName) (pod.spec as Record<string, unknown>).affinity = { nodeAffinity: { requiredDuringSchedulingIgnoredDuringExecution: { nodeSelectorTerms: [{ matchFields: [{ key: 'metadata.name', operator: 'In', values: [input.nodeName] }] }] } } };

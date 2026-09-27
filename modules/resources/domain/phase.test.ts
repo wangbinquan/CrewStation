@@ -23,6 +23,12 @@ describe('阶段规则（RFC-025 设计 §2.3）', () => {
     expect(computePhase(record({ desired: 'absent', releaseReason: { code: 'user', message: '用户释放' }, children: [] }))).toEqual({ phase: 'stopped', reason: { code: 'user', message: '用户释放' } });
   });
 
+  test('owner release confirmation retains occupancy even when the observation cache has no children', () => {
+    const pending = record({ kind: 'business-workspace', desired: 'absent', children: [], conditions: [cond('ReleasePending', 'true')] });
+    expect(computePhase(pending).phase).toBe('stopping');
+    expect(computePhase({ ...pending, conditions: [cond('ReleasePending', 'false')] }).phase).toBe('stopped');
+  });
+
   test('还没有 Pod：未准备好是排队中，否则分配中；Pod 在建或未就绪是启动中，原因带上等待说明', () => {
     expect(computePhase(record({ kind: 'agent-execution', conditions: [cond('Prepared', 'false')] })).phase).toBe('pending');
     expect(computePhase(record()).phase).toBe('provisioning');

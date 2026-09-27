@@ -1,3 +1,4 @@
+import { launchVersionUseCases } from './application/launchVersions';
 import { precondition } from '@crewstation/kernel';
 import { projectComputePolicyUseCases } from './application/projectComputePolicy';
 import { projectProfileUseCases } from './application/projectProfiles';
@@ -87,8 +88,9 @@ export function createAgentRuntimeModule(deps: AgentRuntimeModuleDeps): AgentRun
     ...profileSettingUseCases(useCaseDeps),
     stopClusterTest: tests.stopClusterTest,
     startTest: tests.startTest, getTest: tests.getTest, runQueuedTest: tests.runQueuedTest,
+    ...launchVersionUseCases(useCaseDeps, resolver.launchMaterial),
     resolve: resolver.resolve, launchMaterial: resolver.launchMaterial, lookupForRelease: resolver.lookupForRelease, listNames: resolver.listNames,
-    runtimeImages: images.runtimeImages, issuePushCredential: images.issuePushCredential, authorizeRegistryRequest: images.authorizeRegistryRequest,
+    runtimeImages: images.runtimeImages, issuePushCredential: images.issuePushCredential, issueBuildPushCredential: images.issueBuildPushCredential, authorizeRegistryRequest: images.authorizeRegistryRequest,
   };
   return { api, http: [computeProfileAdminRoutes(api, deps.isAdmin), computeProfileCatalogRoutes(api), projectComputeRoutes(api, deps.isAdmin)], forwardAuth: [registryForwardAuthRoutes(api)], workers: [testWorker(deps.db, api, logger)], migrations: agentRuntimeMigrations };
 }

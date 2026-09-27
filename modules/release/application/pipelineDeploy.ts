@@ -41,7 +41,7 @@ export function deploySteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): Dep
         if (old?.status === 'ready') await scope.releases.update(advance(old, 'superseded', now));
       }
       const service = manifest.spec.service;
-      const workload = ledger ? { workload: nextWorkload(current, { releaseId: release.id, image: release.image ?? '', command: service.command, port: service.port, healthPath: service.healthPath, replicas, resources: { cpu: plan.cpu, memory: plan.memory } }) } : {};
+      const workload = ledger ? { workload: nextWorkload(current, { releaseId: release.id, image: release.image ?? '', command: service.command, port: service.port, healthPath: service.healthPath, ...(service.probes ? { probes: service.probes } : {}), replicas, resources: { cpu: plan.cpu, memory: plan.memory } }) } : {};
       await scope.slots.save(withSlot(slots, { physical: release.targetSlot, releaseId: release.id, state: 'deploying', replicas, readyReplicas: 0, updatedAt: now, ...workload }, now));
     });
     await ctx.save(release, 'deploying', { manifest, configVersion: env.configVersion, pipeline: { ...release.pipeline, deployStartedAt: now.toISOString() } });
@@ -51,7 +51,7 @@ export function deploySteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): Dep
   const registerReady = async (release: Release, status: { replicas: number; readyReplicas: number }): Promise<void> => {
     const now = clock.now();
     const exposes = release.manifest && release.manifest.kind !== 'EventProducer' ? release.manifest.spec.apis.exposes : undefined;
-    const openapi = exposes ? await deps.repo.readFile(release.serviceId, release.tag, exposes.openapi.replace(/^\.\//, '')) : undefined;
+    const openapi = exposes ? await deps.repo.readFile(release.serviceId, release.commitSha, exposes.openapi.replace(/^\.\//, '')) : undefined;
     await uow.run(async (scope) => {
       const slots = await scope.slots.get(release.serviceId);
       // 待命槽就绪即开始「无人访问」计时（RFC-021 M2）；正式槽不计时。
@@ -59,7 +59,7 @@ export function deploySteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): Dep
       if (slots) await scope.slots.save(withSlot(slots, { ...slots[release.targetSlot], state: 'ready', replicas: status.replicas, readyReplicas: status.readyReplicas, updatedAt: now, ...retention }, now));
       await scope.events.publish(DomainTopic.releaseRegistered, {
         occurredAt: now.toISOString(), projectId: release.projectId, serviceId: release.serviceId, releaseId: release.id, tag: release.tag, commitSha: release.commitSha,
-        manifest: release.manifest as Manifest, ...(openapi ? { openapiDocument: Bun.YAML.parse(openapi) } : {}),
+        executionMaterials: release.pipeline.executionMaterials, manifest: release.manifest as Manifest, ...(openapi ? { openapiDocument: Bun.YAML.parse(openapi) } : {}),
       });
     });
   };

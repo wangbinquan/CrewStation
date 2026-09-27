@@ -125,6 +125,7 @@ main() {
   kc apply \
     -f "${SYSTEM_DIR}/10-postgres.yaml" \
     -f "${SYSTEM_DIR}/20-registry.yaml" \
+    -f "${SYSTEM_DIR}/21-image-build-policy.yaml" \
     -f "${SYSTEM_DIR}/31-traefik-rbac.yaml" \
     -f "${SYSTEM_DIR}/32-traefik.yaml" \
     -f "${SYSTEM_DIR}/40-buildkitd.yaml"

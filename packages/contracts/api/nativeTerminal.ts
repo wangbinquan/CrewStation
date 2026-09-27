@@ -1,3 +1,4 @@
+import { RuntimeImageExecutionSnapshotSchema } from './runtimeImages/responses';
 import { ComputeProfileSelectorSchema } from './compute/computeProfile';
 import { z } from 'zod';
 import { TaskIdSchema, UserIdSchema } from '../ids';
@@ -13,6 +14,8 @@ export const StartNativeTerminalRequestSchema = TerminalSizeSchema.extend({
 }).strict();
 
 export const NativeTerminalDtoSchema = NativeTerminalRecordSchema.extend({
+  image: z.string().optional(),
+  runtimeImage: RuntimeImageExecutionSnapshotSchema.optional(),
   taskId: TaskIdSchema, createdBy: UserIdSchema, clientRequestId: z.uuid(),
   lifecycle: z.enum(['starting', 'running', 'ended', 'failed', 'unknown']),
   connection: z.enum(['connected', 'disconnected', 'unknown']),

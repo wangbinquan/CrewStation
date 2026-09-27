@@ -1,10 +1,17 @@
 import { z } from 'zod';
-import { TaskIdSchema } from '../ids';
+import { ReleaseIdSchema, TaskIdSchema } from '../ids';
 
 /** 服务身份的字符串形式：`<project>/<service>`。 */
 export const ServiceIdentitySchema = z.string().regex(/^[a-z][a-z0-9-]*\/[a-z][a-z0-9-]*$/, '服务身份形如 project/service');
 
 export const WorkloadKindSchema = z.enum(['service', 'dev-session', 'business-task', 'platform']);
+
+/** RFC-027：来自控制器观测的服务 Pod 身份；旧索引没有此证据，不能受理 v3 执行。 */
+export const ServiceSourceBindingSchema = z.strictObject({
+  podUid: z.string().min(1).max(128), ip: z.union([z.ipv4(), z.ipv6()]), releaseId: ReleaseIdSchema,
+  physicalSlot: z.enum(['blue', 'green']), ready: z.boolean(),
+});
+export type ServiceSourceBinding = z.infer<typeof ServiceSourceBindingSchema>;
 
 /**
  * 平台内部头：**不属于**业务接入约定表 `IDENTITY_HEADERS`，业务服务永远收不到。
@@ -20,6 +27,7 @@ export const WorkloadIdentitySchema = z.object({
   /** 两槽之一；开发会话与业务任务无槽。 */
   slot: z.enum(['preview', 'prod']).optional(),
   taskId: TaskIdSchema.optional(),
+  source: ServiceSourceBindingSchema.optional(),
 });
 
 /** Pod 身份索引：cs-controller 按 Pod 创建与删除增量维护，cs-auth 按源 Pod IP 反查。 */

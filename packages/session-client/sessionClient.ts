@@ -1,4 +1,5 @@
-import type { RunnerCommand, RunnerEvent, RunnerHello, TaskId } from '@crewstation/contracts';
+import type { RunnerBusinessEvent, StoredBusinessExecutionDto, RunnerCommand, RunnerEvent, RunnerHello, TaskId } from '@crewstation/contracts';
+import { StoredBusinessExecutionSchema, RunnerResultPayloads } from '@crewstation/contracts';
 import { API_INVOCATION_TIMEOUT_MS, COMPARISON_COMMAND_TIMEOUT_MS, COMPARISON_HISTORY_TIMEOUT_MS, WORKSPACE_COMMAND_TIMEOUT_MS } from '@crewstation/contracts';
 import { PlatformError } from '@crewstation/kernel';
 
@@ -7,6 +8,9 @@ export interface ConnectionStatus { connected: boolean; replica?: string; lastSe
 
 /** 与 cs-session 的 internal 路由一一对应；只在系统命名空间内调用。 */
 export interface SessionClient {
+  consumeBusinessExecution(taskId: TaskId, executionId: string, through: number, stopped?: boolean): Promise<void>;
+  getBusinessExecution(taskId: TaskId, executionId: string): Promise<StoredBusinessExecutionDto>;
+  listBusinessExecutionEvents(taskId: TaskId, executionId: string, after?: number, limit?: number): Promise<RunnerBusinessEvent[]>;
   sendCommand(taskId: TaskId, command: RunnerCommand): Promise<unknown>;
   listEvents(taskId: TaskId, options?: { sinceSeq?: number; kinds?: RunnerEvent['kind'][]; agentId?: string; limit?: number }): Promise<StoredEvent[]>;
   connectionStatus(taskId: TaskId): Promise<ConnectionStatus>;
@@ -20,6 +24,9 @@ export function createSessionClient(baseUrl: string, fetchImpl: typeof fetch = f
     return body;
   };
   return {
+    consumeBusinessExecution: async (taskId, executionId, through, stopped) => { await call(`/internal/tasks/${taskId}/executions/${encodeURIComponent(executionId)}/consumed`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ through, stopped }) }); },
+    getBusinessExecution: async (taskId, executionId) => StoredBusinessExecutionSchema.parse(await call(`/internal/tasks/${taskId}/executions/${encodeURIComponent(executionId)}`)),
+    listBusinessExecutionEvents: async (taskId, executionId, after = 0, limit = 200) => RunnerResultPayloads.businessExecutionEvents.parse((await call<{ items: unknown }>(`/internal/tasks/${taskId}/executions/${encodeURIComponent(executionId)}/events?${new URLSearchParams({ after: String(after), limit: String(limit) })}`)).items),
     sendCommand: async (taskId, command) => (await call<{ payload: unknown }>(`/internal/tasks/${taskId}/commands`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(command), signal: AbortSignal.timeout(commandBudget(command) + 15_000) })).payload,
     listEvents: async (taskId, options = {}) => {
       const params = new URLSearchParams();

@@ -1,6 +1,6 @@
 /** 平台统一错误分类；HTTP 状态码映射在 packages/http，领域代码只关心 kind。 */
 export type ErrorKind =
-  | 'not_found' | 'conflict' | 'forbidden' | 'unauthenticated' | 'validation'
+  | 'payload_too_large' | 'gone' | 'not_found' | 'conflict' | 'forbidden' | 'unauthenticated' | 'validation'
   | 'precondition' | 'quota_exceeded' | 'unavailable' | 'internal';
 
 export class PlatformError extends Error {
@@ -26,3 +26,7 @@ export const precondition = (message: string, details?: Record<string, unknown>)
   new PlatformError('precondition', message, details);
 export const quotaExceeded = (message: string, details?: Record<string, unknown>): PlatformError =>
   new PlatformError('quota_exceeded', message, details);
+
+export const gone = (message: string, details?: Record<string, unknown>): PlatformError => new PlatformError('gone', message, details);
+
+export const payloadTooLarge = (message: string, details?: Record<string, unknown>): PlatformError => new PlatformError('payload_too_large', message, details);

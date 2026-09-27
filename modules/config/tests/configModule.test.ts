@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { Actor, ConfigEnv, ConfigItemDto, ProjectId, UserId } from '@crewstation/contracts';
 import { BUILTIN_RESOURCES, IDENTITY_HEADERS } from '@crewstation/contracts';
 import { eventbusMigrations } from '@crewstation/eventbus';
+import { newResourceId } from '@crewstation/kernel';
 import { createApp } from '@crewstation/http';
 import { createIdentityModule, identityMigrations } from '@crewstation/module-identity';
 import { createProjectModule, projectMigrations } from '@crewstation/module-project';
@@ -53,6 +54,7 @@ beforeAll(async () => {
   projectId = (await project.api.createProject(admin, { slug: 'demo', name: '演示', kind: 'DigitalWorker', ownerUserId: owner.userId, template: BUILTIN_RESOURCES.minimalTemplate })).id;
   await project.api.setMember(owner, projectId, { userId: dev.userId, role: 'developer' });
   config = createConfigModule({ db: tdb.db, project: project.api, settings: { secretKeyBase64 } });
+
 });
 afterAll(async () => { await tdb?.drop(); });
 
@@ -140,4 +142,39 @@ describe.skipIf(!available)('config module', () => {
     expect((await app.request(`/v1/projects/${projectId}/config/staging`, { headers: asUser(owner.userId) })).status).toBe(400);
     expect((await app.request(base)).status).toBe(401);
   });
+  test('显式 Secret 挂载只解密所选定义，生产凭据需要维护权限，普通配置不能伪装成 Secret', async () => {
+    const selected = await writeItem(owner, projectId, { name: 'BUILD_TOKEN', env: 'production', isSecret: true, value: 'scoped-build-token' });
+    const plain = await writeItem(owner, projectId, { name: 'BUILD_URL', env: 'production', isSecret: false, value: 'https://example.test' });
+    const values = await config.api.renderSecretDefinitions(owner, projectId, 'production', [selected.definitionId]);
+    expect(values).toEqual({ [selected.definitionId]: 'scoped-build-token' });
+    await expect(config.api.renderSecretDefinitions(dev, projectId, 'production', [selected.definitionId])).rejects.toMatchObject({ kind: 'forbidden' });
+    await expect(config.api.renderSecretDefinitions(owner, projectId, 'production', [plain.definitionId])).rejects.toMatchObject({ kind: 'not_found' });
+    await expect(config.api.renderSecretDefinitions(owner, projectId, 'development', [selected.definitionId])).rejects.toMatchObject({ kind: 'not_found' });
+    await expect(config.api.renderSecretDefinitions(stranger, projectId, 'production', [selected.definitionId])).rejects.toMatchObject({ kind: 'not_found' });
+  });
+  test('Secret 版本戳按所选项变化，不泄露值，权限与显式挂载一致', async () => {
+    const item = await writeItem(owner, projectId, { name: 'INIT_TOKEN', env: 'production', isSecret: true, value: 'secret-v1' });
+    const initial = await config.api.secretDefinitionVersions(owner, projectId, 'production', [item.definitionId]);
+    expect(initial).toEqual([{ definitionId: item.definitionId, itemId: item.id, version: item.version }]);
+    await writeItem(owner, projectId, { name: 'UNRELATED', env: 'production', isSecret: false, value: 'x' });
+    expect(await config.api.secretDefinitionVersions(owner, projectId, 'production', [item.definitionId])).toEqual(initial);
+    await writeItem(owner, projectId, { name: 'INIT_TOKEN', env: 'production', isSecret: true, value: 'secret-v2' });
+    expect(await config.api.secretDefinitionVersions(owner, projectId, 'production', [item.definitionId])).not.toEqual(initial);
+    await expect(config.api.secretDefinitionVersions(dev, projectId, 'production', [item.definitionId])).rejects.toMatchObject({ kind: 'forbidden' });
+    expect(JSON.stringify(initial)).not.toContain('secret-v1');
+  });
+
+  test('初始化 Secret 固定版本回放，轮换不漂移，错误身份和普通配置不能读取', async () => {
+    const item = await writeItem(owner, projectId, { name: 'PINNED_INIT', env: 'production', isSecret: true, value: 'original-init' });
+    const stamps = await config.api.secretDefinitionVersions(owner, projectId, 'production', [item.definitionId]);
+    await writeItem(owner, projectId, { name: 'PINNED_INIT', env: 'production', isSecret: true, value: 'rotated-init' });
+    expect(await config.api.renderPinnedSecretDefinitions(projectId, 'production', stamps)).toEqual({ [item.definitionId]: 'original-init' });
+    expect(await config.api.renderSecretDefinitions(owner, projectId, 'production', [item.definitionId])).toEqual({ [item.definitionId]: 'rotated-init' });
+    await expect(config.api.renderPinnedSecretDefinitions(projectId, 'development', stamps)).rejects.toMatchObject({ kind: 'not_found' });
+    await expect(config.api.renderPinnedSecretDefinitions(projectId, 'production', [{ ...stamps[0]!, itemId: newResourceId() }])).rejects.toMatchObject({ kind: 'not_found' });
+    await expect(config.api.renderPinnedSecretDefinitions(projectId, 'production', [...stamps, ...stamps])).rejects.toMatchObject({ kind: 'validation' });
+    const plain = await writeItem(owner, projectId, { name: 'PINNED_PLAIN', env: 'production', isSecret: false, value: 'plain' });
+    await expect(config.api.renderPinnedSecretDefinitions(projectId, 'production', [{ definitionId: plain.definitionId, itemId: plain.id, version: plain.version }])).rejects.toMatchObject({ kind: 'not_found' });
+  });
+
 });

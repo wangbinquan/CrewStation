@@ -1,3 +1,4 @@
+import { precondition } from '@crewstation/kernel';
 import type { K8sClient, K8sObject, PodEventLike } from '@crewstation/k8s';
 import { LABELS, Resources, podStartup, pvcObject } from '@crewstation/k8s';
 import type { PodPhaseReading, TaskCluster } from '../../ports/cluster';
@@ -79,6 +80,12 @@ export function kubernetesTaskCluster(k8s: K8sClient, workerUid: number): TaskCl
         await k8s.delete(Resources.IngressRoute!, routeName, env.namespace);
       }
     },
-    deleteVolume: async (env) => { await k8s.delete(Resources.PersistentVolumeClaim!, env.pvcName, env.namespace); },
+    deleteVolume: async (env) => {
+      if (!env.render?.businessStorage) { await k8s.delete(Resources.PersistentVolumeClaim!, env.pvcName, env.namespace); return; }
+      const volume = await k8s.get(Resources.PersistentVolumeClaim!, env.pvcName, env.namespace);
+      if (!volume) return;
+      if (!volume.metadata.uid || volume.metadata.labels?.[LABELS.task] !== env.id || (env.businessWorkspace && volume.metadata.uid !== env.businessWorkspace.volumeUid)) throw precondition('业务工作卷实例或归属已变化，停止删除');
+      await k8s.delete(Resources.PersistentVolumeClaim!, env.pvcName, env.namespace, { preconditions: { uid: volume.metadata.uid } });
+    },
   };
 }

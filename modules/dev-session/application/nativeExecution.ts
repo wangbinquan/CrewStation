@@ -5,6 +5,7 @@ import { composeCliStartup } from '../domain/nativeTerminalProjection';
 import type { NativeTerminalRepository, NativeTerminalStart } from '../ports/nativeTerminals';
 import type { EnvironmentView } from '../ports/runtime';
 import type { DevSessionUseCaseDeps } from './dependencies';
+import { restoreDevelopmentImage } from './runtimeImageSelection';
 import { profileLaunchFields } from './profileLaunch';
 
 export const nativeEnded = (record: Pick<NativeTerminalRecord, 'lifecycle'>) => record.lifecycle === 'ended' || record.lifecycle === 'failed';
@@ -33,8 +34,10 @@ export class NativeExecutionLifecycle {
   }
   private async admit(start: NativeTerminalStart): Promise<EnvironmentView | undefined> {
     try {
+      await restoreDevelopmentImage(this.deps, start.execution!.runtimeImage, start.taskId, start.execution!.previousTaskId, start.execution!.taskId);
       return await this.deps.environments.createNativeExecution({ id: start.execution!.taskId, parentTaskId: start.taskId, purpose: 'cli', createdBy: start.createdBy, agentId: start.record.agentId,
         terminalId: start.record.terminalId, runnerId: start.record.runnerId, fingerprint: start.fingerprint, ...(start.execution!.taskProfile ? { profile: start.execution!.taskProfile } : {}),
+        ...(start.execution!.runtimeImage ? { runtimeImage: start.execution!.runtimeImage } : {}),
         ...(start.execution!.image ? { image: start.execution!.image } : {}), ...(start.profile ? { computeProfile: { profileId: start.profile.profileId, revision: start.profile.revision } } : {}) });
     } catch (error) {
       if (!isPlatformError(error) || !rejected(error)) throw error;
@@ -77,7 +80,7 @@ export class NativeExecutionLifecycle {
       const ready = record.ui ? record.ui.state === 'ready' : startup ? startup.state === 'ready' : record.lifecycle === 'running';
       await this.deps.executions?.reportInterface(start.execution!.taskId, ready);
     }
-    return { ...record, lifecycle, taskId: start.taskId, createdBy: start.createdBy, clientRequestId: start.clientRequestId, connection,
+    return { image: start.execution!.image, ...(start.execution?.runtimeImage ? { runtimeImage: start.execution.runtimeImage } : {}), ...record, lifecycle, taskId: start.taskId, createdBy: start.createdBy, clientRequestId: start.clientRequestId, connection,
       ...(startup ? { startup: { ...startup, observedAt: this.deps.clock.now().toISOString() } } : {}),
       execution: { taskId: start.execution!.taskId, state: env?.native?.state ?? (nativeEnded(record) ? 'finished' : 'queued'), profile: env?.native?.profile, message: start.execution!.stopRequested && !nativeEnded(record) ? '正在结束此 CLI' : env?.message },
       ...(nativeEnded(record) ? { finalScreen: start.execution!.screen ?? 'pending' } : {}) };
@@ -179,7 +182,7 @@ export class NativeExecutionLifecycle {
       // 明确停止也能取消调度等待；持久清理只影响本次执行。
       await this.finishRecord(start, 'stopped');
       await this.cleanup((await this.repo.findExecution(executionId))!, env);
-    } else if (observed.connection === 'connected' && start.record.lifecycle === 'starting') {
+    } else if (observed.connection === 'connected' && env.state === 'running' && start.record.lifecycle === 'starting') {
       try { await this.startCommand(start, env); }
       catch (error) {
         if (isPlatformError(error) && ['pty_unavailable', 'terminal_limit', 'terminal_exists', 'native_request_conflict'].includes(String(error.details.code))) await this.finishRecord(start, 'start-failed', error.message);

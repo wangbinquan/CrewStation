@@ -1,3 +1,6 @@
+import type { ServiceProbes } from '@crewstation/contracts';
+import { ServiceProbesSchema } from '@crewstation/contracts';
+
 /**
  * 服务槽记录（RFC-025 T8）里调和器建出工作负载要用的期望，release 写、不含配置与密钥：镜像、启动命令、端口、健康检查路径、副本、资源，
  * 这一次部署的环境 Secret 名（`<服务>-<物理槽>-env-<第几次部署>`，内容建的时候向 release 要），运维重启的标记。
@@ -18,6 +21,7 @@ export interface SlotRender {
   readonly command: readonly string[];
   readonly port: number;
   readonly healthPath: string;
+  readonly probes?: ServiceProbes;
   readonly replicas: number;
   readonly resources: { readonly cpu: string; readonly memory: string };
   readonly restartedAt?: string;
@@ -50,10 +54,12 @@ export function slotRenderOf(spec: Spec): SlotRender | undefined {
   const command = slot['command'], resources = slot['resources'], restartedAt = slot['restartedAt'];
   if (!Array.isArray(command) || !command.length || !command.every(text) || !isFields(resources) || !text(resources['cpu']) || !text(resources['memory'])) return undefined;
   if (restartedAt !== undefined && !text(restartedAt)) return undefined;
+  const probes = slot['probes'] === undefined ? undefined : ServiceProbesSchema.safeParse(slot['probes']);
+  if (probes && !probes.success) return undefined;
   const names = namesOf(spec, slot);
   if (!names) return undefined;
   return {
-    ...names, serviceId: slot['serviceId'] as string, project: slot['project'] as string, service: slot['service'] as string, physical: slot['physical'], releaseId: slot['releaseId'] as string,
+    ...names, ...(probes?.success ? { probes: probes.data } : {}), serviceId: slot['serviceId'] as string, project: slot['project'] as string, service: slot['service'] as string, physical: slot['physical'], releaseId: slot['releaseId'] as string,
     revision: slot['revision'] as number, image: slot['image'] as string, command: [...command] as string[], port: slot['port'] as number, healthPath: slot['healthPath'] as string,
     replicas: slot['replicas'] as number, resources: { cpu: resources['cpu'] as string, memory: resources['memory'] as string }, ...(text(restartedAt) ? { restartedAt } : {}),
   };

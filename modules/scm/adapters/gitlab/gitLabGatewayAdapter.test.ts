@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
 import type { GitLabClient, GitLabProject } from '@crewstation/gitlab-client';
+import { createGitLabClient, GITLAB_ACCESS_LEVEL } from '@crewstation/gitlab-client';
 import { PlatformError } from '@crewstation/kernel';
 import { gitLabGatewayAdapter } from './gitLabGatewayAdapter';
 
@@ -23,4 +24,33 @@ test('远端项目带回 GitLab 自报的网页地址（浏览器打开用），
 test('远端不存在时 findProject 返回 undefined；其他错误照样抛出', async () => {
   expect(await gitLabGatewayAdapter(stubClient(async () => { throw new PlatformError('not_found', 'GitLab 项目不存在'); })).findProject('crewstation/none')).toBeUndefined();
   await expect(gitLabGatewayAdapter(stubClient(async () => { throw new PlatformError('unavailable', 'GitLab 不可达'); })).findProject('crewstation/demo')).rejects.toMatchObject({ kind: 'unavailable' });
+});
+
+test('构建令牌只有 read_repository 与 reporter 权限，开发会话原有读写权限保留', async () => {
+  const bodies: Array<Record<string, unknown>> = [];
+  const client = createGitLabClient({ baseUrl: 'https://gitlab.test', token: 'platform', fetch: (async (_url, init) => {
+    bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+    return Response.json({ id: 7, name: 'build', token: 'one-time', scopes: ['read_repository'], active: true, revoked: false, expires_at: '2026-09-28' });
+  }) as typeof fetch });
+  const gateway = gitLabGatewayAdapter(client);
+  expect(await gateway.createAccessToken('42', { name: 'build', expiresOn: '2026-09-28', readOnly: true })).toEqual({ id: '7', token: 'one-time' });
+  expect(bodies[0]).toMatchObject({ scopes: ['read_repository'], access_level: GITLAB_ACCESS_LEVEL.reporter });
+  await gateway.createAccessToken('42', { name: 'session', expiresOn: '2026-09-28' });
+  expect(bodies[1]).toMatchObject({ scopes: ['read_repository', 'write_repository'], access_level: GITLAB_ACCESS_LEVEL.developer });
+});
+
+test('源码引用与 Git tree 请求固定同一 SHA，不存在的提交返回 undefined', async () => {
+  const urls: string[] = [], sha = 'c'.repeat(40);
+  const client = createGitLabClient({ baseUrl: 'https://gitlab.test', token: 'platform', fetch: (async (input) => {
+    const url = String(input); urls.push(url);
+    if (url.includes('missing')) return Response.json({ message: '404' }, { status: 404 });
+    if (url.includes('/tree')) return Response.json([{ path: 'Dockerfile', type: 'blob', mode: '100644', id: 'x', name: 'Dockerfile' }]);
+    return Response.json({ id: sha, title: 'snapshot', message: '', author_name: '', author_email: '', authored_date: '', committed_date: '' });
+  }) as typeof fetch });
+  const gateway = gitLabGatewayAdapter(client);
+  expect(await gateway.resolveCommit('42', 'main')).toBe(sha);
+  expect(await gateway.listTree('42', sha)).toHaveLength(1);
+  expect(urls[1]).toContain(`ref=${sha}`);
+  expect(urls[1]).toContain('recursive=true');
+  expect(await gateway.resolveCommit('42', 'missing')).toBeUndefined();
 });

@@ -15,12 +15,12 @@ export class ChainedAgentRun extends AgentRunBase {
 
   constructor(spec: DriverAgentSpec, context: DriverLaunchContext, prepared: PreparedRuntime, protocol: KnownAgentProtocol) {
     super(spec, context, prepared, protocol);
-    this.turn = this.begin();
+    this.turn = this.begin().catch((error) => { this.events.fail(error); });
   }
 
   async send(text: string): Promise<void> {
     this.assertCanSend();
-    this.turn = this.turn.then(() => this.runTurn(text));
+    this.turn = this.turn.then(() => this.runTurn(text)).catch((error) => { this.events.fail(error); throw error; });
     await this.turn;
   }
 
@@ -54,6 +54,7 @@ export class ChainedAgentRun extends AgentRunBase {
     }
     this.child = child;
     const result = await pumpTurn(child, {
+      businessEvents: this.spec.businessEvents,
       host: this.context.host,
       logger: this.context.logger,
       usage: this.usage,

@@ -20,7 +20,8 @@ function setup(options: { readonly layout?: WorkspaceLayout; readonly roster?: N
   globalThis.fetch = (async (raw: RequestInfo | URL, init?: RequestInit) => {
     const url = String(raw), method = init?.method ?? 'GET';
     let body: unknown = {}, status = 200;
-    if (url.endsWith('/workspace-layout')) {
+    if (url.endsWith('/development-runtime-images')) body = { projectId: 'project-1', revision: 0, developmentTask: {}, developmentAgents: [] };
+    else if (url.endsWith('/workspace-layout')) {
       if (method === 'PUT') { const input = JSON.parse(String(init?.body)); body = { layout: input.layout, revision: input.expectedRevision + 1, updatedAt: '2026-09-13T00:00:00.000Z' }; }
       else body = options.layout ? { revision: 1, layout: options.layout, updatedAt: '2026-09-13T00:00:00.000Z' } : { revision: 0, layout: null, updatedAt: null };
     } else if (url.endsWith('/agent-terminals')) {
@@ -40,7 +41,7 @@ test('主键按记住的档位直接创建；展开菜单只换档位，没有�
   const caret = summaries().find((node) => node.textContent === '选择算力档位')!;
   expect(caret).toBeDefined(); await act(async () => caret.click()); await page.settle();
   const menu = caret.closest('details')!;
-  expect(menu.querySelectorAll('select')).toHaveLength(1); expect(menu.querySelector('select[aria-label="算力档位"]')).not.toBeNull();
+  expect(menu.querySelectorAll('select')).toHaveLength(2); expect(menu.querySelector('select[aria-label="算力档位"]')).not.toBeNull();
   for (const gone of ['权限', '只读', '可改文件', '完全权限', '控制 CLI 可以执行的操作']) expect(menu.textContent).not.toContain(gone);
   await page.click('创建开发Agent会话');
   expect(f.starts).toHaveLength(1); expect(f.starts[0]).not.toHaveProperty('permission'); expect(page.text()).toContain('演示拒绝');

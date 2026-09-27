@@ -1,3 +1,4 @@
+import { stageBusinessSkills, nativeSkillRoots } from '../../injection/businessSkills';
 // ← agent-workflow `runtime/opencode/driver.ts` 的装配段（`assembleOpencodePersonaSpawn`）。
 // 不复制的部分：清单插件物化、skill staging、工作区边界、SQLite 会话捕获、模型列举、
 // `AGENT_WORKFLOW_OPENCODE_BIN` ／ `OPENCODE_PURE` 环境开关（依据见包根 index.ts）。
@@ -17,7 +18,7 @@ import type { CliRuntimeAdapter, PreparedRuntime } from '../cliRuntimeAdapter';
 import { createCliAgentDriver } from '../cliAgentDriver';
 import { OPENCODE_AGENT_NAME, buildOpencodeArgv } from './argv';
 import { OPENCODE_INLINE_CONFIG_WARN_BYTES, buildOpencodeEnv, opencodeConfigDirName } from './env';
-import { materializeOpencodeConfig } from './managedConfig';
+import { readManagedOpencodeConfig, materializeOpencodeConfig } from './managedConfig';
 import { parseEvent } from './events';
 import { detectOpencodeSessionNotFound, ensureOpencodeBinaryVersion } from './probe';
 
@@ -55,6 +56,14 @@ async function prepareOpencode(spec: DriverAgentSpec, context: DriverLaunchConte
   await materializeOpencodeConfig(env, context.managed, runDir);
   // auto-approve flag 的拼写在 1.18.0 改过，拼错会让每次拉起都只剩一整块 usage ＋ exit 1，所以先探版本。
   const binaryVersion = await ensureOpencodeBinaryVersion(context.host, head, { cwd: context.cwd, env: context.env, logger: context.logger });
+  const adminSkills = (await readManagedOpencodeConfig(context.managed))?.skills as { paths?: unknown } | undefined;
+  const adminPaths = Array.isArray(adminSkills?.paths) ? adminSkills.paths.filter((value): value is string => typeof value === 'string') : [];
+  const skills = await stageBusinessSkills(spec.businessSkills, context.host, [...nativeSkillRoots(context.cwd, context.managed?.home ?? context.env.HOME ?? '/', context.env.XDG_CONFIG_HOME), ...adminPaths]);
+  if (skills) {
+    const config = JSON.parse(env.OPENCODE_CONFIG_CONTENT ?? '{}');
+    config.skills = { ...(config.skills ?? {}), paths: [...new Set([...adminPaths, ...(config.skills?.paths ?? []), skills.skills])] };
+    env.OPENCODE_CONFIG_CONTENT = JSON.stringify(config);
+  }
   return {
     plan: (input) => ({
       cmd: buildOpencodeArgv(
@@ -72,7 +81,7 @@ async function prepareOpencode(spec: DriverAgentSpec, context: DriverLaunchConte
     }),
     parseEvent,
     detectSessionNotFound: detectOpencodeSessionNotFound,
-    dispose: () => runDir.dispose(),
+    dispose: () => { skills?.dispose(); runDir.dispose(); },
   };
 }
 

@@ -1,4 +1,6 @@
+import type { BusinessReleaseMaterials } from '@crewstation/contracts';
 import type { ClusterCommand } from '../../ports/clusterCommands';
+import type { TasksSpec } from '@crewstation/contracts';
 import { integer, text, timestamp } from 'drizzle-orm/pg-core';
 import { jsonDocument } from '@crewstation/persistence';
 import { businessTaskSchema } from './schema';
@@ -43,6 +45,8 @@ export const subtasks = businessTaskSchema.table('subtasks', {
 });
 
 export const contracts = businessTaskSchema.table('contracts', {
+  releaseMaterials: jsonDocument('release_materials').$type<BusinessReleaseMaterials>(),
+  tasksSpec: jsonDocument('tasks_spec').$type<TasksSpec>(),
   releaseId: text('release_id').primaryKey(),
   serviceId: text('service_id').notNull(),
   tag: text('tag').notNull(),

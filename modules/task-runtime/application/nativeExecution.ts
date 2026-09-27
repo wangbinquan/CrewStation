@@ -1,6 +1,6 @@
 import type { TaskId } from '@crewstation/contracts';
-import { DomainTopic } from '@crewstation/contracts';
-import { conflict, notFound, precondition } from '@crewstation/kernel';
+import { DomainTopic, RuntimeImageExecutionSnapshotSchema } from '@crewstation/contracts';
+import { conflict, jsonHash, notFound, precondition } from '@crewstation/kernel';
 import type { CreateNativeExecutionInput, ReleaseReason } from '../api/moduleApi';
 import { cancelStartup, completeStage, failStartup, initialStartup } from '../domain/podStartup';
 import { hashRunnerToken, newRunnerToken } from '../domain/runnerToken';
@@ -18,7 +18,7 @@ export const requireExecutionLease = async (heartbeat: ExecutionLease) => { if (
 function sameRequest(env: TaskEnvironment, input: CreateNativeExecutionInput): boolean {
   const n = env.native;
   return !!n && purposeOf(n) === (input.purpose ?? 'cli') && n.parentTaskId === input.parentTaskId && env.createdBy === input.createdBy && n.agentId === input.agentId
-    && n.terminalId === input.terminalId && n.runnerId === input.runnerId && n.fingerprint === input.fingerprint && n.requestedProfile === (input.profile ?? null);
+    && n.terminalId === input.terminalId && n.runnerId === input.runnerId && n.fingerprint === input.fingerprint && n.requestedProfile === (input.profile ?? null) && jsonHash(env.render?.runtimeImage ?? null) === jsonHash(input.runtimeImage ?? null) && jsonHash(env.render?.businessStorage?.session ?? null) === jsonHash(input.businessSession ?? null);
 }
 
 /** 各用途的父任务种类与被拒时给用户的话（RFC-006 §5.2）：额度满只影响这一个 Agent。 */
@@ -31,6 +31,11 @@ const ADMISSION: Record<ExecutionPurpose, { parentKind: TaskEnvironment['kind'];
 /** 受理只登记意图。配额、不可变执行身份与队列在同一项目事务中提交。 */
 export function createNativeExecutionUseCase(deps: NativeExecutionDeps) {
   return async (input: CreateNativeExecutionInput): Promise<TaskEnvironment> => {
+    if (input.runtimeImage) {
+      RuntimeImageExecutionSnapshotSchema.parse(input.runtimeImage);
+      if (deps.creation !== 'ledger') throw precondition('运行镜像需要资源台账准入');
+      if (input.image && input.image !== input.runtimeImage.image) throw precondition('档位镜像与显式运行镜像冲突');
+    }
     const purpose = input.purpose ?? 'cli', rule = ADMISSION[purpose];
     const original = await deps.uow.read.environments.getById(input.parentTaskId);
     if (!original) throw notFound(rule.parentLabel, input.parentTaskId);
@@ -41,8 +46,11 @@ export function createNativeExecutionUseCase(deps: NativeExecutionDeps) {
         if (!sameRequest(previous, input)) throw conflict(`该${EXECUTION_NOUN[purpose]}执行标识已用于另一份启动配置`);
         return previous;
       }
+      if (await scope.admissions.blocked(input.id)) throw conflict('业务执行准入已取消', { code: 'admission_cancelled' });
       const parent = await scope.environments.getById(input.parentTaskId);
       if (!parent || parent.native || parent.kind !== rule.parentKind || parent.state !== 'running' || !parent.connected) throw precondition(rule.unavailable);
+      if (input.businessSession && (!parent.render?.businessStorage || purpose !== 'subtask' || (input.businessSession.mode === 'create' && input.businessSession.key !== input.id))) throw precondition('原生会话必须绑定隔离业务卷和独立 Agent 身份');
+      if (parent.render?.businessStorage && deps.creation !== 'ledger') throw precondition('隔离业务卷不支持回退到旧执行容器创建路径');
       const profile = await deps.profiles.getTaskProfile(input.profile ?? deps.settings.defaultProfile);
       if (!profile) throw precondition(`算力档位指定的资源套餐 ${input.profile ?? deps.settings.defaultProfile} 不存在，请联系管理员调整算力档位`);
       const workspace = await deps.nativeCluster.inspectWorkspace(parent);
@@ -63,14 +71,14 @@ function executionEnvironment(deps: NativeExecutionDeps, input: CreateNativeExec
   const purpose = input.purpose ?? 'cli', now = deps.clock.now();
   const native: NativeExecution = { ...(purpose === 'cli' ? {} : { purpose }), parentTaskId: parent.id, parentPodUid: workspace.podUid, pvcUid: workspace.pvcUid, nodeName: workspace.nodeName,
     agentId: input.agentId, ...(input.terminalId ? { terminalId: input.terminalId } : {}), runnerId: input.runnerId, fingerprint: input.fingerprint, requestedProfile: input.profile ?? null,
-    profile: { id: profile.id, name: profile.name, cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, image: input.image ?? deps.settings.taskImage,
+    profile: { id: profile.id, name: profile.name, cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, image: input.runtimeImage?.image ?? input.image ?? deps.settings.taskImage,
     ...(input.computeProfile ? { computeProfile: input.computeProfile } : {}), state: 'queued' };
   return { id: input.id, projectId: parent.projectId, serviceId: parent.serviceId, kind: parent.kind, state: 'creating',
     volumeMode: 'persistent', profile: profile.id, namespace: parent.namespace, podName: `${ADMISSION[purpose].podPrefix}-${input.id.replaceAll('-', '')}`, pvcName: parent.pvcName,
     traceId: parent.traceId, runnerTokenHash: hashRunnerToken(newRunnerToken()), connected: false, labels: parent.labels, ...(input.createdBy ? { createdBy: input.createdBy } : {}),
     native, message: `已受理，正在准备此${EXECUTION_NOUN[purpose]}的独立执行环境`, createdAt: now, updatedAt: now, lastActivityAt: now, startup: initialStartup(now),
     // 资源中心建出时的期望（I25 第二步，不含凭据）：镜像与资源取自受理时固定的档位；节点、父 Pod 与卷的 UID 在 native 里。
-    ...(deps.creation === 'ledger' ? { render: { image: native.image, workerUid: deps.settings.workerUid, resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, start: 1, execution: { workspacePod: parent.podName } } } : {}) };
+    ...(deps.creation === 'ledger' ? { render: { ...(input.runtimeImage ? { runtimeImage: input.runtimeImage } : {}), image: native.image, workerUid: parent.render?.businessStorage ? parent.render.workerUid : deps.settings.workerUid, resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, start: 1, execution: { workspacePod: parent.podName }, ...(parent.render?.businessStorage ? { businessStorage: { ...parent.render.businessStorage, ...(input.businessSession ? { session: input.businessSession } : {}) } } : {}) } } : {}) };
 }
 
 /** 准备执行环境反复失败时给用户的话：只说这一个 Agent，不牵连其他 Agent、窗口与工作树。 */
@@ -103,8 +111,8 @@ export async function deferWorkspaceRelease(scope: RepositoryScope, env: TaskEnv
   if (env.native) return scheduleExecutionCleanup(scope, env, now);
   if (env.state === 'releasing' && env.release) { await scope.nativeQueue.enqueue(env.id); return env; }
   const children = (await scope.environments.listChildren(env.id)).filter((child) => child.native?.state !== 'finished');
-  if (!children.length) return undefined;
-  const releasing = transition(env, 'releasing', now, { connected: false, release: { reason, occupied: occupiesQuota(env.state) }, message: '正在结束 CLI 并释放工作区' });
+  if (!children.length && !env.render?.businessStorage) return undefined;
+  const releasing = transition(env, 'releasing', now, { connected: false, ...(env.businessWorkspace ? { businessWorkspace: { ...env.businessWorkspace, phase: 'ready' } } : {}), release: { reason, occupied: occupiesQuota(env.state) }, message: '正在结束执行并释放工作区' });
   await scope.environments.update(releasing);
   for (const child of children) await scheduleExecutionCleanup(scope, child, now);
   await scope.nativeQueue.enqueue(env.id);
@@ -152,7 +160,10 @@ export async function cleanupWorkspace(deps: NativeExecutionDeps, scope: Reposit
   await requireExecutionLease(heartbeat);
   await deps.cluster.deletePod(env);
   if ((await deps.cluster.podPhase(env)).phase !== 'Missing') throw new Error('等待工作区容器退出');
-  if (env.volumeMode === 'follow-container') await deps.cluster.deleteVolume(env);
+  if (env.volumeMode === 'follow-container') {
+    await deps.cluster.deleteVolume(env);
+    if (env.render?.businessStorage && (!deps.businessStorageInspector || (await deps.businessStorageInspector.inspect(env)).volume)) throw new Error('等待业务工作卷回收确认');
+  }
   await requireExecutionLease(heartbeat);
   const now = deps.clock.now(), reason = env.release!.reason;
   await scope.environments.update(transition(env, 'released', now, { release: undefined, message: `released: ${reason}` }));

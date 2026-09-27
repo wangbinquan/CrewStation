@@ -124,3 +124,25 @@ test('执行环境：父工作区的 Pod 或卷没了（工作区重建换了 Po
     expect(h.queued).toEqual([]);
   }
 });
+
+
+test('初始化镜像释放后不再创建 Pod，租约取消传到 Runner Secret 与 Pod 操作', async () => {
+  const h = harness(['PersistentVolumeClaim/cs-demo/task-1-work']);
+  const current = record({ spec: { children: record({}).spec.children, pod: { ...pod, runtimeInitialization: true } } });
+  let desired: 'present' | 'absent' = 'present';
+  h.deps.ledger.get = async () => ({ ...current, desired });
+  const controller = new AbortController();
+  h.deps.cluster.ensureRunnerSecret = async (_pod, _values, signal) => {
+    expect(signal).toBe(controller.signal); h.calls.push('secret'); desired = 'absent'; return { uid: 'secret', created: true };
+  };
+  await applyWorkload({ ...h.deps, signal: controller.signal }, current, h.enqueue);
+  expect(h.calls).toEqual(['secret']);
+  h.calls.length = 0;
+  await applyWorkload({ ...h.deps, signal: controller.signal }, current, h.enqueue);
+  expect(h.calls).toEqual([]);
+  desired = 'present';
+  h.deps.cluster.ensureRunnerSecret = async () => ({ uid: 'secret', created: false });
+  h.deps.cluster.ensurePod = async (_pod, signal) => { expect(signal).toBe(controller.signal); h.calls.push('pod'); return { uid: 'pod', created: true }; };
+  await applyWorkload({ ...h.deps, signal: controller.signal }, current, h.enqueue);
+  expect(h.calls).toContain('pod');
+});

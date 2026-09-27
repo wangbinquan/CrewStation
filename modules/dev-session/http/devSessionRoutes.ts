@@ -1,3 +1,4 @@
+import { OpenDevSessionV2RequestSchema, StartDevAgentV2RequestSchema } from '@crewstation/contracts';
 import type { ProjectId, TaskId, UserId } from '@crewstation/contracts';
 import { OpenDevSessionRequestSchema, ProjectIdSchema, PublishDevSessionRequestSchema, SendAgentMessageRequestSchema, StartDevAgentRequestSchema, TaskIdSchema } from '@crewstation/contracts';
 import { ComparisonDetailQuerySchema, ComparisonTargetSchema } from '@crewstation/contracts';
@@ -20,6 +21,7 @@ export function devSessionRoutes(api: DevSessionModuleApi, isAdmin: (userId: Use
   const actor = async (c: Context<AppEnv>) => { const a = await actorFrom(c, (id) => isAdmin(id as UserId)); return { userId: a.userId as UserId, isAdmin: a.isAdmin }; };
   r.get('/v1/projects/:projectId/dev-session', async (c) => { const s = await api.getSession(await actor(c), parseParams(c, projectParams).projectId as ProjectId); return s ? c.json(s) : c.json({ error: 'not_found', message: '没有开发会话' }, 404); });
   r.post('/v1/projects/:projectId/dev-session', async (c) => c.json(await api.openSession(await actor(c), parseParams(c, projectParams).projectId as ProjectId, await parseBody(c, OpenDevSessionRequestSchema)), 201));
+  r.post('/v2/projects/:projectId/dev-session', async (c) => c.json(await api.openSession(await actor(c), parseParams(c, projectParams).projectId as ProjectId, await parseBody(c, OpenDevSessionV2RequestSchema)), 201));
   r.get('/v1/projects/:projectId/dev-session/rebuild', async (c) => { c.header('cache-control', 'no-store'); return c.json(await api.inspectSessionRebuild(await actor(c), parseParams(c, projectParams).projectId)); });
   r.post('/v1/projects/:projectId/dev-session/rebuild', async (c) => c.json(await api.rebuildSession(await actor(c), parseParams(c, projectParams).projectId, await parseBody(c, RebuildDevSessionRequestSchema)), 202));
   r.get('/v1/projects/:projectId/dev-session/workspace-status', async (c) => c.json(await api.workspaceStatus(await actor(c), parseParams(c, projectParams).projectId as ProjectId)));
@@ -56,6 +58,7 @@ export function devSessionRoutes(api: DevSessionModuleApi, isAdmin: (userId: Use
   r.post('/v1/projects/:projectId/publish', async (c) => c.json(await api.publish(await actor(c), parseParams(c, projectParams).projectId as ProjectId, await parseBody(c, PublishDevSessionRequestSchema)), 202));
   r.get('/v1/tasks/:taskId/agents', async (c) => c.json({ items: await api.listAgents(await actor(c), parseParams(c, z.object({ taskId: TaskIdSchema })).taskId as TaskId) }));
   r.post('/v1/tasks/:taskId/agents', async (c) => c.json(await api.startAgent(await actor(c), parseParams(c, z.object({ taskId: TaskIdSchema })).taskId as TaskId, await parseBody(c, StartDevAgentRequestSchema)), 201));
+  r.post('/v2/tasks/:taskId/agents', async (c) => c.json(await api.startAgent(await actor(c), parseParams(c, z.object({ taskId: TaskIdSchema })).taskId as TaskId, await parseBody(c, StartDevAgentV2RequestSchema)), 201));
   r.post('/v1/tasks/:taskId/agents/:agentId/messages', async (c) => { const p = parseParams(c, agentParams); await api.sendMessage(await actor(c), p.taskId as TaskId, p.agentId, await parseBody(c, SendAgentMessageRequestSchema)); return c.body(null, 204); });
   r.post('/v1/tasks/:taskId/agents/:agentId/cancel', async (c) => { const p = parseParams(c, agentParams); await api.cancelAgent(await actor(c), p.taskId as TaskId, p.agentId); return c.body(null, 204); });
   r.post('/v1/tasks/:taskId/touch', async (c) => { await api.touch(parseParams(c, z.object({ taskId: TaskIdSchema })).taskId as TaskId); return c.body(null, 204); });

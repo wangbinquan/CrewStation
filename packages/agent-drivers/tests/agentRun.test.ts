@@ -71,6 +71,12 @@ const CLAUDE_TURN = (text: string, sessionId = 'sess-1'): ScriptedTurn => ({
 });
 
 describe('oneshot 运行', () => {
+  test('business execution opts into usage frames while preserving the final completion boundary', async () => {
+    const host = createFakeProcessHost([CLAUDE_TURN('好的')]);
+    const events = await collect(createClaudeCodeDriver(() => '/bin/claude').start({ ...spec(), businessEvents: true }, context(host)));
+    expect(events.map((event) => event.type)).toEqual(['started', 'session', 'text', 'usage', 'completed']);
+    expect(events.find((event) => event.type === 'usage')?.usage).toMatchObject({ mode: 'cumulative', inputTokens: 10, outputTokens: 5 });
+  });
   test('started → session → text → completed，用量落在 completed 上', async () => {
     const host = createFakeProcessHost([CLAUDE_TURN('好的')]);
     const events = await collect(createClaudeCodeDriver(() => '/bin/claude').start(spec(), context(host)));

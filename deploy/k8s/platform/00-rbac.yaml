@@ -59,6 +59,10 @@ rules:
   - apiGroups: [traefik.io]
     resources: [ingressroutes, middlewares]
     verbs: [get, list, watch, create, delete, patch, update]
+  - apiGroups: [crd.projectcalico.org]
+    resources: [globalnetworkpolicies]
+    resourceNames: [crewstation-image-build-registry]
+    verbs: [get]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

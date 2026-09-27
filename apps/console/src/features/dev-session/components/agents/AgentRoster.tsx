@@ -1,3 +1,4 @@
+import { RuntimeImageSummary } from '../../../../shared/runtime-images/RuntimeImageSummary';
 import type { AgentInstanceDto } from '@crewstation/contracts';
 import type { ReactElement } from 'react';
 import { useT } from '../../../../shared/lib/useT';
@@ -46,6 +47,7 @@ export function AgentRoster({ agents, selected, onSelect }: AgentRosterProps): R
         >
           <span className={styles.compute}>L-{agent.agentId.slice(-6)} · {agent.computeName ?? agent.compute}</span>
           {agent.profileRevision ? <small className={styles.compute}>{t('devSession.agents.profileRevision', { revision: agent.profileRevision })}</small> : null}
+          <RuntimeImageSummary image={agent.image ?? agent.runtimeImage?.image} compact />
           <Badge tone={agentStateTone(agent.state)}>{t(`devSession.agentState.${agent.state}`)}</Badge>
           {preparationLine(agent) !== undefined ? <small className={styles.compute} title={agent.execution?.message}>{preparationLine(agent)}</small> : null}
         </button>

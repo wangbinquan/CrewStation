@@ -3,6 +3,8 @@ import { isPlatformError } from '@crewstation/kernel';
 import type { Context } from 'hono';
 
 const STATUS_BY_KIND: Record<ErrorKind, number> = {
+  payload_too_large: 413,
+  gone: 410,
   not_found: 404,
   conflict: 409,
   forbidden: 403,

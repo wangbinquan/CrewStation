@@ -19,7 +19,7 @@ export class ResidentAgentRun extends AgentRunBase {
   constructor(spec: DriverAgentSpec, context: DriverLaunchContext, prepared: PreparedRuntime, protocol: KnownAgentProtocol) {
     super(spec, context, prepared, protocol);
     if (prepared.encodeStreamFrame === undefined) throw new DriverStateError('driver_misconfigured', '常驻运行需要适配器提供输入帧编码');
-    this.lifetime = this.begin();
+    this.lifetime = this.begin().catch((error) => { this.events.fail(error); });
   }
 
   async send(text: string): Promise<void> {
@@ -64,6 +64,7 @@ export class ResidentAgentRun extends AgentRunBase {
 
   private async consume(stream: DriverChildProcessWithStdin): Promise<void> {
     const result = await pumpTurn(stream, {
+      businessEvents: this.spec.businessEvents,
       host: this.context.host,
       logger: this.context.logger,
       usage: this.usage,

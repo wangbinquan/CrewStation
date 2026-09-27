@@ -7,9 +7,9 @@ export interface PushGrant {
   readonly sub: string;
   /** 到期时间（Unix 秒）。 */
   readonly exp: number;
-  /** 可推可拉的仓库路径前缀，如 runtime/。 */
+  /** 可推可拉的仓库路径；尾部 / 表示前缀，如 runtime/。 */
   readonly push: readonly string[];
-  /** 只能拉的仓库路径（前缀），如平台底座 crewstation/task-runtime。 */
+  /** 只读仓库路径；没有尾部 / 时精确匹配，如平台底座 crewstation/task-runtime。 */
   readonly pull: readonly string[];
 }
 
@@ -50,6 +50,17 @@ function isGrant(value: unknown): value is PushGrant {
 const READ_METHODS = new Set(['GET', 'HEAD']);
 const WRITE_METHODS = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH']);
 const REPOSITORY_PATH = /^\/v2\/((?:[a-z0-9]+(?:[._-][a-z0-9]+)*\/)*[a-z0-9]+(?:[._-][a-z0-9]+)*)\/(manifests|blobs|tags)\//;
+const REPOSITORY_NAME = /^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)*$/;
+const under = (repository: string, prefixes: readonly string[]) => prefixes.some((prefix) => prefix.endsWith('/') ? repository.startsWith(prefix) : repository === prefix);
+
+/** Mount also reads its source. An omitted/ambiguous source must not delegate global blob lookup to the registry. */
+function permittedMount(grant: PushGrant, method: string, path: string, repository: string, query: URLSearchParams): boolean {
+  if (!query.has('mount') && !query.has('from')) return true;
+  const from = query.getAll('from'), mount = query.getAll('mount');
+  return method === 'POST' && path === `/v2/${repository}/blobs/uploads/` && from.length === 1 && mount.length === 1
+    && REPOSITORY_NAME.test(from[0]!) && /^sha256:[0-9a-f]{64}$/.test(mount[0]!)
+    && under(from[0]!, [...grant.push, ...grant.pull]);
+}
 
 /**
  * 按方法与路径裁定一次仓库请求：/v2/ 探测放行；推送前缀内可推可拉（不含删除）；只读前缀只能 GET／HEAD；
@@ -61,8 +72,9 @@ export function registryDecision(grant: PushGrant, method: string, uri: string):
   if (path === '/v2/' || path === '/v2') return READ_METHODS.has(verb) ? 'allow' : 'deny';
   const repository = REPOSITORY_PATH.exec(path)?.[1];
   if (!repository) return 'deny';
-  const under = (prefixes: readonly string[]) => prefixes.some((prefix) => (prefix.endsWith('/') ? repository.startsWith(prefix) : repository === prefix || repository.startsWith(`${prefix}/`)));
-  if (under(grant.push)) return WRITE_METHODS.has(verb) ? 'allow' : 'deny';
-  if (under(grant.pull)) return READ_METHODS.has(verb) ? 'allow' : 'deny';
+  const query = new URLSearchParams(uri.includes('?') ? uri.slice(uri.indexOf('?') + 1) : '');
+  if (!permittedMount(grant, verb, path, repository, query)) return 'deny';
+  if (under(repository, grant.push)) return WRITE_METHODS.has(verb) ? 'allow' : 'deny';
+  if (under(repository, grant.pull)) return READ_METHODS.has(verb) ? 'allow' : 'deny';
   return 'deny';
 }

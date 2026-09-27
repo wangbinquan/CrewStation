@@ -1,9 +1,11 @@
 import type { K8sObject } from '../resources';
 import { platformLabels } from './labels';
+import type { HttpProbesSpec } from './probes';
+import { httpProbeObjects } from './probes';
 
-export type EnvVar = { name: string; value: string } | { name: string; valueFrom: { secretKeyRef: { name: string; key: string } } };
+export type EnvVar = { name: string; valueFrom: { fieldRef: { fieldPath: string } } } | { name: string; value: string } | { name: string; valueFrom: { secretKeyRef: { name: string; key: string } } };
 export interface ResourceSpec { cpu: string; memory: string; ephemeralStorage?: string }
-export interface VolumeSpec { name: string; mountPath: string; pvc?: string; emptyDir?: boolean; readOnly?: boolean }
+export interface VolumeSpec { name: string; mountPath: string; pvc?: string; emptyDir?: boolean; readOnly?: boolean; subPath?: string }
 
 export interface ContainerSpec {
   name: string;
@@ -13,6 +15,7 @@ export interface ContainerSpec {
   env?: EnvVar[];
   port?: number;
   healthPath?: string;
+  probes?: HttpProbesSpec;
   resources?: ResourceSpec;
   volumes?: VolumeSpec[];
   workingDir?: string;
@@ -30,12 +33,7 @@ export interface WorkloadSpec extends ContainerSpec {
 }
 
 function container(spec: ContainerSpec): Record<string, unknown> {
-  const probes = spec.port && spec.healthPath
-    ? {
-      readinessProbe: { httpGet: { path: spec.healthPath, port: spec.port }, periodSeconds: 5, failureThreshold: 3 },
-      livenessProbe: { httpGet: { path: spec.healthPath, port: spec.port }, periodSeconds: 10, failureThreshold: 6, initialDelaySeconds: 10 },
-    }
-    : {};
+  const probes = httpProbeObjects(spec.port, spec.healthPath, spec.probes);
   return {
     name: spec.name,
     image: spec.image,
@@ -47,7 +45,7 @@ function container(spec: ContainerSpec): Record<string, unknown> {
     ...(spec.port ? { ports: [{ containerPort: spec.port, name: 'http' }] } : {}),
     ...probes,
     ...(spec.resources ? { resources: { requests: requestsOf(spec.resources), limits: requestsOf(spec.resources) } } : {}),
-    volumeMounts: (spec.volumes ?? []).map((v) => ({ name: v.name, mountPath: v.mountPath, readOnly: v.readOnly ?? false })),
+    volumeMounts: (spec.volumes ?? []).map((v) => ({ name: v.name, mountPath: v.mountPath, readOnly: v.readOnly ?? false, ...(v.subPath ? { subPath: v.subPath } : {}) })),
     ...(spec.runAsUser !== undefined ? { securityContext: { runAsUser: spec.runAsUser, allowPrivilegeEscalation: false } } : {}),
   };
 }
@@ -57,7 +55,7 @@ function requestsOf(r: ResourceSpec): Record<string, string> {
 }
 
 function volumes(spec: WorkloadSpec): unknown[] {
-  return (spec.volumes ?? []).map((v) => (v.pvc ? { name: v.name, persistentVolumeClaim: { claimName: v.pvc } } : { name: v.name, emptyDir: {} }));
+  return [...new Map((spec.volumes ?? []).map((v) => [v.name, v])).values()].map((v) => (v.pvc ? { name: v.name, persistentVolumeClaim: { claimName: v.pvc } } : { name: v.name, emptyDir: {} }));
 }
 
 export function podTemplate(spec: WorkloadSpec): Record<string, unknown> {

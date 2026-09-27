@@ -43,7 +43,7 @@ export function computeProfileAdminRoutes(api: AgentRuntimeModuleApi, isAdmin: (
  * 平台镜像仓库主机的 ForwardAuth（RFC-006 §7.2）：挂在 cs-auth。Traefik 把原请求的方法与路径放在 X-Forwarded-* 头里；
  * 401 带 Basic 质询，Docker 客户端据此带上 docker login 保存的凭据重试。
  */
-export function registryForwardAuthRoutes(api: AgentRuntimeModuleApi): Hono<AppEnv> {
+export function registryForwardAuthRoutes(api: Pick<AgentRuntimeModuleApi, 'authorizeRegistryRequest'>): Hono<AppEnv> {
   const r = new Hono<AppEnv>();
   r.get('/forward-auth/registry', (c) => {
     const verdict = api.authorizeRegistryRequest({

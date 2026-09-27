@@ -246,6 +246,23 @@ describe.skipIf(!available)('算力档位模块（RFC-006）', () => {
     expect((await auth('GET', '/v2/', basic('01a0bf5d-8f4b-7c23-8be6-11b97ba285b2', credential.password))).status).toBe(401);
     expect((await auth('GET', '/v2/', basic(credential.username, `${credential.password.slice(0, -2)}xx`))).status).toBe(401);
   });
+  test('构建凭据只可写自己的产物，可读底座但不可写底座、别的项目或构建', async () => {
+    const projectId = newResourceId(), buildId = newResourceId();
+    const input = { projectId, buildId, expiresAt: new Date(Date.now() + 600000).toISOString(), pullRepositories: ['crewstation/task-runtime'] };
+    const token = await mod.api.issueBuildPushCredential(input);
+    const authorization = `Basic ${Buffer.from(`${token.username}:${token.password}`).toString('base64')}`;
+    const verdict = (method: string, repository: string) => mod.api.authorizeRegistryRequest({ authorization, method, uri: `/v2/${repository}/manifests/artifact` }).status;
+    expect(token.pushPrefixes).toEqual([`runtime/projects/${projectId}/${buildId}/`]);
+    expect(verdict('PUT', `runtime/projects/${projectId}/${buildId}/image`)).toBe(200);
+    expect(verdict('PUT', `runtime/projects/${projectId}/${newResourceId()}/image`)).toBe(403);
+    expect(verdict('PUT', `runtime/projects/${newResourceId()}/${buildId}/image`)).toBe(403);
+    expect(verdict('GET', 'crewstation/task-runtime')).toBe(200);
+    expect(verdict('PUT', 'crewstation/task-runtime')).toBe(403);
+    expect(verdict('DELETE', `runtime/projects/${projectId}/${buildId}/image`)).toBe(403);
+    await expect(mod.api.issueBuildPushCredential({ ...input, expiresAt: new Date(Date.now() - 1000).toISOString() })).rejects.toMatchObject({ kind: 'validation' });
+    await expect(mod.api.issueBuildPushCredential({ ...input, expiresAt: new Date(Date.now() + 8000000).toISOString() })).rejects.toMatchObject({ kind: 'validation' });
+  });
+
   test('集群停止测试后，迟到的 passed 回执不能覆盖已停止终态', async () => {
     const created = await createProfile(admin, claude({ name: 'cluster-stop' }));
     const id = created.latestTest!.testId as ProfileTestId;
@@ -260,4 +277,37 @@ describe.skipIf(!available)('算力档位模块（RFC-006）', () => {
     result = () => ({ state: 'passed', outcome: 'passed', stages: [] });
   });
 
+  test('RFC-027 pins encrypted credential versions across rotation; clear revokes old snapshots permanently', async () => {
+    const initial = await createProfile(admin, claude({ name: 'business-versioned' }));
+    const ref = { profileId: initial.id, revision: initial.revision }, stamp = await mod.api.pinLaunchVersion(ref);
+    const credentialId = initial.content.secrets[0]!.id;
+    const rotated = await mod.api.saveProfile(admin, initial.id, { expectedRevision: initial.revision, content: initial.content, credentials: { [credentialId]: { op: 'replace', value: 'rotated-provider-secret' } } });
+    expect((await mod.api.launchMaterialAt(ref, stamp)).beforeStart.secrets.TOKEN).toBe('sk-live-1');
+    const nextRef = { profileId: initial.id, revision: rotated.revision }, nextStamp = await mod.api.pinLaunchVersion(nextRef);
+    expect(nextStamp).not.toBe(stamp); expect((await mod.api.launchMaterialAt(nextRef, nextStamp)).beforeStart.secrets.TOKEN).toBe('rotated-provider-secret');
+    const cleared = await mod.api.saveProfile(admin, initial.id, { expectedRevision: rotated.revision, content: rotated.content, credentials: { [credentialId]: { op: 'clear' } } });
+    await expect(mod.api.launchMaterialAt(ref, stamp)).rejects.toMatchObject({ details: { code: 'secret_version_unavailable' } });
+    await mod.api.saveProfile(admin, initial.id, { expectedRevision: cleared.revision, content: cleared.content, credentials: { [credentialId]: { op: 'replace', value: 'restored-provider-secret' } } });
+    await expect(mod.api.launchMaterialAt(ref, stamp)).rejects.toMatchObject({ details: { code: 'secret_version_unavailable' } });
+    await expect(mod.api.launchMaterialAt(nextRef, nextStamp)).rejects.toMatchObject({ details: { code: 'secret_version_unavailable' } });
+  });
+
+});
+
+
+describe.skipIf(!available)('RFC-027 compute business capability proof', () => {
+  test('only the exact passed revision exposes capability evidence; a later ordinary test cannot inherit it', async () => {
+    const originalResult = result;
+    const capabilities = { events: true, usage: 'incremental' as const, resume: true, skills: true, systemPrompt: true, mcp: true, platformDelegation: false, opaqueInternalDelegation: true };
+    try {
+      result = () => ({ state: 'passed', outcome: 'passed', stages: [], context: { businessExecution: { protocolVersion: 3, capabilities } } });
+      const profile = await createProfile(admin, claude({ name: 'business-proof' })); await drainTests(profile.name);
+      const resolved = await mod.api.resolve({ kind: 'profile', profileId: profile.id }, 'subtask');
+      expect(resolved.businessExecution).toEqual({ protocolVersion: 3, capabilities });
+      result = () => ({ state: 'passed', outcome: 'passed', stages: [] });
+      const test = await mod.api.startTest(admin, profile.id, { clientRequestId: newResourceId() });
+      await mod.api.runQueuedTest(test.testId, noHeartbeat);
+      expect((await mod.api.resolve({ kind: 'profile', profileId: profile.id }, 'subtask')).businessExecution).toBeUndefined();
+    } finally { result = originalResult; }
+  });
 });

@@ -1,16 +1,20 @@
+import type { TaskRecoveryCluster } from '../ports/recoveryCluster';
+import type { RuntimeImageExecutionSnapshot, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
 import type { Clock, Logger } from '@crewstation/kernel';
 import type { TaskCluster } from '../ports/cluster';
-import type { EnvironmentSources, ProfileCatalog, ProjectAuthorizer, QuotaSource, ServiceResolver, SourceCheckoutSource, TaskRuntimeSettings } from '../ports/platform';
+import type { EnvironmentSources, ProfileCatalog, ProjectAuthorizer, QuotaSource, ServiceResolver, SourceCheckoutSource, TaskRuntimeSettings, TestRunner } from '../ports/platform';
 import type { UnitOfWork } from '../ports/unitOfWork';
 
 export interface TaskRuntimeUseCaseDeps {
   uow: UnitOfWork;
   cluster: TaskCluster;
+  businessStorageInspector?: Pick<TaskRecoveryCluster, 'inspect'>;
   authorizer: ProjectAuthorizer;
   quotas: QuotaSource;
   profiles: ProfileCatalog;
   services: ServiceResolver;
   sources: EnvironmentSources;
+  initializationRunner?: Pick<TestRunner, 'sendCommand' | 'connectionStatus'>;
   /** Explicit protocol-2 startup alias, persisted before an older image can connect. */
   legacyRunnerTaskId?: (taskId: string) => Promise<string>;
   /** 缺省不检出：业务任务容器不需要源码，单元测试也不需要集群。 */
@@ -23,4 +27,22 @@ export interface TaskRuntimeUseCaseDeps {
   creation?: 'ledger';
   clock: Clock;
   logger: Logger;
+}
+
+export interface CreateEnvironmentInput {
+  /** 开发镜像保留引用预先分配的身份，仅内部使用。 */
+  runtimeImageTaskId?: TaskId;
+  /** 由调用方预留并通过用途验证的不可变镜像快照，不从父任务继承。 */
+  runtimeImage?: RuntimeImageExecutionSnapshot;
+  businessStorage?: 'isolated-v1';
+  admission?: { id: TaskId; fingerprint: string };
+  serviceId: ServiceId;
+  kind: TaskKind;
+  volumeMode?: VolumeMode;
+  profile?: string;
+  branch?: string;
+  traceId?: TraceId;
+  createdBy?: UserId;
+  preview?: { command: string[]; port: number; healthPath: string };
+  labels?: Record<string, string>;
 }

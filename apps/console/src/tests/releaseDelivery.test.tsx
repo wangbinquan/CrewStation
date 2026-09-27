@@ -34,7 +34,7 @@ test('并列真实部署与完整 SHA，具名确认双版本；首次上线显�
   expect(document.querySelector<HTMLAnchorElement>('a[href="//preview.demo.cs.localhost"]')?.textContent).toBe('打开试用');
   expect(document.querySelector('a[href="//demo.cs.localhost"]')).toBeNull();
   await check(); expect(page.text()).toContain('正式版本 尚未部署 → v1.1.0'); expect(f.writes).toHaveLength(0);
-  await click('确认上线 v1.1.0'); expect(f.writes).toEqual([{ path: `/v1/services/${serviceId}/traffic-switch`, body: { toSlot: 'preview', expectedActiveRelease: null, expectedTargetRelease: targetId } }]);
+  await click('确认上线 v1.1.0'); expect(f.writes).toEqual([{ path: `/v1/services/${serviceId}/traffic-switch`, body: { toSlot: 'preview', expectedActiveRelease: null, expectedTargetRelease: targetId, requestKey: expect.any(String) } }]);
   expect(page.text()).toContain('已登记正式版本切换到 v1.1.0'); expect(page.text()).toContain('网关异步应用');
 });
 
@@ -152,4 +152,29 @@ test('槽卡随资源推送流更新：服务槽记录变了重读一次部署�
   await page.settle();
   expect(slotReads()).toBe(before + 1);
   expect(page.text()).toContain('副本不足'); expect(page.text()).toContain('0／1 副本就绪');
+});
+
+
+test('fenced 交接受理不报完成，刷新页面继续展示原操作且禁止再次切流', async () => {
+  const f = releaseDeliveryFixture(); f.state.controlled = true;
+  page = await renderApp(`/projects/${projectId}/release`); await check(); await click('确认上线 v1.1.0');
+  expect(page.text()).toContain('正在冻结执行权');
+  expect(page.text()).not.toContain('已登记正式版本切换');
+  expect(action()?.disabled).toBe(true);
+  const key = f.writes[0]!.body.requestKey; expect(typeof key).toBe('string');
+  f.state.handoff!.handoff = { stage: 'activating', message: '等待目标应用激活执行权' };
+  page.unmount(); page = await renderApp(`/projects/${projectId}/release`);
+  expect(page.text()).toContain('交接尚未完成'); expect(page.text()).toContain('等待目标应用激活执行权');
+  expect(f.writes).toHaveLength(1);
+  f.state.handoff!.handoff = { stage: 'complete' };
+  page.unmount(); page = await renderApp(`/projects/${projectId}/release`);
+  expect(page.text()).toContain('执行交接已完成');
+});
+
+test('未确认响应后再次提交相同切流保持 requestKey', async () => {
+  const f = releaseDeliveryFixture(); f.state.failSwitch = true;
+  page = await renderApp(`/projects/${projectId}/release`); await check(); await click('确认上线 v1.1.0');
+  const key = f.writes[0]!.body.requestKey;
+  await check(); await click('确认上线 v1.1.0');
+  expect(f.writes[1]!.body.requestKey).toBe(key);
 });

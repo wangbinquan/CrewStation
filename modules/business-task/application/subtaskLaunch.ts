@@ -42,7 +42,7 @@ export function subtaskLaunch(deps: BusinessTaskUseCaseDeps, awaiting: Set<strin
    * 容器刚创建时 TaskRunner 还没连上，此时派发必然以「TaskRunner 未连接」失败。
    * 子任务留在 pending，等 onRunnerConnected 再派发；调用方本来就要轮询子任务状态。
    */
-  const launch = async (run: SubtaskRun): Promise<SubtaskRun> => {
+  const launchUnfenced = async (run: SubtaskRun): Promise<SubtaskRun> => {
     if (run.kind === 'agent' && run.agentProfile) return launchAgent(run);
     const env = await environments.getEnvironment(run.taskId);
     if (!env?.connected) {
@@ -59,6 +59,9 @@ export function subtaskLaunch(deps: BusinessTaskUseCaseDeps, awaiting: Set<strin
       .finally(() => { awaiting.delete(execId); });
     return started;
   };
+  const launch = async (run: SubtaskRun): Promise<SubtaskRun> => deps.legacyDispatch
+    ? (await deps.legacyDispatch(run.taskId, () => launchUnfenced(run))) ?? run
+    : launchUnfenced(run);
 
   return {
     launch,

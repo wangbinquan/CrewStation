@@ -1,3 +1,4 @@
+import type { DevelopmentRuntimeImages } from './ports/runtimeImages';
 import { join } from 'node:path';
 import type { UserId } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
@@ -38,6 +39,7 @@ import { withExecutionPhase } from './domain/terminalPhase';
 export interface DevSessionModuleDeps {
   identities?: ResourceIdentityDirectory;
   /** 资源台账里 CLI／Agent 执行记录的阶段（RFC-025 §11.2）；缺省时名册照 Runner 的说法给出。 */
+  runtimeImages?: DevelopmentRuntimeImages;
   executions?: ExecutionRecords;
   apiCatalog: ApiInvocationCatalog;
   /** 算力档位解析（RFC-001），由组合根接到 project。 */
@@ -72,7 +74,7 @@ export const devSessionMigrations: MigrationSet = {
 
 export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionModule {
   const useCaseDeps: DevSessionUseCaseDeps = {
-    executions: deps.executions,
+    executions: deps.executions, runtimeImages: deps.runtimeImages,
     comparisons: drizzleComparisonReferences(deps.db, deps.clock ?? systemClock, deps.identities),
     environments: deps.environments, runner: deps.runner, scm: deps.scm, releases: deps.releases, manifests: yamlManifestParser,
     authorizer: deps.authorizer, apiCatalog: deps.apiCatalog,

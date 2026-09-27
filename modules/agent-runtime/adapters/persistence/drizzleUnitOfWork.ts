@@ -1,3 +1,4 @@
+import { drizzleCredentialVersions } from './credentialVersions';
 import { drizzleProjectPolicies } from './drizzleProjectPolicies';
 import type { Database, Executor } from '@crewstation/persistence';
 import { enqueueJob } from '@crewstation/queue';
@@ -7,6 +8,7 @@ import { drizzleCredentialRepository, drizzleProfileRepository, drizzleRevisionR
 
 export function scopeOver(executor: Executor): RepositoryScope {
   return {
+    credentialVersions: drizzleCredentialVersions(executor),
     profiles: drizzleProfileRepository(executor),
     projectPolicies: drizzleProjectPolicies(executor),
     revisions: drizzleRevisionRepository(executor),

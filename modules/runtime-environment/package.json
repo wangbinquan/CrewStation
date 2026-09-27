@@ -1,0 +1,29 @@
+{
+  "name": "@crewstation/module-runtime-environment",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "运行镜像定义、构建与登记、不可变版本、用途与档位组合验证、日志及引用保留；服务、任务和 Agent 独立绑定（RFC-028）",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "crewstation": {
+    "layer": 4
+  },
+  "dependencies": {
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/http": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "@crewstation/k8s": "workspace:*",
+    "@crewstation/persistence": "workspace:*",
+    "@crewstation/resource-runtime": "workspace:*",
+    "@crewstation/queue": "workspace:*",
+    "dockerfile-ast": "0.7.1",
+    "drizzle-orm": "0.45.2",
+    "hono": "4.13.7",
+    "zod": "4.6.2"
+  },
+  "devDependencies": {
+    "@crewstation/testkit": "workspace:*"
+  }
+}

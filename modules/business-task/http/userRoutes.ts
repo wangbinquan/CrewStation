@@ -1,7 +1,7 @@
 import type { ProjectId, TaskId, UserId } from '@crewstation/contracts';
 import { ProjectIdSchema, TaskIdSchema } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
-import { actorFrom, parseParams } from '@crewstation/http';
+import { actorFrom, parseBody, parseParams, parseQuery } from '@crewstation/http';
 import type { Context } from 'hono';
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -15,6 +15,12 @@ export function userRoutes(api: BusinessTaskModuleApi, isAdmin: (userId: UserId)
   r.get('/v1/projects/:projectId/business-tasks/:taskId/subtasks', async (c) => {
     const p = parseParams(c, z.object({ projectId: ProjectIdSchema, taskId: TaskIdSchema }));
     return c.json({ items: await api.listProjectSubtasks(await actor(c), p.projectId as ProjectId, p.taskId as TaskId) });
+  });
+  const legacy = z.strictObject({ identity: z.string().min(3).max(256) });
+  r.get('/v1/admin/business-execution/legacy-recovery', async (c) => c.json(await api.legacyRecovery(await actor(c), parseQuery(c, legacy).identity, 'inspect')));
+  r.post('/v1/admin/business-execution/legacy-recovery', async (c) => {
+    const input = await parseBody(c, legacy.extend({ action: z.enum(['reconcile', 'stop']), ticketId: z.uuid().optional() }));
+    return c.json(await api.legacyRecovery(await actor(c), input.identity, input.action, input.ticketId));
   });
   return r;
 }

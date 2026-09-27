@@ -50,6 +50,7 @@ function eventToDto(record: SlotEventRecord): SlotEventDto {
 
 /** 下线、重新部署都不能与进行中的发布或集群运维操作并行（它们会改同一个待命槽）。 */
 async function busyReason(scope: RepositoryScope, serviceId: ServiceId): Promise<{ readonly reason: PrecheckReason; readonly releaseId?: ReleaseId } | undefined> {
+  if (await scope.handoffs.active(serviceId)) return { reason: precheckReason('release-in-progress', '执行交接尚未完成', '先完成交接') };
   const inProgress = await scope.releases.findInProgress(serviceId);
   if (inProgress) return { reason: precheckReason('release-in-progress', `发布 ${inProgress.tag} 仍在进行中（${inProgress.status}）`, '请等待结束后再操作'), releaseId: inProgress.id };
   if (await scope.maintenance.active(serviceId)) return { reason: precheckReason('maintenance-active', '集群运维操作尚未结束', '请等待后再操作') };
@@ -258,7 +259,7 @@ async function checkRedeploy(deps: Deps, release: Release, svc: ResolvedService)
   const spec: SlotDeploySpec = { namespace: svc.namespace, projectSlug: svc.slug, serviceName: svc.name, physical, releaseId: release.id, image: release.image ?? '', manifest: release.manifest!, replicas: prepared.replicas, env: prepared.env.values, plan: prepared.plan };
   // 由资源中心建出（T8）：预检的是这一次部署要写进台账的期望（接着这个槽上一次的 revision 数）。
   const service = release.manifest!.spec.service;
-  const workload = deps.creation === 'ledger' ? nextWorkload(seen[physical], { releaseId: release.id, image: release.image ?? '', command: service.command, port: service.port, healthPath: service.healthPath, replicas: prepared.replicas, resources: { cpu: prepared.plan.cpu, memory: prepared.plan.memory } }) : undefined;
+  const workload = deps.creation === 'ledger' ? nextWorkload(seen[physical], { releaseId: release.id, image: release.image ?? '', command: service.command, port: service.port, healthPath: service.healthPath, ...(service.probes ? { probes: service.probes } : {}), replicas: prepared.replicas, resources: { cpu: prepared.plan.cpu, memory: prepared.plan.memory } }) : undefined;
   const rejected = await dryRunReason(deps, spec, workload ? slotSpecOf(release.serviceId, svc, physical, workload) : undefined);
   return rejected ? { reason: rejected } : { physical, prepared, spec, ...(workload ? { workload } : {}) };
 }
@@ -333,7 +334,7 @@ function sweepUseCase(deps: Deps, removeWorkload: (serviceId: ServiceId, svc: Re
     const slots = await scope.slots.get(serviceId);
     const slot = slots?.[physical];
     if (!slots || !slot || slots.active === physical || slot.releaseId !== releaseId || !hasWorkload(slot)) return { kind: 'none' };
-    if (await scope.releases.findInProgress(serviceId) || await scope.maintenance.active(serviceId)) return { kind: 'none' };
+    if (await scope.handoffs.active(serviceId) || await scope.releases.findInProgress(serviceId) || await scope.maintenance.active(serviceId)) return { kind: 'none' };
     if (!slot.retention) {
       // 升级前就在跑的待命槽从这一刻起算（M26）；这一轮只补计时，不提醒也不下线。
       const lastSwitch = (await scope.switches.listByService(serviceId, 1))[0];

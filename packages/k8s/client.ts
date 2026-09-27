@@ -27,7 +27,7 @@ export interface K8sClient {
   list<T extends K8sObject>(ref: ResourceRef, namespace?: string, options?: ListOptions): Promise<T[]>;
   listPage<T extends K8sObject>(ref: ResourceRef, namespace?: string, options?: ListOptions): Promise<ListPage<T>>;
   jsonPatch<T extends K8sObject>(ref: ResourceRef, name: string, namespace: string | undefined, patch: JsonPatch[]): Promise<T>;
-  create<T extends K8sObject>(obj: T): Promise<T>;
+  create<T extends K8sObject>(obj: T, signal?: AbortSignal): Promise<T>;
   /** 服务端 apply：幂等写入，由 fieldManager 拥有字段。dryRun 时 API Server 照常校验、准入，但不落库。 */
   apply<T extends K8sObject>(obj: T, options?: { fieldManager?: string; force?: boolean; dryRun?: boolean }): Promise<T>;
   mergePatch<T extends K8sObject>(ref: ResourceRef, name: string, namespace: string | undefined, patch: unknown): Promise<T>;
@@ -75,7 +75,7 @@ export function createK8sClient(config: ClusterConfig, fetchImpl: typeof fetch =
     list: async (ref, namespace, options) => (await listPage(ref, namespace, options)).items as never,
     listPage,
     jsonPatch: async (ref, name, namespace, patch) => json(await request('PATCH', resourcePath(ref, namespace, name), { body: JSON.stringify(patch), contentType: 'application/json-patch+json', signal: AbortSignal.timeout(15_000) })),
-    create: async (obj) => json(await request('POST', resourcePath(refOf(obj), obj.metadata.namespace), { body: JSON.stringify(obj), contentType: 'application/json' })),
+    create: async (obj, signal) => json(await request('POST', resourcePath(refOf(obj), obj.metadata.namespace), { body: JSON.stringify(obj), contentType: 'application/json', ...(signal ? { signal } : {}) })),
     apply: async (obj, options = {}) => {
       const params = new URLSearchParams({ fieldManager: options.fieldManager ?? 'crewstation', force: String(options.force ?? true) });
       if (options.dryRun) params.set('dryRun', 'All');

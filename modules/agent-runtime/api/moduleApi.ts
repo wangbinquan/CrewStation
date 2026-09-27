@@ -1,5 +1,6 @@
+import type { BusinessExecutionProof } from '@crewstation/contracts';
 import type {
-  Actor, ProjectId, ProjectComputePolicyDto, SaveProjectComputePolicy, AgentProtocol, BeforeStartMaterial, ComputeProfileDetailDto, ComputeProfileList, ComputeProfileSummaryDto, ComputeProfileSelector, ComputeUsage, CopyComputeProfileRequest, CreateComputeProfileRequest,
+  TerminalTest, Actor, ProjectId, ProjectComputePolicyDto, SaveProjectComputePolicy, AgentProtocol, BeforeStartMaterial, ComputeProfileDetailDto, ComputeProfileList, ComputeProfileSummaryDto, ComputeProfileSelector, ComputeUsage, CopyComputeProfileRequest, CreateComputeProfileRequest,
   LaunchSpec, ProfileRevisionRef, ProfileTestDto, ProfileTestId, RegistryPushCredential, RuntimeImagesInfo, SaveComputeProfileRequest, StartProfileTestRequest,
 } from '@crewstation/contracts';
 
@@ -8,6 +9,8 @@ export type RegistryVerdict = { readonly status: 200 } | { readonly status: 401 
 
 /** 受理一次启动时解析出的档位：名称（default 已换成真实名称）、固定修订与协议。 */
 export interface ResolvedProfile {
+  businessExecution?: BusinessExecutionProof;
+
   readonly id: string;
   readonly name: string;
   readonly revision: number;
@@ -19,6 +22,7 @@ export interface ResolvedProfile {
 
 /** 下发一次启动的全部材料：只在派发命令时取，含解密凭据，不落库、不进日志、不进事件。 */
 export interface ProfileLaunchMaterial extends ResolvedProfile {
+  readonly terminalTest?: TerminalTest;
   readonly launch: LaunchSpec;
   readonly beforeStart: BeforeStartMaterial;
 }
@@ -53,6 +57,8 @@ export interface AgentRuntimeModuleApi {
   runtimeImages(actor: Actor): Promise<RuntimeImagesInfo>;
   /** 签发有期限的推送凭据；口令只在这次响应里出现（C18）。 */
   issuePushCredential(actor: Actor): Promise<RegistryPushCredential>;
+  /** 仅组合根的镜像构建路径使用；固定项目／build 前缀，不开放 HTTP。 */
+  issueBuildPushCredential(input: { projectId: string; buildId: string; expiresAt: string; pullRepositories: readonly string[] }): Promise<RegistryPushCredential>;
   /** 网关对仓库主机每个请求的裁定（ForwardAuth）。 */
   authorizeRegistryRequest(input: { authorization?: string; method: string; uri: string }): RegistryVerdict;
   /** 租户面投影（无 actor：任何登录用户都能看下拉）。 */
@@ -60,6 +66,8 @@ export interface AgentRuntimeModuleApi {
   /** 受理新启动：default 在此解析；不可用、终端档位用错用途都抛可读错误。 */
   resolve(selector: ComputeProfileSelector | undefined, usage: ComputeUsage): Promise<ResolvedProfile>;
   /** 按固定修订取派发材料（含解密凭据）。 */
+  pinLaunchVersion(ref: ProfileRevisionRef): Promise<string>;
+  launchMaterialAt(ref: ProfileRevisionRef, credentialStamp: string): Promise<ProfileLaunchMaterial>;
   launchMaterial(ref: ProfileRevisionRef): Promise<ProfileLaunchMaterial>;
   /** 发布校验：只看存在性与协议。 */
   lookupForRelease(selector: ComputeProfileSelector): Promise<{ id: string; name: string; terminalOnly: boolean } | undefined>;

@@ -7,8 +7,10 @@ import type { TaskPodSpec } from '../../ports/cluster';
 /** 任务容器的 Pod：构造函数在 `@crewstation/k8s`，资源中心的调和器渲染同一种 Pod 时用的也是它（RFC-025 设计 §6.2）。 */
 export function taskPodObject({ env, image, envVars, resources, source, envSecretName, nodeName, workVolume }: TaskPodSpec, workerUid: number): K8sObject {
   return renderTaskPod({
+    ...(env.render?.runtimeImage ? { runtimeInitialization: true } : {}),
     name: env.podName, namespace: env.namespace, taskId: env.id, workload: WORKLOAD_LABELS[env.kind], project: env.labels[LABELS.project] ?? '', service: env.labels[LABELS.service] ?? '',
     image, workerUid, resources, workVolume: workVolume === 'emptyDir' ? { emptyDir: true } : { pvc: env.pvcName }, env: envVars,
+    ...(env.render?.businessStorage ? { businessStorage: { ...env.render.businessStorage, initialize: !env.native && !env.rebuildId && env.render.start === 1 } } : {}),
     ...(envSecretName ? { envFromSecret: envSecretName } : {}), ...(source ? { checkout: source } : {}), ...(nodeName ? { nodeName } : {}),
     labels: { ...(env.rebuildId ? { 'crewstation.io/rebuild': env.rebuildId } : {}), ...(env.native ? { [WORKSPACE_TASK_LABEL]: env.native.parentTaskId } : {}) },
   });

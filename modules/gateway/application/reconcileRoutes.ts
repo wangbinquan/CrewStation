@@ -77,6 +77,16 @@ export function routeUseCases(deps: GatewayUseCaseDeps, project?: ProjectLedgerH
   const reconcileService = (serviceId: ServiceId): Promise<RouteEntry[]> => reconcile(serviceId);
   return {
     reconcileService,
+    productionRouteObserved: async (serviceId: ServiceId, physical: 'blue' | 'green'): Promise<boolean> => {
+      if (!deps.applier.observeRoutes) return false;
+      const service = await deps.services.getService(serviceId), roles = await deps.slots.slotRoles(serviceId);
+      if (!service || service.archived || roles?.prod !== physical) return false;
+      const stored = (await deps.routes.listAll()).find((entry) => entry.serviceId === serviceId)?.routes ?? [];
+      const production = stored.filter((entry) => entry.kind !== 'preview');
+      if (!production.some((entry) => entry.kind === 'prod') || !production.some((entry) => entry.kind === 'service')) return false;
+      if (production.some((entry) => entry.target.service !== `${service.serviceName}-${physical}` || entry.target.namespace !== service.namespace)) return false;
+      return deps.applier.observeRoutes(service.serviceName, service.namespace, production);
+    },
     reconcileAll: async (): Promise<number> => {
       let n = 0;
       for (const svc of await deps.services.listServices()) n += (await reconcileService(svc.serviceId)).length;

@@ -1,4 +1,7 @@
+import type { BusinessReleaseHandoff } from './releaseHandoff';
 import type { ClusterOperation, ClusterResource, ClusterInspectRequest, Actor, BusinessTaskDto, BusinessTaskState, CreateBusinessTaskRequest, DomainPayload, ProjectId, ServiceActor, SubmitSubtaskRequest, SubtaskDto, SubtaskId, SubtaskMessageRequest, TaskId } from '@crewstation/contracts';
+import type { LegacyRecoveryResult } from './legacyRecovery';
+import type { BusinessExecutionApi } from './executionApi';
 
 /** 调用链回放用的业务任务：子任务含每次尝试，带创建时间、上一次尝试与执行环境。 */
 export interface TraceBusinessTaskDto {
@@ -8,6 +11,10 @@ export interface TraceBusinessTaskDto {
 
 /** business-task 对外能力：业务服务以自身身份创建任务并提交契约化子任务；用户只读查看。 */
 export interface BusinessTaskModuleApi {
+  readonly releaseHandoff: BusinessReleaseHandoff;
+  readonly v3: BusinessExecutionApi;
+  legacyRecovery(actor: Actor, identity: string, action: 'inspect' | 'reconcile' | 'stop', ticketId?: string): Promise<LegacyRecoveryResult>;
+  imageReferenceState(input: { projectId: string; versionId: string; ownerType: string; ownerId: string }): Promise<'active' | 'released' | 'unknown'>;
   readonly name: 'business-task';
   inspectClusterTask(actor: Actor, target: ClusterResource, request: ClusterInspectRequest): Promise<Record<string, unknown>>;
   executeClusterTask(actor: Actor, operation: ClusterOperation): Promise<{ operationId: string }>;

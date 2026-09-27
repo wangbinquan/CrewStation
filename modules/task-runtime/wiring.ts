@@ -1,5 +1,10 @@
+import { blockBusinessAdmission } from './application/business/blockAdmission';
+import type { LeasePort } from '@crewstation/resource-runtime';
+import { runImageProbe } from './application/imageProbe/run';
+import { stopImageProbe } from './application/imageProbe/stop';
+import { imageProbeCleanup } from './adapters/k8s/imageProbe';
 import { join } from 'node:path';
-import type { UserId } from '@crewstation/contracts';
+import type { TaskId, UserId } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import type { K8sClient } from '@crewstation/k8s';
 import { LABELS } from '@crewstation/k8s';
@@ -19,6 +24,7 @@ import { createEnvironmentUseCase } from './application/createEnvironment';
 import type { TaskRuntimeUseCaseDeps } from './application/dependencies';
 import { lifecycleUseCases } from './application/lifecycle';
 import { environmentQueries, environmentToDto } from './application/queries';
+import { runtimeImageReferenceState } from './application/runtime-images/referenceState';
 import { observeStartupUseCase, reconcileUseCase } from './application/reconcile';
 import { startupLogTail } from './application/failEnvironment';
 import { reconcileRebuildUseCase } from './application/reconcileRebuild';
@@ -39,6 +45,7 @@ import { ledgerResyncWorker } from './workers/ledgerResyncWorker';
 import type { EnvironmentSources, ProfileCatalog, ProjectAuthorizer, QuotaSource, ServiceResolver, SourceCheckoutSource, TaskRuntimeSettings, TestRunner } from './ports/platform';
 
 export interface TaskRuntimeModuleDeps {
+  imageProbeLeases?: { port: LeasePort; holder: string };
   db: Database;
   k8s: K8sClient;
   authorizer: ProjectAuthorizer;
@@ -95,11 +102,13 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
   const useCaseDeps: TaskRuntimeUseCaseDeps = {
     uow: drizzleUnitOfWork(deps.db, ledgerProjectionFor(deps)),
     cluster: deps.cluster ?? kubernetesTaskCluster(deps.k8s, deps.settings.workerUid),
+    businessStorageInspector: kubernetesTaskRecoveryCluster(deps.k8s),
     authorizer: deps.authorizer,
     quotas: deps.quotas,
     profiles: deps.profiles,
     services: deps.services,
     sources: deps.sources,
+    ...(deps.testRunner ? { initializationRunner: deps.testRunner } : {}),
     legacyRunnerTaskId: legacyRunnerTaskId(resourceIdentityDirectory(deps.db, () => [taskRuntimeMigrations])),
     ...(deps.checkout ? { checkout: deps.checkout } : {}),
     settings: deps.settings,
@@ -124,6 +133,10 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
   });
   const api: TaskRuntimeModuleApi = {
     name: 'task-runtime',
+    blockBusinessAdmission: blockBusinessAdmission(useCaseDeps),
+    imageReferenceState: runtimeImageReferenceState(useCaseDeps),
+    runRuntimeImageProbe: runImageProbe(useCaseDeps, { create: createTestEnvironment, runner: deps.testRunner, mcp: deps.testMcp }),
+    stopRuntimeImageProbe: stopImageProbe(useCaseDeps, deps.imageProbeLeases ? imageProbeCleanup(deps.k8s, deps.imageProbeLeases.port, deps.imageProbeLeases.holder) : undefined),
     reconcileRebuild: reconcileRebuildUseCase(recoveryDeps),
     listClusterTasks: queries.listClusterTasks,
     ...rebuild,
@@ -150,10 +163,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     canOpenStream: queries.canOpenStream,
     reconcile,
     observeStartup,
-    captureStartupLog: async (taskId) => {
-      const env = await useCaseDeps.uow.read.environments.getById(taskId);
-      return env ? startupLogTail(useCaseDeps, env, env.podName) : undefined;
-    },
+    captureStartupLog: (taskId) => captureStartupLog(useCaseDeps, taskId),
     runProfileTest,
     ...workloadRenderUseCases(useCaseDeps),
   };
@@ -165,6 +175,11 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
       ...(ledger ? [ledgerResyncWorker(() => resyncLedger(useCaseDeps.uow, ledger, useCaseDeps.logger, useCaseDeps.clock), useCaseDeps.logger)] : [])],
     migrations: taskRuntimeMigrations,
   };
+}
+
+async function captureStartupLog(deps: TaskRuntimeUseCaseDeps, taskId: TaskId) {
+  const env = await deps.uow.read.environments.getById(taskId);
+  return env ? startupLogTail(deps, env, env.podName) : undefined;
 }
 
 /** 对账每 15 秒一轮；启动观测每秒一轮（RFC-022），上一轮没跑完就跳过这一轮，不叠加。 */

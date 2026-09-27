@@ -32,13 +32,14 @@ export interface MaintenanceSnapshot { switches: { users: boolean; services: boo
 
 /** 观测到的 Pod（cluster-control 的观测缓存转交，结构上是 Kubernetes 对象的子集）。 */
 export interface ObservedPodObject {
-  readonly metadata: { readonly name: string; readonly namespace?: string; readonly labels?: Readonly<Record<string, string>> };
+  readonly metadata: { readonly name: string; readonly namespace?: string; readonly uid?: string; readonly deletionTimestamp?: string; readonly labels?: Readonly<Record<string, string>> };
   readonly status?: unknown;
 }
 
 /** gateway 模块对外能力：路由与放行表生成、Pod 身份反查与服务域放行评估（cs-auth 用后两者）。 */
 export interface GatewayModuleApi {
   readonly name: 'gateway';
+  productionRouteObserved(serviceId: ServiceId, physical: 'blue' | 'green'): Promise<boolean>;
   reconcileService(serviceId: ServiceId): Promise<RouteEntry[]>;
   reconcileAll(): Promise<number>;
   /** 路由的台账补投影（RFC-025）：按网关存的路由表逐个服务再投影一次，不重新 apply；返回处理的服务数。 */

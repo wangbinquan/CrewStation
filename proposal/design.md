@@ -896,6 +896,16 @@ TaskRunner 出向连接 cs-session：携带绑定 cs-session audience 的投影�
 
 平台底座镜像内含 tini、TaskRunner、OpenCode 与 Claude Code CLI 及模板语言工具链，版本一起锁定并记录；新镜像默认只用于新任务，运行中任务不替换。管理员可基于底座构建档位镜像（只放平台仓库，保存档位时按摘要固定），Pod 以 root 显式启动 Runner，Agent 进程仍降权运行（RFC-006）。两个 CLI 的凭据与会话存储按 agent-workflow 的方式靠环境变量与目录约定：模型凭据是算力档位的凭据（SecretBox 密文落库，派发时解密），经启动前材料进入 Agent 进程环境，容器内 Agent 可读取，这是接受并记录的残余风险；`HOME`、`XDG_DATA_HOME` 与 `CLAUDE_CONFIG_DIR` 指向任务持久卷，使持久模式恢复后会话目录仍在。远程 MCP 连接按 agent-workflow 的注入形状写入：OpenCode 的 remote 类型 MCP 配置，Claude Code 的 `--mcp-config` 文件；连接凭据为会话级短期令牌。平台派发给 TaskRunner 的权限一律是 `full`（D59）：开发会话的 CLI、历史 Agent 与业务子任务都不按工具分档，Manifest 的 `agentProfiles[].permission` 作废、旧值照收不用；三档到两个 CLI 权限参数的映射只为 TaskRunner 协议与运行中的旧 Runner 保留，未映射的键拒绝。Claude Code 自带沙箱在容器内关闭。配额按数字人配置；预热池是条件性选项，复用前必须清理跨任务数据。禁止任务容器访问宿主 Docker socket；任务 Pod 不自动挂载默认 ServiceAccount 令牌，只投影所需 audience 的令牌。
 
+### 10.9 v3 业务执行与发布交接（RFC-027）
+
+完整协议与故障语义见 [RFC-027 design](./rfc/RFC-027-business-execution-contract/design.md)，当前验收见 [acceptance](./rfc/RFC-027-business-execution-contract/acceptance.md)。本节补充 v3，不改变旧 v2 响应。
+
+服务槽不承载执行磁盘：持久业务任务的 `/work` 保存仓库、隔离工作树和产物，各 Runner 的可靠日志与各原生会话目录使用隔离挂载。命令由工作区 Runner 异步执行；每个 Agent 有独立 Pod、固定档位修订/镜像和并发额度。requestKey、稳定 ID、事务准入及 outbox 处理丢回执，429 要由客户显式同键重试，不进入容量等待队列。原生会话仅在实测能力允许时续跑。
+
+Runner 日志先落盘再回执，session 保存连续事件水位，business-task 后台投影用户事件与最终输出；GET 不驱动进程。文件读取绑定工作区、路径边界和内容版本。取消只在真实终止后结束；缺失输出用 gap/截断结果明示。未知准入必须由持久 ID 封锁证明结束，不能把查询不存在当作停止。旧未决调用可由管理员按原 Pod UID 和远程副作用证据恢复。
+
+`executionControl: fenced` 服务的可信来源绑定发布/物理槽/Pod UID，实例租约和递增 epoch 约束新决策。release 持久交接经过冻结、应用准备、路由确认、激活后完成；业务自己的 PG 事务还必须检查相同 epoch。Web readiness 与执行权分开。破坏性迁移需要维护窗口、应用停写和实际执行 Pod 停止；失败迁移使用完成证明或保留的暂停 Job 墓碑确认不再写库，再允许较新修复发布接替。startup/readiness/liveness 可分别配置。
+
 ## 11. 空 Kubernetes 集群的一键安装
 
 ### 11.1 安装边界与模式

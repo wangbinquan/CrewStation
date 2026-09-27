@@ -12,7 +12,9 @@ test('Job 名字与 release 自己建时相同：RFC-013 之前的发布沿用�
 
 test('构建脚本：令牌只在 GIT_TOKEN 里，克隆退避重试三次，向给定的 buildkitd 提交', () => {
   const script = buildScript('tcp://buildkitd:1234');
-  expect(script).toContain('oauth2:${GIT_TOKEN}@');
+  expect(script).toContain('GIT_ASKPASS');
+  expect(script).toContain('fetch --quiet --depth 1');
+  expect(script).toContain('source commit mismatch');
   expect(script).toContain('for attempt in 1 2 3; do');
   expect(script).toContain('buildctl --addr "tcp://buildkitd:1234" build');
 });

@@ -109,6 +109,7 @@ export const SetAutoOfflinePolicyRequestSchema = z.object({ ...autoOfflineFields
 });
 
 export const TrafficSwitchRequestSchema = z.object({
+  requestKey: z.string().min(1).max(128).optional(),
   toSlot: SlotNameSchema,
   /** null 明确表示确认时尚无正式版本；省略保留旧客户端语义。 */
   expectedActiveRelease: ReleaseIdSchema.nullable().optional(),
@@ -118,6 +119,7 @@ export const TrafficSwitchRequestSchema = z.object({
 });
 
 export const TrafficSwitchDtoSchema = z.object({
+  handoff: z.object({ stage: z.enum(['freezing', 'preparing', 'routing', 'activating', 'complete']), epoch: z.number().int().positive().optional(), message: z.string().optional() }).optional(),
   id: z.string(),
   serviceId: ServiceIdSchema,
   /** 迁走的角色（晋级与回退都是 preview→prod：待命槽接管生产流量）。 */

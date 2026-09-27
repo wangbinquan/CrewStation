@@ -1,3 +1,4 @@
+import { finishBusinessPause } from './business/workspace';
 import type { EnvironmentRebuild } from '../domain/environmentRebuild';
 import { CONTAINER_START_FAILURES, IMAGE_PULL_FAILURES, RUNNER_UNAVAILABLE_HINT, advanceStartup, runningStage } from '../domain/podStartup';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
@@ -5,6 +6,7 @@ import { EXECUTION_NOUN, awaitingPodCreation, purposeOf } from '../domain/taskEn
 import type { PodPhaseReading } from '../ports/cluster';
 import type { TaskRuntimeUseCaseDeps } from './dependencies';
 import type { lifecycleUseCases } from './lifecycle';
+import { reconcileRuntimeInitialization } from './runtimeInitialization';
 import { describeNativeScheduling, expireExecutionProvisioning } from './nativeExecution';
 
 type Lifecycle = ReturnType<typeof lifecycleUseCases>;
@@ -17,6 +19,8 @@ export function reconcileUseCase(deps: TaskRuntimeUseCaseDeps, lifecycle: Lifecy
     for (const record of await deps.uow.read.rebuilds.pending()) if (record.creation !== 'ledger') await deps.uow.read.rebuildQueue.enqueue(record.id);
     for (const env of await deps.uow.read.environments.pendingExecutions()) await deps.uow.read.nativeQueue.enqueue(env.id);
     for (const env of await deps.uow.read.environments.listByStates(['creating', 'running'])) {
+      if (env.businessWorkspace?.phase === 'pausing') { await finishBusinessPause(deps, env).catch((error: unknown) => deps.logger.warn('business workspace cleanup pending', { taskId: env.id, error: String(error) })); changed += 1; continue; }
+      if (await reconcileRuntimeInitialization(deps, env)) { changed += 1; continue; }
       if (await expireExecutionProvisioning(deps, env)) { changed += 1; continue; }
       const target = await judgeable(deps, env);
       if (target && await judgeEnvironment(deps, lifecycle, env, target.rebuild, await deps.cluster.podPhase(env))) changed += 1;
@@ -36,6 +40,7 @@ export function observeStartupUseCase(deps: TaskRuntimeUseCaseDeps, lifecycle: L
     after = page.length === pageSize ? page.at(-1)!.id : undefined;
     let changed = 0;
     for (const env of page) {
+      if (await reconcileRuntimeInitialization(deps, env)) { changed += 1; continue; }
       const target = await judgeable(deps, env);
       if (!target || !env.startup) continue;
       const read = await deps.cluster.observeStartup(env, { events: runningStage(env.startup) === 'container' });
@@ -62,6 +67,7 @@ async function recordObservation(deps: TaskRuntimeUseCaseDeps, env: TaskEnvironm
 
 /** 排队或清理中的执行环境、排队或替换中的重建由各自的作业处理，不在这里看 Pod。 */
 async function judgeable(deps: TaskRuntimeUseCaseDeps, env: TaskEnvironment): Promise<{ rebuild?: EnvironmentRebuild } | undefined> {
+  if (env.businessWorkspace?.phase === 'pausing') return undefined;
   if (env.native?.state === 'queued' || env.native?.state === 'cleaning') return undefined;
   const rebuild = env.rebuildId ? await deps.uow.read.rebuilds.get(env.rebuildId) : undefined;
   if (rebuild && ['queued', 'replacing'].includes(rebuild.state)) return undefined;
@@ -79,13 +85,13 @@ async function judgeEnvironment(deps: TaskRuntimeUseCaseDeps, lifecycle: Lifecyc
     await lifecycle.markFailed(env.id, `${reason}${message ? `；${message}` : ''}`, env.podName, 'creating', pull ? 'image-pull-failed' : 'container-start-failed');
     return true;
   }
-  if (env.native?.state === 'starting' && deps.clock.now().getTime() - Date.parse(env.native.preparedAt!) >= 5 * 60_000) {
+  if (env.native?.state === 'starting' && !(env.connected && env.render?.runtimeImage) && deps.clock.now().getTime() - Date.parse(env.native.preparedAt!) >= 5 * 60_000) {
     await lifecycle.markFailed(env.id, `此${noun}的执行环境超过 5 分钟未连接，其他 Agent 与窗口保持${message ? `；${message}` : ''}`, env.podName, 'creating', 'connect-timeout');
     return true;
   }
   if (env.native?.state === 'starting' && (phase === 'Pending' || phase === 'Running')) await describeNativeScheduling(deps, env,
     phase === 'Pending' ? `等待此${noun}的执行容器就绪${message ? `：${message}` : ''}` : `此${noun}的执行容器已运行，等待环境连接`);
-  if (rebuild?.state === 'starting' && env.state === 'creating' && deps.clock.now().getTime() - rebuild.updatedAt.getTime() >= 5 * 60_000) {
+  if (rebuild?.state === 'starting' && env.state === 'creating' && !(env.connected && env.render?.runtimeImage) && deps.clock.now().getTime() - rebuild.updatedAt.getTime() >= 5 * 60_000) {
     await lifecycle.markFailed(env.id, `新环境启动超过 5 分钟仍未连接，原工作卷保留；请检查套餐和容器镜像后重试${message ? `；${message}` : ''}`, env.podName, 'creating', 'connect-timeout');
     return true;
   }

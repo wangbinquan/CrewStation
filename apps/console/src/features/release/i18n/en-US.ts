@@ -2,6 +2,12 @@ import type { MessagesShapedLike } from '../../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
+  'release.handoff.freezing': 'Freezing execution authority and reconciling in-flight operations.',
+  'release.handoff.preparing': 'Waiting for the target application to prepare and reconcile.',
+  'release.handoff.routing': 'Preparation confirmed. Switching production routes.',
+  'release.handoff.activating': 'Confirming routes and waiting for target activation. Handoff is not complete.',
+  'release.handoff.complete': 'Execution handoff completed.',
+  'release.handoff.readError': 'Unable to confirm handoff status. Please retry shortly.',
   'release.title': 'Releases and go-live',
   'release.draft.publish': 'Release preparation',
   'release.draft.traffic': 'Switch note',

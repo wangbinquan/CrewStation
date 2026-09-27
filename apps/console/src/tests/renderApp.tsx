@@ -13,6 +13,7 @@ import { messages as releaseZh } from '../features/release/i18n/zh-CN';
 import { messages as devSessionZh } from '../features/dev-session/i18n/zh-CN';
 import { messages as capabilitiesZh } from '../features/capabilities/i18n/zh-CN';
 import { messages as catalogZh } from '../features/catalog/i18n/zh-CN';
+import { messages as runtimeImagesZh } from '../features/runtime-images/i18n/zh-CN';
 import { messages as configZh } from '../features/config/i18n/zh-CN';
 import { messages as logsZh } from '../features/logs/i18n/zh-CN';
 import { messages as clusterZh } from '../features/cluster/i18n/zh-CN';
@@ -37,6 +38,7 @@ const zh = mergeMessages([
   { source: 'events', messages: eventsZh },
   { source: 'logs', messages: logsZh },
   { source: 'config', messages: configZh },
+  { source: 'runtimeImages', messages: runtimeImagesZh },
   { source: 'catalog', messages: catalogZh },
   { source: 'cluster', messages: clusterZh },
   { source: 'traces', messages: tracesZh },

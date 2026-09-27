@@ -1,6 +1,7 @@
-import type { Actor, BranchDto, DevSessionDto, Manifest, OpenDevSessionRequest, PreviewState, ProjectId, RebuildDevSessionRequest, TaskId, WorkspaceStatusDto } from '@crewstation/contracts';
+import type { Actor, BranchDto, DevSessionDto, Manifest, OpenDevSessionV2Request, PreviewState, ProjectId, RebuildDevSessionRequest, TaskId, WorkspaceStatusDto } from '@crewstation/contracts';
 import { restartsFromScratch } from '@crewstation/contracts';
-import { forbidden, conflict, isPlatformError, notFound, precondition } from '@crewstation/kernel';
+import { forbidden, newId, conflict, isPlatformError, notFound, precondition } from '@crewstation/kernel';
+import { reserveDevelopmentImage } from './runtimeImageSelection';
 import { inspectWorkspace } from './workspaceStatus';
 import type { DevSessionUseCaseDeps } from './dependencies';
 import type { EnvironmentView } from '../ports/runtime';
@@ -40,7 +41,7 @@ export function sessionLifecycleUseCases(deps: DevSessionUseCaseDeps) {
     taskId: env.id, projectId: env.projectId, state: env.state === 'paused' ? 'running' : env.state, branch: env.branch ?? '', ...(env.podName ? { podName: env.podName } : {}),
     previewHost: `dev.${slug}.${settings.userDomain}`, preview, createdBy: (env as { createdBy?: DevSessionDto['createdBy'] }).createdBy ?? ('usr_00000000000000000000000000000000' as DevSessionDto['createdBy']),
     createdAt: env.createdAt, lastActivityAt: env.lastActivityAt, ...(reminderAt ? { idleReminderSentAt: reminderAt.toISOString() } : {}), ...(env.message ? { message: env.message } : {}),
-    rebuild: await environments.getRebuild(env.id),
+    rebuild: await environments.getRebuild(env.id), ...(env.runtimeImage ? { runtimeImage: env.runtimeImage } : {}), ...(env.image ? { image: env.image } : {}),
     ...(env.connectionIssue ? { connectionIssue: env.connectionIssue } : {}),
     // RFC-022：开始开发或重建的五段，全部由 task-runtime 产出；observedAt 供页面校正本机时钟。
     ...(env.startup ? { startup: { ...env.startup, observedAt: clock.now().toISOString() } } : {}),
@@ -67,7 +68,7 @@ export function sessionLifecycleUseCases(deps: DevSessionUseCaseDeps) {
   };
 
   return {
-    openSession: async (actor: Actor, projectId: ProjectId, input: OpenDevSessionRequest): Promise<DevSessionDto> => {
+    openSession: async (actor: Actor, projectId: ProjectId, input: OpenDevSessionV2Request): Promise<DevSessionDto> => {
       await authorizer.authorize(actor, projectId, 'develop');
       const svc = await svcOf(projectId);
       if (await environments.findDevSession(projectId)) throw conflict('该项目已有一个开发会话，请先释放');
@@ -81,7 +82,10 @@ export function sessionLifecycleUseCases(deps: DevSessionUseCaseDeps) {
       const preview = dev
         ? { command: dev.command, port: dev.port ?? manifest?.spec.service.port ?? settings.defaultPreviewPort, healthPath: dev.healthPath ?? manifest?.spec.service.healthPath ?? '/' }
         : manifest ? { command: manifest.spec.service.command, port: manifest.spec.service.port, healthPath: manifest.spec.service.healthPath } : undefined;
-      const env = await environments.createEnvironment({ serviceId: svc.serviceId, kind: 'dev-session', branch: input.branch, createdBy: actor.userId, ...(preview ? { preview } : {}), labels: { 'crewstation.io/project': svc.slug, 'crewstation.io/service': svc.name } });
+      const imageTaskId = newId('tsk') as TaskId;
+      const runtimeImage = await reserveDevelopmentImage(deps, actor, projectId, { type: 'session', id: imageTaskId }, input.runtimeImageVersionId);
+      const env = await environments.createEnvironment({ ...(runtimeImage ? { runtimeImage, runtimeImageTaskId: imageTaskId } : {}), serviceId: svc.serviceId, kind: 'dev-session', branch: input.branch, createdBy: actor.userId, ...(preview ? { preview } : {}), labels: { 'crewstation.io/project': svc.slug, 'crewstation.io/service': svc.name } });
+      if (runtimeImage) await deps.runtimeImages!.confirm(runtimeImage, { type: 'session', id: env.id });
       const dto = await toDto(env, svc.slug, 'starting');
       // 回收是顺带的：失败只记下来，不影响已经开好的新会话。
       if (reclaim) await environments.releaseEnvironment(reclaim.id, 'failed').catch((error: unknown) => deps.logger.warn('failed dev session not reclaimed', { taskId: reclaim.id, error: String(error) }));

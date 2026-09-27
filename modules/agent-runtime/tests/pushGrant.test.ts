@@ -31,4 +31,21 @@ describe('推送凭据（RFC-006 C18）', () => {
     expect(registryDecision(grant, 'GET', '/v2/runtime/../cs-api/manifests/dev')).toBe('deny');
     expect(registryDecision(grant, 'GET', '/v2/runtimex/app/manifests/1')).toBe('deny');
   });
+
+  test('构建凭据跨仓库挂载同时要求来源读取权，不能借目标写权复制别的项目 blob', () => {
+    const scoped: PushGrant = { ...grant, push: ['runtime/projects/p1/b1/'], pull: ['crewstation/task-runtime'] };
+    const target = '/v2/runtime/projects/p1/b1/image/blobs/uploads/';
+    const digest = `sha256:${'a'.repeat(64)}`;
+    const mount = (from: string) => `${target}?mount=${digest}&from=${encodeURIComponent(from)}`;
+    expect(registryDecision(scoped, 'POST', mount('crewstation/task-runtime'))).toBe('allow');
+    expect(registryDecision(scoped, 'POST', mount('runtime/projects/p1/b1/other'))).toBe('allow');
+    for (const from of ['runtime/projects/p2/b1/image', 'runtime/projects/p1/b2/image', 'crewstation/task-runtime/private', '../crewstation/task-runtime']) {
+      expect(registryDecision(scoped, 'POST', mount(from))).toBe('deny');
+    }
+    expect(registryDecision(scoped, 'POST', `${target}?mount=${digest}`)).toBe('deny');
+    expect(registryDecision(scoped, 'POST', `${mount('crewstation/task-runtime')}&from=private/image`)).toBe('deny');
+    expect(registryDecision(scoped, 'POST', `${mount('crewstation/task-runtime')}&mount=${digest}`)).toBe('deny');
+    expect(registryDecision(scoped, 'GET', '/v2/crewstation/task-runtime/private/manifests/v1')).toBe('deny');
+    expect(registryDecision(scoped, 'PATCH', `${target}upload-id?_state=signed-state`)).toBe('allow');
+  });
 });

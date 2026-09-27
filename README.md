@@ -53,7 +53,7 @@ CrewStation 是面向全公司各团队的数字人构建、发布与运行平�
 - 切流到 prod 与回退：两个域名同时在服务，切流记录写明来自哪个版本。
 - 经网关登录后注入身份请求头，样例页读出当前用户。
 - 开发会话：init 容器按所选分支克隆仓库，TaskRunner 连上 cs-session，Web 终端有真正的控制终端与作业控制。
-- 业务子任务契约：样例的 `/chat` 建业务任务，子任务等容器就绪后运行 Agent 并返回输出。
+- 业务子任务契约：原 v2 样例的 `/chat` 保持原行为；[v3 独立样例](templates/business-execution-v3/README.md) 演示 PG 写屏障、90 秒异步命令、事件补读、文件和持久任务暂停恢复。v3 发布验收进度见 [RFC-027](proposal/rfc/RFC-027-business-execution-contract/acceptance.md)。
 - 事件链：内置事件生产者投递 → cs-events 去重扇出 → 样例页列出这次投递及其 trace id。
 - 两个 Agent CLI 装进任务镜像，以降权用户启动并报出各自的原生会话 id；OpenCode 1.18.29 已产出真实模型输出、并行跑过两个原生会话、在验证项目里改过文件。
 - 两个平台 MCP 从开发容器内可达，用会话级令牌鉴权，返回真实平台数据。
@@ -402,7 +402,7 @@ bun run scaffold:module <name> <layer> [--deps a,b] [--desc "职责"] [--no-pers
 | 接入容器 | 管理员建的平台项目，Manifest 类型为 `APIProxy`（纯转发公司接口）或 `EventProducer`（把公司 Webhook 转成平台事件）；与数字人一样建仓、发布、切流 |
 | 算力档位 | 管理员定义的完整 Agent 执行配置：协议、按摘要固定的镜像、二进制与参数、启动前步骤、变量与凭据、模型、资源；保存即实测 |
 | TaskRunner | 任务容器里的常驻进程（独立 UID），主动连出到 cs-session，负责启动 Agent、执行命令、读写文件 |
-| 业务子任务 | 业务服务经子任务契约层交给业务执行 Agent 的一次执行，`oneshot` 或 `interactive`，只带 `agentProfile` 与输出契约 |
+| 业务子任务 | 业务服务提交的一次执行；v2 为 Agent oneshot/interactive，v3 增加异步命令、独立 Agent、稳定身份、事件/文件/会话与明确的取消恢复契约 |
 | 能力说明 | 工作台的能力页与能力说明 MCP：实时列出本服务已获授权的接口、数据绑定、订阅、额度与环境 |
 
 已作废、不要再引入的概念（主 Agent、Agent 角色、Checkpoint、ZIP 导入、出站白名单等）列在 [`CLAUDE.md`](CLAUDE.md) 的「Terminology」一节。

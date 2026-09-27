@@ -16,6 +16,7 @@ async function check(deps: Deps, scope: RepositoryScope, actor: Actor, target: C
   const id = target.serviceId as ServiceId, physical = target.physicalSlot;
   if (!physical) throw precondition('缺少物理部署槽');
   const slots = await scope.slots.get(id); if (!slots) throw precondition('部署槽不存在');
+  if (await scope.handoffs.active(id)) throw precondition('执行交接尚未完成，请先完成交接');
   const projection = (await scope.maintenance.projection(id)).find((s) => s.physical === physical);
   if (!projection || projection.revision !== target.domainRevision) throw conflict('部署槽角色或发布配置已变化');
   const pending = await scope.maintenance.active(id);

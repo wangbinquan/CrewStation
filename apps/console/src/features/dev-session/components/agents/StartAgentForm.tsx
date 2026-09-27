@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react';
+import { RuntimeImagePicker } from '../../../../shared/runtime-images/RuntimeImagePicker';
 import { api } from '../../../../shared/api/client';
 import { queryKeys } from '../../../../shared/api/queryKeys';
 import { useApiQuery } from '../../../../shared/api/useApi';
@@ -32,16 +33,17 @@ export function StartAgentForm({ projectId, creation }: StartAgentFormProps): Re
   const ready = profiles.data !== undefined && block === undefined && prompt.trim() !== '';
   return (
     <FormDialog title={t('devSession.agents.start')} submitLabel={busy ? t('devSession.agents.starting') : t('devSession.agents.startSubmit')} submitDisabled={!ready || busy}
-      error={creation.error} dirty={creation.dirty && !busy} onClear={() => edit({ compute: '', prompt: '' })} onClose={() => creation.setOpen(false)} onSubmit={start}>
+      error={creation.error} dirty={creation.dirty && !busy} onClear={() => edit({ compute: '', prompt: '', runtimeImageVersionId: '' })} onClose={() => creation.setOpen(false)} onSubmit={start}>
       <div className={styles.row}>
         <label htmlFor="agent-compute">{t('devSession.agents.compute')}</label>
-        <select id="agent-compute" className={styles.select} value={compute} disabled={busy} onChange={(event) => edit({ compute: event.target.value })}>
+        <select id="agent-compute" className={styles.select} value={compute} disabled={busy} onChange={(event) => edit({ compute: event.target.value, runtimeImageVersionId: '' })}>
           <ComputeOptions items={options} withDescription />
         </select>
       </div>
       {profiles.isPending ? <PaneNotice tone="info">{t('devSession.agents.computeLoading')}</PaneNotice> : null}
       {!profiles.isPending && options.length === 0 ? <PaneNotice tone="warning">{t('devSession.agents.computeEmpty')}</PaneNotice> : null}
       {options.length > 0 && blockText ? <PaneNotice tone="warning">{blockText}</PaneNotice> : null}
+      <RuntimeImagePicker projectId={projectId} usage="agent" profileId={resolveChoice(options, compute)?.id} value={creation.runtimeImageVersionId} onChange={(runtimeImageVersionId) => edit({ runtimeImageVersionId })} disabled={busy} />
       <textarea
         className={styles.prompt}
         rows={3}

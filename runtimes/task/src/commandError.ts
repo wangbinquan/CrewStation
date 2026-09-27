@@ -14,6 +14,8 @@ export const notFound = (what: string): RunnerCommandError => new RunnerCommandE
 export const alreadyExists = (code: string, what: string): RunnerCommandError => new RunnerCommandError(code, `${what} 已存在`);
 
 const KIND_TO_CODE: Record<ErrorKind, string> = {
+  payload_too_large: 'payload_too_large',
+  gone: 'resource_gone',
   not_found: 'not_found',
   conflict: 'conflict',
   forbidden: 'forbidden',

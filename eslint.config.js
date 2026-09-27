@@ -30,6 +30,8 @@ const consoleFeatureIsolation = consoleFeatures.map((feature) => {
 export default tseslint.config(
   { ignores: ['**/node_modules/**', '**/dist/**', '**/generated/**', 'integrations/**', 'templates/**'] },
   ...tseslint.configs.recommended,
+  // 构建示例特意验证 Node CommonJS 包加载；仅这个 .cjs 保留 require，平台源码仍使用 ESM。
+  { files: ['deploy/examples/runtime-tools/node/check.cjs'], rules: { '@typescript-eslint/no-require-imports': 'off' } },
   {
     files: ['**/*.ts', '**/*.tsx'],
     rules: {

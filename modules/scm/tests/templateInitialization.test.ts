@@ -82,10 +82,10 @@ describe('creation template initialization', () => {
     const source = directoryTemplateSource({ templatesRoot, integrationTemplatesRoot, resources: { allocate: async () => Bun.randomUUIDv7(), ensureDefinition: async () => {}, eventType: async () => Bun.randomUUIDv7() } });
     const items = await source.list();
     expect(items.map((item) => [item.name, item.kind])).toEqual([
-      ['gitlab-event-producer', 'EventProducer'], ['minimal-sample', 'DigitalWorker'], ['reference-api-proxy', 'APIProxy'],
+      ['business-execution-v3', 'DigitalWorker'], ['gitlab-event-producer', 'EventProducer'], ['minimal-sample', 'DigitalWorker'], ['reference-api-proxy', 'APIProxy'],
     ]);
-    expect(items[0]?.requiredConfig).toContainEqual({ name: 'GITLAB_WEBHOOK_SECRET_TOKEN', from: 'secret' });
-    expect(items[1]?.requiredConfig).toEqual([]);
+    expect(items.find((item) => item.name === 'gitlab-event-producer')?.requiredConfig).toContainEqual({ name: 'GITLAB_WEBHOOK_SECRET_TOKEN', from: 'secret' });
+    expect(items.find((item) => item.name === 'minimal-sample')?.requiredConfig).toEqual([]);
     const target = await fixture();
     expect((await target.templates.list()).map((item) => item.name)).toEqual(['custom-template']);
     await source.materialize('01a0bf5d-8f4b-7004-9cf7-0eb8bf66ffbc', join(target.root, 'copied-integration'), '01a0bf5d-8f4b-76b5-8a28-f084e91fddf4', { projectId, serviceId });

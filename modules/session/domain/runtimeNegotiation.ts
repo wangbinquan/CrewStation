@@ -3,12 +3,18 @@ import { TASKRUNNER_PROTOCOL_VERSION, TaskIdSchema } from '@crewstation/contract
 import { PlatformError } from '@crewstation/kernel';
 
 const LANGUAGE_LABEL: Record<string, string> = { shell: 'Shell（bash）', python: 'Python 3', javascript: 'JavaScript（bun）' };
+const BUSINESS_EXECUTION_COMMANDS: ReadonlySet<RunnerCommand['type']> = new Set(['sendBusinessMessage', 'getBusinessMessage', 'startBusinessAgent', 'businessExecutionInfo', 'startBusinessCommand', 'getBusinessExecution', 'cancelBusinessExecution', 'readBusinessExecutionEvents', 'ackBusinessExecutionEvents', 'readBusinessFile', 'listBusinessFiles']);
 
 /**
  * RFC-006：档位的启动只能发给理解该协议、且装有启动前脚本所需解释器的 Runner。在写 socket 之前拒绝，
  * 让原因以管理员能处理的话回到调用方，而不是让 Runner 半途失败。
  */
 export function assertLaunchSupported(command: RunnerCommand, capabilities: RunnerHello['capabilities']): void {
+  if ((command.type === 'runtimeInitializationStatus' || command.type === 'cancelRuntimeInitialization') && capabilities.runtimeInitialization !== 1) throw new PlatformError('precondition', '当前任务容器未声明运行镜像初始化能力', { code: 'unsupported_capability', capability: 'runtimeInitialization' });
+  if (BUSINESS_EXECUTION_COMMANDS.has(command.type) && capabilities.businessExecutionV3 !== 1) {
+    throw new PlatformError('precondition', '当前任务容器未声明可靠业务执行能力', { code: 'unsupported_capability', capability: 'businessExecutionV3' });
+  }
+  if (command.type === 'startBusinessAgent') { assertLaunchSupported(command.agent, capabilities); return; }
   if (command.type !== 'startAgent' && command.type !== 'startAgentTerminal' && command.type !== 'probeTerminal') return;
   const material = command.beforeStart;
   if (!capabilities.protocols.includes(command.launch.protocol)) {

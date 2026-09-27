@@ -18,6 +18,7 @@
     "@crewstation/module-release": "workspace:*",
     "@crewstation/module-task-runtime": "workspace:*",
     "@crewstation/persistence": "workspace:*",
+    "@crewstation/secretbox": "workspace:*",
     "drizzle-orm": "0.45.2",
     "hono": "4.13.7",
     "zod": "4.6.2"

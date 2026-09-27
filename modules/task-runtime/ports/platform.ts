@@ -1,4 +1,4 @@
-import type { Actor, ProjectId, RunnerCommand, RunnerEvent, RunnerHello, ServiceId, TaskId, TaskProfileDto } from '@crewstation/contracts';
+import type { RuntimeImageExecutionSnapshot, Actor, ProjectId, RunnerCommand, RunnerEvent, RunnerHello, ServiceId, TaskId, TaskProfileDto } from '@crewstation/contracts';
 
 export interface ProjectAuthorizer {
   authorize(actor: Actor, projectId: ProjectId, action: 'view' | 'develop' | 'force-release-session'): Promise<unknown>;
@@ -33,6 +33,10 @@ export interface SourceCheckoutSource {
 
 /** 由 config 与 data 模块提供：开发组配置与开发库／任务级数据访问的环境变量。 */
 export interface EnvironmentSources {
+  /** 将平台默认任务镜像固定到仓库摘要，已受理环境及重建不重新解析。 */
+  pinTaskImage?(image: string): Promise<string>;
+  /** 仅内部已准入快照可调用；值只进入这次启动的不可变 Runner Secret。 */
+  runtimeImageSecrets?(projectId: ProjectId, owner: { type: 'agent' | 'task' | 'session' | 'validation'; id: string }, snapshot: RuntimeImageExecutionSnapshot): Promise<Record<string, string>>;
   configEnv(projectId: ProjectId, env: 'development' | 'production'): Promise<Record<string, string>>;
   dataEnv(serviceId: ServiceId, env: 'development' | 'production'): Promise<Record<string, string>>;
   taskDataEnv(taskId: TaskId): Promise<Record<string, string>>;

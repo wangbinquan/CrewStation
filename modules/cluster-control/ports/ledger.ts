@@ -6,6 +6,7 @@ import type { ObservedCondition } from '../domain/observation';
 export interface LedgerRecordView {
   readonly id: string;
   readonly kind: string;
+  readonly owner?: { readonly module: string; readonly ref: string };
   readonly projectId?: string;
   readonly parentId?: string;
   readonly desired: 'present' | 'absent';
@@ -103,6 +104,7 @@ export interface JobRef {
  */
 export interface JobOwners {
   jobEnvValues(ref: JobRef): Promise<Readonly<Record<string, string>>>;
+  imageBuildSecretValues?(ref: { readonly recordId: string; readonly buildId: string; readonly executionEpoch: number }): Promise<Readonly<Record<string, string>>>;
 }
 
 /** 旧形状的所属对象（收编空跑用）：按任务标签查任务环境，由组合根从身份目录与 task-runtime 取。 */

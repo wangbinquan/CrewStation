@@ -1,9 +1,11 @@
-import type { DevSessionDto, OpenDevSessionRequest } from '@crewstation/contracts';
+import type { DevSessionDto, OpenDevSessionV2Request } from '@crewstation/contracts';
 import type { UseMutationResult } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { ReactElement } from 'react';
 import type { ApiClientError } from '../../../shared/api/useApi';
 import { errorMessage, retryableReadError } from '../../../shared/api/useApi';
+import { RuntimeImagePicker } from '../../../shared/runtime-images/RuntimeImagePicker';
+import { useProjectScope } from '../../../shared/project/ProjectScope';
 import { useT } from '../../../shared/lib/useT';
 import { Button } from '../../../shared/ui/Button';
 import { ConfirmationDialog } from '../../../shared/ui/dialog/ConfirmationDialog';
@@ -17,7 +19,7 @@ import styles from './OpenSessionForm.module.css';
 export interface OpenSessionFormProps {
   readonly branches: BranchesHandle;
   /** 与页面共用一个开会话请求（表单只传分支；失败后「重试」另带 restartOf）。 */
-  readonly open: UseMutationResult<DevSessionDto, ApiClientError, string | OpenDevSessionRequest>;
+  readonly open: UseMutationResult<DevSessionDto, ApiClientError, string | OpenDevSessionV2Request>;
   readonly previousTaskId?: string;
   /** 放在「从远端另建工作树」弹窗里：不画面板外框与标题，弹窗标题已经说明。 */
   readonly embedded?: boolean;
@@ -28,7 +30,9 @@ export interface OpenSessionFormProps {
  * 会话失败后从远端另建时先确认离开失败会话（确认弹窗，2026-09-23 起），默认聚焦「保留当前工作区」。
  */
 export function OpenSessionForm({ branches, open, previousTaskId, embedded = false }: OpenSessionFormProps): ReactElement {
-  const t = useT();
+  const t = useT(), { projectId } = useProjectScope();
+  const [runtimeImageVersionId, setRuntimeImageVersionId] = useState('');
+  const launch = (branch: string) => open.mutate({ branch, ...(runtimeImageVersionId ? { runtimeImageVersionId } : {}) });
   const [picked, setPicked] = useState('');
   const [confirmedBranch, setConfirmedBranch] = useState<string>();
   // 分支还在加载时 picked 为空，用缺省分支兜底；用户选过之后以选择为准。
@@ -41,14 +45,15 @@ export function OpenSessionForm({ branches, open, previousTaskId, embedded = fal
           {t('devSession.open.branch')}
         </label>
         <BranchSelect id="dev-session-branch" branches={branches.branches} value={branch} disabled={branches.isPending || open.isPending || confirmedBranch !== undefined} onChange={setPicked} />
-        <Button variant="primary" disabled={branch === '' || branches.isPending || branches.loadError !== null || open.isPending || confirmedBranch !== undefined} onClick={() => previousTaskId ? setConfirmedBranch(branch) : open.mutate(branch)}>
+        <Button variant="primary" disabled={branch === '' || branches.isPending || branches.loadError !== null || open.isPending || confirmedBranch !== undefined} onClick={() => previousTaskId ? setConfirmedBranch(branch) : launch(branch)}>
           {open.isPending ? t('devSession.open.pending') : t(previousTaskId ? 'devSession.failed.open' : 'devSession.open.submit')}
         </Button>
       </div>
+      <RuntimeImagePicker projectId={projectId} usage="task" value={runtimeImageVersionId} onChange={setRuntimeImageVersionId} disabled={open.isPending || confirmedBranch !== undefined} />
       {confirmedBranch !== undefined ? <ConfirmationDialog question={t('devSession.failed.question', { taskId: previousTaskId ?? '', branch: confirmedBranch })}
         hint={t('devSession.failed.newWorkspace')} confirmLabel={t('devSession.failed.confirm')} cancelLabel={t('devSession.failed.cancel')} focus="cancel"
         busy={open.isPending} confirmDisabled={branches.loadError !== null || branches.isPending}
-        onConfirm={() => { open.mutate(confirmedBranch); setConfirmedBranch(undefined); }} onCancel={() => setConfirmedBranch(undefined)} /> : null}
+        onConfirm={() => { launch(confirmedBranch); setConfirmedBranch(undefined); }} onCancel={() => setConfirmedBranch(undefined)} /> : null}
       {branches.loadError !== null ? <PaneNotice tone="warning">{errorMessage(branches.loadError)}{retryableReadError(branches.loadError) ? ` ${t('ui.status.autoRetry')}` : ''}</PaneNotice> : null}
       {!branches.isPending && !branches.loadError && branches.branches.length === 0 ? <PaneNotice tone="info">{t('devSession.open.noBranches')}</PaneNotice> : null}
       {open.error !== null ? <PaneNotice tone="warning">{errorMessage(open.error)}</PaneNotice> : null}

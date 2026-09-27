@@ -1,3 +1,4 @@
+import { BusinessReleaseMaterialsSchema } from '../api/business/releaseMaterials';
 import { z } from 'zod';
 import { ProjectIdSchema, ReleaseIdSchema, ServiceIdSchema, SubtaskIdSchema, TaskIdSchema, TraceIdSchema } from '../ids';
 import { ManifestSchema } from '../manifest/manifest';
@@ -39,6 +40,7 @@ export const ReleaseRegisteredSchema = z.object({
   manifest: ManifestSchema,
   /** exposes 指向的 OpenAPI 文档内容（已解析），由 release 模块从标签处读取。 */
   openapiDocument: z.unknown().optional(),
+  executionMaterials: BusinessReleaseMaterialsSchema.optional(),
 });
 
 /** offline：所在的待命槽已下线（RFC-021），可从发布记录重新部署。 */

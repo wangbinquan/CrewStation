@@ -1,5 +1,5 @@
 import type { ReleaseDevSessionResult } from '@crewstation/api-client';
-import type { DevSessionDto, OpenDevSessionRequest } from '@crewstation/contracts';
+import type { DevSessionDto, OpenDevSessionV2Request } from '@crewstation/contracts';
 import type { UseMutationResult } from '@tanstack/react-query';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
@@ -15,7 +15,7 @@ export interface DevSessionHandle {
   readonly missing: boolean;
   readonly loadError: ApiClientError | null;
   /** 传分支开新会话；按原分支重新开始时连同失败的那个会话一起传（restartOf）。 */
-  readonly open: UseMutationResult<DevSessionDto, ApiClientError, string | OpenDevSessionRequest>;
+  readonly open: UseMutationResult<DevSessionDto, ApiClientError, string | OpenDevSessionV2Request>;
   readonly release: UseMutationResult<ReleaseDevSessionResult, ApiClientError, boolean>;
 }
 
@@ -46,7 +46,7 @@ export function useDevSession(projectId: string): DevSessionHandle {
     isPending: firstLoad,
     missing: absent,
     loadError: absent ? null : query.error,
-    open: useApiMutation((input: string | OpenDevSessionRequest) => api.devSession.open(projectId, typeof input === 'string' ? { branch: input } : input), { invalidate: [key] }),
+    open: useApiMutation((input: string | OpenDevSessionV2Request) => api.devSession.open(projectId, typeof input === 'string' ? { branch: input } : input), { invalidate: [key] }),
     release: useApiMutation((force: boolean) => api.devSession.release(projectId, { force, ...(query.data ? { expectedTaskId: query.data.taskId } : {}) }), { invalidate: [key] }),
   };
 }

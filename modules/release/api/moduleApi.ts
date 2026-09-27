@@ -20,6 +20,7 @@ export interface JobRef {
 }
 
 export interface ActiveEndpoint {
+  releaseId?: ReleaseId;
   physical: PhysicalSlot;
   namespace: string;
   kubernetesService: string;
@@ -29,6 +30,9 @@ export interface ActiveEndpoint {
 /** release 模块对外能力：发布、切流、查询；流水线推进由工作器调用。 */
 export interface ReleaseModuleApi {
   readonly name: 'release';
+  getHandoff(actor: Actor, serviceId: ServiceId, id: string): Promise<TrafficSwitchDto>;
+  latestHandoff(actor: Actor, serviceId: ServiceId): Promise<TrafficSwitchDto | null>;
+  progressHandoffs(): Promise<number>;
   listClusterSlots(): Promise<Array<{ serviceId: string; physical: PhysicalSlot; role: 'prod' | 'preview'; releaseId?: string; state: string; manifestReplicas?: number; overrideReplicas?: number; plan?: string; revision: string }>>;
   inspectSlotOperation(actor: Actor, target: ClusterResource, request: ClusterInspectRequest): Promise<Pick<ClusterInspection, 'capability' | 'domain'>>;
   executeSlotOperation(actor: Actor, operation: ClusterOperation, inspection: ClusterInspection): Promise<{ operationId: string }>;

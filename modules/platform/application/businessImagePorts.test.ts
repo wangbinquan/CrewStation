@@ -1,0 +1,27 @@
+import { expect, test } from 'bun:test';
+import type { Actor, ProjectId, RuntimeImageExecutionSnapshot, TaskId } from '@crewstation/contracts';
+import { newResourceId } from '@crewstation/kernel';
+import { businessImagePorts } from './businessImagePorts';
+
+test('业务任务和 Agent 使用各自 owner、允许集合与固定档位验证，不互相继承', async () => {
+  type Bindings = Parameters<typeof businessImagePorts>[0];
+  const reservations: Array<Parameters<Bindings['reserveImage']>> = [], confirmations: Array<Parameters<Bindings['confirmReference']>> = [];
+  const copies: Array<Parameters<Bindings['copyReference']>> = [];
+  const releases: Array<Parameters<Bindings['releaseReference']>> = [];
+  const actor: Actor = { userId: newResourceId() as Actor['userId'], isAdmin: true };
+  const digest = `sha256:${'a'.repeat(64)}`, selected: RuntimeImageExecutionSnapshot = { versionId: newResourceId(), image: `registry.test/tools@${digest}`, digest, architecture: 'linux/amd64', initializer: { steps: [], env: {}, secrets: [] }, tools: [], initializerDigest: digest, validationId: newResourceId(), selectionSource: 'request' };
+  const ports = businessImagePorts({ releaseReference: async (...args) => { releases.push(args); }, reserveImage: async (...args) => { reservations.push(args); return selected; }, confirmReference: async (...args) => { confirmations.push(args); }, copyReference: async (...args) => { copies.push(args); } }, actor);
+  const project = newResourceId() as ProjectId, parent = newResourceId() as TaskId, child = newResourceId() as TaskId;
+  const selection = { allowedRuntimeImageVersionIds: [selected.versionId] }, profile = { profileId: newResourceId(), revision: 3 };
+  expect(await ports.reserveAgent(project, child, selection, profile, selected.versionId)).toEqual(selected);
+  expect(reservations[0]).toEqual([actor, project, { owner: { type: 'agent', id: child }, selection, target: { usage: 'agent', profile }, requestedVersionId: selected.versionId }]);
+  await ports.confirmAgent(selected, child);
+  await ports.reserveTask(project, parent, { runtimeImageVersionId: selected.versionId }); await ports.confirmTask(selected, parent);
+  expect(reservations[1]![2]).toEqual({ owner: { type: 'task', id: parent }, selection: { runtimeImageVersionId: selected.versionId }, target: { usage: 'task' } });
+  expect(confirmations).toEqual([[selected.versionId, { type: 'agent', id: child }], [selected.versionId, { type: 'task', id: parent }]]);
+  const resumed = newResourceId() as TaskId;
+  await ports.restoreAgent(project, selected, child, resumed);
+  expect(copies).toEqual([[project, selected.versionId, { type: 'agent', id: child }, { type: 'agent', id: resumed }]]);
+  await ports.release(selected, { type: 'agent', id: resumed }); await ports.release(selected, { type: 'task', id: parent });
+  expect(releases).toEqual([[selected.versionId, { type: 'agent', id: resumed }], [selected.versionId, { type: 'task', id: parent }]]);
+});

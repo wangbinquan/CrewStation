@@ -1,3 +1,6 @@
+import { BusinessOutputMaterialSchema } from '../api/business/releaseMaterials';
+import { BusinessMaterialRequestSchema } from '../api/business/materials';
+import { BusinessMessageCommands, BusinessMessageReceiptSchema } from './businessMessages';
 import { z } from 'zod';
 import { SubtaskIdSchema, TaskIdSchema } from '../ids';
 import { AgentPermissionSchema, OutputContractSchema } from '../manifest/tasks';
@@ -9,6 +12,9 @@ import { ComparisonDetailQuerySchema, ComparisonDetailsSchema, GitObjectIdSchema
 import { NativeTerminalRecordSchema, NativeTerminalRosterSchema, TerminalControlSchema, TerminalControlStateSchema, TerminalHolderSchema, TerminalSizeSchema, TerminalSnapshotSchema } from './nativeTerminal';
 import { BeforeStartErrorSchema, BeforeStartExecutionSchema, BeforeStartMaterialSchema, RunnerInterpreterSchema } from './beforeStart';
 import { AgentProtocolSchema, LaunchSpecSchema } from './launch';
+import { BusinessExecutionCommands, BusinessExecutionEventSchema, BusinessExecutionInfoSchema, BusinessExecutionReceiptSchema } from './businessExecution';
+import { RuntimeInitializationStatusSchema } from './runtimeInitialization';
+import { BusinessDirectoryDtoSchema, BusinessFileDtoSchema } from '../api/business/files';
 
 /**
  * TaskRunner ↔ cs-session 协议版本；不兼容变更递增，双方在 hello 时校验。
@@ -42,6 +48,10 @@ export const RunnerHelloSchema = z.object({
      * 开发会话是长活对象，升版会让集群里正跑的旧镜像容器握手即被拒，等于强制所有人释放会话。
      */
     previewControl: z.literal(1).optional(),
+    /** RFC-027: reliable business execution, materials and replay; omitted by older runners. */
+    businessExecutionV3: z.literal(1).optional(),
+    /** RFC-028：逐容器初始化、工具检查、持久去重和命令门控。 */
+    runtimeInitialization: z.literal(1).optional(),
     /** 2026-09-23：输入控制记住持有人、同一用户的另一视图直接转移，换人或释放即推 `terminalControl` 事件。同样用能力位而不升协议版本。 */
     terminalControl: z.literal(1).optional(),
     /** 容器内实际可用的脚本解释器清单；缺少所需语言的启动在执行前被拒。 */
@@ -70,6 +80,9 @@ const ProfileLaunchShape = {
 };
 
 export const StartAgentCommandSchema = z.object({
+  businessOutputContract: BusinessOutputMaterialSchema.optional(),
+  businessSkills: BusinessMaterialRequestSchema.shape.skills.optional(),
+  businessSecretEnvNames: z.array(z.string()).max(1024).optional(),
   ...cmd('startAgent'),
   agentId: z.string().min(1),
   ...ProfileLaunchShape,
@@ -80,6 +93,14 @@ export const StartAgentCommandSchema = z.object({
   // headless 与业务子任务要解析事件与会话：通用终端协议只能进「＋ CLI」（RFC-006 C6）。
   if (command.launch.protocol === 'terminal') ctx.addIssue({ code: 'custom', message: '通用终端协议的档位只能用于「＋ CLI」', path: ['launch', 'protocol'] });
 });
+
+/** A v3 Agent has its own durable execution identity and async receipt. */
+export const StartBusinessAgentCommandSchema = z.object({
+  ...cmd('startBusinessAgent'), executionId: z.string().min(1).max(128), attempt: z.number().int().positive(),
+  incarnation: z.uuid(), payloadDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  digestNonce: z.string().regex(/^[a-f0-9]{64}$/),
+  agent: StartAgentCommandSchema.strict(),
+}).strict();
 
 export const StartAgentTerminalCommandSchema = z.object({
   ...cmd('startAgentTerminal'),
@@ -128,6 +149,11 @@ export const ProbeTerminalResultSchema = z.object({
 export const PREVIEW_LOG_LIMITS = { maxLines: 2000, maxBytes: 256 * 1024, maxLineBytes: 8 * 1024, defaultLimit: 200 } as const;
 
 export const RunnerCommandSchema = z.discriminatedUnion('type', [
+  z.object({ ...cmd('runtimeInitializationStatus') }).strict(),
+  z.object({ ...cmd('cancelRuntimeInitialization') }).strict(),
+  ...BusinessExecutionCommands,
+  StartBusinessAgentCommandSchema,
+  ...BusinessMessageCommands,
   StartAgentCommandSchema,
   StartAgentTerminalCommandSchema,
   ProbeTerminalCommandSchema,
@@ -177,6 +203,13 @@ export const PreviewLogLineSchema = z.object({
 });
 
 export const RunnerResultPayloads = {
+  runtimeInitialization: RuntimeInitializationStatusSchema,
+  businessMessage: BusinessMessageReceiptSchema,
+  businessExecutionInfo: BusinessExecutionInfoSchema,
+  businessExecution: BusinessExecutionReceiptSchema,
+  businessExecutionEvents: z.array(BusinessExecutionEventSchema),
+  businessFile: BusinessFileDtoSchema,
+  businessFiles: BusinessDirectoryDtoSchema,
   invokeApi: ApiInvocationResultSchema,
   startAgentTerminal: NativeTerminalRecordSchema,
   probeTerminal: ProbeTerminalResultSchema,
@@ -246,3 +279,5 @@ export type PreviewLogLine = z.infer<typeof PreviewLogLineSchema>;
 export type PreviewStatusPayload = z.infer<(typeof RunnerResultPayloads)['previewStatus']>;
 export type PreviewLogsPayload = z.infer<(typeof RunnerResultPayloads)['previewLogs']>;
 export type FileEntry = z.infer<typeof FileEntrySchema>;
+
+export type StartBusinessAgentCommand = z.infer<typeof StartBusinessAgentCommandSchema>;

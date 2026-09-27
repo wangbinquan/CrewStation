@@ -1,7 +1,8 @@
+import { drizzleContractRepository } from './contractRepository';
 import { publishDomainEvent } from '@crewstation/eventbus';
 import type { Database, Executor } from '@crewstation/persistence';
 import type { RepositoryScope, UnitOfWork } from '../../ports/repositories';
-import { drizzleContractRepository, drizzleSubtaskRepository, drizzleTaskRepository } from './drizzleRepositories';
+import { drizzleSubtaskRepository, drizzleTaskRepository } from './drizzleRepositories';
 
 export function scopeOver(executor: Executor): RepositoryScope {
   return {

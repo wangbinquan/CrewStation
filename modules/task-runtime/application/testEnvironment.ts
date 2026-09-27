@@ -1,5 +1,5 @@
-import type { TaskId, TraceId } from '@crewstation/contracts';
-import { newId, newTraceId, quotaExceeded, validation } from '@crewstation/kernel';
+import type { RuntimeImageProbeInput, TaskId, TraceId } from '@crewstation/contracts';
+import { newId, newTraceId, precondition, quotaExceeded, validation } from '@crewstation/kernel';
 import { failStartup, initialStartup } from '../domain/podStartup';
 import { hashRunnerToken, newRunnerToken } from '../domain/runnerToken';
 import { PROFILE_TEST_MAX_CONCURRENT, PROFILE_TEST_PROJECT_ID, PROFILE_TEST_SERVICE, PROFILE_TEST_SERVICE_ID } from '../domain/profileTestEnvironment';
@@ -10,6 +10,7 @@ import { containerEnv } from './containerEnv';
 import type { TaskRuntimeUseCaseDeps } from './dependencies';
 
 export interface TestEnvironmentInput {
+  validation?: RuntimeImageProbeInput;
   /** 档位修订按摘要固定的镜像：测试与真实启动拉同一份。 */
   image: string;
   /** 档位的资源套餐；不填用平台默认套餐。 */
@@ -30,19 +31,28 @@ export function createTestEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
     if (!profile) throw validation(`任务套餐 ${profileName} 不存在`, { code: 'task_profile_not_found', taskProfile: profileName });
     const token = newRunnerToken();
     const now = clock.now();
-    const id = newId('tsk') as TaskId;
+    const id = (input.validation?.validationId ?? newId('tsk')) as TaskId;
+    if (input.validation && deps.creation !== 'ledger') throw precondition('运行镜像验证必须使用资源台账');
     const env: TaskEnvironment = {
       id, projectId: PROFILE_TEST_PROJECT_ID, serviceId: PROFILE_TEST_SERVICE_ID, kind: 'profile-test', state: 'creating', volumeMode: 'follow-container', profile: profile.id,
       namespace: settings.systemNamespace, podName: podNameFor(id), pvcName: pvcNameFor(id), traceId: newTraceId() as TraceId, runnerTokenHash: hashRunnerToken(token), connected: false,
-      labels: input.labels ?? {}, createdAt: now, updatedAt: now, lastActivityAt: now, startup: initialStartup(now),
+      labels: { ...input.labels, ...(input.validation ? { 'crewstation.io/runtime-validation': input.validation.validationId } : {}) }, createdAt: now, updatedAt: now, lastActivityAt: now, startup: initialStartup(now),
     };
     // 由资源中心建出（RFC-025 I25 第四步）：只到登记为止，Runner Secret 与 Pod 由调和器照记录建，凭据不再以明文环境变量写进 Pod 规格。
-    const rendered = deps.creation === 'ledger' ? { ...env, render: { image: input.image, workerUid: settings.workerUid, resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, start: 1, workVolume: 'emptyDir' as const } } : undefined;
-    await uow.run(async (scope) => {
+    const rendered = deps.creation === 'ledger' ? { ...env, render: { ...(input.validation ? { runtimeImage: input.validation.snapshot, runtimeValidation: { projectId: input.validation.projectId, usage: input.validation.agent ? 'agent' as const : 'task' as const, quotaHeld: true } } : {}), image: input.image, workerUid: settings.workerUid, resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, start: 1, workVolume: 'emptyDir' as const } } : undefined;
+    const existing = await uow.run(async (scope) => {
       await scope.admissions.lock(PROFILE_TEST_PROJECT_ID);
+      if (input.validation) {
+        const old = await scope.environments.getById(id);
+        if (old) {
+          if (old.labels['crewstation.io/runtime-validation'] !== id || ['released', 'releasing', 'failed'].includes(old.state) || old.render?.runtimeImage?.versionId !== input.validation.snapshot.versionId || old.render?.runtimeValidation?.projectId !== input.validation.projectId) throw precondition('验证身份已停止或由其他材料占用，不能重建');
+          return old;
+        }
+      }
       if (!(await scope.admissions.tryAcquire(PROFILE_TEST_PROJECT_ID, PROFILE_TEST_MAX_CONCURRENT))) throw quotaExceeded(`同时进行的档位测试已达 ${PROFILE_TEST_MAX_CONCURRENT} 个，请稍后重测`);
       await scope.environments.insert(rendered ?? env);
     });
+    if (existing) return existing;
     if (rendered) return rendered;
     try {
       const envVars = await containerEnv(deps, env, PROFILE_TEST_SERVICE, token);

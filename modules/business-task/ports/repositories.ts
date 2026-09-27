@@ -1,4 +1,4 @@
-import type { DomainPayload, DomainTopicName, ProjectId, ServiceId, SubtaskId, TaskId } from '@crewstation/contracts';
+import type { DomainPayload, DomainTopicName, ProjectId, ReleaseId, ServiceId, SubtaskId, TaskId } from '@crewstation/contracts';
 import type { BusinessTask } from '../domain/businessTask';
 import type { ContractRegistration } from '../domain/contractRegistry';
 import type { SubtaskRun } from '../domain/subtaskRun';
@@ -32,6 +32,7 @@ export interface SubtaskRepository {
 
 export interface ContractRepository {
   save(registration: ContractRegistration): Promise<void>;
+  forRelease(serviceId: ServiceId, releaseId: ReleaseId): Promise<ContractRegistration | undefined>;
   latest(serviceId: ServiceId): Promise<ContractRegistration | undefined>;
 }
 

@@ -5,5 +5,5 @@
   "type": "module",
   "description": "Kubernetes API 客户端封装与对象构造器（Namespace、Deployment、Job、Pod、PVC、NetworkPolicy、IngressRoute）",
   "exports": { ".": "./index.ts" },
-  "dependencies": { "@crewstation/kernel": "workspace:*" }
+  "dependencies": { "@crewstation/kernel": "workspace:*", "@crewstation/contracts": "workspace:*" }
 }

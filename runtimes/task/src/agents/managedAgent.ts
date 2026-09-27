@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import type { AgentEvent, BeforeStartMaterial } from '@crewstation/contracts';
 import type { Logger } from '@crewstation/kernel';
 import type { BeforeStartRunner } from '../beforeStart/beforeStartRunner';
@@ -17,6 +18,7 @@ export interface ManagedAgentDeps {
   commandEnv: Record<string, string>;
   material: BeforeStartMaterial;
   processAttemptId: string;
+  persistentHome?: string;
   logger: Logger;
 }
 
@@ -25,13 +27,14 @@ export interface ManagedAgentDeps {
  * 准备期间“环境准备中”不冒充“Agent 正在执行”；失败只发一条 before_start_failed 的 error 事件，不创建 CLI。
  */
 export class ManagedAgentProcess implements AgentProcess {
-  readonly events = createEventQueue<AgentEvent>();
+  readonly events: ReturnType<typeof createEventQueue<AgentEvent>>;
   private readonly event: ReturnType<typeof createAgentEventFactory>;
   private inner: AgentProcess | undefined;
   private cancelled = false;
   private readonly ready: Promise<void>;
 
   constructor(private readonly spec: AgentSpec, private readonly deps: ManagedAgentDeps) {
+    this.events = createEventQueue<AgentEvent>(spec.businessEvents ? 4 * 1024 * 1024 : undefined);
     this.event = createAgentEventFactory(spec.agentId);
     this.ready = this.begin();
   }
@@ -42,7 +45,7 @@ export class ManagedAgentProcess implements AgentProcess {
   }
 
   async cancel(): Promise<void> {
-    if (this.events.closed) return;
+    if (this.events.closed && !this.inner) return;
     if (!this.inner) {
       this.cancelled = true;
       this.deps.beforeStart.cancel(this.spec.agentId);
@@ -56,7 +59,7 @@ export class ManagedAgentProcess implements AgentProcess {
   private async begin(): Promise<void> {
     let outcome;
     try {
-      outcome = await this.deps.beforeStart.run({ agentId: this.spec.agentId, processAttemptId: this.deps.processAttemptId, material: this.deps.material, workspace: this.deps.cwd, mcp: this.spec.mcp });
+      outcome = await this.deps.beforeStart.run({ agentId: this.spec.agentId, processAttemptId: this.deps.processAttemptId, material: this.deps.material, workspace: this.deps.cwd, mcp: this.spec.mcp, persistentHome: this.deps.persistentHome });
     } catch (error) {
       const failure = error instanceof BeforeStartFailure ? error : undefined;
       if (this.cancelled || failure?.code === 'cancelled') { if (!this.events.closed) { this.events.push(this.event('cancelled', { result: { durationMs: 0 } })); this.events.close(); } return; }
@@ -66,15 +69,19 @@ export class ManagedAgentProcess implements AgentProcess {
       return;
     }
     if (this.cancelled) return;
-    const env = this.deps.launcher.baseEnv({ ...this.deps.commandEnv, ...outcome.env });
+    const env = this.deps.launcher.baseEnv({ ...this.deps.commandEnv, ...outcome.env, ...(this.spec.businessEvents ? { HOME: outcome.home, XDG_DATA_HOME: join(outcome.home, '.local/share'), XDG_CONFIG_HOME: join(outcome.home, '.config'), XDG_STATE_HOME: join(outcome.home, '.local/state') } : {}) });
     const context: AgentLaunchContext = { cwd: this.deps.cwd, env, launcher: this.deps.launcher, logger: this.deps.logger, managed: { home: outcome.home, runDir: outcome.runDir, ...(outcome.configFile ? { configFile: outcome.configFile } : {}) } };
-    this.inner = this.deps.driver.start(this.spec, context);
+    try { this.inner = this.deps.driver.start(this.spec, context); }
+    catch { this.events.push(this.event('error', { error: { code: 'spawn_failed', message: 'Agent 进程未能创建' } })); this.events.close(); return; }
     void this.forward(this.inner);
   }
 
   private async forward(inner: AgentProcess): Promise<void> {
     try { for await (const event of inner.events) this.events.push(event); }
-    catch (error) { this.events.push(this.event('error', { error: { code: 'driver_failed', message: error instanceof Error ? error.message : String(error) } })); }
+    catch (error) {
+      if (this.spec.businessEvents) this.events.fail(new RunnerCommandError('execution_unknown', 'Agent 事件流异常，进程退出尚未证明'));
+      else this.events.push(this.event('error', { error: { code: 'driver_failed', message: error instanceof Error ? error.message : String(error) } }));
+    }
     finally { this.events.close(); }
   }
 }

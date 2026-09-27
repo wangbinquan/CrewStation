@@ -12,6 +12,8 @@ import type { Hono } from 'hono';
 import { createBunWebSocket } from 'hono/bun';
 import { fetchForwarder } from './adapters/http/fetchForwarder';
 import { drizzleConnectionRegistry, drizzleRunnerEventStore } from './adapters/persistence/drizzleRepositories';
+import { drizzleBusinessExecutionStore } from './adapters/persistence/businessExecutions';
+import { businessIngestionWorker } from './workers/businessIngestionWorker';
 import type { SessionModuleApi } from './api/moduleApi';
 import { browserStreams } from './application/browserStreams';
 import { commandDispatch } from './application/commandDispatch';
@@ -52,6 +54,7 @@ export const sessionMigrations: MigrationSet = {
 
 export function createSessionModule(deps: SessionModuleDeps): SessionModule {
   const useCaseDeps: SessionUseCaseDeps = {
+    businessExecutions: drizzleBusinessExecutionStore(deps.db),
     events: drizzleRunnerEventStore(deps.db),
     legacyRunners: deps.identities ? legacyRunnerIdentity(deps.identities) : undefined,
     registry: drizzleConnectionRegistry(deps.db),
@@ -65,9 +68,14 @@ export function createSessionModule(deps: SessionModuleDeps): SessionModule {
   const hub = runnerHub(useCaseDeps);
   const dispatch = commandDispatch(useCaseDeps, hub);
   const streams = browserStreams(useCaseDeps, hub, dispatch);
+  const ingestion = businessIngestionWorker({ store: useCaseDeps.businessExecutions!, send: dispatch.sendLocalOnly, logger: useCaseDeps.logger,
+    connectedTasks: () => [...hub.connections].filter(([, connection]) => connection.hello.capabilities.businessExecutionV3 === 1).map(([taskId]) => taskId) });
   const { upgradeWebSocket, websocket } = createBunWebSocket<ServerWebSocket>();
   const api: SessionModuleApi = {
     name: 'session',
+    consumeBusinessExecution: (taskId, executionId, through, stopped) => useCaseDeps.businessExecutions!.consume(taskId, executionId, through, stopped),
+    getBusinessExecution: (taskId, executionId) => useCaseDeps.businessExecutions!.get(taskId, executionId),
+    listBusinessExecutionEvents: (taskId, executionId, after, limit) => useCaseDeps.businessExecutions!.list(taskId, executionId, after, limit),
     sendCommand: dispatch.sendCommand,
     connectionStatus: dispatch.connectionStatus,
     listEvents: async (taskId, options) => (await useCaseDeps.events.listSince(taskId, options.sinceSeq ?? 0, { limit: options.limit ?? 500, ...(options.kinds ? { kinds: options.kinds } : {}), ...(options.agentId ? { agentId: options.agentId } : {}) })).map((e) => ({ seq: e.seq, at: e.at.toISOString(), event: e.event })),
@@ -78,7 +86,7 @@ export function createSessionModule(deps: SessionModuleDeps): SessionModule {
     api,
     http: { runner: runnerSocketRoutes(hub, upgradeWebSocket), stream: browserSocketRoutes(streams, deps.isAdmin, upgradeWebSocket), internal: internalRoutes(dispatch, useCaseDeps) },
     websocket,
-    workers: [{ start: () => { timer ??= setInterval(() => void hub.tick(), 5000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } }],
+    workers: [{ start: () => { timer ??= setInterval(() => void hub.tick(), 5000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } }, ingestion],
     migrations: sessionMigrations,
   };
 }

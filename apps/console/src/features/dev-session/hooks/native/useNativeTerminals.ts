@@ -1,4 +1,4 @@
-import type { NativeTerminalDto, StartNativeTerminalRequest } from '@crewstation/contracts';
+import type { NativeTerminalDto, StartNativeTerminalV2Request } from '@crewstation/contracts';
 import { isApiClientError } from '@crewstation/api-client';
 import { useCallback, useEffect, useRef } from 'react';
 import { api } from '../../../../shared/api/client';
@@ -20,9 +20,9 @@ export function useNativeTerminals(taskId: string, channel: TaskStreamChannel, s
     return { ...list, items: list.items.map((item) => (item.startup ? { ...item, startup: stampReceived(item.startup, receivedAt)! } : item)) };
   }, { refetchIntervalMs: (data) => progressPollMs(data?.items.map((item) => item.startup) ?? [], STARTUP_POLL_MS, ROSTER_POLL_MS) });
   const { refetch } = query;
-  const pending = useRef<{ request: StartNativeTerminalRequest; replaces?: string } | null>(null);
+  const pending = useRef<{ request: StartNativeTerminalV2Request; replaces?: string } | null>(null);
   const locked = useRef(false);
-  const start = useApiMutation((input: StartNativeTerminalRequest) => api.devSession.startNativeTerminal(taskId, input), { invalidate: [key] });
+  const start = useApiMutation((input: StartNativeTerminalV2Request) => api.devSession.startNativeTerminal(taskId, input), { invalidate: [key] });
   const stop = useApiMutation((agentId: string) => api.devSession.stopNativeTerminal(taskId, agentId), { invalidate: [key] });
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -34,10 +34,10 @@ export function useNativeTerminals(taskId: string, channel: TaskStreamChannel, s
     return () => { unsubscribe(); if (timer) clearTimeout(timer); };
   }, [channel, refetch]);
   useEffect(() => { if (stream.runnerConnected) void refetch(); }, [stream.runnerConnected, stream.generation, refetch]);
-  const launch = useCallback((compute: string, replaces?: string) => {
+  const launch = useCallback((compute: string, replaces?: string, runtimeImageVersionId?: string) => {
     if (locked.current) return;
     locked.current = true;
-    pending.current ??= { request: { clientRequestId: crypto.randomUUID(), compute: compute ? { kind: 'profile', profileId: compute } : { kind: 'default' }, cols: 80, rows: 24 }, ...(replaces ? { replaces } : {}) };
+    pending.current ??= { request: { clientRequestId: crypto.randomUUID(), compute: compute ? { kind: 'profile', profileId: compute } : { kind: 'default' }, cols: 80, rows: 24, ...(runtimeImageVersionId ? { runtimeImageVersionId } : {}) }, ...(replaces ? { replaces } : {}) };
     const attempt = pending.current;
     start.mutate(attempt.request, {
       // 本窗口创建的 CLI：进程拉起时自动替创建者取得输入控制（RFC-022 D1）。

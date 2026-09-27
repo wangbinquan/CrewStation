@@ -1,4 +1,4 @@
-import type { ReleaseDto, ResourceRecord, SlotDto } from '@crewstation/contracts';
+import type { ReleaseDto, ResourceRecord, SlotDto, TrafficSwitchDto } from '@crewstation/contracts';
 import { testerSummaryFixture, trialMarketFixture } from './projectSummaryFixture';
 import { resourceView } from './resourceRecordFixture';
 
@@ -11,7 +11,7 @@ export function releaseDeliveryFixture() {
   const prod = makeRelease(prodId, 'v1.0.0', sha, time), candidate = makeRelease(targetId, 'v1.1.0', 'b'.repeat(40), '2026-09-13T02:00:00.000Z');
   const releases = [prod, candidate, makeRelease(historyId, 'v0.9.0', 'c'.repeat(40), '2026-09-12T01:00:00.000Z')];
   const slot = (name: 'prod' | 'preview', release: ReleaseDto): SlotDto => ({ name, active: name === 'prod', releaseId: release.id, tag: release.tag, commitSha: release.commitSha, replicas: 1, readyReplicas: 1, state: 'ready', host: name === 'prod' ? 'demo.cs.localhost' : 'preview.demo.cs.localhost' });
-  const state = { role: 'owner', admin: false, failSlots: false, failSwitch: false, mismatch: false, badRelease: false, hold: undefined as Promise<void> | undefined, slots: [slot('prod', prod), slot('preview', candidate)], records: [] as ResourceRecord[] };
+  const state = { handoff: null as TrafficSwitchDto | null, controlled: false, role: 'owner', admin: false, failSlots: false, failSwitch: false, mismatch: false, badRelease: false, hold: undefined as Promise<void> | undefined, slots: [slot('prod', prod), slot('preview', candidate)], records: [] as ResourceRecord[] };
   const writes: Array<{ path: string; body: Record<string, unknown> }> = [], reads: string[] = [];
   globalThis.fetch = (async (raw, init) => {
     const path = new URL(String(raw), 'http://localhost').pathname, method = init?.method ?? 'GET'; let body: unknown = { items: [] }, status = 200;
@@ -21,7 +21,8 @@ export function releaseDeliveryFixture() {
         if (state.failSwitch) { status = 412; body = { error: 'precondition', message: '当前版本含破坏性迁移，不能切回旧版本' }; }
         else {
           body = { id: 'tsw_example', serviceId, fromSlot: 'preview', toSlot: 'prod', releaseId: state.mismatch ? historyId : input.expectedTargetRelease, ...(input.expectedActiveRelease ? { previousReleaseId: input.expectedActiveRelease } : {}), actorUserId: userId, createdAt: time };
-          if (!state.mismatch) { const current = state.slots[0]!, target = state.slots[1]!; state.slots = [{ ...target, name: 'prod', active: true, host: current.host }, { ...current, name: 'preview', active: false, host: target.host }]; }
+          if (state.controlled) { state.handoff = { ...(body as TrafficSwitchDto), handoff: { stage: 'freezing' } }; body = state.handoff; }
+          if (!state.mismatch && !state.controlled) { const current = state.slots[0]!, target = state.slots[1]!; state.slots = [{ ...target, name: 'prod', active: true, host: current.host }, { ...current, name: 'preview', active: false, host: target.host }]; }
         }
       } else { status = 202; body = { ...candidate, commitSha: input.expectedCommitSha, status: 'pending' }; }
     } else {
@@ -33,6 +34,7 @@ export function releaseDeliveryFixture() {
       else if (path === `/v1/projects/${projectId}`) body = { id: projectId, serviceId, name: '演示应用', slug: 'demo', kind: state.admin ? 'APIProxy' : 'DigitalWorker', state: 'active', ownerUserId: userId };
       else if (path.endsWith('/slots')) { if (state.failSlots) { status = 503; body = { error: 'unavailable', message: '部署读取失败' }; } else body = { items: state.slots }; }
       else if (path.startsWith('/v1/releases/')) { const item = releases.find((release) => path.endsWith(release.id)); body = state.badRelease ? { ...item, serviceId: '01a0bf5d-8f4b-7f17-8623-f7330845107a' } : item; }
+      else if (path.endsWith('/execution-handoff')) body = state.handoff;
       else if (path.endsWith('/releases')) body = { items: releases };
       else if (path.endsWith('/branches')) body = { items: [{ name: 'main', headSha: sha, isDefault: true, behindPreview: null, behindProd: null }] };
       else if (path.endsWith('/tags')) body = { items: releases.map((release) => ({ name: release.tag, commitSha: release.commitSha, protected: true, createdAt: release.createdAt })) };

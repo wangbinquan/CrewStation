@@ -103,4 +103,23 @@ describe.skipIf(!available)('scm module', () => {
     expect((await app.request(`/v1/services/${unknownService}/repository`, { headers: asUser(owner.userId) })).status).toBe(404);
     expect((await app.request('/v1/services/not-an-id/repository', { headers: asUser(owner.userId) })).status).toBe(400);
   });
+
+  test('RFC-028 构建源码固定 SHA，跨项目绑定拒绝；短期构建凭据可提前撤销', async () => {
+    const original = (await scm.api.resolveBuildSource(owner, projectId, serviceId, 'main')).commitSha;
+    gitlab.setBranch('100', 'main', 'd'.repeat(40), true);
+    expect((await scm.api.resolveBuildSource(owner, projectId, serviceId, 'main')).commitSha).toBe('d'.repeat(40));
+    expect(original).not.toBe('d'.repeat(40));
+    await expect(scm.api.resolveBuildSource(owner, unknownService as unknown as ProjectId, serviceId, 'main')).rejects.toMatchObject({ kind: 'not_found' });
+    await expect(scm.api.resolveBuildSource(owner, projectId, serviceId, 'missing')).rejects.toMatchObject({ kind: 'not_found' });
+    await expect(scm.api.resolveBuildSource({ userId: stranger, isAdmin: false }, projectId, serviceId, 'main')).rejects.toMatchObject({ kind: 'not_found' });
+    await expect(scm.api.resolveBuildSource(owner, projectId, serviceId, 'bad\nref')).rejects.toMatchObject({ kind: 'validation' });
+    const credential = await scm.api.issueBuildCredential(serviceId, 15);
+    expect(credential.expiresAt).toBe(new Date(clock.now().getTime() + 900000).toISOString());
+    expect(credential.httpUrlWithCredentialTemplate).toContain('{token}');
+    await expect(scm.api.issueBuildCredential(serviceId, 121)).rejects.toMatchObject({ kind: 'validation' });
+    await expect(scm.api.revokeBuildCredential(unknownService, credential.id)).rejects.toMatchObject({ kind: 'not_found' });
+    await scm.api.revokeBuildCredential(serviceId, credential.id);
+    await scm.api.revokeBuildCredential(serviceId, credential.id);
+    expect([...gitlab.get('100').tokens.values()].find((v) => v.name === `cs-build-${credential.id}`)?.revoked).toBe(true);
+  });
 });

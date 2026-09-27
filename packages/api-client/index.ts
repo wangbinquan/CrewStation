@@ -32,3 +32,9 @@ export type { ComputeProfilesResource } from './resources/computeProfiles';
 export type { ClusterResourceClient } from './resources/cluster';
 export type { ResourcesResource } from './resources/resources';
 export { newDraftResourceId } from './resourceId';
+export { createBusinessExecutionClient } from './businessApiClient';
+export type { BusinessExecutionClient } from './businessApiClient';
+
+export type { RuntimeImagesResource, DevelopmentRuntimeImages } from './resources/runtimeImages';
+
+export type { LegacyRecoveryItem, LegacyRecoveryResult } from './resources/tasks';

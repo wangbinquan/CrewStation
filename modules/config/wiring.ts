@@ -13,6 +13,7 @@ import { deleteConfigItemUseCase } from './application/deleteConfigItem';
 import type { ConfigUseCaseDeps } from './application/dependencies';
 import { queryConfigUseCases } from './application/queryConfig';
 import { renderEnvUseCase } from './application/renderEnv';
+import { renderSecretDefinitionsUseCase, secretDefinitionVersionsUseCase, renderPinnedSecretDefinitionsUseCase } from './application/renderSecretDefinitions';
 import { configItemWriteUseCases } from './application/setConfigItem';
 import { validateManifestEnvUseCase } from './application/validateManifestEnv';
 import { ensureTemplateDefinitionUseCase } from './application/ensureTemplateDefinition';
@@ -53,6 +54,9 @@ export function createConfigModule(deps: ConfigModuleDeps): ConfigModule {
     deleteItem: deleteConfigItemUseCase(useCaseDeps),
     ...queryConfigUseCases(useCaseDeps),
     renderDefinitions: renderEnvUseCase(useCaseDeps, true),
+    secretDefinitionVersions: secretDefinitionVersionsUseCase(useCaseDeps),
+    renderPinnedSecretDefinitions: renderPinnedSecretDefinitionsUseCase(useCaseDeps),
+    renderSecretDefinitions: renderSecretDefinitionsUseCase(useCaseDeps),
     renderEnv: renderEnvUseCase(useCaseDeps),
     validateManifestEnv: validateManifestEnvUseCase(useCaseDeps),
   };

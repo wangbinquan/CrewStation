@@ -11,6 +11,8 @@ export type FetchInput = string | URL | Request;
 export type FetchLike = (input: FetchInput, init?: RequestInit) => Promise<Response>;
 
 export interface RequestOptions {
+  /** 本次调用的关联信息等请求头；同名时覆盖客户端缺省值。 */
+  readonly headers?: Readonly<Record<string, string>>;
   readonly query?: Query;
   /** 以 JSON 发送的请求体。 */
   readonly body?: unknown;
@@ -41,6 +43,7 @@ export function createTransport(options: TransportOptions = {}): Transport {
     baseUrl,
     request: async <T>(method: HttpMethod, path: string, request: RequestOptions = {}): Promise<T> => {
       const headers = new Headers({ accept: 'application/json', ...options.headers });
+      for (const [key, value] of Object.entries(request.headers ?? {})) headers.set(key, value);
       const init: RequestInit = { method, headers, credentials: 'include' };
       if (request.signal) init.signal = request.signal;
       if (request.keepalive !== undefined) init.keepalive = request.keepalive;

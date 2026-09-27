@@ -29,7 +29,7 @@ export async function loadSlotDtos(read: RepositoryScope, slots: ServiceSlots, p
   });
 }
 
-export interface ActiveEndpoint { physical: PhysicalSlot; namespace: string; kubernetesService: string; port: number }
+export interface ActiveEndpoint { releaseId?: ReleaseId; physical: PhysicalSlot; namespace: string; kubernetesService: string; port: number }
 
 export function releaseQueries(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'authorizer' | 'services' | 'hosts'>) {
   const { uow, authorizer, services, hosts } = deps;
@@ -76,7 +76,7 @@ export function releaseQueries(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'authorize
       const active = slots[slots.active];
       if (active.state === 'empty' || !active.releaseId) return undefined;
       const release = await uow.read.releases.getById(active.releaseId);
-      return { physical: slots.active, namespace: svc.namespace, kubernetesService: `${svc.name}-${slots.active}`, port: release?.manifest?.spec.service.port ?? 80 };
+      return { releaseId: active.releaseId, physical: slots.active, namespace: svc.namespace, kubernetesService: `${svc.name}-${slots.active}`, port: release?.manifest?.spec.service.port ?? 80 };
     },
     /**
      * 供 agent-runtime 删除档位前列出受影响项目（RFC-006 P8）：两个槽当前部署的版本里，Manifest 明确引用的算力档位 UUID。

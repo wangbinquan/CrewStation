@@ -19,7 +19,7 @@ metadata:
 spec:
   entryPoints: [web]
   routes:
-    - match: Host(`registry.cs.localhost`)
+    - match: Host(`registry.cs.localhost`) || Host(`registry-push.svc.cs.internal`)
       kind: Rule
       priority: 100
       middlewares: [{ name: forward-auth-registry }]

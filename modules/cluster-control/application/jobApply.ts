@@ -4,8 +4,10 @@ import { jobRenderOf } from '../domain/jobRender';
 import type { ClusterWriter, Ensured, ManagedObjectFeed } from '../ports/cluster';
 import type { JobOwners, LedgerObservations, LedgerRecordView } from '../ports/ledger';
 import type { ObservationStats } from './observeChange';
+import { applyImageBuild } from './imageBuildApply';
 
 export interface JobApplyDeps {
+  readonly signal?: AbortSignal;
   readonly ledger: LedgerObservations;
   readonly feed: ManagedObjectFeed;
   readonly cluster: ClusterWriter;
@@ -39,13 +41,20 @@ async function dropSecret(deps: JobApplyDeps, record: LedgerRecordView, job: Job
  * 旧形状（期望里没有 job，release 自己建的）不碰。
  */
 export async function applyJob(deps: JobApplyDeps, record: LedgerRecordView): Promise<void> {
+  if (record.spec['runtimeImageBuild'] !== undefined) return applyImageBuild(deps, record);
   if (record.spec['job'] === undefined) return;
   const job = jobRenderOf(record.spec);
   if (!job) {
     deps.logger.warn('resource job spec incomplete', { resourceId: record.id });
     return;
   }
-  if (isTrue(record, 'Finished') || isTrue(record, 'Failed')) return dropSecret(deps, record, job);
+  if (isTrue(record, 'Finished')) return dropSecret(deps, record, job);
+  if (isTrue(record, 'Failed')) {
+    if (job.purpose === 'migration' && deps.cluster.stopMigrationJob && await deps.cluster.stopMigrationJob(job)) {
+      await deps.ledger.observeConditions(record.id, [{ type: 'Stopped', status: 'true', reason: 'suspended-no-pods', message: '迁移 Job 已封锁，实际 Pod 已清理' }]);
+    }
+    return dropSecret(deps, record, job);
+  }
   if (deps.feed.cached('Job', job.namespace, job.name)) {
     await deps.ledger.observeConditions(record.id, [{ type: 'Created', status: 'true' }]);
     return;

@@ -1,3 +1,4 @@
+import { pauseBusinessWorkspace, resumeBusinessWorkspace } from './business/workspace';
 import type { TaskId } from '@crewstation/contracts';
 import { DomainTopic } from '@crewstation/contracts';
 import { notFound, precondition } from '@crewstation/kernel';
@@ -81,6 +82,7 @@ function resumeEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps, load: (taskId: T
   const { uow, cluster, services, settings, clock } = deps;
   return async (taskId: TaskId): Promise<TaskEnvironment> => {
     const env = await load(taskId);
+    if (env.render?.businessStorage) return resumeBusinessWorkspace(deps, env);
     if (env.state !== 'paused') throw precondition('只有暂停中的任务可以恢复');
     const svc = await services.resolveServiceById(env.serviceId);
     if (!svc) throw notFound('服务', env.serviceId);
@@ -92,7 +94,7 @@ function resumeEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps, load: (taskId: T
     const now = clock.now();
     // 由资源中心建出的环境（RFC-025 I25）：恢复即再启动一次——换一个 Runner Secret（第几次启动加一），Pod 由调和器照记录建。
     if (env.render) {
-      const restarted = transition(env, 'creating', now, { connected: false, podUid: undefined, startup: initialStartup(now), render: { ...env.render, start: env.render.start + 1 } });
+      const restarted = transition(env, 'creating', now, { connected: false, podUid: undefined, runtimeInitialization: undefined, startup: initialStartup(now), render: { ...env.render, start: env.render.start + 1 } });
       await uow.run(async (scope) => {
         await scope.quota.acquire(restarted, limit, `并发任务已达配额上限 ${limit}`);
         await scope.environments.update(restarted);
@@ -119,6 +121,7 @@ function pauseEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps, load: (taskId: Ta
   const { uow, cluster, clock } = deps;
   return async (taskId: TaskId): Promise<TaskEnvironment> => {
     const env = await load(taskId);
+    if (env.render?.businessStorage) return pauseBusinessWorkspace(deps, env);
     if (!canPause(env)) throw precondition('只有持久卷模式的运行中业务任务可以暂停');
     // 暂停时结束任务内全部 Agent 执行环境，恢复时不重起（RFC-006 P7）；子任务按「执行环境已结束」收尾。
     await uow.run(async (scope) => {

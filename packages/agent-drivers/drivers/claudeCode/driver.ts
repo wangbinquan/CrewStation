@@ -1,3 +1,4 @@
+import { stageBusinessSkills, nativeSkillRoots } from '../../injection/businessSkills';
 // ← agent-workflow `runtime/claudeCode/driver.ts` 的装配段（`assembleClaudePersonaSpawn` ＋
 // `writeClaudeMcpConfig`）。源里的 business 路径、边界、skill 投影、子代理注入、会话捕获、
 // 模型表都不复制（依据见包根 index.ts）。
@@ -45,6 +46,7 @@ async function prepareClaude(spec: DriverAgentSpec, context: DriverLaunchContext
   const mcpConfigFile = mcp === null ? undefined : await runDir.write('mcp-config.json', mcp.json);
   // RFC-004：管理员 settings.json 经唯一的 --settings 传入；headless 没有平台观测 hooks 要合成。
   const settingsFile = await writeMergedClaudeSettings(runDir, await readManagedClaudeSettings(context.managed), undefined);
+  const skills = await stageBusinessSkills(spec.businessSkills, context.host, nativeSkillRoots(context.cwd, context.managed?.home ?? context.env.HOME ?? '/', context.env.XDG_CONFIG_HOME));
   const files = {
     systemPromptFile,
     ...(mcpConfigFile === undefined ? {} : { mcpConfigFile }),
@@ -52,8 +54,8 @@ async function prepareClaude(spec: DriverAgentSpec, context: DriverLaunchContext
     ...(settingsFile === undefined ? {} : { settingsFile }),
   };
   return {
-    plan: (input) =>
-      buildClaudeSpawn(
+    plan: (input) => {
+      const plan = buildClaudeSpawn(
         {
           ...base,
           prompt: input.prompt,
@@ -61,11 +63,14 @@ async function prepareClaude(spec: DriverAgentSpec, context: DriverLaunchContext
           interactiveStream: input.resident,
         },
         files,
-      ),
+      );
+      if (skills) plan.cmd.push('--plugin-dir', skills.root);
+      return plan;
+    },
     parseEvent,
     detectSessionNotFound: detectClaudeSessionNotFound,
     encodeStreamFrame: claudeUserMessageFrame,
-    dispose: () => runDir.dispose(),
+    dispose: () => { skills?.dispose(); runDir.dispose(); },
   };
 }
 

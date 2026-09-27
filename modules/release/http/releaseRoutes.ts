@@ -21,6 +21,8 @@ export function releaseRoutes(api: ReleaseModuleApi, isAdmin: (userId: UserId) =
   r.get('/v1/releases/:releaseId', async (c) => c.json(await api.getRelease(await actor(c), parseParams(c, z.object({ releaseId: ReleaseIdSchema })).releaseId as ReleaseId)));
   r.get('/v1/services/:serviceId/slots', async (c) => c.json({ items: await api.getSlots(await actor(c), parseParams(c, serviceParams).serviceId as ServiceId) }));
   r.post('/v1/services/:serviceId/traffic-switch', async (c) => c.json(await api.switchTraffic(await actor(c), parseParams(c, serviceParams).serviceId as ServiceId, await parseBody(c, TrafficSwitchRequestSchema))));
+  r.get('/v1/services/:serviceId/execution-handoffs/:operationId', async (c) => c.json(await api.getHandoff(await actor(c), parseParams(c, serviceParams).serviceId, c.req.param('operationId'))));
+  r.get('/v1/services/:serviceId/execution-handoff', async (c) => c.json(await api.latestHandoff(await actor(c), parseParams(c, serviceParams).serviceId)));
   r.get('/v1/services/:serviceId/traffic-switches', async (c) => c.json({ items: await api.listTrafficSwitches(await actor(c), parseParams(c, serviceParams).serviceId as ServiceId) }));
   // RFC-021：待命槽的下线、推迟、重新部署与记录；平台设置里的自动下线时长。
   r.post('/v1/services/:serviceId/slots/preview/offline', async (c) => { const who = await actor(c); return c.json({ items: await api.takeOffline(who, parseParams(c, serviceParams).serviceId as ServiceId, await parseBody(c, TakeOfflineRequestSchema)) }); });

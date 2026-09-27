@@ -11,7 +11,7 @@ function slotObjects(spec: SlotDeploySpec): [K8sObject, K8sObject] {
   const service = spec.manifest.spec.service;
   return serviceSlotObjects({
     namespace: spec.namespace, project: spec.projectSlug, service: spec.serviceName, physical: spec.physical, releaseId: spec.releaseId, image: spec.image,
-    command: service.command, port: service.port, healthPath: service.healthPath, replicas: spec.replicas ?? service.replicas, resources: { cpu: spec.plan.cpu, memory: spec.plan.memory }, env: spec.env,
+    command: service.command, port: service.port, healthPath: service.healthPath, ...(service.probes ? { probes: service.probes } : {}), replicas: spec.replicas ?? service.replicas, resources: { cpu: spec.plan.cpu, memory: spec.plan.memory }, env: spec.env,
   });
 }
 

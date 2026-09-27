@@ -1,6 +1,6 @@
-import type { Actor, AgentInstanceDto, BranchDto, DevSessionDto, OpenDevSessionRequest, ProjectId, PublishDevSessionRequest, ReleaseDto, SendAgentMessageRequest, StartDevAgentRequest, TaskId, WorkspaceStatusDto } from '@crewstation/contracts';
+import type { Actor, AgentInstanceDto, BranchDto, DevSessionDto, OpenDevSessionV2Request, ProjectId, PublishDevSessionRequest, ReleaseDto, SendAgentMessageRequest, StartDevAgentV2Request, TaskId, WorkspaceStatusDto } from '@crewstation/contracts';
 import type { ComparisonDetailQuery, ComparisonDetails, ComparisonTarget, VersionComparisonDto } from '@crewstation/contracts';
-import type { NativeTerminalDto, NativeTerminalList, NativeTerminalSnapshotDto, StartNativeTerminalRequest } from '@crewstation/contracts';
+import type { NativeTerminalDto, NativeTerminalList, NativeTerminalSnapshotDto, StartNativeTerminalV2Request } from '@crewstation/contracts';
 import type { SaveWorkspaceLayoutRequest, WorkspaceLayoutDto } from '@crewstation/contracts';
 import type { AgentActivityPage, AgentActivityQuery, ReadAgentActivityRequest } from '@crewstation/contracts';
 import type { ApiInvocationRequest, ApiInvocationResponse } from '@crewstation/contracts';
@@ -9,7 +9,7 @@ import type { PreviewAction, PreviewLogsDto, PreviewLogsQuery, PreviewStatusDto 
 
 /** dev-session 对外能力：一项目一会话、分支、并行流式 Agent、从会话发布、空闲提醒。 */
 export interface NativeTerminalApi {
-  startNativeTerminal(actor: Actor, taskId: TaskId, input: StartNativeTerminalRequest): Promise<NativeTerminalDto>;
+  startNativeTerminal(actor: Actor, taskId: TaskId, input: StartNativeTerminalV2Request): Promise<NativeTerminalDto>;
   listNativeTerminals(actor: Actor, taskId: TaskId): Promise<NativeTerminalList>;
   stopNativeTerminal(actor: Actor, taskId: TaskId, agentId: string): Promise<void>;
   getNativeTerminalSnapshot(actor: Actor, taskId: TaskId, agentId: string): Promise<NativeTerminalSnapshotDto>;
@@ -34,7 +34,7 @@ export interface DevSessionModuleApi extends NativeTerminalApi {
   previewStatus(actor: Actor, projectId: ProjectId): Promise<PreviewStatusDto>;
   controlPreview(actor: Actor, projectId: ProjectId, action: PreviewAction): Promise<PreviewStatusDto>;
   previewLogs(actor: Actor, projectId: ProjectId, query: PreviewLogsQuery): Promise<PreviewLogsDto>;
-  openSession(actor: Actor, projectId: ProjectId, input: OpenDevSessionRequest): Promise<DevSessionDto>;
+  openSession(actor: Actor, projectId: ProjectId, input: OpenDevSessionV2Request): Promise<DevSessionDto>;
   getSession(actor: Actor, projectId: ProjectId): Promise<DevSessionDto | undefined>;
   listBranches(actor: Actor, projectId: ProjectId): Promise<BranchDto[]>;
   workspaceStatus(actor: Actor, projectId: ProjectId): Promise<WorkspaceStatusDto>;
@@ -42,7 +42,7 @@ export interface DevSessionModuleApi extends NativeTerminalApi {
   versionComparisonDetails(actor: Actor, projectId: ProjectId, comparisonId: string, query: ComparisonDetailQuery): Promise<ComparisonDetails>;
   refreshComparisonHistory(actor: Actor, projectId: ProjectId, target?: ComparisonTarget): Promise<VersionComparisonDto>;
   releaseSession(actor: Actor, projectId: ProjectId, options?: { force?: boolean; expectedTaskId?: TaskId }): Promise<{ session: DevSessionDto; unpushed: string[] | null; workspace: WorkspaceStatusDto }>;
-  startAgent(actor: Actor, taskId: TaskId, input: StartDevAgentRequest): Promise<AgentInstanceDto>;
+  startAgent(actor: Actor, taskId: TaskId, input: StartDevAgentV2Request): Promise<AgentInstanceDto>;
   sendMessage(actor: Actor, taskId: TaskId, agentId: string, input: SendAgentMessageRequest): Promise<void>;
   cancelAgent(actor: Actor, taskId: TaskId, agentId: string): Promise<void>;
   listAgents(actor: Actor, taskId: TaskId): Promise<AgentInstanceDto[]>;

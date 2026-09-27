@@ -3,8 +3,10 @@ import type { Clock, Logger } from '@crewstation/kernel';
 import type { CommandForwarder, SessionSettings } from '../ports/forwarding';
 import type { ConnectionRegistry, RunnerEventStore } from '../ports/repositories';
 import type { RunnerAuth, TaskAccess } from '../ports/taskRuntime';
+import type { BusinessExecutionStore } from '../ports/businessExecutions';
 
 export interface SessionUseCaseDeps {
+  businessExecutions?: BusinessExecutionStore;
   legacyRunners?: LegacyRunnerBoundary;
   events: RunnerEventStore;
   registry: ConnectionRegistry;

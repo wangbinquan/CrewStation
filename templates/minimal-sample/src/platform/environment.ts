@@ -5,7 +5,7 @@
 export const PLATFORM_ENV = {
   project: 'CS_PROJECT',
   service: 'CS_SERVICE',
-  /** preview｜prod：同一个生产服务的两个蓝绿槽。 */
+  /** blue｜green：物理槽标识；prod／preview 角色随切流变化，不能从此变量判断执行权。 */
   slot: 'CS_SLOT',
   /** production｜development：两个槽都是 production，开发会话是 development。 */
   environment: 'CS_ENVIRONMENT',

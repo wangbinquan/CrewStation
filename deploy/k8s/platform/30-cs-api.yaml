@@ -27,6 +27,7 @@ spec:
             - secretRef: { name: crewstation-metrics, optional: true }
             - secretRef: { name: crewstation-secrets }
           env:
+            - { name: CS_PLATFORM_POD_UID, valueFrom: { fieldRef: { fieldPath: metadata.uid } } }
             - { name: POD_IP, valueFrom: { fieldRef: { fieldPath: status.podIP } } }
 
           readinessProbe: { httpGet: { path: /healthz, port: 8080 }, periodSeconds: 5, timeoutSeconds: 5 }

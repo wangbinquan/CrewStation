@@ -1,3 +1,5 @@
+import type { ExecutionHandoff } from '../ports/executionHandoff';
+import type { ReleaseRuntimeImages } from '../ports/runtimeImages';
 import type { Clock, Logger } from '@crewstation/kernel';
 import type { ImageBuilder, MigrationRunner, ReleaseJobs, SlotDeployer, SlotRenderer } from '../ports/delivery';
 import type { ConfigSource, DataSource, HostNaming, MaintenanceWindow, PlanCatalog, ProjectAuthorizer, ProjectOwners, ReleaseSettings, ServiceResolver, SlotNotifier } from '../ports/platform';
@@ -5,7 +7,9 @@ import type { ReleaseTagger, RepoReader } from '../ports/sourceControl';
 import type { UnitOfWork } from '../ports/unitOfWork';
 
 export interface ReleaseUseCaseDeps {
+  executionHandoff?: ExecutionHandoff;
   uow: UnitOfWork;
+  runtimeImages?: ReleaseRuntimeImages;
   tagger: ReleaseTagger;
   repo: RepoReader;
   builder: ImageBuilder;

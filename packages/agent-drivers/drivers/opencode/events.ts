@@ -1,3 +1,4 @@
+import { businessUsage } from '../businessUsage';
 // ← agent-workflow `runtime/opencode/events.ts`，`--format json` 行 → NormalizedEvent。
 // 与源的差异：新增 `tool` 的尽力提取（源只判定 kind）；`error` 行取厂商的错误文案作 text（源留空，下游只能拿到「运行时报告错误」，
 // 2026-09-18 实机：业务子任务把 OpenCode Zen 的 403 报成这一句）；其余（文本提取、kind 推断、token 累计）原样。
@@ -25,6 +26,7 @@ export function parseEvent(line: string): NormalizedEvent | null {
   if (evt === null) return null;
   const tool = extractToolCall(evt);
   return {
+    businessUsage: businessUsage('opencode', evt),
     kind: inferEventKind(evt),
     text: evt.type === 'error' ? extractErrorText(evt) : extractTextFromEvent(evt),
     // 与 Claude 不同：opencode 每个事件的顶层 `sessionID` 就是会话 id，没有根／侧链之分。

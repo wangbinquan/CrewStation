@@ -37,6 +37,8 @@ export function gitLabGatewayAdapter(client: GitLabClient): GitLabGateway {
     },
     listTags: async (id) => (await client.listTags(id)).map(toRemoteTag),
     readFile: async (id, path, ref) => orUndefined(client.getRawFile(id, path, ref)),
+    resolveCommit: async (id, ref) => (await orUndefined(client.getCommit(id, ref)))?.id,
+    listTree: (id, ref) => client.getRepositoryTree(id, '', { ref, recursive: true }),
     createTag: async (id, input) => toRemoteTag(await client.createTag(id, input)),
     ensureTagProtection: async (id, pattern) => {
       if ((await client.listProtectedTags(id)).some((t) => t.name === pattern)) return;
@@ -47,8 +49,8 @@ export function gitLabGatewayAdapter(client: GitLabClient): GitLabGateway {
       }
     },
     countCommitsBehind: async (id, { from, to }) => (await orUndefined(client.compare(id, from, to)))?.commitCount,
-    createAccessToken: async (id, { name, expiresOn }) => {
-      const created = await client.createProjectAccessToken(id, { name, scopes: SESSION_TOKEN_SCOPES, expiresAt: expiresOn, accessLevel: GITLAB_ACCESS_LEVEL.developer });
+    createAccessToken: async (id, { name, expiresOn, readOnly }) => {
+      const created = await client.createProjectAccessToken(id, { name, scopes: readOnly ? ['read_repository'] : SESSION_TOKEN_SCOPES, expiresAt: expiresOn, accessLevel: readOnly ? GITLAB_ACCESS_LEVEL.reporter : GITLAB_ACCESS_LEVEL.developer });
       return { id: String(created.id), token: created.token };
     },
     revokeAccessToken: async (id, tokenId) => { await orUndefined(client.revokeProjectAccessToken(id, Number(tokenId))); },

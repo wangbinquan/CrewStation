@@ -47,7 +47,7 @@ export function slotSpecOf(serviceId: string, service: Pick<SlotService, 'name' 
     children: [{ kind: 'Deployment', namespace: service.namespace, name }, { kind: 'Service', namespace: service.namespace, name }, { kind: 'Secret', namespace: service.namespace, name: envSecret }],
     slot: {
       serviceId, project: service.slug, service: service.name, physical, releaseId: workload.releaseId, revision: workload.revision, image: workload.image, command: [...workload.command],
-      port: workload.port, healthPath: workload.healthPath, replicas: workload.replicas, resources: { ...workload.resources }, envSecret, ...(workload.restartedAt ? { restartedAt: workload.restartedAt } : {}),
+      port: workload.port, healthPath: workload.healthPath, ...(workload.probes ? { probes: workload.probes } : {}), replicas: workload.replicas, resources: { ...workload.resources }, envSecret, ...(workload.restartedAt ? { restartedAt: workload.restartedAt } : {}),
     },
   };
 }

@@ -1,0 +1,108 @@
+import { join } from 'node:path';
+import type { Actor, UserId } from '@crewstation/contracts';
+import type { Clock, Logger } from '@crewstation/kernel';
+import { noopLogger, systemClock } from '@crewstation/kernel';
+import type { Database, MigrationSet } from '@crewstation/persistence';
+import { readMigrationDir } from '@crewstation/persistence';
+import type { AppEnv } from '@crewstation/http';
+import type { Hono } from 'hono';
+import type { RuntimeEnvironmentModuleApi } from './api/moduleApi';
+import type { RuntimeInitializationSecrets, RuntimeImageAuthorizer, RuntimeImageLimits, RuntimeImageSourceResolver, RuntimeImageValidationContracts } from './ports/platform';
+import { runtimeImageUnitOfWork } from './adapters/persistence/unitOfWork';
+import { developmentImagePolicy } from './application/developmentPolicy';
+import { developmentImageRoutes } from './http/developmentRoutes';
+import { runtimeImageCatalog } from './application/catalog';
+import { runtimeImageBuilds } from './application/builds';
+import { runtimeImageRoutes } from './http/imageRoutes';
+import { runtimeImageValidations } from './application/validations';
+import { runtimeImageReferences } from './application/references';
+import { runtimeImageVersionLifecycle } from './application/versionLifecycle';
+import { runtimeImageVersionRoutes } from './http/versionRoutes';
+import type { RuntimeImageBuildExecutor } from './ports/buildExecutor';
+import type { RuntimeImageValidationExecutor } from './ports/validationExecutor';
+import { validationExecutorWithServices } from './application/validation/service';
+import { runtimeImageValidationController } from './application/validation/controller';
+import { runtimeImageBuildController } from './application/buildController';
+import type { K8sClient } from '@crewstation/k8s';
+import { precondition } from '@crewstation/kernel';
+import { periodicJob, type LeasePort } from '@crewstation/resource-runtime';
+import type { ImageBuild, ImageRevision } from './domain/records';
+import { runtimeImageBuildPlan, type RuntimeImageBuilderSettings } from './domain/buildPlan';
+import type { RuntimeRegistryLayout, RegistryRepositoryAccess } from './domain/registryReference';
+import type { ImageBuildBase, ImageSourceRepository } from './ports/sourceRepository';
+import type { RuntimeBuildLedger } from './ports/buildLedger';
+import type { RuntimeBuildCredentials } from './ports/buildCredentials';
+import { databaseBuildIntents } from './adapters/persistence/buildIntents';
+import { kubernetesRuntimeImageBuildExecutor } from './adapters/k8s/buildExecutor';
+import { httpRuntimeImageRegistry } from './adapters/registry/runtimeImageRegistry';
+import { runtimeImageBuildSecretValues } from './application/buildSecretValues';
+import { configuredImageResolver, serviceImageResolver } from './adapters/registry/serviceImage';
+import { runtimeImageSourcePreparation } from './application/sourcePreparation';
+import { runtimeImageReferenceReconciliation } from './application/referenceReconciliation';
+import type { RuntimeImageReferenceOwners } from './ports/referenceOwners';
+
+export const runtimeEnvironmentMigrations: MigrationSet = { module: 'runtime-environment', layer: 4, files: readMigrationDir(join(import.meta.dir, 'adapters', 'persistence', 'migrations')) };
+
+export interface RuntimeEnvironmentModuleDeps {
+  readonly referenceOwners?: RuntimeImageReferenceOwners;
+  readonly db: Database;
+  readonly authorizer: RuntimeImageAuthorizer;
+  readonly sources: RuntimeImageSourceResolver;
+  readonly validationContracts: RuntimeImageValidationContracts;
+  readonly initializationSecrets?: RuntimeInitializationSecrets;
+  readonly buildExecutor: RuntimeImageBuildExecutor;
+  readonly validationExecutor?: RuntimeImageValidationExecutor;
+  readonly limits: RuntimeImageLimits;
+  readonly clock?: Clock;
+  readonly logger?: Logger;
+  isAdmin(id: UserId): Promise<boolean>;
+}
+
+export interface RuntimeEnvironmentModule {
+  readonly api: RuntimeEnvironmentModuleApi;
+  readonly http: Hono<AppEnv>[];
+  readonly migrations: MigrationSet;
+}
+
+export function createRuntimeEnvironmentModule(deps: RuntimeEnvironmentModuleDeps): RuntimeEnvironmentModule {
+  const useCases = { ...deps, uow: runtimeImageUnitOfWork(deps.db), clock: deps.clock ?? systemClock, logger: deps.logger ?? noopLogger };
+  const api: RuntimeEnvironmentModuleApi = { name: 'runtime-environment', reconcileReferences: runtimeImageReferenceReconciliation(useCases), ...developmentImagePolicy(useCases), ...runtimeImageValidationController(useCases, deps.validationExecutor), ...runtimeImageCatalog(useCases), ...runtimeImageBuilds(useCases), ...runtimeImageValidations(useCases), ...runtimeImageReferences(useCases), ...runtimeImageVersionLifecycle(useCases), ...runtimeImageBuildController(useCases, deps.buildExecutor) };
+  return { api, http: [developmentImageRoutes(api, deps.isAdmin), runtimeImageRoutes(api, deps.isAdmin), runtimeImageVersionRoutes(api, deps.isAdmin)], migrations: runtimeEnvironmentMigrations };
+}
+
+export interface ManagedRuntimeEnvironmentDeps extends Omit<RuntimeEnvironmentModuleDeps, 'sources' | 'buildExecutor'> {
+  readonly k8s: K8sClient; readonly ledger: RuntimeBuildLedger; readonly leases: LeasePort; readonly instance: string;
+  readonly credentials: RuntimeBuildCredentials; readonly sourceRepository: ImageSourceRepository; readonly bases: ImageBuildBase;
+  readonly registry: RuntimeRegistryLayout; readonly builder: RuntimeImageBuilderSettings;
+  existingImageAccess(actor: Actor, projectId: string): Promise<RegistryRepositoryAccess>;
+  buildContext(build: ImageBuild, revision: ImageRevision): Promise<{ namespace: string; slug: string; repositoryUrl: string }>;
+  /** 由平台确认 builder 无法绕过仓库鉴权入口；失败时不能创建构建。 */
+  assertBuildIsolation(): Promise<void>;
+}
+
+/** Kubernetes／资源台账装配；源码授权和凭据权限继续由各自所属模块提供。 */
+export function createManagedRuntimeEnvironmentModule(deps: ManagedRuntimeEnvironmentDeps) {
+  const clock = deps.clock ?? systemClock, logger = deps.logger ?? noopLogger;
+  const registry = httpRuntimeImageRegistry(deps.registry), uow = runtimeImageUnitOfWork(deps.db);
+  const intents = databaseBuildIntents(deps.db, deps.ledger, clock);
+  const executor = kubernetesRuntimeImageBuildExecutor({ ...deps, intents, registry, registryBase: deps.registry.pullBase, holder: deps.instance,
+    plan: async (build, revision) => { await deps.assertBuildIsolation(); return runtimeImageBuildPlan(build, revision, await deps.buildContext(build, revision), deps.builder, clock.now()); },
+  });
+  const bases: ImageBuildBase = { resolve: async (actor, projectId, source) => {
+    const reference = await deps.bases.resolve(actor, projectId, source); if (!reference) return undefined;
+    if (!reference.startsWith(`${deps.registry.pullBase}/`)) throw precondition('平台底座不在受管仓库');
+    const repository = reference.slice(deps.registry.pullBase.length + 1).split('@')[0]!.replace(/:[^/]*$/, '');
+    const inspected = await registry.inspect(reference, source.architecture, { exact: [repository] });
+    return `${inspected.repository}@${inspected.digest}`;
+  } };
+  const sources = runtimeImageSourcePreparation(deps.sourceRepository, bases, { resolve: async (actor, projectId, reference, architecture) => {
+    const image = await registry.inspect(reference, architecture, await deps.existingImageAccess(actor, projectId));
+    return `${image.repository}@${image.digest}`;
+  } });
+  const mod = createRuntimeEnvironmentModule({ ...deps, sources, buildExecutor: executor, validationExecutor: validationExecutorWithServices(registry, deps.registry.pullBase, deps.validationExecutor) });
+  const secretValues = runtimeImageBuildSecretValues(intents, deps.credentials, uow.read.revisions.get);
+  return { ...mod, pinServiceImage: serviceImageResolver(deps.registry), pinPlatformImage: configuredImageResolver(deps.registry),
+    imageBuildSecretValues: async (input: Parameters<typeof secretValues>[0]) => { await deps.assertBuildIsolation(); return secretValues(input); },
+    workers: [periodicJob(async () => { await mod.api.reconcileReferences(); }, () => logger.warn('runtime image reference worker failed'), 30000), periodicJob(mod.api.reconcileValidations, () => logger.warn('runtime image validation worker failed'), 2000), periodicJob(mod.api.reconcileBuilds, () => logger.warn('runtime image build worker failed'), 2000)],
+  };
+}

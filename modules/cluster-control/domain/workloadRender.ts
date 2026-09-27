@@ -1,9 +1,15 @@
+import type { BusinessStorage } from '@crewstation/contracts';
+import { BusinessStorageSchema, TaskIdSchema } from '@crewstation/contracts';
+
 /**
  * 工作区记录（开发会话、业务任务，RFC-025 I25）里调和器建出容器要用的期望，task-runtime 写、不含凭据：
  * Pod 的镜像、资源、标签、工作卷、检出与 Runner Secret 名；开发预览的端口与主机。Pod 与预览的对象名取自期望里的子对象。
  * 记录是数据：字段不全或类型不对就不渲染，不猜。
  */
 export interface WorkloadPodRender {
+  readonly expectedVolumeUid?: string;
+  readonly runtimeInitialization?: true;
+  readonly businessStorage?: BusinessStorage;
   readonly name: string;
   readonly namespace: string;
   readonly taskId: string;
@@ -91,14 +97,21 @@ function podOf(recordId: string, pod: unknown, child: { readonly namespace?: str
   // 工作目录：自己的 PVC 或 Pod 内的临时目录，正好一个。
   if (text(pod['pvc']) === (pod['emptyDir'] === true)) return undefined;
   if (!texts(pod['resources'], ['cpu', 'memory', 'storage'])) return undefined;
+  if (pod['expectedVolumeUid'] !== undefined && (!text(pod['expectedVolumeUid']) || !text(pod['pvc']))) return undefined;
+  if (pod['runtimeInitialization'] !== undefined && pod['runtimeInitialization'] !== true) return undefined;
   const checkout = pod['checkout'], extras = extrasOf(pod);
+  const businessStorage = pod['businessStorage'] === undefined ? undefined : BusinessStorageSchema.safeParse(pod['businessStorage']);
+  if (businessStorage && (!businessStorage.success || !TaskIdSchema.safeParse(recordId).success || !text(pod['pvc']) || pod['workload'] !== 'business-task' || checkout !== undefined || (businessStorage.data.initialize && businessStorage.data.ownerTaskId !== recordId))) return undefined;
   if ((checkout !== undefined && (!texts(checkout, ['repoUrl', 'branch', 'credentialSecretName']) || (checkout['ownedCredential'] !== undefined && typeof checkout['ownedCredential'] !== 'boolean'))) || !extras) return undefined;
   const resources = pod['resources'];
   return {
+    ...(text(pod['expectedVolumeUid']) ? { expectedVolumeUid: pod['expectedVolumeUid'] } : {}),
+    ...(pod['runtimeInitialization'] === true ? { runtimeInitialization: true as const } : {}),
     name: child.name, namespace: child.namespace, taskId: recordId, image: pod['image'] as string, workerUid: pod['workerUid'],
     resources: { cpu: resources['cpu'] as string, memory: resources['memory'] as string, storage: resources['storage'] as string },
     workload: pod['workload'] as string, project: pod['project'], service: pod['service'], ...(text(pod['pvc']) ? { pvc: pod['pvc'] } : { emptyDir: true as const }), secret: pod['secret'] as string,
     ...(checkout ? { checkout: checkoutOf(checkout) } : {}),
+    ...(businessStorage?.success ? { businessStorage: businessStorage.data } : {}),
     ...extras,
   };
 }

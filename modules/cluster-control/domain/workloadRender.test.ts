@@ -6,6 +6,18 @@ const children = [{ kind: 'Pod', namespace: 'cs-demo', name: 'task-1' }, { kind:
 
 // RFC-025 I25：工作区记录里的期望（task-runtime 写，不含凭据）→ 调和器建出容器的渲染输入。
 describe('工作区记录 → 渲染输入', () => {
+  test('可靠业务卷布局保留；未知版本、错误 owner、临时卷与源码检出拒绝', () => {
+    const id = '01a0bf5d-8f4b-7001-8458-107366e7de39';
+    const businessStorage = { version: 1, ownerTaskId: id, initialize: true };
+    const valid = { ...pod, workload: 'business-task', businessStorage };
+    expect(workloadRenderOf(id, { children, pod: valid })?.pod.businessStorage).toMatchObject(businessStorage);
+    for (const broken of [
+      { ...valid, businessStorage: { ...businessStorage, version: 2 } },
+      { ...valid, businessStorage: { ...businessStorage, ownerTaskId: '01a0bf5d-8f4b-7001-8458-107366e7de40' } },
+      { ...valid, pvc: undefined, emptyDir: true }, { ...valid, workload: 'dev-session' },
+      { ...valid, checkout: { repoUrl: 'repo', branch: 'main', credentialSecretName: 'git' } },
+    ]) expect(workloadRenderOf(id, { children, pod: broken })).toBeUndefined();
+  });
   test('Pod 的对象名取自子对象，任务 ID 是记录 ID；检出与预览照写', () => {
     const checkout = { repoUrl: 'http://git/demo.git', branch: 'main', credentialSecretName: 'git-cred' };
     const route = { host: 'dev.demo.cs.localhost', middlewares: [{ name: 'auth', namespace: 'sys' }, { name: 'plain' }] };

@@ -27,3 +27,9 @@ test('字段不全、类型不对、子对象对不上槽的名字都不渲染�
   expect(slotRenderOf({ children: [...children, { kind: 'Secret', namespace: 'cs-demo', name: 'demo-blue-env-1' }], slot })).toBeUndefined();
   expect(slotRenderOf({ children: children.slice(1), slot })).toBeUndefined();
 });
+
+test('独立探针从台账校验读取：无效探针阻断渲染，不静默丢掉启动保护', () => {
+  expect(slotRenderOf({ children, slot: { ...slot, probes: { startup: { path: '/live', failureThreshold: 60 } } } })?.probes).toMatchObject({ startup: { path: '/live', failureThreshold: 60, timeoutSeconds: 1 } });
+  expect(slotRenderOf({ children, slot: { ...slot, probes: { startup: { path: '/live', failureThreshold: 0 } } } })).toBeUndefined();
+  expect(slotRenderOf({ children, slot: { ...slot, probes: { startup: { path: '/live', host: 'untrusted' } } } })).toBeUndefined();
+});

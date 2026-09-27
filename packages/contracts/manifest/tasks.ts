@@ -1,5 +1,8 @@
 import { ComputeProfileSelectorSchema } from '../api/compute/computeProfile';
 import { z } from 'zod';
+import { BusinessConfigSchema } from './businessConfig';
+import { BusinessTaskContractVersionSchema } from '../api/business/executionValues';
+import { RuntimeImageSelectionSchema } from '../api/runtimeImages/values';
 import { ResourceIdSchema } from '../ids';
 
 /**
@@ -16,6 +19,7 @@ export const VolumeModeSchema = z.enum(['follow-container', 'persistent']);
  * 业务会以为自己指定了驱动，实际没有；strict 之后会明确报出「无法识别的键 driver」。
  */
 export const AgentProfileSchema = z.object({
+  ...RuntimeImageSelectionSchema.shape,
   id: ResourceIdSchema,
   name: z.string().trim().min(1).max(80),
   /** 管理员定义的算力档位名，或 `default`；档位封装协议、镜像、二进制、启动前步骤与模型（RFC-006）。 */
@@ -24,6 +28,7 @@ export const AgentProfileSchema = z.object({
   permission: AgentPermissionSchema.optional(),
   /** 相对仓库根的系统提示文件，可选。 */
   systemPromptFile: z.string().min(1).optional(),
+  businessConfig: BusinessConfigSchema.optional(),
 }).strict();
 
 export const OutputContractSchema = z.object({
@@ -36,13 +41,17 @@ export const OutputContractSchema = z.object({
 });
 
 export const TasksSpecSchema = z.object({
+  ...RuntimeImageSelectionSchema.shape,
   /** 管理员定义的任务容器套餐。 */
   taskProfileId: ResourceIdSchema,
+  executionControl: z.enum(['legacy', 'fenced']).optional(),
+  acceptedTaskContractVersions: z.array(BusinessTaskContractVersionSchema).min(1).max(128).optional(),
   defaultVolumeMode: VolumeModeSchema.default('follow-container'),
   agentProfiles: z.array(AgentProfileSchema).default([]),
   outputContracts: z.array(OutputContractSchema).default([]),
 }).refine((t) => new Set(t.agentProfiles.map((p) => p.id)).size === t.agentProfiles.length, 'agentProfiles ID 重复')
-  .refine((t) => new Set(t.outputContracts.map((c) => c.id)).size === t.outputContracts.length, 'outputContracts ID 重复');
+  .refine((t) => new Set(t.outputContracts.map((c) => c.id)).size === t.outputContracts.length, 'outputContracts ID 重复')
+  .refine((t) => t.executionControl !== 'fenced' || (t.acceptedTaskContractVersions?.length ?? 0) > 0, 'fenced 执行必须声明支持的任务契约版本');
 
 export type AgentPermission = z.infer<typeof AgentPermissionSchema>;
 

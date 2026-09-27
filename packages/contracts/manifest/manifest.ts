@@ -5,6 +5,7 @@ import {
   RequestedApiSchema, ServiceSpecSchema, SubscriptionSchema,
 } from './serviceSpec';
 import { TasksSpecSchema } from './tasks';
+import { requireRuntimeImageManifestVersion } from './runtimeImages';
 
 const baseSpec = {
   service: ServiceSpecSchema,
@@ -25,7 +26,7 @@ export const DigitalWorkerManifestSchema = z.object({
     subscriptions: z.array(SubscriptionSchema).default([]),
     tasks: TasksSpecSchema.optional(),
   }),
-});
+}).superRefine(requireRuntimeImageManifestVersion);
 
 export const ApiProxyManifestSchema = z.object({
   apiVersion: ManifestApiVersionSchema,
@@ -40,7 +41,7 @@ export const ApiProxyManifestSchema = z.object({
     }),
     apis: z.object({ exposes: ExposedApiSchema }),
   }),
-});
+}).superRefine(requireRuntimeImageManifestVersion);
 
 export const EventProducerManifestSchema = z.object({
   apiVersion: ManifestApiVersionSchema,
@@ -57,7 +58,7 @@ export const EventProducerManifestSchema = z.object({
       schema: z.string().min(1).optional(),
     })).min(1),
   }),
-});
+}).superRefine(requireRuntimeImageManifestVersion);
 
 export const ManifestSchema = z.discriminatedUnion('kind', [
   DigitalWorkerManifestSchema, ApiProxyManifestSchema, EventProducerManifestSchema,

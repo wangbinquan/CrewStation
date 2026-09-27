@@ -1,0 +1,17 @@
+# RFC-028：构建 Pod 只能经带鉴权的 registry-push 网关推拉平台镜像。
+# Calico 已是安装前提；显式 Deny 优先于项目的默认放行策略。两端口同时覆盖 ClusterIP 与 NodePort 路径。
+# 只选独立镜像构建 Pod，不改变服务、任务、Agent 或旧发布构建的网络权限。
+apiVersion: crd.projectcalico.org/v1
+kind: GlobalNetworkPolicy
+metadata:
+  name: crewstation-image-build-registry
+spec:
+  order: 10
+  selector: has(crewstation.io/image-build)
+  types: [Egress]
+  egress:
+    - action: Deny
+      protocol: TCP
+      destination:
+        ports: [5000, 30500]
+    - action: Allow

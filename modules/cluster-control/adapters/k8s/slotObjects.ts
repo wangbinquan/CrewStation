@@ -13,7 +13,7 @@ export const RESTARTED_AT_ANNOTATION = 'crewstation.io/restarted-at';
 export function slotWorkloadObjects(slot: SlotRender, generation: number): [K8sObject, K8sObject] {
   return serviceSlotObjects({
     namespace: slot.namespace, project: slot.project, service: slot.service, physical: slot.physical, releaseId: slot.releaseId, image: slot.image, command: slot.command,
-    port: slot.port, healthPath: slot.healthPath, replicas: slot.replicas, resources: slot.resources, envFromSecret: slot.secret,
+    port: slot.port, healthPath: slot.healthPath, ...(slot.probes ? { probes: slot.probes } : {}), replicas: slot.replicas, resources: slot.resources, envFromSecret: slot.secret,
     annotations: { [RESOURCE_GENERATION_ANNOTATION]: String(generation) }, ...(slot.restartedAt ? { templateAnnotations: { [RESTARTED_AT_ANNOTATION]: slot.restartedAt } } : {}),
   });
 }

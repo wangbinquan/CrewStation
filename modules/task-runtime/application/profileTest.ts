@@ -1,3 +1,4 @@
+import { probeBusinessProfile } from './profile-testing/businessProfileProbe';
 import { newResourceId } from '@crewstation/kernel';
 import type { BeforeStartExecution, McpConnection, ProbeTerminalResult, ProfileTestContext, ProfileTestOutcome, ProfileTestStage, RunnerEvent, TaskId } from '@crewstation/contracts';
 import { PLATFORM_AGENT_PERMISSION, ProbeTerminalResultSchema, TASKRUNNER_PROTOCOL_VERSION, isKnownProtocol } from '@crewstation/contracts';
@@ -56,7 +57,11 @@ export function runProfileTestUseCase(deps: TaskRuntimeUseCaseDeps, test: Profil
       const waited = await waitForRunner(session);
       if (waited) return waited;
       await describeRunner(session);
-      return isKnownProtocol(input.launch.protocol) ? await observeProtocolTurn(session) : await runTerminalProbe(session);
+      const outcome = isKnownProtocol(input.launch.protocol) ? await observeProtocolTurn(session) : await runTerminalProbe(session);
+      if (outcome.state === 'passed' && isKnownProtocol(input.launch.protocol)) {
+        session.context.businessExecution = await probeBusinessProfile({ input, runner, taskId: env.id, heartbeat, budgetMs: timing.modelBudgetMs + scriptBudgetOf(input), pollMs: timing.pollMs, report: async (stage) => report({ stages: [stage] }) });
+      }
+      return { ...outcome, context: session.context };
     } finally {
       await test.release(env.id).catch((error: unknown) => deps.logger.warn('profile test environment release failed', { taskId: env.id, error: String(error) }));
     }

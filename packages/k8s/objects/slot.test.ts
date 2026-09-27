@@ -38,3 +38,27 @@ test('环境 Secret 不可变，标签与槽的对象相同', () => {
   const secret = serviceSlotSecret({ ...input, name: 'demo-green-env-3' }, { CS_DATABASE_URL: 'postgres://x' });
   expect(secret).toMatchObject({ kind: 'Secret', immutable: true, stringData: { CS_DATABASE_URL: 'postgres://x' }, metadata: { name: 'demo-green-env-3', namespace: 'proj-demo', labels: { 'crewstation.io/slot': 'green', 'crewstation.io/release': input.releaseId } } });
 });
+
+test('慢启动服务有独立 startup、readiness 和 liveness，全部使用服务声明的端口', () => {
+  const [deployment] = serviceSlotObjects({ ...input, probes: {
+    startup: { path: '/live', timeoutSeconds: 2, periodSeconds: 5, failureThreshold: 60, initialDelaySeconds: 0 },
+    readiness: { path: '/ready', timeoutSeconds: 3, periodSeconds: 4, failureThreshold: 2, initialDelaySeconds: 1 },
+    liveness: { path: '/live', timeoutSeconds: 2, periodSeconds: 10, failureThreshold: 6, initialDelaySeconds: 0 },
+  } });
+  expect(containerOf(deployment)).toMatchObject({
+    startupProbe: { httpGet: { path: '/live', port: 3000 }, timeoutSeconds: 2, periodSeconds: 5, failureThreshold: 60 },
+    readinessProbe: { httpGet: { path: '/ready', port: 3000 }, timeoutSeconds: 3, periodSeconds: 4, failureThreshold: 2, initialDelaySeconds: 1 },
+    livenessProbe: { httpGet: { path: '/live', port: 3000 }, timeoutSeconds: 2, periodSeconds: 10, failureThreshold: 6 },
+  });
+});
+
+test('旧服务与只设置 startup 的服务保持原有存活／就绪参数', () => {
+  for (const probes of [undefined, { startup: { path: '/live', timeoutSeconds: 1, periodSeconds: 5, failureThreshold: 60, initialDelaySeconds: 0 } }]) {
+    const [deployment] = serviceSlotObjects({ ...input, ...(probes ? { probes } : {}) });
+    expect(containerOf(deployment)).toMatchObject({
+      readinessProbe: { httpGet: { path: '/healthz', port: 3000 }, periodSeconds: 5, failureThreshold: 3 },
+      livenessProbe: { httpGet: { path: '/healthz', port: 3000 }, periodSeconds: 10, failureThreshold: 6, initialDelaySeconds: 10 },
+    });
+    if (!probes) expect(containerOf(deployment)).not.toHaveProperty('startupProbe');
+  }
+});

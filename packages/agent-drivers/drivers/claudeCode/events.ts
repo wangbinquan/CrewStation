@@ -1,3 +1,4 @@
+import { businessUsage } from '../businessUsage';
 // ← agent-workflow `runtime/claudeCode/events.ts`，stream-json 行 → NormalizedEvent。
 //
 // 事件形状按源的注释验证于 claude 2.1.193／2.1.202／2.1.226/227：
@@ -41,6 +42,7 @@ export function parseEvent(line: string): NormalizedEvent | null {
   const tool = extractToolCall(parts);
   const sessionId = rootSessionId(evt, type);
   return {
+    businessUsage: businessUsage('claude-code', evt),
     kind: inferKind(type, parts),
     text: concatText(parts),
     ...(sessionId === undefined ? {} : { sessionId }),

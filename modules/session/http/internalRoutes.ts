@@ -7,12 +7,32 @@ import { z } from 'zod';
 import type { commandDispatch } from '../application/commandDispatch';
 import type { SessionUseCaseDeps } from '../application/dependencies';
 import { FORWARDED_HEADER } from '../api/internalProtocol';
+import { notFound, precondition } from '@crewstation/kernel';
+import { TaskIdSchema } from '@crewstation/contracts';
 
 const eventsQuery = z.object({ sinceSeq: z.coerce.number().int().min(0).default(0), kinds: z.string().optional(), agentId: z.string().optional(), limit: z.coerce.number().int().min(1).max(5000).default(500) });
+const reliableQuery = z.object({ after: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0), limit: z.coerce.number().int().min(1).max(1000).default(200) }).strict();
 
 /** 进程间接口（只在系统命名空间内可达）：业务任务与开发会话模块经它向 TaskRunner 下发命令、读取持久事件。 */
-export function internalRoutes(dispatch: ReturnType<typeof commandDispatch>, deps: Pick<SessionUseCaseDeps, 'events'>): Hono<AppEnv> {
+export function internalRoutes(dispatch: ReturnType<typeof commandDispatch>, deps: Pick<SessionUseCaseDeps, 'events' | 'businessExecutions'>): Hono<AppEnv> {
   const r = new Hono<AppEnv>();
+  r.post('/internal/tasks/:taskId/executions/:executionId/consumed', async (c) => {
+    if (!deps.businessExecutions) throw precondition('可靠执行存储未启用');
+    const input = await parseBody(c, z.strictObject({ through: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), stopped: z.boolean().optional() }));
+    await deps.businessExecutions.consume(TaskIdSchema.parse(c.req.param('taskId')), c.req.param('executionId'), input.through, input.stopped);
+    return c.json({ ok: true });
+  });
+  r.get('/internal/tasks/:taskId/executions/:executionId', async (c) => {
+    if (!deps.businessExecutions) throw precondition('可靠执行存储未启用');
+    const found = await deps.businessExecutions.get(TaskIdSchema.parse(c.req.param('taskId')), c.req.param('executionId'));
+    if (!found) throw notFound('可靠执行', c.req.param('executionId'));
+    return c.json(found);
+  });
+  r.get('/internal/tasks/:taskId/executions/:executionId/events', async (c) => {
+    if (!deps.businessExecutions) throw precondition('可靠执行存储未启用');
+    const q = parseQuery(c, reliableQuery);
+    return c.json({ items: await deps.businessExecutions.list(TaskIdSchema.parse(c.req.param('taskId')), c.req.param('executionId'), q.after, q.limit) });
+  });
   r.post('/internal/tasks/:taskId/commands', async (c) => {
     const taskId = c.req.param('taskId') as TaskId;
     const command = await parseBody(c, RunnerCommandSchema);

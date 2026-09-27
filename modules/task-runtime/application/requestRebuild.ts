@@ -33,15 +33,17 @@ export function rebuildUseCases(deps: RebuildDependencies) {
       const now = deps.clock.now();
       const id = newResourceId(), podName = `task-r-${id.replaceAll('-', '')}`;
       const record: EnvironmentRebuild = { id, taskId: env.id, projectId, input, namespace: env.namespace,
-        originalPodName: env.podName, podName, pvcName: env.pvcName, secretName: `${podName}-runner`, image: deps.settings.taskImage,
+        originalPodName: env.podName, podName, pvcName: env.pvcName, secretName: `${podName}-runner`, image: env.render?.image ?? deps.settings.taskImage,
         ...(deps.creation === 'ledger' ? { creation: 'ledger' } : {}), state: 'queued', createdAt: now, updatedAt: now, ...(nodeName ? { nodeName } : {}) };
       // 即刻失效旧 Runner；替换 Pod 只复用原工作卷，不重新检出仓库。
       const service = deps.creation === 'ledger' && env.preview ? await deps.services.resolveServiceById(env.serviceId) : undefined;
       if (deps.creation === 'ledger' && env.preview && !service) throw precondition('服务已不存在，恢复停止');
       const render = deps.creation === 'ledger' ? { ...workloadRenderOf(deps.settings, input.profile, undefined, service ? previewRouteOf(deps.settings, env, service.slug).previewRoute : undefined),
+        image: record.image, start: (env.render?.start ?? 0) + 1,
+        ...(env.render?.runtimeImage ? { runtimeImage: env.render.runtimeImage } : {}),
         rebuild: { id: record.id, volumeUid: input.expectedVolumeUid, intent: rebuildIntent(record), ...(nodeName ? { nodeName } : {}) } } : undefined;
       const patch = { ...(render ? { render } : {}), rebuildId: record.id, podName, profile: input.profile.id,
-        connected: false, message: '已受理保留工作树重建，等待后台准备', runnerTokenHash: hashRunnerToken(newRunnerToken()),
+        runtimeInitialization: undefined, connected: false, message: '已受理保留工作树重建，等待后台准备', runnerTokenHash: hashRunnerToken(newRunnerToken()),
         // RFC-022：重建的五段（保留工作卷、不重新检出），替换这个会话之前的启动过程。
         startup: initialStartup(now, { rebuild: true }) };
       // 仅前面核验过的协议拒绝环境沿用原占额进入恢复，不开放通用 running → creating 转移。

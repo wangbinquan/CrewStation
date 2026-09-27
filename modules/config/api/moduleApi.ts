@@ -19,6 +19,10 @@ export interface ConfigModuleApi {
   listVersions(actor: Actor, projectId: ProjectId, env: ConfigEnv): Promise<ConfigVersionDto[]>;
   /** 解密后的环境变量键值；供 release／task-runtime 在受信路径注入，不经 actor，不经 HTTP。指定 version 时按快照回放。 */
   renderDefinitions(projectId: ProjectId, env: ConfigEnv, version?: number): Promise<Record<string, string>>;
+  /** 内部显式挂载路径：按取值组维护权限授权，仅解密所选 Secret，不开放 HTTP。 */
+  secretDefinitionVersions(actor: Actor, projectId: ProjectId, env: ConfigEnv, definitionIds: readonly string[]): Promise<Array<{ definitionId: string; itemId: string; version: number }>>;
+  renderPinnedSecretDefinitions(projectId: ProjectId, env: ConfigEnv, stamps: readonly { definitionId: string; itemId: string; version: number }[]): Promise<Record<string, string>>;
+  renderSecretDefinitions(actor: Actor, projectId: ProjectId, env: ConfigEnv, definitionIds: readonly string[]): Promise<Record<string, string>>;
   renderEnv(projectId: ProjectId, env: ConfigEnv, version?: number): Promise<Record<string, string>>;
   /** 从未改动过为 0。 */
   currentVersion(projectId: ProjectId, env: ConfigEnv): Promise<number>;

@@ -1,3 +1,4 @@
+import { drizzleHandoffs } from './handoff/repository';
 import { drizzleMaintenance } from './drizzleMaintenance';
 import { publishDomainEvent } from '@crewstation/eventbus';
 import type { Database, Executor } from '@crewstation/persistence';
@@ -11,6 +12,7 @@ export function scopeOver(executor: Executor, lockSlots = false, projection?: Sl
   const releases = drizzleReleaseRepository(executor), slots = drizzleSlotRepository(executor, lockSlots), offlinePolicy = drizzleOfflinePolicyRepository(executor);
   const sources = { releases, offlinePolicy };
   return {
+    handoffs: drizzleHandoffs(executor),
     maintenance: drizzleMaintenance(executor),
     releases,
     slots: projection ? ledgerSlotRepository(slots, (value) => syncSlotLedger(executor, projection, sources, value)) : slots,

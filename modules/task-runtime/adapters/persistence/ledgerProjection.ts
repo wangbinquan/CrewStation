@@ -8,12 +8,13 @@ import type { EnvironmentRepository } from '../../ports/repositories';
 
 /**
  * 一条记录的投影：从没进过台账又已经不要了的不补记；已受理释放的期望不再变（台账也拒绝重新声明），
- * 只把后来知道的具体释放原因交给台账补上。
+ * 继续同步所属模块的条件与具体释放原因，不重新声明已释放记录。
  */
 async function syncRecord(writer: LedgerWriter, record: ProjectedRecord, connected?: boolean, sourceId?: string): Promise<void> {
   const existing = await writer.find(record.ref, record.kind);
   if (!existing && record.release) return;
   if (existing?.desired === 'absent') {
+    await writer.report(existing.id, { conditions: record.conditions });
     if (record.release) await writer.requestRelease(existing.id, record.release);
     return;
   }
@@ -43,6 +44,8 @@ export async function syncEnvironmentLedger(executor: Executor, ledger: Environm
       if (projection.route) await syncRecord(writer, projection.route, undefined, env.id);
     });
   } catch (error) {
+    // RFC-027 的额度释放依赖清理确认条件，投影失败必须与环境状态一起回滚。
+    if (env.render?.businessStorage) throw error;
     logger.warn('resource ledger projection failed', { taskId: env.id, error: error instanceof Error ? error.message : String(error) });
   }
 }

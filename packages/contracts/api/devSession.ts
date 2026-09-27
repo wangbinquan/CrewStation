@@ -1,3 +1,4 @@
+import { RuntimeImageExecutionSnapshotSchema } from './runtimeImages/responses';
 import { ComputeProfileSelectorSchema } from './compute/computeProfile';
 import { z } from 'zod';
 import { ProjectIdSchema, ResourceIdSchema, TaskIdSchema, UserIdSchema } from '../ids';
@@ -17,6 +18,8 @@ export type ApiInvocationResponse = z.infer<typeof ApiInvocationResponseSchema>;
 export const DevSessionStateSchema = z.enum(['creating', 'running', 'releasing', 'released', 'failed']);
 
 export const DevSessionDtoSchema = z.object({
+  image: z.string().optional(),
+  runtimeImage: RuntimeImageExecutionSnapshotSchema.optional(),
   taskId: TaskIdSchema,
   projectId: ProjectIdSchema,
   state: DevSessionStateSchema,
@@ -92,6 +95,8 @@ export const BranchDtoSchema = z.object({
 export const AgentInstanceStateSchema = z.enum(['starting', 'preparing', 'running', 'awaiting-input', 'completed', 'failed', 'cancelled']);
 
 export const AgentInstanceDtoSchema = z.object({
+  image: z.string().optional(),
+  runtimeImage: RuntimeImageExecutionSnapshotSchema.optional(),
   agentId: z.string(),
   taskId: TaskIdSchema,
   /** 算力档位 UUID；computeName 是受理时的显示名称。 */

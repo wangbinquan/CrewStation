@@ -2,6 +2,7 @@ import type { K8sObject } from '../resources';
 import { secretObject, serviceObject } from './cluster';
 import { LABELS } from './labels';
 import { deploymentObject } from './workloads';
+import type { HttpProbesSpec } from './probes';
 
 /**
  * 服务槽的渲染输入（release 的部署与资源中心的调和器共用一个构造函数，RFC-025 设计 §6.2）：一个物理槽是同名的一个 Deployment 与一个 Service，
@@ -17,6 +18,7 @@ export interface ServiceSlotInput {
   readonly command: readonly string[];
   readonly port: number;
   readonly healthPath: string;
+  readonly probes?: HttpProbesSpec;
   readonly replicas: number;
   readonly resources: { readonly cpu: string; readonly memory: string };
   /** 明文环境变量（旧形状：release 自己部署）；资源中心建的槽环境只从 `envFromSecret` 引用，规格里没有配置与密钥。 */
@@ -34,7 +36,7 @@ export function serviceSlotObjects(input: ServiceSlotInput): [K8sObject, K8sObje
   const selector = { [LABELS.service]: input.service, [LABELS.slot]: input.physical };
   const labels = { [LABELS.project]: input.project, [LABELS.service]: input.service, [LABELS.slot]: input.physical, [LABELS.workload]: 'service', [LABELS.release]: input.releaseId };
   const deployment = deploymentObject({
-    name, namespace: input.namespace, labels, selector, replicas: input.replicas, image: input.image, command: [...input.command], port: input.port, healthPath: input.healthPath,
+    name, namespace: input.namespace, labels, selector, replicas: input.replicas, image: input.image, command: [...input.command], port: input.port, healthPath: input.healthPath, ...(input.probes ? { probes: input.probes } : {}),
     env: Object.entries(input.env ?? {}).map(([key, value]) => ({ name: key, value })), resources: { cpu: input.resources.cpu, memory: input.resources.memory }, imagePullPolicy: 'Always',
   });
   const template = (deployment.spec as { template: { metadata: Record<string, unknown>; spec: { containers: Array<Record<string, unknown>> } } }).template;

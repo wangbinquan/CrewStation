@@ -19,8 +19,12 @@ test('模板目录使用 UUID；项目副本分配独立且重试稳定的声明
   const source = directoryTemplateSource({ templatesRoot: join(import.meta.dir, '../../../templates'), integrationTemplatesRoot: join(import.meta.dir, '../../../integrations'), resources });
   try {
     const catalog = await source.list();
-    expect(catalog).toHaveLength(3);
+    expect(catalog).toHaveLength(4);
     expect(catalog.every((item) => ResourceIdSchema.safeParse(item.id).success)).toBe(true);
+    const v3 = catalog.find((item) => item.name === 'business-execution-v3')!;
+    expect(v3.kind).toBe('DigitalWorker');
+    await source.materialize(v3.id, join(root, 'v3'));
+    expect(ManifestSchema.parse(Bun.YAML.parse(await readFile(join(root, 'v3/crewstation.yaml'), 'utf8')))).toMatchObject({ apiVersion: 'crewstation/v3', spec: { tasks: { executionControl: 'fenced', defaultVolumeMode: 'persistent' } } });
     const context = () => ({ projectId: newResourceId() as ProjectId, serviceId: newResourceId() as ServiceId });
     const a = context(), b = context(), id = BUILTIN_RESOURCES.minimalTemplate;
     await source.materialize(id, join(root, 'a'), undefined, a);

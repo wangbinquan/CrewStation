@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync } from 'node:fs';
+import { lstatSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { platformMcpEndpoints } from '@crewstation/agent-drivers';
@@ -21,6 +21,8 @@ export interface BeforeStartRequest {
   material: BeforeStartMaterial;
   /** Agent 的工作目录（已解析）；脚本缺省在这里运行。 */
   workspace: string;
+  /** 平台挂载的原生会话目录；不属于临时 runDir，不随 release 清理。 */
+  persistentHome?: string;
   /** 启动命令携带的 MCP 连接：平台两个 MCP 的地址与会话令牌由此进入 `{{mcp.*}}` 与脚本环境（RFC-006 C16）。 */
   mcp?: readonly McpConnection[];
   onProgress?: (execution: BeforeStartExecution) => void;
@@ -36,7 +38,7 @@ export interface BeforeStartOutcome {
   configFile?: { kind: 'claude-settings' | 'opencode-config'; path: string };
 }
 
-export interface BeforeStartRunnerDeps { launcher: ProcessLauncher; interpreters: InterpreterCatalog; emit: (event: RunnerEvent) => void; logger: Logger; baseDir?: string }
+export interface BeforeStartRunnerDeps { afterSteps?: (request: BeforeStartRequest, env: Record<string, string>, signal: AbortSignal) => Promise<void>; launcher: ProcessLauncher; interpreters: InterpreterCatalog; emit: (event: RunnerEvent) => void; logger: Logger; baseDir?: string }
 
 interface Entry { execution: BeforeStartExecution; promise: Promise<BeforeStartOutcome>; abort: AbortController; agentId: string }
 
@@ -92,16 +94,18 @@ export class BeforeStartRunner {
 
   private async execute(entry: Entry, request: BeforeStartRequest): Promise<BeforeStartOutcome> {
     const { material } = request;
-    const runDir = this.runDirFor(request.agentId), home = this.homeFor(request.agentId);
+    const runDir = this.runDirFor(request.agentId), home = request.persistentHome ?? this.homeFor(request.agentId);
     const ctx: HookContext = { agentId: request.agentId, home, runDir, workspace: request.workspace, vars: { ...material.vars }, secrets: { ...material.secrets }, mcp: platformMcpEndpoints(request.mcp ?? []), env: {} };
     this.update(entry, { state: 'running', startedAt: new Date().toISOString() }, request.onProgress);
     try {
       if (entry.abort.signal.aborted) throw new BeforeStartFailure('cancelled', '启动在准备开始前被取消');
-      await this.prepareDirectories(runDir, home);
+      await this.prepareDirectories(runDir, home, request.persistentHome !== undefined);
       for (const step of material.steps) await this.runStep(entry, step, ctx, material.captureOutput, request.onProgress);
       const configFile = material.configFile.kind === 'none' ? undefined : { kind: material.configFile.kind, path: resolveHookPath(material.configFile.pathTemplate, ctx, 'config-file') };
+      const environment = { ...ctx.vars, ...ctx.secrets, ...ctx.env, HOME: home };
+      await this.deps.afterSteps?.(request, environment, entry.abort.signal);
       this.update(entry, { state: 'succeeded', endedAt: new Date().toISOString(), currentStepId: undefined }, request.onProgress);
-      return { execution: entry.execution, env: { ...ctx.vars, ...ctx.secrets, ...ctx.env, HOME: home }, home, runDir, ...(configFile ? { configFile } : {}) };
+      return { execution: entry.execution, env: environment, home, runDir, ...(configFile ? { configFile } : {}) };
     } catch (error) {
       const failure = asBeforeStartFailure(error);
       const cancelled = failure.code === 'cancelled' || entry.abort.signal.aborted;
@@ -134,10 +138,14 @@ export class BeforeStartRunner {
     }
   }
 
-  private async prepareDirectories(runDir: string, home: string): Promise<void> {
+  private async prepareDirectories(runDir: string, home: string, persistent: boolean): Promise<void> {
     // 父目录必须可遍历，叶目录 0700 交给 worker（与 agent-drivers 的运行目录同一套约定）。
     mkdirSync(dirname(runDir), { recursive: true, mode: 0o755 });
-    for (const dir of [runDir, home]) { mkdirSync(dir, { recursive: true, mode: 0o700 }); await this.deps.launcher.chownToWorker(dir); }
+    if (persistent) {
+      const info = lstatSync(home);
+      if (!info.isDirectory() || (info.mode & 0o077) !== 0) throw new BeforeStartFailure('path_denied', '原生会话目录不可用');
+    }
+    for (const dir of persistent ? [runDir] : [runDir, home]) { mkdirSync(dir, { recursive: true, mode: 0o700 }); await this.deps.launcher.chownToWorker(dir); }
   }
 
   private patchStep(entry: Entry, stepId: string, patch: Partial<BeforeStartStepRecord>, onProgress?: BeforeStartRequest['onProgress']): void {

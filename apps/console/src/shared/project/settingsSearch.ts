@@ -1,5 +1,5 @@
 /** 项目设置五组（RFC-009 四组＋ RFC-020 的只读「项目信息」）。 */
-export const SETTINGS_TABS = ['config', 'visibility', 'members', 'info', 'advanced'] as const;
+export const SETTINGS_TABS = ['config', 'runtime-images', 'visibility', 'members', 'info', 'advanced'] as const;
 export type SettingsTab = typeof SETTINGS_TABS[number];
 export interface SettingsSearch {
   readonly tab?: SettingsTab | 'resources' | 'lifecycle';

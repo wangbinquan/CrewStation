@@ -2,6 +2,7 @@ import type { NamespaceRetirement } from '../domain/namespaceRetirement';
 import type { RebuildRender } from '../domain/rebuildRender';
 import type { WorkloadRender } from '../domain/workloadRender';
 import type { RebuildRendering } from './ledger';
+import type { RuntimeImageBuildRender } from '@crewstation/contracts';
 import type { JobRender } from '../domain/jobRender';
 import type { MiddlewareRender } from '../domain/middlewareRender';
 import type { NamespaceRender, NetworkPolicyRender } from '../domain/namespaceRender';
@@ -70,8 +71,8 @@ export interface ClusterWriter {
    * 工作区的容器（RFC-025 I25）：Pod、PVC 按名字建，已在就不动（建了不改），返回实例 UID 与是不是这次建的。
    * Runner Secret 先向 API Server 确认不在，才调 values 向所属模块要内容再建（不可变）——已在的不读内容、不重签令牌。
    */
-  ensurePod(pod: WorkloadPodRender): Promise<Ensured>;
-  ensureRunnerSecret(pod: WorkloadPodRender, values: () => Promise<Readonly<Record<string, string>>>): Promise<Ensured>;
+  ensurePod(pod: WorkloadPodRender, signal?: AbortSignal): Promise<Ensured>;
+  ensureRunnerSecret(pod: WorkloadPodRender, values: () => Promise<Readonly<Record<string, string>>>, signal?: AbortSignal): Promise<Ensured>;
   /** 这一次启动检出用的 Git 凭据 Secret：同样先确认不在，才向所属模块要令牌再建（不可变）。 */
   ensureCheckoutSecret(pod: WorkloadPodRender, values: () => Promise<{ readonly token: string }>): Promise<Ensured>;
   ensureVolume(volume: VolumeRender): Promise<Ensured>;
@@ -89,6 +90,9 @@ export interface ClusterWriter {
   /** 构建、迁移 Job（T8）：凭据 Secret 先确认不在，才调 values 向 release 要内容再建（不可变）；Job 按名字建，已在就不动。 */
   ensureJobSecret(job: JobRender, values: () => Promise<Readonly<Record<string, string>>>): Promise<Ensured>;
   ensureJob(job: JobRender): Promise<Ensured>;
+  stopMigrationJob?(job: JobRender): Promise<boolean>;
+  ensureImageBuildSecret?(plan: RuntimeImageBuildRender, values: () => Promise<Readonly<Record<string, string>>>, signal?: AbortSignal): Promise<Ensured>;
+  ensureImageBuildJob?(plan: RuntimeImageBuildRender, signal?: AbortSignal): Promise<Ensured>;
 }
 
 /** 按名字建出的对象：实例 UID，与是不是这次建的（已在就不动）。 */

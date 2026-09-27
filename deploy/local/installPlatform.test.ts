@@ -56,6 +56,9 @@ describe('首次安装必须交由用户创建管理员', () => {
     const result = await install(root);
     expect(result.code).toBe(0);
     expect(result.commands).toContain('38-cluster-metrics.yaml');
+    // 已有集群只运行 install-platform 时，也必须在控制器启动前安装 builder 隔离策略。
+    expect(result.commands).toContain('21-image-build-policy.yaml');
+    expect(result.commands.indexOf('21-image-build-policy.yaml')).toBeLessThan(result.commands.indexOf('rollout restart deployment/cs-controller'));
     expect(result.commands).toContain('rollout status statefulset/prometheus');
     expect(result.commands).toContain('rollout status daemonset/cs-storage-probe');
     expect(result.commands).not.toContain('bootstrap-admin');

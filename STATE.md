@@ -3,6 +3,85 @@
 > 这份文件让新 session 能立刻接上进度。每完成一批工作就更新它，与提交一起推送。
 > 规则见 `docs/engineering/development-rules.md` §9。
 
+## RFC-028 运行镜像构建与独立绑定（2026-09-27）
+
+发布候选检查现已闭合：首次完整三层结果保留，5个模板失败与10项lint定向修复；全仓static绿、console生产build绿，修复后改动行7929/8102=97.8647%且零缺失加载。详情见acceptance末节；RFC027准备唯一精确发布窗口，第三方referenceResources排除，当前未提交/推送/部署。
+
+共同冻结门禁已完整执行：unit836/0、module1655/9skip/5fail、console925/0，分层无遗漏。架构通过，lint10项阻断；改动行97.81%但两个业务文件未加载，尚非绿。RFC027负责模板元数据／目录断言、lint和其覆盖缺口，修后定向复验与补static；本会话不重复启动完整门禁。发布清单已双方核对，仅排除第三方 referenceResources.test.ts；RFC027获授权在门禁完成后的唯一窗口精确提交两方产物，当前尚未提交。
+
+最新实机：真实 runtime-environment＋resources＋cluster-control＋K8s＋registry 闭环通过。源码构建约18秒登记 digest，超并发拒绝；运行中重启控制器再取消，保留额度至 Job／Pod／Secret 物理清理，两条台账均 stopped/absent，测试凭据全撤销。独立DB及临时命名空间已删除，原有62个Pod/PVC UID保持；详情见 acceptance 最新节。尚未整平台部署／提交／CI。
+
+推送权限补充：修复跨仓库 blob mount 仅验证目标写权、忽略 `from` 来源读取权的缺口，缺失／重复参数拒绝，底座只读仓库改为精确匹配。原鉴权＋真实PG组合19/0（130 assertions），独占临时 registry 实际 mount／403不转发／普通上传／过期401共1/0（11 assertions）。临时容器已自动删除；类型、架构、定向lint通过。此处 HTTP 转发测试使用真实鉴权路由和临时代理，未冒充部署中的 Traefik 全链路，平台部署仍待共享候选冻结。
+
+源码构建实机发现并修复阻断：空 `build-arg:BUILDKIT_SYNTAX=` 导致 BuildKit 拒绝所有源码构建，已移除且保留固定 frontend／禁自定义 frontend 校验，先红后绿13/0（72 assertions）。隔离命名空间用原样生成的 Job 完成真实 Git 固定 SHA、多阶段 RUN/COPY、包 Secret mount 和 push；实际 digest `f0e9a229…f492e0`，最终层及日志无测试凭据。临时命名空间已删除，原有62个Pod/PVC UID不变。详见 RFC028 acceptance 最新节；尚非 API／台账／受管网关完整链路，未提交或部署平台。
+
+真实仓库补充：已有 `verify/hello:1` 经实际 registry 响应固定 digest、登记、service-contract 验证、引用阻断退休与逻辑退休后产物保留，**1 pass／0 fail／13 assertions**。新增 opt-in 实机用例，临时数据库和 port-forward 已清理；无仓库写入。类型／架构／定向 lint 通过。尚非平台部署或服务运行证据，RI 仍按 acceptance 最新节逐项补齐。
+
+最新引用收尾：作者已批准与 RFC027 跨任务协调，双方约定共享候选稳定后只跑一次最终全量门禁、串行提交与部署。镜像 worker 每轮分页 20 条，只凭所属模块不可逆终态证明释放，删除前持摘要锁复核引用完整内容；业务 closed／Agent runtimeReleased、开发父会话 released＋台账 absent＋Pod 消失已接通。可恢复历史、未知准入、查询失败继续保留。平台真实装配与生命周期定向 **19 pass／0 fail／120 assertions**；全仓类型、架构、本批 lint 通过，console 生产构建通过。未提交／推送／整平台部署，RI 实机与最终门禁仍待完成；本段取代下文“跨任务协调未授权”和“所有者查询未接通”的历史状态。
+
+作者已批准完整 RFC／ADR-0010、提交上库与本地部署，RFC 状态 In Progress。保留独立容器；服务、业务／开发父任务、每种 Agent／CLI 各自选择运行镜像，公共工具定义可复用，不强制整组绑定。设计三件套位于 `proposal/rfc/RFC-028-runtime-environment-builds/`。RI-01～RI-28 仍未完成实机验收。
+
+已实现 runtime-environment L4、目录／不可变修订、构建准入／租约与容量、用途验证请求、引用保留、源码 AST／Git tree 预检及仓库摘要检查。独立 BuildKit 执行器已接平台和资源台账，构建凭据按项目／构建限制、撤销与物理停止确认后退额，Calico registry 旁路拒绝策略已写入部署清单；尚未实机执行。SCM 固定提交、只读短期凭据已接线。
+
+Runner 已支持每容器持久初始化、unknown 不重执行、超时／取消／日志掩码／Secret 清理和执行门控。task-runtime 分别保存父任务与 Agent 自己的镜像快照，初始化绑定 Pod UID 与启动代次；后端等待成功回执才 ready，失败确认容器退出后退额。保卷重建和 CLI 恢复沿原镜像。初始化 Secret 已按受理时版本戳读取，Agent 按初始化→beforeStart→工具检查→启动排序。
+
+用途验证控制器已接通租约、取消、失权／材料变化预检、unknown 清理；任务／Agent 使用独立 profile-test 环境，核对实际镜像和 worker 身份，物理停止才释放引用和额度。服务用途只检查仓库产物及启动契约，标明 service-contract，实际就绪仍由发布探针判定。服务发布先读固定 SHA 的 Manifest，引用镜像跳过构建但保持迁移与部署，普通构建检出固定 SHA 后解析产物摘要。
+
+开发配置已支持父任务与每个算力档位独立默认／允许集合；v2 开会话、Agent、CLI 请求显式选镜像，客户端不会降级丢字段。业务 v3 父任务新增 runtimeImageVersionId，受来源发布任务允许集合约束；受理快照、重复键／额度重试和派发保持同镜像。RFC027 新 Agent 派发入口已出现，本任务追加请求镜像字段、快照 DTO、固定档位／允许集合准入与创建前确认引用；HTTP＋真实 PG 镜像用例 3/0（28 assertions）。此前重复 reserveAgent 的并发冲突已由后续文件更新消除，平台端口／业务父任务／Agent 与原派发组合 11/0（92 assertions）；统一使用 agent owner，显式请求完整转发。Agent retry/resume 仍等待 RFC027 对应接口。
+
+工作台已加项目设置「运行镜像」、平台目录、源码／已有镜像配方表单与高级 JSON、构建／日志游标／取消、版本用途验证与引用查看／停用／删除，以及开发默认／允许集合配置。任务、Agent、CLI 启动有独立选择器，可按版本读取名称和摘要；跨项目仍受权限限制。开发配置冲突保留草稿，并提供明确丢弃后重读；管理操作隐藏于无管理权用户。服务／业务 Manifest 选择交互仍待完善。
+
+本轮已补齐发布任务与各 Agent 默认／允许镜像的引用保留，先保存发布快照再确认引用；对应发布真实 PG 4/0（20 assertions），组合端口 2/0（9 assertions）。显式镜像首次连接五分钟期限、初始化独立预算、重连不续期、继承凭据掩码与命令容量约束已有回归。镜像相关模块组合 67/0（435 assertions）；之后连接期限＋原台账／探针 16/0（118 assertions），名称查询权限 5/0（32 assertions），工作台目录表单 7/0（28 assertions）及独立选择 3/0（15 assertions）。contracts:lock 已按获批 RFC028 E10 记录 Manifest v2 const→v2/v3 enum；原 v2 仍接收，契约锁与 Manifest 用例 10/0。
+
+真实模板构建成功：`cs-rfc028-tools:20260927`，本地 image ID `sha256:40aca8b4977df7b1fafe33f91ff96e5dd4a044448a8c7d909391497d40634f7c`（不是注册表 manifest digest）。原生 arm64、worker UID 10001、无网络只读容器实跑 Python PyYAML、Node CJS/ESM、脚本和动态链接二进制全部通过；在该镜像只读挂载当前 Runner 代码的 Linux 初始化／真实 WS 8/0（47 assertions）。浏览器以测试 HTTP 数据验证 320／390／1440 页面和配方弹窗无横向溢出、Escape 焦点恢复、零控制台错误，截图在 `/tmp/cs-rfc028-ui-{width}.png`；预览进程及临时仓库入口已清理。以上都不是平台构建／集群验收。
+
+完整控制面门禁、集群部署、RI 实机、commit／push／精确 SHA CI 均未执行。全仓静态检查会受到 RFC027 持续在制影响，最近看到其 materials 接口／未锁迁移，未修改。剩余重点：业务 Agent retry/resume 镜像保留（等待 RFC027）、引用最终释放／回收、选择交互、初始化恢复边界、完整门禁和平台构建实机。详细证据见 acceptance.md。
+最新补充：具名目录选择开发默认／允许版本、修订分页与明确旧配方构建已落地；工作台整层 919/0（6350 assertions），当前 console 类型和定向 lint 通过。320／390／1440 的配置弹窗测试替身浏览器量测无横向溢出，Escape 恢复焦点，截图 `/tmp/cs-rfc028-policy-ui-{width}.png`，临时入口及 Vite 已清理。镜像模块及已稳定接线的 PG 组合 78/0（513 assertions），受管模块新增真实 DB＋假 K8s／registry 测试 3/0（26 assertions）。Agent 工具关闭竞态先红后绿：等待工具退出／持久取消后再关 SQLite；宿主与原生 Linux 工具镜像各 11/0（53 assertions）。上述端口／类型冲突已消除，曾取得全仓类型／架构通过；后续 RFC027 会话能力继续在制，最近静态检查报告其新增 0022 迁移未锁及 plan 缺 sessionKey/volumeUid，不改写对方输出。契约新增业务镜像字段与实际 image 回显已更新金样。
+本批另补默认任务镜像准入时解析摘要、同键不重解析、保卷重建使用原 render.image 与递增启动代次；相关真实 PG／仓库组合 19/0（143 assertions）。验证表单提供用途／Agent 修订／服务命令与端口，目录 12/0（42 assertions）。任务、Agent、CLI 返回并展示固定镜像，历史缺失保持未知，展示与原租户选择组合 11/0（63 assertions）；console 类型与定向 lint 通过。升级脚本缺 builder 网络策略先红后绿，安装脚本 10/0（48 assertions）。独立命名空间 rootless BuildKit 实跑 RUN/COPY 成功，两容器 UID 1000、退出码 0。网络实测阻断构建 Pod 直连 registry 的 Service／Pod IP／NodePort，未标记对照均可达，网关均可达。已清理探针命名空间并移除原先不存在的临时策略，其他 63 个 Pod/PVC UID 全部保持；非平台端到端构建验收。
+恢复接线最新：resume 改为复制原 agent 镜像引用，停用后仍沿原快照；缺引用或能力拒绝，16/0（122 assertions）。fresh retry 与 RFC028 原快照承诺有语义差异，已登记 I34 并向作者询问，等待答复期间不覆盖并行 fresh 实现。宽覆盖 unit 826/0；module 1597 pass／7 skip／6 fail，其中本任务模板目录与旧 owner 模式造成的 5 项失败已修复并定向16/0；其余为 RFC027 execution 目录 21 文件超限。工具配方现位于 deploy/examples/runtime-tools，避免业务模板目录污染。用途表单浏览器 Agent/service × 320/390/1440 无溢出、焦点正常、无控制台错误；预览已清理。
+代码层检查后续：console 全层 922/0（6362 assertions），console 类型与本任务定向 lint 通过；工作树改动行覆盖预检98.04%，但仍有并发新增函数未加载，不能宣称闸门通过。全仓静态仍受 RFC027 execution 目录超限、inline import 类型写法与 releaseHandoff 测试类型影响。未提交、push 或整平台部署；再次 fetch 后 main/origin 0/0，index 空。当前需要作者裁定 I34 fresh 重试语义，再协调共享候选的最终门禁和部署。
+接手基线 main 与 origin/main 为 `01ecfc1f20b1588341b351216ad7cc029042b05d`。RFC-027 并行实现持续推进，保留其全部输出；本任务仅追加共享文件中自己的部分。业务／Runner／release 接口接线前需复核最新代码，不能用本任务测试结果替代 RFC-027 验证。
+
+
+RFC028 并发回收补充：父任务、Agent、fresh retry 的同键并发已用真实 PG 屏障复现并修复未采用引用遗留，明确事务拒绝也释放，未知提交结果保留。Runner 预检／凭据物化前移以减少未受理预留。定向组合31/0（244 assertions），定向 lint／全仓类型／架构通过；完整发布门禁与 RI 实机尚未完成。进程中断留下的预留仍需所有者稳定证明，不能按时间删除。共享 index 空，未提交／推送／部署；RFC027 句柄仍 active，跨任务协调授权未收到。
+
+## RFC-027 业务执行契约实施中（2026-09-27）
+
+RFC-027 第十一批（未提交）：已补旧票据管理员诊断/停止、原 Pod UID 与副作用证明；v3 断线取消在实际 released 后以 gap/截断结果收敛，session 独立停止墓碑拒绝迟到登记；task-runtime 项目锁内固定 ID 取消屏障拒绝迟到准入。独立 v3 PG/90 秒命令测试客户已落地。定向 PG 13/0、25/0，console 7/0；完整门禁、真实集群/模型、提交/CI/部署仍未完成。详见 RFC acceptance 第十一批。与 RFC028 保持候选冻结及发布协调。
+
+第十批：release 持久交接及工作台阶段、迁移停写与专用取消/暂停/关闭权限、修复发布接替失败迁移的终态证明、发布 prompt/schema 快照、输出校验、档位逐能力探测、session 消费后七天回收、父任务后台状态事件已接通。原生 Linux 真实 WS/Agent/消息/输出 8/0（56 assertions），最近 PG 排空/生命周期/取消/恢复 10/0（102），任务事件/回执恢复 8/0（66）。与 RFC028 获批协调共享候选，业务镜像 owner 正向终态查询已交付其引用 worker；双方无 Git 发布窗口。迁移锁新增到 business-task/0025、release/0008、session/0006；当前 arch 通过。尚待旧票据恢复、未知执行收敛、完整迁移恢复、模板客户、真实模型/集群 BE、统一候选门禁/行覆盖、精确发布/CI/部署。细节和证据见 RFC027 acceptance 第十批；下文第九批以前为历史进度，不代表当前仍未接线。
+
+I34 后续裁定（RFC028 会话，2026-09-27）：作者已选择 fresh 保留原档位／镜像／初始化及材料快照，只新建执行与原生目录。已更新 retry、agentResume、对应测试与两份 RFC 相关文字，下文“fresh 可重新解析档位”为裁定前历史。真实 PG fresh/resume／命令／镜像 15/0（136 assertions）；业务任务关闭后引用释放接线及重启恢复、暂停保留、活 Pod 保留已通过定向测试。当前类型和架构通过，未提交或部署；详情见 RFC028 acceptance 最新节。
+
+第九批：Agent 独立 Pod 的固定 ID 准入、429 同键重试、加密材料和凭据版本固定、可靠事件／usage、交互消息 outbox 与 Runner 去重已接通。原生 HOME／XDG 会话目录持久化；按物理目录互斥，只有原 Pod 释放证明才开放续跑，缺失资源记录不释放写入权；fresh 重试可重新解析档位，resume 固定原修订／材料／卷 UID。business-task/0017–0022、agent-runtime/0007 已锁。skills 独立临时目录、原生加载、同名拒绝与清理已接线；公开事件在入可靠日志前遮盖已知凭据（含跨文本帧）。能力 HTTP 和受理前拒绝已接通，真实档位测试还未产生完整业务能力证明，因此不宣告 Runner v3 已可用于生产。
+
+本批定向：Agent／能力／会话／镜像 12/0（110 assertions），fresh/resume 与命令重试 6/0（59），档位模块与凭据／能力证据 16/0（102），skills＋既有配置 11/0（40），真实 WS／消息／凭据遮盖 3/0（23）。类型与架构通过，未运行完整候选门禁。release 的 business-task 反向交接端口正在接线；仍待真实档位兼容测试、发布材料／输出契约、session 原始日志回收、旧票据恢复、release 持久交接／维护屏障、UI／模板、隔离集群 BE 验收、提交／精确 SHA CI 和部署。下方前八批是历史进度。
+
+第八批：父任务 pause/resume/close 已接 v3 幂等记录、generation、服务事务锁和原 Pod/PVC 身份检查。删除未确认时保留额度，恢复拒绝缺失／替换卷，不初始化空工作区。子任务准入与父生命周期互斥；429 仅同键显式重试。任务状态事件、日志世代、关闭确认后七天清理与 410 快照指针已接通；清理有界且保留游标墓碑。business-task/0015、0016 与 task-runtime/0014 已入锁。真实 PG：工作区 4/0（34 assertions）；生命周期／历史／投影／取消 13/0（137 assertions）。arch 与定向 lint 通过；新增 gone 错误类型引发 Runner 映射遗漏已补，类型正在复验。仍未完成 Agent 材料／执行／会话、session 历史回收、旧票据恢复、release、UI／模板及完整集群验收；未提交、推送或部署。下方前七批为历史进度，后续实现已替代其中部分待办。
+
+
+作者接受方案 B（算力归平台、业务任务容器承载执行、服务槽承载 Web／控制面），已授权完整实现本 RFC、提交远端与本地部署，并明确本 RFC **只修改 CS**。三件套位于 `proposal/rfc/RFC-027-business-execution-contract/`，状态 In Progress。尚未提交、部署或完成产品验收。
+
+当前代码核对基线 `01ecfc1f20b1588341b351216ad7cc029042b05d`。修正原报告：D64 已放开服务槽出网，不再作为接入阻塞或原则例外。设计覆盖 v3 严格业务接口、幂等准入、长命令异步结果与取消确认、持久事件／文件、Agent 动态材料与配置归属、会话恢复、父任务 release 契约固定、带 epoch 和实例租约的发布交接、迁移停写证明及独立探针；保留 v2。BE-01～24 均为待执行验收，不是现有能力。
+
+当前已实现基础部分：v3 严格 DTO／客户端与新增契约金样；独立探针贯通 Manifest、release、资源台账和 K8s 渲染；task-runtime 固定业务任务 ID 的幂等准入；business-task 持久意图／租约 CAS／无容量等待队列／丢回执对账；release 完整任务声明不可变登记；可信 Pod UID／release／物理槽签名绑定与当前实例复核。已接通 v3 **父任务创建／查询、执行权 claim/renew/release/activate/handoff-ready HTTP**、同事务受理屏障及控制器 outbox worker。服务控制记录使用 DB 时钟、preparing→active 与单调 epoch；冻结阻断新派发，未知在途票据对账后才允许交接；新 holder 可原 ID 接管旧 pending 意图。**Runner 仍未声明 businessExecutionV3，Agent／command 子任务、生命周期及 release 发布流程尚未接入。**
+
+本批证据见 RFC027 `acceptance.md`：business-task 全部模块用例＋task-runtime 准入 37/0；身份／网关 28/0；契约／客户端／探针 56/0；typecheck、定向 ESLint、arch:check 与 diff 检查通过。真实 PG 使用本机测试数据库的隔离测试库；不是集群产品验收。迁移精确追加 task-runtime/0012、business-task/0007～0008、gateway/0007，未向部署库执行。尚未跑完整本地门禁／改动行防护／CI。
+
+第二批定向结果：business-task 模块 41/0（303 assertions），最后的交接幂等修正另测控制组 6/0（67 assertions）；api-client 全部 38/0；worker＋契约组 15/0。追加本任务 business-task/0009 控制记录迁移，未部署。候选 v3 的 quotaHeld 改为 boolean|null，资源不可观测时不伪报 false，依据已登记金样和 design。定向 ESLint 与 diff 检查通过；这次全库 typecheck/arch 并未通过，输出涉及 RFC028 在制 `runtime-environment` 的类型与未入锁迁移，没有修改这些并发文件，不能沿用上一批全库绿声称当前已过门禁。
+
+第三批已实现 Runner 私有执行日志（Bun SQLite、WAL/FULL）、异步命令监督器、incarnation／摘要去重、输出水位／确认回收、取消与超时、容量失败，以及新 Runner 命令的 WS 接线。旧 exec 保持原行为；新命令需要显式 businessJournalDir，目前尚未为生产 Pod 配置，完整 businessExecutionV3 仍不宣告，session 会提前拒绝旧能力。新组＋原生命周期等 34/0（201 assertions），包括真实子进程 SIGKILL 与 WS 重启补读；90 秒真实命令单项 1/0（90.21 秒），首尾输出完整；存储失效和补读容量回归也通过，最终日志组 7/0。持久卷隔离布局、session 持久投影与业务子任务派发尚未接入。定向 ESLint、最终 typecheck／arch、diff 检查通过；中途观察到的并行 RFC028 类型／跨层错误随后已消失，未改其文件。最终 fetch 为 main...origin/main 0/0；未跑完整门禁、未提交／部署。
+
+接续优先补齐 fenced 服务的旧 v1/v2 写入口屏障，避免旧槽绕过 v3 校验；需要把切换前已经在途的旧请求也纳入交接，不能只做一次读锁检查。之后实现 Runner 异步日志／可靠输出／文件与生命周期、材料／会话、release 发布流程接线及完整验收。现有 handoff-ready 暂保守检查所有已准入父操作（还没有 v3 任务终态投影），生命周期落地时必须改成只查未结束任务。aw 侧责任只以跨仓合同列在 design §10／plan T15，未写入外部只读仓库。接手前已有 `tests/e2e/referenceResources.test.ts`，以及并行 RFC028 的 `docs/adr/0010-runtime-environment-module.md`、`proposal/rfc/RFC-028-runtime-environment-builds/`、`modules/runtime-environment/`、`packages/contracts/api/runtimeImages/` 等均保持原样，非本任务提交范围；共享文件的并发内容也不得剥离。
+
+第四批已贯通隔离卷布局（父任务工作区共享、各 Runner 私有日志分挂）、session PG 可靠事件接收／确认水位／后台补读／内部读取与客户端。追加 session/0005 迁移并锁定，仅隔离测试库执行。存储布局本机 9/0、台账 PG 8/0（68 assertions）；session 新接收／worker／客户端 12/0（78 assertions）。文件 v3 HTTP 与 Runner 接线、内容摘要分块、目录游标和 Linux openat2 描述符读取也已实现：真实 PG HTTP 8/0（93 assertions）；原生 arm64 Linux 容器中安全／真实 WS 7/0（110 assertions），含 1 MiB 二进制块、FIFO、链接替换和旧版本冲突。首次使用 amd64 仿真镜像遇到 openat2 ENOSYS，已归因并改用现有原生 Runner 镜像验证；生产对不支持内核明确拒绝。尚未宣告完整 businessExecutionV3，未完成旧 API 屏障、子任务派发、生命周期、Agent 材料／会话和 release 接线，不能将以上测试视为完整 BE 验收。未跑完整候选门禁、未提交／push／部署；共享 RFC028 内容保持完整。
+
+第五批补齐旧 v1/v2 写入口及后台派发的持久票据屏障，首次 claim 与其共用服务事务；HTTP 返回后的旧 exec 仍被跟踪，已启用控制时旧 pending 保持而非误启动／失败，终态回收继续。business-task/0010 精确入锁，旧票据 unknown 的诊断／安全恢复仍待接线；定向屏障＋原模块 17/0（131 assertions）。修复日志库丢失静默建空库：数据库与独立身份双校验，日志组 9/0（45 assertions），先红后绿。真实 Docker subPath 挂载验证父／Agent worker 共用工作内容且各自私有日志 EACCES，临时卷已清理；不能替代 K8s BE-10。命令保留 env／NUL 在准入前拒绝，普通变量透传定向 1/0。最新类型／架构／定向 lint 通过；此前 RFC028 接线错误已随并行推进消失。后续继续 v3 子任务持久准入与派发、事件投影／生命周期、Agent 材料与会话、旧票据恢复和 release 完整交接。没有完整候选门禁或提交／部署；RFC028 新增的 runtime 初始化目录也属于其并发输出，不应扫入本任务独占清单。
+
+第六批新增 v3 command 持久受理与加密派发意图，固定 executionId／incarnation，回执丢失可对账、Runner 更换不重跑；冻结屏障纳入在途／unknown 子任务。命令结果投影／分页／SSE 已接 session 持久端口，完整水位后才发布终态，迟到回执不覆盖终态，GET 不驱动执行。business-task/0011、0012 已入锁。受理／投影／session 15/0（134 assertions），摘要 UTF-8／JSON 容量 2/0（22 assertions），架构和定向 lint 通过；最新全仓类型检查仅报并行 RFC028 validation/controller.ts 三处错误，保留其 WIP。取消、重试、生命周期、Agent、历史过期、release 和验收仍待完成，未提交／推送／部署。
+
+第七批完成 command cancel／fresh retry 基础接线：取消在 PG 持久化，未派发原子撤销，在途必须等待输出终态；Runner 原身份取消墓碑拦迟到 start，session 先登记后发。fresh 新建 attempt，单后继、不覆盖原结果；新 holder 可显式接管未派发 pending。business-task/0013、0014 已入锁。合并命令组 15/0（148 assertions）、追加接管后受理组 6/0（54 assertions），真实 WS＋session 8/0（50 assertions），墓碑真实进程 1/0；前一轮业务模块＋session 68/0。全仓类型检查后来通过，架构通过；定向 lint 的两处 inline type import 已修正。contracts:lock 碰到 RFC028 并行 Manifest v2/v3 变化的 breaking 检查，未强制更新。继续父 pause/resume/close 和 PVC 身份；全部 Agent、历史过期、旧票据恢复、release、UI、集群验收与发布仍未收口。
+
 ## RFC-025 已完成（2026-09-27）
 
 T1–T17 与 RC-01–16 已收口，最终证据见 `proposal/rfc/RFC-025-resource-center/acceptance.md` §19。最终代码／验收提交 d730b156e2acbca470eacdaa8fdd5f5cf128d9c7，CI 36288347746 六项全绿；本地 static、unit 725/0、module 1412/7 skip/0 fail、console 905/0、构建与改动行防护通过。工作台已部署 cs-console:rc025-final-d730b156（1/1）；API／controller／session 继续 rc025-interface-a6da5868（1/1）。最终文档提交需核对其独立精确 SHA CI，不重复运行未变的本地候选门禁。

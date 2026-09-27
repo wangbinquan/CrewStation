@@ -3,6 +3,14 @@ import { loadPlatformSettings, portFrom } from './platformSettings';
 
 const base = { CS_DATABASE_URL: 'postgres://test:test@localhost/test', CS_SECRET_KEY: 'test', POD_IP: '10.244.0.106' };
 
+test('缺省任务镜像与受管底座一致，准入可以解析摘要；显式镜像配置不被替换', () => {
+  const defaults = loadPlatformSettings(base);
+  expect(defaults.taskImage).toBe(`${defaults.registryBase}/${defaults.baseImage.repository}:${defaults.baseImage.tag}`);
+  const configured = loadPlatformSettings({ ...base, CS_REGISTRY_BASE: 'registry.test:5000', CS_BASE_IMAGE_REPOSITORY: 'platform/task', CS_BASE_IMAGE_TAG: 'v2' });
+  expect(configured.taskImage).toBe('registry.test:5000/platform/task:v2');
+  expect(loadPlatformSettings({ ...base, CS_TASK_IMAGE: 'custom.test/task:fixed' }).taskImage).toBe('custom.test/task:fixed');
+});
+
 test('session 副本地址使用实际监听端口，不读取 Kubernetes 同名 Service 变量', () => {
   const env = { ...base, CS_SESSION_PORT: 'tcp://10.96.116.44:8083' };
   // 实机地址曾被拼成 http://PodIP:tcp://ServiceIP:8083，跨副本命令永久等待。

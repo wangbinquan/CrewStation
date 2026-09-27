@@ -1,3 +1,5 @@
+import { withInitializationDeadline } from '../domain/initializationDeadline';
+import { inspectBusinessWorkspace } from './business/workspace';
 import type { TaskId } from '@crewstation/contracts';
 import { advanceStartup, failAtStage, runningStage } from '../domain/podStartup';
 import { tokenMatches } from '../domain/runnerToken';
@@ -18,13 +20,19 @@ export function runnerLifecycle(deps: TaskRuntimeUseCaseDeps) {
       return deps.uow.run(async (scope) => {
         await scope.admissions.lock(original.projectId);
         const env = await scope.environments.getById(taskId);
-        if (!env || !['creating', 'running'].includes(env.state) || !tokenMatches(token, env.runnerTokenHash)) return false;
+        if (!env || env.businessWorkspace?.phase === 'pausing' || !['creating', 'running'].includes(env.state) || !tokenMatches(token, env.runnerTokenHash)) return false;
         if (env.native && !['starting', 'running'].includes(env.native.state)) return false;
         const record = env.rebuildId ? await scope.rebuilds.get(env.rebuildId) : undefined;
         if (record && !['starting', 'ready'].includes(record.state)) return false;
         const instance = !env.native && !env.podUid ? await deps.cluster.podPhase(env) : undefined;
+        const workspace = env.render?.businessStorage && !env.native ? await inspectBusinessWorkspace(deps, env) : undefined;
+        const storage = workspace ? { businessWorkspace: { ...workspace, phase: 'ready' as const } } : {};
         const now = deps.clock.now();
-        const patch = { ...(instance?.uid ? { podUid: instance.uid } : {}), connected: true, lastActivityAt: now, updatedAt: now, ...(env.runnerRejection ? { runnerRejection: undefined, message: undefined } : {}), ...(env.native ? { native: { ...env.native, state: 'running' as const } } : {}) };
+        if (env.render?.runtimeImage && env.state === 'creating') {
+          await scope.environments.update({ ...env, ...storage, render: withInitializationDeadline(env.render, now), ...(instance?.uid ? { podUid: instance.uid } : {}), connected: true, lastActivityAt: now, updatedAt: now, message: 'Runner 已连接，等待运行环境初始化' });
+          return true;
+        }
+        const patch = { ...storage, ...(instance?.uid ? { podUid: instance.uid } : {}), connected: true, lastActivityAt: now, updatedAt: now, ...(env.runnerRejection ? { runnerRejection: undefined, message: undefined } : {}), ...(env.native ? { native: { ...env.native, state: 'running' as const } } : {}) };
         const observed = env.startup && early ? { ...env, startup: advanceStartup(env.startup, early) } : env;
         await scope.environments.update(env.state === 'creating' ? transition(observed, 'running', now, { ...patch, message: '环境已连接' }) : { ...env, ...patch });
         if (record?.state === 'starting') await scope.rebuilds.update({ ...record, state: 'ready', updatedAt: now, message: '原工作树已恢复；需要的 CLI 请逐个手动启动' });

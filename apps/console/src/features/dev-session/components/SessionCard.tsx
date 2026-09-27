@@ -1,3 +1,4 @@
+import { RuntimeImageSummary } from '../../../shared/runtime-images/RuntimeImageSummary';
 import type { ReleaseDevSessionResult } from '@crewstation/api-client';
 import type { DevSessionDto } from '@crewstation/contracts';
 import type { UseMutationResult } from '@tanstack/react-query';
@@ -36,6 +37,7 @@ function details(session: DevSessionDto, stream: StreamState, access: SessionAcc
   return [
     { label: t('devSession.session.taskId'), value: <code>{session.taskId}</code> },
     { label: t('devSession.session.branch'), value: <code>{session.branch}</code> },
+    { label: t('runtimeImages.picker.label'), value: <RuntimeImageSummary image={session.image ?? session.runtimeImage?.image} /> },
     { label: t('devSession.session.pod'), value: <code>{session.podName ?? '—'}</code> },
     { label: t('devSession.session.created'), value: formatDateTime(session.createdAt, locale) },
     {

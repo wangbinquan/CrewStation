@@ -25,6 +25,7 @@ spec:
           envFrom:
             - configMapRef: { name: crewstation-env }
           env:
+            - { name: CS_PLATFORM_POD_UID, valueFrom: { fieldRef: { fieldPath: metadata.uid } } }
             - { name: POD_IP, valueFrom: { fieldRef: { fieldPath: status.podIP } } }
             # 直连 cs-api：MCP 只是转发者，必须把调用方的身份头原样带过去，
             # 经网关会被 drop-identity-headers 抹掉，调用方身份就丢了。

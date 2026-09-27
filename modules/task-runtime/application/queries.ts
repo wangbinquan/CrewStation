@@ -1,4 +1,4 @@
-import type { Actor, ProjectId, TaskId } from '@crewstation/contracts';
+import type { RuntimeImageExecutionSnapshot, RuntimeInitializationStatus, Actor, ProjectId, TaskId } from '@crewstation/contracts';
 import { TASKRUNNER_PROTOCOL_VERSION } from '@crewstation/contracts';
 import type { DevSessionDto, StartupRecord } from '@crewstation/contracts';
 import { notFound, precondition } from '@crewstation/kernel';
@@ -7,6 +7,10 @@ import type { EnvironmentState, TaskEnvironment } from '../domain/taskEnvironmen
 import type { TaskRuntimeUseCaseDeps } from './dependencies';
 
 export interface EnvironmentDto {
+  image?: string;
+  businessWorkspace?: TaskEnvironment['businessWorkspace'];
+  runtimeImage?: RuntimeImageExecutionSnapshot;
+  runtimeInitialization?: RuntimeInitializationStatus;
   id: TaskId;
   projectId: ProjectId;
   serviceId: string;
@@ -31,7 +35,11 @@ export interface EnvironmentDto {
 
 export function environmentToDto(env: TaskEnvironment): EnvironmentDto {
   return {
+    ...(env.businessWorkspace ? { businessWorkspace: env.businessWorkspace } : {}),
     id: env.id, projectId: env.projectId, serviceId: env.serviceId, kind: env.kind, state: env.state, volumeMode: env.volumeMode, profile: env.profile, podName: env.podName,
+    ...(env.render?.runtimeImage ? { runtimeImage: env.render.runtimeImage } : {}),
+    ...(env.render?.image || env.native?.image ? { image: env.render?.image ?? env.native?.image } : {}),
+    ...(env.runtimeInitialization ? { runtimeInitialization: env.runtimeInitialization } : {}),
     connected: env.connected && !env.runnerRejection, ...(env.branch ? { branch: env.branch } : {}), ...(env.preview ? { preview: env.preview } : {}), traceId: env.traceId, ...(env.createdBy ? { createdBy: env.createdBy } : {}), ...(env.message ? { message: env.message } : {}),
     createdAt: env.createdAt.toISOString(), lastActivityAt: env.lastActivityAt.toISOString(),
     ...(env.runnerRejection ? { connectionIssue: { ...env.runnerRejection, requiredProtocol: TASKRUNNER_PROTOCOL_VERSION } } : {}),

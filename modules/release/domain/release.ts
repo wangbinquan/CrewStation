@@ -1,4 +1,5 @@
-import type { Manifest, ProjectId, ReleaseId, ReleaseStatus, ServiceId, UserId } from '@crewstation/contracts';
+import type { BusinessReleaseMaterials } from '@crewstation/contracts';
+import type { RuntimeImageExecutionSnapshot, Manifest, ProjectId, ReleaseId, ReleaseStatus, ServiceId, UserId } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
 import type { PhysicalSlot } from './slots';
 
@@ -22,7 +23,7 @@ export interface Release {
    * `readyAt`：首次就绪的时刻；只有就绪过的版本才能从发布记录重新部署（RFC-021 §4）。
    * `jobs: 'ledger'`：这次发布的构建、迁移 Job 由资源中心建（RFC-025 T8），流水线照 Job 记录判结果；两个起始时刻给它们兜底的时限。
    */
-  readonly pipeline: { buildRef?: string; migrationRef?: string; step: number; deployStartedAt?: string; readyAt?: string; jobs?: 'ledger'; buildStartedAt?: string; migrationStartedAt?: string };
+  readonly pipeline: { executionMaterials?: BusinessReleaseMaterials; runtimeImageSelections?: Array<{ versionId: string; ownerId: string }>; runtimeImage?: RuntimeImageExecutionSnapshot; buildRef?: string; migrationRef?: string; step: number; deployStartedAt?: string; readyAt?: string; jobs?: 'ledger'; buildStartedAt?: string; migrationStartedAt?: string };
   readonly message?: string;
   readonly createdBy: UserId;
   readonly createdAt: Date;
@@ -34,7 +35,7 @@ export interface Release {
  * failed 只有就绪过的版本才允许，由用例按 `isRedeployable` 把关；ready → deploying 只给「就绪却不在任何槽上」的旧数据。
  */
 const NEXT: Record<ReleaseStatus, readonly ReleaseStatus[]> = {
-  pending: ['building', 'failed'],
+  pending: ['building', 'migrating', 'deploying', 'failed'],
   building: ['migrating', 'deploying', 'failed'],
   migrating: ['deploying', 'failed'],
   deploying: ['ready', 'failed'],

@@ -28,7 +28,7 @@ export function createCliAgentDriver(adapter: CliRuntimeAdapter, which: (binary:
 
 /** 启动前就能判定的失败：一条 error 事件后即结束，send／cancel 都是空操作。 */
 function failedBeforeStart(spec: DriverAgentSpec, code: string, message: string): DriverAgentProcess {
-  const events = createEventStream<AgentEvent>();
+  const events = createEventStream<AgentEvent>(spec.businessEvents ? 4 * 1024 * 1024 : undefined);
   const event = createAgentEventFactory(spec.agentId);
   events.push(event('error', { error: { code, message } }));
   events.close();
@@ -65,7 +65,7 @@ interface PendingRun extends DriverAgentProcess {
 
 /** 装配期的门面：把真实运行的事件转发出去，并把装配前到达的 send／cancel 排到装配之后。 */
 function createPendingRun(spec: DriverAgentSpec): PendingRun {
-  const events = createEventStream<AgentEvent>();
+  const events = createEventStream<AgentEvent>(spec.businessEvents ? 4 * 1024 * 1024 : undefined);
   const event = createAgentEventFactory(spec.agentId);
   let attached: AgentRunBase | undefined;
   let ready: (() => void) | undefined;
@@ -77,8 +77,8 @@ function createPendingRun(spec: DriverAgentSpec): PendingRun {
     attach(run) {
       attached = run;
       void (async () => {
-        for await (const item of run.events) events.push(item);
-        events.close();
+        try { for await (const item of run.events) events.push(item); events.close(); }
+        catch (error) { events.fail(error); await run.cancel().catch(() => undefined); }
       })();
       ready?.();
     },

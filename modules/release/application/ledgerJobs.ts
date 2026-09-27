@@ -30,7 +30,7 @@ export function ledgerJobSteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): 
     const envSecret = `${releaseJobName(release, purpose)}-env`, base = { releaseId: release.id, purpose, activeDeadlineSeconds: settings.buildTimeoutSeconds, ttlSecondsAfterFinished: JOB_TTL_SECONDS, envSecret };
     if (purpose === 'migration') return { ...base, image: release.image ?? '', command: release.manifest?.spec.release.migrationCommand ?? [], env: {}, resources: { ...MIGRATION_RESOURCES } };
     const { httpUrl } = await deps.repo.buildSource!(release.serviceId);
-    return { ...base, image: settings.builderImage, command: ['sh', '-c', buildScript(settings.buildkitAddress)], env: { REPO_URL: httpUrl, REF: release.tag, IMAGE: release.image ?? '' }, resources: { ...BUILD_RESOURCES } };
+    return { ...base, image: settings.builderImage, command: ['sh', '-c', buildScript(settings.buildkitAddress)], env: { REPO_URL: httpUrl, REF: release.commitSha, IMAGE: release.image ?? '' }, resources: { ...BUILD_RESOURCES } };
   };
   const declare = async (release: Release, svc: ResolvedService, purpose: JobPurpose): Promise<void> => {
     const job = await renderOf(release, purpose);

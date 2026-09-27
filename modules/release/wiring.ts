@@ -1,3 +1,7 @@
+import type { ExecutionHandoff } from './ports/executionHandoff';
+import { releaseHandoffUseCases } from './application/execution/handoff';
+import { periodicJob } from '@crewstation/resource-runtime';
+import type { ReleaseRuntimeImages } from './ports/runtimeImages';
 import { kubernetesSlotControl } from './adapters/k8s/slotControl';
 import { slotMaintenanceUseCases } from './application/slotMaintenance';
 import { slotLifecycleUseCases } from './application/slotLifecycle';
@@ -34,6 +38,8 @@ import { resyncSlotLedger } from './application/slotLedgerResync';
 import type { SlotLedger } from './ports/ledger';
 
 export interface ReleaseModuleDeps {
+  executionHandoff?: ExecutionHandoff;
+  runtimeImages?: ReleaseRuntimeImages;
   physicalOperationId?: (id: string) => Promise<string>;
   db: Database;
   k8s: K8sClient;
@@ -90,7 +96,8 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
   const useCaseDeps: ReleaseUseCaseDeps = {
     uow: drizzleUnitOfWork(deps.db, deps.ledger ? { ledger: deps.ledger, services: deps.services, logger } : undefined),
     tagger: deps.tagger,
-    repo: deps.repo,
+    repo: deps.repo, executionHandoff: deps.executionHandoff,
+    ...(deps.runtimeImages ? { runtimeImages: deps.runtimeImages } : {}),
     builder: deps.delivery?.builder ?? buildKitBuilder(deps.k8s, { builderImage: deps.settings.builderImage, buildkitAddress: deps.settings.buildkitAddress, timeoutSeconds: deps.settings.buildTimeoutSeconds }),
     migrator: deps.delivery?.migrator ?? migrationJobRunner(deps.k8s, { timeoutSeconds: deps.settings.buildTimeoutSeconds }),
     deployer: deps.delivery?.deployer ?? kubernetesSlotDeployer(deps.k8s),
@@ -111,6 +118,7 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
   };
   const api: ReleaseModuleApi = {
     name: 'release',
+    ...releaseHandoffUseCases(useCaseDeps),
     ...slotMaintenanceUseCases({ ...useCaseDeps, slotControl: kubernetesSlotControl(deps.k8s, deps.physicalOperationId), isAdmin: deps.isAdmin }),
     publish: publishUseCase(useCaseDeps),
     switchTraffic: switchTrafficUseCase(useCaseDeps),
@@ -127,7 +135,7 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
   return {
     api,
     http: [releaseRoutes(api, deps.isAdmin)],
-    workers: [createWorker({ db: deps.db, kinds: [PIPELINE_JOB_KIND], owner: deps.settings.workerOwner, concurrency: 4, logger, handler: pipelineJobHandler(api, jobs) }), sweep,
+    workers: [createWorker({ db: deps.db, kinds: [PIPELINE_JOB_KIND], owner: deps.settings.workerOwner, concurrency: 4, logger, handler: pipelineJobHandler(api, jobs) }), sweep, periodicJob(() => api.progressHandoffs().then(() => undefined), (error) => logger.warn('execution handoff progress failed', { error: String(error) }), 1000),
       ...(deps.ledger ? [slotLedgerResyncWorker(() => resyncSlotLedger(useCaseDeps.uow, logger), logger)] : [])],
     migrations: releaseMigrations,
   };

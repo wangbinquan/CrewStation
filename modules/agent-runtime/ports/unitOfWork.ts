@@ -1,7 +1,9 @@
+import type { CredentialVersions } from './credentialVersions';
 import type { ProfileTestId } from '@crewstation/contracts';
 import type { CredentialRepository, ProjectPolicyRepository, ProfileRepository, RevisionRepository, TestRepository } from './repositories';
 
 export interface RepositoryScope {
+  readonly credentialVersions: CredentialVersions;
   readonly projectPolicies: ProjectPolicyRepository;
   readonly profiles: ProfileRepository;
   readonly revisions: RevisionRepository;

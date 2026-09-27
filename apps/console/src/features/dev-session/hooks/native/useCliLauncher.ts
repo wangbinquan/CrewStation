@@ -1,5 +1,5 @@
 import type { WorkspaceLayout } from '@crewstation/contracts';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { api } from '../../../../shared/api/client';
 import { queryKeys } from '../../../../shared/api/queryKeys';
 import { useApiQuery } from '../../../../shared/api/useApi';
@@ -16,6 +16,7 @@ import type { useNativeTerminals } from './useNativeTerminals';
  */
 export function useCliLauncher(projectId: string, layout: WorkspaceLayout, store: WorkspaceLayoutStore, native: ReturnType<typeof useNativeTerminals>, canStart: boolean) {
   const t = useT();
+  const [runtimeImageVersionId, setRuntimeImageVersionId] = useState('');
   const profiles = useApiQuery(queryKeys.computeProfiles(projectId), () => api.catalog.listComputeProfiles(projectId));
   const compute = layout.preferredCompute ?? '';
   // 列出全部档位（含仅终端的通用终端协议，RFC-006 C6）；选中的档位不可用、平台没设默认档位时不许启动：服务端会拒绝，前端先把原因摆出来。
@@ -26,10 +27,10 @@ export function useCliLauncher(projectId: string, layout: WorkspaceLayout, store
   const full = layout.tabs.reduce((sum, tab) => sum + tab.paneOrder.length, 0) + layout.hiddenTerminalIds.length >= LAYOUT_TERMINALS;
   const unavailable = !canStart || native.start.isPending || profiles.isPending || profiles.isError || full;
   const { launch: start } = native;
-  const launch = useCallback(() => start(compute), [start, compute]);
-  const setCompute = useCallback((value: string) => store.update((current) => ({ ...current, preferredCompute: value || undefined })), [store]);
+  const launch = useCallback(() => start(compute, undefined, runtimeImageVersionId || undefined), [start, compute, runtimeImageVersionId]);
+  const setCompute = useCallback((value: string) => { setRuntimeImageVersionId(''); store.update((current) => ({ ...current, preferredCompute: value || undefined })); }, [store]);
   const label = t(native.start.isPending ? 'devSession.agents.starting' : native.retryingOriginal ? 'devSession.native.retryStart' : 'devSession.native.add');
-  return { profiles, items, compute, setCompute, block, blockText, starting, full, unavailable, disabled: unavailable || block !== undefined, launch, label };
+  return { retryingOriginal: native.retryingOriginal, projectId, runtimeImageVersionId, setRuntimeImageVersionId, profileId: resolveChoice(items, compute)?.id, profiles, items, compute, setCompute, block, blockText, starting, full, unavailable, disabled: unavailable || block !== undefined, launch, label };
 }
 
 export type CliLauncher = ReturnType<typeof useCliLauncher>;

@@ -1,10 +1,13 @@
 import type { WorkloadIdentity } from '@crewstation/contracts';
+import { ServiceSourceBindingSchema } from '@crewstation/contracts';
 import type { ObservedPodObject } from '../api/moduleApi';
 import type { PodLabels } from '../domain/podIdentity';
 import { identityFromLabels, TOMBSTONE_RETENTION_MS, toWorkloadIdentity } from '../domain/podIdentity';
 import type { GatewayUseCaseDeps } from './dependencies';
 
 export interface ObservedPod {
+  uid?: string;
+  ready?: boolean;
   name: string;
   namespace: string;
   ip?: string;
@@ -18,10 +21,12 @@ export interface ObservedPod {
  * 已结束（Succeeded、Failed）或没有 IP 的由 syncPod 标删除。
  */
 export function observedPodOf(pod: ObservedPodObject, gone: boolean): ObservedPod {
-  const status = (pod.status ?? {}) as { podIP?: string; phase?: string };
+  const status = (pod.status ?? {}) as { podIP?: string; phase?: string; conditions?: Array<{ type?: string; status?: string }> };
   return {
     name: pod.metadata.name, namespace: pod.metadata.namespace ?? 'default', labels: (pod.metadata.labels ?? {}) as PodLabels, deleted: gone,
     ...(status.podIP ? { ip: status.podIP } : {}), ...(status.phase ? { phase: status.phase } : {}),
+    ...(pod.metadata.uid ? { uid: pod.metadata.uid } : {}),
+    ready: !pod.metadata.deletionTimestamp && status.phase === 'Running' && (status.conditions?.some((condition) => condition.type === 'Ready' && condition.status === 'True') ?? false),
   };
 }
 
@@ -37,10 +42,11 @@ export function podIdentityUseCases(deps: GatewayUseCaseDeps) {
     }
     const now = deps.clock.now();
     if (pod.deleted || !pod.ip || pod.phase === 'Succeeded' || pod.phase === 'Failed') {
-      await deps.pods.markDeleted(pod.name, pod.namespace, now);
+      await deps.pods.markDeleted(pod.name, pod.namespace, now, pod.uid);
       return;
     }
-    await deps.pods.upsert({ ip: pod.ip, podName: pod.name, namespace: pod.namespace, ...identity, updatedAt: now });
+    const source = identity.workload === 'service' ? ServiceSourceBindingSchema.safeParse({ podUid: pod.uid, ip: pod.ip, releaseId: pod.labels['crewstation.io/release'], physicalSlot: identity.physicalSlot, ready: pod.ready ?? false }) : undefined;
+    await deps.pods.upsert({ ip: pod.ip, podName: pod.name, namespace: pod.namespace, ...identity, ...(source?.success ? { source: source.data } : {}), updatedAt: now });
   };
   return {
     syncPod,

@@ -94,6 +94,7 @@ function conditionsOf(env: TaskEnvironment): ProjectedCondition[] {
     { type: 'Paused', status: env.state === 'paused' ? 'true' : 'false' },
     { type: 'Rebuilding', status: env.rebuildId && env.state === 'creating' ? 'true' : 'false' },
   ];
+  if (env.render?.businessStorage) conditions.push({ type: 'ReleasePending', status: env.state === 'releasing' && (!!env.native || !!env.release?.occupied) ? 'true' : 'false', reason: 'execution-cleanup-pending', message: '执行资源尚未完成回收确认' });
   if (env.native) conditions.push({ type: 'Prepared', status: env.native.state === 'queued' ? 'false' : 'true' });
   if (env.render) conditions.push(provisioningOf(env));
   return conditions;
@@ -112,6 +113,9 @@ function workloadRender(env: TaskEnvironment): ProjectedRecord['render'] {
   if (!reconcilerCreates(env)) return undefined;
   const { image, workerUid, resources, checkout } = env.render;
   const pod = {
+    ...(env.businessWorkspace ? { expectedVolumeUid: env.businessWorkspace.volumeUid } : {}),
+    ...(env.render.runtimeImage ? { runtimeInitialization: true } : {}),
+    ...(env.render.businessStorage ? { businessStorage: { ...env.render.businessStorage, initialize: !env.native && !env.rebuildId && env.render.start === 1 } } : {}),
     image, workerUid, resources, workload: WORKLOAD_LABELS[env.kind], project: env.labels['crewstation.io/project'] ?? '', service: env.labels['crewstation.io/service'] ?? '',
     // 档位测试（I25 第四步）用 Pod 内的临时目录，没有工作卷。
     ...(env.render.workVolume === 'emptyDir' ? { emptyDir: true } : { pvc: env.pvcName }), secret: runnerSecretOf(env), ...executionRender(env),
@@ -175,9 +179,9 @@ export function projectEnvironment(env: TaskEnvironment, previewRoute: WorkloadR
   const volume: ProjectedRecord | undefined = ownsVolume ? {
     kind: 'volume', ref: `${env.id}/work`, projectId: env.projectId, parentId: env.id,
     children: [{ kind: 'PersistentVolumeClaim', namespace: env.namespace, name: env.pvcName }], reclaim: env.volumeMode === 'follow-container' ? 'delete' : 'retain',
-    display: { mode: env.volumeMode }, conditions: env.render ? [provisioningOf(env)] : [], ...(volumeReleased ? { release: volumeReleased } : {}),
+    display: { mode: env.volumeMode }, conditions: env.render ? [{ ...provisioningOf(env), ...(env.businessWorkspace ? { status: 'false' as const } : {}) }] : [], ...(volumeReleased ? { release: volumeReleased } : {}),
     // 资源中心建出的环境（I25）：卷由调和器照这里建，只在要建出容器时建一次，卷丢了不补建（数据不能凭空换成空卷）。
-    ...(reconcilerCreates(env) && !env.render.rebuild ? { render: { pvc: { size: env.render.resources.storage, labels: { 'crewstation.io/task': env.id, 'crewstation.io/project': env.labels['crewstation.io/project'] ?? '' } } } } : {}),
+    ...(reconcilerCreates(env) && !env.render.rebuild && !env.businessWorkspace ? { render: { pvc: { size: env.render.resources.storage, labels: { 'crewstation.io/task': env.id, 'crewstation.io/project': env.labels['crewstation.io/project'] ?? '' } } } } : {}),
   } : undefined;
   const name = env.rebuildId ? podNameFor(env.id) : env.podName;
   const route: ProjectedRecord | undefined = split ? {

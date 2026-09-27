@@ -1,3 +1,4 @@
+import { migrationWriteBarrier } from './execution/migrationBarrier';
 import type { ReleaseId, ServiceId } from '@crewstation/contracts';
 import { notFound, precondition } from '@crewstation/kernel';
 import type { JobRef, SlotDeployRef } from '../api/moduleApi';
@@ -37,6 +38,8 @@ export function slotOwnerUseCases(deps: ReleaseUseCaseDeps) {
       const step = ref.purpose === 'build' ? ['pending', 'building'] : ['building', 'migrating'];
       if (!release || release.pipeline.jobs !== 'ledger' || !step.includes(release.status)) throw precondition('这次发布已不在这一步，不再建它的 Job');
       if (ref.purpose === 'build') return { GIT_TOKEN: (await deps.repo.buildToken!(release.serviceId)).token };
+      const barrier = await migrationWriteBarrier(deps, release);
+      if (!barrier.ready) throw precondition(barrier.message ?? '迁移停写尚未确认');
       const svc = await deps.services.resolveServiceById(release.serviceId);
       if (!release.manifest || !svc) throw notFound('发布', ref.releaseId);
       return (await renderSlotEnv(deps, { projectId: release.projectId, serviceId: release.serviceId, projectSlug: svc.slug, serviceName: svc.name, physical: release.targetSlot, manifest: release.manifest })).values;

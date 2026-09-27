@@ -32,8 +32,16 @@ export interface TaskEnvironmentDto {
   readonly lastActivityAt: string;
 }
 
+export interface LegacyRecoveryItem {
+  id: string; kind: string; state: 'open' | 'unknown'; taskId?: string; ownerPodUid?: string; createdAt: string;
+  blockedBy: string[]; canStopRuntime: boolean;
+}
+export interface LegacyRecoveryResult { recovered: number; items: LegacyRecoveryItem[] }
+
 /** 任务：环境只读视图（task-runtime）、业务任务只读视图（business-task）、开发会话的数据访问绑定（data）。 */
 export interface TasksResource {
+  legacyRecovery(identity: string): Promise<LegacyRecoveryResult>;
+  recoverLegacy(identity: string, action: 'reconcile' | 'stop', ticketId?: string): Promise<LegacyRecoveryResult>;
   /** GET /v1/projects/:projectId/tasks?state= */
   list(projectId: string, query?: { readonly state?: TaskEnvironmentState }): Promise<ItemsPage<TaskEnvironmentDto>>;
   /** GET /v1/tasks/:taskId */
@@ -61,6 +69,8 @@ export function tasksResource(transport: Transport): TasksResource {
   const project = (projectId: string) => `/v1/projects/${segment(projectId)}`;
   const task = (taskId: string) => `/v1/tasks/${segment(taskId)}`;
   return {
+    legacyRecovery: (identity) => transport.request('GET', '/v1/admin/business-execution/legacy-recovery', { query: { identity } }),
+    recoverLegacy: (identity, action, ticketId) => transport.request('POST', '/v1/admin/business-execution/legacy-recovery', { body: { identity, action, ticketId } }),
     list: (projectId, query) => transport.request<ItemsPage<TaskEnvironmentDto>>('GET', `${project(projectId)}/tasks`, { query }),
     describe: (taskId) => transport.request<TaskEnvironmentDto>('GET', task(taskId)),
     listBusinessTasks: (projectId) => transport.request<ItemsPage<BusinessTaskDto>>('GET', `${project(projectId)}/business-tasks`),

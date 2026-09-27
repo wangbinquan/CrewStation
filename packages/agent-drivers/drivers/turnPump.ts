@@ -14,6 +14,7 @@ import { accumulateTokens, toAgentEvent } from './agentEventMapping';
 export const DRAIN_GRACE_MS = 2000;
 
 export interface TurnPumpDeps {
+  businessEvents?: boolean;
   host: ProcessHost;
   logger: Logger;
   usage: TokenUsage;
@@ -41,12 +42,18 @@ export async function pumpTurn(child: DriverChildProcess, deps: TurnPumpDeps): P
     deps.host.pumpLines(child.stderr, (line) => {
       tail.append(`${line}\n`);
       // stderr 不进事件流：它多是 CLI 的诊断噪声，失败时整段尾部会随 error 事件一起给出。
-      deps.logger.debug('agent stderr', { line });
+      if (!deps.businessEvents) deps.logger.debug('agent stderr', { line });
     }),
   ]);
+  // Attach rejection handling before awaiting process exit; a broken pump must also stop the child.
+  const settled = pumps.then(() => ({ ok: true as const }), (error: unknown) => { void deps.host.killTree(child, 0).catch(() => undefined); return { ok: false as const, error }; });
   await child.exited;
-  const drained = await Promise.race([pumps.then(() => true), Bun.sleep(DRAIN_GRACE_MS).then(() => false)]);
+  const drained = await Promise.race([settled.then(() => true), Bun.sleep(DRAIN_GRACE_MS).then(() => false)]);
   if (!drained) await deps.host.killTree(child, 0);
+  if (deps.businessEvents || drained) {
+    const result = await settled;
+    if (!result.ok) throw result.error;
+  }
   return { exitCode: child.exitCode, signalCode: child.signalCode, stderrTail: tail.text, drained };
 }
 
@@ -59,6 +66,7 @@ function handleStdoutLine(line: string, deps: TurnPumpDeps): void {
     return;
   }
   accumulateTokens(deps.usage, event);
+  if (deps.businessEvents && event.businessUsage) deps.push(deps.emit('usage', { usage: event.businessUsage }, event.timestamp));
   if (event.sessionId !== undefined) deps.onSessionId(event.sessionId);
   const mapped = toAgentEvent(event, deps.emit);
   if (mapped !== null) deps.push(mapped);

@@ -1,6 +1,9 @@
-import type { Actor, AgentProtocol, BeforeStartMaterial, ComputeProfileSelector, ComputeUsage, LaunchSpec, ProfileRevisionRef, ProjectId, RunnerCommand, RunnerEvent, ServiceId, TaskId, TraceId, VolumeMode } from '@crewstation/contracts';
+import type { BusinessExecutionProof, BusinessSessionStorage } from '@crewstation/contracts';
+import type { RuntimeImageExecutionSnapshot, RunnerBusinessEvent, StoredBusinessExecutionDto, Actor, AgentProtocol, BeforeStartMaterial, ComputeProfileSelector, ComputeUsage, LaunchSpec, ProfileRevisionRef, ProjectId, RunnerCommand, RunnerEvent, ServiceId, TaskId, TraceId, VolumeMode } from '@crewstation/contracts';
 
 export interface EnvironmentView {
+  image?: string;
+  businessWorkspace?: { volumeUid: string; phase: 'ready' | 'pausing' | 'paused' | 'resuming' };
   id: TaskId;
   projectId: ProjectId;
   state: 'creating' | 'running' | 'paused' | 'releasing' | 'released' | 'failed';
@@ -15,13 +18,16 @@ export interface EnvironmentView {
 
 /** Agent 子任务的独立执行环境（每个 Agent 一个 Pod，占一个项目并发额度）；image 是档位修订按摘要固定的镜像。 */
 export interface CreateSubtaskExecutionInput {
+  runtimeImage?: RuntimeImageExecutionSnapshot;
+  businessSession?: BusinessSessionStorage;
   id: TaskId; parentTaskId: TaskId; purpose: 'subtask'; agentId: string; runnerId: string; fingerprint: string;
   profile?: string; image?: string; computeProfile?: { profileId: string; revision: number };
 }
 
 /** 由 task-runtime 提供。 */
 export interface Environments {
-  createEnvironment(input: { serviceId: ServiceId; kind: 'business'; volumeMode?: VolumeMode; profile?: string; traceId?: TraceId; labels?: Record<string, string> }): Promise<EnvironmentView>;
+  blockBusinessAdmission?(serviceId: ServiceId, taskId: TaskId): Promise<boolean>;
+  createEnvironment(input: { runtimeImage?: RuntimeImageExecutionSnapshot; serviceId: ServiceId; kind: 'business'; admission?: { id: TaskId; fingerprint: string }; businessStorage?: 'isolated-v1'; volumeMode?: VolumeMode; profile?: string; traceId?: TraceId; labels?: Record<string, string> }): Promise<EnvironmentView>;
   createNativeExecution(input: CreateSubtaskExecutionInput): Promise<EnvironmentView>;
   releaseEnvironment(taskId: TaskId, reason: 'business' | 'failed'): Promise<EnvironmentView>;
   pauseEnvironment(taskId: TaskId): Promise<EnvironmentView>;
@@ -31,6 +37,9 @@ export interface Environments {
 
 /** 由 session-client 提供。 */
 export interface Runner {
+  consumeBusinessExecution?(taskId: TaskId, executionId: string, through: number, stopped?: boolean): Promise<void>;
+  getBusinessExecution?(taskId: TaskId, executionId: string): Promise<StoredBusinessExecutionDto>;
+  listBusinessExecutionEvents?(taskId: TaskId, executionId: string, after?: number, limit?: number): Promise<RunnerBusinessEvent[]>;
   sendCommand(taskId: TaskId, command: RunnerCommand): Promise<unknown>;
   listEvents(taskId: TaskId, options?: { sinceSeq?: number; kinds?: RunnerEvent['kind'][]; agentId?: string; limit?: number }): Promise<Array<{ seq: number; at: string; event: RunnerEvent }>>;
 }
@@ -42,6 +51,8 @@ export interface ServiceDirectory {
 
 /** 受理时解析出的档位（RFC-006）：`default` 已换成真实名称，修订固定。 */
 export interface ResolvedCompute {
+  businessExecution?: BusinessExecutionProof;
+
   id: string;
   name: string;
   revision: number;
@@ -62,6 +73,8 @@ export interface ComputeLaunch extends ResolvedCompute {
  * 不存在报 validation（details.available 列出可选）；没有默认档位、档位不可用报 precondition；终端档位报 validation。
  */
 export interface ComputeCatalog {
+  pinLaunchVersion?(ref: ProfileRevisionRef): Promise<string>;
+  launchMaterialAt?(ref: ProfileRevisionRef, credentialStamp: string): Promise<ComputeLaunch>;
   resolve(selector: ComputeProfileSelector | undefined, usage: ComputeUsage, projectId: ProjectId): Promise<ResolvedCompute>;
   /** 按受理时固定的修订取材料：停用或改了当前修订都不影响它。 */
   launchMaterial(ref: ProfileRevisionRef): Promise<ComputeLaunch>;
@@ -72,6 +85,9 @@ export interface ProjectAuthorizer {
 }
 
 export interface BusinessTaskSettings {
+  readonly legacyFixedAdmission?: boolean;
+  readonly legacyOwnerPodUid?: string;
   readonly mcp: Array<{ name: string; url: string }>;
   readonly outputLimitBytes: number;
+  readonly secretKeyBase64?: string;
 }

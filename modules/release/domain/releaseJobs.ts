@@ -9,18 +9,29 @@ export function releaseJobName(release: Pick<Release, 'id' | 'legacyResourceId'>
 }
 
 /**
- * 构建 Job 的脚本：克隆标签处的仓库，用 buildctl 向 buildkitd 提交 Dockerfile 构建并推送到平台注册表。令牌只在环境变量 GIT_TOKEN 里；
- * 刚签发的 GitLab 项目访问令牌偶尔还没在 Git HTTP 认证路径上生效，克隆会以 401 失败，退避重试三次。
+ * 构建 Job 的脚本：检出固定提交的仓库，用 buildctl 向 buildkitd 提交 Dockerfile 构建并推送到平台注册表。令牌只在环境变量 GIT_TOKEN 里；
+ * 刚签发的 GitLab 项目访问令牌偶尔还没在 Git HTTP 认证路径上生效，抓取会以 401 失败，退避重试三次。
  */
 export function buildScript(buildkitAddress: string): string {
   return [
     'set -eu',
-    'AUTH_URL=$(echo "$REPO_URL" | sed "s#://#://oauth2:${GIT_TOKEN}@#")',
+    'SOURCE=$(mktemp -d)',
+    'export GIT_ASKPASS=$(mktemp) GIT_TERMINAL_PROMPT=0',
+    'trap \'rm -rf "$SOURCE"; rm -f "$GIT_ASKPASS"\' EXIT',
+    'printf \'#!/bin/sh\\ncase "$1" in *Username*) printf "oauth2";; *) printf "%%s" "$GIT_TOKEN";; esac\\n\' > "$GIT_ASKPASS"',
+    'chmod 700 "$GIT_ASKPASS"',
+    'git -C "$SOURCE" init --quiet',
     'for attempt in 1 2 3; do',
-    '  if git clone --quiet --depth 1 --branch "$REF" "$AUTH_URL" /work; then break; fi',
-    '  if [ "$attempt" = 3 ]; then echo "clone failed after 3 attempts" >&2; exit 1; fi',
+    '  if git -C "$SOURCE" fetch --quiet --depth 1 "$REPO_URL" "$REF"; then break; fi',
+    '  if [ "$attempt" = 3 ]; then echo "fetch failed after 3 attempts" >&2; exit 1; fi',
     '  sleep $((attempt * 5))',
     'done',
+    '[ "$(git -C "$SOURCE" rev-parse FETCH_HEAD)" = "$REF" ] || { echo "source commit mismatch" >&2; exit 1; }',
+    'mkdir -p /work',
+    'git -C "$SOURCE" archive --output="$SOURCE/source.tar" FETCH_HEAD',
+    'tar -xf "$SOURCE/source.tar" -C /work',
+    'rm -f "$GIT_ASKPASS"',
+    'unset GIT_TOKEN',
     'cd /work',
     `buildctl --addr "${buildkitAddress}" build --frontend dockerfile.v0 --local context=. --local dockerfile=. --output type=image,name="$IMAGE",push=true,registry.insecure=true`,
   ].join('\n');

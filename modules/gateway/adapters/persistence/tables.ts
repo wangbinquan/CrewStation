@@ -1,5 +1,6 @@
 import { integer, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
 import { jsonDocument } from '@crewstation/persistence';
+import type { ServiceSourceBinding } from '@crewstation/contracts';
 import { gatewaySchema } from './schema';
 
 export const allowlists = gatewaySchema.table('allowlists', {
@@ -9,6 +10,7 @@ export const allowlists = gatewaySchema.table('allowlists', {
 });
 
 export const podIdentities = gatewaySchema.table('pod_identities', {
+  source: jsonDocument('service_source').$type<ServiceSourceBinding>(),
   namespace: text('namespace').notNull(),
   podName: text('pod_name').notNull(),
   ip: text('ip').notNull(),

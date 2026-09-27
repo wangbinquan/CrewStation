@@ -31,6 +31,8 @@ export function condition(record: Pick<LedgerRecord, 'conditions'>, type: string
 export function computePhase(record: PhaseInput): PhaseResult {
   const rule = kindRule(record.kind);
   const present = record.children.filter(isPresent);
+  const releasePending = condition(record, 'ReleasePending');
+  if (record.desired === 'absent' && releasePending?.status === 'true') return { phase: 'stopping', reason: reasonOf(releasePending.reason ?? 'release-pending', releasePending.message ?? '所属模块尚未确认执行已停止') };
   const cleanup = condition(record, 'CleanupBlocked');
   if (record.desired === 'absent' && cleanup?.status === 'true') return { phase: 'stopping', reason: reasonOf(cleanup.reason ?? 'cleanup-blocked', cleanup.message ?? '资源清理受阻，请处理后重试') };
   if (record.desired === 'absent') return present.length ? { phase: 'stopping', reason: record.releaseReason ?? STOPPING } : { phase: 'stopped', ...(record.releaseReason ? { reason: record.releaseReason } : {}) };

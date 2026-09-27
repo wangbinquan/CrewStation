@@ -1,3 +1,4 @@
+import { RuntimeImageSummary } from '../../../../shared/runtime-images/RuntimeImageSummary';
 import type { NativeTerminalDto } from '@crewstation/contracts';
 import { useEffect } from 'react';
 import type { ReactElement } from 'react';
@@ -52,6 +53,7 @@ function NativeTerminalFrame({ terminalId, terminal, name, channel, stream, onAc
     {terminal?.protocol !== 'terminal' || state !== 'unknown' ? <span className={styles.lifecycle} data-activity={state}>{t(`activity.status.${state}`)}</span> : null}
     {terminal?.lifecycle === 'running' && terminal.connection === 'connected' && stream.runnerConnected && state !== 'ended' ? <small>{t('activity.processOnline')}</small> : null}
     {terminal ? <span className={styles.compute} title={terminal.computeName ?? terminal.compute}>{terminal.computeName ?? terminal.compute}</span> : null}
+    <RuntimeImageSummary image={terminal?.image ?? terminal?.runtimeImage?.image} compact />
     {terminal?.protocol === 'terminal' ? <small title={t('devSession.agents.terminalOnlyHint')}>{t('devSession.agents.terminalOnly')}</small> : null}
     {terminal?.profileRevision ? <small>{t('devSession.agents.profileRevision', { revision: terminal.profileRevision })}</small> : null}
     {terminal?.execution?.profile ? <small title={t('devSession.native.resourcesHint')}>CPU {terminal.execution.profile.cpu} · {terminal.execution.profile.memory}</small> : null}

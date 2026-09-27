@@ -88,6 +88,8 @@ async function clientRoutes(): Promise<Set<string>> {
   // 不同方法的实参形状不同（id、输入对象、查询对象）；逐个形状试一遍，只要路径被构造出来就录到。
   const shapes: unknown[][] = [
     [ARGS[0], ARGS[1], ARGS[2]],
+    [ARGS[0], ARGS[1], ARGS[2], ARGS[3], {}],
+    [ARGS[0], { runtimeImageVersionId: ARGS[1] }],
     [ARGS[0], ARGS[1], {}],
     [ARGS[0], {}],
     [ARGS[0]],

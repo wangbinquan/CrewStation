@@ -1,0 +1,8 @@
+.stack { display: grid; gap: 12px; min-width: 0; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.field { display: grid; gap: 6px; min-width: 0; }
+.field input, .field select, .field textarea { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+.field textarea { font-family: var(--cs-font-mono, monospace); font-size: 12px; }
+.code { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow: auto; font-size: 12px; }
+.identity { overflow-wrap: anywhere; font-family: var(--cs-font-mono, monospace); font-size: 12px; }
+.note { color: var(--cs-color-text-muted); margin: 0; }

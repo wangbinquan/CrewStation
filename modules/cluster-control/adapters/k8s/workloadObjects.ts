@@ -5,8 +5,10 @@ import type { VolumeRender, WorkloadPodRender, WorkloadPreviewRender } from '../
 /** 工作区的 Pod（RFC-025 I25）：与 task-runtime 自己建时同一个构造函数；环境只从 Runner Secret 引用，Pod 规格里没有凭据。 */
 export function workloadPodObject(pod: WorkloadPodRender): K8sObject {
   const object = taskPodObject({
+    ...(pod.runtimeInitialization ? { runtimeInitialization: true } : {}),
     name: pod.name, namespace: pod.namespace, taskId: pod.taskId, workload: pod.workload, project: pod.project, service: pod.service, image: pod.image,
     workerUid: pod.workerUid, resources: pod.resources, workVolume: pod.pvc ? { pvc: pod.pvc } : { emptyDir: true }, envFromSecret: pod.secret, ...(pod.checkout ? { checkout: pod.checkout } : {}),
+    ...(pod.businessStorage ? { businessStorage: pod.businessStorage } : {}),
     ...(pod.nodeName ? { nodeName: pod.nodeName } : {}), ...(pod.labels ? { labels: pod.labels } : {}),
   });
   if (pod.annotations) object.metadata.annotations = { ...object.metadata.annotations, ...pod.annotations };

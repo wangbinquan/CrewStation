@@ -18,6 +18,7 @@ export function publishUseCase(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'tagger' |
     const svc = await services.resolveServiceById(serviceId);
     if (!svc) throw notFound('服务', serviceId);
     await authorizer.authorize(actor, svc.projectId, 'publish');
+    if (await uow.read.handoffs.active(serviceId)) throw conflict('执行交接尚未完成，请继续原交接后再发布');
     const inProgress = await uow.read.releases.findInProgress(serviceId);
     if (inProgress) throw conflict(`发布 ${inProgress.tag} 仍在进行中（${inProgress.status}）`, { releaseId: inProgress.id });
     const seen = await uow.read.slots.get(serviceId);
@@ -29,6 +30,7 @@ export function publishUseCase(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'tagger' |
     const dto = await uow.run(async (scope) => {
       await scope.slots.initialize(initialSlots(serviceId, now));
       const slots = (await scope.slots.get(serviceId))!;
+      if (await scope.handoffs.active(serviceId)) throw conflict('执行交接尚未完成，请继续原交接后再发布');
       if (await scope.maintenance.active(serviceId)) throw conflict('集群运维操作尚未结束，请等待后再发布');
       // 首次发布也先确保槽行存在并取得锁，再复查；打标期间另一发布可能已被受理。
       const concurrent = await scope.releases.findInProgress(serviceId);

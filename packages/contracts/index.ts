@@ -71,3 +71,33 @@ export * from './api/resources/resourceRecord';
 export * from './api/resources/resourceView';
 export * from './api/resources/adoption';
 export * from './api/resources/legacyPhases';
+
+export * from './manifest/businessConfig';
+export * from './manifest/serviceProbes';
+export * from './api/business/executionValues';
+export * from './api/business/control';
+export * from './api/business/requests';
+export * from './api/business/materials';
+export * from './api/business/files';
+export * from './api/business/events';
+export * from './api/business/responses';
+export * from './api/business/capabilities';
+
+// RFC-028：运行镜像构建、用途验证与独立绑定。
+export * from './api/runtimeImages/values';
+export * from './api/runtimeImages/requests';
+export * from './api/runtimeImages/responses';
+export * from './api/runtimeImages/buildResources';
+export * from './taskrunner/runtimeInitialization';
+export * from './taskrunner/businessStorage';
+export * from './taskrunner/businessExecution';
+
+export * from './api/runtimeImages/development';
+
+export * from './api/runtimeImages/probe';
+
+export { businessFrameOutputBytes } from './taskrunner/businessExecution';
+
+export * from './taskrunner/businessMessages';
+
+export * from './api/business/releaseMaterials';

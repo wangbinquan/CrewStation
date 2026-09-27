@@ -1,8 +1,9 @@
 import type {
-  Actor, AgentEvent, AgentInstanceDto, AgentInstanceState, BeforeStartExecution, RunnerEvent, SendAgentMessageRequest, StartDevAgentRequest, TaskId,
+  Actor, AgentEvent, AgentInstanceDto, AgentInstanceState, BeforeStartExecution, RunnerEvent, SendAgentMessageRequest, StartDevAgentV2Request, TaskId,
 } from '@crewstation/contracts';
 import { PLATFORM_AGENT_PERMISSION } from '@crewstation/contracts';
 import { forbidden, newId, notFound, precondition } from '@crewstation/kernel';
+import { reserveDevelopmentImage } from './runtimeImageSelection';
 import type { AgentStart, AgentStartRepository } from '../ports/agentStarts';
 import type { AgentExecutionLifecycle } from './agentExecution';
 import type { DevSessionUseCaseDeps } from './dependencies';
@@ -28,21 +29,24 @@ export function agentUseCases(deps: DevSessionUseCaseDeps, starts: AgentStartRep
     return start && start.taskId === taskId ? { start, runnerTask: start.execution.taskId } : { runnerTask: taskId };
   };
   return {
-    startAgent: async (actor: Actor, taskId: TaskId, input: StartDevAgentRequest): Promise<AgentInstanceDto> => {
+    startAgent: async (actor: Actor, taskId: TaskId, input: StartDevAgentV2Request): Promise<AgentInstanceDto> => {
       const env = await guard(actor, taskId);
       // RFC-006：受理时解析档位（省略即 default），headless 只能用两种已知协议；此后派发只按固定修订取材料。
       const resolved = await deps.compute.resolve(input.compute, 'agent', env.projectId);
+      const imageTaskId = newId('tsk') as TaskId;
+      const runtimeImage = await reserveDevelopmentImage(deps, actor, env.projectId, { type: 'agent', id: imageTaskId }, input.runtimeImageVersionId, { profileId: resolved.id, revision: resolved.revision });
       const start: AgentStart = {
         agentId: newId('agt'), taskId: env.id, createdBy: actor.userId, compute: resolved.id, computeName: resolved.name, profile: { profileId: resolved.id, revision: resolved.revision }, permission: PLATFORM_AGENT_PERMISSION,
         request: { prompt: input.prompt, ...(input.cwd ? { cwd: input.cwd } : {}), ...(input.resumeSessionId ? { resumeSessionId: input.resumeSessionId } : {}) },
-        execution: { taskId: newId('tsk') as TaskId, runnerId: Bun.randomUUIDv7(), image: resolved.image, ...(resolved.taskProfile ? { taskProfile: resolved.taskProfile } : {}) },
+        execution: { taskId: imageTaskId, runnerId: Bun.randomUUIDv7(), image: runtimeImage?.image ?? resolved.image, ...(runtimeImage ? { runtimeImage } : {}), ...(resolved.taskProfile ? { taskProfile: resolved.taskProfile } : {}) },
         state: 'pending', cursor: 0, finalized: false, createdAt: deps.clock.now().toISOString(),
       };
       await starts.insert(start);
+      if (runtimeImage) await deps.runtimeImages!.confirm(runtimeImage, { type: 'agent', id: imageTaskId });
       const execution = await executions.admit(start);
       void executions.dispatch(start.agentId);
       await environments.touch(taskId);
-      return { agentId: start.agentId, taskId: env.id, compute: start.compute, computeName: start.computeName, permission: start.permission, state: 'preparing', profileRevision: start.profile.revision,
+      return { image: start.execution.image, ...(start.execution.runtimeImage ? { runtimeImage: start.execution.runtimeImage } : {}), agentId: start.agentId, taskId: env.id, compute: start.compute, computeName: start.computeName, permission: start.permission, state: 'preparing', profileRevision: start.profile.revision,
         execution: { taskId: execution.id, state: execution.native?.state ?? 'queued', ...(execution.message ? { message: execution.message } : {}) }, startedAt: start.createdAt };
     },
     sendMessage: async (actor: Actor, taskId: TaskId, agentId: string, input: SendAgentMessageRequest): Promise<void> => {
@@ -96,7 +100,8 @@ async function withExecution(deps: DevSessionUseCaseDeps, start: AgentStart, obs
   const state: AgentInstanceState = start.state === 'ended' && !['completed', 'failed', 'cancelled'].includes(base.state) ? (start.cancelled ? 'cancelled' : start.failure ? 'failed' : 'completed') : base.state;
   const executionState = env?.native?.state ?? (start.finalized || start.state === 'ended' ? 'finished' : 'queued');
   const message = start.failure ?? (['queued', 'starting'].includes(executionState) ? env?.message : undefined);
-  return { ...base, computeName: start.computeName, compute: base.compute || start.compute, profileRevision: base.profileRevision ?? start.profile.revision, state,
+  return { ...base, image: start.execution.image, computeName: start.computeName, compute: base.compute || start.compute, profileRevision: base.profileRevision ?? start.profile.revision, state,
+    ...(start.execution.runtimeImage ? { runtimeImage: start.execution.runtimeImage } : {}),
     ...(state !== base.state && start.endedAt ? { endedAt: start.endedAt } : {}), execution: { taskId: start.execution.taskId, state: executionState, ...(message ? { message } : {}) } };
 }
 

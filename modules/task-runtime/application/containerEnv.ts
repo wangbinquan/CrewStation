@@ -1,4 +1,6 @@
-import { PLATFORM_ENV } from '@crewstation/contracts';
+import type { ProjectId } from '@crewstation/contracts';
+import { PLATFORM_ENV, RuntimeInitializationMaterialSchema } from '@crewstation/contracts';
+import { precondition } from '@crewstation/kernel';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
 import type { TaskRuntimeUseCaseDeps } from './dependencies';
 
@@ -29,8 +31,10 @@ export async function containerEnv(deps: Pick<TaskRuntimeUseCaseDeps, 'sources' 
     CS_CANONICAL_RUNNER_TASK_ID: env.id,
     CS_RUNNER_TASK_ID: await deps.legacyRunnerTaskId?.(env.id) ?? env.id,
     CS_SESSION_URL: deps.settings.sessionUrl,
+    ...(env.kind === 'profile-test' ? { CS_RUNNER_BUSINESS_PROBE: '1' } : {}),
     CS_WORKDIR: '/work',
     CS_WORKER_UID: String(deps.settings.workerUid),
+    ...(env.render?.businessStorage ? { CS_WORKER_UID: String(env.render.workerUid), CS_WORKER_GID: String(env.render.workerUid) } : {}),
   };
   if (env.native) {
     values.CS_RUNNER_NATIVE_ID = env.native.runnerId;
@@ -40,6 +44,15 @@ export async function containerEnv(deps: Pick<TaskRuntimeUseCaseDeps, 'sources' 
     values.CS_PREVIEW_PORT = String(env.preview.port);
     values.CS_PREVIEW_HEALTH_PATH = env.preview.healthPath;
     values[PLATFORM_ENV.port] = String(env.preview.port);
+  }
+  const image = env.render?.runtimeImage;
+  if (image) {
+    for (const key of Object.keys(image.initializer.env)) if (key in values) throw precondition(`运行镜像变量 ${key} 与任务环境冲突`);
+    if (image.initializer.secrets.length && !deps.sources.runtimeImageSecrets) throw precondition('初始化 Secret 读取端口尚未配置');
+    const secrets = image.initializer.secrets.length ? await deps.sources.runtimeImageSecrets!((env.render?.runtimeValidation?.projectId ?? env.projectId) as ProjectId, { type: env.render?.runtimeValidation ? 'validation' : env.native ? 'agent' : env.kind === 'dev-session' ? 'session' : 'task', id: env.id }, image) : {};
+    values.CS_RUNTIME_IMAGE_INITIALIZATION = JSON.stringify(RuntimeInitializationMaterialSchema.parse({
+      environmentId: env.id, startGeneration: env.render!.start, versionId: image.versionId, initializerDigest: image.initializerDigest, initializer: image.initializer, tools: image.tools, secrets, ...(env.native || env.render?.runtimeValidation?.usage === 'agent' ? { toolsPhase: 'agent-before-start' } : {}),
+    }));
   }
   return values;
 }

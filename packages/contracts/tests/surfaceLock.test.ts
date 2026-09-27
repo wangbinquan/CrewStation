@@ -22,7 +22,11 @@ describe('业务契约面金样', () => {
     const surface = buildContractSurface();
     expect(Object.keys(surface.constants).sort()).toEqual(['EVENT_HEADERS', 'HOST_PATTERNS', 'IDENTITY_HEADERS', 'PLATFORM_ENV', 'PLATFORM_PATHS', 'PLATFORM_SERVICE_HOSTS', 'TASKRUNNER', 'TOKEN_CLAIMS']);
     expect(surface.constants.IDENTITY_HEADERS?.userId).toBe('x-cs-user-id');
-    expect(Object.keys(surface.schemas).sort()).toEqual(['BusinessTaskDto', 'CreateBusinessTaskRequest', 'EventDelivery', 'Manifest', 'ProducedEvent', 'SubmitSubtaskRequest', 'SubtaskDto', 'SubtaskMessageRequest']);
+    expect(Object.keys(surface.schemas).sort()).toEqual(['BusinessTaskDto', 'CreateBusinessTaskRequest', 'EventDelivery', 'Manifest', 'ProducedEvent', 'SubmitSubtaskRequest', 'SubtaskDto', 'SubtaskMessageRequest',
+      'BusinessCapabilitiesDto', 'BusinessControlActivate', 'BusinessControlClaim', 'BusinessControlDto', 'BusinessControlLeaseRequest', 'BusinessDirectoryDto', 'BusinessDirectoryQuery',
+      'BusinessEventPage', 'BusinessEventQuery', 'BusinessFileDto', 'BusinessFileQuery', 'BusinessHandoffReady', 'BusinessMaterialDto', 'BusinessMaterialRequest', 'BusinessOperationDto',
+      'BusinessOutputDto', 'BusinessSubtaskMessageV3', 'BusinessSubtaskMutation', 'BusinessSubtaskV3Dto', 'BusinessTaskMutation', 'BusinessTaskV3Dto', 'CreateBusinessTaskV3',
+      'RetryBusinessSubtaskV3', 'SubmitBusinessSubtaskV3'].sort());
   });
 });
 

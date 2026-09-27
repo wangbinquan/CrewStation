@@ -1,4 +1,4 @@
-import type { ProjectId, TaskId } from '@crewstation/contracts';
+import type { ProjectId, ServiceId, TaskId } from '@crewstation/contracts';
 import type { EnvironmentState, TaskEnvironment } from '../domain/taskEnvironment';
 
 export interface EnvironmentRepository {
@@ -31,6 +31,8 @@ export const NATIVE_EXECUTION_JOB_KIND = 'task-runtime.native-execution';
 
 /** 配额准入表：一行一项目，UPDATE … WHERE running < limit 原子判定（AT-19、AT-39）。 */
 export interface AdmissionRepository {
+  block(taskId: TaskId, serviceId: ServiceId): Promise<void>;
+  blocked(taskId: TaskId): Promise<boolean>;
   /** 事务内先锁项目，再读会话／变更配额，串行化创建、释放和恢复。 */
   lock(projectId: ProjectId): Promise<void>;
   tryAcquire(projectId: ProjectId, limit: number): Promise<boolean>;

@@ -28,6 +28,8 @@ export interface ServicesResource {
   listSlots(serviceId: string): Promise<ItemsPage<SlotDto>>;
   /** POST /v1/services/:serviceId/traffic-switch（负责人）：切流或回退；expectedActiveRelease 不一致时拒绝。 */
   switchTraffic(serviceId: string, input: TrafficSwitchRequest): Promise<TrafficSwitchDto>;
+  getExecutionHandoff(serviceId: string, operationId: string): Promise<TrafficSwitchDto>;
+  latestExecutionHandoff(serviceId: string): Promise<TrafficSwitchDto | null>;
   /** GET /v1/services/:serviceId/traffic-switches */
   listTrafficSwitches(serviceId: string): Promise<ItemsPage<TrafficSwitchDto>>;
   /** RFC-021 POST /v1/services/:serviceId/slots/preview/offline（负责人、管理员）：下线待验证版本，返回两个槽。 */
@@ -61,6 +63,8 @@ export function servicesResource(transport: Transport): ServicesResource {
     getRelease: (releaseId) => transport.request<ReleaseDto>('GET', `/v1/releases/${segment(releaseId)}`),
     listSlots: (serviceId) => transport.request<ItemsPage<SlotDto>>('GET', `${base(serviceId)}/slots`),
     switchTraffic: (serviceId, input) => transport.request<TrafficSwitchDto>('POST', `${base(serviceId)}/traffic-switch`, { body: input }),
+    getExecutionHandoff: (serviceId, operationId) => transport.request<TrafficSwitchDto>('GET', `${base(serviceId)}/execution-handoffs/${segment(operationId)}`),
+    latestExecutionHandoff: (serviceId) => transport.request<TrafficSwitchDto | null>('GET', `${base(serviceId)}/execution-handoff`),
     listTrafficSwitches: (serviceId) => transport.request<ItemsPage<TrafficSwitchDto>>('GET', `${base(serviceId)}/traffic-switches`),
     takeOffline: (serviceId, input) => transport.request<ItemsPage<SlotDto>>('POST', `${base(serviceId)}/slots/preview/offline`, { body: input }),
     postponeOffline: (serviceId, input) => transport.request<ItemsPage<SlotDto>>('POST', `${base(serviceId)}/slots/preview/postpone`, { body: input }),

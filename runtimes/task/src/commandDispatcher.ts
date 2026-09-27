@@ -22,12 +22,13 @@ export interface CommandDispatcher {
   readonly inFlight: number;
 }
 
-export function createCommandDispatcher(handlers: CommandHandlers, port: ReplyPort, logger: Logger): CommandDispatcher {
+export function createCommandDispatcher(handlers: CommandHandlers, port: ReplyPort, logger: Logger, guard?: (command: RunnerCommand) => void): CommandDispatcher {
   const inFlight = new Set<Promise<void>>();
   let refusing = false;
   const run = async (command: RunnerCommand): Promise<void> => {
     const startedAt = Date.now();
     try {
+      guard?.(command);
       const handler = handlers[command.type] as (input: RunnerCommand) => Promise<unknown>;
       const payload = await handler(command);
       port.reply(command.id, payload ?? {});

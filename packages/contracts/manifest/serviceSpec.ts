@@ -1,14 +1,17 @@
 import { z } from 'zod';
 import { ResourceIdSchema } from '../ids';
+import { ServiceProbesSchema } from './serviceProbes';
 
-export const ManifestApiVersionSchema = z.literal('crewstation/v2');
+export const ManifestApiVersionSchema = z.enum(['crewstation/v2', 'crewstation/v3']);
 export const ManifestKindSchema = z.enum(['DigitalWorker', 'APIProxy', 'EventProducer']);
 export const HttpMethodSchema = z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
 
 export const ServiceSpecSchema = z.object({
+  runtimeImageVersionId: ResourceIdSchema.optional(),
   command: z.array(z.string().min(1)).min(1),
   port: z.number().int().min(1).max(65535),
   healthPath: z.string().startsWith('/').default('/healthz'),
+  probes: ServiceProbesSchema.optional(),
   /** 管理员定义的服务套餐名。 */
   servicePlanId: ResourceIdSchema,
   replicas: z.number().int().min(1).max(20).default(1),

@@ -1,3 +1,4 @@
+import type { ServiceProbes } from '@crewstation/contracts';
 import type { ReleaseId, ServiceId, SlotName, UserId } from '@crewstation/contracts';
 import { precheckFailed, precheckReason } from './precheck';
 
@@ -43,6 +44,7 @@ export interface SlotWorkload {
   readonly command: readonly string[];
   readonly port: number;
   readonly healthPath: string;
+  readonly probes?: ServiceProbes;
   readonly replicas: number;
   readonly resources: { readonly cpu: string; readonly memory: string };
   readonly restartedAt?: string;

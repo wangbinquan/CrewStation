@@ -59,3 +59,11 @@ test('结束了或流水线已放弃：删凭据 Secret（删除中的不重复�
   expect(await applyJob(broken.deps, record()).then(() => 'ok', (error: Error) => error.message)).toBe('exceeded quota');
   expect(broken.calls.at(-1)).toBe('condition:Created=false');
 });
+
+
+test('failed migration only records Stopped after the retained Job fence and physical cleanup are proven', async () => {
+  const h = harness(), failed = record([{ type: 'Failed', status: 'true' }]);
+  h.deps.cluster.stopMigrationJob = async () => false; await applyJob(h.deps, failed); expect(h.calls).toEqual([]);
+  h.deps.cluster.stopMigrationJob = async () => true; await applyJob(h.deps, failed); expect(h.calls).toEqual(['condition:Stopped=true']);
+  expect(h.calls).not.toContain('job');
+});

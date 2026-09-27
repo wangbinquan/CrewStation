@@ -1,3 +1,4 @@
+import { jsonHash } from '@crewstation/kernel';
 import type { RouteEntry } from '@crewstation/contracts';
 import type { K8sClient } from '@crewstation/k8s';
 import { LABELS, Resources, ingressRouteObject, stripPrefixMiddleware } from '@crewstation/k8s';
@@ -17,6 +18,16 @@ export function traefikApplier(k8s: K8sClient, settings: Pick<GatewaySettings, '
   };
   return {
     applyMiddlewares,
+    observeRoutes: async (serviceName, namespace, routes) => {
+      for (const route of routes) {
+        const name = routeObjectName(serviceName, route.kind), observed = await k8s.get(Resources.IngressRoute!, name, namespace, AbortSignal.timeout(10_000));
+        const expected = ingressRouteObject({ name, namespace, host: route.host, ...(route.pathPrefix ? { pathPrefix: route.pathPrefix, priority: PREFIX_ROUTE_PRIORITY } : {}),
+          target: { name: route.target.service, port: route.target.port, namespace: route.target.namespace },
+          middlewares: route.middlewares.map((m) => (systemMiddlewares.has(m) ? { name: m, namespace: settings.systemNamespace } : { name: m })) });
+        if (!observed || observed.metadata.deletionTimestamp || jsonHash(observed.spec) !== jsonHash(expected.spec)) return false;
+      }
+      return routes.length > 0;
+    },
     applyRoutes: async (serviceName, namespace, entries) => {
       await applyMiddlewares(namespace, entries);
       const wanted = new Set<string>();

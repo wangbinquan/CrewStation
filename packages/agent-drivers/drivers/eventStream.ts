@@ -4,11 +4,13 @@
 export interface EventStream<T> extends AsyncIterable<T> {
   push(item: T): void;
   close(): void;
+  fail(error: unknown): void;
   readonly closed: boolean;
 }
 
-export function createEventStream<T>(): EventStream<T> {
-  const items: T[] = [];
+export function createEventStream<T>(maxBytes?: number): EventStream<T> {
+  const items: Array<{ item: T; bytes: number }> = [];
+  let bytes = 0, failure: unknown;
   let closed = false;
   let wake: (() => void) | undefined;
   const notify = (): void => {
@@ -19,23 +21,28 @@ export function createEventStream<T>(): EventStream<T> {
   return {
     push(item) {
       if (closed) return;
-      items.push(item);
+      const size = maxBytes === undefined ? 0 : Buffer.byteLength(JSON.stringify(item));
+      if (maxBytes !== undefined && bytes + size > maxBytes) {
+        failure = new Error('Agent event buffer exceeded its limit'); closed = true; notify(); throw failure;
+      }
+      bytes += size; items.push({ item, bytes: size });
       notify();
     },
     close() {
       closed = true;
       notify();
     },
+    fail(error) { failure = error; closed = true; notify(); },
     get closed() {
       return closed;
     },
     async *[Symbol.asyncIterator]() {
       for (;;) {
         if (items.length > 0) {
-          yield items.shift() as T;
+          const next = items.shift()!; bytes -= next.bytes; yield next.item;
           continue;
         }
-        if (closed) return;
+        if (closed) { if (failure !== undefined) throw failure; return; }
         await new Promise<void>((resolve) => {
           wake = resolve;
         });

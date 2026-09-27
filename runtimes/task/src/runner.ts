@@ -1,3 +1,4 @@
+import { profileBusinessStorage } from './storage/profileBusinessStorage';
 import type { AgentProtocol, RunnerHello } from '@crewstation/contracts';
 import { TASKRUNNER_PROTOCOL_VERSION } from '@crewstation/contracts';
 import type { Logger } from '@crewstation/kernel';
@@ -15,6 +16,9 @@ import type { RunnerConfig } from './config';
 import { createContractVerifier } from './contract/verifyContract';
 import type { ExecSupervisor } from './exec/execSupervisor';
 import { createExecSupervisor } from './exec/execSupervisor';
+import { businessAgentFactory } from './agents/businessAgentFactory';
+import { createBusinessCommands } from './exec/businessCommands';
+import type { BusinessCommands } from './exec/businessCommands';
 import { createFileCommands } from './files/fileCommands';
 import type { WorkdirPaths } from './files/workdirPath';
 import { createWorkdirPaths } from './files/workdirPath';
@@ -35,6 +39,7 @@ import { fetchComparisonHistory } from './workspace/fetchComparisonHistory';
 import { createApiInvoker } from './http/apiInvocation';
 import { BeforeStartRunner } from './beforeStart/beforeStartRunner';
 import { detectInterpreters } from './beforeStart/interpreters';
+import { RuntimeInitialization } from './initialization/runtimeInitialization';
 
 export interface RunnerHooks {
   /** shutdown 排空完成后调用；缺省 process.exit。测试注入以免真的退出。 */
@@ -78,17 +83,21 @@ class TaskRunner implements RunnerHandle {
     private readonly agents: AgentSupervisor,
     private readonly probes: TerminalProbes,
     private readonly execs: ExecSupervisor,
+    private readonly business: BusinessCommands,
     private readonly terminals: TerminalSupervisor,
     private readonly nativeTerminals: NativeTerminalSupervisor,
     private readonly preview: PreviewSupervisor,
+    private readonly initialization: RuntimeInitialization,
   ) {}
 
   static async create(config: RunnerConfig, hooks: RunnerHooks, logger: Logger): Promise<TaskRunner> {
+    config = await profileBusinessStorage(config);
     const paths = await createWorkdirPaths(config.workdir);
     const isolation = resolveIsolation({ uid: config.workerUid, gid: config.workerGid, currentUid: probeCurrentUid(), which: (b) => Bun.which(b) });
     if (isolation.enabled) logger.info('privilege drop enabled: children run via setpriv', { uid: isolation.uid, gid: isolation.gid });
     else logger.warn('privilege drop disabled: children run as the runner user', { reason: isolation.reason });
-    const launcher = createProcessLauncher({ isolation, processEnv: process.env, workerHome: paths.root, logger });
+    const launcher = createProcessLauncher({ isolation, processEnv: { ...process.env, ...config.runtimeInitialization?.material.initializer.env }, workerHome: paths.root, logger });
+    const initialization = new RuntimeInitialization(config.runtimeInitialization, launcher);
     const drivers = hooks.drivers ?? createCliDriverFactory();
     const linkRef: { current?: SessionLink } = {};
     const emit = (event: Parameters<SessionLink['emit']>[0]): void => {
@@ -96,11 +105,12 @@ class TaskRunner implements RunnerHandle {
     };
     // 启动前 Hook（RFC-004，RFC-006 起每次启动都经它）：解释器清单启动时探测一次并写进 hello；执行器同一容器串行。
     const interpreters = await detectInterpreters(launcher, (b) => Bun.which(b));
-    const beforeStart = new BeforeStartRunner({ launcher, interpreters, emit, logger: logger.child({ component: 'before-start' }), ...(config.agentRunDir ? { baseDir: config.agentRunDir } : {}) });
+    const beforeStart = new BeforeStartRunner({ afterSteps: (request, env, signal) => initialization.checkAgentTools(request.processAttemptId, env, signal), launcher, interpreters, emit, logger: logger.child({ component: 'before-start' }), ...(config.agentRunDir ? { baseDir: config.agentRunDir } : {}) });
     logger.info('before-start interpreters detected', { interpreters: interpreters.list.map((i) => `${i.language}=${i.version ?? '?'}`) });
     const agents = createAgentSupervisor({ drivers, launcher, paths, beforeStart, emit, logger: logger.child({ component: 'agents' }) });
     const probes = createTerminalProbes({ beforeStart, launcher, paths, logger: logger.child({ component: 'probe' }) });
     const execs = createExecSupervisor({ launcher, paths, emit, logger: logger.child({ component: 'exec' }) });
+    const business = createBusinessCommands({ launcher, paths, logger: logger.child({ component: 'business-exec' }) }, config.businessJournalDir, { outputBytes: 64 * 1024 * 1024, spoolBytes: 64 * 1024 * 1024, eventBytes: 256 * 1024 }, businessAgentFactory({ drivers, launcher, paths, beforeStart, logger }, config.businessSessionDir));
     const terminals = createTerminalSupervisor({ choice: config.terminalBackend, launcher, paths, emit, logger: logger.child({ component: 'terminal' }) });
     const nativeTerminals = new NativeTerminalSupervisor({ backend: terminals.backend, launcher, paths, beforeStart, emit, runnerId: config.nativeRunnerId, logger: logger.child({ component: 'native-terminal' }) });
     const preview = createPreviewSupervisor({ config: config.preview, policy: config.previewPolicy, launcher, workdir: paths.root, emit, logger: logger.child({ component: 'preview' }) });
@@ -110,14 +120,14 @@ class TaskRunner implements RunnerHandle {
     const comparisons = createWorkspaceComparisons({ git, paths, launcher });
     const apiInvoker = createApiInvoker(config.internalApiBase);
     const runnerRef: { current?: TaskRunner } = {};
-    const handlers = buildCommandHandlers({ agents, probes, execs, terminals, nativeTerminals, files, preview, verifyContract, invokeApi: apiInvoker.invoke, workspaceStatus: () => readWorkspaceStatus(git, paths), comparisons, fetchComparisonHistory: (url, sha) => fetchComparisonHistory(git, url, sha), requestShutdown: (grace) => void runnerRef.current?.shutdown(grace) });
+    const handlers = buildCommandHandlers({ initialization, agents, probes, execs, business, terminals, nativeTerminals, files, preview, verifyContract, invokeApi: apiInvoker.invoke, workspaceStatus: () => readWorkspaceStatus(git, paths), comparisons, fetchComparisonHistory: (url, sha) => fetchComparisonHistory(git, url, sha), requestShutdown: (grace) => void runnerRef.current?.shutdown(grace) });
     const hello = (): RunnerHello => ({
       type: 'hello',
       protocolVersion: TASKRUNNER_PROTOCOL_VERSION,
       taskId: config.taskId,
       runnerToken: config.runnerToken,
       workdir: paths.root,
-      capabilities: { protocols: [...RUNNER_PROTOCOLS], pty: terminals.backend !== undefined, preview: preview.enabled, ...(apiInvoker.enabled ? { apiInvocations: 1 as const } : {}), previewControl: 1 as const, terminalControl: 1 as const, interpreters: interpreters.list },
+      capabilities: { ...(config.businessJournalDir && process.platform === 'linux' ? { businessExecutionV3: 1 as const } : {}), protocols: [...RUNNER_PROTOCOLS], pty: terminals.backend !== undefined, preview: preview.enabled, ...(apiInvoker.enabled ? { apiInvocations: 1 as const } : {}), previewControl: 1 as const, terminalControl: 1 as const, runtimeInitialization: 1 as const, interpreters: interpreters.list },
     });
     const dispatcherRef: { current?: CommandDispatcher } = {};
     const link = createSessionLink({
@@ -130,9 +140,9 @@ class TaskRunner implements RunnerHandle {
       logger: logger.child({ component: 'link' }),
     });
     linkRef.current = link;
-    const dispatcher = createCommandDispatcher(handlers, link, logger.child({ component: 'dispatch' }));
+    const dispatcher = createCommandDispatcher(handlers, link, logger.child({ component: 'dispatch' }), (command) => initialization.assertCommand(command));
     dispatcherRef.current = dispatcher;
-    const runner = new TaskRunner(config, hooks, logger, paths, launcher, link, dispatcher, agents, probes, execs, terminals, nativeTerminals, preview);
+    const runner = new TaskRunner(config, hooks, logger, paths, launcher, link, dispatcher, agents, probes, execs, business, terminals, nativeTerminals, preview, initialization);
     runnerRef.current = runner;
     return runner;
   }
@@ -143,9 +153,11 @@ class TaskRunner implements RunnerHandle {
 
   start(): void {
     this.logger.info('taskrunner starting', { workdir: this.paths.root, sessionUrl: this.config.sessionUrl, preview: this.preview.enabled, isolated: this.launcher.isolation.enabled });
-    this.link.emit({ kind: 'runnerState', state: 'ready' });
-    this.preview.start();
     this.link.start();
+    void this.initialization.start().then((status) => {
+      if (status.state !== 'succeeded' || this.shuttingDown) return;
+      this.link.emit({ kind: 'runnerState', state: 'ready' }); this.preview.start();
+    }).catch(() => this.logger.error('runtime initialization unavailable'));
   }
 
   whenConnected(): Promise<void> {
@@ -172,8 +184,9 @@ class TaskRunner implements RunnerHandle {
     this.link.emit({ kind: 'runnerState', state: 'draining' });
     this.dispatcher.refuseNew();
     this.probes.cancelAll();
-    await Promise.allSettled([this.agents.cancelAll(), this.terminals.closeAll(), this.nativeTerminals.closeAll(), this.execs.cancelAll(), this.preview.stop()]);
+    await Promise.allSettled([this.initialization.close(), this.agents.cancelAll(), this.terminals.closeAll(), this.nativeTerminals.closeAll(), this.execs.cancelAll(), this.preview.stop()]);
     await this.dispatcher.drain();
+    await this.business.stop();
     this.logger.info('drained');
   }
 }

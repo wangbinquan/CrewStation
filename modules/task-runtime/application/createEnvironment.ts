@@ -1,6 +1,5 @@
-import type { ProjectId, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
-import { DomainTopic } from '@crewstation/contracts';
-import { conflict, newId, newTraceId, notFound, validation } from '@crewstation/kernel';
+import type { ProjectId, ServiceId, TaskId, TraceId, VolumeMode } from '@crewstation/contracts';
+import { newId, newTraceId, notFound, validation } from '@crewstation/kernel';
 import { completeStage, failStartup, initialStartup } from '../domain/podStartup';
 import { hashRunnerToken, newRunnerToken } from '../domain/runnerToken';
 import type { TaskEnvironment, WorkloadRender } from '../domain/taskEnvironment';
@@ -8,19 +7,10 @@ import { podNameFor, pvcNameFor, transition } from '../domain/taskEnvironment';
 import type { TaskPodSpec, TaskSourceCheckout } from '../ports/cluster';
 import type { TaskRuntimeSettings } from '../ports/platform';
 import { containerEnv } from './containerEnv';
-import type { TaskRuntimeUseCaseDeps } from './dependencies';
+import type { CreateEnvironmentInput, TaskRuntimeUseCaseDeps } from './dependencies';
+export type { CreateEnvironmentInput } from './dependencies';
+import { admissionFingerprint, admitEnvironment, matchAdmission } from './environmentAdmission';
 
-export interface CreateEnvironmentInput {
-  serviceId: ServiceId;
-  kind: TaskKind;
-  volumeMode?: VolumeMode;
-  profile?: string;
-  branch?: string;
-  traceId?: TraceId;
-  createdBy?: UserId;
-  preview?: { command: string[]; port: number; healthPath: string };
-  labels?: Record<string, string>;
-}
 
 /** 开发预览的用户域主机与所需中间件；没有预览进程就不建路由。 */
 export function previewRouteOf(settings: TaskRuntimeSettings, env: { preview?: unknown }, slug: string): { previewRoute?: TaskPodSpec['previewRoute'] } {
@@ -72,6 +62,11 @@ async function renderedCheckoutOf(deps: TaskRuntimeUseCaseDeps, serviceId: Servi
 export function createEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
   const { uow, cluster, quotas, profiles, services, settings, clock, logger } = deps;
   return async (input: CreateEnvironmentInput): Promise<TaskEnvironment> => {
+    const fingerprint = admissionFingerprint(deps, input);
+    if (input.admission) {
+      const replay = matchAdmission(await uow.read.environments.getById(input.admission.id), fingerprint);
+      if (replay) return replay;
+    }
     const svc = await services.resolveServiceById(input.serviceId);
     if (!svc) throw notFound('服务', input.serviceId);
     const selected = input.kind === 'dev-session' ? await profiles.devSessionProfile?.(svc.projectId) ?? settings.defaultProfile : input.profile ?? settings.defaultProfile;
@@ -79,11 +74,13 @@ export function createEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
     if (!profile) throw validation(`任务套餐 ${selected} 不存在`);
     const limit = await quotas.quotaLimit(svc.projectId);
     if (limit === undefined) throw validation('项目尚未配置并发任务配额');
+    const image = input.runtimeImage?.image ?? (deps.creation === 'ledger' && deps.sources.pinTaskImage ? await deps.sources.pinTaskImage(settings.taskImage) : settings.taskImage);
     const volumeMode: VolumeMode = input.kind === 'dev-session' ? 'follow-container' : (input.volumeMode ?? 'follow-container');
     const token = newRunnerToken();
     const now = clock.now();
-    const id = newId('tsk') as TaskId;
+    const id = input.admission?.id ?? input.runtimeImageTaskId ?? newId('tsk') as TaskId;
     const env: TaskEnvironment = {
+      ...(fingerprint ? { admissionFingerprint: fingerprint } : {}),
       id, projectId: svc.projectId as ProjectId, serviceId: input.serviceId, kind: input.kind, state: 'creating', volumeMode, profile: profile.id,
       namespace: svc.namespace, podName: podNameFor(id), pvcName: pvcNameFor(id), traceId: input.traceId ?? (newTraceId() as TraceId), runnerTokenHash: hashRunnerToken(token),
       connected: false, ...(input.branch ? { branch: input.branch } : {}), ...(input.preview ? { preview: input.preview } : {}), labels: input.labels ?? {},
@@ -92,13 +89,13 @@ export function createEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
       startup: initialStartup(now, input.branch && deps.checkout ? { checkout: input.branch } : {}),
     };
     // 由资源中心建出（I25）：只到登记为止，期望随记录进台账，卷、Runner Secret、Pod 与预览由调和器照它建。
-    const rendered = deps.creation === 'ledger' ? { ...env, render: workloadRenderOf(settings, profile, await renderedCheckoutOf(deps, input.serviceId, input.branch), previewRouteOf(settings, env, svc.slug).previewRoute) } : undefined;
-    await admit(deps, rendered ?? env, limit);
-    if (rendered) return rendered;
+    const rendered = deps.creation === 'ledger' ? { ...env, render: { ...workloadRenderOf(settings, profile, await renderedCheckoutOf(deps, input.serviceId, input.branch), previewRouteOf(settings, env, svc.slug).previewRoute), image, ...(input.runtimeImage ? { runtimeImage: input.runtimeImage } : {}), ...(input.businessStorage ? { businessStorage: { version: 1 as const, ownerTaskId: id } } : {}) } } : undefined;
+    const admitted = await admitEnvironment(deps, rendered ?? env, limit);
+    if (rendered) return admitted;
     try {
       await cluster.ensureVolume(env, profile.storage);
       const podUid = await cluster.createPod({
-        env, image: settings.taskImage, envVars: await containerEnv(deps, env, svc, token), resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage },
+        env, image, envVars: await containerEnv(deps, env, svc, token), resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage },
         ...(await sourceOf(deps, env.serviceId, env.branch)), ...previewRouteOf(settings, env, svc.slug),
       });
       await recordPodInstance(deps, env, podUid);
@@ -114,17 +111,6 @@ export function createEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
     }
     return env;
   };
-}
-
-/** 配额准入与登记同一事务（一个项目一个开发会话）；配了台账时记录随之进台账。 */
-async function admit(deps: TaskRuntimeUseCaseDeps, env: TaskEnvironment, limit: number): Promise<void> {
-  await deps.uow.run(async (scope) => {
-    await scope.admissions.lock(env.projectId);
-    if (env.kind === 'dev-session' && (await scope.environments.findDevSession(env.projectId))) throw conflict('该项目已有一个开发会话在运行', { projectId: env.projectId });
-    await scope.quota.acquire(env, limit, `并发任务已达配额上限 ${limit}`);
-    await scope.environments.insert(env);
-    await scope.events.publish(DomainTopic.taskCreated, { occurredAt: env.createdAt.toISOString(), traceId: env.traceId, projectId: env.projectId, serviceId: env.serviceId, taskId: env.id, kind: env.kind });
-  });
 }
 
 /** Preserve concurrent Runner updates while binding the exact instance returned by Kubernetes. */

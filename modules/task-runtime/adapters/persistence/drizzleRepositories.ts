@@ -10,6 +10,9 @@ const json = <T>(v: unknown): T => (typeof v === 'string' ? JSON.parse(v) : v) a
 
 export function drizzleEnvironmentRepository(db: Executor): EnvironmentRepository {
   const toEnv = (r: typeof environments.$inferSelect): TaskEnvironment => ({
+    ...(r.businessWorkspace ? { businessWorkspace: json<TaskEnvironment['businessWorkspace']>(r.businessWorkspace) } : {}),
+    ...(r.runtimeInitialization ? { runtimeInitialization: json<TaskEnvironment['runtimeInitialization']>(r.runtimeInitialization) } : {}),
+    ...(r.admissionFingerprint ? { admissionFingerprint: r.admissionFingerprint } : {}),
     ...(r.legacyCluster ? { legacyCluster: json<TaskEnvironment['legacyCluster']>(r.legacyCluster) } : {}),
     id: r.id as TaskId, projectId: r.projectId as ProjectId, serviceId: r.serviceId as ServiceId, kind: r.kind as TaskKind, state: r.state as EnvironmentState,
     volumeMode: r.volumeMode as VolumeMode, profile: r.profile, namespace: r.namespace, podName: r.podName, ...(r.podUid ? { podUid: r.podUid } : {}), pvcName: r.pvcName, traceId: r.traceId as TraceId,
@@ -19,7 +22,7 @@ export function drizzleEnvironmentRepository(db: Executor): EnvironmentRepositor
     ...(r.native ? { native: json<TaskEnvironment['native']>(r.native) } : {}), ...(r.release ? { release: json<TaskEnvironment['release']>(r.release) } : {}), ...(r.runnerRejection ? { runnerRejection: json<TaskEnvironment['runnerRejection']>(r.runnerRejection) } : {}),
     ...(r.startup ? { startup: json<TaskEnvironment['startup']>(r.startup) } : {}), ...(r.render ? { render: json<TaskEnvironment['render']>(r.render) } : {}),
   });
-  const toRow = (e: TaskEnvironment): typeof environments.$inferInsert => ({ ...e, podUid: e.podUid ?? null, branch: e.branch ?? null, preview: e.preview ?? null, createdBy: e.createdBy ?? null, message: e.message ?? null, rebuildId: e.rebuildId ?? null, native: e.native ?? null, release: e.release ?? null, runnerRejection: e.runnerRejection ?? null, startup: e.startup ?? null, render: e.render ?? null });
+  const toRow = (e: TaskEnvironment): typeof environments.$inferInsert => ({ ...e, businessWorkspace: e.businessWorkspace ?? null, runtimeInitialization: e.runtimeInitialization ?? null, podUid: e.podUid ?? null, branch: e.branch ?? null, preview: e.preview ?? null, createdBy: e.createdBy ?? null, message: e.message ?? null, rebuildId: e.rebuildId ?? null, native: e.native ?? null, release: e.release ?? null, runnerRejection: e.runnerRejection ?? null, startup: e.startup ?? null, render: e.render ?? null });
   return {
     insert: async (e) => { await db.insert(environments).values(toRow(e)); },
     update: async (e) => { await db.update(environments).set(toRow(e)).where(eq(environments.id, e.id)); },
@@ -46,6 +49,8 @@ export function drizzleEnvironmentRepository(db: Executor): EnvironmentRepositor
 
 export function drizzleAdmissionRepository(db: Executor): AdmissionRepository {
   return {
+    block: async (taskId, serviceId) => { await db.execute(sql`INSERT INTO task_runtime.blocked_admissions(task_id,service_id) VALUES (${taskId},${serviceId}) ON CONFLICT DO NOTHING`); },
+    blocked: async (taskId) => (await db.execute(sql`SELECT task_id FROM task_runtime.blocked_admissions WHERE task_id=${taskId}`)).length > 0,
     lock: async (projectId) => {
       await db.insert(admissions).values({ projectId, running: 0 }).onConflictDoNothing();
       await db.select().from(admissions).where(eq(admissions.projectId, projectId)).for('update');

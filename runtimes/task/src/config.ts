@@ -1,6 +1,8 @@
 import type { TaskId } from '@crewstation/contracts';
 import { NativeTerminalRosterSchema, PLATFORM_ENV, TaskIdSchema } from '@crewstation/contracts';
 import type { Logger } from '@crewstation/kernel';
+import { loadRuntimeInitialization } from './initialization/config';
+import type { RuntimeInitializationConfig } from './initialization/runtimeInitialization';
 
 export interface PreviewConfig {
   command: string[];
@@ -11,6 +13,8 @@ export interface PreviewConfig {
 export type TerminalBackendChoice = 'auto' | 'native' | 'script';
 
 export interface RunnerConfig {
+  businessProbe?: boolean;
+  runtimeInitialization?: RuntimeInitializationConfig;
   taskId: TaskId;
   nativeRunnerId?: string;
   runnerToken: string;
@@ -22,6 +26,9 @@ export interface RunnerConfig {
   preview?: PreviewConfig;
   /** 每个 Agent 私有目录的根（RFC-004）；缺省 <tmpdir>/crewstation-agents，测试注入临时目录。 */
   agentRunDir?: string;
+  /** RFC-027: 平台独占的持久日志目录；未配置时拒绝可靠业务执行命令。 */
+  businessJournalDir?: string;
+  businessSessionDir?: string;
   terminalBackend: TerminalBackendChoice;
   replayCapacity: number;
   /** 超过该时长没有收到 cs-session 的任何帧（含 ping）即主动重连；0 表示关闭看门狗。 */
@@ -46,12 +53,16 @@ export function loadConfigFromEnv(env: Env = process.env): RunnerConfig {
   const taskId = TaskIdSchema.safeParse(env.CS_CANONICAL_RUNNER_TASK_ID ?? env.CS_RUNNER_TASK_ID ?? required(env, 'CS_TASK_ID'));
   if (!taskId.success) throw new RunnerConfigError('CS_TASK_ID 不是合法的任务 ID（36 字符 UUIDv7）');
   return {
+    businessProbe: env.CS_RUNNER_BUSINESS_PROBE === '1',
+    runtimeInitialization: loadRuntimeInitialization(env),
     taskId: taskId.data,
     ...(env.CS_RUNNER_NATIVE_ID ? { nativeRunnerId: NativeTerminalRosterSchema.shape.runnerId.parse(env.CS_RUNNER_NATIVE_ID) } : {}),
     runnerToken: required(env, 'CS_RUNNER_TOKEN'),
     sessionUrl: required(env, 'CS_SESSION_URL'),
     internalApiBase: env[PLATFORM_ENV.internalApiBase] || undefined,
     workdir: env.CS_WORKDIR || '/work',
+    ...(env.CS_RUNNER_BUSINESS_SESSION_DIR ? { businessSessionDir: env.CS_RUNNER_BUSINESS_SESSION_DIR } : {}),
+    ...(env.CS_RUNNER_BUSINESS_JOURNAL_DIR ? { businessJournalDir: env.CS_RUNNER_BUSINESS_JOURNAL_DIR } : {}),
     workerUid: integer(env, 'CS_WORKER_UID', DEFAULT_WORKER_ID),
     workerGid: integer(env, 'CS_WORKER_GID', DEFAULT_WORKER_ID),
     preview: parsePreview(env),

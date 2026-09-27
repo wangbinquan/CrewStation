@@ -1,4 +1,5 @@
-import type { ProjectId, ServiceId, StartupRecord, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
+import type { BusinessSessionStorage } from '@crewstation/contracts';
+import type { RuntimeInitializationStatus, RuntimeImageExecutionSnapshot, ProjectId, ServiceId, StartupRecord, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
 import { cancelStartup, completeThrough, defaultFailureCode, failStartup } from './podStartup';
 export interface LegacyTaskClusterIdentity {
@@ -46,6 +47,11 @@ export interface NativeExecution {
  * 每次（重新）启动是第几次（start）决定 Runner Secret 的名字，恢复换一个新的，旧的由孤儿回收删掉。之前受理的环境没有它，照旧由 task-runtime 自己建。
  */
 export interface WorkloadRender {
+  readonly runtimeConnectionDeadline?: { readonly generation: number; readonly at: string };
+  readonly runtimeInitializationDeadline?: { readonly generation: number; readonly at: string };
+  readonly runtimeValidation?: { readonly projectId: string; readonly usage: 'task' | 'agent'; readonly quotaHeld: boolean };
+  readonly runtimeImage?: RuntimeImageExecutionSnapshot;
+  readonly businessStorage?: { readonly version: 1; readonly ownerTaskId: TaskId; readonly session?: BusinessSessionStorage };
   readonly image: string;
   readonly workerUid: number;
   readonly resources: { readonly cpu: string; readonly memory: string; readonly storage: string };
@@ -75,7 +81,15 @@ export interface RunnerRejection {
 }
 
 /** 一项任务一个长驻容器（R05、R29）；开发会话与业务任务共用这个对象，只是 kind 与卷模式不同。 */
+export interface BusinessWorkspaceLifecycle {
+  readonly volumeUid: string;
+  readonly phase: 'ready' | 'pausing' | 'paused' | 'resuming';
+}
+
 export interface TaskEnvironment {
+  readonly businessWorkspace?: BusinessWorkspaceLifecycle;
+  readonly runtimeInitialization?: RuntimeInitializationStatus;
+  readonly admissionFingerprint?: string;
   readonly legacyCluster?: LegacyTaskClusterIdentity;
   readonly id: TaskId;
   readonly projectId: ProjectId;

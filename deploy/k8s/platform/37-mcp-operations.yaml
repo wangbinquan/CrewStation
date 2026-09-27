@@ -25,6 +25,7 @@ spec:
           envFrom:
             - configMapRef: { name: crewstation-env }
           env:
+            - { name: CS_PLATFORM_POD_UID, valueFrom: { fieldRef: { fieldPath: metadata.uid } } }
             - { name: POD_IP, valueFrom: { fieldRef: { fieldPath: status.podIP } } }
             # 直连 cs-api：授权由 cs-api 判定，调用方身份头必须原样到达，不能被网关抹掉。
             - { name: CS_PLATFORM_API_URL, value: "http://cs-api.crewstation-system.svc.cluster.local:8080" }

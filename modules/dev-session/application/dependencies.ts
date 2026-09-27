@@ -1,3 +1,4 @@
+import type { DevelopmentRuntimeImages } from '../ports/runtimeImages';
 import type { ExecutionRecords } from '../ports/executionRecords';
 import type { Clock, Logger } from '@crewstation/kernel';
 import type { ApiInvocationCatalog, ComputeCatalog, DevSessionSettings, ManifestParser, McpCredentials, Notifier, ProjectAuthorizer, Releases, ServiceResolver, SourceControl } from '../ports/platform';
@@ -5,6 +6,7 @@ import type { Environments, ReminderRepository, Runner } from '../ports/runtime'
 import type { ComparisonReferences } from '../ports/comparisons';
 
 export interface DevSessionUseCaseDeps {
+  runtimeImages?: DevelopmentRuntimeImages;
   executions?: ExecutionRecords;
   comparisons: ComparisonReferences;
   apiCatalog: ApiInvocationCatalog;

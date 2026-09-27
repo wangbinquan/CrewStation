@@ -1,4 +1,5 @@
-import type { Actor, ProjectId, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
+import type { BusinessSessionStorage } from '@crewstation/contracts';
+import type { RuntimeImageProbeInput, RuntimeImageProbeResult, RuntimeInitializationStatus, RuntimeImageExecutionSnapshot, Actor, ProjectId, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
 import type { DevSessionDto, DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest, StartupRecord } from '@crewstation/contracts';
 import type { BeforeStartMaterial, LaunchSpec, ProfileTestContext, ProfileTestOutcome, ProfileTestStage, TerminalTest } from '@crewstation/contracts';
 
@@ -17,6 +18,10 @@ export type EnvironmentState = 'creating' | 'running' | 'paused' | 'releasing' |
 export type ReleaseReason = 'user' | 'owner-force' | 'business' | 'failed' | 'pod-lost' | 'profile-test';
 
 export interface EnvironmentDto {
+  image?: string;
+  businessWorkspace?: { volumeUid: string; phase: 'ready' | 'pausing' | 'paused' | 'resuming' };
+  runtimeImage?: RuntimeImageExecutionSnapshot;
+  runtimeInitialization?: RuntimeInitializationStatus;
   id: TaskId;
   projectId: ProjectId;
   serviceId: string;
@@ -46,6 +51,13 @@ export interface TraceKeyPage { before?: { at: string; traceId: string }; limit:
 export type TraceEnvironmentDto = EnvironmentDto & { updatedAt: string };
 
 export interface CreateEnvironmentInput {
+  /** 开发镜像保留引用预先分配的身份，仅内部使用。 */
+  runtimeImageTaskId?: TaskId;
+  /** 由调用方预留并通过用途验证的不可变镜像快照，不从父任务继承。 */
+  runtimeImage?: RuntimeImageExecutionSnapshot;
+  businessStorage?: 'isolated-v1';
+  /** RFC-027：持久意图固定的任务 ID；同一摘要重放不再扣额，限资源台账业务任务。 */
+  admission?: { id: TaskId; fingerprint: string };
   serviceId: ServiceId;
   kind: TaskKind;
   volumeMode?: VolumeMode;
@@ -62,6 +74,8 @@ export interface CreateEnvironmentInput {
  * image 是档位修订按摘要固定的镜像；省略时用平台任务镜像（RFC-006 之前受理的 CLI）。
  */
 export interface CreateNativeExecutionInput {
+  businessSession?: BusinessSessionStorage;
+  runtimeImage?: RuntimeImageExecutionSnapshot;
   id: TaskId;
   parentTaskId: TaskId;
   purpose?: 'cli' | 'agent' | 'subtask';
@@ -86,6 +100,10 @@ export interface RebuildRendering {
 }
 
 export interface TaskRuntimeModuleApi {
+  blockBusinessAdmission(serviceId: ServiceId, taskId: TaskId): Promise<boolean>;
+  imageReferenceState(input: { projectId: string; versionId: string; ownerType: string; ownerId: string }): Promise<'active' | 'released' | 'unknown'>;
+  runRuntimeImageProbe(input: RuntimeImageProbeInput, heartbeat: () => Promise<boolean>): Promise<RuntimeImageProbeResult>;
+  stopRuntimeImageProbe(validationId: string): Promise<boolean>;
   reconcileRebuild(taskId: TaskId, rebuildId: string, operations: RebuildRendering, heartbeat: () => Promise<boolean>): Promise<void>;
   readonly name: 'task-runtime';
   listClusterTasks(): Promise<Array<{ taskId: string; projectId: string; namespace: string; podName: string; podUid?: string; pvcName: string; pvcUid?: string; kind: string; state: string; purpose?: string; parentTaskId?: string; agentId?: string; terminalId?: string; profile: string; profileRevision?: number; profileTestId?: string; revision: string; volumeMode: string }>>;

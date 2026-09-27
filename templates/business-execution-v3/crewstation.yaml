@@ -1,0 +1,22 @@
+apiVersion: crewstation/v3
+kind: DigitalWorker
+spec:
+  service:
+    command: [bun, src/main.ts]
+    port: 3000
+    servicePlanId: 01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10
+    replicas: 1
+    probes:
+      startup: { path: /ready, periodSeconds: 2, timeoutSeconds: 2, failureThreshold: 90 }
+      readiness: { path: /ready, periodSeconds: 3, timeoutSeconds: 2, failureThreshold: 3 }
+      liveness: { path: /live, periodSeconds: 10, timeoutSeconds: 2, failureThreshold: 3 }
+  tasks:
+    taskProfileId: 01a0bf5d-8f4b-7001-8458-107366e7de39
+    defaultVolumeMode: persistent
+    executionControl: fenced
+    acceptedTaskContractVersions: [sample-v1]
+    agentProfiles: []
+    outputContracts: []
+  release:
+    migrationCommand: [bun, src/migrate.ts]
+    migration: { compatibility: expand-only, destructive: false, rollback: switch-back }

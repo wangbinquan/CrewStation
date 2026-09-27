@@ -3,6 +3,8 @@ import type { ProjectId, UserId, WorkloadIdentity } from '@crewstation/contracts
 import { IDENTITY_HEADERS, TOKEN_CLAIMS } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import { verifyWithJwks } from '@crewstation/jwt';
+import { newResourceId } from '@crewstation/kernel';
+import type { ReleaseId } from '@crewstation/contracts';
 import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import type { Hono } from 'hono';
@@ -171,6 +173,37 @@ describe.skipIf(!available)('forward-auth user domain', () => {
 });
 
 describe.skipIf(!available)('forward-auth service domain', () => {
+  test('RFC-027：签名绑定 release／Pod UID；过期来源、IP 复用、错误受众不能恢复执行身份', async () => {
+    const ip = '10.244.27.9';
+    const original: WorkloadIdentity & { source: NonNullable<WorkloadIdentity['source']> } = { identity: 'demo/demo', project: 'demo', service: 'demo', kind: 'service', slot: 'prod',
+      source: { ip, podUid: 'original-pod', releaseId: newResourceId() as ReleaseId, physicalSlot: 'blue', ready: true } };
+    workloads[ip] = original;
+    try {
+      const response = await forwardService({ 'x-forwarded-for': ip, 'x-forwarded-host': 'api.svc.cs.internal' });
+      expect(response.status).toBe(200);
+      const token = response.headers.get(IDENTITY_HEADERS.sourceToken)!;
+      expect(await identity.api.resolveServiceSource(token)).toEqual(original);
+      const verified = await verifyWithJwks(token, await identity.api.jwks(), { audience: 'platform-api', issuer: TOKEN_CLAIMS.issuer });
+      expect(verified.claims).toMatchObject({ [TOKEN_CLAIMS.sourcePodUid]: 'original-pod', [TOKEN_CLAIMS.sourceReleaseId]: original.source!.releaseId, [TOKEN_CLAIMS.sourcePhysicalSlot]: 'blue' });
+      const wrongAudience = await forwardService({ 'x-forwarded-for': ip, 'x-forwarded-host': 'other.svc.cs.internal' });
+      expect(await identity.api.resolveServiceSource(wrongAudience.headers.get(IDENTITY_HEADERS.sourceToken)!)).toBeUndefined();
+      expect(await identity.api.resolveServiceSource('forged')).toBeUndefined();
+      for (const patch of [{ podUid: 'replaced' }, { releaseId: newResourceId() as ReleaseId }, { physicalSlot: 'green' as const }, { ip: '10.244.27.10' }]) {
+        workloads[ip] = { ...original, source: { ...original.source!, ...patch } };
+        expect(await identity.api.resolveServiceSource(token)).toBeUndefined();
+      }
+      workloads[ip] = { ...original, identity: 'other/other', project: 'other', service: 'other' };
+      expect(await identity.api.resolveServiceSource(token)).toBeUndefined();
+      // ready 与在线角色现查，不沿用旧令牌中签发时的运行状态。
+      workloads[ip] = { ...original, slot: 'preview', source: { ...original.source!, ready: false } };
+      expect(await identity.api.resolveServiceSource(token)).toMatchObject({ slot: 'preview', source: { ready: false } });
+      delete workloads[ip];
+      expect(await identity.api.resolveServiceSource(token)).toBeUndefined();
+      const legacy = await forwardService({ 'x-forwarded-for': '10.244.0.23', 'x-forwarded-host': 'api.svc.cs.internal' });
+      expect(await identity.api.resolveServiceSource(legacy.headers.get(IDENTITY_HEADERS.sourceToken)!)).toBeUndefined();
+    } finally { delete workloads[ip]; }
+  });
+
   test('缺少或未登记的源 IP → 403', async () => {
     expect((await forwardService({ 'x-forwarded-host': 'other.svc.cs.internal' })).status).toBe(403);
     const unknown = await forwardService({ 'x-forwarded-for': '10.244.9.9', 'x-forwarded-host': 'other.svc.cs.internal' });

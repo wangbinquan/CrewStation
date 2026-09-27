@@ -1,5 +1,6 @@
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { CapabilitiesPage } from '../../features/capabilities';
+import { RuntimeImagesPage } from '../../features/runtime-images';
 import { ConfigPage } from '../../features/config';
 import { AppVisibilityPage, ProjectSettingsSection } from '../../features/projects';
 import { useT } from '../../shared/lib/useT';
@@ -22,6 +23,7 @@ export function ProjectSettingsPage() {
   return <div className={styles.page}>
     <PageHeader title={t('nav.settings')} description={t('settings.description')} />
     <SectionNavigation label={t('settings.groups')} value={tab} items={tabs.map((value) => ({ value, label: t(`settings.tab.${value}`), description: t(`settings.hint.${value}`) }))} onChange={(value) => change({ tab: value as SettingsTab })}>
+      {tab === 'runtime-images' ? <RuntimeImagesPage key={projectId} /> : null}
       {tab === 'visibility' ? <AppVisibilityPage key={projectId} embedded /> : null}
       {tab === 'config' ? <ConfigPage key={projectId} env={search.env ?? 'development'} onEnvironmentChange={(env) => change({ tab, env })} /> : null}
       {tab === 'members' || tab === 'advanced' ? <ProjectSettingsSection key={`${projectId}:${tab}`} section={tab === 'advanced' ? 'lifecycle' : 'members'} /> : null}

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { businessExecutionSurface } from './businessExecutionSurface';
 import { BusinessTaskDtoSchema, CreateBusinessTaskRequestSchema, SubmitSubtaskRequestSchema, SubtaskDtoSchema, SubtaskMessageRequestSchema } from '../api/businessTask';
 import { HOST_PATTERNS, IDENTITY_HEADERS, PLATFORM_ENV, PLATFORM_PATHS, PLATFORM_SERVICE_HOSTS, TOKEN_CLAIMS } from '../convention';
 import { EVENT_HEADERS, EventDeliverySchema, ProducedEventSchema } from '../events/delivery';
@@ -34,6 +35,7 @@ export function buildContractSurface(): ContractSurface {
       TASKRUNNER: { protocolVersion: String(TASKRUNNER_PROTOCOL_VERSION) },
     },
     schemas: {
+      ...businessExecutionSurface(),
       Manifest: sent(ManifestSchema),
       ProducedEvent: sent(ProducedEventSchema),
       EventDelivery: received(EventDeliverySchema),

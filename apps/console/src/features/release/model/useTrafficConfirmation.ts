@@ -5,12 +5,14 @@ import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { errorMessage } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
+import { executionHandoffKey } from './useExecutionHandoff';
 import { loadTrafficSnapshot } from './deployedVersions';
 import type { TrafficSnapshot } from './deployedVersions';
 import type { ReleaseActions } from './useReleaseActions';
 
 export function useTrafficConfirmation(projectId: string, serviceId: string, canSwitch: boolean, actions: ReleaseActions, refresh: () => Promise<unknown>) {
   const t = useT(), client = useQueryClient(), lock = useRef(false), mounted = useRef(true);
+  const intent = useRef<{ fingerprint: string; requestKey: string } | undefined>(undefined);
   const [snapshot, setSnapshot] = useState<TrafficSnapshot>(), [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false), [checking, setChecking] = useState(false), [error, setError] = useState<string>(), [fieldError, setFieldError] = useState<string>(), [done, setDone] = useState<string>();
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
@@ -30,14 +32,18 @@ export function useTrafficConfirmation(projectId: string, serviceId: string, can
     if (reason.length > 500) { setFieldError(t('release.traffic.reasonInvalid')); return; }
     if (!actions.begin('traffic')) return; lock.current = true; setBusy(true); setError(undefined); setFieldError(undefined);
     try {
-      const parsed = TrafficSwitchDtoSchema.safeParse(await api.services.switchTraffic(serviceId, { toSlot: 'preview', expectedActiveRelease: snapshot.prod?.id ?? null, expectedTargetRelease: snapshot.target.id, ...(reason.trim() ? { reason: reason.trim() } : {}) }));
+      const input = { toSlot: 'preview' as const, expectedActiveRelease: snapshot.prod?.id ?? null, expectedTargetRelease: snapshot.target.id, ...(reason.trim() ? { reason: reason.trim() } : {}) };
+      const fingerprint = JSON.stringify(input);
+      if (intent.current?.fingerprint !== fingerprint) intent.current = { fingerprint, requestKey: crypto.randomUUID() };
+      const parsed = TrafficSwitchDtoSchema.safeParse(await api.services.switchTraffic(serviceId, { ...input, requestKey: intent.current.requestKey }));
       if (!parsed.success) throw new Error('release.traffic.responseUnknown'); const response = parsed.data;
       if (response.serviceId !== serviceId || response.releaseId !== snapshot.target.id || response.previousReleaseId !== snapshot.prod?.id || response.toSlot !== 'prod') throw new Error('release.traffic.responseUnknown');
-      if (mounted.current) { setReason(''); markDraft('traffic', false); setDone(t('release.traffic.done', { tag: snapshot.target.tag })); }
+      if (response.handoff) client.setQueryData(executionHandoffKey(serviceId), response);
+      if (mounted.current) { setReason(''); markDraft('traffic', false); if (!response.handoff || response.handoff.stage === 'complete') setDone(t('release.traffic.done', { tag: snapshot.target.tag })); }
     } catch (cause) { if (mounted.current) setError(describe(cause)); }
     finally {
       if (mounted.current) setSnapshot(undefined);
-      await Promise.all([queryKeys.slots(serviceId), queryKeys.releases(serviceId), queryKeys.trafficSwitches(serviceId), queryKeys.devSession(projectId), ['projects', projectId, 'comparison-details']].map((queryKey) => client.invalidateQueries({ queryKey })));
+      await Promise.all([executionHandoffKey(serviceId), queryKeys.slots(serviceId), queryKeys.releases(serviceId), queryKeys.trafficSwitches(serviceId), queryKeys.devSession(projectId), ['projects', projectId, 'comparison-details']].map((queryKey) => client.invalidateQueries({ queryKey })));
       lock.current = false; setBusy(false); actions.finish('traffic');
     }
   };

@@ -1,10 +1,11 @@
+import { BusinessUsageSchema } from '../api/business/events';
 import { z } from 'zod';
 import { AgentPermissionSchema } from '../manifest/tasks';
 import { KnownAgentProtocolSchema } from './launch';
 
 /** 驱动层把两个 CLI 的输出归一为这一种事件；工作台流式面板与 execution_events 都消费它。 */
 export const AgentEventTypeSchema = z.enum([
-  'started', 'session', 'text', 'thinking', 'tool-start', 'tool-end', 'permission', 'status', 'error', 'completed', 'cancelled',
+  'usage', 'started', 'session', 'text', 'thinking', 'tool-start', 'tool-end', 'permission', 'status', 'error', 'completed', 'cancelled',
 ]);
 
 export const AgentEventSchema = z.object({
@@ -12,6 +13,7 @@ export const AgentEventSchema = z.object({
   seq: z.number().int().min(0),
   at: z.iso.datetime(),
   type: AgentEventTypeSchema,
+  usage: BusinessUsageSchema.optional(),
   /** CLI 原生会话 ID，出现后可用于 resume。 */
   sessionId: z.string().optional(),
   /**

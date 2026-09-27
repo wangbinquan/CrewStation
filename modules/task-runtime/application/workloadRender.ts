@@ -1,3 +1,4 @@
+import { inspectBusinessWorkspace } from './business/workspace';
 import type { TaskId } from '@crewstation/contracts';
 import { notFound, precondition } from '@crewstation/kernel';
 import { completeStage } from '../domain/podStartup';
@@ -33,6 +34,7 @@ export function workloadRenderUseCases(deps: TaskRuntimeUseCaseDeps) {
       const env = await current(taskId);
       if (!wantsProvisioning(env)) throw precondition('这个环境眼下不需要建出容器', { taskId, state: env.state });
       if (env.native) await requireRunningWorkspace(deps, env);
+      if (env.businessWorkspace) await inspectBusinessWorkspace(deps, env);
       // 档位测试（I25 第四步）是平台任务，不属于任何服务。
       const svc = env.kind === 'profile-test' ? PROFILE_TEST_SERVICE : await deps.services.resolveServiceById(env.serviceId);
       if (!svc) throw precondition('环境所属的服务已不存在', { taskId });
@@ -73,6 +75,9 @@ export function workloadRenderUseCases(deps: TaskRuntimeUseCaseDeps) {
 /** 建出之后的环境：工作区记下 Pod 实例；执行环境进入「启动中」（记下 Pod 与 Runner Secret 的实例），与本模块自己建时准备完的样子一样。 */
 function bound(deps: TaskRuntimeUseCaseDeps, env: TaskEnvironment, podUid: string, secretUid: string | undefined): TaskEnvironment {
   const now = deps.clock.now().toISOString();
+  if (env.render?.runtimeImage && env.render.runtimeConnectionDeadline?.generation !== env.render.start) {
+    env = { ...env, render: { ...env.render, runtimeConnectionDeadline: { generation: env.render.start, at: new Date(deps.clock.now().getTime() + 300_000).toISOString() } } };
+  }
   const startup = env.startup ? { startup: completeStage(env.startup, 'queue', now) } : {};
   if (!env.native) return { ...env, podUid, ...startup };
   const noun = EXECUTION_NOUN[purposeOf(env.native)];

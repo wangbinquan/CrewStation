@@ -19,13 +19,14 @@ export function drizzleAllowlistRepository(db: Executor): AllowlistRepository {
 
 export function drizzlePodIdentityRepository(db: Executor): PodIdentityRepository {
   const toRecord = (row: typeof podIdentities.$inferSelect): PodIdentityRecord => ({
+    ...(row.source ? { source: json<NonNullable<PodIdentityRecord['source']>>(row.source) } : {}),
     ip: row.ip, podName: row.podName, namespace: row.namespace, project: row.project, service: row.service, workload: row.workload as WorkloadKind,
     ...(row.physicalSlot ? { physicalSlot: row.physicalSlot } : {}), ...(row.taskId ? { taskId: row.taskId } : {}),
     version: row.version, updatedAt: row.updatedAt, ...(row.deletedAt ? { deletedAt: row.deletedAt } : {}),
   });
   return {
     upsert: async (r) => {
-      const values = { namespace: r.namespace, podName: r.podName, ip: r.ip, project: r.project, service: r.service, workload: r.workload, physicalSlot: r.physicalSlot ?? null, taskId: r.taskId ?? null, version: 1, updatedAt: r.updatedAt, deletedAt: null };
+      const values = { namespace: r.namespace, podName: r.podName, ip: r.ip, project: r.project, service: r.service, workload: r.workload, physicalSlot: r.physicalSlot ?? null, taskId: r.taskId ?? null, source: r.source ?? null, version: 1, updatedAt: r.updatedAt, deletedAt: null };
       const rows = await db.insert(podIdentities).values(values)
         .onConflictDoUpdate({ target: [podIdentities.namespace, podIdentities.podName], set: { ...values, version: sql`${podIdentities.version} + 1` } })
         .returning();
@@ -35,8 +36,8 @@ export function drizzlePodIdentityRepository(db: Executor): PodIdentityRepositor
       .where(and(isNull(podIdentities.deletedAt), lt(podIdentities.updatedAt, before))).returning({ podName: podIdentities.podName })).length,
     purgeTombstones: async (before) => (await db.delete(podIdentities)
       .where(and(isNotNull(podIdentities.deletedAt), lt(podIdentities.deletedAt, before))).returning({ podName: podIdentities.podName })).length,
-    markDeleted: async (podName, namespace, at) => {
-      await db.update(podIdentities).set({ deletedAt: at, updatedAt: at }).where(and(eq(podIdentities.namespace, namespace), eq(podIdentities.podName, podName)));
+    markDeleted: async (podName, namespace, at, podUid) => {
+      await db.update(podIdentities).set({ deletedAt: at, updatedAt: at }).where(and(eq(podIdentities.namespace, namespace), eq(podIdentities.podName, podName), podUid ? sql`(${podIdentities.source} IS NULL OR ${podIdentities.source}->>'podUid' = ${podUid})` : undefined));
     },
     byIp: async (ip) => {
       const rows = await db.select().from(podIdentities).where(and(eq(podIdentities.ip, ip), isNull(podIdentities.deletedAt))).orderBy(desc(podIdentities.updatedAt)).limit(1);

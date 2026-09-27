@@ -3,6 +3,12 @@
 import { createJsonLogger } from '@crewstation/kernel';
 import { loadConfigFromEnv } from './config';
 import { startRunner } from './runner';
+import { prepareBusinessVolumeCommand } from './storage/businessVolume';
+
+if (process.argv[2] === 'prepare-business-volume') {
+  await prepareBusinessVolumeCommand(process.argv.slice(3));
+  process.exit(0);
+}
 
 const config = loadConfigFromEnv();
 const logger = createJsonLogger({ service: 'taskrunner', taskId: config.taskId });

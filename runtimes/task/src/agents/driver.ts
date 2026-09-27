@@ -1,3 +1,4 @@
+import type { BusinessMaterialRequest } from '@crewstation/contracts';
 import type { AgentEvent, AgentEventType, AgentPermission, KnownAgentProtocol, LaunchSpec, McpConnection } from '@crewstation/contracts';
 import type { ManagedRuntimeContext } from '@crewstation/agent-drivers';
 import type { Logger } from '@crewstation/kernel';
@@ -5,6 +6,9 @@ import type { ProcessLauncher } from '../process/launcher';
 
 /** 一次 startAgent 命令剥掉协议外壳后的启动规格。 */
 export interface AgentSpec {
+  businessSkills?: BusinessMaterialRequest['skills'];
+  /** RFC-027: opt-in usage frames; legacy Agent event ordering is unchanged. */
+  businessEvents?: boolean;
   agentId: string;
   /** 算力档位名（RFC-001）：平台透传，运行时不解释，只在 started 事件里回显。 */
   compute: string;

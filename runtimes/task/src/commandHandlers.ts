@@ -3,18 +3,22 @@ import type { TerminalProbes } from './agents/terminalProbe';
 import type { CommandHandlers } from './commandDispatcher';
 import type { ContractVerifier } from './contract/verifyContract';
 import type { ExecSupervisor } from './exec/execSupervisor';
+import type { BusinessCommands } from './exec/businessCommands';
 import type { FileCommands } from './files/fileCommands';
 import type { PreviewSupervisor } from './preview/previewSupervisor';
 import type { TerminalSupervisor } from './terminal/terminalSupervisor';
 import type { NativeTerminalSupervisor } from './terminal/nativeSupervisor';
 import type { ApiInvocationResult, RunnerApiInvocation, RunnerWorkspaceStatus } from '@crewstation/contracts';
 import type { WorkspaceComparisons } from './workspace/workspaceComparison';
+import type { RuntimeInitialization } from './initialization/runtimeInitialization';
 
 export interface CommandTargets {
+  initialization?: RuntimeInitialization;
   invokeApi: (input: RunnerApiInvocation) => Promise<ApiInvocationResult>;
   agents: AgentSupervisor;
   probes: TerminalProbes;
   execs: ExecSupervisor;
+  business: BusinessCommands;
   terminals: TerminalSupervisor;
   nativeTerminals: NativeTerminalSupervisor;
   files: FileCommands;
@@ -32,6 +36,19 @@ const ack = (): Record<string, never> => ({});
 /** 协议命令 → 各监督器；无内容的命令统一回 `{}`（RunnerResultPayloads.ack）。 */
 export function buildCommandHandlers(targets: CommandTargets): CommandHandlers {
   return {
+    runtimeInitializationStatus: async () => targets.initialization?.status() ?? { enabled: false, state: 'succeeded', steps: [], checks: [] },
+    cancelRuntimeInitialization: async () => targets.initialization ? targets.initialization.cancel() : { enabled: false, state: 'succeeded', steps: [], checks: [] },
+    businessExecutionInfo: () => targets.business.info(),
+    sendBusinessMessage: (c) => targets.business.sendMessage(c),
+    getBusinessMessage: (c) => targets.business.getMessage(c),
+    startBusinessAgent: (c) => targets.business.startAgent(c),
+    startBusinessCommand: (c) => targets.business.start(c),
+    getBusinessExecution: (c) => targets.business.get(c.executionId),
+    cancelBusinessExecution: (c) => targets.business.cancel(c),
+    readBusinessExecutionEvents: (c) => targets.business.read(c.executionId, c.after, c.limit),
+    ackBusinessExecutionEvents: (c) => targets.business.acknowledge(c.executionId, c.through),
+    readBusinessFile: (c) => targets.business.files.read(c.query),
+    listBusinessFiles: (c) => targets.business.files.list(c.query),
     invokeApi: ({ id: _id, type: _type, ...input }) => targets.invokeApi(input),
     startAgentTerminal: (c) => targets.nativeTerminals.start(c),
     listAgentTerminals: async () => targets.nativeTerminals.list(),

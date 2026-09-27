@@ -28,6 +28,10 @@ export interface ScmModuleApi {
   listBranches(actor: Actor, serviceId: ServiceId, options?: ListBranchesOptions): Promise<BranchDto[]>;
   listTags(actor: Actor, serviceId: ServiceId): Promise<TagDto[]>;
   readFile(serviceId: ServiceId, ref: string, path: string): Promise<string | undefined>;
+  /** 构建固定输入：绑定 ID 就是所属服务 ID，先核对路径项目与 develop 权限。 */
+  resolveBuildSource(actor: Actor, projectId: ProjectId, bindingId: ServiceId, ref: string): Promise<{ commitSha: string; httpUrl: string; tree: readonly { path: string; mode: string; type: 'tree' | 'blob' | 'commit' }[] }>;
+  issueBuildCredential(serviceId: ServiceId, ttlMinutes: number): Promise<SessionCredentialDto & { id: string }>;
+  revokeBuildCredential(serviceId: ServiceId, credentialId: string): Promise<void>;
   /** 以平台令牌在分支 HEAD 上打 `v<major>.<minor>.<patch>`；业务用户没有打标权。 */
   createReleaseTag(serviceId: ServiceId, input: CreateReleaseTagRequest): Promise<ReleaseTagDto>;
   /** 签发会话级短期 Git 凭据；明文只返回这一次，平台只存哈希。 */

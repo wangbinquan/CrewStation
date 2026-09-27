@@ -85,12 +85,14 @@ export async function applyWorkload(deps: WorkloadApplyDeps, record: LedgerRecor
   }
   try {
     deps.signal?.throwIfAborted();
-    const secret = await deps.cluster.ensureRunnerSecret(pod, () => owners.runnerValues(record.id));
+    if (pod.runtimeInitialization && (await deps.ledger.get(record.id))?.desired !== 'present') return;
+    const secret = await deps.cluster.ensureRunnerSecret(pod, () => owners.runnerValues(record.id), deps.signal);
     applied(deps, record, 'Secret', { namespace: pod.namespace, name: pod.secret }, secret);
     // 检出用的 Git 凭据归这一次启动（I25）：Pod 的 init 容器引用它，先于 Pod 建出。
     if (pod.checkout?.ownedCredential) applied(deps, record, 'Secret', { namespace: pod.namespace, name: pod.checkout.credentialSecretName }, await deps.cluster.ensureCheckoutSecret(pod, () => owners.checkoutValues(record.id)));
     deps.signal?.throwIfAborted();
-    const created = await deps.cluster.ensurePod(pod);
+    if (pod.runtimeInitialization && (await deps.ledger.get(record.id))?.desired !== 'present') return;
+    const created = await deps.cluster.ensurePod(pod, deps.signal);
     applied(deps, record, 'Pod', pod, created);
     deps.signal?.throwIfAborted();
     if (preview) applied(deps, record, 'Service', preview, await deps.cluster.applyPreview(preview, { ...optional('service', deps.feed.cached('Service', preview.namespace, preview.name)), ...optional('route', deps.feed.cached('IngressRoute', preview.namespace, preview.name)) }));

@@ -1,3 +1,4 @@
+import { StartNativeTerminalV2RequestSchema } from '@crewstation/contracts';
 import type { TaskId, UserId } from '@crewstation/contracts';
 import { AgentActivityQuerySchema, ReadAgentActivityRequestSchema, StartNativeTerminalRequestSchema, TaskIdSchema } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
@@ -22,6 +23,7 @@ export function nativeTerminalRoutes(api: NativeTerminalApi & Pick<DevSessionMod
     return c.json(await api.getNativeTerminalSnapshot(await actor(c), p.taskId, p.agentId));
   });
   r.post('/v1/tasks/:taskId/agent-terminals', async (c) => c.json(await api.startNativeTerminal(await actor(c), parseParams(c, params).taskId as TaskId, await parseBody(c, StartNativeTerminalRequestSchema)), 202));
+  r.post('/v2/tasks/:taskId/agent-terminals', async (c) => c.json(await api.startNativeTerminal(await actor(c), parseParams(c, params).taskId as TaskId, await parseBody(c, StartNativeTerminalV2RequestSchema)), 202));
   r.post('/v1/tasks/:taskId/agent-terminals/:agentId/stop', async (c) => {
     const p = parseParams(c, params.extend({ agentId: z.string().min(1) }));
     await api.stopNativeTerminal(await actor(c), p.taskId as TaskId, p.agentId);

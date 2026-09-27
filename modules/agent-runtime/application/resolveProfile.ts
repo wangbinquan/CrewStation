@@ -40,7 +40,7 @@ export function resolveProfileUseCases(deps: AgentRuntimeUseCaseDeps) {
       if (!revision) throw notFound('档位修订', `${profile.id}@${profile.currentRevision}`);
       const availability = availabilityOf(profile, revision, latest);
       if (!availability.available) throw precondition(availability.reason ?? `算力档位 ${profile.id} 暂不可用`, { code: 'profile_unavailable', profile: profile.id, state: availability.state });
-      return { id: profile.id, name: profile.name, revision: revision.revision, protocol: profile.protocol, image: pinned(revision), ...(revision.content.taskProfile ? { taskProfile: revision.content.taskProfile } : {}) };
+      return { businessExecution: latest?.state === 'passed' && latest.contentHash === revision.contentHash ? latest.context.businessExecution : undefined, id: profile.id, name: profile.name, revision: revision.revision, protocol: profile.protocol, image: pinned(revision), ...(revision.content.taskProfile ? { taskProfile: revision.content.taskProfile } : {}) };
     },
     /** 已受理的启动按固定修订取材料：停用或改了当前修订都不影响它（停用只阻止新的受理）。 */
     launchMaterial: async (ref: ProfileRevisionRef): Promise<ProfileLaunchMaterial> => {
@@ -49,7 +49,7 @@ export function resolveProfileUseCases(deps: AgentRuntimeUseCaseDeps) {
       if (!profile || !revision) throw precondition(`算力档位 ${ref.profileId} 的修订 ${ref.revision} 已不存在（档位可能已被删除），请重新选择档位`, { code: 'profile_revision_missing', ...ref });
       return {
         id: profile.id, name: profile.name, revision: revision.revision, protocol: profile.protocol, image: pinned(revision), launch: revision.content.launch,
-        beforeStart: await materialFor(profile, revision, false), ...(revision.content.taskProfile ? { taskProfile: revision.content.taskProfile } : {}),
+        beforeStart: await materialFor(profile, revision, false), ...(revision.content.terminalTest ? { terminalTest: revision.content.terminalTest } : {}), ...(revision.content.taskProfile ? { taskProfile: revision.content.taskProfile } : {}),
       };
     },
     /** 发布校验用（§4.4）：只看存在性与协议，不看测试状态；default 解析到当前默认档位。 */
