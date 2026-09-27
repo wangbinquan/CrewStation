@@ -546,3 +546,5 @@ evidence/<release-or-commit>/
 ## RFC-033 补充：代码托管事件交付（2026-09-27，已批准）
 
 实施与 CE-01～CE-09 验收由 [RFC-033 plan](rfc/RFC-033-code-host-event-producers/plan.md) 跟踪，补充 T4.6／内置 EventProducer 范围。要求 producer 单测、模板 UUID 物化、真实 PG 去重／失败重试／死信重放／切槽测试，以及隔离本机集群协议验证。人工签名请求与真实上游回调分别记录，源码／CI／部署不互相替代。
+
+RFC-033 于2026-09-27完成：生产代码c072aef6、493bd47a远端精确CI六项全绿，本机GitLab／GitHub producer与网关已部署，三类评论持久投递／去重／验签通过；完整回执和保留资源边界见RFC验收。

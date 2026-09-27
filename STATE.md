@@ -1,8 +1,8 @@
 # 当前执行状态
 
-## RFC-033 代码托管事件补齐（2026-09-27，In Progress）
+## RFC-033 代码托管事件补齐（2026-09-27，Done）
 
-用户已明确批准实施、上库远端、部署本机。GitLab MR／Issue 评论与独立 GitHub producer 已实现，复用 cs-events。定向57/0、364断言；真实PG验证回执丢失重送、重试、死信与切槽。模板6/0、46断言；相关平台与约定复验7/0、46断言；static及两项目类型通过，新增生产改动行147/147，独立Docker镜像构建成功。共享完整check 3510/54skip/56fail已结束：本任务4项模板失败均修复复验，其他失败按原日志保留，不重复完整门禁。精确SHA CI与本机隔离验收待发布后完成；细节见RFC033 acceptance。STATE包含并发RFC028记录，发布时完整保留。
+用户已批准实施、上库远端、部署本机。GitLab MR／Issue 评论、独立 GitHub producer 和外部签名 webhook 网关精确入口已实现并上线；aw未改。实现c072aef6与网关修复493bd47a均已推送，精确SHA CI见RFC033 acceptance。producer／真实PG链路57/0、364断言；网关完整装配19/0、127断言；新增生产行分别147/147、35/35，静态与模板检查通过。本机GitLab v0.1.6、GitHub v0.1.1 Ready，cs-auth为rfc033-493bd47a，其余控制面保留并行发布inline-a12c7d13。三类评论通过真实网关至持久消费者，均delivered且重复无新增、payload一致、错误签名401、非入口403、旧类型UUID保持。实际公网GitHub回调未配置；本机人工签名协议验收不冒充公网回调。旧GitLab待命槽已下线，独立验收消费者保留50m／256Mi用于复核，未绕过正式槽删除保护；详见RFC033 acceptance与local-acceptance.json。并发RFC028记录及referenceResources在制源码完整保留。
 
 ## 运行镜像无仓库构建与布局已交付（2026-09-27）
 

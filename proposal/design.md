@@ -1282,3 +1282,5 @@ Kubernetes 原生动作使用 UID/resourceVersion 条件；开发工作区经保
 ## RFC-033 补充：代码托管 webhook producer（2026-09-27，已批准）
 
 GitLab 新增 `gitlab.merge-request.comment` 与 `gitlab.issue.comment`；旧事件与订阅保持兼容。GitHub 独立模板使用 `/hooks/github`、原始字节 HMAC-SHA256 和 `GITHUB_WEBHOOK_SECRET`，以 delivery ID 优先去重。两个容器保留 payload，仅在 cs-events 有效持久回执后确认 accepted。复用现有目录登记、inbox、投递、死信与切槽，无新 DTO／迁移。封闭矩阵、失败响应和无 delivery 头的退化语义见 [RFC-033 design](rfc/RFC-033-code-host-event-producers/design.md)。
+
+外部 webhook 网关补充：仅当前就绪正式 EventProducer 的服务域、精确 ingress.path 与 POST 可无平台工作负载身份到达签名处理器；verification=none不开放。网关不签发来源身份，服务维护仍返回503；业务容器负责token／原始字节签名验证。其他路径、方法、待命或下线版本沿用平台来源鉴权。

@@ -1,6 +1,6 @@
 # RFC-033：代码托管事件生产者设计
 
-状态：In Progress。[proposal](./proposal.md) 已于本轮获用户批准，进入实施。
+状态：Done。[proposal](./proposal.md) 已批准并实施，实机入口补充见§8，证据见 [验收](./acceptance.md)。
 
 ## 1. 架构与归属
 

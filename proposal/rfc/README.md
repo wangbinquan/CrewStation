@@ -68,4 +68,4 @@ proposal/rfc/RFC-NNN-{slug}/
 | [RFC-030](./RFC-030-market-discovery/proposal.md) | 能力市场紧凑目录：负责人可见与过滤、名称／用途多关键词检索、URL 查询状态与统一详情弹窗 | Done · 2026-09-27 · 功能6c5605c2已发布，最终d2852b32精确SHA六项CI全绿并部署本机；真实列表/搜索/弹窗与图标设置验收通过，见acceptance。 |
 | [RFC-031](./RFC-031-console-catalog-ux/proposal.md) | 工作台目录统一显示与交互：项目、接入、运行镜像、算力和资源套餐的紧凑信息层级、主次操作与上下文恢复 | Done · 2026-09-27 · 功能6c5605c2已发布，最终d2852b32精确SHA六项CI全绿并部署本机；真实列表/搜索/弹窗与图标设置验收通过，见acceptance。 |
 | [RFC-032](./RFC-032-app-icons/proposal.md) | 应用图标：业务约定 /favicon.ico、上传图片与自定义 URL，统一尺寸、受保护读取与失败回退 | Done · 2026-09-27 · 功能6c5605c2已发布，最终d2852b32精确SHA六项CI全绿并部署本机；真实列表/搜索/弹窗与图标设置验收通过，见acceptance。 |
-| [RFC-033](./RFC-033-code-host-event-producers/proposal.md) | 代码托管事件补齐：GitLab MR／Issue 评论与 GitHub EventProducer，复用现有持久事件分发并验证幂等／重试／切槽 | In Progress · 2026-09-27 · 用户已批准实施、上库远端和部署本机，开始实现。 |
+| [RFC-033](./RFC-033-code-host-event-producers/proposal.md) | 代码托管事件补齐：GitLab MR／Issue 评论与 GitHub EventProducer，复用现有持久事件分发并验证幂等／重试／切槽 | Done · 2026-09-27 · producer与精确网关入口已上库／部署，精确CI与本机持久投递验收通过；公网回调未配置。 |

@@ -1,6 +1,6 @@
 # RFC-033 实施计划
 
-状态：In Progress；用户已批准实施、上库远端与部署本机。
+状态：Done；用户已批准实施、上库远端与部署本机。T1～T8已完成，证据见 [验收](./acceptance.md)。
 
 ## 任务
 
@@ -17,13 +17,13 @@
 
 ## 验收跟踪
 
-CE-01～CE-09 均待执行；按 proposal 的编号分别记自动化、集群协议注入和真实上游回调，不合并证明范围。代码完成、提交、CI、部署、上游配置为不同交付状态。
+CE-01～CE-09已按本期范围验收。生产代码c072aef6和493bd47a的精确SHA CI均六项success；本机三类评论投递到独立持久消费者通过。真实上游公网回调未配置；人工协议注入与联网回调分开记证据。验收消费者保留50m／256Mi供复核；旧待命槽已下线，平台禁止直接删除承流正式槽，未绕过保护。
 
 ## 实施边界
 
-预期修改：`integrations/gitlab-event-producer/`、新 `integrations/github-event-producer/`、`modules/scm` 的模板发现／测试及必要打包接线、`modules/events/tests/` 和必要测试夹具、基线与本 RFC 文档。
+实际修改：`integrations/gitlab-event-producer/`、新 `integrations/github-event-producer/`、`modules/scm` 的模板发现／测试及必要打包接线、`modules/events/tests/` 和必要测试夹具、基线与本 RFC 文档；实机暴露的网关缺口通过identity／release／platform精确入口策略修复，见design§8。
 
-现有 EventDelivery／Produce DTO、数据库表与投递状态机预期不需要修改；实施中如发现确需变更，先回写具体合同差异。aw 不修改。第三方运行镜像／工作台／referenceResources 在制内容完整保留。
+现有 EventDelivery／Produce DTO、数据库表与投递状态机均未修改。aw 不修改。第三方运行镜像／工作台／referenceResources 在制内容完整保留。
 
 ## 开始记录
 

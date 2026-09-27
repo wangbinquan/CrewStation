@@ -1,0 +1,404 @@
+{
+  "verifiedAt": "2026-09-27T15:26:00Z",
+  "method": "local-cluster protocol injection through Traefik; not an upstream public GitHub callback",
+  "producerCommit": "c072aef6c4f125ac921a05d9fb0cb33305582a58",
+  "gatewayCommit": "493bd47a1b4bc06a019c5b51b331ff2908c82c94",
+  "authImage": "cs-control-plane:rfc033-493bd47a",
+  "authImageId": "sha256:1146fc70e3d494190cb5b3349214856f9adb03db7018f8202feac550c30f002d",
+  "eventTypeCount": 40,
+  "oldTypeIdsPreserved": true,
+  "protocol": [
+    {
+      "source": "gitlab",
+      "target": "MergeRequest",
+      "payload": {
+        "object_kind": "note",
+        "project": {
+          "id": 26
+        },
+        "object_attributes": {
+          "id": 33001,
+          "noteable_type": "MergeRequest",
+          "note": "rfc033-e1c83542-403f-4ed8-9748-031bc55c5470-MergeRequest",
+          "action": "create",
+          "created_at": "2026-09-27T00:00:00Z"
+        },
+        "merge_request": {
+          "id": 33003,
+          "iid": 33
+        },
+        "issue": {
+          "id": 33004,
+          "iid": 34
+        }
+      },
+      "first": {
+        "status": 202,
+        "body": {
+          "accepted": true,
+          "eventType": "gitlab.merge-request.comment",
+          "eventId": "01a0e378-031e-7000-84d1-124940d1af9e",
+          "deduplicated": false,
+          "deliveries": 1
+        }
+      },
+      "redelivery": {
+        "status": 202,
+        "body": {
+          "accepted": true,
+          "eventType": "gitlab.merge-request.comment",
+          "eventId": "01a0e378-031e-7000-84d1-124940d1af9e",
+          "deduplicated": true,
+          "deliveries": 0
+        }
+      }
+    },
+    {
+      "source": "gitlab",
+      "target": "Issue",
+      "payload": {
+        "object_kind": "note",
+        "project": {
+          "id": 26
+        },
+        "object_attributes": {
+          "id": 33002,
+          "noteable_type": "Issue",
+          "note": "rfc033-e1c83542-403f-4ed8-9748-031bc55c5470-Issue",
+          "action": "create",
+          "created_at": "2026-09-27T00:00:00Z"
+        },
+        "merge_request": {
+          "id": 33003,
+          "iid": 33
+        },
+        "issue": {
+          "id": 33004,
+          "iid": 34
+        }
+      },
+      "first": {
+        "status": 202,
+        "body": {
+          "accepted": true,
+          "eventType": "gitlab.issue.comment",
+          "eventId": "01a0e378-03b9-7000-961b-13d26f14c2f7",
+          "deduplicated": false,
+          "deliveries": 1
+        }
+      },
+      "redelivery": {
+        "status": 202,
+        "body": {
+          "accepted": true,
+          "eventType": "gitlab.issue.comment",
+          "eventId": "01a0e378-03b9-7000-961b-13d26f14c2f7",
+          "deduplicated": true,
+          "deliveries": 0
+        }
+      }
+    },
+    {
+      "source": "github",
+      "target": "PullRequest",
+      "payload": {
+        "action": "created",
+        "repository": {
+          "id": 33001
+        },
+        "issue": {
+          "id": 33003,
+          "number": 33,
+          "pull_request": {
+            "url": "https://api.github.com/repos/validation/example/pulls/33"
+          }
+        },
+        "comment": {
+          "id": 33004,
+          "body": "rfc033-e1c83542-403f-4ed8-9748-031bc55c5470-PullRequest",
+          "created_at": "2026-09-27T00:00:00Z"
+        }
+      },
+      "first": {
+        "status": 202,
+        "body": {
+          "accepted": true,
+          "eventType": "github.pull-request.comment",
+          "eventId": "01a0e378-040d-7000-b91c-ae743fd838dd",
+          "deduplicated": false,
+          "deliveries": 1
+        }
+      },
+      "redelivery": {
+        "status": 202,
+        "body": {
+          "accepted": true,
+          "eventType": "github.pull-request.comment",
+          "eventId": "01a0e378-040d-7000-b91c-ae743fd838dd",
+          "deduplicated": true,
+          "deliveries": 0
+        }
+      },
+      "tamperedStatus": 401
+    }
+  ],
+  "boundary": [
+    {
+      "method": "POST",
+      "path": "/hooks/github",
+      "status": 401
+    },
+    {
+      "method": "GET",
+      "path": "/hooks/github",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "path": "/hooks/github/extra",
+      "status": 403
+    },
+    {
+      "method": "POST",
+      "path": "/api",
+      "status": 403
+    }
+  ],
+  "receipts": [
+    {
+      "delivery_id": "01a0e378-0322-7000-af43-601c7507be0f",
+      "event_id": "01a0e378-031e-7000-84d1-124940d1af9e",
+      "envelope": {
+        "source": {
+          "project": "gitlab-event-producer",
+          "producer": "gitlab",
+          "producerId": "01a0c12a-de1f-7000-8f77-38e6f7cc9694"
+        },
+        "attempt": 1,
+        "eventId": "01a0e378-031e-7000-84d1-124940d1af9e",
+        "payload": {
+          "issue": {
+            "id": 33004,
+            "iid": 34
+          },
+          "project": {
+            "id": 26
+          },
+          "object_kind": "note",
+          "merge_request": {
+            "id": 33003,
+            "iid": 33
+          },
+          "object_attributes": {
+            "id": 33001,
+            "note": "rfc033-e1c83542-403f-4ed8-9748-031bc55c5470-MergeRequest",
+            "action": "create",
+            "created_at": "2026-09-27T00:00:00Z",
+            "noteable_type": "MergeRequest"
+          }
+        },
+        "traceId": "01a0e37802fc7000b0b985dc7a731532",
+        "eventType": "gitlab.merge-request.comment",
+        "deliveryId": "01a0e378-0322-7000-af43-601c7507be0f",
+        "occurredAt": "2026-09-27T00:00:00.000Z",
+        "receivedAt": "2026-09-27T15:24:48.286Z",
+        "eventTypeId": "01a0e363-a8da-7000-b653-0c6230bffda0"
+      },
+      "received_at": "2026-09-27T15:24:49.117Z"
+    },
+    {
+      "delivery_id": "01a0e378-040e-7000-8de0-1571e7749939",
+      "event_id": "01a0e378-040d-7000-b91c-ae743fd838dd",
+      "envelope": {
+        "source": {
+          "project": "github-event-producer",
+          "producer": "github",
+          "producerId": "01a0e366-14d3-7000-a297-6350a15c0b1b"
+        },
+        "attempt": 1,
+        "eventId": "01a0e378-040d-7000-b91c-ae743fd838dd",
+        "payload": {
+          "issue": {
+            "id": 33003,
+            "number": 33,
+            "pull_request": {
+              "url": "https://api.github.com/repos/validation/example/pulls/33"
+            }
+          },
+          "action": "created",
+          "comment": {
+            "id": 33004,
+            "body": "rfc033-e1c83542-403f-4ed8-9748-031bc55c5470-PullRequest",
+            "created_at": "2026-09-27T00:00:00Z"
+          },
+          "repository": {
+            "id": 33001
+          }
+        },
+        "traceId": "01a0e37803f270008b12449474b53d72",
+        "eventType": "github.pull-request.comment",
+        "deliveryId": "01a0e378-040e-7000-8de0-1571e7749939",
+        "occurredAt": "2026-09-27T00:00:00.000Z",
+        "receivedAt": "2026-09-27T15:24:48.525Z",
+        "eventTypeId": "01a0e366-14d6-7000-91c8-1c531448670f"
+      },
+      "received_at": "2026-09-27T15:24:49.117Z"
+    },
+    {
+      "delivery_id": "01a0e378-03ba-7000-a023-117ec01563c6",
+      "event_id": "01a0e378-03b9-7000-961b-13d26f14c2f7",
+      "envelope": {
+        "source": {
+          "project": "gitlab-event-producer",
+          "producer": "gitlab",
+          "producerId": "01a0c12a-de1f-7000-8f77-38e6f7cc9694"
+        },
+        "attempt": 1,
+        "eventId": "01a0e378-03b9-7000-961b-13d26f14c2f7",
+        "payload": {
+          "issue": {
+            "id": 33004,
+            "iid": 34
+          },
+          "project": {
+            "id": 26
+          },
+          "object_kind": "note",
+          "merge_request": {
+            "id": 33003,
+            "iid": 33
+          },
+          "object_attributes": {
+            "id": 33002,
+            "note": "rfc033-e1c83542-403f-4ed8-9748-031bc55c5470-Issue",
+            "action": "create",
+            "created_at": "2026-09-27T00:00:00Z",
+            "noteable_type": "Issue"
+          }
+        },
+        "traceId": "01a0e37803a17000b8ce3ab9ee1939fe",
+        "eventType": "gitlab.issue.comment",
+        "deliveryId": "01a0e378-03ba-7000-a023-117ec01563c6",
+        "occurredAt": "2026-09-27T00:00:00.000Z",
+        "receivedAt": "2026-09-27T15:24:48.441Z",
+        "eventTypeId": "01a0e363-a8dc-7000-acb3-a0798fcec481"
+      },
+      "received_at": "2026-09-27T15:24:49.117Z"
+    }
+  ],
+  "deliveries": [
+    {
+      "id": "01a0e378-040e-7000-8de0-1571e7749939",
+      "eventId": "01a0e378-040d-7000-b91c-ae743fd838dd",
+      "eventTypeId": "01a0e366-14d6-7000-91c8-1c531448670f",
+      "eventType": "github.pull-request.comment",
+      "subscriptionId": "01a0e367-2755-7002-91df-a3134fd87be0",
+      "state": "delivered",
+      "attempts": 1,
+      "traceId": "01a0e37803f270008b12449474b53d72",
+      "deliveredAt": "2026-09-27T15:24:49.120Z"
+    },
+    {
+      "id": "01a0e378-03ba-7000-a023-117ec01563c6",
+      "eventId": "01a0e378-03b9-7000-961b-13d26f14c2f7",
+      "eventTypeId": "01a0e363-a8dc-7000-acb3-a0798fcec481",
+      "eventType": "gitlab.issue.comment",
+      "subscriptionId": "01a0e367-2755-7001-84c9-b60d2f781e19",
+      "state": "delivered",
+      "attempts": 1,
+      "traceId": "01a0e37803a17000b8ce3ab9ee1939fe",
+      "deliveredAt": "2026-09-27T15:24:49.119Z"
+    },
+    {
+      "id": "01a0e378-0322-7000-af43-601c7507be0f",
+      "eventId": "01a0e378-031e-7000-84d1-124940d1af9e",
+      "eventTypeId": "01a0e363-a8da-7000-b653-0c6230bffda0",
+      "eventType": "gitlab.merge-request.comment",
+      "subscriptionId": "01a0e367-2755-7000-9cfc-4b969eedcca2",
+      "state": "delivered",
+      "attempts": 1,
+      "traceId": "01a0e37802fc7000b0b985dc7a731532",
+      "deliveredAt": "2026-09-27T15:24:49.119Z"
+    }
+  ],
+  "slots": {
+    "gitlab": {
+      "items": [
+        {
+          "name": "prod",
+          "active": true,
+          "releaseId": "01a0e364-2615-7000-ae57-9a362e8398ab",
+          "tag": "v0.1.6",
+          "commitSha": "50ff4840fca7430cb581eb5178f4bffe98284a67",
+          "replicas": 1,
+          "readyReplicas": 1,
+          "state": "ready",
+          "host": "gitlab-event-producer.cs.localhost"
+        },
+        {
+          "name": "preview",
+          "active": false,
+          "replicas": 0,
+          "readyReplicas": 0,
+          "state": "empty",
+          "host": "preview.gitlab-event-producer.cs.localhost",
+          "offline": {
+            "releaseId": "01a0c888-83f4-7000-9753-9c76321db26b",
+            "tag": "v0.1.4",
+            "at": "2026-09-27T15:13:53.854Z",
+            "reason": "manual",
+            "actorUserId": "01a0c12a-de09-7005-b0f9-d55a8676540b"
+          }
+        }
+      ]
+    },
+    "github": {
+      "items": [
+        {
+          "name": "prod",
+          "active": true,
+          "releaseId": "01a0e367-d114-7000-86eb-b819ee0e6ac5",
+          "tag": "v0.1.1",
+          "commitSha": "c6a489926be352f5afa088041933d145d7424ea7",
+          "replicas": 1,
+          "readyReplicas": 1,
+          "state": "ready",
+          "host": "github-event-producer.cs.localhost"
+        },
+        {
+          "name": "preview",
+          "active": false,
+          "replicas": 0,
+          "readyReplicas": 0,
+          "state": "empty",
+          "host": "preview.github-event-producer.cs.localhost"
+        }
+      ]
+    },
+    "consumer": {
+      "items": [
+        {
+          "name": "prod",
+          "active": true,
+          "releaseId": "01a0e366-e7e8-7000-80cf-f6a7ff7842a0",
+          "tag": "v0.1.1",
+          "commitSha": "2b97dae945b016010c0cf7f91daaaef5c15b12c7",
+          "replicas": 1,
+          "readyReplicas": 1,
+          "state": "ready",
+          "host": "rfc033-webhooks.cs.localhost"
+        },
+        {
+          "name": "preview",
+          "active": false,
+          "replicas": 0,
+          "readyReplicas": 0,
+          "state": "empty",
+          "host": "preview.rfc033-webhooks.cs.localhost"
+        }
+      ]
+    }
+  },
+  "duplicateCreatesOnlyOneReceipt": true,
+  "originalPayloadPreserved": true
+}
