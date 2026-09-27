@@ -23,7 +23,7 @@ const ADMIN_PAGES = [
   { path: '/admin/projects', marker: '项目管理', capability: '项目供给与生命周期' },
   { path: '/admin/users', marker: '用户与权限', capability: '用户目录与管理员裁定' },
   { path: '/admin/compute', marker: '算力档位', capability: '算力档位（RFC-001）' },
-  { path: '/admin/runtime-images', marker: '运行镜像目录', capability: '运行镜像的全平台目录（RFC-028）' },
+  { path: '/admin/runtime-images', marker: '运行镜像', capability: '运行镜像的全平台目录（RFC-028）' },
   { path: '/admin/service-plans', marker: '服务套餐', capability: '数字人服务套餐' },
   { path: '/admin/task-profiles', marker: '任务容器套餐', capability: '任务容器套餐' },
   { path: '/admin/projects/resource-templates?kind=service', marker: '全平台共享模板', capability: '项目管理下的共享资源规格模板' },
