@@ -3,6 +3,14 @@
 > 这份文件让新 session 能立刻接上进度。每完成一批工作就更新它，与提交一起推送。
 > 规则见 `docs/engineering/development-rules.md` §9。
 
+## RFC-025 已完成（2026-09-27）
+
+T1–T17 与 RC-01–16 已收口，最终证据见 `proposal/rfc/RFC-025-resource-center/acceptance.md` §19。最终代码／验收提交 d730b156e2acbca470eacdaa8fdd5f5cf128d9c7，CI 36288347746 六项全绿；本地 static、unit 725/0、module 1412/7 skip/0 fail、console 905/0、构建与改动行防护通过。工作台已部署 cs-console:rc025-final-d730b156（1/1）；API／controller／session 继续 rc025-interface-a6da5868（1/1）。最终文档提交需核对其独立精确 SHA CI，不重复运行未变的本地候选门禁。
+
+作者授权的临时成员、额度、套餐与平台默认限流已全部恢复；双身份失权、并发争抢与退额、四类预检、多身份／来源合计桶、默认生效通过。限流提示采用只读本机响应注入的真实浏览器证据，没有扩大共享服务压测；该临时服务器已关闭。测试项目 rfc025-rebuild-verify 保留原 PVC／哨兵文件与工作区、prod v0.1.0 ready，preview empty；所有验收 CLI 停止。rfc025-retire-verify 已归档且 Namespace 删除，库和仓库保留；八个历史业务卷未动。共享工作树 `tests/e2e/referenceResources.test.ts` 是接手前已有改动，未纳入任何本轮提交。
+
+以下为分期接力历史，早期“进行中／待验证”以本节与 acceptance §19 为准。
+
 ## RFC-025 接手续作（2026-09-27）
 
 最新结果：CLI InterfaceReady 修复 a6da5868917e72fc2db658adf193a28d64e5ee3c 已发布，CI 36286527002 六项成功；API／controller／session 已部署 rc025-interface-a6da5868（1/1），console 沿用 bb1bfc09。静态、unit 725/0、module 1412/7 skip/0 fail、console 905/0、生产构建和新增行防护 21/21 全通过。真实 CLI 从 waiting-interface 到 ready 由后台独立推进，未发送模型任务，验证后已停止并删除 Pod。I27 空孤儿 Secret 自动回收、原 PVC 待回收及管理员显式删除、归档 Namespace 删除全过程已完成，两份数据库和仓库保留；控制器重启未复活命名空间。六处页面／API／UID 对照已保存，详见 acceptance §17.1、§18.5–18.7。

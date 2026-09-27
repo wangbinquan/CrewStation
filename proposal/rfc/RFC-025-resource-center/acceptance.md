@@ -530,7 +530,7 @@ I29 裁定（三个 (a)）之后：
 
 开发者真实浏览器看到另一作者的 CLI 等待任务。产生阶段变化时只调用一次该 CLI 的停止接口（脚本 finally 对测试名册另作幂等收尾，不计为页面重复发起），两身份各自经网关的资源 SSE 均在 **02:03:23.322Z stopping → 02:03:24.582Z stopped**；开发者页面没有手动刷新即显示进程结束／只读末屏。资源回收后额度 1／2，开发者重新创建可受理，额度回到 2／2；这条复验 CLI 随后正常停止。移除临时成员后，该成员的 SSE 在 **02:05:05.810Z** 收到 `reset reason=forbidden` 并关闭，02:05:06Z 新的资源查询返回 404。
 
-finally 恢复成员清单与额度：仅原 dev-admin owner，maxConcurrentTasks=3、running=1。所有本次 CLI 为 ended 或因额度拒绝 failed，独立 Pod 均不存在。浏览器截图 `member-concurrent.png`、`member-ended.png`，原始记录 `/private/tmp/rfc025-members-quota-proof.json`。
+finally 恢复成员清单与额度：仅原 dev-admin owner，maxConcurrentTasks=3、running=1。所有本次 CLI 为 ended 或因额度拒绝 failed，独立 Pod 均不存在。浏览器截图 `member-concurrent.png`、`member-ended.png`、`member-revoked.png`，原始记录 `/private/tmp/rfc025-members-quota-proof.json`。
 
 ### 19.2 四种预检与无新增台账（RC-07）
 
@@ -558,4 +558,4 @@ finally 恢复成员清单与额度：仅原 dev-admin owner，maxConcurrentTask
 
 最终只读核对记录在 `/private/tmp/rfc025-final-restoration-proof.json`：临时成员已移除；额度 3／已用 1；套餐 inherit；项目限流 override=null；平台默认全部恢复，相关中间件现值一致。所有验收 CLI 与同步拒绝的 Agent 都没有活动执行 Pod。`rfc025-rebuild-verify` 保留已恢复的原工作区、原 PVC 和哨兵文件；示例 v0.1.0 已为正式槽 ready／1 个副本，preview empty，便于后续复核。`rfc025-retire-verify` 已归档且 Namespace 删除，数据库与仓库按 I27 保留。八个历史待回收业务卷未删除。
 
-上一笔证据提交 `9749551754bb72a072a7567bc166c37369e1f239` 的 [CI 36287075641](https://github.com/wangbinquan/CrewStation/actions/runs/36287075641) 六项全部成功。本批最终候选本地 static、unit 725/0、module 1412/7 skip/0 fail、console 905/0、生产构建通过；改动行防护确认翻译数据不产生需防护的可执行行，组件回归 3/0。发布结果在完成后补记；其他任务的 `tests/e2e/referenceResources.test.ts` 保持原样，不纳入提交。
+上一笔证据提交 `9749551754bb72a072a7567bc166c37369e1f239` 的 [CI 36287075641](https://github.com/wangbinquan/CrewStation/actions/runs/36287075641) 六项全部成功。本批最终候选本地 static、unit 725/0、module 1412/7 skip/0 fail、console 905/0、生产构建通过；改动行防护确认翻译数据不产生需防护的可执行行，组件回归 3/0。代码／验收提交 `d730b156e2acbca470eacdaa8fdd5f5cf128d9c7` 的 [CI 36288347746](https://github.com/wangbinquan/CrewStation/actions/runs/36288347746) 六项全部成功；工作台已部署 `cs-console:rc025-final-d730b156`（1/1），镜像 ID `sha256:6cba37316753cd93850c6bbd47d6bf8a6c3552541be7cdf253b9a4468163a908`，中英文实页复核通过。API／controller／session 继续 a6da5868，无需重部署。T1–T17 与 RC-01–16 据上述范围收口，RFC 状态 Done；最终状态文档提交以其独立精确 SHA CI 终态核对。其他任务的 `tests/e2e/referenceResources.test.ts` 保持原样，不纳入提交。
