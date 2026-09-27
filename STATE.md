@@ -1,5 +1,16 @@
 # 当前执行状态
 
+
+## RFC028/029 修复已部署，真实恢复闭环补证（2026-09-28）
+
+实现1004e68f精确CI36345641340六项success，本机六控制面＋console均rfc029-1004e68f、cs-auth仍rfc033-493bd47a。原完整门禁3711／11skip／0fail适用，源码未再改，不重跑。真实弹窗已完成失败command重试（双击／丢回执同键仅一个attempt2）、Agent同原生会话继续、失败工作区同卷重建、原卷缺失后关联新任务；最后一项保留旧失败任务、新卷且不重放步骤。真实关联任务Dialog的三宽／双语／主题12组通过、0写请求、焦点恢复。
+
+本轮四个任务已正式closed、quotaHeld=false，Pod清理；三个持久工作卷按正常保留策略留下。原父任务01a0e30e…仍running／原UID，其他业务39个Pod/PVC UID不变。四个反向镜像定义已停用且不默认开放，专用业务／开发镜像策略恢复到原内容、revision均5。临时验证和构建资源由平台回收；详见RFC028/029 acceptance新首节与/tmp回执。
+
+RI06/07：缺Agent CLI镜像任务passed、Agent failed，Agent绑定412而task200；初始化exit23和1秒超时均failed、后续工具未调度、绑定412。RI08结合持久SQLite unknown／取消用例、控制面重连无重复和新Pod重执行闭合。已有镜像当前底座登记成功，无引用副本退休retained共享摘要；旧底座登记失败回执保留，不能把它混为当前登记失败。
+
+本批文档提交范围仅4份：STATE、RFC028 acceptance/plan、RFC029 acceptance；第三方tests/e2e/referenceResources.test.ts未改未纳入。整个目标仍active；尚需按RI/TR矩阵收口未完成的权限／撤权、并发／deadline及其余产品边界，不能把本轮真实恢复成功当作两个RFC全量Done。无跨session交互。
+
 ## RFC028/029 实机修复最终门禁绿，准备精确发布（2026-09-28）
 
 最终8文件候选完整check已自然退出0：3711 pass／11 skip／0 fail、23561断言、711文件、632.58秒，`/tmp/cs-rfc029-live-fixes-final-full-check.log`；内容指纹相同，不重跑。13/13改动生产行已覆盖，v2网关配置单独实机先红后绿。准备发布12路径（8源码/配置＋STATE/RFC028验收及plan/RFC029验收），不含第三方referenceResources。

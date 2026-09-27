@@ -1,5 +1,21 @@
 # RFC-029 恢复工作台验收记录
 
+
+## 2026-09-28：1004e68f部署后的真实恢复闭环
+
+修复提交 `1004e68f33a515cfb6d616047bedb951808da3d9` 的 [CI 36345641340](https://github.com/wangbinquan/CrewStation/actions/runs/36345641340) 六项全部success；本地六控制面及console由该SHA构建并升级，cs-auth仍为独立rfc033-493bd47a。首次部署脚本在CI仍有e2e运行时被前置断言阻止、没有修改部署；观察进程成功结束并重新取得六项绿色后才实际升级。精确发布／部署回执 `/tmp/cs-rfc029-live-fixes-{publication,ci-final}.json`、`/tmp/cs-rfc029-1004-{deploy-after,platform-pods,owned-resources}.json`。
+
+- TR-02：专用命令子任务 `01a0e448-50d1-7000-804a-721bcbba8a43` 在真实弹窗双击确认。服务器受理后于浏览器响应阶段主动断线，仅1次POST；关闭并重开详情后看到请求 `01a0e475-0e40-7000-b1a5-505a44f8291b` succeeded，新attempt2成功。用捕获的同requestKey重放返回原请求，历史只有两个attempt，完整原镜像快照不变。回执与截图 `/tmp/cs-rfc029-live-command-recovered.{json,png}`，原断线响应 `/tmp/cs-rfc029-command-lost-reply.json`。
+- TR-05：专用已取消Agent `01a0e44d-e536-7000-8adf-bff458339f55` 在真实弹窗选择“继续原会话”，请求 `01a0e475-bd3c-7000-9f1a-948229ad09e4` succeeded、attempt2成功，会话仍为 `ses_f1bb188e0ffepHA8JWUCu2obDI`，完整镜像快照不变。此脚本未开启POST计数，输出posts0不代表没有写请求；以持久请求及两个attempt为证。`/tmp/cs-rfc029-live-native-recovered.{json,png}`。
+- TR-04：仅对本轮任务 `01a0e448-13e1-7000-bc00-39f5197fe12c` 的Runner PID11注入故障。旧Pod Failed/exit137仍存在时评估明确original_execution_not_stopped且无动作；按UID前置条件只删除该Pod、保留PVC后才允许“保留工作区重建”。实际弹窗双击确认产生请求 `01a0e479-8973-7000-a1b2-07d7ccffe0d6`，最终succeeded。新Pod UID `7556b075-2602-4633-8b5e-722c6560cc50`、原PVC UID `8eea7314-d0d5-4462-b186-74a3dac36024`、原b8b7镜像；标记文件保留，初始化记录1→2。`/tmp/cs-rfc029-parent-assessment-{old-pod,no-pod}.json`、`/tmp/cs-rfc029-live-rebuild.{json,png}`、`/tmp/cs-rfc029-rebuilt-{resources.json,files.txt}`。
+- 真实重建页面以新请求succeeded及上部“工作区：运行中”共同作为完成条件，无手动刷新；证明进度联动刷新修复已部署。原父任务 `01a0e30e-e096-7000-be22-db3c8ecd4171` UID保持，不在故障／清理范围。cs-session升级后验收父任务初始化记录前后相同，未因Runner重连重复执行。
+
+- 原卷缺失路径：新建空验收任务 `01a0e47b-b641-7000-ac48-17e5aa102c87`，仅对该Pod注入失败并按UID删除其专用卷；评估仅有restart-task和original_workspace_unavailable。真实弹窗确认产生 `01a0e47e-3f98-7000-a183-c58a3f0c86e5`，关联新任务 `01a0e47e-51dc-7000-82a6-ce217a750f04` running，旧任务仍failed，新PVC UID `4b99b17e-6293-406c-9f43-05a4f2bbcc7a`，完整原镜像保持，新任务无子执行。`/tmp/cs-rfc029-live-restart.{json,png}`。创建脚本最初错把业务动作200断言为201，沿同键回读并修正，没有创建第二个父任务。
+- TR-10部署数据补证：真实“查看新任务”在1440／390／320×中英×明暗共12组中均替换当前shared Dialog内容、无第二个详情append、无横向溢出；Esc关闭后焦点回原行，0写请求、0浏览器错误。`/tmp/cs-rfc029-live-recovery-layout.json`，窄屏截图前缀 `/tmp/cs-rfc029-live-recovery-linked-`。此前确认框键盘及长列表夹具证据仍保留各自范围。
+- 四个本轮业务任务已正式close并读到closed／quotaHeld=false；无残留Pod，三个持久卷按正常关闭保留策略保留，未为腾容量删除。原卷缺失用例删除的是刚创建的专用空卷。原父任务仍running且UID相同，其他业务39个Pod/PVC UID全部保持。`/tmp/cs-rfc029-owned-task-cleanup-final.json`、`/tmp/cs-rfc029-owned-cleanup-resources.json`、`/tmp/cs-rfc029-final-preservation.json`。
+
+本节替代下文“修复尚未发布部署”的历史状态；未覆盖的TR/RI子项继续保留，不宣称整个RFC完成。
+
 ## 2026-09-28：发布部署、真实恢复及验收发现
 
 最终八文件候选新增v2网关补正后，完整门禁 **3711 pass／11 skip／0 fail、23561断言、711文件、632.58秒、exit0**，日志 `/tmp/cs-rfc029-live-fixes-final-full-check.log`；源码/配置指纹前后相同。此前5文件候选的完整门禁3708/11skip/1fail（既有缺二进制CLI测试5秒超时）保留；该文件定向11/0、126断言，缺二进制用例49ms，未修改驱动或放宽超时。最终完整候选包含网关新增行为，实际再次全绿；不将定向结果冒充旧全量成功。

@@ -1,5 +1,15 @@
 # RFC-028 实施证据
 
+
+## 2026-09-28：用途隔离、初始化失败与重连实机
+
+- RI-06：非默认开放的无仓库镜像 `01a0e470-2949-7000-a798-8479666144b6` 构建成功，版本 `01a0e470-8e8e-7000-8355-1a0a9dd7d73e` 只移除 Agent CLI，保留 Runner。实际 digest `a6421995c2a965feacf22850fe1083a6a0439f2909bea9d3c614b51e68015614` 的 task 验证 passed、Agent 原档位修订3验证 failed；版本仍 available。开发 Agent 绑定412／image_usage_unvalidated，任务绑定200；配置随即恢复（开发配置revision5、镜像授权revision3）。两次验证与builder的Pod/PVC均已回收。证据 `/tmp/cs-rfc028-owned-bad-agent-{build,validations,observed,binding}.json`、`/tmp/cs-rfc028-bad-agent-resources.json`。
+- RI-07：两份隔离配方分别执行exit23和20秒sleep／1秒期限。持久Runner回执均failed，有固定executionId和Pod UID；前者exitCode23，后者exitCode null，checks均为空，后续must-not-run工具没有被调度。验证环境最终released，两个任务绑定均412。专用业务授权已CAS恢复revision5。证据 `/tmp/cs-rfc028-owned-init-{negative,observed}.json`、`/tmp/cs-rfc028-init-runtime-proof.json`。此前直接登记旧任务镜像的两次尝试被产物身份／摘要／架构／底座检查拒绝、无版本；失败回执保留，改用当前标准底座inline构建后完成本验收，不将该失败推断为已定位产品缺陷。
+- RI-08：部署1004e68f重启cs-session后，本轮父任务 `01a0e443-d6e2-7000-884d-4d5d26a90143` 的Pod UID不变，`/work/.rfc028-init-events`前后逐字相同。业务／开发新Pod重建均初始化第二次；`runtimes/task/tests/runtimeInitialization.test.ts` 的实际SQLite日志断言证明残留running意图转unknown、标记文件不存在、startAgent被拒绝；同组覆盖取消不再启动。这些用例已包含最终3711/0门禁及此前Linux原生8/0证据，不重复跑完整检查。组合证据闭合RI-08，明确unknown证明来自受控Runner测试而非本轮业务Pod崩溃。
+- 当前标准底座产物的existing登记 `01a0e47b-773b-7000-9da3-0aa233c14c09` succeeded，版本 `01a0e47b-77ea-7000-aa63-0171c94419db` 与初始化失败配方版本共享repository和digest `f850edbf26b349c3e4cf242118e18ca9edfa5b84956bed19e0eab5493e429810`。无引用副本停用后删除返回retired／physicalDeletion=retained，另一版本仍available。`/tmp/cs-rfc028-owned-existing{,-retired}.json`。补齐已部署平台existing正向及共享摘要保留，不将逻辑退休声称为磁盘回收。
+- 四个本轮反向验证定义均已停用且defaultVisible=false；专用业务授权和开发选择恢复，revision均5。`/tmp/cs-rfc028-owned-negative-cleanup.json`、`/tmp/cs-rfc028-final-policy-restored.json`。没有停用原供业务运行的镜像。
+- 修复提交 `1004e68f33a515cfb6d616047bedb951808da3d9` 的[精确SHA CI](https://github.com/wangbinquan/CrewStation/actions/runs/36345641340)六项全部成功，本地六控制面及console均升级对应标签；cs-auth仍为rfc033-493bd47a，原业务父任务UID不变。部署回执 `/tmp/cs-rfc029-1004-{deploy-after,platform-pods,owned-resources}.json`。完整本地门禁3711／11skip／0fail仍对应同一源码候选。
+
 ## 2026-09-28：服务回退保留镜像与任务
 
 专用服务经正式fenced切流由v0.4.0回退v0.3.1，旧应用实际取得active执行权，release返回原服务摘要ad0b08d0…而非新默认；原任务完整runtimeImage与PVC UID保持。随后正式切回v0.4.0，已确认active，两个版本原Pod继续使用各自摘要，没有重构镜像。证据 `/tmp/cs-rfc028-service-{rollback,rollback-active,return,return-active}.json`，配合本页已有暂停同卷、原生resume、停用定义保留引用证据，RI-22闭合。

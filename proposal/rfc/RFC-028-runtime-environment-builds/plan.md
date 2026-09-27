@@ -52,12 +52,12 @@ RI-01／RI-02 已有完整实际执行证据（2026-09-28），其余 RI 按 acc
 |---|---|---|
 | RI-01 | service、parent、Agent A、Agent B 分别指定不同镜像，实际按各自 digest 运行 | 已通过：2026-09-28 service／parent／A／B 四个实际 imageID，见 acceptance 同日节 |
 | RI-02 | 同一兼容镜像可显式复用到父任务与 Agent，工具清单一致 | 已通过：原显式复用父任务与 Agent A 实际工具输出、task／agent 用途验证，见 acceptance 同日节 |
-| RI-03 | Python 包、Node CJS/ESM、本地脚本、动态链接二进制、模板真实可用 | 实际 worker UID 下父 command 与 Agent 工具调用 |
+| RI-03 | Python 包、Node CJS/ESM、本地脚本、动态链接二进制、模板真实可用 | 已通过：父command与Agent A/B七项真实工具输出，见acceptance的实际工具闭环 |
 | RI-04 | 多阶段 Dockerfile、安装脚本、COPY、带校验下载成功；错误校验和失败 | 构建日志与不可用版本证明 |
 | RI-05 | source/existing 都可选；非法前缀／路径／符号链接／frontend／任务底座拒绝 | 正反向解析、真实 registry／builder 检查 |
-| RI-06 | 镜像构建成功但 Agent 不兼容时不允许该组合，不否定其他用途 | 真实坏 binaryPath／库／协议组合验证 |
-| RI-07 | 初始化失败／超时阻断执行，Runner 连上不等于 ready | 后端绕过 UI 仍拒绝，实机进度 |
-| RI-08 | 初始化重连不重复，新 Pod 重执行，unknown 不自动重复副作用 | 持久执行 ID、重启／取消证据 |
+| RI-06 | 镜像构建成功但 Agent 不兼容时不允许该组合，不否定其他用途 | 已通过：同digest任务passed、缺CLI的Agent组合failed；Agent绑定412而任务200，临时策略已恢复，见acceptance同日节 |
+| RI-07 | 初始化失败／超时阻断执行，Runner 连上不等于 ready | 已通过：实机exit23与1秒超时均failed、后续工具未调度，任务绑定均412，持久初始化回执见acceptance |
+| RI-08 | 初始化重连不重复，新 Pod 重执行，unknown 不自动重复副作用 | 已通过：真实控制面重连无重复、开发及业务新Pod重新初始化；SQLite unknown／取消防重回归和Linux证据，见acceptance |
 | RI-09 | 请求覆盖＞当前位置默认＞原平台默认；Agent 不继承父镜像 | 优先级表全组合测试＋实机 |
 | RI-10 | 父任务请求不能选 Agent 专属列表，Agent A 不能用 B 专属列表；显式非法不回退 | 已通过：2026-09-28三个实际业务入口均400/runtime_image_not_allowed，子任务列表与原Pod UID未变；结合模块无副作用回归 |
 | RI-11 | 项目隔离、tester/user 无构建权、服务身份无镜像管理权 | HTTP／数据库回归与双身份实机 |
