@@ -19,7 +19,10 @@ export function runtimeImageConsoleFixture(admin = false, role = 'owner') {
       if (path.endsWith('/setup') && state.setupFailure) return Response.json({ error: 'unavailable', message: 'response lost' }, { status: 503 });
       if (path.endsWith('/setup')) return Response.json({ image, revision: { ...revision, ...body.recipe as object } }, { status: 201 });
       if (path.endsWith('/builds')) return state.buildFailure ? Response.json({ error: 'unavailable', message: 'builder unavailable' }, { status: 503 }) : Response.json(build, { status: 202 });
-      if (path.endsWith(`/runtime-images/${riImage}`) && method === 'PATCH') { Object.assign(image, body, { revision: image.revision + 1 }); return Response.json(image); }
+      if (path.endsWith(`/runtime-images/${riImage}`) && method === 'PATCH') {
+        if (body.expectedRevision !== image.revision) return Response.json({ error: 'conflict', message: '镜像已修改' }, { status: 409 });
+        Object.assign(image, body, { revision: image.revision + 1 }); return Response.json(image);
+      }
       if (path.endsWith('/cancel')) return Response.json({ ...build, state: 'cancelling' });
       if (path.endsWith('/revisions')) return Response.json({ ...revision, ...body, id: riId(17), revision: 2 }, { status: 201 });
       if (path.endsWith('/validations')) return Response.json({ id: riId(18), versionId: riVersion, projectId: riProject, target: body.target, state: 'queued', checks: [], contractDigest: digest, createdBy: riId(1), createdAt: at, updatedAt: at }, { status: 202 });

@@ -47,6 +47,10 @@ test('使用记录展示已释放任务与已下线服务，详情链接定位�
   await page!.click('配置与管理'); await page!.click('修改名称与说明'); await text(dialog().querySelector('input')!, 'Renamed'); await page!.click('保存');
   expect(fixture!.writes.at(-1)).toMatchObject({ url: `/v1/projects/${riProject}/runtime-images/${riImage}`, body: { name: 'Renamed', expectedRevision: 1 } });
   await page!.click('停用此镜像'); expect(fixture!.writes.at(-1)!.body).toMatchObject({ enabled: false, expectedRevision: 2 });
+  // A new edit after a successful save and toggle must capture the latest revision.
+  await page!.click('修改名称与说明'); await text(dialog().querySelector('input')!, 'Renamed again'); await page!.click('保存');
+  expect(fixture!.writes.at(-1)!.body).toMatchObject({ name: 'Renamed again', expectedRevision: 3 });
+  expect(document.querySelectorAll('dialog[open]')).toHaveLength(0);
 });
 
 test('Agent 底座从具名档位选择当前修订，不要求输入内部 ID', async () => {
