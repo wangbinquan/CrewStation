@@ -1,3 +1,4 @@
+import { VersionIdentity } from './VersionIdentity';
 import { FormField } from '../../../shared/ui/FormField';
 import { SaveDevelopmentRuntimeImagesSchema } from '@crewstation/contracts';
 import type { RuntimeImageSelection, SaveDevelopmentRuntimeImages } from '@crewstation/contracts';
@@ -24,8 +25,8 @@ export function DevelopmentImages({ projectId, editable }: { readonly projectId:
   const edit = () => { if (!draft && query.data) setDraft({ expectedRevision: query.data.revision, developmentTask: query.data.developmentTask, developmentAgents: query.data.developmentAgents }); setOpen(true); };
   return <Card title={t('images.development')} stacked actions={editable ? <Button disabled={!query.data || !!query.error} onClick={edit}>{t('images.configure')}</Button> : null}>
     <p>{t('images.policyHint')}</p><QueryStatus isPending={query.isPending} error={query.error} />
-    <p>{t('images.usage.task')} · {query.data?.developmentTask.runtimeImageVersionId ?? t('runtimeImages.picker.platform')}</p>
-    {query.data?.developmentAgents.map((agent) => <p key={agent.profileId} className={styles.identity}>{name(agent.profileId)} · {agent.selection.runtimeImageVersionId ?? t('runtimeImages.picker.platform')}</p>)}
+    <p>{t('images.usage.task')} · {query.data?.developmentTask.runtimeImageVersionId ? <VersionIdentity projectId={projectId} versionId={query.data.developmentTask.runtimeImageVersionId} /> : query.data ? t('runtimeImages.picker.platform') : '—'}</p>
+    {query.data?.developmentAgents.map((agent) => <p key={agent.profileId} className={styles.identity}>{name(agent.profileId)} · {agent.selection.runtimeImageVersionId ? <VersionIdentity projectId={projectId} versionId={agent.selection.runtimeImageVersionId} /> : t('runtimeImages.picker.platform')}</p>)}
     {save.isSuccess ? <ActionNote tone="success">{t('images.policySaved')}</ActionNote> : null}
     {open && draft ? <FormDialog title={t('images.configure')} submitLabel={t('images.save')} busy={save.isPending} onClose={() => setOpen(false)} onSubmit={() => save.mutate()} error={save.error ? errorMessage(save.error) : undefined}>
       <div className={styles.stack}>
@@ -57,7 +58,11 @@ function SelectionFields({ projectId, label, value, onChange }: { readonly proje
   return <fieldset className={styles.stack}><legend>{label}</legend>
     <div className={styles.row}><Button onClick={() => setChoosing('default')}>{t('images.pickDefault')}</Button><Button onClick={() => setChoosing('allowed')}>{t('images.pickAllowed')}</Button></div>
     {choosing ? <VersionBrowser projectId={projectId} onSelect={select} /> : null}
-    <FormField label={t('images.defaultVersion')}><input value={value.runtimeImageVersionId ?? ''} placeholder={t('runtimeImages.picker.platform')} onChange={(event) => onChange({ ...value, runtimeImageVersionId: event.target.value || undefined })} /></FormField>
+    <p>{t('images.defaultVersion')} · {value.runtimeImageVersionId ? <VersionIdentity projectId={projectId} versionId={value.runtimeImageVersionId} /> : t('runtimeImages.picker.platform')}</p>
+    <Button onClick={() => onChange({ ...value, runtimeImageVersionId: undefined })}>{t('images.usePlatformDefault')}</Button>
+    {value.allowedRuntimeImageVersionIds?.map((id) => <div key={id} className={styles.row}><VersionIdentity projectId={projectId} versionId={id} /><Button size="small" onClick={() => { const ids = value.allowedRuntimeImageVersionIds!.filter((v) => v !== id); setAllowed(ids.join('\n')); onChange({ ...value, allowedRuntimeImageVersionIds: ids }); }}>{t('images.removeSelection')}</Button></div>)}
+    <details><summary>{t('images.advancedSelection')}</summary><FormField label={t('images.defaultVersion')}><input value={value.runtimeImageVersionId ?? ''} placeholder={t('runtimeImages.picker.platform')} onChange={(event) => onChange({ ...value, runtimeImageVersionId: event.target.value || undefined })} /></FormField>
     <FormField label={t('images.allowedVersions')}><textarea rows={3} value={allowed} onChange={(event) => { setAllowed(event.target.value); onChange({ ...value, allowedRuntimeImageVersionIds: event.target.value.split(/\s+/).filter(Boolean) }); }} /></FormField>
+    </details>
   </fieldset>;
 }

@@ -22,7 +22,7 @@ test('目录展示真实版本，构建带幂等键，日志按游标续读，�
   await page!.click('构建日志'); await page!.reread();
   expect(page!.text()).toContain('install complete'); expect(fixture!.reads.some((url) => url.endsWith('/logs?after=1'))).toBe(true);
   await page!.click('取消构建'); expect(fixture!.writes.at(-1)!.url).toContain('/cancel');
-  await page!.click('用途验证'); expect(page!.text()).toContain('尚未在此验证中启动服务');
+  await page!.click('镜像版本'); await page!.click('用途验证'); expect(page!.text()).toContain('尚未在此验证中启动服务');
 });
 
 test('新增修订校验 JSON，关闭保留草稿；配方支持 existing 且不自动构建', async () => {
@@ -48,7 +48,7 @@ test('平台目录仅管理员读取；项目目录不替代管理员跨项目�
   fixture = runtimeImageConsoleFixture(false); page = await renderElement(<AdminRuntimeImagesPage />, messages);
   expect(fixture.reads.some((url) => url.includes('/runtime-image-catalog'))).toBe(false);
   page.unmount(); fixture.restore(); fixture = runtimeImageConsoleFixture(true); page = await renderElement(<AdminRuntimeImagesPage />, messages);
-  expect(fixture.reads.some((url) => url.includes('/runtime-image-catalog'))).toBe(true); expect(page.text()).toContain('Python tools');
+  await page.settle(); expect(fixture.reads.some((url) => url.includes('/runtime-image-catalog'))).toBe(true); expect(page.text()).toContain('Python tools');
 });
 
 test('配置冲突保留草稿，只在明确丢弃后读取最新修订与字段', async () => {
@@ -93,6 +93,8 @@ test('构建来源表单生成已有镜像配方，并保留高级初始化草�
 
 test('源码构建从本项目仓库选择绑定，保存的是服务绑定身份而非展示名', async () => {
   await open(); await page!.click('查看'); await page!.click('新增构建修订');
+  const kind = dialog().querySelector<HTMLSelectElement>('select')!;
+  await act(async () => { kind.value = 'source'; kind.dispatchEvent(new Event('change', { bubbles: true })); }); await page!.settle();
   const repository = [...dialog().querySelectorAll<HTMLSelectElement>('select')].find((select) => [...select.options].some((option) => option.textContent === 'Tools project'))!;
   expect(repository).toBeDefined();
   await act(async () => { repository.value = riId(22); repository.dispatchEvent(new Event('change', { bubbles: true })); });
@@ -142,13 +144,13 @@ test('服务用途验证表单按 argv 保存参数，明确契约检查范围',
   expect(fixture!.writes.at(-1)!.body.target).toEqual({ usage: 'service', command: ['/app/start', 'argument with spaces', '--serve'], port: 8088, healthPath: '/ready' });
 });
 
-test('Agent 用途验证按项目档位名称选择，固定所填修订', async () => {
+test('Agent 用途验证按项目档位名称选择，自动固定当前修订', async () => {
   await open(); await page!.click('查看'); await page!.click('用途验证'); await page!.click('发起验证');
   const usage = dialog().querySelector<HTMLSelectElement>('select')!;
   await act(async () => { usage.value = 'agent'; usage.dispatchEvent(new Event('change', { bubbles: true })); }); await page!.settle();
   const profile = dialog().querySelectorAll<HTMLSelectElement>('select')[1]!;
   expect(profile.textContent).toContain('Agent A');
   await act(async () => { profile.value = riProfile; profile.dispatchEvent(new Event('change', { bubbles: true })); });
-  await text(dialog().querySelector<HTMLInputElement>('input')!, '3'); await page!.click('发起验证');
+  expect(dialog().querySelector('input[type=number]') === null).toBe(true); await page!.click('发起验证');
   expect(fixture!.writes.at(-1)!.body.target).toEqual({ usage: 'agent', profile: { profileId: riProfile, revision: 3 } });
 });

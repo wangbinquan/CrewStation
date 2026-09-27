@@ -85,9 +85,9 @@ async function observeRecord(deps: ReconcileDeps, record: LedgerRecordView): Pro
  * 所以观测缓存里这个名字的实例都要删；删除带着缓存里那个实例的 UID，读缓存与删之间被换成新实例时 API Server 拒绝，下一轮再判断。
  * 删除中的不重复删；系统命名空间里不带任务标签的平台组件一律不碰。请求发出即可，对象消失由观测写回，删完记录进入「已结束」。
  */
-async function removeChildren(deps: ReconcileDeps, record: LedgerRecordView): Promise<void> {
+async function removeChildren(deps: ReconcileDeps, record: LedgerRecordView, kinds: readonly ObservedKind[] = REMOVAL_ORDER): Promise<void> {
   const targets = targetsOf(record);
-  for (const kind of REMOVAL_ORDER) {
+  for (const kind of kinds) {
     if (kind === 'PersistentVolumeClaim' && record.kind !== 'volume') continue;
     for (const child of targets.filter((target) => target.kind === kind)) {
       const cached = deps.feed.cached(kind, child.namespace, child.name), uid = cached?.metadata.uid;
@@ -274,6 +274,11 @@ export async function reconcileRecord(deps: ReconcileDeps, id: string, enqueue: 
   await observeControlledPods(deps, record, enqueue);
   // 槽变了（上线、下线、部署就绪）：指向它的路由重新核对该指槽还是指说明页（D13）。
   enqueueRoutesOfSlot(record, deps.routeTargets, enqueue);
+  // 暂停保留记录和卷，但本次及旧启动凭据必须清掉，否则台账一直计作 stopping 并占额度。
+  if (record.kind === 'business-workspace' && record.desired === 'present' && record.conditions.some((entry) => entry.type === 'Paused' && entry.status === 'true')) {
+    const current = await deps.ledger.get(id);
+    if (current?.generation === record.generation && current.conditions.some((entry) => entry.type === 'Paused' && entry.status === 'true')) await removeChildren(deps, record, ['Secret']);
+  }
   if (record.desired === 'present') await APPLIERS[record.kind]?.(deps, record, enqueue);
   if (record.desired === 'absent') {
     if (record.kind === 'namespace') await retireNamespace(deps, record);

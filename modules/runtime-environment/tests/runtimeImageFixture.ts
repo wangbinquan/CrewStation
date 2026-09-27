@@ -1,3 +1,4 @@
+import type { RuntimeImageExecutionHistory } from '../ports/executionHistory';
 import type { Actor, RuntimeImageSource, UserId } from '@crewstation/contracts';
 import { CreateRuntimeImageRevisionSchema, IDENTITY_HEADERS } from '@crewstation/contracts';
 import { createApp } from '@crewstation/http';
@@ -13,14 +14,14 @@ import type { RuntimeImageReferenceOwners } from '../ports/referenceOwners';
 export const actor = (isAdmin = false): Actor => ({ userId: newResourceId() as UserId, isAdmin });
 export const digest = `sha256:${'a'.repeat(64)}`;
 
-export async function runtimeImageFixture(executor?: RuntimeImageBuildExecutor, secrets?: { versions: NonNullable<RuntimeImageValidationContracts['secretVersions']>; values: RuntimeInitializationSecrets }, validationExecutor?: RuntimeImageValidationExecutor, referenceOwners?: RuntimeImageReferenceOwners) {
+export async function runtimeImageFixture(executor?: RuntimeImageBuildExecutor, secrets?: { versions: NonNullable<RuntimeImageValidationContracts['secretVersions']>; values: RuntimeInitializationSecrets }, validationExecutor?: RuntimeImageValidationExecutor, referenceOwners?: RuntimeImageReferenceOwners, executionHistory?: RuntimeImageExecutionHistory) {
   const tdb = await createTestDatabase([runtimeEnvironmentMigrations]);
   const project = newResourceId(), otherProject = newResourceId(), repositoryBindingId = newResourceId();
   const developer = actor(), admin = actor(true), tester = actor(), outsider = actor();
   const memberships = new Map([[developer.userId, new Set([project, otherProject])], [tester.userId, new Set([project])]]);
   let now = new Date('2026-09-27T00:00:00Z'), prepares = 0, contractFingerprint = digest;
   const mod = createRuntimeEnvironmentModule({
-    db: tdb.db, clock: { now: () => now }, isAdmin: async (id) => id === admin.userId, referenceOwners,
+    db: tdb.db, clock: { now: () => now }, isAdmin: async (id) => id === admin.userId, referenceOwners, executionHistory,
     authorizer: { authorize: async (a, p, action) => {
       if (a.isAdmin) return;
       if (!memberships.get(a.userId)?.has(p) || action === 'manage' || (a.userId === tester.userId && action !== 'view')) throw forbidden();

@@ -1,3 +1,4 @@
+import { releaseImageHistory } from './adapters/persistence/imageHistory';
 import type { ExecutionHandoff } from './ports/executionHandoff';
 import { releaseHandoffUseCases } from './application/execution/handoff';
 import { periodicJob } from '@crewstation/resource-runtime';
@@ -118,6 +119,7 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
   };
   const api: ReleaseModuleApi = {
     name: 'release',
+    imageHistory: releaseImageHistory(deps.db),
     ...releaseHandoffUseCases(useCaseDeps),
     ...slotMaintenanceUseCases({ ...useCaseDeps, slotControl: kubernetesSlotControl(deps.k8s, deps.physicalOperationId), isAdmin: deps.isAdmin }),
     publish: publishUseCase(useCaseDeps),

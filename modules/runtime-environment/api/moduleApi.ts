@@ -1,3 +1,5 @@
+import type { CreateRuntimeImageSetup } from '@crewstation/contracts';
+import type { RuntimeImageHistoryQuery, RuntimeImageHistoryPage } from '@crewstation/contracts';
 import type {
   SaveDevelopmentRuntimeImages, Actor, CreateRuntimeImageRequest, CreateRuntimeImageRevision, RuntimeImageBuildDto, RuntimeImageDto, RuntimeImageLogPage, RuntimeImageLogQuery,
   RuntimeImagePageQuery, RuntimeImageRevisionDto, RuntimeImageVersionDto, StartRuntimeImageBuild, UpdateRuntimeImageRequest, StartImageValidation, RuntimeImageValidationDto,
@@ -6,6 +8,8 @@ import type { RuntimeImageBindings, ImageReferenceView } from './bindings';
 
 /** 运行镜像目录与构建；用途验证结果单独管理，不把构建成功当成可执行。 */
 export interface RuntimeEnvironmentModuleApi extends RuntimeImageBindings {
+  createSetup(actor: Actor, projectId: string, input: CreateRuntimeImageSetup): Promise<{ image: RuntimeImageDto; revision: RuntimeImageRevisionDto }>;
+  imageHistory(actor: Actor, projectId: string, imageId: string, query: RuntimeImageHistoryQuery): Promise<RuntimeImageHistoryPage>;
   readonly name: 'runtime-environment';
   getDevelopmentImages(actor: Actor, projectId: string): Promise<Omit<SaveDevelopmentRuntimeImages, 'expectedRevision'> & { projectId: string; revision: number }>;
   saveDevelopmentImages(actor: Actor, projectId: string, input: SaveDevelopmentRuntimeImages): Promise<Omit<SaveDevelopmentRuntimeImages, 'expectedRevision'> & { projectId: string; revision: number }>;

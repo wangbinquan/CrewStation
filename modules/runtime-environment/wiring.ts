@@ -1,3 +1,6 @@
+import { createRuntimeImageSetup } from './application/catalog/createSetup';
+import { runtimeImageExecutionHistory } from './application/catalog/executionHistory';
+import type { RuntimeImageExecutionHistory } from './ports/executionHistory';
 import { join } from 'node:path';
 import type { Actor, UserId } from '@crewstation/contracts';
 import type { Clock, Logger } from '@crewstation/kernel';
@@ -44,6 +47,7 @@ import type { RuntimeImageReferenceOwners } from './ports/referenceOwners';
 export const runtimeEnvironmentMigrations: MigrationSet = { module: 'runtime-environment', layer: 4, files: readMigrationDir(join(import.meta.dir, 'adapters', 'persistence', 'migrations')) };
 
 export interface RuntimeEnvironmentModuleDeps {
+  readonly executionHistory?: RuntimeImageExecutionHistory;
   readonly referenceOwners?: RuntimeImageReferenceOwners;
   readonly db: Database;
   readonly authorizer: RuntimeImageAuthorizer;
@@ -66,7 +70,7 @@ export interface RuntimeEnvironmentModule {
 
 export function createRuntimeEnvironmentModule(deps: RuntimeEnvironmentModuleDeps): RuntimeEnvironmentModule {
   const useCases = { ...deps, uow: runtimeImageUnitOfWork(deps.db), clock: deps.clock ?? systemClock, logger: deps.logger ?? noopLogger };
-  const api: RuntimeEnvironmentModuleApi = { name: 'runtime-environment', reconcileReferences: runtimeImageReferenceReconciliation(useCases), ...developmentImagePolicy(useCases), ...runtimeImageValidationController(useCases, deps.validationExecutor), ...runtimeImageCatalog(useCases), ...runtimeImageBuilds(useCases), ...runtimeImageValidations(useCases), ...runtimeImageReferences(useCases), ...runtimeImageVersionLifecycle(useCases), ...runtimeImageBuildController(useCases, deps.buildExecutor) };
+  const api: RuntimeEnvironmentModuleApi = { name: 'runtime-environment', createSetup: createRuntimeImageSetup(useCases), imageHistory: runtimeImageExecutionHistory(useCases), reconcileReferences: runtimeImageReferenceReconciliation(useCases), ...developmentImagePolicy(useCases), ...runtimeImageValidationController(useCases, deps.validationExecutor), ...runtimeImageCatalog(useCases), ...runtimeImageBuilds(useCases), ...runtimeImageValidations(useCases), ...runtimeImageReferences(useCases), ...runtimeImageVersionLifecycle(useCases), ...runtimeImageBuildController(useCases, deps.buildExecutor) };
   return { api, http: [developmentImageRoutes(api, deps.isAdmin), runtimeImageRoutes(api, deps.isAdmin), runtimeImageVersionRoutes(api, deps.isAdmin)], migrations: runtimeEnvironmentMigrations };
 }
 

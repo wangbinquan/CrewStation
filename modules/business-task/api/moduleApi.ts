@@ -1,3 +1,4 @@
+import type { BusinessExecutionTaskPage, BusinessExecutionTaskQuery } from '@crewstation/contracts';
 import type { BusinessReleaseHandoff } from './releaseHandoff';
 import type { ClusterOperation, ClusterResource, ClusterInspectRequest, Actor, BusinessTaskDto, BusinessTaskState, CreateBusinessTaskRequest, DomainPayload, ProjectId, ServiceActor, SubmitSubtaskRequest, SubtaskDto, SubtaskId, SubtaskMessageRequest, TaskId } from '@crewstation/contracts';
 import type { LegacyRecoveryResult } from './legacyRecovery';
@@ -11,6 +12,7 @@ export interface TraceBusinessTaskDto {
 
 /** business-task 对外能力：业务服务以自身身份创建任务并提交契约化子任务；用户只读查看。 */
 export interface BusinessTaskModuleApi {
+  listExecutionTasks(actor: Actor, query: BusinessExecutionTaskQuery): Promise<BusinessExecutionTaskPage>;
   readonly releaseHandoff: BusinessReleaseHandoff;
   readonly v3: BusinessExecutionApi;
   legacyRecovery(actor: Actor, identity: string, action: 'inspect' | 'reconcile' | 'stop', ticketId?: string): Promise<LegacyRecoveryResult>;

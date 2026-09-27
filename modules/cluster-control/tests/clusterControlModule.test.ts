@@ -777,4 +777,22 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     expect((await resources.api.get(slot.id))?.conditions.find((entry) => entry.type === 'CrashLooping')?.status).toBe('false');
     feed.cache.delete('Pod/cs-demo/shop-green-5d8f7c-b1');
   });
+  test('暂停业务工作区清理当前和旧启动凭据，保留原卷，观测清理后不再占额度', async () => {
+    const owner = resources.api.owner('task-runtime'), projectId = '01a0e273-1111-7000-8000-000000000001' as ProjectId;
+    const refs = ['task-paused-runner-1', 'task-paused-runner-2'];
+    const record = await owner.declare({ kind: 'business-workspace', ref: 'paused-secret-proof', projectId,
+      spec: { children: refs.map((name) => ({ kind: 'Secret', namespace: 'cs-demo', name })) }, conditions: [{ type: 'Paused', status: 'false' }] });
+    for (const name of refs) await place(child('Secret', name));
+    const volume = child('PersistentVolumeClaim', 'task-paused-work', 'original-volume', { status: { phase: 'Bound' } });
+    await place(volume);
+    await owner.declare({ kind: 'volume', ref: 'paused-secret-proof/work', parentId: record.id, projectId, spec: { children: [{ kind: 'PersistentVolumeClaim', namespace: 'cs-demo', name: volume.metadata.name }] } });
+    // 实机曾因暂停后的旧 Runner Secret 永久留在台账，零 Pod 仍占额度；包含已退出 spec 的旧启动凭据。
+    await owner.declare({ kind: 'business-workspace', ref: 'paused-secret-proof', projectId, spec: { children: [{ kind: 'Secret', namespace: 'cs-demo', name: refs[1]! }] }, conditions: [{ type: 'Paused', status: 'true' }] });
+    await until('暂停凭据清理', async () => (await resources.api.get(record.id))?.phase === 'stopped');
+    expect(await resources.api.occupancy(projectId)).toBe(0);
+    for (const name of refs) expect(await k8s.get(Resources.Secret!, name, 'cs-demo')).toBeUndefined();
+    expect((await k8s.get(Resources.PersistentVolumeClaim!, volume.metadata.name, 'cs-demo'))?.metadata.uid).toBe('original-volume');
+    expect((await resources.api.get(record.id))?.desired).toBe('present');
+  });
+
 });

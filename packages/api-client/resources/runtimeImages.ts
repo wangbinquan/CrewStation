@@ -1,3 +1,5 @@
+import type { CreateRuntimeImageSetup } from '@crewstation/contracts';
+import type { RuntimeImageHistoryQuery, RuntimeImageHistoryPage } from '@crewstation/contracts';
 import type { CreateRuntimeImageRequest, CreateRuntimeImageRevision, RuntimeImageBuildDto, RuntimeImageDto, RuntimeImageLogPage, RuntimeImagePageQuery, RuntimeImageRevisionDto, RuntimeImageVersionDto, RuntimeImageValidationDto, SaveDevelopmentRuntimeImages, StartImageValidation, StartRuntimeImageBuild, UpdateRuntimeImageRequest } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { RuntimeImageReferenceDto, RuntimeImageOptionDto } from '@crewstation/contracts';
@@ -6,6 +8,8 @@ import { segment } from '../requestUrl';
 
 export type DevelopmentRuntimeImages = Omit<SaveDevelopmentRuntimeImages, 'expectedRevision'> & { projectId: string; revision: number };
 export interface RuntimeImagesResource {
+  createSetup(projectId: string, input: CreateRuntimeImageSetup): Promise<{ image: RuntimeImageDto; revision: RuntimeImageRevisionDto }>;
+  history(projectId: string, imageId: string, page?: Partial<RuntimeImageHistoryQuery>): Promise<RuntimeImageHistoryPage>;
   adminCatalog(page?: Partial<RuntimeImagePageQuery>): Promise<ItemsPage<RuntimeImageDto>>;
   list(projectId: string, page?: Partial<RuntimeImagePageQuery>): Promise<ItemsPage<RuntimeImageDto>>;
   create(projectId: string, input: CreateRuntimeImageRequest): Promise<RuntimeImageDto>;
@@ -38,6 +42,8 @@ export function runtimeImagesResource(t: Transport): RuntimeImagesResource {
   const version = (project: string, id: string, versionId: string) => `${image(project, id)}/versions/${segment(versionId)}`;
   const development = (project: string) => `/v1/projects/${segment(project)}/development-runtime-images`;
   return {
+    createSetup: (p, input) => t.request('POST', `${root(p)}/setup`, { body: input }),
+    history: (p, id, page) => t.request('GET', `${image(p, id)}/history`, { query: page }),
     adminCatalog: (page) => t.request('GET', '/v1/admin/runtime-image-catalog', { query: page }),
     list: (p, page) => t.request('GET', root(p), { query: page }), create: (p, input) => t.request('POST', root(p), { body: input }),
     get: (p, id) => t.request('GET', image(p, id)), update: (p, id, input) => t.request('PATCH', image(p, id), { body: input }),

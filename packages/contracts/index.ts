@@ -87,6 +87,7 @@ export * from './api/business/capabilities';
 export * from './api/runtimeImages/values';
 export * from './api/runtimeImages/requests';
 export * from './api/runtimeImages/responses';
+export * from './api/runtimeImages/history';
 export * from './api/runtimeImages/buildResources';
 export * from './taskrunner/runtimeInitialization';
 export * from './taskrunner/businessStorage';
@@ -101,3 +102,5 @@ export { businessFrameOutputBytes } from './taskrunner/businessExecution';
 export * from './taskrunner/businessMessages';
 
 export * from './api/business/releaseMaterials';
+
+export * from './api/business/taskList';

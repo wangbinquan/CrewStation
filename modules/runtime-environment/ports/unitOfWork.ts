@@ -1,6 +1,10 @@
 import type { BuildRepository, DevelopmentPolicyRepository, ImageRepository, LogRepository, ReferenceRepository, RevisionRepository, ValidationRepository, VersionRepository } from './repositories';
 
 export interface RepositoryScope {
+  readonly creations: {
+    get(projectId: string, actorId: string, requestKey: string): Promise<{ fingerprint: string; imageId: string; revisionId: string } | undefined>;
+    insert(input: { projectId: string; actorId: string; requestKey: string; fingerprint: string; imageId: string; revisionId: string }): Promise<void>;
+  };
   readonly images: ImageRepository;
   readonly revisions: RevisionRepository;
   readonly builds: BuildRepository;

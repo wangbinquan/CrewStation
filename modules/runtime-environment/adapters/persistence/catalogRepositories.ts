@@ -25,6 +25,7 @@ export function revisionRepository(db: Executor): RevisionRepository {
 }
 export function versionRepository(db: Executor): VersionRepository {
   return {
+    ids: async (imageId) => (await db.select({ id: imageVersions.id }).from(imageVersions).where(eq(imageVersions.imageId, imageId))).map((r) => r.id),
     get: async (id, lock) => { const q = db.select().from(imageVersions).where(eq(imageVersions.id, id)); return (await (lock ? q.for('update') : q))[0]?.payload; },
     insert: async (v) => { await db.insert(imageVersions).values({ id: v.id, imageId: v.imageId, projectId: v.projectId, buildId: v.buildId, repository: v.repository, digest: v.digest, state: v.state, payload: v }); },
     update: async (v) => { await db.update(imageVersions).set({ state: v.state, payload: v }).where(eq(imageVersions.id, v.id)); },

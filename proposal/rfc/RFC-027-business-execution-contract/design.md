@@ -167,7 +167,7 @@ aw 基于增量事件做软预算，达到阈值调用 cancel；计量迟报和�
 
 父任务 paused 时文件 API 返回 409 `task_paused`，不为了读文件偷偷启动 Pod 或占额度；历史输出摘要仍可读。aw 页面需要长期展示的产物在暂停前导入自身持久存储。平台不在本 RFC 新增大文件仓库。
 
-pause 先核对无 pending/running/awaiting-input/verifying/cancelling 子任务；有活动执行返回 409 `active_subtasks`。需要取消时显式逐项取消并等确认，不能把 awaiting_human 与 CLI 的 awaiting-input 混为一谈。父 Pod 删除确认后才 paused 和释放父额度；PVC 保留。resume 以同一 taskId／卷 UID／固定 release 契约重新准入，额度不足 429，卷丢失报错，不悄悄建空卷。
+pause 先核对无 pending/running/awaiting-input/verifying/cancelling 子任务；有活动执行返回 409 `active_subtasks`。需要取消时显式逐项取消并等确认，不能把 awaiting_human 与 CLI 的 awaiting-input 混为一谈。父 Pod 删除确认后才 paused；PVC 保留。资源调和器清理该暂停业务工作区当前及旧启动的 Runner Secret，删除复核认领和 UID，不释放父记录、不删 PVC；台账在实际子对象消失后恢复可用额度。resume 以同一 taskId／卷 UID／固定 release 契约重新准入，额度不足 429，卷丢失报错，不悄悄建空卷。
 
 生命周期操作在服务事务中固定 requestKey、generation 和执行权；pause／close 均要求活动或未知子任务先显式取消并确认，避免销毁仍有结果待核实的父工作区。关闭过程持续可观测，确认原 Pod 清理后才完成；重复 receipt 查询不增加 generation。恢复 429 保留操作 ID，由同键显式重试重新申请额度。
 

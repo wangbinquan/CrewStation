@@ -261,3 +261,12 @@ RFC-027 正在修改 contracts、business-task、session、release 和 Runner。
 - Docker [构建变量](https://docs.docker.com/build/building/variables/)和[构建 Secret](https://docs.docker.com/build/building/secrets/)区分普通参数与临时凭据。
 - BuildKit [rootless 文档](https://github.com/moby/buildkit/blob/master/docs/rootless.md)作为执行配置依据，部署限制须实机确认。
 - npm [npm ci](https://docs.npmjs.com/cli/v11/commands/npm-ci/)与 Python [venv](https://docs.python.org/3/library/venv.html)用于模板锁文件安装与解释器隔离，实际入口的导入能力仍需验证。
+
+
+### 9.1 作者补充：完整新增、管理与执行历史（2026-09-27）
+
+作者明确指出页面无法回答如何新增、管理、每个镜像跑过哪些任务。T12须覆盖完整流程：新增时同时填写名称、说明、用途与来源、源码构建位置；安装 pip／npm、脚本及二进制的 Dockerfile 提供可复制示例并说明提交仓库后构建。保存首份配方与定义为原子操作、预检失败不残留空定义，重复提交不重复创建；构建受理独立可重试，页面持续显示同一镜像。
+
+目录展示版本产出与构建、验证各自真实状态，不再把定义 enabled 标成镜像可运行。详情按概览／版本与验证／构建日志／使用记录组织；可修改名称说明、基于现有配方创建新修订、重新构建、停用新选择，停用不改历史执行。保留 UUID／完整摘要于技术详情，主要信息使用名称、用途、时间与原因。
+
+使用记录读取 task-runtime 与 release 自有持久快照，通过 platform 端口组合，不跨 schema 查询。过滤项目及版本、排序后分页；环境创建失败也保留并显示状态，不能声称它实际运行成功。已释放环境保留历史；配置引用和 validation 不冒充业务执行。公开镜像的使用记录仍仅限当前项目，避免泄露其他项目。链接指向现有调用链／发布详情，缺少可证明的业务名称明确显示任务编号。数据读取失败显示错误，不能当作无历史。

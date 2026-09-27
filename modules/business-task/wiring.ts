@@ -1,3 +1,5 @@
+import { drizzleBusinessTaskList } from './adapters/persistence/task-list/repository';
+import { taskListUseCases } from './application/taskList';
 import type { ExecutionAgentSecrets } from './ports/executionAgentSecrets';
 import { legacyRecoveryUseCases } from './application/legacyRecovery';
 import type { LegacyRecoveryProof } from './ports/legacyRecovery';
@@ -111,6 +113,7 @@ export function createBusinessTaskModule(deps: BusinessTaskModuleDeps): Business
     runOnce: async () => (await tasksV3.runOnce()) + (await progressSubtask()) + (await progressProjection()) + (await progressCancellation()) + (await progressLifecycle()) + (await progressMessage()),
   };
   const api: BusinessTaskModuleApi = {
+    ...taskListUseCases(drizzleBusinessTaskList(deps.db)),
     ...legacyRecoveryUseCases(useCaseDeps, legacyBarrier, deps.legacyRecoveryProof),
     imageReferenceState: drizzleImageReferenceState(deps.db),
     v3, releaseHandoff: releaseHandoffUseCases(executionDeps),

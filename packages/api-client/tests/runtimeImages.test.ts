@@ -35,3 +35,13 @@ test('运行镜像客户端保留日志游标、请求键和配置版本，管�
   expect(calls[2]).toMatchObject({ method: 'PUT', body: { expectedRevision: 3 } });
   expect(calls[3]?.url).toBe('https://cs.test/v1/admin/runtime-image-catalog?limit=30');
 });
+
+test('新增完整配方与历史查询保留请求键、项目版本及分页位置', async () => {
+  const calls: Array<{ method?: string; url: string; body?: unknown }> = [];
+  const api = createApiClient({ baseUrl: 'https://cs.test', fetch: async (url, init) => { calls.push({ method: init?.method, url: String(url), body: init?.body ? JSON.parse(String(init.body)) : undefined }); return Response.json({ items: [] }); } });
+  const input = { name: 'Tools', description: '', requestKey: 'same-create', recipe: { source: { kind: 'existing' as const, reference: 'runtime/tools:1', usage: 'task' as const, architecture: 'linux/amd64' as const }, initializer: { steps: [], env: {}, secrets: [] }, tools: [] } };
+  await api.runtimeImages.createSetup('p/a', input);
+  await api.runtimeImages.history('p/a', 'image', { versionId: 'version', before: 'cursor', limit: 20 });
+  expect(calls[0]).toMatchObject({ method: 'POST', url: 'https://cs.test/v1/projects/p%2Fa/runtime-images/setup', body: input });
+  const query = new URL(calls[1]!.url); expect(query.pathname).toBe('/v1/projects/p%2Fa/runtime-images/image/history'); expect(Object.fromEntries(query.searchParams)).toEqual({ versionId: 'version', before: 'cursor', limit: '20' });
+});

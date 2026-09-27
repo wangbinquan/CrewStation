@@ -39,7 +39,7 @@ CrewStation 是面向全公司各团队的数字人构建、发布与运行平�
 **Agent 只按用途分两类**，没有角色维度（没有主 Agent，也没有分析／编码／审核之分）：
 
 - **意图创建与修改 Agent**：在开发会话的容器里开发数字人应用本身，开发者可以并行开多个流式交互的 Agent。
-- **业务执行 Agent**：由数字人的业务服务经子任务契约层按需调用，只带 `agentProfile` 与输入输出契约，下一步做什么由业务程序决定。
+- **业务执行 Agent**：由数字人的业务服务经子任务契约层按需调用，按发布声明选择 `agentProfile` 与输入输出契约；v3 可提交经授权的 prompt、skills、MCP 和 env，每个独立 Agent 单独占用 Pod 和额度，下一步做什么由业务程序决定。
 
 两类 Agent 的镜像、命令、模型与资源都来自管理员定义的**算力档位**；每个 Agent 跑在自己的 Pod 里，占一个并发额度（RFC-006）。
 
@@ -53,7 +53,7 @@ CrewStation 是面向全公司各团队的数字人构建、发布与运行平�
 - 切流到 prod 与回退：两个域名同时在服务，切流记录写明来自哪个版本。
 - 经网关登录后注入身份请求头，样例页读出当前用户。
 - 开发会话：init 容器按所选分支克隆仓库，TaskRunner 连上 cs-session，Web 终端有真正的控制终端与作业控制。
-- 业务子任务契约：原 v2 样例的 `/chat` 保持原行为；[v3 独立样例](templates/business-execution-v3/README.md) 演示 PG 写屏障、90 秒异步命令、事件补读、文件和持久任务暂停恢复。v3 发布验收进度见 [RFC-027](proposal/rfc/RFC-027-business-execution-contract/acceptance.md)。
+- 业务子任务契约：原 v2 样例的 `/chat` 保持原行为；[v3 独立样例](templates/business-execution-v3/README.md) 演示 PG 写屏障、90 秒异步命令、事件补读、文件和持久任务暂停恢复。v3 协议、真实模型与发布验收证据见 [RFC-027](proposal/rfc/RFC-027-business-execution-contract/acceptance.md)。
 - 事件链：内置事件生产者投递 → cs-events 去重扇出 → 样例页列出这次投递及其 trace id。
 - 两个 Agent CLI 装进任务镜像，以降权用户启动并报出各自的原生会话 id；OpenCode 1.18.29 已产出真实模型输出、并行跑过两个原生会话、在验证项目里改过文件。
 - 两个平台 MCP 从开发容器内可达，用会话级令牌鉴权，返回真实平台数据。

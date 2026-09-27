@@ -1,3 +1,4 @@
+import type { RuntimeImageHistoryRead, RuntimeImageHistoryItem } from '@crewstation/contracts';
 import type { ClusterResource, ClusterInspectRequest, ClusterInspection, ClusterOperation } from '@crewstation/contracts';
 import type { Actor, AutoOfflinePolicyDto, PostponeOfflineRequest, PublishRequest, RedeployPrecheckDto, RedeployRequest, ReleaseDto, ReleaseId, ServiceId, SetAutoOfflinePolicyRequest, SlotDto, SlotEventDto, TakeOfflineRequest, TrafficSwitchDto, TrafficSwitchRequest } from '@crewstation/contracts';
 
@@ -29,6 +30,7 @@ export interface ActiveEndpoint {
 
 /** release 模块对外能力：发布、切流、查询；流水线推进由工作器调用。 */
 export interface ReleaseModuleApi {
+  imageHistory(input: RuntimeImageHistoryRead): Promise<RuntimeImageHistoryItem[]>;
   readonly name: 'release';
   getHandoff(actor: Actor, serviceId: ServiceId, id: string): Promise<TrafficSwitchDto>;
   latestHandoff(actor: Actor, serviceId: ServiceId): Promise<TrafficSwitchDto | null>;

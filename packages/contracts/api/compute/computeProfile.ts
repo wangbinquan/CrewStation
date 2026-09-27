@@ -186,6 +186,7 @@ export const ComputeProfileReferencesSchema = z.object({ code: z.literal('profil
 
 /** 租户面投影（沿用 RFC-001 的按角色裁剪）：够画下拉，不泄露镜像、二进制与模型。 */
 export const ComputeProfileSummaryDtoSchema = z.object({
+  revision: z.number().int().positive().optional(),
   id: ResourceIdSchema,
   name: ComputeProfileNameSchema,
   description: z.string().default(''),

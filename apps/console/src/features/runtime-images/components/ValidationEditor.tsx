@@ -22,13 +22,13 @@ export function ValidationEditor({ projectId, value, onChange }: { readonly proj
         {(['task', 'agent', 'service'] as const).map((usage) => <option key={usage} value={usage}>{t(`images.usage.${usage}`)}</option>)}
       </select></FormField>
       {parsed.usage === 'agent' ? <>
-        <FormField label={t('images.agentProfile')}><select value={String(profile.profileId ?? '')} onChange={(event) => update({ profile: { ...profile, profileId: event.target.value } })}>
+        <FormField label={t('images.agentProfile')}><select value={String(profile.profileId ?? '')} onChange={(event) => { const selected = profiles.data?.items.find((item) => item.id === event.target.value); update({ profile: { profileId: event.target.value, revision: selected?.revision } }); }}>
           <option value="">{t('images.selectProfile')}</option>
           {profiles.data?.items.map((item) => <option key={item.id} value={item.id} disabled={!item.available}>{item.name}</option>)}
           {profile.profileId && !profiles.data?.items.some((item) => item.id === profile.profileId) ? <option value={String(profile.profileId)}>{String(profile.profileId)}</option> : null}
         </select></FormField>
         <QueryStatus isPending={profiles.isPending} error={profiles.error} />
-        <FormField label={t('images.profileRevision')}><input type="number" min={1} value={typeof profile.revision === 'number' ? profile.revision : ''} onChange={(event) => update({ profile: { ...profile, revision: Number(event.target.value) } })} /></FormField>
+        {profile.profileId ? <p>{t('images.profileVersion', { revision: typeof profile.revision === 'number' ? profile.revision : '?' })}</p> : null}
       </> : null}
       {parsed.usage === 'service' ? <>
         <p>{t('images.serviceValidationHint')}</p>

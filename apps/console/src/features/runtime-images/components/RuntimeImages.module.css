@@ -6,3 +6,5 @@
 .code { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow: auto; font-size: 12px; }
 .identity { overflow-wrap: anywhere; font-family: var(--cs-font-mono, monospace); font-size: 12px; }
 .note { color: var(--cs-color-text-muted); margin: 0; }
+
+.formFields { border: 0; padding: 0; margin: 0; display: grid; gap: 16px; min-width: 0; }

@@ -2,6 +2,7 @@
 export const SETTINGS_TABS = ['config', 'runtime-images', 'visibility', 'members', 'info', 'advanced'] as const;
 export type SettingsTab = typeof SETTINGS_TABS[number];
 export interface SettingsSearch {
+  readonly image?: string;
   readonly tab?: SettingsTab | 'resources' | 'lifecycle';
   readonly env?: 'development' | 'production';
   readonly resource?: 'overview' | 'api' | 'events';
@@ -24,5 +25,6 @@ export function parseSettingsSearch(raw: Record<string, unknown>): SettingsSearc
     return { tab: 'resources', resource, ...(resource === 'events' ? { subscription: searchText(raw.subscription) } : {}) };
   }
   const tab = SETTINGS_TABS.find((value) => value === raw.tab) ?? 'config';
+  if (tab === 'runtime-images') return { tab, image: searchText(raw.image, 128) };
   return tab === 'config' ? { tab, env: raw.env === 'production' ? 'production' : 'development' } : { tab };
 }

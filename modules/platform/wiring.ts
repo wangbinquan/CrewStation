@@ -2,7 +2,7 @@ import { executionWriterObserver, migrationWriterObserver, legacyOwnerObserver }
 import { releaseImagePorts } from './application/releaseImagePorts';
 import { imageValidationPorts } from './application/imageValidationPorts';
 import { businessExecutionPorts, executionHandoffPorts } from './application/businessExecutionPorts';
-import { developmentImagePorts, imageReferenceOwnerPorts } from './application/developmentImagePorts';
+import { developmentImagePorts, imageOwnerPorts } from './application/developmentImagePorts';
 import { executionRecords } from './application/executionRecords';
 import { createManagedRuntimeEnvironmentModule } from '@crewstation/module-runtime-environment';
 import { runtimeImagePlatformPorts } from './application/runtimeImagePorts';
@@ -499,7 +499,7 @@ function composeModules(deps: CompositionDeps) {
   const resources = composeLedger(deps, core);
   late.resources = resources.api;
   const runtimeEnvironment = createManagedRuntimeEnvironmentModule({
-    referenceOwners: imageReferenceOwnerPorts(() => late),
+    ...imageOwnerPorts(() => late),
     validationExecutor: imageValidationPorts({ authorize: core.project.api.authorize, isAdmin: core.isAdmin, launchMaterial: core.agentRuntime.api.launchMaterial, runtime: () => { if (!late.taskRuntime) throw new Error('task-runtime 尚未装配'); return late.taskRuntime; } }),
     ...runtimeImagePlatformPorts({ project: core.project.api, scm: core.scm.api, config: core.config.api, compute: core.agentRuntime.api, isAdmin: core.isAdmin }, deps.settings), db: deps.db, k8s: deps.k8s, logger: deps.logger, instance: deps.instance, isAdmin: core.isAdmin,
     ledger: { get: resources.api.get, within: (tx) => resources.api.owner('runtime-environment').within(tx) }, leases: resources.api.leases, assertBuildIsolation: () => assertRuntimeImageBuildIsolation(deps.k8s, deps.settings.registryBase),

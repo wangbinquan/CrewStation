@@ -195,7 +195,8 @@ describe.skipIf(!available)('算力档位模块（RFC-006）', () => {
     expect(list.status).toBe(200);
     expect(JSON.stringify(await list.json())).not.toContain('sk-live');
     const catalog = await (await app.request('/v1/catalog/compute-profiles', { headers: as(dev) })).json() as { items: Array<Record<string, unknown>> };
-    expect(catalog.items.map((i) => Object.keys(i).sort())).toContainEqual(['available', 'description', 'id', 'isDefault', 'name', 'terminalOnly']);
+    expect(catalog.items.every((item) => Number.isInteger(item.revision) && Number(item.revision) > 0)).toBe(true);
+    expect(catalog.items.map((i) => Object.keys(i).sort())).toContainEqual(['available', 'description', 'id', 'isDefault', 'name', 'revision', 'terminalOnly']);
     expect(JSON.stringify(catalog)).not.toContain('/opt/');
     const refused = await app.request(`/v1/admin/compute-profiles/${profileId('glm-claude-2')}`, { method: 'DELETE', headers: as(admin) });
     expect(refused.status).toBe(409);

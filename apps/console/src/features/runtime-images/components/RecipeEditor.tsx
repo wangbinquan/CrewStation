@@ -1,3 +1,4 @@
+import { RecipeGuide } from './RecipeGuide';
 import { FormField } from '../../../shared/ui/FormField';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { api } from '../../../shared/api/client';
@@ -14,6 +15,7 @@ function recipe(value: string): ObjectValue | undefined { try { return object(JS
 export function RecipeEditor({ projectId, value, onChange }: { readonly projectId: string; readonly value: string; readonly onChange: (value: string) => void }) {
   const t = useT(), parsed = recipe(value), source = object(parsed?.source), profile = object(source?.baseProfile);
   const project = useApiQuery(['runtime-images', projectId, 'source-project'], () => api.projects.get(projectId), { ...AUTO_REFRESH, enabled: source?.kind === 'source' });
+  const profiles = useApiQuery(['runtime-images', projectId, 'validation-profiles'], () => api.catalog.listComputeProfiles(projectId), { ...AUTO_REFRESH, enabled: source?.usage === 'agent' });
   const update = (change: ObjectValue) => onChange(JSON.stringify({ ...parsed, source: { ...source, ...change } }, null, 2));
   const field = (key: string, label: string, placeholder?: string) => <FormField label={t(label)}><input value={typeof source?.[key] === 'string' ? source[key] : ''} placeholder={placeholder} onChange={(event) => update({ [key]: event.target.value })} /></FormField>;
   return <div className={styles.stack}>
@@ -35,10 +37,12 @@ export function RecipeEditor({ projectId, value, onChange }: { readonly projectI
           {source.repositoryBindingId && source.repositoryBindingId !== project.data?.serviceId ? <option value={String(source.repositoryBindingId)}>{String(source.repositoryBindingId)}</option> : null}
         </select></FormField><QueryStatus isPending={project.isPending} error={project.error} />
         {field('ref', 'images.gitRef', 'main')}
-        {field('context', 'images.context', '.')}{field('dockerfile', 'images.dockerfile', 'Dockerfile')}
+        {field('context', 'images.context', '.')}{field('dockerfile', 'images.dockerfile', 'Dockerfile')}<p className={styles.note}>{t('images.contextHint')}</p><RecipeGuide service={source.usage === 'service'} />
         {source.usage === 'agent' ? <div className={styles.row}>
-          <FormField label={t('images.baseProfile')}><input value={String(profile?.profileId ?? '')} onChange={(event) => update({ baseProfile: { revision: 1, ...profile, profileId: event.target.value } })} /></FormField>
-          <FormField label={t('images.profileRevision')}><input type="number" min={1} value={Number(profile?.revision ?? 1)} onChange={(event) => update({ baseProfile: { ...profile, revision: Number(event.target.value) } })} /></FormField>
+          <FormField label={t('images.agentProfile')}><select value={String(profile?.profileId ?? '')} onChange={(event) => { const selected = profiles.data?.items.find((item) => item.id === event.target.value); update({ baseProfile: { profileId: event.target.value, revision: selected?.revision ?? 1 } }); }}>
+            <option value="">{t('images.selectProfile')}</option>{profiles.data?.items.map((item) => <option key={item.id} value={item.id} disabled={!item.available}>{item.name} · {t('images.profileVersion', { revision: item.revision ?? '?' })}</option>)}
+          </select></FormField><QueryStatus isPending={profiles.isPending} error={profiles.error} />
+          {profile?.profileId ? <p>{t('images.profileVersion', { revision: Number(profile.revision ?? 1) })}</p> : null}
         </div> : null}
       </> : field('reference', 'images.existingReference', 'runtime/tools:1.0')}
     </> : null}

@@ -49,7 +49,7 @@ export function profileQueries(deps: AgentRuntimeUseCaseDeps) {
       const rows = await Promise.all((await uow.read.profiles.list()).filter((p) => includeHidden || p.defaultVisible !== false).map(current));
       return rows.map(({ profile, revision, latest }) => {
         const { available, reason } = availabilityOf(profile, revision, latest);
-        return { id: profile.id, name: profile.name, description: profile.description, terminalOnly: profile.protocol === 'terminal', isDefault: profile.isDefault, available, ...(reason ? { reason } : {}) };
+        return { id: profile.id, name: profile.name, description: profile.description, revision: revision.revision, terminalOnly: profile.protocol === 'terminal', isDefault: profile.isDefault, available, ...(reason ? { reason } : {}) };
       });
     },
   };

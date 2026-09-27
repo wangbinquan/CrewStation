@@ -1,3 +1,4 @@
+import { environmentImageHistory } from './adapters/persistence/imageHistory';
 import { blockBusinessAdmission } from './application/business/blockAdmission';
 import type { LeasePort } from '@crewstation/resource-runtime';
 import { runImageProbe } from './application/imageProbe/run';
@@ -133,6 +134,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
   });
   const api: TaskRuntimeModuleApi = {
     name: 'task-runtime',
+    imageHistory: environmentImageHistory(deps.db),
     blockBusinessAdmission: blockBusinessAdmission(useCaseDeps),
     imageReferenceState: runtimeImageReferenceState(useCaseDeps),
     runRuntimeImageProbe: runImageProbe(useCaseDeps, { create: createTestEnvironment, runner: deps.testRunner, mcp: deps.testMcp }),

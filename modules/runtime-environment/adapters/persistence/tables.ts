@@ -31,3 +31,8 @@ export const imageLogs = schema.table('build_logs', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
 });
 export const developmentImagePolicies = schema.table('development_policies', { projectId: text('project_id').primaryKey(), payload: jsonDocument('payload').$type<DevelopmentImagePolicy>().notNull() });
+
+export const imageCreationRequests = schema.table('creation_requests', {
+  projectId: text('project_id').notNull(), actorId: text('actor_id').notNull(), requestKey: text('request_key').notNull(),
+  fingerprint: text('fingerprint').notNull(), imageId: text('image_id').notNull(), revisionId: text('revision_id').notNull(),
+}, (t) => [uniqueIndex('image_creation_request_unique').on(t.projectId, t.actorId, t.requestKey)]);

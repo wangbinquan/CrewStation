@@ -24,6 +24,7 @@ export interface BuildRepository {
   runnable(at: string, limit: number): Promise<ImageBuild[]>;
 }
 export interface VersionRepository {
+  ids(imageId: string): Promise<string[]>;
   get(id: string, lock?: boolean): Promise<ImageVersion | undefined>;
   insert(version: ImageVersion): Promise<void>;
   update(version: ImageVersion): Promise<void>;

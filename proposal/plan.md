@@ -533,4 +533,4 @@ evidence/<release-or-commit>/
 
 平台采用 v3 异步受理、固定 requestKey/执行身份、持久事件游标、文件版本读取、隔离持久工作区、逐 Agent Pod 计额与可证明取消。fenced 服务通过发布 handoff 交接控制权，业务应用仍须在自己的数据库落实 epoch 写屏障。旧 v2 接口继续保持原契约，受控服务不允许绕过新执行权屏障；管理员可诊断和恢复旧未决票据。
 
-实现、验证、发布分别记账：[RFC-027 plan](./rfc/RFC-027-business-execution-contract/plan.md) 与 [验收证据](./rfc/RFC-027-business-execution-contract/acceptance.md) 是本次收口状态来源。实现候选已进入共同门禁，完整集群/真实档位验收与发布尚待完成；旧 AT 用例通过不能直接充当新 BE 用例证据。aw 的 T15 与 BE-22～24 继续保留外部依赖。
+实现、验证、发布分别记账：[RFC-027 plan](./rfc/RFC-027-business-execution-contract/plan.md) 与 [验收证据](./rfc/RFC-027-business-execution-contract/acceptance.md) 是本次收口状态来源。平台主体已发布且精确 SHA CI 六项通过；真实长命令、档位材料/会话、独立 Agent 额度、原卷恢复/丢失、控制面重启/交接、维护迁移和慢启动已验收，实机发现的补丁正在最终发布收口；旧 AT 用例通过不能直接充当新 BE 用例证据。aw 的 T15 与 BE-22～24 继续保留外部依赖。

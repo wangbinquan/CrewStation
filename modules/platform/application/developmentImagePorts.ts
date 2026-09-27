@@ -1,3 +1,4 @@
+import type { RuntimeImageHistoryItem, RuntimeImageHistoryRead } from '@crewstation/contracts';
 import type { Actor, ProjectId, RuntimeImageExecutionSnapshot, RuntimeImageSelection, RuntimeImageValidationTarget } from '@crewstation/contracts';
 
 interface ImageBindings {
@@ -32,3 +33,13 @@ export function imageReferenceOwnerPorts(owners: () => {
 }
 interface ReferenceQuery { projectId: string; versionId: string; ownerType: string; ownerId: string }
 type ReferenceState = 'active' | 'released' | 'unknown';
+
+interface HistoryOwner { imageHistory(input: RuntimeImageHistoryRead): Promise<RuntimeImageHistoryItem[]> }
+export function imageOwnerPorts(owners: () => { businessTask?: { imageReferenceState(input: ReferenceQuery): Promise<ReferenceState> }; taskRuntime?: HistoryOwner & { imageReferenceState(input: ReferenceQuery): Promise<ReferenceState> }; release?: HistoryOwner }) {
+  return { referenceOwners: imageReferenceOwnerPorts(owners), executionHistory: { list: async (input: RuntimeImageHistoryRead) => {
+    const ports = owners();
+    if (!ports.taskRuntime || !ports.release) throw new Error('运行镜像使用记录模块尚未装配');
+    const pages = await Promise.all([ports.taskRuntime.imageHistory(input), ports.release.imageHistory(input)]);
+    return pages.flat().sort((a, b) => b.id.localeCompare(a.id)).slice(0, input.limit);
+  } } };
+}

@@ -1,3 +1,4 @@
+import { ImageHistory } from './ImageHistory';
 import { RuntimeImageValidationTargetSchema } from '@crewstation/contracts';
 import type { RuntimeImageVersionDto } from '@crewstation/contracts';
 import { useRef, useState } from 'react';
@@ -16,21 +17,22 @@ import styles from './RuntimeImages.module.css';
 
 export function ImageVersions({ projectId, imageId, editable, manageable, owned }: { readonly projectId: string; readonly imageId: string; readonly editable: boolean; readonly owned: boolean; readonly manageable: boolean }) {
   const t = useT(), key = ['runtime-images', projectId, imageId, 'versions'];
-  const [before, setBefore] = useState<string>(), [selected, setSelected] = useState<RuntimeImageVersionDto>();
+  const [before, setBefore] = useState<string>(), [selected, setSelected] = useState<RuntimeImageVersionDto>(), [history, setHistory] = useState(false);
   const versions = useApiQuery([...key, before], () => api.runtimeImages.versions(projectId, imageId, { before, limit: 20 }), AUTO_REFRESH);
   const disable = useApiMutation((id: string) => api.runtimeImages.disable(projectId, imageId, id), { invalidate: [key] });
   return <div className={styles.stack}>
     <h3>{t('images.versions')}</h3><QueryStatus isPending={versions.isPending} error={versions.error} />
     {versions.data?.items.length ? <DataTable columns={[t('images.version'), t('images.state'), t('images.actions')]}>
-      {versions.data.items.map((version) => <tr key={version.id}><td><p className={styles.identity}>{version.id}</p><p className={styles.identity}>{version.digest}</p>{version.architecture}</td><td>{t(`images.state.${version.state}`)}</td><td><div className={styles.row}>
-        <Button size="small" onClick={() => setSelected(version)}>{t('images.validation')}</Button>
+      {versions.data.items.map((version) => <tr key={version.id}><td><p>{new Date(version.createdAt).toLocaleString()}</p><p className={styles.identity}>{version.digest.slice(0, 19)} · {version.architecture}</p><details><summary>{t('images.technicalDetails')}</summary><p className={styles.identity}>{version.id}</p><p className={styles.identity}>{version.digest}</p></details></td><td>{t(`images.state.${version.state}`)}</td><td><div className={styles.row}>
+        {editable ? <Button size="small" onClick={() => { setSelected(version); setHistory(false); }}>{t('images.validation')}</Button> : null}<Button size="small" onClick={() => { setSelected(version); setHistory(true); }}>{t('images.history')}</Button>
         {manageable && owned && version.state === 'available' ? <Button size="small" variant="danger" disabled={disable.isPending} onClick={() => disable.mutate(version.id)}>{t('images.disable')}</Button> : null}
       </div></td></tr>)}
     </DataTable> : null}
     {disable.error ? <ActionNote tone="error">{errorMessage(disable.error)}</ActionNote> : null}
     <div className={styles.row}>{before ? <Button onClick={() => setBefore(undefined)}>{t('images.first')}</Button> : null}{versions.data?.items.length === 20 ? <Button onClick={() => setBefore(versions.data!.items.at(-1)!.id)}>{t('images.next')}</Button> : null}</div>
-    {selected && editable ? <VersionReferences key={`refs:${selected.id}`} projectId={projectId} imageId={imageId} version={versions.data?.items.find((version) => version.id === selected.id) ?? selected} manageable={manageable && owned} /> : null}
-    {selected ? <VersionValidation key={selected.id} projectId={projectId} imageId={imageId} version={versions.data?.items.find((version) => version.id === selected.id) ?? selected} editable={editable} /> : null}
+    {selected && history ? <ImageHistory key={selected.id} projectId={projectId} imageId={imageId} versionId={selected.id} /> : null}
+    {selected && !history && editable ? <VersionReferences key={`refs:${selected.id}`} projectId={projectId} imageId={imageId} version={versions.data?.items.find((version) => version.id === selected.id) ?? selected} manageable={manageable && owned} /> : null}
+    {selected && !history ? <VersionValidation key={selected.id} projectId={projectId} imageId={imageId} version={versions.data?.items.find((version) => version.id === selected.id) ?? selected} editable={editable} /> : null}
   </div>;
 }
 

@@ -1,5 +1,34 @@
 # RFC-027 实施与验收证据
 
+## 第十五批：真实 Agent、原卷续跑、维护迁移与慢启动（2026-09-27）
+
+- 专用父任务 `01a0e263-469b-7000-9d64-d8d19e0ea1b7` 的 Agent `01a0e263-7ec3-7000-abb9-b6fa9b3be465` 实际独立 Pod 运行并成功完成；同 requestKey 返回原句柄。发布 prompt、动态 prompt、env、skills 的四个标记写入 `/work/agent-proof.txt`，文件接口读回64字节；工作区内无 `system.txt`，证明发布材料不依赖检出源码。19个持久事件含4次工具调用、4份非零累计 usage，游标唯一。rev3 实测能力包括 events、usage=final、resume、systemPrompt、skills、MCP；平台独立委派能力仍报告false，原生内部委派为opaque，不冒称逐内部代理计额。
+- 父任务安全暂停后恢复，PVC UID `e304fbd6-70d0-4cbb-abe6-b3fc4c4c8da9` 与四标记文件不变；Agent `01a0e265-760f-7000-b240-1c4592a3e3fd` 用原 session `ses_f1d9c347affeIHoWQrq7H3RYHa` 续跑，不读取文件即回忆上一轮 `ORCHID-742`，exit0。同会话并发抢占409。没有把 fresh 当作 resume。
+- 维护迁移 release `01a0e267-7a96-7000-8b01-63f0fca1fbff`：维护前发布412；进入仅测试服务的维护窗口后epoch10 frozen、应用已回执，但两个父任务未排空时Job尚不存在。两个任务pause并确认Pod消失/额度释放后才创建Job，日志实际记录 `{migration:rfc027,epoch:10,phase:frozen}`。切流 `01a0e26d-4a12-7000-a0b8-f226ed00dc0c` 完成；回退旧v0.1.2返回412 rollback-blocked。测试维护已通过公开API退出。
+- 删除已暂停的专用旧父任务PVC（固定UID `d60758a7-5c6e-40a6-aa8a-6a12147ba2d2`）后，resume操作终态failed／workspace_volume_changed，任务仍paused、quotaHeld=false；未出现替代PVC或Pod。未删除用户工作卷。
+- 并行验收额外发现暂停后的Runner Secret残留使资源台账继续stopping计额。补回归先红（等待清理超时）后绿：调和器仅清理暂停业务工作区当前/旧启动Secret，按认领和UID删除，保留卷；最新generation/Paused复核防止沿旧状态操作。26个相关PG用例通过，189断言。补丁控制器镜像image ID `616029de927510119711a5114a8fd3336b56929e2fbda7ee179f1904c547cb77` 部署后真实项目running由3恢复为1，两个残留Secret消失。
+- 随后两个独立Agent `01a0e274-972c-7000-8548-410f0fb91f38`、`01a0e274-98ef-7000-8696-9c5fa5356e45` 同时各有Running Pod，UID分别 `d339c664-15dc-4291-969a-88aa56b098c5`、`cf37e189-7b71-4260-a5f1-b68b056a3ccb`；父容器加两Agent占满3单位，第三个调用429，未自动排队。
+- 慢启动v0.1.4／release `01a0e26f-1b38-7000-bab8-da5faf340456` 固定源码 `663468cd1a8a66d9021bc9f482f0375bfbec2eff`，服务在95秒前 `/live`200且`/ready`503。Pod实际97秒变Ready、restartCount=0；standby实例 `/state` control=null，未获得执行权。
+- 90秒命令 `01a0e274-f6b0-7000-b591-257536df1fc2` 启动后，发起handoff `01a0e274-fb35-7000-bfbd-a9017e0cbff0` 并实际重启API/controller；交接恢复到complete／epoch14，新正式槽同键重放仍返回原execution `01a0e274-f6b0-7001-9526-7b3e5f293d87` running，没有新attempt。最终10:43:21 exit0、首尾输出完整且finalCursor闭合；`restart-count`只有1字节q，证明副作用只执行一次。两个并行Agent均exit0，拒绝请求已显式取消，未后台自动启动。
+
+真实发布页中英文320/390/1440共6种布局均无横向溢出，重载仍显示v0.1.4正式及“执行交接已完成”，浏览器错误为空；记录 `/tmp/rfc027-handoff-ui-final.json`。两个专用父任务已通过公开close操作达到closed／quotaHeld=false。最新增量真实PG/客户端/子进程35 pass、236断言，改动行69/69（100%）、零违规，arch和契约锁7/0通过。
+
+
+最终联合候选：RFC028交接68文件与本任务合并后91个实际改动路径，第三方集群布局/实机测试全部排除。交接后的候选哈希核对一致；共享STATE/contracts index/RFC索引保留双方完整输出。联合改动行631/635=99.37%、58个生产文件、零违规。分层证据unit838/0、console934/0；module首次1672 pass/9 skip/1 fail（并行档位摘要新增revision断言），定向修复16/0与旧CLI历史兼容1/0，另本任务35/0。全仓static绿。补充 `bun run check` 使用了错误的本地E2E登录模式，在登录页失败后主动停止，明确为无效/未完成运行，不能称为全量绿；最终整仓判定以本次精确提交的六项CI为准。
+
+源证据保留在 `/tmp/rfc027-live-be.jsonl`、`/tmp/rfc027-agent-event-proof.json`、`/tmp/rfc027-agent-resume-result.json`、`/tmp/rfc027-migration-rollback.json`、`/tmp/rfc027-maintenance-exited.json`、`/tmp/rfc027-slow-pod-ready.json`。新补丁最终发布/CI与收尾仍待完成；真实aw接入不在本仓实施。
+
+## 第十四批：补丁发布与真实能力／执行中切流（2026-09-27）
+
+- 补丁 `aebb85e13b41221c729f4e4e8c38eece4d7519d8` 精确16路径共同提交，保留RFC028 TLS和STATE输出；[精确SHA CI 36311481909](https://github.com/wangbinquan/CrewStation/actions/runs/36311481909) 六作业成功。本地 static 通过，补丁22/23可执行行覆盖95.65%、零违规。API/controller部署`rfc027-probe-fix3`，image ID `96efc491690ba51c868eeb9421426e30b32cc9bcad2bdfa69291813cd7d8ceb6`；0016迁移Job成功，仅应用1条迁移、roles初始化0。
+- 专用档位最初512Mi内存被OOMKilled，结果明确unknown；仅把专用套餐调为200m/2Gi，真实rev2探针events、usage=final、resume、systemPrompt、MCP通过。skills失败读取到CLI明确未发现该skill，定位Runner的`toDriverSpec`丢掉businessSkills；新增真实子进程跨边界回归先红后绿，5/0（19断言）。修复Runner本地镜像digest `a5050e545793452f6dbed940ce4329aba8a91f86035d9fd7b689025546997fdd`，仅验收档位升rev3，capabilities已实际报告skills=true及上述其余能力。新增Runner修复尚待提交。
+- 真正跨切流命令：child `01a0e25b-d450-7000-884b-2800930df27c`／execution `01a0e25b-d450-7001-81a9-52052541fe43`于10:14:24启动90秒；10:14:38启动handoff `01a0e25c-0b22-7000-bb83-e598107b1717`，10:15:06观察green epoch7 active时同execution仍running；10:15:54 exit0，`cross-firstcross-last`完整、truncated=false且有finalCursor。旧blue读取当前holder后回送fence仍403，未发生新副作用。此前180秒命令未跨交接，不计此证据。
+- 第三版测试客户v0.1.2／release `01a0e25c-ce9a-7000-bbfc-98fb082a214e`、源码`ef8c05a986838112447c1aa9f4655fff056e7b2a`真实发布ready；handoff `01a0e25f-0a5a-7000-baed-c00c7323e8ba` complete epoch9。原v0.1.0闲置回退槽经正式offline API下线，释放500m，仅操作专用测试项目。
+- 真命令取消child `01a0e261-aea0-7000-b413-9d57fd1a97f4`在运行时收到202；确认exited、cancelled结果和finalCursor后终态，首标记保留，末尾副作用文件404。
+- 管理员任务列表补只读legacy/v3合并查询、失败/未知在SQL分页前排序、稳定游标、项目过滤、未解决子任务摘要；成功重试不因历史失败永久置顶。真实PG＋HTTP授权＋客户端＋Runner技能组合9/0（47断言），本任务补丁63/63行覆盖，零违规。并行工作台接线尚在进行，未宣称真实UI完成。只读列表不提供管理员绕过service fence的执行权限。
+
+独立业务Agent、真实父卷原生会话恢复、卷丢失和维护迁移验收继续，RFC未完成。源证据 `/tmp/rfc027-live-be.jsonl`、`/tmp/rfc027-probe-fix3-ci.json`、`/tmp/rfc027-task-list-tests.log`。
+
 ## 实机修复补丁（2026-09-27，待补丁发布验证）
 
 真实档位测试暴露三处阻断：Runner 命令校验填充默认 skills 后摘要与探针不一致；session ACK 回收 Runner spool 后探针仍向 Runner 从零补读；资源台账下 quota.release 为 no-op，但档位测试仍走哨兵计数器，51 个已 released 环境留下 running=4，实际零测试 Pod 却永久拒绝测试。已分别改为按 Runner schema 规范化后计算摘要、从 session 持久事件读取并消费、普通档位测试释放哨兵容量。新增 0016 迁移只重算平台哨兵，保留活动／清理中及用途验证尚未物理释放的容量。显式准入错误不再被不确定回执重试遮蔽。

@@ -1,5 +1,5 @@
 import type {
-  BusinessTaskDto, DataResourceDto, DecideTaskDataBinding, ProjectId, SubtaskDto, TaskDataBindingDto, TaskDataBindingState, TaskId, TaskKind, VolumeMode,
+  BusinessExecutionTaskPage, BusinessExecutionTaskQuery, BusinessTaskDto, DataResourceDto, DecideTaskDataBinding, ProjectId, SubtaskDto, TaskDataBindingDto, TaskDataBindingState, TaskId, TaskKind, VolumeMode,
 } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
@@ -40,6 +40,7 @@ export interface LegacyRecoveryResult { recovered: number; items: LegacyRecovery
 
 /** 任务：环境只读视图（task-runtime）、业务任务只读视图（business-task）、开发会话的数据访问绑定（data）。 */
 export interface TasksResource {
+  listExecutionTasks(query?: BusinessExecutionTaskQuery): Promise<BusinessExecutionTaskPage>;
   legacyRecovery(identity: string): Promise<LegacyRecoveryResult>;
   recoverLegacy(identity: string, action: 'reconcile' | 'stop', ticketId?: string): Promise<LegacyRecoveryResult>;
   /** GET /v1/projects/:projectId/tasks?state= */
@@ -69,6 +70,7 @@ export function tasksResource(transport: Transport): TasksResource {
   const project = (projectId: string) => `/v1/projects/${segment(projectId)}`;
   const task = (taskId: string) => `/v1/tasks/${segment(taskId)}`;
   return {
+    listExecutionTasks: (query) => transport.request('GET', '/v1/admin/business-execution/tasks', { query: { ...query } }),
     legacyRecovery: (identity) => transport.request('GET', '/v1/admin/business-execution/legacy-recovery', { query: { identity } }),
     recoverLegacy: (identity, action, ticketId) => transport.request('POST', '/v1/admin/business-execution/legacy-recovery', { body: { identity, action, ticketId } }),
     list: (projectId, query) => transport.request<ItemsPage<TaskEnvironmentDto>>('GET', `${project(projectId)}/tasks`, { query }),

@@ -52,3 +52,7 @@ export type StartImageValidation = z.infer<typeof StartImageValidationSchema>;
 export type RuntimeImagePageQuery = z.infer<typeof RuntimeImagePageQuerySchema>;
 export type RuntimeImageLogQuery = z.infer<typeof RuntimeImageLogQuerySchema>;
 export type SaveDevelopmentRuntimeImages = z.infer<typeof SaveDevelopmentRuntimeImagesSchema>;
+
+/** Save the definition and its first prepared revision together; retries reuse the original result. */
+export const CreateRuntimeImageSetupSchema = CreateRuntimeImageRequestSchema.extend({ requestKey: RuntimeImageRequestKeySchema, recipe: CreateRuntimeImageRevisionSchema });
+export type CreateRuntimeImageSetup = z.infer<typeof CreateRuntimeImageSetupSchema>;

@@ -1,3 +1,4 @@
+import type { RuntimeImageHistoryRead, RuntimeImageHistoryItem } from '@crewstation/contracts';
 import type { BusinessSessionStorage } from '@crewstation/contracts';
 import type { RuntimeImageProbeInput, RuntimeImageProbeResult, RuntimeInitializationStatus, RuntimeImageExecutionSnapshot, Actor, ProjectId, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
 import type { DevSessionDto, DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest, StartupRecord } from '@crewstation/contracts';
@@ -100,6 +101,7 @@ export interface RebuildRendering {
 }
 
 export interface TaskRuntimeModuleApi {
+  imageHistory(input: RuntimeImageHistoryRead): Promise<RuntimeImageHistoryItem[]>;
   blockBusinessAdmission(serviceId: ServiceId, taskId: TaskId): Promise<boolean>;
   imageReferenceState(input: { projectId: string; versionId: string; ownerType: string; ownerId: string }): Promise<'active' | 'released' | 'unknown'>;
   runRuntimeImageProbe(input: RuntimeImageProbeInput, heartbeat: () => Promise<boolean>): Promise<RuntimeImageProbeResult>;

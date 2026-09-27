@@ -226,3 +226,19 @@ Agent档位真实能力测试另暴露 RFC027 probe 在 schema 补缺省值前�
 取消终态补证：09:44:26 `cancelling`→09:44:58 `cancelled`，归属标签下 Job／Pod／Secret全部为0；`/tmp/cs-rfc028-platform-cancel-build.json`记录真实API状态。真实UI后续通过键盘Enter打开配方、Escape回到「新增构建修订」，弹窗三宽分别[16,304]／[16,374]／[420,1020]且内部不溢出；分页续读失败构建直到404尾部，console错误为空，见`/tmp/cs-rfc028-platform-ui-interactions.json`。独立GitLab分支推进至`213b07686be79a81a5c333b8a81b8f7ceb8d1336`后，原配方仍固定`228360…`，自定义frontend实际拒绝。额外COPY素材被保存为未构建修订2；RFC的路径预检针对context／Dockerfile及源码链接，不把COPY指令未提前拒绝误判为承诺违约。
 
 TLS修复后的整平台构建已成功：`01a0e245-2543-7000-baf3-84967051278a` 在09:55:26 UTC登记版本`01a0e24a-78f7-7000-8b99-fbc0cc97fe86`，仓库manifest摘要`sha256:f19e42be27ac695355e655f2fa2f7c2794d7cb90c4833466b95f84d8471ab77e`。链路为真实登录API→固定GitLab源码→独立BuildKit→受管HTTPS鉴权推送→停止资源→registry检查→版本登记。完整状态与版本在`/tmp/cs-rfc028-platform-parent-rebuild-final.json`。本配方仍按受理时旧底座固定；发现部署遗漏的CS_BASE_IMAGE_TAG后，协调会话已同步新版标签并滚动API/controller，新Runner用途验收将使用新配方，不篡改已受理快照。
+
+
+## 工作台完整流程修复（2026-09-27，尚未发布／部署）
+
+作者指出新增只有空定义、管理信息难以理解、无法追溯使用任务。本批按 design §9.1 实施：项目与平台目录均可新增，首份配方和镜像定义原子保存、请求幂等；构建受理单独重试，失败不重复创建定义。配方提供 Dockerfile 安装说明，Agent 底座按名称选择当前修订。目录分开展示构建、产物及验证，详情含版本、构建日志、使用记录、名称／说明／启停和配置。开发选择与使用记录展示名称／短摘要，内部编号放入高级项。
+
+使用记录新增只读端口，task-runtime／release 各查自有持久快照，经 platform 合并、分页；项目隔离先于查询，已释放环境和失败／下线发布仍可见。防删除引用不再冒充执行历史，档位／用途验证环境不混入业务使用。全镜像和指定版本均可追溯，详情链接落调用链或精确发布。
+
+定向证据：镜像与任务列表 console 19/0（83 assertions），实际 PostgreSQL 新增与历史5/0（33 assertions），端口／API-client4/0（22 assertions）。首次沙箱数据库连接被限制，该次0/3 errors不算通过；允许本机连接后在独立临时库复验通过。contracts:lock报告业务契约面无变化；新增0003创建幂等迁移已精确入锁。
+
+真实 Chrome 的临时预览（HTTP测试数据，**不是已部署平台验收**）：中英文320／390／1440无文档溢出，新增弹窗边界[16,304]／[16,374]／[420,1020]，Escape回到新增按钮，零控制台错误；管理员实际通过选择项目→填写名称／已有镜像来源→保存并构建表单。历史三宽截图、JSON位于`/tmp/cs-image-ux-*`。查看截图后修正fieldset默认边框／间距并复验；临时Vite与两个入口文件已清理。最终候选检查见下段。任务恢复页仅接通实际任务列表、失败优先与相关旧票据排障；RFC029恢复请求执行尚未接通，不宣称恢复完成。
+
+
+最终候选核验：完整 `check:static`（架构、lint、后端类型、console类型）与 console 生产构建通过。unit **838/0，5105 assertions**；首次 module **1672 pass/9 skip/1 fail，9640 assertions**，唯一失败是租户档位摘要新增 revision 后的精确字段断言，保留敏感字段排除并补 revision 正整数断言，真实PG定向 **16/0，103 assertions**。没有重新运行整层 module，也不将首次失败报告写成全绿。首次 console 4 fail 涉及动作链接规范、运行中候选变更及并发集群布局断言；本批动作链接和权限查询已修正，集群用例由其所属会话更新。本批最终候选冻结后完整 console **934/0，6432 assertions，142文件**，本批代码哈希未变化。
+
+复核另补旧 native 执行未保存 purpose 的兼容：先红证明历史误标 Agent，改为复用领域 purposeOf 后真实PG **1/0，8 assertions**，旧记录显示 CLI。本批67条精确路径（含未跟踪新文件）新增代码防护 **563/567＝99.2945%，47生产文件，violations=[]**；更新过行号的历史适配器只采用修复后的定向覆盖。报告 `/tmp/cs-image-ux-patch.json`，最终代码快照 `/tmp/cs-image-ux-final-candidate.json`，日志 `/tmp/cs-image-ux-{unit,module,profile-repair,history-final,console-final,static-final,build-final}.log`。共享 contracts 导出等文件保留 RFC027 并发输出，第三方集群布局与 referenceResources 不纳入本批清单。尚待统一提交／精确SHA CI／部署，RFC028实机矩阵与RFC029真正恢复执行仍未完成。
