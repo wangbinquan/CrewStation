@@ -9,7 +9,7 @@
 - 集群范围汇总在清单标题右侧保留范围和 Pod/PVC 数量，原生 details 默认收起、键盘可展开；全部指标、部分覆盖与过期状态保留。公共汇总也改为横向换行，管理总览的展开明细同步受益。
 - 去掉筛选卡的重复标题，保留具名可访问分组；桌面筛选尽量一行，窄屏两列。表格填满剩余高度，无分页时不渲染空操作行。工作负载、网络、命名空间、待回收卷共用紧凑清单样式。
 
-## 验证
+## 部署前验证
 
 使用作者允许的现有 dev-admin，在独立验收页面正常 OIDC 登录。仅在该页面替换 `/assets/*` 为本地工作台构建，接口仍读取真实集群；没有部署此修改，也没有操作集群资源。
 
@@ -28,6 +28,16 @@
 - `compactPageLayout.test.ts` 与 `clusterLayout.test.ts` 真实浏览器合计 11 pass / 0 fail / 202 assertions。新增高度用例先在原部署得到 145/113px 的失败，再在本地构建通过。
 - 旧用例以「切换条前至少滚动 100px」间接锁死大页头，现改为真实滚动大于零，并继续验证切页不跳动。
 
-完整后端测试、发布 SHA 的 hosted CI 不属于上述证据。共享工作树存在其他任务的在制修改，本次未 staging、commit、push 或部署。
+上述为部署前候选内容验证；后续提交、CI 与实际部署结果见下节。共享工作树中的其他任务输出始终保留。
 
 截图：`/tmp/cs-compact-light-pods.png`、`/tmp/cs-compact-dark-storage.png`；日志：`/tmp/cs-compact-{static,console,browser-tests}.log`。验收页面已关闭。
+
+
+## 提交与本机部署
+
+- 布局代码提交 `932bfd1e9994ae02e24c23061e62e3df8183b7ff`（13 个精确路径），已推送；[精确 SHA CI](https://github.com/wangbinquan/CrewStation/actions/runs/36314029740) 六项作业成功。
+- 最终工作台镜像从后继 `3af3c568cdd9ededb0a3bc56034f1cb1c4760d7d` 的 `git archive` 构建，同时保留镜像编辑 revision 修复；未混入共享树在制内容。[最终部署 SHA CI](https://github.com/wangbinquan/CrewStation/actions/runs/36314080207) 六项作业全部成功。
+- 与并行平台发布串行交接后，仅更新 `docker-desktop / crewstation-system / deployment/console`，实际镜像 `cs-console:compact-3af3c568`，imageID `sha256:47adaebfb5ff3b3153b0da279e6df1d3756ac30f0c3cd9435101b1864f6a70ac`，Ready/Available 为 1，重启 0。
+- 部署后以获准的 dev-admin 正常 OIDC 登录，直接加载实际服务资产（无本地替换）：`index-BrIyZiW7.js` / `index-L1rx_h1t.css`。Pod 表格 586px、存储与配置 546px、标题均 20px，与候选验证一致。
+- 实际部署再次运行两个布局 E2E 文件：**11 pass / 0 fail / 202 assertions**，四种桌面窗口均至少半屏可操作，窄屏中英文、汇总键盘展开与详情布局通过；独立验收页已关闭。
+- 部署后证据：`/tmp/cs-compact-deployed-browser.log`、`/tmp/cs-compact-deployed-measurements.json`、`/tmp/cs-compact-deployed-{pods,storage}.png`、`/tmp/cs-compact-after-{deployment,pods}.json`。
