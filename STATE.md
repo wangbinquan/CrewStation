@@ -5,7 +5,9 @@
 
 ## RFC-025 接手续作（2026-09-27）
 
-最新候选补齐 CLI InterfaceReady：dev-session 后台上报，CLI 记录等待界面后才 ready，旧 Runner 兼容；非 CLI 不受此条件限制。静态、unit 725/0、module 1412/7 skip/0 fail、console 905/0、生产构建与新增行防护 21/21 全通过。六处页面对照与资源／UID 快照已保存。I27 一次性验收项目已归档，Namespace／Quota／NetworkPolicy UID 保持；残留卷／Secret／已完成 Job 的删除阻断已实测，空孤儿正常清理及管理员最终删除仍在进行。双身份与并发额度临时授权仍待作者答复；RFC 未标 Done。
+最新结果：CLI InterfaceReady 修复 a6da5868917e72fc2db658adf193a28d64e5ee3c 已发布，CI 36286527002 六项成功；API／controller／session 已部署 rc025-interface-a6da5868（1/1），console 沿用 bb1bfc09。静态、unit 725/0、module 1412/7 skip/0 fail、console 905/0、生产构建和新增行防护 21/21 全通过。真实 CLI 从 waiting-interface 到 ready 由后台独立推进，未发送模型任务，验证后已停止并删除 Pod。I27 空孤儿 Secret 自动回收、原 PVC 待回收及管理员显式删除、归档 Namespace 删除全过程已完成，两份数据库和仓库保留；控制器重启未复活命名空间。六处页面／API／UID 对照已保存，详见 acceptance §17.1、§18.5–18.7。
+
+RFC 仍 In Progress：成员失权／并发额度的临时测试授权被自动审批拒绝，待作者具体答复；缺少 plan-unavailable 与 quota_exceeded 的完整 HTTP 拒绝证明、跨身份合计桶、浏览器限流提示和临时修改平台默认值的实机证明。rfc025-rebuild-verify 工作区和 preview 保留供续验，两条测试 CLI 均已停止；rfc025-retire-verify 已归档且 Namespace 删除。八个历史业务卷未动。接手前的 tests/e2e/referenceResources.test.ts 仍原样未提交。
 
 接手基线 `1fbbde8d` 与 origin/main 一致，基线 CI 35978999719 成功；本机控制面实为 `rc025-t14c-20260924`、console 为 `app-access-2-20260924`，均就绪，以下旧段落的部署标签是历史记录。
 

@@ -439,7 +439,18 @@ I29 裁定（三个 (a)）之后：
 
 管理员经集群详情的标准资源动作受理，provisioning 每次读取归档事实与命名空间身份；resources 在项目锁和所有关联调和租约下核对终态、确认卷已经显式释放，并完整盘点物理资源。受理同时释放命名空间、额度、网络策略和闲置 Service 的记录，不涉及数据库、仓库。cluster-control 删除前再次盘点所有 namespaced API（含 CRD、分页），按 Namespace UID／resourceVersion 删除；未知对象、残留卷、读失败都阻断。只允许确认过的脚手架及其控制器生成的空端点；不会强制移除 finalizer。释放墓碑在记录压缩后仍禁止项目内新声明。
 
-新增回归覆盖授权、归档不自动删除、活动项目阻断、残留卷与未知 CRD、租约竞争和盘点失败的原子回滚、压缩后不复活、命名空间换 UID、分页与发现失败、只读视图与确认词。组合根用真实数据库、完整模块装配和假 Kubernetes 验证从标准动作到调和删除。本地完整门禁：静态通过，unit 724/0、module 1410/7 skip/0 fail、console 最终 905/0（初轮发布页首个用例在懒加载完成前断言，改为等待实际 SHA 出现后整层通过）；新增可执行行 170/175（97.1%）。单元层一次在沙箱内无法监听临时端口，使用允许本机监听的同一命令后完整通过；模块层未重复运行。已发布 bb1bfc09，精确 SHA CI 六项全绿并部署（§16.2）；归档删除实机流程待在隔离验收项目完成。
+新增回归覆盖授权、归档不自动删除、活动项目阻断、残留卷与未知 CRD、租约竞争和盘点失败的原子回滚、压缩后不复活、命名空间换 UID、分页与发现失败、只读视图与确认词。组合根用真实数据库、完整模块装配和假 Kubernetes 验证从标准动作到调和删除。本地完整门禁：静态通过，unit 724/0、module 1410/7 skip/0 fail、console 最终 905/0（初轮发布页首个用例在懒加载完成前断言，改为等待实际 SHA 出现后整层通过）；新增可执行行 170/175（97.1%）。单元层一次在沙箱内无法监听临时端口，使用允许本机监听的同一命令后完整通过；模块层未重复运行。已发布 bb1bfc09，精确 SHA CI 六项全绿并部署（§16.2）；归档删除实机流程已完成，见 §17.1。
+
+
+### 17.1 本机归档、孤儿与管理员清理闭环
+
+新建一次性项目 `rfc025-retire-verify`（`01a0e078-d8fa-7000-99ff-0a872c5c4c1f`），全程仅使用本项目的空验收资源。01:28:56Z 归档前删除入口为 412／请先归档；归档后 Namespace UID `ae96af6c-4274-4084-a7f3-8a69abe86c0f`、额度 UID 与三条网络策略 UID 全部不变。先被仍未结束的路由阻断；通过正常下线接口结束预览后，物理盘点继续以 412 列出空 PVC、空 Secret 和已完成的构建 Job／Pod。
+
+测试空 Secret 与 1Mi PVC 于 01:27:58Z 创建，带指向不存在任务的受管标签；没有缩短十分钟宽限期或修改时钟。01:45:25.241Z 控制器自动按 UID 删除 Secret；01:45:25.286Z 将原 PVC 登记为工作卷 `01a0e089-d819-7000-87c3-2c59b58d5857`，PendingReclaim=true／stopped，PVC UID **`a791d829-9934-4ba9-a70e-6760952e2fb9` 不变**。01:46:47Z 命名空间入口仍因这个未释放的卷返回 412，证明 stopped 不等于可以跳过卷确认。
+
+核对构建 Job 成功且 UID 一致后，仅清理本次已完成的 Job。01:46:47.456Z 通过标准 `delete-volume` 管理员动作受理，HTTP 202，卷变 stopping，随后 PVC 消失。01:47:03.462Z `delete-namespace` 返回 202，命名空间先 stopping，01:47:19Z 核对 Namespace 已消失，namespace 与 network-policy-set 记录 stopped。控制器滚动重启后也未重建。01:49Z 项目仍 archived，两份数据库记录仍 ready；仓库绑定与真实 GitLab main 分支查询均返回 200，仓库 HEAD `7902d9f415bdd29545a62e7e7046ecb17f3d8796`。未删除数据库、仓库或八个历史待回收业务卷。
+
+原始记录为本机 `/private/tmp/rfc025-retire-archive.json`、`rfc025-retire-orphan-audit.log`、`rfc025-retire-volume-block.json`、`rfc025-retire-finish-volume.json`、`rfc025-retire-finish-namespace.json`、`rfc025-retire-finish-read.json`、`rfc025-retire-retained.json`。
 
 ## 18. 最终资源推送与长连接复验
 
@@ -465,18 +476,18 @@ I29 裁定（三个 (a)）之后：
 | RC-02 | §18.1 两连接阶段与毫秒时间；两浏览器刷新仍结束 | 另一名成员观察与失权测试待明确授权 |
 | RC-03 | §18.1 Last-Event-ID 续传与过旧快照；resourceStream 模块失权回归绿 | 成员移除后真实流 reset／关闭待明确授权 |
 | RC-04 | §3.3 真实 72 小时到期、Pod／路由回收、PVC PendingReclaim；§16.2 保卷重建 | 无需破坏现有历史工作卷 |
-| RC-05 | §3.4、§11 真实孤儿清单、UID 删除审计与 PVC 待回收；删除工作卷模块／组合回归绿 | 管理员删除本次隔离验收卷的实际流程 |
+| RC-05 | §3.4、§11 真实孤儿清单、UID 删除审计与 PVC 待回收；删除工作卷模块／组合回归绿 | §17.1 已完成空孤儿卷的登记与管理员删除 |
 | RC-06 | audit §1 的旧失败 Pod／预览入口／过期 Runner Secret 已按 §3.3–3.4 处理；孤儿业务 PVC 三条和失败到期卷五条保留待管理员；§11 旧 Service／中间件认领与无引用中间件回收；§12.2 旧 Git 凭据无残留；§15.1 三个当前预览 UID 原位移交 | 八个历史卷按保留规则处理，不擅自删除原使用者数据；本轮验收项目单独收尾 |
-| RC-07 | §4 四类原因码、说明、出路与无新增记录由真实台账模块回归锁住 | 四种入口拒绝的完整部署后 HTTP 证据仍待补 |
+| RC-07 | §4 四类原因码、说明、出路与无新增记录由真实台账模块回归锁住 | 01:29Z 只读预检已实测 manifest-outdated 与 profile-missing；plan-unavailable 与 quota_exceeded 的隔离场景仍待补 |
 | RC-08 | §5 HTML 说明页与 503 JSON；§14、§15 Host 唯一、候补仲裁、开发预览独立路由 | §18.4 已完成本轮隔离项目下线→重新部署闭环 |
 | RC-09 | §13 三类突发；§14 匿名 IP；§18.2 SSE／WebSocket 保持；429 自动重读组件回归绿 | 多身份／来源的合计桶与浏览器重试提示 |
 | RC-10 | §6 运行中默认／项目覆盖策略的模块与中间件渲染回归 | §18.4 项目覆盖 186 ms 内生效并恢复；平台默认仍保留已批准现值 |
 | RC-11 | §3.5 台账占用核对、并发最后一单位只一方受理、结束中占用与释放退额模块回归绿 | 隔离项目并发受理／释放实机待明确授权 |
-| RC-12 | §7 Namespace／Quota／NetworkPolicy 调和（<1 秒恢复），§8 database／data-binding 实况；§14 空闲轮换真实 PostgreSQL 回归 | I27 归档保留→阻断残留→管理员删除命名空间实机 |
+| RC-12 | §7 Namespace／Quota／NetworkPolicy 调和（<1 秒恢复），§8 database／data-binding 实况；§14 空闲轮换真实 PostgreSQL 回归 | §17.1 已完成 I27 归档保留、阻断残留、管理员删除闭环 |
 | RC-13 | §10 双控制器租约分工与持有者失效后接手实机通过 | 无 |
 | RC-14 | §9、§12 集群资源叠加与项目拓扑；架构规则与完整 static 门禁绿 | §18.5 已完成同轮对照 |
 | RC-15 | §11 旧 tsk 别名实查，UUID 主键与 rel／tsk 解析回归绿 | 无 |
-| RC-16 | 各期本地静态、unit／module／console、新增行防护及精确 SHA CI；最近代码 bb1bfc09 六项全绿 | 本轮文档提交的 CI 终态 |
+| RC-16 | 各期本地静态、unit／module／console、新增行防护及精确 SHA CI；最近代码 a6da5868 六项全绿 | 本节证据提交以对应 SHA 的 CI 终态为准 |
 
 本轮基线已回填 v0.3.17（R59–R60、D65–D68、AT-60–AT-61），九份相关 RFC 与 ADR-0006 加修订说明，结构文档、README、CLAUDE、dev-gotchas、STATE 同步；正式 Done 要等上表未完成项关闭。
 
@@ -498,3 +509,22 @@ I29 裁定（三个 (a)）之后：
 最终逐条对照设计 §2.3 发现，CLI 的执行记录原先只要求 Pod 和 Runner 就绪，会早于 RFC-024 的界面就绪时刻变为 ready。现由 dev-session 后台将界面事实通过组合根写入 task-runtime 所属记录；仅 development-cli 要求 InterfaceReady。首次就绪前保持 starting／waiting-interface，曾就绪后界面不可用为 degraded；非 CLI 的独立 Agent、业务子任务、档位测试不等待界面。释放优先，重复事实不增加台账版本，Runner 投影不抹掉该条件；旧 Runner 没有 ui 字段时沿用既有启动进度兼容判定。
 
 两条新增阶段／后台回归先在旧代码上失败（29 pass／2 fail），修复后定向 31/0；真实 PostgreSQL 组合回归 1/0，覆盖等待、就绪、降级恢复、释放、幂等和写入归属。本地静态检查、unit 725/0、module 1412/7 skip/0 fail、console 905/0、console 生产构建全部通过；包含新增文件的改动行防护 21/21（100%）。各层只运行一次完整成功候选，接手前的 E2E 文件未纳入；发布与实机结果在完成后补记。
+
+
+#### CLI 就绪实机复验
+
+`a6da5868917e72fc2db658adf193a28d64e5ee3c` 已发布，[精确 SHA CI 36286527002](https://github.com/wangbinquan/CrewStation/actions/runs/36286527002) 的 static、unit、module、console、gate、e2e 六项全部成功；API／controller／session 已滚动至 `cs-control-plane:rc025-interface-a6da5868`，镜像 ID `sha256:9ed97c4382facf22c2cc0651003d1d4c8f2542ae4c98e9384f322c4c8b98c650`，三个服务均 1/1，console 沿用 bb1bfc09。新增 CLI `01a0e08d-47a9-7001-a410-d1e1c817a7f2`，执行记录 `01a0e08d-47a9-7000-8c55-354764f229e8`，不发送模型提示。
+
+经真实网关的资源 SSE：01:49:12.352Z pending → 01:49:13.364Z starting／waiting-connect → **01:49:15.387Z starting／waiting-interface** → **01:49:48.484Z ready／InterfaceReady=true**。Runner ui.readyAt 为 01:49:47.317Z。只有收到 ready 后才读取名册和打开开发页；后台独立推进得到证明。浏览器显示新 CLI 等待任务和真实 OpenCode 界面。随后经正常停止接口结束本次 CLI，保留原工作区。证据：`/private/tmp/rfc025-interface-live-proof.json`、`/private/tmp/rfc025-final-ui/cli-interface-ready.png`。
+
+
+### 18.7 尚未完成的实机项与测试夹具
+
+代码发布与上述实机流程均已完成，不将以下缺证改为通过：
+
+- RC-02／03／11：测试项目临时添加 dev-developer、并发额度改为 2、验证两身份观察／移除后断流及最后额度争抢，然后恢复原值。自动审批拒绝了这组操作，尚未取得作者具体答复，因此未执行，也未改成员或额度。
+- RC-07：`/private/tmp/rfc025-preflight-read.json` 已记录旧发布 manifest-outdated 与 profile-missing 的真实只读预检、说明和出路；plan-unavailable、quota_exceeded 的完整部署后拒绝与无新记录证据仍需隔离验收。
+- RC-09：三类单身份限流、SSE／WebSocket 保持已有证据；跨身份／来源合计桶仍缺。补做的管理员只读突发得到 286×200／914×429、401×200／6799×429，页面最终自行加载成功，但未捕获限流提示，不能据此宣称提示已实测。进一步延长突发的请求被自动审批以共享服务负载和缺少具体规模授权为由拒绝，未执行，停止扩大压测。
+- RC-10：项目覆盖的真实生效／恢复已通过；平台默认保持作者批准的值，尚未在实机临时改写默认值验证。
+
+`rfc025-retire-verify` 已归档且命名空间删除，数据库／Git 仓库按 I27 保留。`rfc025-rebuild-verify` 保留原工作区及哨兵文件，preview v0.1.0 运行中；本轮两条测试 CLI 都已停止、独立 Pod 已删除，留给剩余验收的工作区没有释放。八个历史待回收卷未动。已有其他任务文件 `tests/e2e/referenceResources.test.ts` 原样保留，未纳入两次提交。RFC 正式收尾必须在本节剩余验收完成后进行。
