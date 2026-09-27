@@ -1,7 +1,7 @@
 import { startMcpProbe } from './mcpProbeServer';
 import { randomBytes } from 'node:crypto';
 import type { BusinessExecutionProof, ProfileTestStage, StartAgentCommand } from '@crewstation/contracts';
-import { PLATFORM_AGENT_PERMISSION } from '@crewstation/contracts';
+import { PLATFORM_AGENT_PERMISSION, StartAgentCommandSchema } from '@crewstation/contracts';
 import { newResourceId } from '@crewstation/kernel';
 import type { ProfileTestRunInput } from '../../api/moduleApi';
 import type { BusinessProbeTurnDeps } from './businessProbeTurns';
@@ -15,8 +15,8 @@ export async function probeBusinessProfile(deps: Input): Promise<BusinessExecuti
   const capabilities: BusinessExecutionProof['capabilities'] = { events: false, usage: 'none', resume: false, systemPrompt: false, skills: false, mcp: false, platformDelegation: false, opaqueInternalDelegation: true };
   const command = (patch: Partial<StartAgentCommand>): StartAgentCommand => {
     const agentId = newResourceId();
-    return { id: agentId, type: 'startAgent', agentId, processAttemptId: agentId, compute: deps.input.profile, profileRevision: deps.input.revision, launch: deps.input.launch, beforeStart: deps.input.beforeStart,
-      permission: PLATFORM_AGENT_PERMISSION, mode: 'oneshot', env: {}, mcp: [], ...patch };
+    return StartAgentCommandSchema.parse({ id: agentId, type: 'startAgent', agentId, processAttemptId: agentId, compute: deps.input.profile, profileRevision: deps.input.revision, launch: deps.input.launch, beforeStart: deps.input.beforeStart,
+      permission: PLATFORM_AGENT_PERMISSION, mode: 'oneshot', env: {}, mcp: [], ...patch });
   };
   const nonce = () => `cs-proof-${randomBytes(12).toString('hex')}`;
   const probe = async (name: string, agent: StartAgentCommand, expected: string) => {

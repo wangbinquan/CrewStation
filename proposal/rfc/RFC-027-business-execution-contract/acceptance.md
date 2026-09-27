@@ -1,5 +1,25 @@
 # RFC-027 实施与验收证据
 
+## 实机修复补丁（2026-09-27，待补丁发布验证）
+
+真实档位测试暴露三处阻断：Runner 命令校验填充默认 skills 后摘要与探针不一致；session ACK 回收 Runner spool 后探针仍向 Runner 从零补读；资源台账下 quota.release 为 no-op，但档位测试仍走哨兵计数器，51 个已 released 环境留下 running=4，实际零测试 Pod 却永久拒绝测试。已分别改为按 Runner schema 规范化后计算摘要、从 session 持久事件读取并消费、普通档位测试释放哨兵容量。新增 0016 迁移只重算平台哨兵，保留活动／清理中及用途验证尚未物理释放的容量。显式准入错误不再被不确定回执重试遮蔽。
+
+测试客户的控制租约不再依赖模型 capabilities：档位不可用不应阻止发布交接；API 仍验证可信来源发布和 epoch。以上回归先红后绿，最终真实 PG 组合 13 pass／0 fail／146 assertions，另资源台账组合 7 pass／0 fail／46 assertions。尚待修复部署后的真实 Agent 能力测试；不以普通 CLI smoke 代替业务事件、续跑及材料能力证明。
+
+
+
+## 2026-09-27：发布、部署与真实执行链（第十三批，进行中）
+
+- 联合实现 `73855918d43ea0fe608ad08a453cee016b0a02dc` 已精确提交735路径并推送，第三方 `tests/e2e/referenceResources.test.ts` 保留未提交；两个任务的共享输出完整保留。[精确SHA CI 36309067072](https://github.com/wangbinquan/CrewStation/actions/runs/36309067072) 的 static/unit/module/console/gate/e2e 六项全部成功。
+- 本机统一镜像标签 `rfc027-028-73855918`，8个控制面/工作台Deployment就绪；增量迁移33项、角色初始化0。备份 `/tmp/rfc027-028-before.dump`（约36MiB）以PG17.11临时无网络容器完整 `pg_restore --file=/dev/null` 解码通过。最初经kubectl stdin做TOC验证遇到早退管道超时，未冒充该命令成功。原非平台Pod/全部PVC共46个UID不变，配置仅更新builder/新任务镜像，未重建既有工作区。
+- 专属项目 `rfc027-live` / `01a0e230-b5b2-7000-aead-11379a2dc9a8`、服务 `01a0e230-b5b2-7001-ab00-37dd3ba50ea4`，真实GitLab模板建仓、build、应用PG migration、待命槽ready成功；首次handoff `01a0e232-31ce-7000-aa4b-dd869304551c` complete，epoch3，真实用户域访问到唯一active holder。待命Web ready时control为null，没有提前执行权。
+- 节点CPU不足时首次默认套餐任务仅Pending；通过公开API关闭，未修改存量任务/套餐。新建专属50m任务套餐后，父任务 `01a0e235-45ee-7000-a4d2-8d42968120b5` ready。90秒命令 `01a0e235-96e2-7000-b54b-a07290065cb4` 61ms受理，40秒时仍running；期间真实重启cs-session，最终stdout=`first\nlast\n`、exit0、truncated=false、finalCursor闭合。原executionId不变，/work/launches大小1，证明没有重复启动；同键返回原ID，变摘要409，活动pause409。
+- 文件相对越界/绝对路径400，错误版本409。安全pause后实际Pod消失、quotaHeld=false、同PVC UID `d60758a7-5c6e-40a6-aa8a-6a12147ba2d2` 保留。真实事件/文件/状态证据 `/tmp/rfc027-live-be.jsonl`、`/tmp/rfc027-live-workspace.log`。恢复和第二次交接仍继续验证，不能先标BE全通过。
+- 真模型探测发现probe构造的缺省businessSkills在HTTP/WS schema解析后补[]，造成Runner摘要不一致；原catch又把明确拒绝掩盖成后续执行记录不存在。真实wire schema回归先2fail，修为先normalize再算摘要后3pass；拒绝/回执丢失区分回归先1fail，修复后与真实PG档位执行器合计8/0（99 assertions）、typecheck/lint/arch通过。正在部署controller补丁后复验原生CLI；不将普通模型冒烟视为能力测试通过。
+
+第十三批后续：同任务resume已确认PVC UID不变，proof.txt仍为preserved；generation从2增至3，没有空卷替换。额度达到3时第四次准入返回429，未知字段400；本轮新增两个额度探针均close并确认quotaHeld=false。工作台管理员旧票据查询通过真实网关，zh-CN/en-US × light/dark × 320/390/1280 共12种组合无横向溢出、无console error，截图与 `/tmp/rfc027-ui-proof.json` 保存；本项目无旧票据，停止确认有票据分支仍以模块/组件测试证明，不冒充实机点过。
+
+模型探测第二次暴露session后台ACK会清理Runner原始事件，直接读Runner旧游标导致失败；已改从session持久事件端口读取并在消费完成后确认，MCP监听探测同样改读持久日志。带“Runner已清理事件”的回归先3fail，修复后通过。模板控制权也移除对capabilities查询的依赖（档位测试中不应阻断命令/交接）；真实PG回归先2fail后通过。最终组合11/0（132 assertions），check:static完整通过，coverage `/tmp/rfc027-probe-fix2-coverage`。此补丁仍在实机复验，尚未提交。初次部署遗漏构建底座CS_BASE_IMAGE_TAG，已补为rfc027-028-73855918；既有配方的固定旧摘要保留，新配方沿新底座。
 
 ## 2026-09-27：共同候选门禁与定向修复（第十二批）
 

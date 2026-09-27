@@ -1,4 +1,4 @@
-import type { RuntimeImageExecutionSnapshot, Actor, ProjectId, RunnerCommand, RunnerEvent, RunnerHello, ServiceId, TaskId, TaskProfileDto } from '@crewstation/contracts';
+import type { RuntimeImageExecutionSnapshot, StoredBusinessExecutionDto, RunnerBusinessEvent, Actor, ProjectId, RunnerCommand, RunnerEvent, RunnerHello, ServiceId, TaskId, TaskProfileDto } from '@crewstation/contracts';
 
 export interface ProjectAuthorizer {
   authorize(actor: Actor, projectId: ProjectId, action: 'view' | 'develop' | 'force-release-session'): Promise<unknown>;
@@ -62,6 +62,9 @@ export interface TaskRuntimeSettings {
  * task-runtime 平时不需要它；只有档位测试在这里等待启动前步骤与协议轮次的结果。
  */
 export interface TestRunner {
+  getBusinessExecution?(taskId: TaskId, executionId: string): Promise<StoredBusinessExecutionDto>;
+  listBusinessExecutionEvents?(taskId: TaskId, executionId: string, after?: number, limit?: number): Promise<RunnerBusinessEvent[]>;
+  consumeBusinessExecution?(taskId: TaskId, executionId: string, through: number, stopped?: boolean): Promise<void>;
   sendCommand(taskId: TaskId, command: RunnerCommand): Promise<unknown>;
   listEvents(taskId: TaskId, options?: { sinceSeq?: number; kinds?: RunnerEvent['kind'][]; agentId?: string; limit?: number }): Promise<Array<{ seq: number; at: string; event: RunnerEvent }>>;
   connectionStatus(taskId: TaskId): Promise<{ connected: boolean; capabilities?: RunnerHello['capabilities'] }>;

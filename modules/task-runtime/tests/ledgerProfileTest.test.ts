@@ -1,3 +1,5 @@
+import { sql } from 'drizzle-orm';
+import { PROFILE_TEST_PROJECT_ID } from '../domain/profileTestEnvironment';
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { RunnerCommand, RunnerEvent, TaskId } from '@crewstation/contracts';
 import { LaunchSpecSchema, PLATFORM_ENV } from '@crewstation/contracts';
@@ -94,5 +96,28 @@ describe.skipIf(!available)('档位测试由资源中心建出（RFC-025 I25 第
     expect(outcome).toMatchObject({ state: 'passed', outcome: 'passed' });
     expect(await runtime.api.getEnvironment(id)).toMatchObject({ kind: 'profile-test', state: 'released' });
     expect((await resources.api.get(id))?.desired).toBe('absent');
+    const counters = await tdb.db.execute(sql`SELECT running FROM task_runtime.admissions WHERE project_id=${PROFILE_TEST_PROJECT_ID}`);
+    expect(counters[0]?.['running']).toBe(0);
+    await runtime.api.releaseEnvironment(id, 'profile-test');
+    expect((await tdb.db.execute(sql`SELECT running FROM task_runtime.admissions WHERE project_id=${PROFILE_TEST_PROJECT_ID}`))[0]?.['running']).toBe(0);
   });
+  test('修复迁移仅重算哨兵，保留清理中与用途验证未退容量，重复执行不减活动容量', async () => {
+    const repair = await Bun.file(new URL('../adapters/persistence/migrations/0016_profile_test_admission_repair.sql', import.meta.url)).text();
+    const count = async () => (await tdb.db.execute(sql`SELECT running FROM task_runtime.admissions WHERE project_id=${PROFILE_TEST_PROJECT_ID}`))[0]?.['running'];
+    await tdb.db.execute(sql`UPDATE task_runtime.admissions SET running=4 WHERE project_id=${PROFILE_TEST_PROJECT_ID}`);
+    await tdb.db.execute(sql.raw(repair));
+    expect(await count()).toBe(0);
+    await tdb.db.execute(sql`UPDATE task_runtime.environments SET state='releasing' WHERE kind='profile-test'`);
+    await tdb.db.execute(sql.raw(repair));
+    expect(await count()).toBe(1);
+    await tdb.db.execute(sql`UPDATE task_runtime.environments SET state='released',render=jsonb_set(render,'{runtimeValidation}','{"quotaHeld":true}'::jsonb) WHERE kind='profile-test'`);
+    await tdb.db.execute(sql.raw(repair));
+    expect(await count()).toBe(1);
+    await tdb.db.execute(sql.raw(repair));
+    expect(await count()).toBe(1);
+    await tdb.db.execute(sql`UPDATE task_runtime.environments SET render=jsonb_set(render,'{runtimeValidation,quotaHeld}','false'::jsonb) WHERE kind='profile-test'`);
+    await tdb.db.execute(sql.raw(repair));
+    expect(await count()).toBe(0);
+  });
+
 });

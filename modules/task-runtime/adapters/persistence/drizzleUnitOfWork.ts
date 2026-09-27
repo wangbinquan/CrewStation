@@ -36,7 +36,8 @@ function taskQuota(executor: Executor, admissions: AdmissionRepository, projecti
         throw error;
       }
     },
-    release: async () => undefined,
+    // 档位测试仍用系统哨兵计数；镜像用途验证由物理停止确认端口单独退额。
+    release: async (env) => { if (env.kind === 'profile-test' && !env.render?.runtimeValidation) await admissions.release(env.projectId); },
     running: (projectId) => projection.ledger.occupancy(projectId),
   };
 }

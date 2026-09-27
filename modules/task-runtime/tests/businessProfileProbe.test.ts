@@ -1,16 +1,19 @@
 import { expect, test } from 'bun:test';
 import type { AgentEvent, RunnerBusinessEvent, RunnerBusinessReceipt, RunnerCommand, TaskId } from '@crewstation/contracts';
-import { LaunchSpecSchema } from '@crewstation/contracts';
-import { newResourceId } from '@crewstation/kernel';
+import { LaunchSpecSchema, RunnerCommandSchema, businessAgentDigestInput } from '@crewstation/contracts';
+import { newResourceId, precondition } from '@crewstation/kernel';
 import { probeBusinessProfile } from '../application/profile-testing/businessProfileProbe';
 import type { TestRunner } from '../ports/platform';
 
 function fixture() {
   const commands: RunnerCommand[] = [], receipts = new Map<string, RunnerBusinessReceipt>(), events = new Map<string, RunnerBusinessEvent[]>();
-  const state = { supported: true, mismatch: undefined as string | undefined, unknown: false, gap: false, sessionToken: '', mcpToken: '' };
+  const state = { supported: true, mismatch: undefined as string | undefined, unknown: false, gap: false, rejectStart: false, lostReply: false, sessionToken: '', mcpToken: '' };
   const runner: TestRunner = {
     connectionStatus: async () => ({ connected: true, capabilities: { protocols: ['opencode'], pty: false, preview: false, ...(state.supported ? { businessExecutionV3: 1 as const } : {}) } }),
     listEvents: async () => [],
+    getBusinessExecution: async (taskId, id) => ({ taskId, receipt: receipts.get(id)!, persistedThrough: receipts.get(id)!.lastSequence, acknowledgedThrough: receipts.get(id)!.lastSequence, complete: receipts.get(id)!.phase === 'finished' }),
+    listBusinessExecutionEvents: async (_taskId, id, after = 0) => (events.get(id) ?? []).filter((event) => event.sequence > after),
+    consumeBusinessExecution: async () => {},
     sendCommand: async (_taskId, command) => {
       commands.push(command);
       if (command.type === 'businessExecutionInfo') return { incarnation: '00000000-0000-4000-8000-000000000001', limits: { outputBytes: 100000, spoolBytes: 100000, eventBytes: 10000 } };
@@ -21,6 +24,12 @@ function fixture() {
       }
       if (command.type === 'cancelBusinessExecution') return {};
       if (command.type === 'startBusinessAgent') {
+        if (state.rejectStart) throw precondition('Agent 执行参数摘要不匹配', { code: 'execution_conflict' });
+        // A real HTTP/WS hop normalizes optional fields; its digest must match the Runner's parsed bytes.
+        const wire = RunnerCommandSchema.parse(command);
+        if (wire.type !== 'startBusinessAgent') throw new Error('wrong command');
+        const digest = new Bun.CryptoHasher('sha256').update(businessAgentDigestInput(wire.agent, wire.digestNonce)).digest('hex');
+        expect(digest).toBe(command.payloadDigest);
         const agent = command.agent, step = agent.resumeSessionId ? 'resume' : agent.systemPrompt ? 'systemPrompt' : agent.businessSkills?.length ? 'skills' : agent.mcp.length ? 'mcp' : 'events';
         const token = step === 'resume' ? state.sessionToken : step === 'mcp' ? state.mcpToken : JSON.stringify(agent).match(/cs-proof-[a-f0-9]+/)![0];
         if (step === 'events') state.sessionToken = token;
@@ -29,10 +38,11 @@ function fixture() {
         const frames: RunnerBusinessEvent[] = fields.map((event, index) => ({ sequence: index + (state.gap ? 2 : 1), occurredAt: new Date().toISOString(), frame: { type: 'agent', event: { ...event, agentId: agent.agentId, seq: index + 1, at: new Date().toISOString() } } }));
         events.set(command.executionId, frames);
         receipts.set(command.executionId, { executionId: command.executionId, attempt: 1, payloadDigest: command.payloadDigest, incarnation: command.incarnation, phase: state.unknown ? 'unknown' : 'finished', lastSequence: frames.length, acknowledgedSequence: 0, outputBytes: 1, result: { reason: 'exited', exitCode: 0, durationMs: 1 } });
+        if (state.lostReply) throw new Error('connection lost after start');
         return receipts.get(command.executionId);
       }
-      if (command.type === 'getBusinessExecution') return receipts.get(command.executionId);
-      if (command.type === 'readBusinessExecutionEvents') return events.get(command.executionId);
+      if (command.type === 'getBusinessExecution') throw new Error('Probe must read persisted session receipt');
+      if (command.type === 'readBusinessExecutionEvents') throw new Error('Runner already discarded acknowledged events');
       throw new Error(`unexpected ${command.type}`);
     },
   };
@@ -59,4 +69,13 @@ test('unknown execution and noncontiguous source events abort proof batch and ca
     expect(f.commands.filter((command) => command.type === 'startBusinessAgent')).toHaveLength(1);
     expect(f.commands.at(-1)?.type).toBe('cancelBusinessExecution');
   }
+});
+
+test('explicit Runner rejection is preserved; a lost response reconciles the original execution without a new start', async () => {
+  const rejected = fixture(); rejected.state.rejectStart = true;
+  await expect(rejected.run()).rejects.toMatchObject({ kind: 'precondition', details: { code: 'execution_conflict' } });
+  expect(rejected.commands.some((command) => command.type === 'getBusinessExecution')).toBe(false);
+  const uncertain = fixture(); uncertain.state.lostReply = true;
+  expect((await uncertain.run())?.capabilities.events).toBe(true);
+  expect(uncertain.commands.filter((command) => command.type === 'startBusinessAgent')).toHaveLength(5);
 });

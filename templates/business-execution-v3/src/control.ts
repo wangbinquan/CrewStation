@@ -6,12 +6,11 @@ const root = '/v3/business-execution/control';
 export class Controller {
   readonly instanceId = Bun.randomUUIDv7();
   current: Control | undefined;
-  private releaseId: string | undefined;
   private running = false;
   constructor(readonly platform: Platform, readonly store: Store) {}
   get stopAuthority(): { operationId: string; epoch: number } {
     const c = this.current;
-    if (!c?.migration || c.activeReleaseId !== this.releaseId || c.phase !== 'frozen') throw new Error('此实例没有迁移排空权限');
+    if (!c?.migration || c.phase !== 'frozen') throw new Error('此实例没有迁移排空权限');
     return { operationId: c.migration.operationId, epoch: c.epoch };
   }
   get fence(): Fence {
@@ -27,13 +26,10 @@ export class Controller {
     finally { this.running = false; }
   }
   private async reconcile(): Promise<void> {
-    this.releaseId ??= (await this.platform.call<{ releaseId: string }>('/v3/business-execution/capabilities')).releaseId;
     let control = await this.platform.call<Control>(root);
     if (control.migration) {
-      this.current = control;
-      if (control.activeReleaseId !== this.releaseId) return;
       await this.store.prepare(control.epoch, null, 'frozen', null);
-      await this.platform.call(`${root}/migrations/${control.migration.operationId}/ready`, {
+      this.current = await this.platform.call<Control>(`${root}/migrations/${control.migration.operationId}/ready`, {
         operationId: control.migration.operationId, expectedEpoch: control.epoch, preparationDigest: digest({ epoch: control.epoch, phase: 'frozen' }),
       }); return;
     }

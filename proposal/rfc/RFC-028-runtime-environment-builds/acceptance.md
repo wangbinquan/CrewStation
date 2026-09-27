@@ -208,3 +208,21 @@
 最终改动行防护 **7929／8102＝97.8647%，473个生产文件，violations=[]**。依据候选SHA256识别修改文件，删除这些文件的旧全量行号记录，仅采用修复后的定向coverage；未变文件沿用完整三层coverage，避免类型导入／函数提取导致旧覆盖错位。脚本 `/tmp/cs-rfc027-028-release-patch.ts`，报告 `/tmp/cs-rfc027-028-release-patch.json`；静态日志 `/tmp/cs-rfc027-028-final-static.log`，前端构建日志 `/tmp/cs-rfc027-028-console-build.log`。定向coverage分别在 `/tmp/rfc027-gate-template-coverage`、`/tmp/rfc027-gate-behavior-coverage`、`/tmp/cs-rfc027-028-final-startup-coverage`、`/tmp/cs-rfc027-028-final-driver-coverage`。
 
 两会话已约定由RFC027会话在唯一窗口精确发布共同候选，保留完整并发输出与真实贡献署名；第三方 `tests/e2e/referenceResources.test.ts` 明确排除。此刻尚未提交／推送／精确SHA CI或部署，部署后RI仍待执行。
+
+## 共同发布、本地部署与真实平台首轮（2026-09-27）
+
+共同候选已发布为 `73855918d43ea0fe608ad08a453cee016b0a02dc`（735条精确路径，含两会话并发产物，第三方 referenceResources 未纳入）。[精确 SHA CI 36309067072](https://github.com/wangbinquan/CrewStation/actions/runs/36309067072) 六个作业 static、unit、module、console、gate、e2e 全部成功。本地版本 `rfc027-028-73855918` 由 RFC027 会话统一部署；8个 Deployment 就绪，33项迁移与角色初始化成功，备份可解码，原非平台 Pod／PVC 46个 UID 未变。上述部署资源证明由协调会话提供；本会话独立核对了精确 SHA CI。
+
+真实平台专属项目 `rfc028-images-20260927`（`01a0e231-5614-7000-be6b-82ee33fb22ba`），仓库分支 `rfc028-images`、固定 SHA `2283600436f0afa798b860447daa022136f40f71`。全部通过真实登录后的公共 API 创建；原算力档位不变，复制独立档位、100m测试套餐并限定项目可见。为释放节点容量，仅下线本项目自动生成的待命服务。
+
+- 首次源码构建 `01a0e233-be54-7000-8ea1-bed35fe66126`：多阶段编译、pip PyYAML、npm CJS／ESM、脚本与动态链接二进制均在 worker UID10001 下输出预期结果；最终推送 HTTPS 返回 Traefik 404，因此构建正确登记 failed，没有可用版本。完整分页日志 `/tmp/cs-rfc028-platform-parent-build-full-logs.json`。
+- 根因是 `41-registry-gateway.yaml` 的内部域名只在 HTTP 路由，TLS 路由遗漏。新增 `registryGateway.test.ts` 先1 fail，修复后连既有网关回归3 pass／31 assertions，定向lint通过；协调窗口仅 apply 此文件，只有 `registry-push-tls` 改变，没有滚动平台 Pod。真实 push 仍待后续构建确认。
+- 重试构建 `01a0e23c-e914-7000-b001-18ccfc1214d6` 在 checkout 的 git fetch 停滞；同 Pod 禁用凭据的新 Git 请求可快速收到401。为释放共享容量，经公共取消接口停止，不能将网络诊断或路由单测计为 push 成功。
+- 真实 API 七项负向检查：绝对 context、父级遍历、保留底座参数、自定义 frontend 参数、外部 registry、不存在绑定、非平台任务底座均返回4xx，配方数量仍为1。证据 `/tmp/cs-rfc028-platform-preflight.json`；不存在绑定的404不等于双项目隔离已验收。
+- 实际项目设置运行镜像列表在320／390／1440px下整页宽度等于视口，零console错误；截图已人工查看，窄屏表格保留内部横向滚动。证据 `/tmp/cs-rfc028-platform-ui.json` 与相应PNG。此处仅列表布局，尚非RI25全部对象选择／键盘／日志路径通过。
+
+Agent档位真实能力测试另暴露 RFC027 probe 在 schema 补缺省值前计算摘要的问题，由 RFC027 会话修复并独立复验。完整 RI01～28继续保持未完成，不以提交、CI或部署成功替代。
+
+取消终态补证：09:44:26 `cancelling`→09:44:58 `cancelled`，归属标签下 Job／Pod／Secret全部为0；`/tmp/cs-rfc028-platform-cancel-build.json`记录真实API状态。真实UI后续通过键盘Enter打开配方、Escape回到「新增构建修订」，弹窗三宽分别[16,304]／[16,374]／[420,1020]且内部不溢出；分页续读失败构建直到404尾部，console错误为空，见`/tmp/cs-rfc028-platform-ui-interactions.json`。独立GitLab分支推进至`213b07686be79a81a5c333b8a81b8f7ceb8d1336`后，原配方仍固定`228360…`，自定义frontend实际拒绝。额外COPY素材被保存为未构建修订2；RFC的路径预检针对context／Dockerfile及源码链接，不把COPY指令未提前拒绝误判为承诺违约。
+
+TLS修复后的整平台构建已成功：`01a0e245-2543-7000-baf3-84967051278a` 在09:55:26 UTC登记版本`01a0e24a-78f7-7000-8b99-fbc0cc97fe86`，仓库manifest摘要`sha256:f19e42be27ac695355e655f2fa2f7c2794d7cb90c4833466b95f84d8471ab77e`。链路为真实登录API→固定GitLab源码→独立BuildKit→受管HTTPS鉴权推送→停止资源→registry检查→版本登记。完整状态与版本在`/tmp/cs-rfc028-platform-parent-rebuild-final.json`。本配方仍按受理时旧底座固定；发现部署遗漏的CS_BASE_IMAGE_TAG后，协调会话已同步新版标签并滚动API/controller，新Runner用途验收将使用新配方，不篡改已受理快照。

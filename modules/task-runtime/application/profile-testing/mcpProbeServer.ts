@@ -1,5 +1,6 @@
-import { BusinessExecutionEventSchema, BusinessExecutionInfoSchema, BusinessExecutionReceiptSchema, businessCommandDigestInput } from '@crewstation/contracts';
+import { BusinessExecutionInfoSchema, businessCommandDigestInput } from '@crewstation/contracts';
 import { newResourceId } from '@crewstation/kernel';
+import { readProbeEvents } from './businessProbeTurns';
 import type { BusinessProbeTurnDeps } from './businessProbeTurns';
 
 /** Private, loopback-only JSON-RPC test tool. It receives no tenant material or credentials. */
@@ -24,8 +25,7 @@ async function awaitListening(deps: BusinessProbeTurnDeps, executionId: string):
   let after = 0, output = '';
   for (;;) {
     if (!await deps.heartbeat()) throw new Error('MCP 测试服务器租约丢失');
-    const receipt = BusinessExecutionReceiptSchema.parse(await deps.runner.sendCommand(deps.taskId, { id: newResourceId(), type: 'getBusinessExecution', executionId }));
-    const page = BusinessExecutionEventSchema.array().parse(await deps.runner.sendCommand(deps.taskId, { id: newResourceId(), type: 'readBusinessExecutionEvents', executionId, after, limit: 200 }));
+    const { stored, page } = await readProbeEvents(deps, executionId, after), receipt = stored.receipt;
     for (const event of page) {
       if (event.sequence !== after + 1) throw new Error('MCP 测试服务器事件不连续');
       after = event.sequence;
