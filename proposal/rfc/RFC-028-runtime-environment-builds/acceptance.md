@@ -361,3 +361,25 @@ Agent 负向选择现在返回400 `runtime_image_not_allowed`；A镜像子任务
 - 早期完整检查的沙箱版因 localhost 监听权限失败；正常版自然结束3510 pass／54 skip／56 fail，其中48项实机登录等待、2项运行进程缓存旧镜像模块、4项并行模板变动、2项预览／GitLab问题。不得称全量通过。镜像两项已定向通过。候选冻结后使用既有dev-admin OIDC方式的新完整检查仍在执行，记录 `/tmp/cs-rfc028-owned-inline-full-check.log`。
 
 当前没有本批提交、精确SHA CI或部署；真实无仓库构建、授权业务执行与跨业务复用仍待补证。原 RFC028 的 RI 未完成项及 RFC029 恢复执行不因本批源码实现而关闭。
+
+### a12c7d13 发布与本机部署进展
+
+49路径已精确提交并推送 `a12c7d137800d35ae6cae78c20b060c2bd8cec8a`，保留第三方referenceResources；发布后main/origin 0/0、index空。两镜像从该提交归档直接构建，7控制面运行 `cs-control-plane:inline-a12c7d13`、console运行 `cs-console:inline-a12c7d13`，8个rollout成功。部署后的页面6组双语／主题／三宽、105读／0写通过；真实API越界路径400、Dockerfile超限400、匿名创建401。
+
+冻结后完整check自然结束：3631 pass／11 skip／7 fail／3 errors、22893断言、694文件、807.88秒。7项失败均在既有实机页面（加载超时、429与状态断言），3 errors也在实机用例链；本批模块和工作台用例通过，仍不得称全量绿。精确CI `36327737192` 最终六项全部success，回执 `/tmp/cs-rfc028-owned-inline-ci-final.json`。
+
+真实无仓库定义 `01a0e361-522b-7000-a97f-a6422abd20c7`、修订 `01a0e361-522b-7001-ad81-413f86cc9cbe`、构建 `01a0e361-5247-7000-a960-0cb10de288d1` 已受理。保存记录无sourceProjectId/repositoryBindingId/commitSha，实际Pod只含context-input及push卷、没有Git卷。当前CPU requests不足600m导致FailedScheduling，尚不能认定构建成功。已通过平台下线本任务第二业务无正式流量的闲置preview `01a0e31f-c6f5-7000-b129-23bf0c63d1de`（500m），保留业务、数据与版本；其后并发验收资源占用增加，正在协调串行资源验收。主验收任务仍保留，未操作其他会话资源。
+
+无仓库构建已于15:10:53Z成功，版本 `01a0e36b-4768-7000-b8d3-2b93c54edac0`，摘要 `sha256:112511b70b8bb528e6e6881512d3222f508b0cd4fd876c344aedafe37264b202`，产物在 `runtime/platform/<buildId>/image`。构建Job／Pod已物理回收；构建过程中已执行示例里的Python、CJS／ESM、脚本和原生二进制检查，另外直接执行了上传的755脚本。后续独立验证 `01a0e36b-8f24-7000-825e-227c8ebd64ea` 固定默认1CPU，当前因集群仅余770m处于调度等待，工具验证尚未完成，不将镜像available当作passed。
+
+### 仓库无关构建补充验收完成（2026-09-27）
+
+本节取代前述调度等待状态；其余旧RI未完成项仍保持原边界。
+
+- 无仓库构建成功，版本 `01a0e36b-4768-7000-b8d3-2b93c54edac0`、摘要 `sha256:112511b70b8bb528e6e6881512d3222f508b0cd4fd876c344aedafe37264b202`。固定配方9个文件，包含二进制输入及执行位；构建不读取业务仓库。
+- 主业务验证 `01a0e36b-8f24-7000-825e-227c8ebd64ea`、第二业务验证 `01a0e36e-6b09-7000-876c-41b0ea1e0546` 均passed；同一镜像实测UID10001及7项工具检查。第二业务原授权已恢复为inherit/revision4，新版本在该业务404，配方摘要与文件内容保持不变。第一次临时断言因JSON键顺序比较误报；改为结构比较及摘要双核对通过，仅重读，没有重复写授权。
+- 本任务专用业务v0.3.1（release `01a0e36e-86ad-7000-9769-4ba8842daab1`）只扩展任务允许镜像集合，沿用既有服务摘要；经fenced切换后由真实业务入口创建任务 `01a0e36f-c884-7000-b9e7-3ff652cde99d`。任务selectionSource=request，实际Pod imageID等于上述摘要；运行态初始化7项检查全部passed，证明工具在真实业务任务容器执行。本条证明启动检查，未声称新增业务命令子任务。
+- 已通过业务close入口结束该临时任务：closed、quotaHeld=false、resourceState=released；真实页面「使用记录」仍显示该已释放任务，详情在共享弹窗，截图 `/tmp/cs-rfc028-owned-inline-history.png`。旧主父任务 `01a0e30e-e096-7000-be22-db3c8ecd4171` 未动。
+- 主验收业务保留新增镜像授权和v0.3.1供查看；第二业务临时授权已恢复、空闲preview保持下线以释放容量。没有修改其他业务的镜像授权、任务或Agent容器。构建与验证临时资源已回收。
+
+完整证据：`/tmp/cs-rfc028-owned-inline-{live-final,validation-primary,validation-secondary,business-proof,business-pod,business-task-closed,revoke-proof-final,final-history,ci-final}.json`。本批代码a12c7d13六项CI成功、8组件已部署就绪、部署页6组及真实401／400已通过；非管理员403由真实PG＋HTTP路由测试验证。T19–T21闭合，不据此将整个RFC028或RFC029标Done。
