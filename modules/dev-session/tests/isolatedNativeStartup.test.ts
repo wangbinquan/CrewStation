@@ -193,3 +193,27 @@ test('RFC-024：界面画出之前 CLI 退出——CLI 初始化失败，回收�
   expect(saved.stages.find((stage) => stage.state === 'failed')).toMatchObject({ kind: 'interface', logTail: 'Error: config invalid', error: { code: 'agent-start-failed' } });
   expect(captured).toEqual([executionTaskId]);
 });
+
+
+test('后台把 CLI 界面状态写入资源台账；初始化中不能报告 ready，旧 Runner 沿用兼容判定', async () => {
+  const f = isolatedNativeFixture(), reports: Array<{ id: string; ready: boolean }> = [];
+  f.deps.executions = { phases: async () => new Map(), reportInterface: async (id, ready) => { reports.push({ id, ready }); } };
+  const cli = await f.start(), id = cli.execution!.taskId;
+  const current = f.rosters.get(id)!.terminals[0]!;
+  current.ui = { state: 'waiting' }; current.revision++;
+  await f.run(cli);
+  expect(reports.at(-1)).toEqual({ id, ready: false });
+  current.ui = { state: 'ready', by: 'screen' }; current.revision++;
+  await f.run(cli);
+  expect(reports.at(-1)).toEqual({ id, ready: true });
+  current.ui = { state: 'waiting' }; current.revision++;
+  await f.run(cli);
+  expect(reports.at(-1)).toEqual({ id, ready: false });
+  delete current.ui; current.revision++;
+  await f.run(cli);
+  expect(reports.at(-1)).toEqual({ id, ready: true });
+  const before = reports.length;
+  f.controls.offline.add(id);
+  await f.api.listNativeTerminals(actor, taskId);
+  expect(reports).toHaveLength(before);
+});

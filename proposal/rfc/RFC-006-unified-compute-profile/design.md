@@ -1,5 +1,7 @@
 # RFC-006｜设计
 
+> RFC-025 修订（2026-09-27）：每个执行环境仍占一个配额单位，但额度改由资源台账在项目锁下按阶段计算；工作区、CLI、子任务、档位测试的 Kubernetes 创建和回收由 cluster-control 执行。领域模块保留配置、凭据签发与生命周期。 统一边界见 [资源中心设计](../RFC-025-resource-center/design.md)，验证证据见 [验收记录](../RFC-025-resource-center/acceptance.md)。
+
 > Done · 2026-09-18 作者设定会话目标「完整实现RFC并提交上库」，据此实施完成。与 [proposal.md](proposal.md)、[plan.md](plan.md)、[ADR-0005](../../../docs/adr/0005-compute-profile-in-agent-runtime.md) 一起看。§11 是对结构文档的变化，§13 是实施前必须实测的技术点。
 
 ## 1. 现状与断点

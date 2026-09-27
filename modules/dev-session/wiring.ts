@@ -72,6 +72,7 @@ export const devSessionMigrations: MigrationSet = {
 
 export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionModule {
   const useCaseDeps: DevSessionUseCaseDeps = {
+    executions: deps.executions,
     comparisons: drizzleComparisonReferences(deps.db, deps.clock ?? systemClock, deps.identities),
     environments: deps.environments, runner: deps.runner, scm: deps.scm, releases: deps.releases, manifests: yamlManifestParser,
     authorizer: deps.authorizer, apiCatalog: deps.apiCatalog,

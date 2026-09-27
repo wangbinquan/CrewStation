@@ -44,6 +44,15 @@ describe('阶段规则（RFC-025 设计 §2.3）', () => {
     expect(computePhase(record({ children: [pod('Running', true)], conditions: [cond('RunnerConnected', 'false'), cond('Rebuilding', 'true')] })).phase).toBe('starting');
   });
 
+  test('CLI 等待界面就绪；独立 Agent 和子任务不要求界面，失去已报告的界面条件才降级', () => {
+    const cli = record({ kind: 'agent-execution', purpose: 'development-cli', children: [pod('Running', true)], conditions: [cond('RunnerConnected', 'true')] });
+    expect(computePhase(cli)).toEqual({ phase: 'starting', reason: { code: 'waiting-interface', message: '环境已连接，等待 CLI 界面就绪' } });
+    expect(computePhase({ ...cli, conditions: [...cli.conditions, cond('InterfaceReady', 'true')] }).phase).toBe('ready');
+    expect(computePhase({ ...cli, conditions: [...cli.conditions, cond('InterfaceReady', 'false', { message: 'CLI 界面暂不可用' })] })).toEqual({ phase: 'degraded', reason: { code: 'InterfaceReady-false', message: 'CLI 界面暂不可用' } });
+    for (const purpose of ['development-agent', 'business-subtask', 'profile-test'] as const) expect(computePhase({ ...cli, purpose }).phase).toBe('ready');
+    expect(computePhase({ ...cli, desired: 'absent' }).phase).toBe('stopping');
+  });
+
   test('失败条件优先于观测；暂停是结束中或已结束；Pod 已退出是降级（判失败归所属模块）', () => {
     expect(computePhase(record({ children: [pod('Running', true)], conditions: [cond('Failed', 'true', { reason: 'connect-timeout', message: '超过 5 分钟未连接' })] }))).toEqual({ phase: 'failed', reason: { code: 'connect-timeout', message: '超过 5 分钟未连接' } });
     expect(computePhase(record({ kind: 'business-workspace', conditions: [cond('Paused', 'true')], children: [pod('Running', true)] })).phase).toBe('stopping');

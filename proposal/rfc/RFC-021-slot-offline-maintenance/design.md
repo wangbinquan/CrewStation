@@ -1,5 +1,7 @@
 # RFC-021｜技术设计
 
+> RFC-025 修订（2026-09-27）：槽的期望与观测纳入台账，下线仍保留发布记录和 Service；用户域未部署入口由资源调和器改指平台说明页，保留 503 与 not-deployed 契约。项目归档不级联删除工作卷或命名空间；I27 的管理员清理另行受理。 统一边界见 [资源中心设计](../RFC-025-resource-center/design.md)，验证证据见 [验收记录](../RFC-025-resource-center/acceptance.md)。
+
 > 状态：Done · 2026-09-23 · 作者裁定见 [提案](./proposal.md) §4；实施补记见 §14，验收见 [acceptance.md](./acceptance.md)
 > 配套：[提案](./proposal.md) · [计划](./plan.md)
 

@@ -192,8 +192,8 @@ modules/<name>/
 |---|---|---|---|
 | L1 | `resources` | RFC-025 资源中心台账：期望（所属模块写）与实况（资源中心写）、子对象、变更日志、租约、别名；种类注册表与阶段规则、受理与按台账推导的额度、保留期、可做操作、标准视图与 SSE 推送流（ADR-0009） | —（与 `identity` 同层、互不依赖） |
 | L1 | `identity` | User、登录适配器、用户令牌与 JWKS、服务身份解析（源 Pod IP → 身份）、来源令牌、上游凭据下发 | — |
-| L2 | `cluster-control` | 受管 Kubernetes 对象的调和：观测映射写回台账、孤儿回收、旧对象收编（第一期只观测与空跑报告；写集群的代码按 RFC-025 分期从各模块迁入） | resources |
-| L2 | `data-control` | 数据面的调和：观测平台数据库集群上的库与角色，写回 `database`／`data-binding` 记录（建、改、删按 I28 的裁定分步从 `data` 迁入） | resources |
+| L2 | `cluster-control` | 受管 Kubernetes 对象的调和：观测映射写回台账、孤儿回收、旧对象收编；任务与执行 Pod、服务槽、Job、路由、限流、命名空间与策略的物理写入归调和器；管理员归档清理先完整盘点 | resources |
+| L2 | `data-control` | 数据面的调和：生成并加密保存口令，供给／观测库与角色，回收临时角色，执行可恢复的空闲项目口令轮换；写回 `database`／`data-binding` 记录 | resources |
 | L2 | `project` | Project、Service、成员三级角色、preview 测试者、命名空间登记、TaskQuota、ServicePlan、TaskProfile（算力档位已按 ADR-0005 移出） | identity |
 | L3 | `scm` | SourceRepositoryBinding、建仓、代推、标签与保护标签、会话级短期 Git 凭据 | project |
 | L3 | `config` | ConfigItem、SecretValue、开发与生产两组值、版本快照、注入渲染 | project |
@@ -233,7 +233,7 @@ flowchart BT
   resources & cluster-control & data-control --> platform
 ```
 
-RFC-025 各期推进时，写期望、读实况的领域模块（`data`、`release`、`task-runtime`、`dev-session`、`business-task`、`gateway`、`provisioning`、`cluster-management`）改为依赖 `resources`；它们不依赖 `cluster-control`（ADR-0009）。
+RFC-025 中，写期望、读实况的领域模块（`data`、`release`、`task-runtime`、`dev-session`、`business-task`、`gateway`、`provisioning`、`cluster-management`）改为依赖 `resources`；它们不依赖 `cluster-control`（ADR-0009）。
 
 拆分依据：Design 里每一个有自己状态机的对象簇一个模块。围绕任务的能力刻意拆成四个模块（`task-runtime`、`dev-session`、`business-task`、`session`），因为 agent-workflow 的 `task.ts` 正是把这四件事写进了一个 7780 行的文件。管理员运行环境有自己的版本／检查／启用状态机，因此按 ADR-0004 单独成 `agent-runtime`，而不塞进已有 39／40 个源码文件的 `project` 或 `dev-session`；RFC-006 把运行环境并入算力档位后，档位整体移入 `agent-runtime`（ADR-0005）。
 

@@ -928,3 +928,10 @@ git reset -q HEAD -- <自己的路径>                     # 共享暂存区里�
 e2e 用例本身按「共享集群只发只读请求或必然被拒的写请求」写，这次没有留下改动，但它不该在预检时跑。
 预检改用三层各自带覆盖率：`bun run test:unit --cover && bun run test:module --cover && bun run test:console --cover`，再 `bun run test:patch --base origin/main --tiers unit,module,console`。
 
+
+## RFC-025 实况与清理边界（2026-09-27）
+
+- Kubernetes 会规范化资源数量，也会省略 `VolumeMount.readOnly=false`。重建校验必须接受等值回读，同时拒绝真实规格变化与显式只读挂载；不能仅用内存 fake 的原样对象证明实机兼容。
+- 开发预览 IngressRoute 的认领从工作区移交独立 route 时，期望、唯一认领与观测必须同事务转移，并与两边的调和租约互斥；删除旧快照前重新查当前归属。只从 spec 删字段仍会留下观测认领。
+- 归档不是 Namespace 的删除许可。管理员清理前盘点所有 namespaced API（全部版本补齐种类、CRD 与分页），任何失败都不能解释为空；Pod、PVC、未知对象阻断。只允许已确认的额度、策略、闲置 Service 与其控制器生成的空端点；不强删 finalizer，不删同名替换 UID。
+- 台账压缩后，归档清理的释放原因仍作为墓碑；命名空间内的新声明须取得项目锁并查墓碑。资源台账不存 Runner／Git／数据库明文凭据，值由所属能力在创建 Secret 时按需提供。

@@ -14,7 +14,7 @@ export interface PhaseResult {
   readonly reason?: ResourceReason;
 }
 
-type PhaseInput = Pick<LedgerRecord, 'kind' | 'desired' | 'spec' | 'children' | 'conditions' | 'releaseReason'>;
+type PhaseInput = Pick<LedgerRecord, 'kind' | 'purpose' | 'desired' | 'spec' | 'children' | 'conditions' | 'releaseReason'>;
 
 const reasonOf = (code: string, message: string, hint?: string): ResourceReason => ({ code, message, ...(hint ? { hint } : {}) });
 const STOPPING = reasonOf('stopping', '已受理释放，正在回收');
@@ -122,12 +122,13 @@ function workloadPhase(record: PhaseInput, rule: KindRule, pod: ResourceChild): 
     return { phase: 'degraded', reason: reasonOf(pod.phase === 'Failed' ? 'pod-failed' : 'pod-exited', pod.reason ? `${summary}：${pod.reason}` : summary) };
   }
   if (pod.phase !== 'Running' || !pod.ready) return { phase: 'starting', ...(pod.reason ? { reason: reasonOf('waiting-container', pod.reason) } : {}) };
-  const unmet = rule.readyConditions.map((type) => ({ type, entry: condition(record, type) })).filter(({ entry }) => entry?.status !== 'true');
+  const required = record.kind === 'agent-execution' && record.purpose === 'development-cli' ? [...rule.readyConditions, 'InterfaceReady'] : rule.readyConditions;
+  const unmet = required.map((type) => ({ type, entry: condition(record, type) })).filter(({ entry }) => entry?.status !== 'true');
   if (!unmet.length) return { phase: 'ready' };
   // 从没为真：还在启动；曾经为真、现在为假或未知：降级（例如 Runner 断开）。重建中的工作区按重新启动算。
   const rebuilding = condition(record, 'Rebuilding')?.status === 'true';
   const lost = unmet.find(({ entry }) => entry !== undefined);
-  if (!lost || rebuilding) return { phase: 'starting', reason: WAIT_CONNECT };
+  if (!lost || rebuilding) return { phase: 'starting', reason: unmet[0]?.type === 'InterfaceReady' ? reasonOf('waiting-interface', '环境已连接，等待 CLI 界面就绪') : WAIT_CONNECT };
   return { phase: 'degraded', reason: reasonOf(`${lost.type}-${lost.entry!.status}`, lost.entry!.message ?? `${lost.type} 不成立`) };
 }
 

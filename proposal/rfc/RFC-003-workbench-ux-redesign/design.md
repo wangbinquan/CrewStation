@@ -1,5 +1,7 @@
 # RFC-003｜交互、状态与实现设计
 
+> RFC-025 修订（2026-09-27）：资源阶段、可做动作及原因统一来自 resources 快照与 SSE；开发页、概览、拓扑和管理员清单共用同一记录。CLI 的 ready 同时要求容器就绪与 InterfaceReady，界面不把旧 running 自行换成可交互。 统一边界见 [资源中心设计](../RFC-025-resource-center/design.md)，验证证据见 [验收记录](../RFC-025-resource-center/acceptance.md)。
+
 > 状态：In Progress · 2026-09-13 · 作者已批准完整实现\
 > “新增”描述本 RFC 的目标；设计时源码基线见 [audit.md](./audit.md)，实现与验收进度见 [plan.md](./plan.md)。
 

@@ -429,8 +429,72 @@ I29 裁定（三个 (a)）之后：
 
 新建隔离验收项目 `rfc025-rebuild-verify`（项目 `01a0e044-4976-7000-90df-8b9c0f0dabaf`，工作区 `01a0e044-7120-7000-bfcc-51c08a8cc253`）。原 Pod UID 为 `c7927e89-3717-4319-a0fd-bbb8cd81b081`，在原工作卷写入验收哨兵。第一次运维检查因目标变化未受理；刷新检查后受理，但新 Pod 规格校验失败，按重建补偿回收本次对象，原卷保留。实机服务端 dry-run 的输入／输出逐字段比较确认：`VolumeMount.readOnly=false` 被 API Server 省略，导致子集校验误判。修复只接受该字段的省略形式，显式 `true` 仍拒绝；回归覆盖这两支。原有三个开发会话未参与操作。修复后的保卷恢复实机结果另补，不能用先前 CI 绿代替它。
 
+### 16.2 保卷恢复复验通过
+
+修复随 `bb1bfc0939ae50cc55e10072d6837e6d1ac70a57` 发布。[CI 36284333074](https://github.com/wangbinquan/CrewStation/actions/runs/36284333074) 的 static、unit、module、console、gate、e2e 全部成功，01:10:31Z 终态。API／controller／session 与 console 均已滚动到 `rc025-cleanup-bb1bfc09`；控制面镜像 ID `sha256:df69c58a74db7a93fe913af784403ba6c33f0c1ca9d01340fa4af946fc1f3b76`，console 为 `sha256:8fb657e12c6bc43e00abfa85cf182922d8ea7547cbabc48612700ccdc7065a59`。命名空间清理所需只读全资源盘点与 Namespace 删除 RBAC 一并应用。
+
+在同一隔离验收项目，通过正常重建检查与确认接口重试：01:06:36.566Z queued，01:06:38.342Z ready，1.776 秒。新 Pod `task-r-01a0e0664f9670009a1cbc2273046ff6`，UID `a0afa0a3-14e3-4f75-ba89-bf6f68335268`，Running；原 PVC UID **`98fd7cb5-43be-4dca-840e-daa32bf2d175` 不变**，`/work/rfc025-rebuild-sentinel.txt` 仍为 `rfc025-retained-worktree-e799d3fd`，新 Pod 没有 initContainers。会话、预览与重建接口分别为 running、ready、ready。已部署开发页显示「原工作树已恢复」「已连接」，工作树为 main @ d4cbd98797、一个未提交的验收文件。没有重新检出，也没有自动恢复 CLI。
+
 ## 17. 归档命名空间管理员清理（I27、T13）
 
 管理员经集群详情的标准资源动作受理，provisioning 每次读取归档事实与命名空间身份；resources 在项目锁和所有关联调和租约下核对终态、确认卷已经显式释放，并完整盘点物理资源。受理同时释放命名空间、额度、网络策略和闲置 Service 的记录，不涉及数据库、仓库。cluster-control 删除前再次盘点所有 namespaced API（含 CRD、分页），按 Namespace UID／resourceVersion 删除；未知对象、残留卷、读失败都阻断。只允许确认过的脚手架及其控制器生成的空端点；不会强制移除 finalizer。释放墓碑在记录压缩后仍禁止项目内新声明。
 
-新增回归覆盖授权、归档不自动删除、活动项目阻断、残留卷与未知 CRD、租约竞争和盘点失败的原子回滚、压缩后不复活、命名空间换 UID、分页与发现失败、只读视图与确认词。组合根用真实数据库、完整模块装配和假 Kubernetes 验证从标准动作到调和删除。本地完整门禁：静态通过，unit 724/0、module 1410/7 skip/0 fail、console 最终 905/0（初轮发布页首个用例在懒加载完成前断言，改为等待实际 SHA 出现后整层通过）；新增可执行行 170/175（97.1%）。单元层一次在沙箱内无法监听临时端口，使用允许本机监听的同一命令后完整通过；模块层未重复运行。发布和实机证据待补。
+新增回归覆盖授权、归档不自动删除、活动项目阻断、残留卷与未知 CRD、租约竞争和盘点失败的原子回滚、压缩后不复活、命名空间换 UID、分页与发现失败、只读视图与确认词。组合根用真实数据库、完整模块装配和假 Kubernetes 验证从标准动作到调和删除。本地完整门禁：静态通过，unit 724/0、module 1410/7 skip/0 fail、console 最终 905/0（初轮发布页首个用例在懒加载完成前断言，改为等待实际 SHA 出现后整层通过）；新增可执行行 170/175（97.1%）。单元层一次在沙箱内无法监听临时端口，使用允许本机监听的同一命令后完整通过；模块层未重复运行。已发布 bb1bfc09，精确 SHA CI 六项全绿并部署（§16.2）；归档删除实机流程待在隔离验收项目完成。
+
+## 18. 最终资源推送与长连接复验
+
+### 18.1 两条连接同步结束、刷新与续传
+
+09-27 01:09Z，在隔离验收项目创建 CLI `01a0e069-0263-7001-bfb5-48b73b854544`，执行资源 `01a0e069-0263-7000-837e-7c8607690497`。两条独立、经真实网关的管理员资源 SSE 均在创建前打开，依次收到 pending、starting、ready。只发一次正常停止请求，HTTP 204；连接一在 **01:13:02.767Z stopping → 01:13:05.093Z stopped**，连接二在 **01:13:02.766Z stopping → 01:13:05.094Z stopped**。两个浏览器窗口的旧登录曾过期，重新登录／刷新后均显示「进程已结束」、退出末屏只读；概览为运行中的工作区、0 个 CLI，未复活已结束执行。这里的逐阶段时间是独立 HTTP 流证据，不冒充登录过期期间的浏览器动画。
+
+01:18Z 使用 ready 时的 `Last-Event-ID: 602841` 重连，收到该资源的 `upsert cursor=602847 phase=stopped`，没有重复快照；`Last-Event-ID: 0` 过旧，得到 `snapshot cursor=602847`。原始证据在本机 `/private/tmp/rfc025-stream-events.json`、`/private/tmp/rfc025-read-connections.json`（不含 Cookie）。
+
+### 18.2 API 突发期间 SSE 与 WebSocket 保持
+
+在同一工作区先建立真实任务 WebSocket，收到 `streamReady connected=true`，同时打开资源 SSE。管理员 `/v1/me` 100 并发得到 42×200、58×429，429 均带 `Retry-After: 1`；16 秒观察后 WebSocket 仍 OPEN 且继续收事件，SSE 未断并收到 01:18:33.558Z 心跳。与 §13 三类突发、§14 匿名桶证据合并，确认普通 API 突发未切断既有长连接；这不是多用户合计桶或网关多副本共享计数的证明。
+
+双身份失权与并发额度实机脚本已准备；自动审批因临时添加测试项目成员与修改额度而拒绝执行，待作者明确批准。本节不将这两项标为已实测；模块回归已经通过。
+
+### 18.3 当前 RC 证据对照与剩余边界
+
+以下按 2026-09-27 本轮实查更新，保留早期分期记录的时间语境；“模块通过”不替代清单要求的实机证据。RFC 仍为 In Progress。
+
+| 编号 | 当前证据 | 剩余实机范围 |
+|---|---|---|
+| RC-01 | §3.2、§12.1 与本轮开发页、概览、完整形态、发布页、健康页：工作区 ready／已连接、CLI stopped／0 个 CLI，preview ready／1 个就绪副本、prod stopped／尚未部署；集群拓扑共享台账已部署 | §18.5 已保存六处截图与同轮 API／UID 快照 |
+| RC-02 | §18.1 两连接阶段与毫秒时间；两浏览器刷新仍结束 | 另一名成员观察与失权测试待明确授权 |
+| RC-03 | §18.1 Last-Event-ID 续传与过旧快照；resourceStream 模块失权回归绿 | 成员移除后真实流 reset／关闭待明确授权 |
+| RC-04 | §3.3 真实 72 小时到期、Pod／路由回收、PVC PendingReclaim；§16.2 保卷重建 | 无需破坏现有历史工作卷 |
+| RC-05 | §3.4、§11 真实孤儿清单、UID 删除审计与 PVC 待回收；删除工作卷模块／组合回归绿 | 管理员删除本次隔离验收卷的实际流程 |
+| RC-06 | audit §1 的旧失败 Pod／预览入口／过期 Runner Secret 已按 §3.3–3.4 处理；孤儿业务 PVC 三条和失败到期卷五条保留待管理员；§11 旧 Service／中间件认领与无引用中间件回收；§12.2 旧 Git 凭据无残留；§15.1 三个当前预览 UID 原位移交 | 八个历史卷按保留规则处理，不擅自删除原使用者数据；本轮验收项目单独收尾 |
+| RC-07 | §4 四类原因码、说明、出路与无新增记录由真实台账模块回归锁住 | 四种入口拒绝的完整部署后 HTTP 证据仍待补 |
+| RC-08 | §5 HTML 说明页与 503 JSON；§14、§15 Host 唯一、候补仲裁、开发预览独立路由 | §18.4 已完成本轮隔离项目下线→重新部署闭环 |
+| RC-09 | §13 三类突发；§14 匿名 IP；§18.2 SSE／WebSocket 保持；429 自动重读组件回归绿 | 多身份／来源的合计桶与浏览器重试提示 |
+| RC-10 | §6 运行中默认／项目覆盖策略的模块与中间件渲染回归 | §18.4 项目覆盖 186 ms 内生效并恢复；平台默认仍保留已批准现值 |
+| RC-11 | §3.5 台账占用核对、并发最后一单位只一方受理、结束中占用与释放退额模块回归绿 | 隔离项目并发受理／释放实机待明确授权 |
+| RC-12 | §7 Namespace／Quota／NetworkPolicy 调和（<1 秒恢复），§8 database／data-binding 实况；§14 空闲轮换真实 PostgreSQL 回归 | I27 归档保留→阻断残留→管理员删除命名空间实机 |
+| RC-13 | §10 双控制器租约分工与持有者失效后接手实机通过 | 无 |
+| RC-14 | §9、§12 集群资源叠加与项目拓扑；架构规则与完整 static 门禁绿 | §18.5 已完成同轮对照 |
+| RC-15 | §11 旧 tsk 别名实查，UUID 主键与 rel／tsk 解析回归绿 | 无 |
+| RC-16 | 各期本地静态、unit／module／console、新增行防护及精确 SHA CI；最近代码 bb1bfc09 六项全绿 | 本轮文档提交的 CI 终态 |
+
+本轮基线已回填 v0.3.17（R59–R60、D65–D68、AT-60–AT-61），九份相关 RFC 与 ADR-0006 加修订说明，结构文档、README、CLAUDE、dev-gotchas、STATE 同步；正式 Done 要等上表未完成项关闭。
+
+### 18.4 下线／重新部署与项目限流覆盖
+
+- **RC-08**：01:22:48.098Z 通过正常下线接口停止本次隔离项目待验证版本 v0.1.0。槽先变 empty，路由调和期间短暂收到 `no available server`，不把这个响应算成平台说明页；01:23:28Z 复核为 HTTP **503**、JSON `error=not-deployed`，details 带该次下线时间、manual、v0.1.0。浏览器显示平台统一说明页与重新部署指引。物理 IngressRoute 已改指 `crewstation-system/cs-api`，预览 Host 仅一条。随后通过正常预检／重新部署接口部署原 release `01a0e044-6621-7000-873d-34a36af2690a`；01:23:50.931Z deploying，01:23:56.085Z ready／1 个就绪副本，原预览 `/healthz` 返回 200 `status=ok`。发布 ID、标签和 SHA 不变，没有新建发布／构建。
+- **RC-10／Host 桶**：01:24:39Z 仅将本次测试项目的 Host 桶临时收紧为 2/s、突发 4，每用户桶仍为 30/s、突发 60，平台默认未改。从 API 写入到观察到真实 `rate-limit-host` Middleware 为新值 **186 ms**；30 并发读预览健康接口得到 4×200、26×429，429 均有 `Retry-After: 1`。随后撤销项目覆盖，API 回到 override=null、revision=0，真实中间件恢复 300/s、突发 600。其他项目未修改。单身份请求足以区分两个桶的限额，但不代替多身份合计校验。
+- 原始记录：本机 `/private/tmp/rfc025-slot-verifyOffline.json`、`rfc025-slot-redeploy.json`、`rfc025-routes-offline.json`、`rfc025-project-rate-evidence.json`，均不含会话 Cookie。
+
+
+### 18.5 六处页面与同轮快照（RC-01、RC-14）
+
+09-27 01:41–01:43Z，同一管理员、同一测试项目依次核对开发页、概览、完整形态、发布页、健康页和集群管理展开后的项目 Pod 层。工作区 `01a0e044-7120-7000-bfcc-51c08a8cc253` 对应新 Pod `task-r-01a0e0664f9670009a1cbc2273046ff6`，阶段 ready，开发页显示已连接／原工作树已恢复；CLI `…854544` 为 stopped，开发页只读末屏、概览 0 个 CLI。preview 槽 ready、Deployment 1/1，各入口显示运行中或就绪；prod 槽与 route 为 stopped、not-deployed，发布与概览明确显示未部署，拓扑为已结束／尚未部署。
+
+健康页的 prod 未知、0/0 是健康判定，拓扑横带的「就绪」汇总包含仍就绪的数据库；二者不是单条槽资源的标准阶段，未拿它们替代槽台账。六张截图和同轮资源 API、Kubernetes UID 快照保存在本机 `/private/tmp/rfc025-final-ui/`：`dev-session.png`、`overview.png`、`topology.png`、`release.png`、`health.png`、`cluster.png`、`resources.json`、`cluster.json`。
+
+### 18.6 CLI 界面就绪条件补齐
+
+最终逐条对照设计 §2.3 发现，CLI 的执行记录原先只要求 Pod 和 Runner 就绪，会早于 RFC-024 的界面就绪时刻变为 ready。现由 dev-session 后台将界面事实通过组合根写入 task-runtime 所属记录；仅 development-cli 要求 InterfaceReady。首次就绪前保持 starting／waiting-interface，曾就绪后界面不可用为 degraded；非 CLI 的独立 Agent、业务子任务、档位测试不等待界面。释放优先，重复事实不增加台账版本，Runner 投影不抹掉该条件；旧 Runner 没有 ui 字段时沿用既有启动进度兼容判定。
+
+两条新增阶段／后台回归先在旧代码上失败（29 pass／2 fail），修复后定向 31/0；真实 PostgreSQL 组合回归 1/0，覆盖等待、就绪、降级恢复、释放、幂等和写入归属。本地静态检查、unit 725/0、module 1412/7 skip/0 fail、console 905/0、console 生产构建全部通过；包含新增文件的改动行防护 21/21（100%）。各层只运行一次完整成功候选，接手前的 E2E 文件未纳入；发布与实机结果在完成后补记。

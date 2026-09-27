@@ -1,5 +1,7 @@
 # RFC-020｜技术与交互设计
 
+> RFC-025 修订（2026-09-27）：工作区信息架构和布局协议不变；CLI 标签、概览开发摘要、发布槽与拓扑统一消费资源快照和 SSE，受理释放即结束中，读请求限流按 Retry-After 自动重读，写请求不自动重发。 统一边界见 [资源中心设计](../RFC-025-resource-center/design.md)，验证证据见 [验收记录](../RFC-025-resource-center/acceptance.md)。
+
 > Done · 2026-09-23（实施与实机证据见 [acceptance.md](./acceptance.md)；实施中的偏差记在 [plan.md](./plan.md) §4）；与 [proposal.md](./proposal.md) 配套，已按作者对 D1–D7 的裁定改写（D2 取 (b)：开发资源入口取消，三主题进开发页参考面板；D3 取 (b)：运行与诊断保留横向页签，合并为五个）。只改工作台组织与一个可选的契约字段，不新增后端接口。
 
 ## 目录

@@ -1,5 +1,7 @@
 # RFC-019｜技术设计
 
+> RFC-025 修订（2026-09-27）：拓扑的工作区、执行环境、服务槽和构建节点阶段与原因来自资源台账及推送；物理拓扑、数量与容量保留采集快照来源。空闲服务入口不冒充运行工作负载。 统一边界见 [资源中心设计](../RFC-025-resource-center/design.md)，验证证据见 [验收记录](../RFC-025-resource-center/acceptance.md)。
+
 > 状态：Done · 2026-09-22 · 实施与实机证据见 [acceptance.md](./acceptance.md)
 > 配套：[提案](./proposal.md) · [计划](./plan.md) · [交互设计稿核对](./prototype-review.md)
 

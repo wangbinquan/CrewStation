@@ -5,5 +5,7 @@ import type { ResourcePhase, TaskId } from '@crewstation/contracts';
  * （工作负载记录沿用环境 ID）。读不到就返回空，名册照 Runner 的说法给出。
  */
 export interface ExecutionRecords {
+  /** 后台观察到的 CLI 界面事实；容器未创建、已释放或非 CLI 的记录不改写。 */
+  reportInterface(executionTaskId: TaskId, ready: boolean): Promise<void>;
   phases(workspaceTaskId: TaskId): Promise<ReadonlyMap<string, ResourcePhase>>;
 }

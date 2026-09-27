@@ -1,5 +1,7 @@
 # RFC-022｜技术设计
 
+> RFC-025 修订（2026-09-27）：启动进度与起止时间继续由后端保存和输出，资源标准阶段与启动细节分开。新保卷重建请求由 cluster-control 在资源租约中创建本次 Secret／Pod，task-runtime 保留确认、原卷校验、状态机与补偿，不重新检出。 统一边界见 [资源中心设计](../RFC-025-resource-center/design.md)，验证证据见 [验收记录](../RFC-025-resource-center/acceptance.md)。
+
 > 状态：Done · 2026-09-23 · 作者裁定见 [提案](./proposal.md) §4 与 §8（第三轮批准并实施）
 > 配套：[提案](./proposal.md) · [计划](./plan.md)
 

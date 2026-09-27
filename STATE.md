@@ -5,6 +5,8 @@
 
 ## RFC-025 接手续作（2026-09-27）
 
+最新候选补齐 CLI InterfaceReady：dev-session 后台上报，CLI 记录等待界面后才 ready，旧 Runner 兼容；非 CLI 不受此条件限制。静态、unit 725/0、module 1412/7 skip/0 fail、console 905/0、生产构建与新增行防护 21/21 全通过。六处页面对照与资源／UID 快照已保存。I27 一次性验收项目已归档，Namespace／Quota／NetworkPolicy UID 保持；残留卷／Secret／已完成 Job 的删除阻断已实测，空孤儿正常清理及管理员最终删除仍在进行。双身份与并发额度临时授权仍待作者答复；RFC 未标 Done。
+
 接手基线 `1fbbde8d` 与 origin/main 一致，基线 CI 35978999719 成功；本机控制面实为 `rc025-t14c-20260924`、console 为 `app-access-2-20260924`，均就绪，以下旧段落的部署标签是历史记录。
 
 本轮先推进 T13：集群展开项目拓扑接全平台资源快照与 SSE，按项目过滤；capabilities 开发摘要的阶段、原因与连接事实改读台账，缺记录不回退旧 running。新增回归已先红后绿，本地静态门禁通过，unit 713/0、module 1380/7 skip/0 fail、console 902/0，新增可执行行覆盖 52/52；已推送 ee032c95 并部署 API／Console 为 rc025-t13b-ee032c95（1/1）；精确 SHA CI 36258625492 六项通过（含 gate 与 e2e），证据集中在 RFC025 acceptance §12。另修资源维护用例的时钟漂移：该组按数据库时间巡检，却固定在 09-23；现只在该组初始化时对齐数据库时钟，22/22 定向通过，未改生产保留期规则。
@@ -16,6 +18,10 @@
 T6 重建创建移交已发布 e09b1de6，精确 SHA CI 36282868910 六项成功，API／controller／session 已升级 rc025-rebuild-e09b1de6。实机验收发现 Kubernetes 省略 VolumeMount.readOnly=false 导致新 Pod 误判，已补兼容与防只读回归，修复后实机重验待完成。原先本地验证：新请求由资源调和器在逐记录租约中执行，本模块保留原卷检查、项目锁、重试与补偿；旧请求沿用原队列。新增迁移 0011，定向回归已覆盖响应丢失、卷替换、五次失败和租约中止；静态门禁、unit 722/0、module 1401/7 skip/0 fail、console 904/0 已通过，新增可执行行覆盖 163/163；发布与实机待完成（acceptance §16）。
 
 I27 管理员归档命名空间删除入口已实现：完整 API 发现与分页盘点、卷与未结束资源阻断、项目锁和调和租约、原 Namespace UID 删除、删除墓碑防复活；归档本身继续保留命名空间、额度和网络策略。完整门禁通过：静态、unit 724/0、module 1410/7 skip/0 fail、console 905/0，新增可执行行 170/175（97.1%）；发布与实机清理尚未完成。见 acceptance §16.1、§17。
+
+最新验收（2026-09-27 01:18Z）：bb1bfc09 已推送，CI 36284333074 六项全绿；API／controller／session／console 均已部署 rc025-cleanup-bb1bfc09。隔离项目 rfc025-rebuild-verify 的保卷恢复成功：新 Pod Running、原 PVC UID 和哨兵文件不变、无重新检出；两个独立 SSE 同步收到 CLI stopping→stopped，刷新不复活；游标续传与旧游标快照、API 突发时 SSE／WebSocket 保持通过。证据在 acceptance §16.2、§18。基线文档 v0.3.17 回填进行中。双身份失权／并发额度脚本因临时成员授权与额度修改被自动审批拒绝，已请求作者明确批准；归档删除与剩余 RC 尚未最终关闭。此前记录中的“待发布”“待恢复复验”已由本段取代。
+
+本轮另完成下线／重部署闭环与项目限流覆盖（acceptance §18.4）：隔离项目预览下线后返回统一说明页与 503 not-deployed，原 release 重部署约 5 秒 ready、健康接口 200；Host 桶临时收紧为 2/s、突发 4，186 ms 调和，30 并发为 4×200＋26×429，随后已恢复 override=null 和 300/s、突发 600。平台默认和其他项目未改。文档改动仅补已完成事实，RFC025 保持 In Progress；不要把回填或既有 CI 绿误当完整 RC 收口。
 
 ## 一句话
 

@@ -1,5 +1,7 @@
 # RFC-010｜技术设计
 
+> RFC-025 修订（2026-09-27）：集群盘点继续提供物理清单和容量；已认领对象叠加资源台账的阶段与动作。受维护对象不允许直接删除；待回收工作卷与归档命名空间走管理员标准资源动作。运维检查、幂等回执和领域操作边界保留。 统一边界见 [资源中心设计](../RFC-025-resource-center/design.md)，验证证据见 [验收记录](../RFC-025-resource-center/acceptance.md)。
+
 > 状态：Done；实现与实机验收完成，范围裁定见 [proposal.md](./proposal.md)，发布证据见 [acceptance.md](./acceptance.md)
 > 日期：2026-09-20；设计前的源码核对见 [audit.md](./audit.md)，实施结果见第 10 节与 [验收记录](./acceptance.md)
 

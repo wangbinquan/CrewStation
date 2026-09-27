@@ -1,5 +1,7 @@
 # RFC-024｜技术设计
 
+> RFC-025 修订（2026-09-27）：InterfaceReady 作为执行环境的领域条件写入资源台账，与 Pod Running／Ready 合成标准阶段；只容器就绪仍是 starting，条件失去后可降级。客户端不从早期名册状态推断输入可用。 统一边界见 [资源中心设计](../RFC-025-resource-center/design.md)，验证证据见 [验收记录](../RFC-025-resource-center/acceptance.md)。
+
 > 状态：Done · 2026-09-23 · 作者批准三件套，Q1–Q3 取推荐方案（静止 500 ms、超时 45 秒（验收后修订为 90 秒）、代答查询另立 RFC）；实机验收见 [acceptance.md](./acceptance.md)
 > 配套：[提案](./proposal.md) · [实施计划](./plan.md)
 

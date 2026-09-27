@@ -73,6 +73,10 @@ export class NativeExecutionLifecycle {
     } else if (!nativeEnded(record) && env) record = await this.finishRecord(start, env.native?.failureReason ? 'environment-failed' : 'stopped', env.native?.failureReason);
     const lifecycle = nativeEnded(record) || record.lifecycle === 'starting' ? record.lifecycle : connection === 'connected' ? record.lifecycle : 'unknown';
     const startup = await this.startupOf(start, env, record);
+    if (connection === 'connected' && !nativeEnded(record)) {
+      const ready = record.ui ? record.ui.state === 'ready' : startup ? startup.state === 'ready' : record.lifecycle === 'running';
+      await this.deps.executions?.reportInterface(start.execution!.taskId, ready);
+    }
     return { ...record, lifecycle, taskId: start.taskId, createdBy: start.createdBy, clientRequestId: start.clientRequestId, connection,
       ...(startup ? { startup: { ...startup, observedAt: this.deps.clock.now().toISOString() } } : {}),
       execution: { taskId: start.execution!.taskId, state: env?.native?.state ?? (nativeEnded(record) ? 'finished' : 'queued'), profile: env?.native?.profile, message: start.execution!.stopRequested && !nativeEnded(record) ? '正在结束此 CLI' : env?.message },
