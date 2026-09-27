@@ -1,5 +1,5 @@
 import type { ClusterPurpose, ResourceConditionStatus, ResourceKind, StartupRecord } from '@crewstation/contracts';
-import type { ExecutionPurpose, TaskEnvironment } from './taskEnvironment';
+import type { ExecutionPurpose, TaskEnvironment, WorkloadRender } from './taskEnvironment';
 import { canonicalNativeIntent, EXECUTION_INTENT_ANNOTATION, WORKSPACE_TASK_LABEL } from './physicalIdentity';
 import { checkoutSecretOf, podNameFor, purposeOf, reconcilerCreates, runnerSecretOf, WORKLOAD_LABELS, wantsProvisioning } from './taskEnvironment';
 
@@ -42,6 +42,7 @@ export interface ProjectedRecord {
 export interface EnvironmentProjection {
   readonly workload: ProjectedRecord;
   readonly volume?: ProjectedRecord;
+  readonly route?: ProjectedRecord;
   /** Runner 当前是否连着；是否上报「断开」要看台账里是否曾经连上（资源中心按「曾经为真」判降级）。 */
   readonly connected: boolean;
 }
@@ -109,7 +110,7 @@ function provisioningOf(env: TaskEnvironment): ProjectedCondition {
  */
 function workloadRender(env: TaskEnvironment): ProjectedRecord['render'] {
   if (!reconcilerCreates(env)) return undefined;
-  const { image, workerUid, resources, checkout, previewRoute } = env.render;
+  const { image, workerUid, resources, checkout } = env.render;
   const pod = {
     image, workerUid, resources, workload: WORKLOAD_LABELS[env.kind], project: env.labels['crewstation.io/project'] ?? '', service: env.labels['crewstation.io/service'] ?? '',
     // 档位测试（I25 第四步）用 Pod 内的临时目录，没有工作卷。
@@ -117,7 +118,7 @@ function workloadRender(env: TaskEnvironment): ProjectedRecord['render'] {
     // 检出（I25）：没带 Secret 名的，凭据 Secret 由资源中心按这一次启动建（ownedCredential），令牌建的时候向本模块要。
     ...(checkout ? { checkout: { repoUrl: checkout.repoUrl, branch: checkout.branch, credentialSecretName: checkoutSecretOf(env)!, ...(checkout.credentialSecretName ? {} : { ownedCredential: true }) } } : {}),
   };
-  return { pod, ...(env.preview ? { preview: { port: env.preview.port, kind: env.kind, ...(previewRoute ? { route: previewRoute } : {}) } } : {}) };
+  return { pod, ...(env.preview ? { preview: { port: env.preview.port, kind: env.kind } } : {}) };
 }
 
 /**
@@ -156,12 +157,13 @@ function workloadChildren(env: TaskEnvironment): ProjectedRecord['children'] {
   ];
 }
 
-export function projectEnvironment(env: TaskEnvironment): EnvironmentProjection {
+export function projectEnvironment(env: TaskEnvironment, previewRoute: WorkloadRender['previewRoute'] = env.render?.previewRoute): EnvironmentProjection {
   const release = releaseOf(env);
+  const split = !!env.preview && !env.native && !!previewRoute;
   const workload: ProjectedRecord = {
     id: env.id, kind: workloadKind(env), ref: env.id, projectId: env.projectId,
     ...(env.native ? { parentId: env.native.parentTaskId } : {}),
-    purpose: workloadPurpose(env), children: workloadChildren(env),
+    purpose: workloadPurpose(env), children: workloadChildren(env).filter((child) => !split || child.kind !== 'IngressRoute'),
     display: workloadDisplay(env), conditions: conditionsOf(env), ...(env.startup ? { startup: env.startup } : {}), ...(release ? { release } : {}),
     ...(env.legacyCluster?.taskId ? { aliases: [{ source: 'tsk' as const, alias: env.legacyCluster.taskId }] } : {}),
     ...(workloadRender(env) ? { render: workloadRender(env)! } : {}),
@@ -176,7 +178,14 @@ export function projectEnvironment(env: TaskEnvironment): EnvironmentProjection 
     // 资源中心建出的环境（I25）：卷由调和器照这里建，只在要建出容器时建一次，卷丢了不补建（数据不能凭空换成空卷）。
     ...(reconcilerCreates(env) ? { render: { pvc: { size: env.render.resources.storage, labels: { 'crewstation.io/task': env.id, 'crewstation.io/project': env.labels['crewstation.io/project'] ?? '' } } } } : {}),
   } : undefined;
-  return { workload, ...(volume ? { volume } : {}), connected: env.connected };
+  const name = env.rebuildId ? podNameFor(env.id) : env.podName;
+  const route: ProjectedRecord | undefined = split ? {
+    kind: 'route', ref: `${env.id}/preview`, projectId: env.projectId, parentId: env.id, purpose: workloadPurpose(env),
+    children: [{ kind: 'IngressRoute', namespace: env.namespace, name }], display: { host: previewRoute!.host, entry: 'development-preview' }, conditions: [],
+    render: { ...previewRoute, releaseWithParent: true, service: env.labels['crewstation.io/service'] || env.serviceId, target: { namespace: env.namespace, service: name, port: 80 } },
+    ...(release ? { release } : {}),
+  } : undefined;
+  return { workload, ...(volume ? { volume } : {}), ...(route ? { route } : {}), connected: env.connected };
 }
 
 /**

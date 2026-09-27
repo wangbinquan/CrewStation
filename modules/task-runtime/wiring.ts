@@ -76,9 +76,23 @@ export const taskRuntimeMigrations: MigrationSet = {
   files: readMigrationDir(join(import.meta.dir, 'adapters', 'persistence', 'migrations')),
 };
 
+function ledgerProjectionFor(deps: TaskRuntimeModuleDeps): Parameters<typeof drizzleUnitOfWork>[1] {
+  return deps.ledger ? { ledger: deps.ledger, ...(deps.logger ? { logger: deps.logger } : {}),
+    ...(deps.creation === 'ledger' ? { preview: async (env) => {
+      if (!env.preview || env.native) return undefined;
+      let route = env.render?.previewRoute;
+      if (!route) {
+        const service = await deps.services.resolveServiceById(env.serviceId);
+        if (!service) throw new Error('预览所属服务不存在，暂不移交入口');
+        route = { host: `dev.${service.slug}.${deps.settings.userDomain}`, middlewares: [{ name: deps.settings.dropIdentityHeadersMiddleware, namespace: deps.settings.systemNamespace }, { name: deps.settings.userAuthMiddleware, namespace: deps.settings.systemNamespace }] };
+      }
+      return { ...route, middlewares: [...route.middlewares, ...(deps.settings.previewRateMiddlewares ?? []).map((name) => ({ name }))] };
+    } } : {}) } : undefined;
+}
+
 export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntimeModule {
   const useCaseDeps: TaskRuntimeUseCaseDeps = {
-    uow: drizzleUnitOfWork(deps.db, deps.ledger ? { ledger: deps.ledger, ...(deps.logger ? { logger: deps.logger } : {}) } : undefined),
+    uow: drizzleUnitOfWork(deps.db, ledgerProjectionFor(deps)),
     cluster: deps.cluster ?? kubernetesTaskCluster(deps.k8s, deps.settings.workerUid),
     authorizer: deps.authorizer,
     quotas: deps.quotas,

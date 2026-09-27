@@ -410,3 +410,7 @@ I29 裁定（三个 (a)）之后：
 ### 14.2 后续实现边界复核
 
 开发预览仍由工作区记录认领 Service／IngressRoute；`task-runtime/domain/ledgerProjection.ts` 与 `cluster-control/application/workloadApply.ts` 仍使用这一形状。台账会保留已经从期望移除但物理上尚在的子对象（`resources/application/commit.ts`、`resources/domain/record.ts`），因此不能仅从工作区 spec 删除 IngressRoute 再声明 route：旧记录仍持有唯一认领，且释放时仍会删除它。失败重建还会沿用原预览对象名并由 task-runtime 写入（`task-runtime/adapters/k8s/rebuildProvisioner.ts`）。下一批必须同时覆盖明确的子对象移交、旧调和快照的删除防护、重建写入者与保留期释放；本批未将 T6、T9 或整个 RFC 标为完成。
+
+## 15. 2026-09-27 开发预览独立路由（T9）
+
+实现范围见 design「开发预览归属移交」。新增回归先在旧实现上失败：缺少原子移交入口、工作区仍认领 IngressRoute、父释放后独立路由未释放。实现后定向核对：唯一认领与 UID 原样移交；租约忙时原记录保持；跨模块／项目／上级与第三方对象拒绝；旧会话补投影、重建稳定 Service 名、父释放／保留期级联；旧调和快照不能误删已移交入口。新预览路由的认证后限流中间件顺序也有断言。本地验证：结构与 lint、后端与 console 类型检查通过；unit 720/0、module 1392/7 skip/0 fail、console 904/0；按工作树候选（含新增文件）核对新增可执行行 80/80，100%。发布与实机证据待补记。

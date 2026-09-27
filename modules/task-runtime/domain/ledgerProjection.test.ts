@@ -100,10 +100,10 @@ describe('任务环境投影到资源台账（RFC-025 第二期）', () => {
   test('资源中心建出的工作区：子对象带这一次启动的 Runner Secret 与预览；期望写 Pod 与预览；卷写大小与标签；Provisioning 随创建与绑定变化', () => {
     const render = { image: 'task:1', workerUid: 10001, resources: { cpu: '1', memory: '2Gi', storage: '10Gi' }, start: 2, checkout: { repoUrl: 'http://git/demo.git', branch: 'main', credentialSecretName: 'git-cred' }, previewRoute: { host: 'dev.demo.cs.localhost', middlewares: [{ name: 'auth', namespace: 'sys' }] } };
     const creating = projectEnvironment(env({ state: 'creating', connected: false, render, preview: { command: ['bun', 'dev'], port: 3000, healthPath: '/' }, labels: { 'crewstation.io/project': 'demo', 'crewstation.io/service': 'demo' } }));
-    expect(creating.workload.children).toEqual([{ kind: 'Pod', namespace: 'cs-demo', name: 'task-100' }, { kind: 'Secret', namespace: 'cs-demo', name: 'task-100-runner-2' }, { kind: 'Service', namespace: 'cs-demo', name: 'task-100' }, { kind: 'IngressRoute', namespace: 'cs-demo', name: 'task-100' }]);
+    expect(creating.workload.children).toEqual([{ kind: 'Pod', namespace: 'cs-demo', name: 'task-100' }, { kind: 'Secret', namespace: 'cs-demo', name: 'task-100-runner-2' }, { kind: 'Service', namespace: 'cs-demo', name: 'task-100' }]);
     expect(creating.workload.render).toEqual({
       pod: { image: 'task:1', workerUid: 10001, resources: render.resources, workload: 'dev-session', project: 'demo', service: 'demo', pvc: 'task-100-work', secret: 'task-100-runner-2', checkout: render.checkout },
-      preview: { port: 3000, kind: 'dev-session', route: render.previewRoute },
+      preview: { port: 3000, kind: 'dev-session' },
     });
     expect(creating.workload.conditions).toContainEqual({ type: 'Provisioning', status: 'true' });
     expect(creating.volume).toMatchObject({ render: { pvc: { size: '10Gi', labels: { 'crewstation.io/task': env().id, 'crewstation.io/project': 'demo' } } }, conditions: [{ type: 'Provisioning', status: 'true' }] });
@@ -149,4 +149,20 @@ describe('任务环境投影到资源台账（RFC-025 第二期）', () => {
     expect(owned.workload.render).toBeUndefined();
     expect(owned.workload.children).toEqual([{ kind: 'Pod', namespace: 'cs-demo', name: 'cli-103' }, { kind: 'Secret', namespace: 'cs-demo', name: 'cli-103-runner' }]);
   });
+});
+
+test('开发预览独立为子路由；旧会话可补入主机信息，重建保持原 Service 名，释放与工作区一致', () => {
+  const preview = { command: ['bun', 'dev'], port: 3000, healthPath: '/' };
+  const route = { host: 'dev.demo.localhost', middlewares: [{ name: 'auth', namespace: 'system' }] };
+  const current = env({ preview });
+  const projected = projectEnvironment(current, route);
+  expect(projected.workload.children.map((child) => child.kind)).toEqual(['Pod', 'Service']);
+  expect(projected.route).toMatchObject({ kind: 'route', ref: `${current.id}/preview`, parentId: current.id,
+    children: [{ kind: 'IngressRoute', namespace: 'cs-demo', name: 'task-100' }],
+    render: { host: route.host, middlewares: route.middlewares, target: { namespace: 'cs-demo', service: 'task-100', port: 80 } } });
+  const rebuilt = projectEnvironment({ ...current, podName: 'task-r-new', rebuildId: 'rebuild-1' }, route);
+  expect(rebuilt.route?.children[0]?.name).toBe(`task-${current.id.replaceAll('-', '')}`);
+  expect(projectEnvironment({ ...current, state: 'released', message: 'released: retention-expired' }, route).route?.release?.code).toBe('retention-expired');
+  expect(projectEnvironment(env(), route).route).toBeUndefined();
+  expect(projectEnvironment({ ...current, native: native() }, route).route).toBeUndefined();
 });

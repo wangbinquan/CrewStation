@@ -305,7 +305,7 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
     services: { resolveServiceById: resolveById },
     checkout: taskCheckout(core, k8s, resolveById),
     sources: { configEnv: (projectId, env) => config.api.renderEnv(projectId, env), dataEnv: data.api.envFor, taskDataEnv: data.api.envForTask },
-    settings: { taskImage: settings.taskImage, systemNamespace: settings.systemNamespace, sessionUrl: settings.sessionRunnerUrl, userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, workerUid: 10001, defaultProfile: settings.defaultTaskProfile, userAuthMiddleware: 'forward-auth-user', dropIdentityHeadersMiddleware: 'drop-identity-headers' },
+    settings: { taskImage: settings.taskImage, systemNamespace: settings.systemNamespace, sessionUrl: settings.sessionRunnerUrl, userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, workerUid: 10001, defaultProfile: settings.defaultTaskProfile, userAuthMiddleware: 'forward-auth-user', dropIdentityHeadersMiddleware: 'drop-identity-headers', previewRateMiddlewares: ['rate-limit-user', 'rate-limit-host'] },
   });
   late.taskRuntime = taskRuntime.api;
   const runner = createSessionClient(settings.sessionInternalUrl);

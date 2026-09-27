@@ -11,6 +11,7 @@ export interface WorkloadApplyDeps {
   readonly stats: ObservationStats;
   readonly logger: Logger;
   readonly retryMs?: number;
+  readonly signal?: AbortSignal;
   /** 工作区容器的所属模块（task-runtime）：建 Runner Secret 时要内容、Pod 建出后记实例；不给就不建工作区容器。 */
   readonly workloads?: WorkloadOwners;
 }
@@ -72,12 +73,15 @@ export async function applyWorkload(deps: WorkloadApplyDeps, record: LedgerRecor
     return;
   }
   try {
+    deps.signal?.throwIfAborted();
     const secret = await deps.cluster.ensureRunnerSecret(pod, () => owners.runnerValues(record.id));
     applied(deps, record, 'Secret', { namespace: pod.namespace, name: pod.secret }, secret);
     // 检出用的 Git 凭据归这一次启动（I25）：Pod 的 init 容器引用它，先于 Pod 建出。
     if (pod.checkout?.ownedCredential) applied(deps, record, 'Secret', { namespace: pod.namespace, name: pod.checkout.credentialSecretName }, await deps.cluster.ensureCheckoutSecret(pod, () => owners.checkoutValues(record.id)));
+    deps.signal?.throwIfAborted();
     const created = await deps.cluster.ensurePod(pod);
     applied(deps, record, 'Pod', pod, created);
+    deps.signal?.throwIfAborted();
     if (preview) applied(deps, record, 'Service', preview, await deps.cluster.applyPreview(preview, { ...optional('service', deps.feed.cached('Service', preview.namespace, preview.name)), ...optional('route', deps.feed.cached('IngressRoute', preview.namespace, preview.name)) }));
     await owners.bindWorkload(record.id, created.uid, secret.uid);
     await deps.ledger.observeConditions(record.id, [{ type: 'Created', status: 'true' }]);

@@ -104,6 +104,29 @@ describe.skipIf(!available)('任务环境投影进资源台账（RFC-025 第二�
     expect(await resources.api.get(before.id)).toMatchObject({ desired: 'absent', releaseReason: { code: 'business', message: '业务释放' } });
   });
 
+  test('旧预览在线移交：补投影保留物理 UID，旧工作区释放不能再认领入口', async () => {
+    const k8s = createFakeK8sClient();
+    const plain = createTaskRuntimeModule(runtimeDeps(tdb.db, k8s, ledger));
+    const created = await plain.api.createEnvironment({ serviceId, kind: 'business', volumeMode: 'persistent', preview: { command: ['bun', 'dev'], port: 3000, healthPath: '/' } });
+    const child = { kind: 'IngressRoute', namespace: 'cs-qa', name: created.podName };
+    const physical = (await k8s.get(Resources.IngressRoute!, child.name, child.namespace))!;
+    await resources.api.observe({ child: { ...child, uid: physical.metadata.uid!, phase: 'Present', ready: true } });
+    expect(await resources.api.claimOf(child)).toBe(created.id);
+    const upgraded = createTaskRuntimeModule({ ...runtimeDeps(tdb.db, k8s, ledger), creation: 'ledger' });
+    const worker = upgraded.workers.at(-1)!;
+    worker.start();
+    try {
+      await worker.stop();
+      const route = (await resources.api.list({ parentId: created.id, kind: 'route' }))[0]!;
+      expect(route.spec).toMatchObject({ host: 'dev.qa.localhost', releaseWithParent: true });
+      expect(route.children[0]?.uid).toBe(physical.metadata.uid!);
+      expect((await resources.api.get(created.id))?.children.some((entry) => entry.kind === 'IngressRoute')).toBe(false);
+      expect(await resources.api.claimOf(child)).toBe(route.id);
+      await upgraded.api.releaseEnvironment(created.id, 'business');
+      expect((await resources.api.get(route.id))?.desired).toBe('absent');
+    } finally { await worker.stop(); }
+  });
+
   // 设计 §6.5：RFC-013 之前的 tsk_… 写进台账的别名，按旧 ID 也能找回记录（收编与旧标签的对象都靠它）。
   test('带旧身份的环境：补投影把 tsk_… 写成记录的别名，按别名找回同一条记录；重复补投影不重复写', async () => {
     const plain = createTaskRuntimeModule(runtimeDeps(tdb.db, createFakeK8sClient()));

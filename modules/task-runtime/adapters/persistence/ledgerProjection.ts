@@ -2,7 +2,7 @@ import type { Logger } from '@crewstation/kernel';
 import type { Executor } from '@crewstation/persistence';
 import type { ProjectedRecord } from '../../domain/ledgerProjection';
 import { projectEnvironment, runnerCondition } from '../../domain/ledgerProjection';
-import type { TaskEnvironment } from '../../domain/taskEnvironment';
+import type { TaskEnvironment, WorkloadRender } from '../../domain/taskEnvironment';
 import type { EnvironmentLedger, LedgerRecordRef, LedgerWriter } from '../../ports/ledger';
 import type { EnvironmentRepository } from '../../ports/repositories';
 
@@ -10,7 +10,7 @@ import type { EnvironmentRepository } from '../../ports/repositories';
  * 一条记录的投影：从没进过台账又已经不要了的不补记；已受理释放的期望不再变（台账也拒绝重新声明），
  * 只把后来知道的具体释放原因交给台账补上。
  */
-async function syncRecord(writer: LedgerWriter, record: ProjectedRecord, connected?: boolean): Promise<void> {
+async function syncRecord(writer: LedgerWriter, record: ProjectedRecord, connected?: boolean, sourceId?: string): Promise<void> {
   const existing = await writer.find(record.ref, record.kind);
   if (!existing && record.release) return;
   if (existing?.desired === 'absent') {
@@ -18,7 +18,8 @@ async function syncRecord(writer: LedgerWriter, record: ProjectedRecord, connect
     return;
   }
   const runner = connected === undefined ? [] : runnerCondition(connected, existing?.conditions ?? []);
-  const saved = await writer.declare({
+  const declare = sourceId && writer.splitChildren ? (input: Parameters<LedgerWriter['declare']>[0]) => writer.splitChildren!(sourceId, input) : (input: Parameters<LedgerWriter['declare']>[0]) => writer.declare(input);
+  const saved = await declare({
     ...(record.id ? { id: record.id } : {}), kind: record.kind, ref: record.ref, projectId: record.projectId,
     ...(record.parentId ? { parentId: record.parentId } : {}), ...(record.purpose ? { purpose: record.purpose } : {}),
     spec: { children: record.children, ...(record.reclaim ? { reclaim: record.reclaim } : {}), ...record.render }, display: record.display, conditions: [...record.conditions, ...runner],
@@ -32,13 +33,14 @@ async function syncRecord(writer: LedgerWriter, record: ProjectedRecord, connect
  * 在当前事务里把环境投影进资源台账（RFC-025 第二期）。投影包在保存点里：台账写失败只回滚保存点、记一条日志，
  * 环境本身照常提交——迁移期间台账的问题不能挡住开发会话与 CLI 的操作；漏掉的由补投影（ledgerResync）追上。
  */
-export async function syncEnvironmentLedger(executor: Executor, ledger: EnvironmentLedger, env: TaskEnvironment, logger: Logger): Promise<void> {
-  const projection = projectEnvironment(env);
+export async function syncEnvironmentLedger(executor: Executor, ledger: EnvironmentLedger, env: TaskEnvironment, logger: Logger, preview?: (env: TaskEnvironment) => Promise<WorkloadRender['previewRoute']>): Promise<void> {
   try {
+    const projection = projectEnvironment(env, await preview?.(env) ?? env.render?.previewRoute);
     await executor.transaction(async (savepoint) => {
       const writer = ledger.within(savepoint);
       await syncRecord(writer, projection.workload, projection.connected);
       if (projection.volume) await syncRecord(writer, projection.volume);
+      if (projection.route) await syncRecord(writer, projection.route, undefined, env.id);
     });
   } catch (error) {
     logger.warn('resource ledger projection failed', { taskId: env.id, error: error instanceof Error ? error.message : String(error) });

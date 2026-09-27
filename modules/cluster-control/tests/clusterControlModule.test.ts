@@ -500,6 +500,21 @@ describe.skipIf(!available)('cluster-control：观测写回台账与收编空跑
     expect(routeApplies).toHaveLength(3);
   });
 
+  test('旧工作区调和快照不能删除已移交的预览入口，租约中止也不再删除', async () => {
+    const owner = resources.api.owner('task-runtime');
+    const child = { kind: 'IngressRoute', namespace: 'cs-demo', name: 'moved-preview' };
+    const source = await owner.declare({ kind: 'dev-workspace', ref: 'moved-workspace', projectId: PROJECT, spec: { children: [child] } });
+    const object = await k8s.create<K8sObject>({ apiVersion: 'traefik.io/v1alpha1', kind: 'IngressRoute', metadata: { name: child.name, namespace: child.namespace, labels: { 'app.kubernetes.io/managed-by': 'crewstation' } } });
+    await feed.emit({ kind: 'IngressRoute', object, gone: false });
+    const snapshot = { ...(await resources.api.get(source.id))!, desired: 'absent' as const };
+    await owner.splitChildren(source.id, { kind: 'route', ref: 'moved-workspace/preview', parentId: source.id, projectId: PROJECT, spec: { children: [child] } });
+    const stale = { ...ledger, get: async (id: string) => id === source.id ? snapshot : ledger.get(id) };
+    const deps = { ledger: stale, feed, cluster, clock: { now: () => new Date() }, systemNamespace: 'crewstation-system', stats: newObservationStats(), logger: noopLogger };
+    await reconcileRecord(deps, source.id, () => {});
+    expect((await k8s.get(Resources.IngressRoute!, child.name, child.namespace))?.metadata.uid).toBe(object.metadata.uid!);
+    await expect(reconcileRecord({ ...deps, signal: AbortSignal.abort() }, source.id, () => {})).rejects.toThrow();
+  });
+
   test('入口仲裁：规范化 Host＋路径择一，其他 API 前缀保留，胜出项释放后候补恢复', async () => {
     const gateway = resources.api.owner('gateway');
     const declare = (name: string, host: string, pathPrefix: string) => gateway.declare({ kind: 'route', ref: name, projectId: PROJECT, spec: {

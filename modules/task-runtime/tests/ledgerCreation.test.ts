@@ -32,7 +32,7 @@ describe.skipIf(!available)('工作区容器由资源中心建出（RFC-025 I25�
     services: { resolveServiceById: async () => ({ projectId: project, namespace: 'cs-lc', slug: 'lc', name: 'lc' }) },
     sources: { configEnv: async () => ({ GREETING: 'hi' }), dataEnv: async () => ({}), taskDataEnv: async () => ({}) },
     checkout,
-    settings: { taskImage: 'task:current', sessionUrl: 'ws://session/runner', systemNamespace: 'cs-system', userDomain: 'localhost', serviceDomain: 'svc.localhost', workerUid: 10001, defaultProfile: profiles[0]!.id, userAuthMiddleware: 'auth', dropIdentityHeadersMiddleware: 'drop' },
+    settings: { taskImage: 'task:current', sessionUrl: 'ws://session/runner', systemNamespace: 'cs-system', userDomain: 'localhost', serviceDomain: 'svc.localhost', workerUid: 10001, defaultProfile: profiles[0]!.id, userAuthMiddleware: 'auth', dropIdentityHeadersMiddleware: 'drop', previewRateMiddlewares: ['rate-limit-user', 'rate-limit-host'] },
   });
 
   beforeAll(async () => {
@@ -50,9 +50,13 @@ describe.skipIf(!available)('工作区容器由资源中心建出（RFC-025 I25�
     const created = await tasks.api.createEnvironment({ serviceId, kind: 'dev-session', branch: 'main', preview: { command: ['bun', 'dev'], port: 3000, healthPath: '/' }, labels: { 'crewstation.io/project': 'lc', 'crewstation.io/service': 'lc' } });
     expect([...k8s.objects.values()]).toEqual([]);
     const workspace = (await resources.api.get(created.id))!;
-    expect(workspace.spec.children.map((child) => `${child.kind}/${child.name}`)).toEqual([`Pod/${created.podName}`, `Secret/${created.podName}-runner-1`, `Service/${created.podName}`, `IngressRoute/${created.podName}`]);
+    expect(workspace.spec.children.map((child) => `${child.kind}/${child.name}`)).toEqual([`Pod/${created.podName}`, `Secret/${created.podName}-runner-1`, `Service/${created.podName}`]);
     expect(workspace.spec['pod']).toMatchObject({ image: 'task:current', workload: 'dev-session', project: 'lc', pvc: `${created.podName}-work`, secret: `${created.podName}-runner-1`, checkout: { repoUrl: 'http://git/lc.git', branch: 'main', credentialSecretName: 'git-checkout-lc' } });
-    expect(workspace.spec['preview']).toEqual({ port: 3000, kind: 'dev-session', route: { host: 'dev.lc.localhost', middlewares: [{ name: 'drop', namespace: 'cs-system' }, { name: 'auth', namespace: 'cs-system' }] } });
+    expect(workspace.spec['preview']).toEqual({ port: 3000, kind: 'dev-session' });
+    const route = (await resources.api.list({ parentId: created.id, kind: 'route' }))[0]!;
+    expect(route.spec).toMatchObject({ children: [{ kind: 'IngressRoute', namespace: 'cs-lc', name: created.podName }], host: 'dev.lc.localhost', target: { namespace: 'cs-lc', service: created.podName, port: 80 } });
+    expect(route.spec['middlewares']).toEqual([{ name: 'drop', namespace: 'cs-system' }, { name: 'auth', namespace: 'cs-system' }, { name: 'rate-limit-user' }, { name: 'rate-limit-host' }]);
+    expect(await resources.api.claimOf({ kind: 'IngressRoute', namespace: 'cs-lc', name: created.podName })).toBe(route.id);
     expect(JSON.stringify(workspace.spec)).not.toContain('CS_RUNNER_TOKEN');
     expect(await provisioning(created.id)).toBe('true');
     const volume = (await resources.api.list({ parentId: created.id, kind: 'volume' }))[0]!;

@@ -9,6 +9,7 @@ import { QUOTA_PHASES } from '../domain/quota';
 import type { QuotaLimits } from '../ports/platform';
 import type { LedgerScope } from '../ports/repositories';
 import { commitRecord } from './commit';
+import { splitChildrenIn } from './childTransfer';
 import { guardCredentialRotation } from './projectQuiescence';
 
 const MAX_CHILDREN = 32;
@@ -117,6 +118,7 @@ async function reportIn(scope: LedgerScope, module: string, id: string, report: 
 export function ownerWriter(module: string, run: <T>(fn: (scope: LedgerScope) => Promise<T>) => Promise<T>, limits: QuotaLimits, clock: Clock): ResourceWriter {
   return {
     declare: (input) => run((scope) => declareIn(scope, module, input, clock.now())),
+    splitChildren: (sourceId, input) => run((scope) => splitChildrenIn(scope, module, sourceId, input, clock.now(), () => declareIn(scope, module, input, clock.now()))),
     admit: (input) => run((scope) => admitIn(scope, module, input, limits, clock.now())),
     requestRelease: (id, reason) => run((scope) => releaseIn(scope, module, id, reason, clock.now())),
     report: (id, report) => run((scope) => reportIn(scope, module, id, report, clock.now())),

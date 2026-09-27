@@ -310,11 +310,13 @@ describe.skipIf(!available)('变更日志、租约、维护（设计 §6.3、§6
     const ledger = h.module.api.owner('task-runtime');
     const due = await ledger.declare(workspace('r1'));
     const kept = await ledger.declare(workspace('r2'));
+    const route = await ledger.declare({ kind: 'route', ref: 'r1/preview', projectId: PROJECT, parentId: due.id, spec: { children: [], releaseWithParent: true } });
     for (const id of [due.id, kept.id]) await ledger.report(id, { conditions: [{ type: 'Failed', status: 'true', reason: 'connect-timeout', message: '超时' }] });
     await h.database.db.execute(sql`UPDATE resources.records SET retain_until = now() - interval '1 minute' WHERE id = ${due.id}`);
     await h.module.maintainOnce();
     expect(await h.module.api.get(due.id)).toMatchObject({ desired: 'absent', phase: 'stopped', releaseReason: { code: 'retention-expired' } });
     expect(await h.module.api.get(kept.id)).toMatchObject({ desired: 'present', phase: 'failed' });
+    expect(await h.module.api.get(route.id)).toMatchObject({ desired: 'absent', releaseReason: { code: 'retention-expired' } });
   });
 
   test('压缩：已结束满 7 天的记录只留身份与最终阶段，并写一条移除；变更日志清理保留最新一条', async () => {

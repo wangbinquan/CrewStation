@@ -96,6 +96,8 @@ export interface ResourceReport {
 
 export interface ResourceWriter {
   declare(input: ResourceDeclaration): Promise<LedgerRecord>;
+  /** 工作区的预览入口拆为其子路由；同事务转移唯一认领和观测，与调和租约互斥。 */
+  splitChildren(sourceId: string, input: ResourceDeclaration): Promise<LedgerRecord>;
   /** 受理：占额度的种类先在项目锁下按台账数额度（设计 §3、D31），够才声明。 */
   admit(input: ResourceDeclaration): Promise<LedgerRecord>;
   /**

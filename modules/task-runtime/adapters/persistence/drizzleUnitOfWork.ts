@@ -11,12 +11,13 @@ import { drizzleAdmissionRepository, drizzleEnvironmentRepository } from './driz
 import { drizzleRebuildRepository } from './drizzleRebuildRepository';
 import { admitEnvironment, findWorkloadRecord, ledgerEnvironmentRepository, syncEnvironmentLedger } from './ledgerProjection';
 import type { EnvironmentLedger } from '../../ports/ledger';
-import type { TaskEnvironment } from '../../domain/taskEnvironment';
+import type { TaskEnvironment, WorkloadRender } from '../../domain/taskEnvironment';
 
 /** 可选的资源台账投影（RFC-025）：给了就在每次环境落库的同一事务里同步台账。 */
 export interface LedgerProjection {
   readonly ledger: EnvironmentLedger;
   readonly logger?: Logger;
+  readonly preview?: (env: TaskEnvironment) => Promise<WorkloadRender['previewRoute']>;
 }
 
 /** 额度（D31）：配了台账就经台账受理、按阶段数（不做减法）；没配就用本模块的计数器。 */
@@ -42,7 +43,7 @@ function taskQuota(executor: Executor, admissions: AdmissionRepository, projecti
 
 export function scopeOver(executor: Executor, projection?: LedgerProjection): RepositoryScope {
   const environments = drizzleEnvironmentRepository(executor), admissions = drizzleAdmissionRepository(executor);
-  const sync = projection ? (env: TaskEnvironment) => syncEnvironmentLedger(executor, projection.ledger, env, projection.logger ?? noopLogger) : undefined;
+  const sync = projection ? (env: TaskEnvironment) => syncEnvironmentLedger(executor, projection.ledger, env, projection.logger ?? noopLogger, projection.preview) : undefined;
   return {
     environments: sync ? ledgerEnvironmentRepository(environments, sync) : environments,
     ...(sync && projection ? { ledger: { sync, workload: (env: TaskEnvironment) => findWorkloadRecord(executor, projection.ledger, env) } } : {}),

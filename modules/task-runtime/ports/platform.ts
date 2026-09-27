@@ -49,6 +49,8 @@ export interface TaskRuntimeSettings {
   /** 开发预览是用户域主机，路由要挂网关的这两个系统中间件。 */
   readonly userAuthMiddleware: string;
   readonly dropIdentityHeadersMiddleware: string;
+  /** 独立预览路由在认证后挂项目限流中间件，由组合根给出名字。 */
+  readonly previewRateMiddlewares?: readonly string[];
 }
 
 /**

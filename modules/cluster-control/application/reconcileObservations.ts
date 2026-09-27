@@ -91,6 +91,9 @@ async function removeChildren(deps: ReconcileDeps, record: LedgerRecordView): Pr
     for (const child of targets.filter((target) => target.kind === kind)) {
       const cached = deps.feed.cached(kind, child.namespace, child.name), uid = cached?.metadata.uid;
       if (!cached || !uid || cached.metadata.deletionTimestamp) continue;
+      deps.signal?.throwIfAborted();
+      // 旧调和快照可能先于预览认领移交；只删除此刻仍由本记录拥有的对象。
+      if (await deps.ledger.claimOf(child) !== record.id) continue;
       if (cached.metadata.namespace === deps.systemNamespace && !cached.metadata.labels?.['crewstation.io/task'] && !cached.metadata.labels?.[RESOURCE_ID_LABEL]) continue;
       await deps.cluster.remove({ kind, ...(cached.metadata.namespace ? { namespace: cached.metadata.namespace } : {}), name: cached.metadata.name, uid });
       deps.stats.removed += 1;

@@ -1,4 +1,4 @@
-import { jsonHash } from '@crewstation/kernel';
+import { conflict, jsonHash } from '@crewstation/kernel';
 import type { LedgerRecord } from '../domain/record';
 import { childKey, inKeyOrder, isPresent, mergeChildren } from '../domain/record';
 import { settlePhase } from '../domain/phase';
@@ -38,5 +38,14 @@ export async function commitRecord(scope: LedgerScope, previous: LedgerRecord | 
   else await scope.records.insert(saved);
   if (!previous || storedHash(previous) !== storedHash(saved)) await scope.records.replaceChildren(saved.id, storedChildren(saved));
   await scope.changes.append({ ...(saved.projectId ? { projectId: saved.projectId } : {}), resourceId: saved.id, version: saved.version, change: 'upsert' });
+  if (previous?.desired === 'present' && saved.desired === 'absent' && ['dev-workspace', 'business-workspace'].includes(saved.kind)) {
+    const routes = await scope.records.list({ parentId: saved.id, kind: 'route', includeStopped: true });
+    if (routes.length >= 2000) throw conflict('工作区子路由达到查询上限，拒绝不完整释放');
+    for (const candidate of routes) {
+      const route = await scope.records.get(candidate.id, { forUpdate: true });
+      if (!route || route.desired === 'absent' || route.owner.module !== saved.owner.module || route.spec['releaseWithParent'] !== true) continue;
+      await commitRecord(scope, route, { ...route, desired: 'absent', generation: route.generation + 1, ...(saved.releaseReason ? { releaseReason: saved.releaseReason } : {}) }, now);
+    }
+  }
   return saved;
 }
