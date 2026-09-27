@@ -1,6 +1,6 @@
 # RFC-027 · 业务执行契约与 agent-workflow 平台接入｜Proposal
 
-> 状态：In Progress · 2026-09-27。作者已批准完整实施、提交远端及本地部署；实现范围仅 CrewStation，aw 由外部 RFC 承接。
+> 状态：Done · 2026-09-27。作者已批准完整实施、提交远端及本地部署；实现范围仅 CrewStation，aw 由外部 RFC 承接。
 > 配套：[技术设计](./design.md) · [实施计划与验收](./plan.md)
 
 ## 1. 背景与证据边界

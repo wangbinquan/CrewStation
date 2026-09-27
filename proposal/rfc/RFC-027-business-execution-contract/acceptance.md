@@ -1,5 +1,31 @@
 # RFC-027 实施与验收证据
 
+## 完成交付（2026-09-27，CS 范围）
+
+RFC-027 状态 **Done**。实现仅修改 CrewStation；aw 仓库未修改，T15、BE-22～24 及 BE-14/18 中的真实 aw 部分由外部接入 RFC 承接。下方早期批次的“未完成/未发布”是历史状态，以本节为准。RFC029 的管理员恢复请求与应用执行流程是后续独立能力，本次任务列表不冒称已能点击重跑业务任务。
+
+- 联合最终实现 **`0c8be5fd899d7c0f2dda1f403fec469e6a0c2114`** 精确91路径推送；[CI 36313900860](https://github.com/wangbinquan/CrewStation/actions/runs/36313900860) 的 static、unit、module、console、gate、e2e **六项全部成功**。保留RFC028作者完整交接输出；第三方布局与referenceResources未混入该提交。此前73855918、aebb85e1各自精确CI亦六项成功。
+- 精确提交经 `git archive` 直接输入镜像构建，没有切换/另建checkout，没有纳入共享树未提交内容。API/controller镜像 `cs-control-plane:rfc027-final-0c8be5fd`（image ID `34f1978e3a7bd79d071332176417776ebe0d398583515e3ee29b31e24f1d7d32`）、console同tag（image ID `8de87268f1ab215b51be4aeb6ee602ba08be7d267fc7e2fc9fd38487f1da4f6e`）均已ready；迁移Job `rfc027-final-0c8be5fd-migrate` 仅应用runtime-environment/0003、roles初始化0。新任务Runner底座tag同步，registry digest `7701acd4430538bae7b2b69aefddf4a65f19b544bda0dcd0e89ee752c7b55152`，既有任务保留原镜像快照。
+- 实际管理员任务列表GET 200，新旧任务合并且失败/未知在分页前排序；项目过滤后键盘进入真实测试任务详情。中英×深浅色×320/390/1440共12组合无页面横向溢出、浏览器错误为空，无手输内部身份入口。发布页6组合和重载保留交接完成状态。证据 `/tmp/rfc027-task-list-ui-final.json`、`/tmp/rfc027-handoff-ui-final.json`。
+- 两个专用父任务均closed、额度running=0，拒绝的Agent请求已显式撤销；专用维护已退出。原有非平台Pod及全部PVC共46个UID保持不变（`/tmp/rfc027-final-preservation.json`）。测试服务和保留卷遵循正常保留策略，不以删除用户资源腾容量。布局任务随后独立部署含OCC修复的3af3c568 console（imageID `47adaebfb5ff3b3153b0da279e6df1d3756ac30f0c3cd9435101b1864f6a70ac`），实际布局E2E11/0、202断言；该后继部署不替代本节0c8be5fd的独立证据。
+
+平台验收对应关系如下。测试层使用真实PG/子进程验证故障排列；集群列只记实际执行的场景，不把每种故障都称为集群注入，也不把单节点验证称为多节点高可用证明。
+
+| BE | CS 验收证据 | 实机或边界 |
+|---|---|---|
+| 01–03 | executionHttp、executionOperations、executionSubtasks/Agents、准入与能力测试 | 严格400、同键同ID/异摘要409、父/Agent 429、实际额度与清理 |
+| 04–06 | Runner监督器/协议、session businessExecutions、executionProjection | 90秒命令、session/API/controller重启、原ID、单次副作用、完整首尾与finalCursor |
+| 07 | Runner持久化/容量/日志故障、executionRetention、session businessRetention | 明确gap/截断/410；不是每个存储故障的集群注入 |
+| 08–10 | executionCancellation/Files/Lifecycle、businessWorkspace及安全读取 | 真取消后无末尾副作用；活动pause409；原卷恢复；丢失卷失败且无空替代；凭据清理后退额 |
+| 11–13 | materials/publishedMaterials、驱动skills/MCP/usage与去重 | 真模型四材料标记、无源码发布prompt、MCP能力、非零final usage；软预算责任仍在业务客户 |
+| 14–16 | 固定release/profile/image、executionSessions、retry/imageResume | 两独立Agent Pod加父任务占3额度，第三个429；真实同session续跑、并发409；原生内部委派不冒充平台子任务 |
+| 17–18 | executionControl、legacyWriteBarrier、releaseHandoff | 两槽递增epoch、旧源请求拒绝、执行中切流不重启；真实aw内部数据库实现由外部接入承担 |
+| 19–20 | release executionHandoff各阶段重建/失败分支、migrationBarrier/Recovery | 交接中重启恢复；真实排空后才迁移、冻结日志、旧schema回退412；失败Job暂停墓碑的独立集群核心断言见第十一批 |
+| 21 | 探针契约/渲染、v2模板回归 | 95秒延迟，97秒Ready/零重启，/live和/ready分开，standby无租约 |
+| 22–24 | 外部aw验收 | 未实施、未验证；不影响本RFC已约定的CS交付边界 |
+
+最终本地/CI证据保持区分：本地增量35/0、联合改动行631/635=99.37%、静态检查绿；一次错误登录模式的完整本地命令被停止，未计成功。以上六项精确SHA CI提供完整候选终态。共享文件包含两位Codex会话贡献，署名使用同一真实Agent名的一条trailer。
+
 ## 第十五批：真实 Agent、原卷续跑、维护迁移与慢启动（2026-09-27）
 
 - 专用父任务 `01a0e263-469b-7000-9d64-d8d19e0ea1b7` 的 Agent `01a0e263-7ec3-7000-abb9-b6fa9b3be465` 实际独立 Pod 运行并成功完成；同 requestKey 返回原句柄。发布 prompt、动态 prompt、env、skills 的四个标记写入 `/work/agent-proof.txt`，文件接口读回64字节；工作区内无 `system.txt`，证明发布材料不依赖检出源码。19个持久事件含4次工具调用、4份非零累计 usage，游标唯一。rev3 实测能力包括 events、usage=final、resume、systemPrompt、skills、MCP；平台独立委派能力仍报告false，原生内部委派为opaque，不冒称逐内部代理计额。

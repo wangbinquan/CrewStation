@@ -53,7 +53,9 @@ Runner 已支持每容器持久初始化、unknown 不重执行、超时／取�
 
 RFC028 并发回收补充：父任务、Agent、fresh retry 的同键并发已用真实 PG 屏障复现并修复未采用引用遗留，明确事务拒绝也释放，未知提交结果保留。Runner 预检／凭据物化前移以减少未受理预留。定向组合31/0（244 assertions），定向 lint／全仓类型／架构通过；完整发布门禁与 RI 实机尚未完成。进程中断留下的预留仍需所有者稳定证明，不能按时间删除。共享 index 空，未提交／推送／部署；RFC027 句柄仍 active，跨任务协调授权未收到。
 
-## RFC-027 业务执行契约实施中（2026-09-27）
+## RFC-027 已完成 CS 交付（2026-09-27）
+
+**最终状态：Done。** 0c8be5fd 精确91路径已推送、CI36313900860六项成功；API/controller/console精确候选本地ready，0003新增表迁移1条。真实Agent材料/会话、独立Pod额度、90秒执行跨session/API/controller重启、原卷恢复/丢失、切流/维护迁移及97秒慢启动全部形成证据。新管理员只读任务列表真实12组合布局/键盘通过，测试计算额度归零，原46个非平台Pod/PVC UID未变。详见RFC027 acceptance首节；下文为历史进度。aw未改动，真实aw接入及RFC029完整任务恢复执行仍为独立后续任务。RFC028镜像OCC补丁另提交3af3c568，console已由布局任务部署含该修复的3af3c568，实际布局E2E11/0、202断言；不倒退修复。
 
 最新实机收口：aebb85e1 精确SHA CI六项绿。真实独立Agent、发布/动态prompt、env/skills、MCP能力、非零usage与原卷原生session续跑通过；两Agent独立Pod计额，第三个429。维护迁移仅在epoch10停写/两父任务排空后启动，旧schema回退412；缺失原卷拒绝且不补空卷；95秒慢启动实际97秒Ready、零重启、待命无执行权。API/controller在90秒命令与handoff中重启，交接complete epoch14，原execution成功且副作用只有一次。实机发现暂停Runner Secret残留计额，回归先红后绿26/0，补丁控制器已部署并实际清理；两个验收父任务已close。最后增量（只读任务列表、skills透传、暂停凭据清理）定向35/0、236断言；文档/最终精确发布及新UI验收正在收尾，RFC尚未Done。当前共享index引入RFC028 history依赖，只在必要的最终发布窗口协调，不做常规跨session同步；第三方referenceResources继续排除。RFC029完整恢复操作属于单独获批任务，不能把只读任务列表称为已实现恢复按钮。
 
