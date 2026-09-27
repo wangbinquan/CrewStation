@@ -63,6 +63,8 @@ export interface WorkloadRender {
    * 调和器建之前照它们核对父工作区还是受理时那一个。
    */
   readonly execution?: { readonly workspacePod: string };
+  /** 保卷重建：确认的卷实例与不可变请求摘要；不创建卷、不重新检出。 */
+  readonly rebuild?: { readonly id: string; readonly volumeUid: string; readonly intent: string; readonly nodeName?: string };
 }
 
 export interface RunnerRejection {
@@ -173,11 +175,11 @@ export function graceElapsed(env: TaskEnvironment, now: Date, graceMs = POD_CREA
 export const WORKLOAD_LABELS: Readonly<Record<TaskKind, string>> = { 'dev-session': 'dev-session', business: 'business-task', 'profile-test': 'profile-test' };
 
 /**
- * 由资源中心建出的环境（RFC-025 I25）：有渲染期望、不在重建（重建与档位测试仍由 task-runtime 自己建）。执行环境要带父工作区的 Pod 名，
+ * 由资源中心建出的环境（RFC-025 I25）：有渲染期望；重建只接新的匹配请求（旧请求沿用旧队列）。执行环境要带父工作区的 Pod 名，
  * 没有的照旧由本模块建。
  */
 export function reconcilerCreates(env: TaskEnvironment): env is TaskEnvironment & { readonly render: WorkloadRender } {
-  return !!env.render && !env.rebuildId && (!env.native || !!env.render.execution);
+  return !!env.render && (!env.rebuildId || env.render.rebuild?.id === env.rebuildId) && (!env.native || !!env.render.execution);
 }
 
 /**
@@ -185,7 +187,7 @@ export function reconcilerCreates(env: TaskEnvironment): env is TaskEnvironment 
  * 沿用 `<Pod 名>-runner`（清理与孤儿判定认这个名字）。
  */
 export function runnerSecretOf(env: TaskEnvironment & { readonly render: WorkloadRender }): string {
-  return env.native ? `${env.podName}-runner` : `${env.podName}-runner-${env.render.start}`;
+  return env.native || env.render.rebuild ? `${env.podName}-runner` : `${env.podName}-runner-${env.render.start}`;
 }
 
 /** 这一次启动检出用的 Git 凭据 Secret（I25）：`<Pod 名>-checkout-<第几次启动>`；旧形状沿用受理时写好的按服务 Secret；不检出没有。 */
@@ -196,7 +198,7 @@ export function checkoutSecretOf(env: TaskEnvironment & { readonly render: Workl
 
 /** 所属模块要资源中心建出容器（领域条件 Provisioning）：工作区在创建中、还没绑定 Pod 实例；执行环境还在排队（准备好之前）。 */
 export function wantsProvisioning(env: TaskEnvironment): boolean {
-  return reconcilerCreates(env) && env.state === 'creating' && (env.native ? env.native.state === 'queued' : !env.podUid);
+  return reconcilerCreates(env) && !env.render.rebuild && env.state === 'creating' && (env.native ? env.native.state === 'queued' : !env.podUid);
 }
 
 export function podNameFor(taskId: TaskId): string {

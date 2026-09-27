@@ -577,6 +577,7 @@
         "zod": "4.6.2",
       },
       "devDependencies": {
+        "@crewstation/module-cluster-control": "workspace:*",
         "@crewstation/module-resources": "workspace:*",
         "@crewstation/testkit": "workspace:*",
       },

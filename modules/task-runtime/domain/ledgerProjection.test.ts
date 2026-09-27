@@ -166,3 +166,15 @@ test('开发预览独立为子路由；旧会话可补入主机信息，重建�
   expect(projectEnvironment(env(), route).route).toBeUndefined();
   expect(projectEnvironment({ ...current, native: native() }, route).route).toBeUndefined();
 });
+
+test('保卷重建只投影本次 Pod 和 Secret，不重新创建 PVC 或检出；预览 Service 沿用原名', () => {
+  const rebuilt = env({ state: 'creating', rebuildId: 'rb-new', podName: 'task-r-new', preview: { command: ['bun'], port: 3000, healthPath: '/' },
+    render: { image: 'new-image', workerUid: 10001, resources: { cpu: '2', memory: '4Gi', storage: '10Gi' }, start: 1,
+      rebuild: { id: 'rb-new', volumeUid: 'original-volume', intent: 'confirmed-intent' } } });
+  const projected = projectEnvironment(rebuilt);
+  expect(projected.workload.render).toMatchObject({ rebuild: { id: 'rb-new', volumeUid: 'original-volume' }, pod: { image: 'new-image', secret: 'task-r-new-runner', pvc: rebuilt.pvcName } });
+  expect(projected.workload.render?.['pod']).not.toHaveProperty('checkout');
+  expect(projected.volume?.render).toBeUndefined();
+  expect(projected.volume?.conditions).toContainEqual({ type: 'Provisioning', status: 'false' });
+  expect(projected.workload.children).toContainEqual({ kind: 'Service', namespace: rebuilt.namespace, name: `task-${rebuilt.id.replaceAll('-', '')}` });
+});

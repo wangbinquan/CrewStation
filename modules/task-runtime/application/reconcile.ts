@@ -14,7 +14,7 @@ export function reconcileUseCase(deps: TaskRuntimeUseCaseDeps, lifecycle: Lifecy
   return async (): Promise<number> => {
     let changed = 0;
     // 作业崩溃或补偿重试耗尽后仍有持久化意图：去重补投，不丢失恢复。
-    for (const record of await deps.uow.read.rebuilds.pending()) await deps.uow.read.rebuildQueue.enqueue(record.id);
+    for (const record of await deps.uow.read.rebuilds.pending()) if (record.creation !== 'ledger') await deps.uow.read.rebuildQueue.enqueue(record.id);
     for (const env of await deps.uow.read.environments.pendingExecutions()) await deps.uow.read.nativeQueue.enqueue(env.id);
     for (const env of await deps.uow.read.environments.listByStates(['creating', 'running'])) {
       if (await expireExecutionProvisioning(deps, env)) { changed += 1; continue; }

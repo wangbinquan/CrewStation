@@ -1,3 +1,6 @@
+import type { RebuildRender } from '../domain/rebuildRender';
+import type { WorkloadRender } from '../domain/workloadRender';
+import type { RebuildRendering } from './ledger';
 import type { JobRender } from '../domain/jobRender';
 import type { MiddlewareRender } from '../domain/middlewareRender';
 import type { NamespaceRender, NetworkPolicyRender } from '../domain/namespaceRender';
@@ -50,6 +53,7 @@ export interface ManagedObjectReader {
  * 任务容器与服务槽随凭据的裁定（I25）再移交。
  */
 export interface ClusterWriter {
+  rebuild?(render: WorkloadRender, intent: RebuildRender, signal?: AbortSignal): RebuildRendering;
   remove(target: { readonly kind: ObservedKind; readonly namespace?: string; readonly name: string; readonly uid: string }): Promise<void>;
   /** 按路由期望渲染 IngressRoute，与观测缓存里的对象（current）比对：缺了或不一致才 apply。 */
   applyRoute(route: RouteRender, current: ObservedObject | undefined): Promise<'applied' | 'unchanged'>;

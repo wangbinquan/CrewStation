@@ -43,7 +43,7 @@ export async function sourceOf(deps: TaskRuntimeUseCaseDeps, serviceId: ServiceI
 }
 
 /** 资源中心建出容器时的期望（RFC-025 I25）：镜像、资源、检出与开发预览路由；凭据不在这里。 */
-function workloadRenderOf(settings: TaskRuntimeSettings, profile: { cpu: string; memory: string; storage: string }, checkout: WorkloadRender['checkout'], previewRoute: TaskPodSpec['previewRoute']): WorkloadRender {
+export function workloadRenderOf(settings: TaskRuntimeSettings, profile: { cpu: string; memory: string; storage: string }, checkout: WorkloadRender['checkout'], previewRoute: TaskPodSpec['previewRoute']): WorkloadRender {
   return {
     image: settings.taskImage, workerUid: settings.workerUid, resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, start: 1,
     ...(checkout ? { checkout } : {}),

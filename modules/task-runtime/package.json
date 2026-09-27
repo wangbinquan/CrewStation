@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "TaskEnvironment 生命周期、Pod 与两种持久卷模式、配额原子准入、TaskRunner 归属与协议服务端语义",
+  "description": "TaskEnvironment \u751f\u547d\u5468\u671f\u3001Pod \u4e0e\u4e24\u79cd\u6301\u4e45\u5377\u6a21\u5f0f\u3001\u914d\u989d\u539f\u5b50\u51c6\u5165\u3001TaskRunner \u5f52\u5c5e\u4e0e\u534f\u8bae\u670d\u52a1\u7aef\u8bed\u4e49",
   "exports": {
     ".": "./index.ts"
   },
@@ -28,6 +28,7 @@
   },
   "devDependencies": {
     "@crewstation/module-resources": "workspace:*",
-    "@crewstation/testkit": "workspace:*"
+    "@crewstation/testkit": "workspace:*",
+    "@crewstation/module-cluster-control": "workspace:*"
   }
 }

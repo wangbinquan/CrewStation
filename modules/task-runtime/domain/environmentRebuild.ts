@@ -8,6 +8,8 @@ export interface LegacyRebuildClusterIdentity {
 /** 恢复意图不携带凭据；新 Runner Secret 由集群适配器幂等准备。 */
 export interface EnvironmentRebuild {
   readonly legacyCluster?: LegacyRebuildClusterIdentity;
+  readonly creation?: 'owner' | 'ledger';
+  readonly attempts?: number;
   readonly id: string;
   readonly taskId: TaskId;
   readonly projectId: ProjectId;

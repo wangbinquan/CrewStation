@@ -21,6 +21,7 @@ import { lifecycleUseCases } from './application/lifecycle';
 import { environmentQueries, environmentToDto } from './application/queries';
 import { observeStartupUseCase, reconcileUseCase } from './application/reconcile';
 import { startupLogTail } from './application/failEnvironment';
+import { reconcileRebuildUseCase } from './application/reconcileRebuild';
 import { rebuildUseCases } from './application/requestRebuild';
 import { rebuildWorker } from './workers/rebuildWorker';
 import { nativeExecutionWorker } from './workers/nativeExecutionWorker';
@@ -123,6 +124,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
   });
   const api: TaskRuntimeModuleApi = {
     name: 'task-runtime',
+    reconcileRebuild: reconcileRebuildUseCase(recoveryDeps),
     listClusterTasks: queries.listClusterTasks,
     ...rebuild,
     createEnvironment: async (input) => environmentToDto(await create(input)),

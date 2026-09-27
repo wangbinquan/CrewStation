@@ -52,7 +52,16 @@ export interface LedgerObservations {
  * 工作区容器的所属模块（task-runtime，RFC-025 I25 裁定：渲染时回调）：建 Runner Secret 之前要它的内容（配置、数据连接串、新签发的
  * Runner 令牌），Pod 建出后把实例交回去。值只在调和器的内存里过一下、写进 Secret，不落台账。由组合根接上。
  */
+/** 调和器为确认过的重建提供物理操作；凭据只经内存传递。 */
+export interface RebuildRendering {
+  prepareSecret(values: () => Promise<Record<string, string>>, expectedUid?: string): Promise<{ uid: string; token: string }>;
+  ensurePod(expectedUid?: string): Promise<string>;
+  ensurePreview(): Promise<void>;
+  cleanup(instances: { podUid?: string; secretUid?: string }): Promise<void>;
+}
+
 export interface WorkloadOwners {
+  reconcileRebuild?(recordId: string, rebuildId: string, operations: RebuildRendering, heartbeat: () => Promise<boolean>): Promise<void>;
   runnerValues(recordId: string): Promise<Readonly<Record<string, string>>>;
   /** 建这一次启动检出用的 Git 凭据 Secret 之前要令牌（只读、短时，I25）；值只写进 Secret，不落台账。 */
   checkoutValues(recordId: string): Promise<{ readonly token: string }>;

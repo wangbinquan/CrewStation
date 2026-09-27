@@ -460,7 +460,7 @@ function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCo
     // D13：槽「已结束」时待验证与正式主机改指 cs-api 的说明页（Service 与端口同平台路由清单 deploy/k8s/platform/30-cs-api.yaml）。
     explainer: { namespace: deps.settings.systemNamespace, service: 'cs-api', port: 8080, path: UNAVAILABLE_PATH },
     // RFC-025 I25：建工作区与执行环境的 Runner Secret 时回头向 task-runtime 要内容（值不落台账），Pod 建出后交回实例；执行环境的父工作区变了交它判失败。
-    workloads: { runnerValues: (id) => runtime.taskRuntime.api.runnerValues(id as TaskId), checkoutValues: (id) => runtime.taskRuntime.api.checkoutValues(id as TaskId), bindWorkload: (id, podUid, secretUid) => runtime.taskRuntime.api.bindWorkload(id as TaskId, podUid, secretUid),
+    workloads: { reconcileRebuild: (id, rebuildId, operations, heartbeat) => runtime.taskRuntime.api.reconcileRebuild(id as TaskId, rebuildId, operations, heartbeat), runnerValues: (id) => runtime.taskRuntime.api.runnerValues(id as TaskId), checkoutValues: (id) => runtime.taskRuntime.api.checkoutValues(id as TaskId), bindWorkload: (id, podUid, secretUid) => runtime.taskRuntime.api.bindWorkload(id as TaskId, podUid, secretUid),
       workloadUnavailable: (id, code) => runtime.taskRuntime.api.workloadUnavailable(id as TaskId, code) },
     // T8：建服务槽的环境 Secret、构建与迁移 Job 的凭据 Secret 时同样回头向 release 要内容；槽建不成交它判这一次部署失败。
     slots: { slotEnvValues: (ref) => release.api.slotEnvValues(ref), slotFailed: (ref, message) => release.api.slotFailed(ref, message) }, jobs: { jobEnvValues: (ref) => release.api.jobEnvValues(ref) },

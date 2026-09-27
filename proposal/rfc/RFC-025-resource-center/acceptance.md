@@ -414,3 +414,11 @@ I29 裁定（三个 (a)）之后：
 ## 15. 2026-09-27 开发预览独立路由（T9）
 
 实现范围见 design「开发预览归属移交」。新增回归先在旧实现上失败：缺少原子移交入口、工作区仍认领 IngressRoute、父释放后独立路由未释放。实现后定向核对：唯一认领与 UID 原样移交；租约忙时原记录保持；跨模块／项目／上级与第三方对象拒绝；旧会话补投影、重建稳定 Service 名、父释放／保留期级联；旧调和快照不能误删已移交入口。新预览路由的认证后限流中间件顺序也有断言。本地验证：结构与 lint、后端与 console 类型检查通过；unit 720/0、module 1392/7 skip/0 fail、console 904/0；按工作树候选（含新增文件）核对新增可执行行 80/80，100%。发布与实机证据待补记。
+
+### 15.1 发布与本机复核
+
+`e799d3fdad5c2fa398177a65b32d7e68039450a0` 已推送；[CI 36281654856](https://github.com/wangbinquan/CrewStation/actions/runs/36281654856) 六项成功，含 gate、e2e。本机 API／controller／session 已从该 SHA 的 archive 构建并升级为 `cs-control-plane:rc025-preview-e799d3fd`（镜像 ID `sha256:b2b6e4a89e11d27a903cc70409770d863f922bf8a56409333e85acc87f6f5f2c`），均完成滚动；console 未变。2026-09-27 00:11:49Z 核对 demo、rfc003-ux、rfc003-verify-workbench 三个入口：IngressRoute UID 全部与升级前相同，链均为清身份头→用户认证→用户限流→Host 限流，台账增加三条 route（160→163）；三个会话的记录及摘要仍 ready、connected。存量认领原位移交完成。
+
+## 16. 2026-09-27 保卷重建创建移交（T6）
+
+新请求写入台账，由 cluster-control 在资源租约中执行 Secret／Pod／Service 创建与本次对象补偿；task-runtime 保留项目锁、旧 Pod／卷检查、状态机与凭据签发，旧请求继续原队列。迁移 `task_runtime/0011_rebuild_creation.sql` 持久保存创建归属与重试次数。新卷创建和重新检出均无入口。已完成 T9 移交的旧会话先补投影再重建的回归在修复前因 IngressRoute 认领冲突失败；现受理时固定预览信息，额度受理不再抢占路由。其余回归覆盖响应丢失保持同一令牌、五次失败与补偿、卷 UID 替换、租约中止与外来对象保护。本地最终验证：结构、lint、后端与 console 类型通过；unit 722/0、module 1401/7 skip/0 fail、console 904/0；新增可执行行 163/163，100%。初轮捕获预览期望格式不一致，修复后复用标准转换并补断言；共享数量比较接受 Kubernetes 等值单位且拒绝实质规格变化，相关层已重新跑绿。发布与实机证据待补。

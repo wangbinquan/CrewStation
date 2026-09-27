@@ -20,3 +20,5 @@ export { serviceSlotObjects, serviceSlotSecret, slotObjectName } from './objects
 export { boundedMetricsText, parseMetricsJson } from './metrics';
 export type { PodEventLike, PodImagePull, PodStartupContainer, PodStartupObservation } from './podStartup';
 export { podStartup } from './podStartup';
+
+export { resourcesMatch } from './quantities';

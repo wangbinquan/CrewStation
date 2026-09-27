@@ -7,7 +7,7 @@ import { REBUILD_JOB_KIND } from '../ports/rebuilds';
 
 async function runRebuild(deps: RebuildExecutionDeps, id: string, heartbeat: RebuildHeartbeat): Promise<void> {
   const original = await deps.uow.read.rebuilds.get(id);
-  if (!original) return;
+  if (!original || original.creation === 'ledger') return;
   await deps.uow.run(async (scope) => {
     await scope.admissions.lock(original.projectId);
     await requireRebuildLease(heartbeat);

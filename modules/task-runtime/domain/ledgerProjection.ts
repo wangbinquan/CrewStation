@@ -115,10 +115,11 @@ function workloadRender(env: TaskEnvironment): ProjectedRecord['render'] {
     image, workerUid, resources, workload: WORKLOAD_LABELS[env.kind], project: env.labels['crewstation.io/project'] ?? '', service: env.labels['crewstation.io/service'] ?? '',
     // 档位测试（I25 第四步）用 Pod 内的临时目录，没有工作卷。
     ...(env.render.workVolume === 'emptyDir' ? { emptyDir: true } : { pvc: env.pvcName }), secret: runnerSecretOf(env), ...executionRender(env),
+    ...(env.render.rebuild ? { labels: { 'crewstation.io/rebuild': env.render.rebuild.id }, annotations: { 'crewstation.io/rebuild-intent': env.render.rebuild.intent }, ...(env.render.rebuild.nodeName ? { nodeName: env.render.rebuild.nodeName } : {}) } : {}),
     // 检出（I25）：没带 Secret 名的，凭据 Secret 由资源中心按这一次启动建（ownedCredential），令牌建的时候向本模块要。
     ...(checkout ? { checkout: { repoUrl: checkout.repoUrl, branch: checkout.branch, credentialSecretName: checkoutSecretOf(env)!, ...(checkout.credentialSecretName ? {} : { ownedCredential: true }) } } : {}),
   };
-  return { pod, ...(env.preview ? { preview: { port: env.preview.port, kind: env.kind } } : {}) };
+  return { pod, ...(env.render.rebuild ? { rebuild: env.render.rebuild } : {}), ...(env.preview ? { preview: { port: env.preview.port, kind: env.kind } } : {}) };
 }
 
 /**
@@ -148,7 +149,7 @@ function workloadChildren(env: TaskEnvironment): ProjectedRecord['children'] {
   // 资源中心建出的环境（I25）：每次启动一个 Runner Secret（检出用的 Git 凭据由资源中心建的也归这一次启动），预览与 Pod 同名。
   if (reconcilerCreates(env)) {
     const checkout = env.render.checkout && !env.render.checkout.credentialSecretName ? [at('Secret', checkoutSecretOf(env)!)] : [];
-    return [at('Pod', env.podName), at('Secret', runnerSecretOf(env)), ...checkout, ...(env.preview ? [at('Service', env.podName), at('IngressRoute', env.podName)] : [])];
+    return [at('Pod', env.podName), at('Secret', runnerSecretOf(env)), ...checkout, ...(env.preview ? [at('Service', env.rebuildId ? podNameFor(env.id) : env.podName), at('IngressRoute', env.rebuildId ? podNameFor(env.id) : env.podName)] : [])];
   }
   const route = env.rebuildId ? podNameFor(env.id) : env.podName;
   return [
@@ -176,7 +177,7 @@ export function projectEnvironment(env: TaskEnvironment, previewRoute: WorkloadR
     children: [{ kind: 'PersistentVolumeClaim', namespace: env.namespace, name: env.pvcName }], reclaim: env.volumeMode === 'follow-container' ? 'delete' : 'retain',
     display: { mode: env.volumeMode }, conditions: env.render ? [provisioningOf(env)] : [], ...(volumeReleased ? { release: volumeReleased } : {}),
     // 资源中心建出的环境（I25）：卷由调和器照这里建，只在要建出容器时建一次，卷丢了不补建（数据不能凭空换成空卷）。
-    ...(reconcilerCreates(env) ? { render: { pvc: { size: env.render.resources.storage, labels: { 'crewstation.io/task': env.id, 'crewstation.io/project': env.labels['crewstation.io/project'] ?? '' } } } } : {}),
+    ...(reconcilerCreates(env) && !env.render.rebuild ? { render: { pvc: { size: env.render.resources.storage, labels: { 'crewstation.io/task': env.id, 'crewstation.io/project': env.labels['crewstation.io/project'] ?? '' } } } } : {}),
   } : undefined;
   const name = env.rebuildId ? podNameFor(env.id) : env.podName;
   const route: ProjectedRecord | undefined = split ? {

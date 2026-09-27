@@ -4,6 +4,7 @@ import type { Logger } from '@crewstation/kernel';
 import { isPlatformError } from '@crewstation/kernel';
 import { createInformer, createWorkQueue } from '@crewstation/resource-runtime';
 import type { ClusterWriter, Ensured, ManagedObjectFeed, ManagedObjectReader, ObjectChange, ObservedKind } from '../../ports/cluster';
+import { rebuildObjects } from './rebuildObjects';
 import { objectCovered } from './coverage';
 import { jobSecretObject, releaseJobObject } from './jobObjects';
 import { middlewareObject } from './middlewareObjects';
@@ -57,6 +58,7 @@ export function kubernetesClusterWriter(k8s: K8sClient): ClusterWriter {
     return 'applied';
   };
   return {
+    rebuild: (render, intent, signal) => rebuildObjects(k8s, render, intent, signal),
     remove: async ({ kind, namespace, name, uid }) => {
       try { await k8s.delete(Resources[kind]!, name, namespace, { preconditions: { uid }, ...(kind === 'Pod' ? { gracePeriodSeconds: 30 } : {}) }); }
       catch (error) { if (!isPlatformError(error) || error.kind !== 'conflict') throw error; }

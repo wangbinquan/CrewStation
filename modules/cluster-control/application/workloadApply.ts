@@ -1,4 +1,5 @@
 import type { Logger } from '@crewstation/kernel';
+import { rebuildRenderOf } from '../domain/rebuildRender';
 import { volumeRenderOf, workloadRenderOf, workspaceUnchanged } from '../domain/workloadRender';
 import type { ClusterWriter, Ensured, ManagedObjectFeed } from '../ports/cluster';
 import type { LedgerObservations, LedgerRecordView, WorkloadOwners } from '../ports/ledger';
@@ -53,6 +54,16 @@ export async function applyVolume(deps: WorkloadApplyDeps, record: LedgerRecordV
  * 建不成的抛出，工作队列按退避重试，原因写进记录（Created 为假），页面照标准记录显示。
  */
 export async function applyWorkload(deps: WorkloadApplyDeps, record: LedgerRecordView, enqueue: (id: string, afterMs?: number) => void): Promise<void> {
+  if (record.spec['rebuild']) {
+    const render = workloadRenderOf(record.id, record.spec), owners = deps.workloads;
+    const intent = render && rebuildRenderOf(record.spec['rebuild'], render);
+    if (!render || !intent || !owners?.reconcileRebuild || !deps.cluster.rebuild) throw new Error('重建期望或渲染器不完整');
+    if (conditionTrue(record, 'Rebuilding')) {
+      await owners.reconcileRebuild(record.id, intent.id, deps.cluster.rebuild(render, intent, deps.signal), async () => !deps.signal?.aborted);
+      enqueue(record.id, deps.retryMs ?? WAIT_MS);
+    }
+    return;
+  }
   if (!provisioning(record) || !deps.workloads) return;
   const render = workloadRenderOf(record.id, record.spec);
   if (!render) {
