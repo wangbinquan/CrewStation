@@ -16,26 +16,28 @@ let tdb: TestDatabase;
 beforeAll(async () => { if (available) tdb = await createTestDatabase([dataMigrations]); });
 afterAll(async () => { await tdb?.drop(); });
 
-async function fixture() {
+async function fixture(holdRead = false) {
   const f = await objectArchiveFixture(tdb.db), owner: Actor = { userId: objectId() as UserId, isAdmin: false };
+  const completed = Promise.withResolvers<{ size: number; sha256: string }>();
   let calls = 0, missing = false;
   const plane = { get: async (_location, input) => {
     calls++; if (missing) throw notFound('physical object');
     expect(input.expected).toEqual({ size: 100, sha256: 'a'.repeat(64) });
     const size = input.range ? 10 : 100;
     return { body: new ReadableStream<Uint8Array>({ start: (c) => { c.enqueue(new Uint8Array(size).fill(120)); c.close(); } }), size,
-      ...(input.range ? { contentRange: 'bytes 0-9/100' } : {}), completed: Promise.resolve({ size, sha256: 'a'.repeat(64) }) };
+      ...(input.range ? { contentRange: 'bytes 0-9/100' } : {}), completed: holdRead ? completed.promise : Promise.resolve({ size, sha256: 'a'.repeat(64) }) };
   } } as ObjectBackendPlane;
   const api = objectAdministration({ catalog: f.catalog, reads: f.reads, plane, downloads: { content: f.content, owner: objectId() },
     authorizer: { authorize: async (actor, projectId) => { if (actor.userId !== owner.userId || projectId !== f.source.projectId) throw forbidden(); } } });
   const app = createApp({ name: 'object-console-download' }); app.route('/', objectAdminRoutes(api, async () => false));
   const path = `/v3/object-storage/objects/${f.object.id}/content`, headers = { [IDENTITY_HEADERS.userId]: owner.userId };
-  return { ...f, owner, app, path, headers, calls: () => calls, lose: () => { missing = true; } };
+  return { ...f, owner, app, path, headers, calls: () => calls, lose: () => { missing = true; }, finishRead: () => completed.resolve({ size: 100, sha256: 'a'.repeat(64) }) };
 }
 
 describe.skipIf(!available)('console artifact download', () => {
-  test('checks membership before opening content; a read uses shared capacity until the response finishes', async () => {
-    const f = await fixture();
+  test('checks membership before opening content; a read uses shared capacity until the backend finishes', async () => {
+    // CI regression: an already-completed backend may release before this assertion; control its completion explicitly.
+    const f = await fixture(true);
     expect((await f.app.request(f.path)).status).toBe(401);
     expect((await f.app.request(f.path, { headers: { [IDENTITY_HEADERS.userId]: objectId() } })).status).toBe(404);
     expect(f.calls()).toBe(0);
@@ -46,6 +48,8 @@ describe.skipIf(!available)('console artifact download', () => {
     expect(response.headers.get('cache-control')).toBe('private, no-store');
     expect(response.headers.get('x-cs-object-sha256')).toBe(f.object.sha256);
     expect((await f.catalog.space(f.space.id))?.activeTransfers).toBe(1);
+    expect(await f.reads.queue([f.space.id])).toMatchObject({ activeDownloads: 1, unknownDownloads: 0 });
+    f.finishRead();
     expect((await response.arrayBuffer()).byteLength).toBe(100);
     expect((await f.catalog.space(f.space.id))?.activeTransfers).toBe(0);
     expect(await f.reads.queue([f.space.id])).toMatchObject({ activeDownloads: 0, unknownDownloads: 0 });
