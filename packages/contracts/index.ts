@@ -40,6 +40,7 @@ export * from './api/apiCatalog';
 export * from './api/events';
 export * from './api/data';
 export * from './api/observability';
+export * from './api/observability/tokenPricing';
 export * from './api/trace/traceChain';
 export type { Actor, ServiceActor } from './api/actor';
 export * from './api/scm';
@@ -82,6 +83,18 @@ export * from './api/business/files';
 export * from './api/business/events';
 export * from './api/business/responses';
 export * from './api/business/capabilities';
+export * from './api/business/finalization';
+export * from './api/object-storage/values';
+export * from './api/object-storage/requests';
+export * from './api/object-storage/responses';
+export * from './api/object-storage/observations';
+export * from './api/object-storage/archivePlans';
+export * from './api/object-storage/receiptPages';
+export * from './api/object-storage/archiveHelper';
+export * from './api/object-storage/loss';
+export * from './api/object-storage/revisionPreview';
+export * from './api/object-storage/artifactDeletion';
+export * from './api/object-storage/backups';
 
 // RFC-028：运行镜像构建、用途验证与独立绑定。
 export * from './api/runtimeImages/values';
@@ -92,6 +105,9 @@ export * from './api/runtimeImages/buildResources';
 export * from './taskrunner/runtimeInitialization';
 export * from './taskrunner/businessStorage';
 export * from './taskrunner/businessExecution';
+export * from './taskrunner/executionCompletion';
+export * from './api/resources/workloadSafety';
+export * from './api/resources/taskVolume';
 
 export * from './api/runtimeImages/development';
 
@@ -109,3 +125,10 @@ export * from './api/business/recovery';
 export * from './api/runtimeImages/projectPolicy';
 
 export * from './api/market/appIcon';
+
+export * from './api/observability/executionObservations';
+
+export * from './taskrunner/usageObservation';
+export * from './api/object-storage/taskInputs';
+
+export * from './api/observability/runtimeStatistics';

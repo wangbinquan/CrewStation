@@ -15,6 +15,20 @@ const native = (patch: Partial<NativeExecution> = {}): NativeExecution => ({
 });
 
 describe('任务环境投影到资源台账（RFC-025 第二期）', () => {
+  test('归档任务卷跨运行、暂停、失败、释放及新启动持续属于 taskId，Agent 仅消费同一卷', () => {
+    const parent = env({ kind: 'business', volumeMode: 'persistent', branch: undefined, render: { image: 'task@sha256:abc', workerUid: 1000, resources: { cpu: '1', memory: '1Gi', storage: '1Gi' }, start: 1, businessStorage: { version: 1, ownerTaskId: env().id }, completionPolicy: 'archive-and-delete' } });
+    for (const state of ['creating', 'running', 'paused', 'failed', 'releasing', 'released'] as const) {
+      const projection = projectEnvironment({ ...parent, state });
+      expect(projection.volume).toMatchObject({ parentId: parent.id, reclaim: 'retain', render: { taskStorage: { taskId: parent.id, completionPolicy: 'archive-and-delete' } } });
+      expect(projection.volume?.release).toBeUndefined();
+      expect(projection.volume?.children).toEqual([{ kind: 'PersistentVolumeClaim', namespace: parent.namespace, name: parent.pvcName }]);
+      expect(projection.workload.children.some((child) => child.kind === 'PersistentVolumeClaim')).toBe(false);
+    }
+    const resumed = projectEnvironment({ ...parent, podName: 'next-unique-pod', state: 'creating', businessWorkspace: { volumeUid: 'original-volume', phase: 'resuming' }, render: { ...parent.render!, start: 2 } });
+    expect(resumed.volume?.render).toEqual({ taskStorage: { taskId: parent.id, completionPolicy: 'archive-and-delete' } });
+    expect(resumed.workload.render?.pod).toMatchObject({ pvc: parent.pvcName, expectedVolumeUid: 'original-volume' });
+    expect(projectEnvironment({ ...parent, native: native({ purpose: 'subtask', state: 'finished' }) }).volume).toBeUndefined();
+  });
   test('开发会话：开发工作区一条（沿用环境 ID），工作卷一条挂在它下面；领域条件都是「否」', () => {
     const { workload, volume, connected } = projectEnvironment(env());
     expect(workload).toEqual({

@@ -19,7 +19,7 @@ export function ProjectOperationsPage() {
   const change = (next: OperationsSearch, replace = false, resetScroll = true) => { void navigate({ to: PROJECT_PATHS[space].operations, params: { projectId }, search: next, replace, resetScroll }); };
   const logs = (slot: 'prod' | 'preview') => change({ tab: 'logs', source: 'slot', slot });
   return <div className={styles.page}>
-    <PageHeader title={t('nav.operations')} />
+    <PageHeader title={t('nav.operations')} actions={space === 'workbench' ? <ButtonLink to="/projects/$projectId/object-storage" params={{ projectId }}>{t('objects.title')}</ButtonLink> : undefined} />
     <Tabs label={t('nav.operations')} value={tab} items={OPERATIONS_TABS.map((value) => ({ value, label: t(`operations.tab.${value}`) }))} onChange={(value) => change({ tab: OPERATIONS_TABS.find((item) => item === value) })}>
       {tab === 'topology' ? <TopologyPage key={projectId} projectId={projectId} onLogs={(next) => change({ ...next, tab: 'logs' })} /> : null}
       {tab === 'health' ? <HealthCards key={projectId} projectId={projectId} onLogs={logs} /> : null}

@@ -30,6 +30,7 @@ export interface ActiveEndpoint {
 
 /** release 模块对外能力：发布、切流、查询；流水线推进由工作器调用。 */
 export interface ReleaseModuleApi {
+  objectStorageContract(serviceId: ServiceId, releaseId: ReleaseId): Promise<{ planId: string; fenced: boolean } | undefined>;
   imageHistory(input: RuntimeImageHistoryRead): Promise<RuntimeImageHistoryItem[]>;
   readonly name: 'release';
   getHandoff(actor: Actor, serviceId: ServiceId, id: string): Promise<TrafficSwitchDto>;

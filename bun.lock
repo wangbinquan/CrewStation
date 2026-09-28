@@ -55,6 +55,7 @@
       "name": "@crewstation/cs-api",
       "version": "0.0.0",
       "dependencies": {
+        "@crewstation/contracts": "workspace:*",
         "@crewstation/http": "workspace:*",
         "@crewstation/k8s": "workspace:*",
         "@crewstation/kernel": "workspace:*",
@@ -215,6 +216,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@crewstation/contracts": "workspace:*",
+        "@crewstation/filesystem-metrics": "workspace:*",
         "@crewstation/http": "workspace:*",
         "@crewstation/k8s": "workspace:*",
         "@crewstation/kernel": "workspace:*",
@@ -298,6 +300,7 @@
         "@crewstation/secretbox": "workspace:*",
         "drizzle-orm": "0.45.2",
         "postgres": "3.4.9",
+        "zod": "4.6.2",
       },
       "devDependencies": {
         "@crewstation/module-resources": "workspace:*",

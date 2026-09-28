@@ -1,4 +1,11 @@
 import { inspectBusinessRecovery } from './application/business/recoveryInspection';
+import { businessStorageFinalization } from './application/business/finalization';
+import { businessStorageCleanup } from './application/business/storageCleanup';
+import { unprovisionedStorage } from './adapters/persistence/unprovisionedStorage';
+import type { ArchiveCredentials } from './ports/archiveExecution';
+import { archiveExecutionStore } from './adapters/persistence/archiveExecutions';
+import { archiveExecution } from './application/archive/execution';
+import { archiveExecutionWorker } from './workers/archiveExecutions';
 import { rebuildBusinessWorkspace } from './application/business/rebuild';
 import { restartBusinessWorkspace } from './application/business/restart';
 import { environmentImageHistory } from './adapters/persistence/imageHistory';
@@ -36,6 +43,7 @@ import { rebuildUseCases } from './application/requestRebuild';
 import { rebuildWorker } from './workers/rebuildWorker';
 import { nativeExecutionWorker } from './workers/nativeExecutionWorker';
 import { createNativeExecutionUseCase } from './application/nativeExecution';
+import { resolveDevelopmentObjectSource } from './application/development/objectStorage';
 import { createTestEnvironmentUseCase } from './application/testEnvironment';
 import { workloadRenderUseCases } from './application/workloadRender';
 import { PROFILE_TEST_LABELS } from './domain/profileTestEnvironment';
@@ -44,11 +52,15 @@ import type { ProfileTestTiming } from './application/profileTest';
 import { environmentRoutes } from './http/environmentRoutes';
 import type { TaskCluster } from './ports/cluster';
 import type { EnvironmentLedger } from './ports/ledger';
+import type { WorkloadSafetyPort, TaskVolumePort } from './ports/workloadSafety';
 import { resyncLedger } from './application/ledgerResync';
 import { ledgerResyncWorker } from './workers/ledgerResyncWorker';
 import type { EnvironmentSources, ProfileCatalog, ProjectAuthorizer, QuotaSource, ServiceResolver, SourceCheckoutSource, TaskRuntimeSettings, TestRunner } from './ports/platform';
 
 export interface TaskRuntimeModuleDeps {
+  archive?: { credentials: ArchiveCredentials; apiUrl: string };
+  workloadSafety?: WorkloadSafetyPort;
+  taskVolumes?: TaskVolumePort;
   imageProbeLeases?: { port: LeasePort; holder: string };
   db: Database;
   k8s: K8sClient;
@@ -102,8 +114,10 @@ function ledgerProjectionFor(deps: TaskRuntimeModuleDeps): Parameters<typeof dri
     } } : {}) } : undefined;
 }
 
-export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntimeModule {
-  const useCaseDeps: TaskRuntimeUseCaseDeps = {
+function taskRuntimeUseCaseDeps(deps: TaskRuntimeModuleDeps): TaskRuntimeUseCaseDeps {
+  return {
+    workloadSafety: deps.workloadSafety, taskVolumes: deps.taskVolumes,
+    ...(deps.ledger && deps.creation === 'ledger' ? { unprovisionedStorage: unprovisionedStorage(deps.db, deps.ledger) } : {}),
     uow: drizzleUnitOfWork(deps.db, ledgerProjectionFor(deps)),
     cluster: deps.cluster ?? kubernetesTaskCluster(deps.k8s, deps.settings.workerUid),
     businessStorageInspector: kubernetesTaskRecoveryCluster(deps.k8s),
@@ -120,7 +134,12 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     clock: deps.clock ?? systemClock,
     logger: deps.logger ?? noopLogger,
   };
+}
+
+export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntimeModule {
+  const useCaseDeps = taskRuntimeUseCaseDeps(deps);
   const create = createEnvironmentUseCase(useCaseDeps);
+  const archives = deps.archive && deps.ledger && deps.creation === 'ledger' ? archiveExecution({ runtime: useCaseDeps, store: archiveExecutionStore(deps.db, deps.ledger), ...deps.archive }) : undefined;
   const lifecycle = lifecycleUseCases(useCaseDeps);
   const queries = environmentQueries(useCaseDeps);
   const reconcile = reconcileUseCase(useCaseDeps, lifecycle);
@@ -136,6 +155,9 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     ...(deps.testRunner ? { runner: deps.testRunner } : {}), ...(deps.testTiming ? { timing: deps.testTiming } : {}), ...(deps.testMcp ? { mcp: deps.testMcp } : {}),
   });
   const api: TaskRuntimeModuleApi = {
+    ...(archives ? { archiveExecution: archives } : {}),
+    ...(archives && deps.taskVolumes ? { storageCleanup: businessStorageCleanup(useCaseDeps, archives) } : {}),
+    ...businessStorageFinalization(useCaseDeps),
     ...businessRecoveryApi(useCaseDeps),
     name: 'task-runtime',
     imageHistory: environmentImageHistory(deps.db),
@@ -147,6 +169,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     listClusterTasks: queries.listClusterTasks,
     ...rebuild,
     createEnvironment: async (input) => environmentToDto(await create(input)),
+    resolveDevelopmentObjectSource: resolveDevelopmentObjectSource(useCaseDeps),
     createNativeExecution: async (input) => environmentToDto(await createNative(input)),
     releaseEnvironment: async (taskId, reason) => environmentToDto(await lifecycle.releaseEnvironment(taskId, reason)),
     pauseEnvironment: async (taskId) => environmentToDto(await lifecycle.pauseEnvironment(taskId)),
@@ -177,7 +200,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
   return {
     api,
     http: [environmentRoutes(api, deps.isAdmin)],
-    workers: [rebuildWorker(deps.db, recoveryDeps), nativeExecutionWorker(deps.db, executionDeps), ...periodicWorkers(useCaseDeps.logger, reconcile, observeStartup),
+    workers: [rebuildWorker(deps.db, recoveryDeps), nativeExecutionWorker(deps.db, executionDeps), ...periodicWorkers(useCaseDeps.logger, reconcile, observeStartup), ...(archives ? [archiveExecutionWorker(archives.reconcile, useCaseDeps.logger)] : []),
       ...(ledger ? [ledgerResyncWorker(() => resyncLedger(useCaseDeps.uow, ledger, useCaseDeps.logger, useCaseDeps.clock), useCaseDeps.logger)] : [])],
     migrations: taskRuntimeMigrations,
   };

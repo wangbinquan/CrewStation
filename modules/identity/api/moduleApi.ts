@@ -228,6 +228,7 @@ export interface IdentityModuleApi {
   resolveDevSessionToken(token: string): Promise<ResolvedDevSession | undefined>;
   /** RFC-027：签名令牌 + 当前 Pod 索引；不接受调用方自报 release／Pod UID。 */
   resolveServiceSource(token: string): Promise<(WorkloadIdentity & { source: NonNullable<WorkloadIdentity['source']> }) | undefined>;
+  resolveDevelopmentSource(token: string): Promise<(WorkloadIdentity & { developmentSource: NonNullable<WorkloadIdentity['developmentSource']> }) | undefined>;
   currentUser(userId: UserId, authMethod?: AuthMethod): Promise<CurrentUserDto>;
   jwks(): Promise<JwksDocument>;
   /** 生成新签名钥，旧钥进入重叠期继续验签。 */

@@ -1,4 +1,4 @@
-import type { ServiceSourceBinding, WorkloadIdentity, WorkloadKind } from '@crewstation/contracts';
+import type { DevelopmentSourceBinding, ServiceSourceBinding, WorkloadIdentity, WorkloadKind } from '@crewstation/contracts';
 
 /** 从 Pod 标签还原工作负载身份；标签名与 packages/k8s 的 LABELS 一致，但领域层不依赖 k8s 包。 */
 export interface PodLabels {
@@ -13,6 +13,7 @@ export interface PodLabels {
 
 export interface PodIdentityRecord {
   source?: ServiceSourceBinding;
+  developmentSource?: DevelopmentSourceBinding;
   ip: string;
   podName: string;
   namespace: string;
@@ -51,5 +52,6 @@ export function toWorkloadIdentity(record: PodIdentityRecord, prodPhysical: stri
     ...(slot ? { slot } : {}),
     ...(record.taskId ? { taskId: record.taskId as WorkloadIdentity['taskId'] } : {}),
     ...(record.workload === 'service' && record.source ? { source: record.source } : {}),
+    ...(record.workload === 'dev-session' && record.developmentSource ? { developmentSource: record.developmentSource } : {}),
   };
 }

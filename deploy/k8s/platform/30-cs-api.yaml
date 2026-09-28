@@ -12,6 +12,7 @@ spec:
     matchLabels: { app.kubernetes.io/name: cs-api }
   template:
     metadata:
+      finalizers: [crewstation.io/object-transfer-stop]
       labels: { app.kubernetes.io/name: cs-api, app.kubernetes.io/part-of: crewstation, app.kubernetes.io/managed-by: crewstation, crewstation.io/project: platform, crewstation.io/service: cs-api, crewstation.io/workload: platform }
     spec:
       serviceAccountName: crewstation-control
@@ -20,10 +21,11 @@ spec:
           image: cs-control-plane:dev
           imagePullPolicy: IfNotPresent
           args: ["apps/cs-api/src/main.ts"]
-          ports: [{ name: http, containerPort: 8080 }]
+          ports: [{ name: http, containerPort: 8080 }, { name: objects, containerPort: 8087 }]
           envFrom:
             - configMapRef: { name: crewstation-env }
             - configMapRef: { name: crewstation-metrics-env, optional: true }
+            - configMapRef: { name: crewstation-objects-env, optional: true }
             - secretRef: { name: crewstation-metrics, optional: true }
             - secretRef: { name: crewstation-secrets }
           env:
@@ -41,4 +43,4 @@ metadata:
   namespace: crewstation-system
 spec:
   selector: { app.kubernetes.io/name: cs-api }
-  ports: [{ name: http, port: 8080, targetPort: 8080 }]
+  ports: [{ name: http, port: 8080, targetPort: 8080 }, { name: objects, port: 8087, targetPort: 8087 }]

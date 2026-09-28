@@ -5,6 +5,10 @@ import { messages as appZh } from '../app/i18n/zh-CN';
 import { messages as adminEn } from '../features/admin/i18n/en-US';
 import { messages as adminZh } from '../features/admin/i18n/zh-CN';
 import { messages as clusterEn } from '../features/cluster/i18n/en-US';
+import { messages as runtimeEn } from '../features/observability/i18n/en-US';
+import { messages as runtimeZh } from '../features/observability/i18n/zh-CN';
+import { messages as storageEn } from '../features/object-storage/i18n/en-US';
+import { messages as storageZh } from '../features/object-storage/i18n/zh-CN';
 import { messages as imagesEn } from '../features/runtime-images/i18n/en-US';
 import { messages as imagesZh } from '../features/runtime-images/i18n/zh-CN';
 import { messages as clusterZh } from '../features/cluster/i18n/zh-CN';
@@ -43,7 +47,7 @@ function linkTree(root: Element | null): RenderedGroup[] {
 
 const EXPECTED_TREE: readonly RenderedGroup[] = [
   { title: null, pages: ['总览', '申请审批'] },
-  { title: '运行与观测', pages: ['集群管理', '业务执行恢复', '网关'] },
+  { title: '运行与观测', pages: ['运行观测与统计', '集群管理', '业务执行恢复', '对象存储', '网关'] },
   { title: '供给与接入', pages: ['项目管理', '能力接入'] },
   { title: '身份与访问', pages: ['用户与权限', '认证'] },
   { title: '资源与网络', pages: ['运行镜像', '算力档位'] },
@@ -108,8 +112,8 @@ describe('管理空间的分组树（2026-09-21 修订 RFC-003 §4）', () => {
   });
 });
 
-const zh: Record<string, string> = { ...appZh, ...adminZh, ...clusterZh, ...imagesZh };
-const en: Record<string, string> = { ...appEn, ...adminEn, ...clusterEn, ...imagesEn };
+const zh: Record<string, string> = { ...appZh, ...adminZh, ...clusterZh, ...imagesZh, ...storageZh, ...runtimeZh };
+const en: Record<string, string> = { ...appEn, ...adminEn, ...clusterEn, ...imagesEn, ...storageEn, ...runtimeEn };
 
 describe('分组定义本身', () => {
   test('每个管理页只登记一次，每组都有页面', () => {

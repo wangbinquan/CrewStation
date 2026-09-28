@@ -3,6 +3,9 @@ import type { RebuildRender } from '../domain/rebuildRender';
 import type { WorkloadRender } from '../domain/workloadRender';
 import type { RebuildRendering } from './ledger';
 import type { RuntimeImageBuildRender } from '@crewstation/contracts';
+import type { TaskVolumeTarget } from '@crewstation/contracts';
+import type { WorkloadConsumer, WorkloadStartPermit, WorkloadStopProof } from '@crewstation/contracts';
+import type { WorkloadStopObservation } from '../domain/workloadStop';
 import type { JobRender } from '../domain/jobRender';
 import type { MiddlewareRender } from '../domain/middlewareRender';
 import type { NamespaceRender, NetworkPolicyRender } from '../domain/namespaceRender';
@@ -55,6 +58,14 @@ export interface ManagedObjectReader {
  * 任务容器与服务槽随凭据的裁定（I25）再移交。
  */
 export interface ClusterWriter {
+  inspectTaskClaim?(namespace: string, name: string): Promise<{ namespace: string; name: string; uid: string } | undefined>;
+  inspectTaskVolume?(namespace: string, name: string, now: Date): Promise<TaskVolumeTarget | undefined>;
+  removeTaskVolume?(target: TaskVolumeTarget, now: Date): Promise<void>;
+  taskVolumeReclaimed?(target: TaskVolumeTarget, now: Date): Promise<boolean>;
+  inspectWorkloadStart?(pod: WorkloadPodRender): Promise<Omit<WorkloadStartPermit, 'grantedAt'> | undefined>;
+  activateWorkload?(pod: WorkloadPodRender, permit: Omit<WorkloadStartPermit, 'grantedAt'>): Promise<void>;
+  observeWorkloadStop?(consumer: WorkloadConsumer, now: Date): Promise<WorkloadStopObservation>;
+  releaseWorkloadStop?(proof: WorkloadStopProof): Promise<void>;
   inspectNamespaceRetirement?(name: string, intent: NamespaceRetirement, systemNamespace: string, signal?: AbortSignal): Promise<void>;
   removeRetiredNamespace?(name: string, intent: NamespaceRetirement, systemNamespace: string, signal?: AbortSignal): Promise<void>;
   rebuild?(render: WorkloadRender, intent: RebuildRender, signal?: AbortSignal): RebuildRendering;

@@ -44,6 +44,7 @@ export interface ConfigSource {
 /** 由 data 模块提供：生产数据资源的连接环境变量。 */
 export interface DataSource {
   envFor(serviceId: ServiceId, env: ConfigEnv): Promise<Record<string, string>>;
+  objectEnv?(serviceId: ServiceId, env: ConfigEnv, planId: string): Promise<Record<string, string>>;
 }
 
 export interface HostNaming {

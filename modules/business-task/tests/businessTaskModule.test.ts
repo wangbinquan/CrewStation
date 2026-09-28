@@ -156,8 +156,7 @@ describe.skipIf(!available)('business-task module', () => {
     await expect(bt.api.sendSubtaskMessage(caller, task.id, chat.id, { content: 'x' })).rejects.toMatchObject({ kind: 'precondition' });
 
     const failing = await bt.api.submitSubtask(caller, task.id, { kind: 'command', name: 'lint', command: ['sh', '-c', 'fail'], timeoutSeconds: 60 });
-    await Bun.sleep(50);
-    expect(await bt.api.getSubtask(caller, task.id, failing.id)).toMatchObject({ state: 'failed', exitCode: 2 });
+    expect(await eventually(() => bt.api.getSubtask(caller, task.id, failing.id), (s) => s.state === 'failed')).toMatchObject({ state: 'failed', exitCode: 2 });
     const finished = (await tdb.db.execute(`SELECT count(*)::int AS n FROM platform_infra.domain_events WHERE topic = 'business-task.subtask-finished'`)) as unknown as Array<{ n: number }>;
     expect(finished[0]!.n).toBeGreaterThanOrEqual(5);
 

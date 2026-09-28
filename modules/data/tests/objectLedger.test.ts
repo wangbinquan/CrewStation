@@ -1,0 +1,48 @@
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { noopLogger } from '@crewstation/kernel';
+import { createResourcesModule, resourcesMigrations } from '@crewstation/module-resources';
+import type { TestDatabase } from '@crewstation/testkit';
+import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
+import { objectCatalogRepository } from '../adapters/persistence/objectCatalog';
+import { objectUploadRepository } from '../adapters/persistence/objectUploads';
+import { objectLedgerProjection } from '../application/objectLedgerProjection';
+import { objectProvisioning } from '../application/objectProvisioning';
+import type { DataLedger } from '../ports/ledger';
+import { dataMigrations } from '../wiring';
+import { backendFixture, objectId, sourceFixture } from './objectFixtures';
+
+const available = await testDatabaseAvailable();
+let tdb: TestDatabase;
+beforeAll(async () => { if (available) tdb = await createTestDatabase([dataMigrations, resourcesMigrations]); });
+afterAll(async () => { await tdb?.drop(); });
+describe.skipIf(!available)('object spaces in the public resource ledger', () => {
+  test('provisioning requires the stable resource record; health and usage reconcile without PVCs or quota units', async () => {
+    let now = new Date(), broken = true;
+    const source = sourceFixture(), catalog = objectCatalogRepository(tdb.db);
+    const resources = createResourcesModule({ db: tdb.db, clock: { now: () => now }, quotas: { limitFor: async () => 1 }, authorizer: { projectAccess: async () => ({ operate: true }) }, isAdmin: async () => true });
+    const backend = await catalog.registerBackend(backendFixture({ health: 'ready', observedAt: now.toISOString() }));
+    const plan = await catalog.savePlan(objectId(), { name: 'Local', backendId: backend.id, quotaBytes: 1000, maxObjectBytes: 500, maxConcurrentTransfers: 4, enabled: true });
+    await catalog.authorizePlans(source.projectId, 1, [plan.id]);
+    const owner = resources.api.owner('data'), ledger: DataLedger = { declare: async (input) => { if (broken) throw new Error('ledger unavailable'); return owner.declare(input); }, get: resources.api.get, requestRelease: owner.requestRelease, presentBindings: async () => [] };
+    const projection = objectLedgerProjection(catalog, ledger, { now: () => now }, noopLogger);
+    const provision = objectProvisioning(projection.catalog, { resolveServiceById: async () => ({ projectId: source.projectId, slug: 'app' }) }, { deploymentMode: 'local', apiUrl: 'http://api.internal' });
+    await expect(provision(source.serviceId, 'production', plan.id)).rejects.toThrow('ledger unavailable');
+    const space = (await catalog.spaces(source.projectId))[0]!;
+    expect(await resources.api.get(space.id)).toBeUndefined();
+    expect(await projection.resync()).toBe(0);
+    broken = false;
+    expect(await provision(source.serviceId, 'production', plan.id)).toMatchObject({ CS_OBJECT_SPACE_ID: space.id });
+    const record = (await resources.api.get(space.id))!;
+    expect(record).toMatchObject({ kind: 'object-space', phase: 'ready', desired: 'present', owner: { module: 'data', ref: space.id }, spec: { children: [], backendId: backend.id }, display: { quotaBytes: '1000', usedBytes: '0' } });
+    expect(await resources.api.occupancy(source.projectId)).toBe(0);
+    await objectUploadRepository(tdb.db).reserve(space.id, objectId(), { requestKey: objectId(), name: 'retained', mediaType: 'text/plain', size: 100, sha256: 'a'.repeat(64) }, { source });
+    await projection.resync(); expect((await resources.api.get(space.id))?.display.reservedBytes).toBe('100');
+    expect((await resources.api.get(space.id))?.generation).toBe(record.generation);
+    now = new Date(now.getTime() + 121_000); await projection.resync();
+    expect(await resources.api.get(space.id)).toMatchObject({ phase: 'provisioning', reason: { code: 'object-health-unknown' } });
+    await catalog.observeBackend({ backendId: backend.id, placementRevision: 1, credentialRevision: 1, observedAt: now.toISOString(), health: 'unavailable', message: 'backend unreachable', freeBytes: null, totalBytes: null });
+    await projection.resync(); expect(await resources.api.get(space.id)).toMatchObject({ phase: 'degraded', reason: { code: 'object-health-unavailable' } });
+    expect((await resources.api.list({ projectId: source.projectId, kind: 'object-space' })).map((r) => r.id)).toEqual([space.id]);
+    expect((await catalog.spaces(source.projectId))).toHaveLength(1);
+  });
+});

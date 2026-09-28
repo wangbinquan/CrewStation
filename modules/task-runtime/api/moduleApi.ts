@@ -1,9 +1,12 @@
 import type { RuntimeImageHistoryRead, RuntimeImageHistoryItem } from '@crewstation/contracts';
+import type { BusinessStorageFinalization, DevelopmentSourceBinding, WorkloadStopBarrier } from '@crewstation/contracts';
 import type { BusinessRecoveryScope, BusinessWorkspaceProof, RebuildBusinessWorkspaceInput, RestartBusinessWorkspaceInput } from './businessRecovery';
 import type { BusinessSessionStorage } from '@crewstation/contracts';
 import type { RuntimeImageProbeInput, RuntimeImageProbeResult, RuntimeInitializationStatus, RuntimeImageExecutionSnapshot, Actor, ProjectId, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
 import type { DevSessionDto, DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest, StartupRecord } from '@crewstation/contracts';
 import type { BeforeStartMaterial, LaunchSpec, ProfileTestContext, ProfileTestOutcome, ProfileTestStage, TerminalTest } from '@crewstation/contracts';
+import type { ArchiveExecutionApi } from './archiveExecution';
+import type { StorageCleanupApi } from './storageCleanup';
 
 /**
  * 档位测试（RFC-006 §6）：输入为一个档位修订的镜像、launch 与启动前材料，加上已知协议的 nonce 提示或通用终端的测试命令；
@@ -53,11 +56,14 @@ export interface TraceKeyPage { before?: { at: string; traceId: string }; limit:
 export type TraceEnvironmentDto = EnvironmentDto & { updatedAt: string };
 
 export interface CreateEnvironmentInput {
+  developmentObjectPlanId?: string;
   /** 开发镜像保留引用预先分配的身份，仅内部使用。 */
   runtimeImageTaskId?: TaskId;
   /** 由调用方预留并通过用途验证的不可变镜像快照，不从父任务继承。 */
   runtimeImage?: RuntimeImageExecutionSnapshot;
   businessStorage?: 'isolated-v1';
+  completionPolicy?: 'archive-and-delete';
+  objectInputsGeneration?: number;
   /** RFC-027：持久意图固定的任务 ID；同一摘要重放不再扣额，限资源台账业务任务。 */
   admission?: { id: TaskId; fingerprint: string };
   serviceId: ServiceId;
@@ -102,6 +108,11 @@ export interface RebuildRendering {
 }
 
 export interface TaskRuntimeModuleApi {
+  readonly storageCleanup?: StorageCleanupApi;
+  readonly archiveExecution?: ArchiveExecutionApi;
+  freezeBusinessStorage(input: BusinessStorageFinalization): Promise<void>;
+  resolveBusinessStorage(input: BusinessStorageFinalization): Promise<string | null>;
+  stopBusinessStorage(input: BusinessStorageFinalization): Promise<WorkloadStopBarrier>;
   rebuildBusinessWorkspace(input: RebuildBusinessWorkspaceInput): Promise<EnvironmentDto>;
   restartBusinessWorkspace(input: RestartBusinessWorkspaceInput): Promise<EnvironmentDto>;
   inspectBusinessRecovery(scope: BusinessRecoveryScope): Promise<BusinessWorkspaceProof | undefined>;
@@ -113,6 +124,7 @@ export interface TaskRuntimeModuleApi {
   reconcileRebuild(taskId: TaskId, rebuildId: string, operations: RebuildRendering, heartbeat: () => Promise<boolean>): Promise<void>;
   readonly name: 'task-runtime';
   listClusterTasks(): Promise<Array<{ taskId: string; projectId: string; namespace: string; podName: string; podUid?: string; pvcName: string; pvcUid?: string; kind: string; state: string; purpose?: string; parentTaskId?: string; agentId?: string; terminalId?: string; profile: string; profileRevision?: number; profileTestId?: string; revision: string; volumeMode: string }>>;
+  resolveDevelopmentObjectSource(source: DevelopmentSourceBinding): Promise<{ projectId: ProjectId; serviceId: ServiceId; planId: string } | undefined>;
   createEnvironment(input: CreateEnvironmentInput): Promise<EnvironmentDto>;
   createNativeExecution(input: CreateNativeExecutionInput): Promise<EnvironmentDto>;
   releaseEnvironment(taskId: TaskId, reason: ReleaseReason): Promise<EnvironmentDto>;

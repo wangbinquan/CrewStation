@@ -1,4 +1,5 @@
 import { migrationControlRepository } from './migrationControl';
+import { persistExecutionControl } from './control-projection/repository';
 import { executionMessages } from './messages/tables';
 import { executionLifecycles as lifecycles, executionTaskStates as taskStates } from './execution/lifecycleTables';
 import { executionCancellations as cancels } from './execution/cancellationTables';
@@ -10,7 +11,7 @@ import type { ExecutionControl } from '../../domain/executionControl';
 import { liveControl, nextEpoch } from '../../domain/executionControl';
 import { activateControl, claimControl, prepareHandoff, releaseControl, renewControl } from '../../domain/controlTransitions';
 import type { ExecutionControls, FreezeExecutionInput } from '../../ports/executionControl';
-import { executionControls as controls, executionOperations as ops } from './executionTables';
+import { executionOperations as ops } from './executionTables';
 import { executionNow, executionTransaction, readExecutionControl } from './executionTransaction';
 import { legacyMutationsQuiescent } from './legacyMutations';
 
@@ -38,14 +39,14 @@ function frozenControl(current: ExecutionControl, input: FreezeExecutionInput): 
     handoff: { operationId: input.operationId, expectedActiveReleaseId: input.expectedActiveReleaseId, targetReleaseId: input.targetReleaseId, targetSlot: input.targetSlot, stage: 'frozen' } };
 }
 
-export function drizzleExecutionControls(db: Database): ExecutionControls {
+export function drizzleExecutionControls(db: Database, projectStorage = false): ExecutionControls {
   const update = (serviceId: string, fn: (current: ExecutionControl | undefined, now: Date, tx: Executor) => Promise<ExecutionControl> | ExecutionControl) => executionTransaction(db, serviceId, async (tx, now) => {
-    const control = await fn(await readExecutionControl(tx, serviceId), now, tx);
-    await tx.insert(controls).values({ serviceId, body: control }).onConflictDoUpdate({ target: controls.serviceId, set: { body: control } });
+    const previous = await readExecutionControl(tx, serviceId);
+    const control = await persistExecutionControl(tx, await fn(previous, now, tx), previous, projectStorage);
     return { control, now };
   });
   return {
-    ...migrationControlRepository(db),
+    ...migrationControlRepository(db, projectStorage),
     activeTaskContracts: async (serviceId) => {
       const active = await db.select({ intent: ops.intent }).from(ops).leftJoin(taskStates, sql`${ops.intent}->'task'->>'id' = ${taskStates.taskId}`).where(and(eq(ops.serviceId, serviceId), inArray(ops.state, ['pending', 'running', 'succeeded', 'retryable-rejected']), sql`COALESCE(${taskStates.state}, '') <> 'closed'`));
       return active.map(({ intent }) => ({ taskId: intent.task.id, taskContractVersion: intent.task.taskContractVersion }));

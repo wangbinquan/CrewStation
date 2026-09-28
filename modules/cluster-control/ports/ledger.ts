@@ -1,4 +1,6 @@
 import type { ResourceChild } from '@crewstation/contracts';
+import type { TaskVolumeSafetyState, TaskVolumeTarget, TaskVolumeReclaimProof } from '@crewstation/contracts';
+import type { WorkloadAdmissionIdentity, WorkloadConsumer, WorkloadStartPermit, WorkloadStopProof } from '@crewstation/contracts';
 import type { LegacyTask } from '../domain/adoption';
 import type { ObservedCondition } from '../domain/observation';
 
@@ -21,6 +23,22 @@ export interface LedgerRecordView {
 
 /** 资源中心（resources 模块）给调和器的入口，由组合根接上。 */
 export interface LedgerObservations {
+  readonly taskVolumes?: {
+    get(id: string): Promise<TaskVolumeSafetyState>;
+    beginProvision(id: string): Promise<void>;
+    recordClaim?(id: string, claim: { namespace: string; name: string; uid: string }): Promise<void>;
+    recordTarget(id: string, target: TaskVolumeTarget): Promise<void>;
+    recordReclaimed(id: string, proof: TaskVolumeReclaimProof): Promise<void>;
+  };
+  readonly workloadSafety?: {
+    closeAdmission?(identity: WorkloadAdmissionIdentity): Promise<void>;
+    admissionClosed?(id: string): Promise<boolean>;
+    get(id: string): Promise<{ consumer: WorkloadConsumer; admissionClosed: boolean; startPermit: WorkloadStartPermit | null; stopProof: WorkloadStopProof | null } | undefined>;
+    register?(consumer: WorkloadConsumer): Promise<{ consumer: WorkloadConsumer; admissionClosed: boolean }>;
+    grantStart?(id: string, permit: Omit<WorkloadStartPermit, 'grantedAt'>): Promise<unknown>;
+    closeConsumer(id: string): Promise<{ consumer: WorkloadConsumer; admissionClosed: boolean; startPermit: WorkloadStartPermit | null; stopProof: WorkloadStopProof | null }>;
+    recordStop(proof: WorkloadStopProof): Promise<WorkloadStopProof>;
+  };
   get(id: string): Promise<LedgerRecordView | undefined>;
   /** 在册的记录（不含已结束的）：调和器启动与定期全量核对时逐条排进队列。 */
   /** 同 Host＋精确 PathPrefix 的候选（含释放中的记录），先在数据库筛选再限量。 */
@@ -70,6 +88,12 @@ export interface WorkloadOwners {
   bindWorkload(recordId: string, podUid: string, secretUid?: string): Promise<void>;
   /** 执行环境建出之前父工作区换了实例或不在运行（workspace-changed）：交所属模块判这个执行环境失败，文案由它写。 */
   workloadUnavailable(recordId: string, code: 'workspace-changed'): Promise<void>;
+}
+
+/** Dedicated fixed archive environment: no Runner, checkout or application environment callbacks. */
+export interface ArchiveOwners {
+  values(recordId: string): Promise<Readonly<Record<string, string>>>;
+  bind(recordId: string, podUid: string, secretUid: string): Promise<void>;
 }
 
 /** 要建的是哪个槽的哪一次部署（槽记录期望里的，release 据此核对这次部署还要不要）。 */

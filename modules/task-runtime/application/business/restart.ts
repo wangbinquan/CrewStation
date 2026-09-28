@@ -8,6 +8,8 @@ import { hashRunnerToken, newRunnerToken } from '../../domain/runnerToken';
 import type { TaskRuntimeUseCaseDeps } from '../dependencies';
 import { admitEnvironment, matchAdmission } from '../environmentAdmission';
 import { inspectBusinessRecovery } from './recoveryInspection';
+import { storageStart } from './storageStart';
+import { assertBusinessStorageMutable } from './finalizationGuard';
 
 /** A new workspace with the original execution materials; never copy the old volume or success state. */
 export function restartBusinessWorkspace(deps: TaskRuntimeUseCaseDeps) {
@@ -20,6 +22,7 @@ export function restartBusinessWorkspace(deps: TaskRuntimeUseCaseDeps) {
     if (replay) return replay;
     const original = await deps.uow.read.environments.getById(input.taskId);
     if (!original || original.projectId !== input.projectId || original.serviceId !== input.serviceId) throw notFound('原业务工作区', input.taskId);
+    assertBusinessStorageMutable(original);
     if (original.kind !== 'business' || original.native || original.state !== 'failed' || !original.render?.businessStorage || original.render.businessStorage.ownerTaskId !== original.id) throw precondition('只有失败的独立业务工作区可以重新执行');
     const proof = await inspect(input);
     if (!proof?.stopped) throw precondition('旧执行尚未确认停止', { code: 'workspace_cleanup_pending' });
@@ -32,7 +35,8 @@ export function restartBusinessWorkspace(deps: TaskRuntimeUseCaseDeps) {
       podName: podNameFor(input.newTaskId), pvcName: pvcNameFor(input.newTaskId), traceId: input.traceId, admissionFingerprint: fingerprint,
       connected: false, runnerTokenHash: hashRunnerToken(newRunnerToken()), startup: initialStartup(now),
       createdAt: now, updatedAt: now, lastActivityAt: now,
-      render: { image: pinned.image, workerUid: pinned.workerUid, resources: pinned.resources, start: 1,
+      render: { image: pinned.image, workerUid: pinned.workerUid, resources: pinned.resources, start: 1, ...storageStart(pinned.completionPolicy),
+        ...(pinned.objectInputsGeneration ? { objectInputsGeneration: 1 } : {}),
         ...(pinned.runtimeImage ? { runtimeImage: pinned.runtimeImage } : {}), businessStorage: { version: 1, ownerTaskId: input.newTaskId } },
     };
     return admitEnvironment(deps, restarted, limit, original);

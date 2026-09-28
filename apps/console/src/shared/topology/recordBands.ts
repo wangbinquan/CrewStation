@@ -111,7 +111,7 @@ function devBand(parts: BandParts, shown: readonly ResourceRecord[], volumes: re
 
 function businessBand(parts: BandParts, shown: readonly ResourceRecord[], volumes: readonly ResourceRecord[], input: RecordBandInput, t: Translate): void {
   const workspaces = shown.filter((r) => r.kind === 'business-workspace').sort(byRecency);
-  const executions = shown.filter((r) => r.kind === 'agent-execution' && r.purpose === 'business-subtask');
+  const executions = shown.filter((r) => r.kind === 'archive-execution' || r.kind === 'agent-execution' && r.purpose === 'business-subtask');
   const all = [...workspaces, ...executions];
   if (all.length === 0) return;
   const band = 'business';

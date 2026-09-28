@@ -2,6 +2,8 @@
  * 业务接入约定表（Plan T0.3）：业务代码只依赖这里列出的名字，平台任何一侧改名都算破坏性变更。
  * 同一份内容由能力说明 MCP 与工作台能力页原样展示。
  */
+export const OBJECT_HEADERS = { fence: 'x-cs-object-fence', sha256: 'x-cs-object-sha256' } as const;
+
 export const IDENTITY_HEADERS = {
   /** 用户域：网关注入的已鉴权用户，明文可读。 */
   userId: 'x-cs-user-id',
@@ -48,6 +50,9 @@ export const PLATFORM_ENV = {
   internalApiBase: 'CS_INTERNAL_API_BASE',
   jwksUrl: 'CS_JWKS_URL',
   databaseUrl: 'CS_DATABASE_URL',
+  /** 服务对象空间的稳定标识与平台代理地址；不含后端凭据或物理 key。 */
+  objectSpaceId: 'CS_OBJECT_SPACE_ID',
+  objectsUrl: 'CS_OBJECTS_URL',
   port: 'PORT',
   taskId: 'CS_TASK_ID',
   traceId: 'CS_TRACE_ID',
@@ -64,6 +69,7 @@ export const PLATFORM_PATHS = {
 export const TOKEN_CLAIMS = {
   sourceIp: 'cs_source_ip',
   sourcePodUid: 'cs_source_pod_uid',
+  sourceTaskId: 'cs_source_task_id',
   sourceReleaseId: 'cs_source_release_id',
   sourcePhysicalSlot: 'cs_source_physical_slot',
   issuer: 'crewstation',

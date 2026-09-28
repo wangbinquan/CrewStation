@@ -1,6 +1,12 @@
 import { expect, test } from 'bun:test';
 import { isAllowed } from './authorization';
 
+test('任务存储终结只供负责人和平台管理员，开发者及应用用户不能确认丢弃', () => {
+  expect(isAllowed('owner', 'manage-task-storage')).toBe(true);
+  expect(isAllowed('admin', 'manage-task-storage')).toBe(true);
+  for (const role of ['developer', 'tester', 'user', undefined] as const) expect(isAllowed(role, 'manage-task-storage')).toBe(false);
+});
+
 test('RFC-021 两个新动作只给负责人与平台管理员：下线／推迟／重新部署待验证版本、开关正式版本维护', () => {
   for (const action of ['manage-slots', 'manage-maintenance'] as const) {
     expect(isAllowed('owner', action)).toBe(true);

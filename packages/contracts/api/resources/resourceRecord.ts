@@ -8,8 +8,8 @@ import { StartupProgressSchema } from '../progress/startupProgress';
  * 期望（spec）只由所属模块写、不出现在这里；实况只由资源中心写（阶段、原因、条件、子对象、启动进度）。
  */
 export const ResourceKindSchema = z.enum([
-  'namespace', 'network-policy-set', 'dev-workspace', 'agent-execution', 'business-workspace', 'volume',
-  'service-slot', 'build-job', 'migration-job', 'route', 'rate-limit-policy', 'database', 'data-binding',
+  'namespace', 'network-policy-set', 'dev-workspace', 'agent-execution', 'archive-execution', 'business-workspace', 'volume',
+  'service-slot', 'build-job', 'migration-job', 'route', 'rate-limit-policy', 'database', 'data-binding', 'object-space',
 ]);
 
 /** 八个标准阶段（RFC-025 提案 §5.2）。 */

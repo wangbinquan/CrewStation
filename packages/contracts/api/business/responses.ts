@@ -3,6 +3,7 @@ import { RuntimeImageExecutionSnapshotSchema } from '../runtimeImages/responses'
 import { ReleaseIdSchema, ResourceIdSchema, ServiceIdSchema, SubtaskIdSchema, TaskIdSchema, TraceIdSchema } from '../../ids';
 import { VolumeModeSchema } from '../../manifest/tasks';
 import { BusinessResultSchema } from './events';
+import { CompletionPolicySchema } from '../object-storage/values';
 import { BusinessDigestSchema, BusinessGenerationSchema, BusinessProcessStateSchema, BusinessSubtaskStateV3Schema, BusinessTaskContractVersionSchema, BusinessTaskStateV3Schema } from './executionValues';
 
 export const BusinessTaskV3DtoSchema = z.strictObject({
@@ -11,6 +12,7 @@ export const BusinessTaskV3DtoSchema = z.strictObject({
   id: TaskIdSchema, serviceId: ServiceIdSchema, state: BusinessTaskStateV3Schema, releaseId: ReleaseIdSchema,
   taskContractVersion: BusinessTaskContractVersionSchema, contractDigest: BusinessDigestSchema,
   generation: BusinessGenerationSchema, volumeMode: VolumeModeSchema, volumeUid: z.string().nullable(),
+  completionPolicy: CompletionPolicySchema.optional(),
   taskProfileId: ResourceIdSchema, traceId: TraceIdSchema, labels: z.record(z.string(), z.string()),
   resourceState: z.enum(['admitting', 'creating', 'ready', 'releasing', 'released', 'unknown', 'failed']),
   quotaHeld: z.boolean().nullable(), message: z.string().optional(), createdAt: z.iso.datetime(), closedAt: z.iso.datetime().optional(),

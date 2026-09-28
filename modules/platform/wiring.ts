@@ -1,5 +1,8 @@
+import { businessObservationAdmission, observationPorts, observationSlotRecords, observationUsageSource } from './application/observationPorts';
 import { executionWriterObserver, migrationWriterObserver, legacyOwnerObserver } from './adapters/executionWriters';
 import { webhookAwareAllowlist } from './application/webhookIngress';
+import { objectStorageSources } from './application/objectStorageSources';
+import { assertStorageConsumers } from './adapters/k8s/storageContract'; import { objectTransferOwners } from './adapters/k8s/objectTransferOwners';
 import { releaseImagePorts } from './application/releaseImagePorts';
 import { imageValidationPorts } from './application/imageValidationPorts';
 import { businessExecutionPorts, executionHandoffPorts } from './application/businessExecutionPorts';
@@ -15,13 +18,13 @@ import { createClusterManagementModule } from '@crewstation/module-cluster-manag
 import { createClusterControlModule, type ClusterControlModuleApi, type SlotSpec } from '@crewstation/module-cluster-control';
 import { createResourcesModule, type ResourcesModuleApi } from '@crewstation/module-resources';
 import { installedSystemComponents } from './domain/systemComponents';
-import { BUILTIN_RESOURCES, type Actor, type ClusterResource, type ClusterInspectRequest, type ClusterOperation, type ClusterInspection, type ComputeProfileSelector, type ComputeUsage, type ProfileTestId, type ProjectId, type RebuildDevSessionRequest, type ServiceId, type TaskId, type UserDto, type UserId } from '@crewstation/contracts';
+import { BUILTIN_RESOURCES, type Actor, type ClusterResource, type ClusterInspectRequest, type ClusterOperation, type ClusterInspection, type ComputeProfileSelector, type ComputeUsage, type ProfileTestId, type ProjectId, type RebuildDevSessionRequest, type ServiceId, type TaskId, type UserId } from '@crewstation/contracts';
 import { eventbusMigrations, type EventConsumer } from '@crewstation/eventbus';
 import { secretObject, type K8sClient } from '@crewstation/k8s';
 import { forbidden, precondition, type Logger } from '@crewstation/kernel';
 import { createAgentRuntimeModule } from '@crewstation/module-agent-runtime';
 import { createApiCatalogModule } from '@crewstation/module-api-catalog';
-import { createBusinessTaskModule, type BusinessTaskModuleApi } from '@crewstation/module-business-task';
+import { createBusinessTaskModule, readBusinessObservationFacts, type BusinessTaskModuleApi } from '@crewstation/module-business-task';
 import { createCapabilitiesModule } from '@crewstation/module-capabilities';
 import { createConfigModule } from '@crewstation/module-config';
 import { createDataModule } from '@crewstation/module-data';
@@ -30,7 +33,7 @@ import { createDevSessionModule } from '@crewstation/module-dev-session';
 import { createEventsModule, type EventsModuleApi } from '@crewstation/module-events';
 import { createGatewayModule, UNAVAILABLE_PATH, type GatewayModuleApi } from '@crewstation/module-gateway';
 import { createIdentityModule } from '@crewstation/module-identity';
-import { createObservabilityModule } from '@crewstation/module-observability';
+import { createObservabilityModule, type ObservabilityModuleApi } from '@crewstation/module-observability';
 import { createProvisioningModule, type ProjectFacts } from '@crewstation/module-provisioning';
 import { createProjectModule, type ProjectModuleApi, type ResolvedService } from '@crewstation/module-project';
 import { createReleaseModule, type ReleaseModuleApi } from '@crewstation/module-release';
@@ -42,18 +45,9 @@ import { createSessionClient } from '@crewstation/session-client';
 import type { PlatformSettings } from '@crewstation/settings';
 import type { AppEnv } from '@crewstation/http';
 import type { Hono } from 'hono';
-import type { Lifecycle } from './api/moduleApi';
+import type { Lifecycle, PlatformApi } from './api/moduleApi';
 /** 组合根的对外形状：各进程只挑选自己角色的入口；模块实例也暴露出来供 CLI 与测试直接使用。 */
-export interface PlatformModuleApi {
-  readonly name: 'platform';
-  /** 引导首位管理员这一条运维路径需要它：安装脚本在容器内以子命令调用（RFC-005 §8）。 */
-  readonly initializePlatformRoles: () => Promise<{ initialized: number }>;
-  readonly bootstrapAdmin: (raw: unknown) => Promise<UserDto>;
-  readonly routers: { controller: Hono<AppEnv>[]; api: Hono<AppEnv>[]; auth: Hono<AppEnv>[]; session: Hono<AppEnv>[]; events: Hono<AppEnv>[] };
-  readonly background: { controller: Lifecycle[]; api: Lifecycle[]; session: Lifecycle[]; events: Lifecycle[] };
-  readonly websocket: unknown;
-  readonly migrations: MigrationSet[];
-}
+export type PlatformModuleApi = PlatformApi<Hono<AppEnv>, MigrationSet>;
 
 export interface PlatformModuleDeps {
   db: Database;
@@ -72,15 +66,19 @@ export const SYSTEM_ACTOR: Actor = { userId: BUILTIN_RESOURCES.systemActor as Us
 
 const consumerLifecycle = (consumer: EventConsumer): Lifecycle => ({ start: () => consumer.start(), stop: () => consumer.stop() });
 
-interface Late { businessTask?: BusinessTaskModuleApi; events?: EventsModuleApi; project?: ProjectModuleApi; gateway?: GatewayModuleApi; taskRuntime?: TaskRuntimeModuleApi; release?: ReleaseModuleApi; resources?: ResourcesModuleApi; dataControl?: DataControlModuleApi; clusterControl?: ClusterControlModuleApi }
+interface Late { observability?: ObservabilityModuleApi; objectHistory?: NonNullable<NonNullable<Parameters<typeof createDataModule>[0]['objects']>['history']>; businessTask?: BusinessTaskModuleApi; events?: EventsModuleApi; project?: ProjectModuleApi; gateway?: GatewayModuleApi; taskRuntime?: TaskRuntimeModuleApi; release?: ReleaseModuleApi; resources?: ResourcesModuleApi; dataControl?: DataControlModuleApi; clusterControl?: ClusterControlModuleApi }
 
 type CompositionDeps = PlatformModuleDeps & { identities: ResourceIdentityDirectory };
 
-/** data 的晚绑定端口：台账写入口（RFC-025 第四期）与 data-control 存的口令（I28，可回退为 data 自己建）；两者都装在 core 之后，经 late 取。 */
-function dataPorts(settings: PlatformSettings, late: Late): Pick<Parameters<typeof createDataModule>[0], 'ledger' | 'credentials'> {
+function dataPorts(settings: PlatformSettings, late: Late, sources: ReturnType<typeof objectStorageSources>, k8s: PlatformModuleDeps['k8s']): Pick<Parameters<typeof createDataModule>[0], 'ledger' | 'credentials' | 'objects'> {
   const ledger = () => { if (!late.resources) throw new Error('resources 尚未装配'); return late.resources; };
   const dataControl = () => { if (!late.dataControl) throw new Error('data-control 尚未装配'); return late.dataControl; };
+  const objectPlane = () => { const plane = dataControl().objects; if (!plane) throw new Error('对象数据面尚未配置'); return plane; };
   return {
+    objects: { inputApiUrl: `http://cs-api.${settings.systemNamespace}.svc:8087`, transferOwners: objectTransferOwners(k8s, settings.systemNamespace, settings.platformPodUid), sources, provisioning: { deploymentMode: settings.objectStorage?.deploymentMode ?? 'production', apiUrl: settings.objectStorage?.apiUrl ?? `http://api.${settings.serviceDomain}:8088` }, exporterToken: settings.clusterMetrics?.exporterToken ?? '', history: { read: (input) => { if (!late.objectHistory) throw new Error('对象历史指标尚未装配'); return late.objectHistory.read(input); } }, plane: {
+      configure: (...args) => objectPlane().configure(...args), prepareRotation: (...args) => { const plane = objectPlane(); if (!plane.prepareRotation) throw precondition('对象凭据轮换不可用'); return plane.prepareRotation(...args); }, probe: (...args) => objectPlane().probe(...args), metrics: () => objectPlane().metrics(),
+      inspectWrite: (...args) => objectPlane().inspectWrite?.(...args) ?? Promise.resolve('unknown'), put: (...args) => objectPlane().put(...args), get: (...args) => objectPlane().get(...args), verify: (...args) => objectPlane().verify(...args), remove: (...args) => objectPlane().remove(...args),
+    }, tasks: { revision: (id) => { if (!late.businessTask) throw new Error('业务归档修订尚未装配'); return late.businessTask.acceptedArchiveRevision(id); }, accepted: (id) => { if (!late.businessTask) throw new Error('业务终结意图尚未装配'); return late.businessTask.acceptedFinalization(id); }, read: (serviceId, taskId) => { if (!late.businessTask) throw new Error('业务归档身份尚未装配'); return late.businessTask.archiveTask(serviceId, taskId); } } },
     ledger: {
       declare: (input) => ledger().owner('data').declare(input), get: (id) => ledger().get(id), requestRelease: (id, reason) => ledger().owner('data').requestRelease(id, reason),
       presentBindings: async () => (await ledger().list({ kind: 'data-binding' })).filter((record) => record.owner.module === 'data' && record.desired === 'present'),
@@ -158,7 +156,7 @@ function composeCore(deps: CompositionDeps, late: Late) {
     db, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, users: userDirectory,
     services: { resolveServiceById: async (id) => { const r = await resolveById(id); return r ? { projectId: r.projectId, slug: r.slug } : undefined; } },
     settings: { defaultPlan: 'db-small', secretKeyBase64: settings.secretKeyBase64, postgres: settings.dataPostgres },
-    ...dataPorts(settings, late),
+    ...dataPorts(settings, late, objectStorageSources(identity.api, project.api, () => late.release, () => late.taskRuntime), deps.k8s),
   });
   const scm = createScmModule({ db, project: project.api, identities: deps.identities, templateResources: {
     allocate: (kind, context, templateId, slotId) => deps.identities.bind('scm', kind, ['template', context.serviceId, templateId, slotId]),
@@ -217,7 +215,7 @@ function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeC
       render: async (projectId, env) => ({ values: await config.api.renderDefinitions(projectId, env), version: await config.api.currentVersion(projectId, env) }),
       validate: (projectId, env, keys) => config.api.validateManifestEnv(projectId, env, keys.map((configDefinitionId) => ({ name: 'CONFIG', configDefinitionId, from: 'config' as const }))),
     },
-    data: { envFor: data.api.envFor },
+    data: { envFor: data.api.envFor, ...(data.api.objectEnv ? { objectEnv: data.api.objectEnv } : {}) },
     // RFC-021：项目完整维护即破坏性迁移窗口（gateway 在 release 之后装配，故惰性取）；自动下线的提醒发给负责人。
     maintenance: { open: (serviceId) => { if (!late.gateway) throw new Error('gateway 尚未装配'); return late.gateway.maintenanceWindowOpen(serviceId); } },
     owners: { ownerOf: project.api.ownerOf },
@@ -280,17 +278,18 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
   const mcp = [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }];
   const ledger = resources.api.owner('task-runtime');
   const taskRuntime = createTaskRuntimeModule({
+    ...(data.api.archiveHelper ? { archive: { credentials: data.api.archiveHelper, apiUrl: `http://cs-api.${settings.systemNamespace}.svc:8087` } } : {}),
     imageProbeLeases: { port: resources.api.leases, holder: deps.instance },
     db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, quotas: { quotaLimit: project.api.quotaLimit }, testRunner, testMcp: mcp,
     // RFC-025 第二期：环境落库时在同一事务里投影进资源台账；live 给补投影列出台账里还挂着的 task-runtime 记录。
     // 额度经台账受理（D31：按阶段数，结束中仍占），occupancy 是项目眼下占用的额度单位。
-    ledger: { within: (tx) => ledger.within(tx as object), live: async () => (await resources.api.list({})).filter((record) => record.owner.module === 'task-runtime'), occupancy: resources.api.occupancy },
+    workloadSafety: resources.api.workloadSafety, taskVolumes: resources.api.taskVolumes, ledger: { within: (tx) => ledger.within(tx as object), live: async () => (await resources.api.list({})).filter((record) => record.owner.module === 'task-runtime'), occupancy: resources.api.occupancy },
     // RFC-025 I25：工作区（开发会话、业务任务）的容器由资源中心照记录建出，受理只写期望（不含凭据）；运维开关可回退为本模块自己建。
     ...(settings.workloadCreation === 'ledger' ? { creation: 'ledger' as const } : {}),
     profiles: { devSessionProfile: core.agentRuntime.api.projectDevTaskProfile, listTaskProfiles: project.api.listTaskProfiles, getTaskProfile: async (name) => (await project.api.listTaskProfiles()).find((p) => p.id === name) },
     services: { resolveServiceById: resolveById },
     checkout: taskCheckout(core, k8s, resolveById),
-    sources: { pinTaskImage: runtimeImages.pinPlatformImage, runtimeImageSecrets: runtimeImages.api.renderInitializationSecrets, configEnv: (projectId, env) => config.api.renderEnv(projectId, env), dataEnv: data.api.envFor, taskDataEnv: data.api.envForTask },
+    sources: { ...(data.api.objectEnv ? { objectEnv: data.api.objectEnv } : {}), taskInputEnv: (input) => { if (!data.api.taskInputs) throw precondition('任务对象输入不可用'); return data.api.taskInputs.environment(input); }, bindTaskInputs: (id, uid) => { if (!data.api.taskInputs) throw precondition('任务对象输入不可用'); return data.api.taskInputs.bind(id, uid); }, pinTaskImage: runtimeImages.pinPlatformImage, runtimeImageSecrets: runtimeImages.api.renderInitializationSecrets, configEnv: (projectId, env) => config.api.renderEnv(projectId, env), dataEnv: data.api.envFor, taskDataEnv: data.api.envForTask },
     settings: { taskImage: settings.taskImage, systemNamespace: settings.systemNamespace, sessionUrl: settings.sessionRunnerUrl, userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, workerUid: 10001, defaultProfile: settings.defaultTaskProfile, userAuthMiddleware: 'forward-auth-user', dropIdentityHeadersMiddleware: 'drop-identity-headers', previewRateMiddlewares: ['rate-limit-user', 'rate-limit-host'] },
   });
   late.taskRuntime = taskRuntime.api;
@@ -317,7 +316,8 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
     compute: computeCatalog,
     settings: { idleMinutes: settings.idleMinutes, userDomain: settings.userDomain, mcp, defaultPreviewPort: 3000 },
   });
-  const businessTask = createBusinessTaskModule({ legacyRecoveryProof: legacyOwnerObserver(deps.k8s, settings.systemNamespace), ...businessExecutionPorts(runtimeImages.api, core.config.api, core.identity.api, SYSTEM_ACTOR),
+  const businessTask = createBusinessTaskModule({ taskStorageStatus: (id) => settings.workloadCreation === 'ledger' ? core.data.api.taskStorageStatus(id) : Promise.resolve({ available: false, reason: 'workload_safety_unavailable' }), taskInputs: core.data.api.taskInputs, executionObservations: businessObservationAdmission(() => late.observability), storageControl: { apply: core.data.api.applyObjectWriteControl }, legacyRecoveryProof: legacyOwnerObserver(deps.k8s, settings.systemNamespace), ...businessExecutionPorts(runtimeImages.api, core.config.api, core.identity.api, SYSTEM_ACTOR),
+    finalizationPreparation: core.data.api.archiveFinalization ? { operatorArchive: core.data.api.archiveAdministration, preflight: core.data.api.archiveService?.preflight, archive: core.data.api.archiveFinalization, runtime: taskRuntime.api } : undefined,
     identities: deps.identities,
     db, logger, isAdmin: (id) => isAdmin(id), environments: taskRuntime.api, runner, authorizer: project.api,
     directory: { resolveServiceIdentity: async (identity) => { const r = await project.api.resolveServiceIdentity(identity); return r ? { serviceId: r.serviceId, projectId: r.projectId } : undefined; } },
@@ -361,14 +361,10 @@ function composeAggregates(deps: PlatformModuleDeps, late: Late, core: ReturnTyp
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, apiCatalog, isAdmin } = core;
   const serviceOfProject = project.api.resolveServiceOfProject;
-  const observability = createObservabilityModule({
+  const observability = createObservabilityModule({ runtimeTasks: readBusinessObservationFacts, usageSource: observationUsageSource(runtime.businessTask.api.v3, runtime.session.api), ...observationPorts(runtime.businessTask.api.v3, project.api, core.agentRuntime.api),
     db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, services: { resolveServiceOfProject: serviceOfProject }, slots: delivery.release.api,
-    // 健康与告警巡检照服务槽记录（RFC-025 第三期）：资源中心观测 Deployment 与它的 Pod，汇总崩溃重启。
-    records: {
-      slotRecords: async (projectId) => (await resources.api.list({ projectId, kind: 'service-slot', includeStopped: true }))
-        .map((record) => ({ physical: record.display['physical'] ?? '', children: record.children, conditions: record.conditions, phaseSince: record.phaseSince.toISOString() })),
-    },
-    // 调用链（Design §14）：每个来源都按项目取数——同一个事件投给多个订阅项目时共用 traceId，别的项目的记录不能带出来。
+    records: observationSlotRecords(resources.api),
+    // 调用链（Design §14）：每个来源按项目读取，跨模块接口仅在组合根装配。
     traces: {
       environments: { traceKeys: runtime.taskRuntime.api.traceKeys, activeTraceIds: runtime.taskRuntime.api.activeTraceIds, list: runtime.taskRuntime.api.listTraceEnvironments },
       deliveries: { traceKeys: runtime.events.api.traceKeys, activeTraceIds: runtime.events.api.activeTraceIds, list: runtime.events.api.listTraceDeliveries },
@@ -380,6 +376,7 @@ function composeAggregates(deps: PlatformModuleDeps, late: Late, core: ReturnTyp
     },
     listProjectIds: async () => (await project.api.listServices()).map((s) => s.projectId),
   });
+  late.observability = observability.api;
   const capabilities = createCapabilitiesModule({
     isAdmin: (id) => isAdmin(id),
     market: { list: project.api.listMarketListings, get: project.api.getMarketListing, slots: (serviceId) => delivery.release.api.getSlots(SYSTEM_ACTOR, serviceId), maintenance: (serviceId) => delivery.gateway.api.maintenanceOf(serviceId) },
@@ -447,7 +444,8 @@ function composeLedger(deps: CompositionDeps, core: ReturnType<typeof composeCor
 
 function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCore>, ledger: ReturnType<typeof composeLedger>, runtime: ReturnType<typeof composeRuntime>, { gateway, release }: ReturnType<typeof composeDelivery>, runtimeImages: ReturnType<typeof createManagedRuntimeEnvironmentModule>) {
   return createClusterControlModule({
-    k8s: deps.k8s, logger: deps.logger, isAdmin: core.identity.api.isAdmin, systemNamespace: deps.settings.systemNamespace,
+    ...(runtime.taskRuntime.api.archiveExecution ? { archives: runtime.taskRuntime.api.archiveExecution } : {}),
+    k8s: deps.k8s, logger: deps.logger, isAdmin: core.identity.api.isAdmin, systemNamespace: deps.settings.systemNamespace, ...(deps.settings.clusterMetrics ? { volumeProbe: deps.settings.clusterMetrics } : {}),
     // 多副本分工（RFC-025 设计 §6.3）：逐条调和与孤儿回收在资源中心的租约下进行，持有者是这个副本。
     leases: { port: ledger.api.leases, holder: `${deps.instance}.cluster-control` },
     // RFC-025 设计 §7.4：身份索引改读观测缓存的 Pod，全平台只剩这一条 Pod watch。
@@ -460,6 +458,7 @@ function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCo
     // T8：建服务槽的环境 Secret、构建与迁移 Job 的凭据 Secret 时同样回头向 release 要内容；槽建不成交它判这一次部署失败。
     slots: { slotEnvValues: (ref) => release.api.slotEnvValues(ref), slotFailed: (ref, message) => release.api.slotFailed(ref, message) }, jobs: { jobEnvValues: (ref) => release.api.jobEnvValues(ref), imageBuildSecretValues: runtimeImages.imageBuildSecretValues },
     ledger: {
+      workloadSafety: ledger.api.workloadSafety, taskVolumes: ledger.api.taskVolumes,
       observe: (input) => ledger.api.observe(input), claimOf: (child) => ledger.api.claimOf(child), get: (id) => ledger.api.get(id),
       routeCandidates: (host, pathPrefix) => ledger.api.list({ kind: 'route', includeStopped: true, routeMatch: { host, ...(pathPrefix ? { pathPrefix } : {}) } }),
       listLive: () => ledger.api.list({}), changesSince: ledger.api.changesSince, latestChange: ledger.api.latestChange,
@@ -508,6 +507,7 @@ function composeModules(deps: CompositionDeps) {
   const runtime = composeRuntime(deps, core, delivery, late, resources, runtimeEnvironment);
   const aggregates = composeAggregates(deps, late, core, delivery, runtime, resources);
   const cluster = composeCluster(deps, core, delivery, runtime, resources);
+  late.objectHistory = { read: cluster.objectHistory };
   const clusterControl = composeControl(deps, core, resources, runtime, delivery, runtimeEnvironment);
   const dataControl = composeDataControl(deps, resources);
   late.dataControl = dataControl.api;
@@ -520,11 +520,11 @@ export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
   const identities = resourceIdentityDirectory(deps.db, () => migrations);
   const m = composeModules({ ...deps, identities });
   const api: PlatformModuleApi = {
-    name: 'platform',
-    initializePlatformRoles: () => m.identity.api.initializePlatformRoles(),
-    bootstrapAdmin: (raw) => m.identity.api.bootstrapAdmin(raw),
+    name: 'platform', storageContract: { ...m.data.api.storageContract, enable: async () => { await assertStorageConsumers(deps.k8s, deps.settings.systemNamespace, m.data.api.storageContract.version); await m.data.api.storageContract.enable(); } },
+    initializePlatformRoles: () => m.identity.api.initializePlatformRoles(), bootstrapAdmin: (raw) => m.identity.api.bootstrapAdmin(raw),
     routers: {
-      controller: m.cluster.internalHttp,
+      controller: [...m.cluster.internalHttp, ...m.data.internalHttp],
+      transfers: [...m.identity.http.devSessionGate, ...m.data.transferHttp],
       // devSessionGate 只挂中间件不占路径，必须排在最前：Hono 按注册顺序执行，晚于业务路由就来不及改判身份。
       api: [...m.identity.http.devSessionGate, ...m.project.http, ...m.identity.http.users, ...m.config.http, ...m.agentRuntime.http, ...m.runtimeEnvironment.http, ...m.data.http, ...m.scm.http, ...m.apiCatalog.http, ...m.release.http, ...m.gateway.http, ...m.taskRuntime.http, ...m.devSession.http, m.businessTask.http.service, m.businessTask.http.user, ...m.events.http.query, ...m.observability.http, ...m.cluster.http, ...m.capabilities.http, ...m.provisioning.http, ...m.clusterControl.http, ...m.resources.http],
       auth: [...m.identity.http.auth, ...m.identity.http.forwardAuth, ...m.agentRuntime.forwardAuth],

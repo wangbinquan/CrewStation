@@ -28,6 +28,7 @@ export function taskAdmissionCandidate(source: TaskAdmissionSource, registration
   const task: OperationCandidate['intent']['task'] = {
     id: taskId, serviceId: source.serviceId, releaseId: registration.releaseId, state: 'admitting', generation: 1,
     taskContractVersion: input.taskContractVersion, contractDigest, volumeMode: input.volumeMode ?? spec.defaultVolumeMode,
+    ...(input.completionPolicy ? { completionPolicy: input.completionPolicy } : {}),
     taskProfileId: input.taskProfileId ?? spec.taskProfileId, labels: input.labels, traceId,
     volumeUid: null, resourceState: 'admitting', quotaHeld: false, createdAt: now.toISOString(),
   };
@@ -35,7 +36,7 @@ export function taskAdmissionCandidate(source: TaskAdmissionSource, registration
   return {
     id: newResourceId(), serviceId: source.serviceId, kind: 'create-task', parentId: '', requestKey: input.requestKey,
     requestDigest, effectiveDigest: jsonHash({ requestDigest, releaseId: registration.releaseId, contractDigest, volumeMode: task.volumeMode, taskProfileId: task.taskProfileId }), epoch: source.epoch,
-    intent: { kind: 'create-task', projectId: source.projectId, callerIdentity: source.identity, task, tasksSpec: spec, ...(registration.releaseMaterials ? { releaseMaterials: registration.releaseMaterials } : {}),
+    intent: { kind: 'create-task', projectId: source.projectId, callerIdentity: source.identity, task, tasksSpec: spec, ...(input.inputObjects ? { inputObjects: input.inputObjects } : {}), ...(registration.releaseMaterials ? { releaseMaterials: registration.releaseMaterials } : {}),
       environmentLabels: { ...input.labels, 'crewstation.io/project': source.project, 'crewstation.io/service': source.service } },
   };
 }

@@ -2,7 +2,9 @@
 export type AdminPagePath =
   | '/admin'
   | '/admin/requests'
+  | '/admin/observability'
   | '/admin/cluster'
+  | '/admin/object-storage'
   | '/admin/business-execution'
   | '/admin/gateway'
   | '/admin/projects'
@@ -44,8 +46,10 @@ export const ADMIN_PENDING_PAGES: readonly AdminNavPage[] = [
  */
 export const ADMIN_ENTRY_GROUPS: readonly AdminEntryGroup[] = [
   { id: 'observability', titleKey: 'nav.admin.groupObservability', pages: [
+    { to: '/admin/observability', labelKey: 'runtime.title', hintKey: 'runtime.description' },
     { to: '/admin/cluster', labelKey: 'cluster.title', hintKey: 'cluster.description' },
     { to: '/admin/business-execution', labelKey: 'executionRecovery.title', hintKey: 'executionRecovery.hint' },
+    { to: '/admin/object-storage', labelKey: 'objects.title', hintKey: 'objects.description' },
     { to: '/admin/gateway', labelKey: 'nav.admin.gateway', hintKey: 'admin.overview.gateway' },
   ] },
   { id: 'supply', titleKey: 'nav.admin.groupSupply', pages: [

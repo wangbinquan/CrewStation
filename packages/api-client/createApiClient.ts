@@ -1,4 +1,5 @@
 import { runtimeImagesResource, type RuntimeImagesResource } from './resources/runtimeImages';
+import { objectStorageResource, type ObjectStorageResource } from './resources/storage/objects';
 import { clusterResource } from './resources/cluster';
 import type { ClusterResourceClient } from './resources/cluster';
 import type { TransportOptions } from './httpTransport';
@@ -60,6 +61,7 @@ export interface ApiClient {
   readonly services: ServicesResource;
   readonly devSession: DevSessionResource;
   readonly runtimeImages: RuntimeImagesResource;
+  readonly objectStorage: ObjectStorageResource;
   readonly tasks: TasksResource;
   readonly config: ConfigResource;
   readonly apiCatalog: ApiCatalogResource;
@@ -92,6 +94,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     services: servicesResource(transport),
     devSession: devSessionResource(transport),
     runtimeImages: runtimeImagesResource(transport),
+    objectStorage: objectStorageResource(transport),
     tasks: tasksResource(transport),
     config: configResource(transport),
     apiCatalog: apiCatalogResource(transport),

@@ -1,4 +1,4 @@
-import type { RunnerBusinessEvent, RunnerBusinessReceipt, TaskId } from '@crewstation/contracts';
+import type { ExecutionCompletionProof, RunnerBusinessEvent, RunnerBusinessReceipt, TaskId } from '@crewstation/contracts';
 
 export interface StoredBusinessExecution {
   taskId: TaskId;
@@ -10,6 +10,7 @@ export interface StoredBusinessExecution {
 }
 
 export interface BusinessExecutionStore {
+  completionProof(taskId: TaskId, executionId: string): Promise<ExecutionCompletionProof | undefined>;
   consume(taskId: TaskId, executionId: string, through: number, stopped?: boolean): Promise<void>;
   expire(): Promise<number>;
   register(taskId: TaskId, receipt: RunnerBusinessReceipt): Promise<StoredBusinessExecution>;

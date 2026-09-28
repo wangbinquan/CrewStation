@@ -31,7 +31,7 @@ export const BusinessCwdSchema = z.string().max(4096).refine((value) => {
 }, 'cwd 必须位于 /work 内');
 
 export const BusinessSubtaskStateV3Schema = z.enum(['admitting', 'pending', 'running', 'awaiting-input', 'verifying', 'cancelling', 'cancelled', 'succeeded', 'failed']);
-export const BusinessTaskStateV3Schema = z.enum(['admitting', 'creating', 'running', 'pausing', 'paused', 'closing', 'closed', 'failed']);
+export const BusinessTaskStateV3Schema = z.enum(['admitting', 'creating', 'running', 'pausing', 'paused', 'finalizing', 'closing', 'closed', 'failed']);
 export const BusinessProcessStateSchema = z.enum(['not-started', 'live', 'unknown', 'exited']);
 
 export type BusinessSubtaskStateV3 = z.infer<typeof BusinessSubtaskStateV3Schema>;

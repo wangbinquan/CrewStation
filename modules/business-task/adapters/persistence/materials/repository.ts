@@ -21,6 +21,7 @@ export function drizzleExecutionMaterials(db: Database): ExecutionMaterials {
       if (!parent) throw notFound('业务任务', candidate.taskId);
       await authorizeExecution(tx, candidate.serviceId, parent.intent.tasksSpec.executionControl === 'fenced', authorization, now);
       const state = (await tx.select().from(executionTaskStates).where(eq(executionTaskStates.taskId, candidate.taskId)))[0];
+      if (state?.state === 'finalizing') throw conflict('任务正在终结，不能写入新材料', { code: 'task_finalizing' });
       if (state && ['closed', 'closing'].includes(state.state)) throw conflict('任务已关闭或正在关闭', { code: 'task_closed' });
       const row = (await tx.insert(materials).values({ id: candidate.view.materialId, serviceId: candidate.serviceId, taskId: candidate.taskId, requestKey: candidate.requestKey, digest: candidate.view.digest, sealed: candidate.sealed, sizeBytes: candidate.view.sizeBytes, createdAt: now }).returning())[0]!;
       return view(row);

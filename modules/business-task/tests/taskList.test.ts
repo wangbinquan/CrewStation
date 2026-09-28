@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import type { Actor, TaskId, UserId } from '@crewstation/contracts';
+import type { Actor, ProjectId, TaskId, UserId } from '@crewstation/contracts';
 import { BusinessExecutionTaskPageSchema, BusinessSubtaskV3DtoSchema } from '@crewstation/contracts';
 import { createApp } from '@crewstation/http';
 import { userRoutes } from '../http/userRoutes';
@@ -10,6 +10,7 @@ import { drizzleBusinessTaskList } from '../adapters/persistence/task-list/repos
 import { tasks, subtasks } from '../adapters/persistence/tables';
 import { executionSubtasks } from '../adapters/persistence/execution/subtaskTables';
 import { taskListUseCases } from '../application/taskList';
+import { projectTaskStorageList } from '../application/finalization/queries';
 import { businessTaskMigrations } from '../wiring';
 import { executionHttpFixture } from './executionHttpFixture';
 
@@ -87,5 +88,23 @@ describe.skipIf(!available)('管理员任务列表跨协议排序、分页与恢
     expect((await f.list.list({ state: 'unknown' })).items).toHaveLength(0);
     expect((await f.list.list({ state: 'closed' })).items).toHaveLength(0);
     await expect(f.list.list({ state: 'paused', cursor: first.next })).rejects.toMatchObject({ kind: 'validation' });
+  });
+  test('project storage task list checks membership before reading and fixes project scope before keyset pagination', async () => {
+    const f = await setup(), own = await f.insert('paused'), foreign = newResourceId() as ProjectId;
+    await f.insert('failed', undefined, foreign);
+    const checked: unknown[] = [], useCases = projectTaskStorageList(f.list, { authorize: async (...args) => { checked.push(args); return 'owner'; } });
+    const result = await useCases.listProjectTaskStorage({ ...f.actor, isAdmin: false }, f.projectId, { limit: 1 });
+    expect(result.items.map((item) => item.id)).toEqual([own]); expect(result.next).toBeUndefined();
+    expect(checked[0]).toEqual([{ ...f.actor, isAdmin: false }, f.projectId, 'view']);
+    await expect(useCases.listProjectTaskStorage(f.actor, f.projectId, { projectId: foreign } as never)).rejects.toThrow();
+    const app = createApp({ name: 'project-storage-list' }); app.route('/', userRoutes({ ...f.module.api, ...useCases }, async () => false));
+    const url = `/v3/projects/${f.projectId}/object-storage/tasks`;
+    expect((await app.request(url)).status).toBe(401);
+    const headers = { 'x-cs-user-id': f.actor.userId };
+    const response = await app.request(url, { headers }); expect(response.status).toBe(200); expect(BusinessExecutionTaskPageSchema.parse(await response.json()).items.map((item) => item.id)).toEqual([own]);
+    expect((await app.request(url + '?projectId=' + foreign, { headers })).status).toBe(400);
+    let read = false;
+    const denied = projectTaskStorageList({ list: async () => { read = true; return { items: [] }; } }, { authorize: async () => { throw new Error('membership denied'); } });
+    await expect(denied.listProjectTaskStorage(f.actor, foreign, {})).rejects.toThrow('membership denied'); expect(read).toBe(false);
   });
 });

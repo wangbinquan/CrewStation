@@ -4,6 +4,7 @@ import type { ClusterResource, DataResourceDto, DevSessionDto, ResourceRecord, S
 import type { Translate } from '../lib/useT';
 import type { Topology, TopologyBand, TopologyEdge, TopologyNode } from '../ui/topology/topologyModel';
 import { appendStorage, resourceNode } from './storageTopology';
+import { appendObjectSpaces } from './objectSpaces';
 import { recordBands, recordStatus } from './recordBands';
 import { databaseNode, durationText, factText, podFacts, podStatus, purposeSemantic, workloadStatus } from './topologyText';
 
@@ -148,6 +149,7 @@ export function buildProjectTopology(input: ProjectTopologyInput, t: Translate):
     a.nodes.push({ id: r.uid, resourceId: r.resourceId, kind: 'workload', semantic: purposeSemantic(r.purpose), title: r.name, subtitle: r.kind, lane: 1, band: 'other', ...workloadStatus(r, t), abnormal: r.abnormal });
   }
   const missingBindings = appendStorage(a, resources, input.records ?? [], t);
+  appendObjectSpaces(a, input.records ?? [], resources, t);
   const edgeIds = new Set(a.nodes.map((n) => n.id));
   return { id: `project:${input.project.id}`, title: t('topology.project.title', { name: input.project.name }), lanes: [t('topology.lane.entry'), t('topology.lane.workloads'), t('topology.lane.pods'), t('topology.lane.data'), ...(resources.some((r) => r.kind === 'PersistentVolume') ? [t('topology.lane.physicalStorage')] : [])], bands: a.bands, nodes: a.nodes, edges: a.edges.filter((e) => edgeIds.has(e.from) && edgeIds.has(e.to)), observedAt: snapshot.observedAt, complete: snapshot.complete && missingBindings === 0, incompleteReason: [snapshot.incompleteReason, ...(missingBindings ? [t('topology.incomplete.binding')] : [])].filter(Boolean).join(' · ') };
 }

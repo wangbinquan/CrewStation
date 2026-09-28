@@ -1,5 +1,5 @@
 import type { WorkloadIdentity } from '@crewstation/contracts';
-import { ServiceSourceBindingSchema } from '@crewstation/contracts';
+import { DevelopmentSourceBindingSchema, ServiceSourceBindingSchema } from '@crewstation/contracts';
 import type { ObservedPodObject } from '../api/moduleApi';
 import type { PodLabels } from '../domain/podIdentity';
 import { identityFromLabels, TOMBSTONE_RETENTION_MS, toWorkloadIdentity } from '../domain/podIdentity';
@@ -46,7 +46,8 @@ export function podIdentityUseCases(deps: GatewayUseCaseDeps) {
       return;
     }
     const source = identity.workload === 'service' ? ServiceSourceBindingSchema.safeParse({ podUid: pod.uid, ip: pod.ip, releaseId: pod.labels['crewstation.io/release'], physicalSlot: identity.physicalSlot, ready: pod.ready ?? false }) : undefined;
-    await deps.pods.upsert({ ip: pod.ip, podName: pod.name, namespace: pod.namespace, ...identity, ...(source?.success ? { source: source.data } : {}), updatedAt: now });
+    const development = identity.workload === 'dev-session' ? DevelopmentSourceBindingSchema.safeParse({ podUid: pod.uid, podName: pod.name, ip: pod.ip, taskId: identity.taskId, ready: pod.ready ?? false }) : undefined;
+    await deps.pods.upsert({ ip: pod.ip, podName: pod.name, namespace: pod.namespace, ...identity, ...(source?.success ? { source: source.data } : {}), ...(development?.success ? { developmentSource: development.data } : {}), updatedAt: now });
   };
   return {
     syncPod,

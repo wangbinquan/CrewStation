@@ -31,6 +31,11 @@ export function condition(record: Pick<LedgerRecord, 'conditions'>, type: string
 export function computePhase(record: PhaseInput): PhaseResult {
   const rule = kindRule(record.kind);
   const present = record.children.filter(isPresent);
+  if (record.kind === 'volume' && record.spec['taskStorage'] && record.desired === 'absent' && condition(record, 'StorageReclaimed')?.status !== 'true') return { phase: 'stopping', reason: reasonOf('storage-reclaim-pending', '等待原工作卷及底层存储回收证明') };
+  const consumerId = record.spec['workloadConsumerId'], proof = condition(record, 'WorkloadStopped');
+  if (record.kind === 'archive-execution' && consumerId && present.some((child) => child.kind === 'Pod' && ['Succeeded', 'Failed'].includes(child.phase))
+    && !(proof?.status === 'true' && proof.reason === consumerId)) return { phase: 'stopping', reason: reasonOf('archive-stop-pending', '归档助手已退出，等待工作卷消费者停止证明') };
+  if (consumerId && !(proof?.status === 'true' && proof.reason === consumerId) && (record.desired === 'absent' || ['Paused', 'Failed', 'ReleasePending'].some((type) => condition(record, type)?.status === 'true'))) return { phase: 'stopping', reason: reasonOf(proof?.reason ?? 'stop-proof-pending', proof?.message ?? '等待工作卷消费者停止证明') };
   const releasePending = condition(record, 'ReleasePending');
   if (record.desired === 'absent' && releasePending?.status === 'true') return { phase: 'stopping', reason: reasonOf(releasePending.reason ?? 'release-pending', releasePending.message ?? '所属模块尚未确认执行已停止') };
   const cleanup = condition(record, 'CleanupBlocked');
@@ -40,6 +45,10 @@ export function computePhase(record: PhaseInput): PhaseResult {
   const reclaim = condition(record, 'PendingReclaim');
   if (reclaim?.status === 'true') return { phase: 'stopped', reason: reasonOf(reclaim.reason ?? 'pending-reclaim', reclaim.message ?? PENDING_RECLAIM) };
   const superseded = condition(record, 'Superseded');
+  if (record.kind === 'object-space') {
+    const health = condition(record, 'ObjectStorageReady');
+    return health?.status === 'true' ? { phase: 'ready' } : { phase: health?.status === 'false' ? 'degraded' : 'provisioning', reason: reasonOf(health?.reason ?? 'object-health-unknown', health?.message ?? '对象存储健康尚未观测') };
+  }
   if (record.kind === 'route' && superseded?.status === 'true') return { phase: present.some((child) => child.kind === 'IngressRoute') ? 'stopping' : 'stopped', reason: reasonOf('route-superseded', superseded.message ?? '相同入口已有优先路由，当前路由已停用') };
   const failed = condition(record, 'Failed');
   if (failed?.status === 'true') return { phase: 'failed', reason: reasonOf(failed.reason ?? 'failed', failed.message ?? '平台判定失败') };

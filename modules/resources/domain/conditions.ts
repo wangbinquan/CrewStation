@@ -24,7 +24,7 @@ function sinceOf(previous: ResourceCondition | undefined, update: ConditionUpdat
  * 终态条件：Job 的结果（Finished）一旦为真不再改回——观测的先后不保证，按记录核对时读到的旧版本对象（还在跑）不能把已记下的结果
  * 覆盖掉；Job 之后被 TTL 删掉，结果也就留在这里（提案 §5.1）。
  */
-const TERMINAL_CONDITIONS: ReadonlySet<string> = new Set(['Finished']);
+const TERMINAL_CONDITIONS: ReadonlySet<string> = new Set(['Finished', 'StorageReclaimed']);
 
 /**
  * 合并条件：同类型的状态变了才换起始时间（报告方给了发生时刻就用它），只改说明不换；新类型追加；终态条件为真之后不再改。
@@ -61,7 +61,7 @@ export function countByKindPhase(records: readonly { readonly kind: ResourceKind
  * 只由资源中心（调和器与观测）写的条件；所属模块上报这些类型会被拒绝（设计 §2.1：实况只由资源中心写）。
  * 所属模块写的是领域条件：RunnerConnected、InterfaceReady、Failed、Paused、Rebuilding、Prepared……
  */
-export const CENTER_CONDITIONS: ReadonlySet<string> = new Set(['CleanupBlocked', 'Observed', 'Applied', 'ReconcileError', 'SpecDrift', 'CrashLooping', 'Superseded', 'PendingReclaim', 'ContainersReady', 'Finished', 'Stopped']);
+export const CENTER_CONDITIONS: ReadonlySet<string> = new Set(['WorkloadStopped', 'StorageReclaimed', 'CleanupBlocked', 'Observed', 'Applied', 'ReconcileError', 'SpecDrift', 'CrashLooping', 'Superseded', 'PendingReclaim', 'ContainersReady', 'Finished', 'Stopped']);
 
 export function ownerConditionViolation(updates: readonly ConditionUpdate[]): string | undefined {
   return updates.find((update) => CENTER_CONDITIONS.has(update.type))?.type;

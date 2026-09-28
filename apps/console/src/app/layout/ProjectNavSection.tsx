@@ -21,6 +21,7 @@ const PROJECT_PAGES: readonly ProjectPageItem[] = [
   { page: 'development', labelKey: 'nav.devSession' },
   { page: 'release', labelKey: 'nav.release' },
   { page: 'operations', labelKey: 'nav.operations' },
+  { page: 'observability', labelKey: 'runtime.title' },
   { page: 'settings', labelKey: 'nav.settings' },
 ];
 

@@ -15,7 +15,8 @@ type Deps = Pick<IdentityUseCaseDeps, 'tokens' | 'workloads' | 'allowlist'>;
  */
 export function forwardAuthServiceUseCase(deps: Deps) {
   return async (request: ServiceAuthRequest): Promise<ServiceAuthDecision> => {
-    const target = { host: firstHost(request.host), method: request.method.toUpperCase(), path: pathOf(request.uri) };
+    // Port selects a gateway listener; service authorization and token audience use its DNS host.
+    const target = { host: firstHost(request.host).replace(/:\d+$/, ''), method: request.method.toUpperCase(), path: pathOf(request.uri) };
     const webhook = await deps.allowlist.externalWebhook?.(target);
     if (webhook?.kind === 'webhook') return { kind: 'webhook', traceId: newTraceId() };
     if (webhook) return webhook;
@@ -38,6 +39,10 @@ export function forwardAuthServiceUseCase(deps: Deps) {
       ...(caller.kind === 'service' && caller.source ? {
         [TOKEN_CLAIMS.sourceIp]: caller.source.ip, [TOKEN_CLAIMS.sourcePodUid]: caller.source.podUid,
         [TOKEN_CLAIMS.sourceReleaseId]: caller.source.releaseId, [TOKEN_CLAIMS.sourcePhysicalSlot]: caller.source.physicalSlot,
+      } : {}),
+      ...(caller.kind === 'dev-session' && caller.developmentSource ? {
+        [TOKEN_CLAIMS.sourceIp]: caller.developmentSource.ip, [TOKEN_CLAIMS.sourcePodUid]: caller.developmentSource.podUid,
+        [TOKEN_CLAIMS.sourceTaskId]: caller.developmentSource.taskId,
       } : {}),
     };
     const sourceToken = await deps.tokens.sign({ subject: serviceSubject(caller.identity), audience, expiresInSeconds: SOURCE_TOKEN_TTL_SECONDS, claims });

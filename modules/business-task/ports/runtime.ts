@@ -1,4 +1,4 @@
-import type { BusinessExecutionProof, BusinessSessionStorage } from '@crewstation/contracts';
+import type { BusinessExecutionProof, BusinessSessionStorage, ExecutionCompletionProof } from '@crewstation/contracts';
 import type { RuntimeImageExecutionSnapshot, RunnerBusinessEvent, StoredBusinessExecutionDto, Actor, AgentProtocol, BeforeStartMaterial, ComputeProfileSelector, ComputeUsage, LaunchSpec, ProfileRevisionRef, ProjectId, RunnerCommand, RunnerEvent, ServiceId, TaskId, TraceId, VolumeMode } from '@crewstation/contracts';
 
 export interface EnvironmentView {
@@ -33,7 +33,7 @@ export interface Environments {
     volumeUid: string | null; volumeVerified: boolean; image?: string; runtimeImage?: RuntimeImageExecutionSnapshot;
   } | undefined>;
   blockBusinessAdmission?(serviceId: ServiceId, taskId: TaskId): Promise<boolean>;
-  createEnvironment(input: { runtimeImage?: RuntimeImageExecutionSnapshot; serviceId: ServiceId; kind: 'business'; admission?: { id: TaskId; fingerprint: string }; businessStorage?: 'isolated-v1'; volumeMode?: VolumeMode; profile?: string; traceId?: TraceId; labels?: Record<string, string> }): Promise<EnvironmentView>;
+  createEnvironment(input: { objectInputsGeneration?: number; runtimeImage?: RuntimeImageExecutionSnapshot; serviceId: ServiceId; kind: 'business'; admission?: { id: TaskId; fingerprint: string }; businessStorage?: 'isolated-v1'; completionPolicy?: 'archive-and-delete'; volumeMode?: VolumeMode; profile?: string; traceId?: TraceId; labels?: Record<string, string> }): Promise<EnvironmentView>;
   createNativeExecution(input: CreateSubtaskExecutionInput): Promise<EnvironmentView>;
   releaseEnvironment(taskId: TaskId, reason: 'business' | 'failed'): Promise<EnvironmentView>;
   pauseEnvironment(taskId: TaskId): Promise<EnvironmentView>;
@@ -43,6 +43,7 @@ export interface Environments {
 
 /** 由 session-client 提供。 */
 export interface Runner {
+  getExecutionCompletionProof?(taskId: TaskId, executionId: string): Promise<ExecutionCompletionProof>;
   consumeBusinessExecution?(taskId: TaskId, executionId: string, through: number, stopped?: boolean): Promise<void>;
   getBusinessExecution?(taskId: TaskId, executionId: string): Promise<StoredBusinessExecutionDto>;
   listBusinessExecutionEvents?(taskId: TaskId, executionId: string, after?: number, limit?: number): Promise<RunnerBusinessEvent[]>;
@@ -87,7 +88,7 @@ export interface ComputeCatalog {
 }
 
 export interface ProjectAuthorizer {
-  authorize(actor: Actor, projectId: ProjectId, action: 'view'): Promise<unknown>;
+  authorize(actor: Actor, projectId: ProjectId, action: 'view' | 'manage-task-storage'): Promise<unknown>;
 }
 
 export interface BusinessTaskSettings {

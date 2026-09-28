@@ -1,26 +1,25 @@
+import { persistExecutionControl } from './control-projection/repository';
 import { and, eq, sql } from 'drizzle-orm';
 import { precondition } from '@crewstation/kernel';
 import type { Database } from '@crewstation/persistence';
 import type { ExecutionControls } from '../../ports/executionControl';
 import { freezeMigration, migrationReady } from '../../domain/migrationControl';
-import { executionControls as controls, executionOperations as ops } from './executionTables';
+import { executionOperations as ops } from './executionTables';
 import { executionTaskStates } from './execution/lifecycleTables';
 import { executionTransaction, readExecutionControl } from './executionTransaction';
 import { tasks, subtasks } from './tables';
 import { executionSubtasks } from './execution/subtaskTables';
 
-export function migrationControlRepository(db: Database): Pick<ExecutionControls, 'freezeMigration' | 'migrationReady' | 'writerRuntimes'> {
+export function migrationControlRepository(db: Database, projectStorage = false): Pick<ExecutionControls, 'freezeMigration' | 'migrationReady' | 'writerRuntimes'> {
   return {
     freezeMigration: (id, request) => executionTransaction(db, id, async (tx, now) => {
       const current = await readExecutionControl(tx, id); if (!current) throw precondition('迁移前必须先由应用启用执行屏障');
-      const control = freezeMigration(current, request);
-      await tx.update(controls).set({ body: control }).where(eq(controls.serviceId, id));
+      const control = await persistExecutionControl(tx, freezeMigration(current, request), current, projectStorage);
       return { control, now };
     }),
     migrationReady: (id, source, input) => executionTransaction(db, id, async (tx, now) => {
       const current = await readExecutionControl(tx, id); if (!current) throw precondition('服务尚无执行控制记录');
-      const control = migrationReady(current, source, input);
-      await tx.update(controls).set({ body: control }).where(eq(controls.serviceId, id));
+      const control = await persistExecutionControl(tx, migrationReady(current, source, input), current, projectStorage);
       return { control, now };
     }),
     writerRuntimes: async (id) => {

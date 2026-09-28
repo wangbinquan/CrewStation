@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { businessExecutionSurface } from './businessExecutionSurface';
+import { objectStorageSurface } from './objectStorageSurface';
 import { BusinessTaskDtoSchema, CreateBusinessTaskRequestSchema, SubmitSubtaskRequestSchema, SubtaskDtoSchema, SubtaskMessageRequestSchema } from '../api/businessTask';
-import { HOST_PATTERNS, IDENTITY_HEADERS, PLATFORM_ENV, PLATFORM_PATHS, PLATFORM_SERVICE_HOSTS, TOKEN_CLAIMS } from '../convention';
+import { HOST_PATTERNS, IDENTITY_HEADERS, OBJECT_HEADERS, PLATFORM_ENV, PLATFORM_PATHS, PLATFORM_SERVICE_HOSTS, TOKEN_CLAIMS } from '../convention';
 import { EVENT_HEADERS, EventDeliverySchema, ProducedEventSchema } from '../events/delivery';
 import { ManifestSchema } from '../manifest/manifest';
 import { TASKRUNNER_PROTOCOL_VERSION } from '../taskrunner/protocol';
@@ -30,12 +31,13 @@ const received = (schema: z.ZodType) => surfaceSchema(schema, 'platform-to-busin
 export function buildContractSurface(): ContractSurface {
   return {
     constants: {
-      IDENTITY_HEADERS, PLATFORM_ENV, PLATFORM_PATHS, TOKEN_CLAIMS, HOST_PATTERNS, PLATFORM_SERVICE_HOSTS, EVENT_HEADERS,
+      IDENTITY_HEADERS, OBJECT_HEADERS, PLATFORM_ENV, PLATFORM_PATHS, TOKEN_CLAIMS, HOST_PATTERNS, PLATFORM_SERVICE_HOSTS, EVENT_HEADERS,
       // 协议号一变，所有在跑的任务容器都会在握手时被拒（RFC-008 的背景事故），所以它也算契约面。
       TASKRUNNER: { protocolVersion: String(TASKRUNNER_PROTOCOL_VERSION) },
     },
     schemas: {
       ...businessExecutionSurface(),
+      ...objectStorageSurface(),
       Manifest: sent(ManifestSchema),
       ProducedEvent: sent(ProducedEventSchema),
       EventDelivery: received(EventDeliverySchema),

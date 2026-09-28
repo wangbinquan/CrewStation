@@ -4,6 +4,7 @@ import { volumeRenderOf, workloadRenderOf, workspaceUnchanged } from '../domain/
 import type { ClusterWriter, Ensured, ManagedObjectFeed } from '../ports/cluster';
 import type { LedgerObservations, LedgerRecordView, WorkloadOwners } from '../ports/ledger';
 import type { ObservationStats } from './observeChange';
+import { prepareWorkloadAdmission, reconcileWorkloadAdmission } from './workloadAdmission';
 
 export interface WorkloadApplyDeps {
   readonly ledger: LedgerObservations;
@@ -45,6 +46,10 @@ export async function applyVolume(deps: WorkloadApplyDeps, record: LedgerRecordV
     deps.logger.warn('resource volume lost, not recreated', { resourceId: record.id, namespace: volume.namespace, name: volume.name });
     return;
   }
+  if (record.spec['taskStorage']) {
+    if (!deps.ledger.taskVolumes) throw new Error('归档任务卷供给准入不可用');
+    await deps.ledger.taskVolumes.beginProvision(record.id);
+  }
   applied(deps, record, 'PersistentVolumeClaim', volume, await deps.cluster.ensureVolume(volume));
 }
 
@@ -54,6 +59,7 @@ export async function applyVolume(deps: WorkloadApplyDeps, record: LedgerRecordV
  * 建不成的抛出，工作队列按退避重试，原因写进记录（Created 为假），页面照标准记录显示。
  */
 export async function applyWorkload(deps: WorkloadApplyDeps, record: LedgerRecordView, enqueue: (id: string, afterMs?: number) => void): Promise<void> {
+  await reconcileWorkloadAdmission(deps, record, enqueue);
   if (record.spec['rebuild']) {
     const render = workloadRenderOf(record.id, record.spec), owners = deps.workloads;
     const intent = render && rebuildRenderOf(record.spec['rebuild'], render);
@@ -70,7 +76,8 @@ export async function applyWorkload(deps: WorkloadApplyDeps, record: LedgerRecor
     deps.logger.warn('resource workload spec incomplete', { resourceId: record.id });
     return;
   }
-  const { pod, preview } = render, owners = deps.workloads, volume = pod.pvc ? deps.feed.cached('PersistentVolumeClaim', pod.namespace, pod.pvc) : undefined;
+  let { pod } = render;
+  const { preview } = render, owners = deps.workloads, volume = pod.pvc ? deps.feed.cached('PersistentVolumeClaim', pod.namespace, pod.pvc) : undefined;
   // 执行环境（I25 第二步）：父工作区的 Pod 与卷要还是受理时那两个实例；没了或换了，交所属模块判失败、不建。
   if (pod.workspace && !workspaceUnchanged(pod, deps.feed.cached('Pod', pod.namespace, pod.workspace.pod), volume)) {
     deps.logger.warn('resource workload workspace changed', { resourceId: record.id, workspacePod: pod.workspace.pod });
@@ -84,6 +91,7 @@ export async function applyWorkload(deps: WorkloadApplyDeps, record: LedgerRecor
     return;
   }
   try {
+    pod = await prepareWorkloadAdmission(deps, pod, volume);
     deps.signal?.throwIfAborted();
     if (pod.runtimeInitialization && (await deps.ledger.get(record.id))?.desired !== 'present') return;
     const secret = await deps.cluster.ensureRunnerSecret(pod, () => owners.runnerValues(record.id), deps.signal);
@@ -97,6 +105,7 @@ export async function applyWorkload(deps: WorkloadApplyDeps, record: LedgerRecor
     deps.signal?.throwIfAborted();
     if (preview) applied(deps, record, 'Service', preview, await deps.cluster.applyPreview(preview, { ...optional('service', deps.feed.cached('Service', preview.namespace, preview.name)), ...optional('route', deps.feed.cached('IngressRoute', preview.namespace, preview.name)) }));
     await owners.bindWorkload(record.id, created.uid, secret.uid);
+    await reconcileWorkloadAdmission(deps, record, enqueue);
     await deps.ledger.observeConditions(record.id, [{ type: 'Created', status: 'true' }]);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

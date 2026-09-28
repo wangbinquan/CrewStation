@@ -37,11 +37,15 @@ export async function openAdminSession(connect: () => Promise<Browser> = connect
   try {
     browser = await connect();
     admin = await signIn(browser, e2eAdminUsername());
-    const page = await apiGet<{ items?: ProjectRow[] }>(admin, '/v1/projects?limit=50');
+    const requested = process.env.CS_E2E_PROJECT_ID;
+    const page = requested
+      ? { items: [await apiGet<ProjectRow>(admin, `/v1/projects/${encodeURIComponent(requested)}`)] }
+      : await apiGet<{ items?: ProjectRow[] }>(admin, '/v1/projects?limit=50');
     // 必须是已开通且有服务的数字人项目：开通失败或半截的项目页面构成不同，拿它断言只会得出假结论。
     const usable = (page.items ?? []).find(
-      (row) => row.state === 'active' && typeof row.serviceId === 'string' && row.kind === 'DigitalWorker',
+      (row) => (!requested || row.id === requested) && row.state === 'active' && typeof row.serviceId === 'string' && row.kind === 'DigitalWorker',
     );
+    if (requested && !usable) throw new Error(`CS_E2E_PROJECT_ID 指定的项目 ${requested} 不是已开通的数字人`);
     const owned = browser, signedIn = admin;
     return {
       browser: owned,
@@ -56,7 +60,7 @@ export async function openAdminSession(connect: () => Promise<Browser> = connect
     // 登录之后的一步失败也要关掉那一页，只断开连接会把它留在共用的调试浏览器里（见 consoleSession.signIn）。
     await admin?.close().catch(() => undefined);
     browser?.close();
-    if (e2eRequired()) throw new Error(`CS_TEST_REQUIRE 要求实机验收，但管理员会话没有建立：${String(error)}`, { cause: error });
+    if (e2eRequired() || process.env.CS_E2E_PROJECT_ID) throw new Error(`实机验收管理员会话没有建立：${String(error)}`, { cause: error });
     return undefined;
   }
 }

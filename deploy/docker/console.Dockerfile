@@ -9,6 +9,7 @@ RUN printf '{"name":"crewstation-console-build","private":true,"workspaces":["ap
   && bun install && cd apps/console && bun run build
 
 FROM oven/bun:1.3.13-slim
+LABEL io.crewstation.storage-contract="1"
 WORKDIR /srv
 COPY --from=build /app/apps/console/dist ./dist
 COPY apps/console/serve.ts ./serve.ts

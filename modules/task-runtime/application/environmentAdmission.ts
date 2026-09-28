@@ -1,15 +1,18 @@
-import { DomainTopic, RuntimeImageExecutionSnapshotSchema, TaskIdSchema } from '@crewstation/contracts';
+import { DomainTopic, ResourceIdSchema, RuntimeImageExecutionSnapshotSchema, TaskIdSchema } from '@crewstation/contracts';
 import { conflict, jsonHash, validation } from '@crewstation/kernel';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
 import type { CreateEnvironmentInput, TaskRuntimeUseCaseDeps } from './dependencies';
 
 /** 固定 ID 只用于业务执行的持久意图；直接建 Pod 的旧路径不能提供丢回执后的安全恢复。 */
 export function admissionFingerprint(deps: TaskRuntimeUseCaseDeps, input: CreateEnvironmentInput): string | undefined {
+  if (input.developmentObjectPlanId !== undefined && (input.kind !== 'dev-session' || deps.creation !== 'ledger' || !deps.sources.objectEnv || !ResourceIdSchema.safeParse(input.developmentObjectPlanId).success)) throw validation('开发对象空间需要有效档位与开发会话台账准入');
   if (input.runtimeImage) {
     RuntimeImageExecutionSnapshotSchema.parse(input.runtimeImage);
     if (deps.creation !== 'ledger') throw validation('运行镜像需要资源台账准入');
   }
   if (input.businessStorage && (input.businessStorage !== 'isolated-v1' || !input.admission || input.kind !== 'business' || input.branch || input.preview || deps.creation !== 'ledger')) throw validation('隔离业务卷需要无源码检出的业务台账准入');
+  if (input.completionPolicy && (input.completionPolicy !== 'archive-and-delete' || input.businessStorage !== 'isolated-v1' || input.volumeMode !== 'persistent')) throw validation('归档终结必须使用持久隔离业务卷');
+  if (input.objectInputsGeneration !== undefined && (input.completionPolicy !== 'archive-and-delete' || !Number.isSafeInteger(input.objectInputsGeneration) || input.objectInputsGeneration < 1 || !deps.sources.taskInputEnv || !deps.sources.bindTaskInputs)) throw validation('对象输入需要可绑定的任务存储能力');
   if (input.runtimeImageTaskId && (input.kind !== 'dev-session' || !input.runtimeImage || input.admission || !TaskIdSchema.safeParse(input.runtimeImageTaskId).success)) throw validation('镜像保留身份仅用于开发会话');
   if (!input.admission) return undefined;
   if (input.kind !== 'business' || deps.creation !== 'ledger') throw validation('固定任务 ID 需要业务任务与资源台账准入');

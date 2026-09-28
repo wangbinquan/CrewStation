@@ -7,10 +7,11 @@ import { queueMigrations } from '@crewstation/queue';
 import { createTestDatabase } from '@crewstation/testkit';
 import { drizzleUnitOfWork } from '../adapters/persistence/drizzleUnitOfWork';
 import { createTaskRuntimeModule, taskRuntimeMigrations } from '../wiring';
+import type { EnvironmentSources } from '../ports/platform';
 
 export const imageSnapshot = (): RuntimeImageExecutionSnapshot => ({ versionId: newResourceId(), image: `registry/runtime@sha256:${'a'.repeat(64)}`, digest: `sha256:${'a'.repeat(64)}`, architecture: 'linux/arm64', validationId: newResourceId(), initializerDigest: `sha256:${'b'.repeat(64)}`, initializer: { steps: [], env: {}, secrets: [] }, tools: [], selectionSource: 'request' });
 
-export async function runtimeImageFixture(pinTaskImage?: (image: string) => Promise<string>, creation: 'ledger' | 'owner' = 'ledger') {
+export async function runtimeImageFixture(pinTaskImage?: (image: string) => Promise<string>, creation: 'ledger' | 'owner' = 'ledger', taskInputs?: Pick<EnvironmentSources, 'taskInputEnv' | 'bindTaskInputs' | 'objectEnv'>) {
   const tdb = await createTestDatabase([eventbusMigrations, queueMigrations, resourcesMigrations, taskRuntimeMigrations]);
   const k8s = createFakeK8sClient(), projectId = newResourceId() as ProjectId, serviceId = newResourceId() as ServiceId;
   const resources = createResourcesModule({ db: tdb.db, quotas: { limitFor: async () => 8 }, authorizer: { projectAccess: async () => ({ operate: true }) }, isAdmin: async () => true });
@@ -25,7 +26,7 @@ export async function runtimeImageFixture(pinTaskImage?: (image: string) => Prom
     ledger: { within: (tx) => owner.within(tx as object), live: async () => (await resources.api.list({})).filter((r) => r.owner.module === 'task-runtime'), occupancy: resources.api.occupancy },
     profiles: { listTaskProfiles: async () => [profile], getTaskProfile: async () => profile },
     services: { resolveServiceById: async () => ({ projectId, namespace: 'cs-runtime-image', slug: 'runtime-image', name: 'runtime-image' }) },
-    sources: { ...(pinTaskImage ? { pinTaskImage } : {}), configEnv: async () => ({ GREETING: 'hello' }), dataEnv: async () => ({}), taskDataEnv: async () => ({}) },
+    sources: { ...taskInputs, ...(pinTaskImage ? { pinTaskImage } : {}), configEnv: async () => ({ GREETING: 'hello' }), dataEnv: async () => ({}), taskDataEnv: async () => ({}) },
     testRunner: { sendCommand: async (id, command) => command.type === 'exec' ? { exitCode: 0, stdout: '10001\n' } : statuses.get(id), listEvents: async () => [], connectionStatus: async () => ({ connected: true, capabilities: { protocols: [], pty: false, preview: false, ...(protocol.supported ? { runtimeInitialization: 1 as const } : {}) } }) },
     settings: { taskImage: 'platform:fallback', sessionUrl: 'ws://session/runner', systemNamespace: 'cs-system', userDomain: 'localhost', serviceDomain: 'svc.localhost', workerUid: 10001, defaultProfile: profile.id, userAuthMiddleware: 'auth', dropIdentityHeadersMiddleware: 'drop' },
   });

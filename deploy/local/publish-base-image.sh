@@ -7,7 +7,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 # shellcheck source=lib.sh
 source "$ROOT/deploy/local/lib.sh"
 TAG="${CS_BASE_IMAGE_TAG:-dev}"
-SOURCE="docker.io/library/cs-task-runtime:dev"
+SOURCE="${CS_BASE_IMAGE_SOURCE:-docker.io/library/cs-task-runtime:dev}"
 TARGET="127.0.0.1:30500/crewstation/task-runtime:${TAG}"
 
 node_exec ctr -n k8s.io images inspect "${SOURCE}" >/dev/null 2>&1 \

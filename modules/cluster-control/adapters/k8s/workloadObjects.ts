@@ -1,9 +1,12 @@
 import type { K8sObject } from '@crewstation/k8s';
 import { LABELS, pvcObject, secretObject, taskPodObject, taskPreviewObjects } from '@crewstation/k8s';
 import type { VolumeRender, WorkloadPodRender, WorkloadPreviewRender } from '../../domain/workloadRender';
+import { protectWorkloadPod } from './safety/workloadGate';
+import { archivePodObject } from './safety/archivePod';
 
 /** 工作区的 Pod（RFC-025 I25）：与 task-runtime 自己建时同一个构造函数；环境只从 Runner Secret 引用，Pod 规格里没有凭据。 */
 export function workloadPodObject(pod: WorkloadPodRender): K8sObject {
+  if (pod.archive) return archivePodObject(pod);
   const object = taskPodObject({
     ...(pod.runtimeInitialization ? { runtimeInitialization: true } : {}),
     name: pod.name, namespace: pod.namespace, taskId: pod.taskId, workload: pod.workload, project: pod.project, service: pod.service, image: pod.image,
@@ -12,7 +15,7 @@ export function workloadPodObject(pod: WorkloadPodRender): K8sObject {
     ...(pod.nodeName ? { nodeName: pod.nodeName } : {}), ...(pod.labels ? { labels: pod.labels } : {}),
   });
   if (pod.annotations) object.metadata.annotations = { ...object.metadata.annotations, ...pod.annotations };
-  return object;
+  return protectWorkloadPod(object, pod);
 }
 
 /** 这一次启动的 Runner Secret：不可变，内容是建的时候向 task-runtime 要来的（值不落库）；执行环境的带上与 Pod 相同的附加标签与注解。 */

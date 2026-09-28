@@ -1,5 +1,9 @@
 import { stopMigrationJob } from './stoppedMigrationJob';
+import { inspectTaskClaim, inspectTaskVolume, taskVolumeReclaimed, removeTaskVolume } from './safety/volumeReclaim';
+import type { VolumeProbeOptions } from './safety/volumeReclaim';
 import { assertPinnedVolume } from './pinnedVolume';
+import { observeWorkloadStop, releaseWorkloadStop } from './safety/workloadStop';
+import { activateWorkload, assertWorkloadGate, inspectWorkloadStart } from './safety/workloadGate';
 import type { K8sClient, K8sObject } from '@crewstation/k8s';
 import { LABELS, MANAGED_BY, Resources } from '@crewstation/k8s';
 import type { Logger } from '@crewstation/kernel';
@@ -56,13 +60,19 @@ async function ensureNamed(k8s: K8sClient, kind: ObservedKind, target: { readonl
   }
 }
 
-export function kubernetesClusterWriter(k8s: K8sClient): ClusterWriter {
+export function kubernetesClusterWriter(k8s: K8sClient, volumeProbe?: VolumeProbeOptions): ClusterWriter {
   const apply = async (desired: K8sObject, current: Parameters<typeof objectCovered>[0]): Promise<'applied' | 'unchanged'> => {
     if (objectCovered(current, desired)) return 'unchanged';
     await k8s.apply(desired);
     return 'applied';
   };
   return {
+    inspectTaskClaim: (namespace, name) => inspectTaskClaim(k8s, namespace, name),
+    ...(volumeProbe ? { inspectTaskVolume: (namespace: string, name: string, now: Date) => inspectTaskVolume(k8s, namespace, name, volumeProbe, now), taskVolumeReclaimed: (target: Parameters<typeof taskVolumeReclaimed>[1], now: Date) => taskVolumeReclaimed(k8s, target, volumeProbe, now), removeTaskVolume: (target: Parameters<typeof taskVolumeReclaimed>[1], now: Date) => removeTaskVolume(k8s, target, volumeProbe, now) } : {}),
+    inspectWorkloadStart: (pod) => inspectWorkloadStart(k8s, pod),
+    activateWorkload: (pod, permit) => activateWorkload(k8s, pod, permit),
+    observeWorkloadStop: (consumer, now) => observeWorkloadStop(k8s, consumer, now),
+    releaseWorkloadStop: (proof) => releaseWorkloadStop(k8s, proof),
     inspectNamespaceRetirement: async (name, intent, systemNamespace, signal) => { await inspectNamespaceRetirement(k8s, name, intent, systemNamespace, signal); },
     removeRetiredNamespace: (name, intent, systemNamespace, signal) => removeRetiredNamespace(k8s, name, intent, systemNamespace, signal),
     rebuild: (render, intent, signal) => rebuildObjects(k8s, render, intent, signal),
@@ -75,7 +85,12 @@ export function kubernetesClusterWriter(k8s: K8sClient): ClusterWriter {
     applyNamespace: (namespace, current) => apply(namespaceObjectOf(namespace), current),
     applyQuota: (namespace, current) => apply(quotaObjectOf(namespace), current),
     applyNetworkPolicy: (policy, current) => apply(networkPolicyObjectOf(policy), current),
-    ensurePod: async (pod, signal) => { await assertPinnedVolume(k8s, pod, signal); return ensureNamed(k8s, 'Pod', pod, () => workloadPodObject(pod), signal); },
+    ensurePod: async (pod, signal) => {
+      await assertPinnedVolume(k8s, pod, signal);
+      const result = await ensureNamed(k8s, 'Pod', pod, () => workloadPodObject(pod), signal);
+      if (pod.consumer) assertWorkloadGate((await k8s.get<K8sObject>(Resources.Pod!, pod.name, pod.namespace, signal))!, pod);
+      return result;
+    },
     ensureRunnerSecret: (pod, values, signal) => ensureNamed(k8s, 'Secret', { namespace: pod.namespace, name: pod.secret }, async () => runnerSecretObject(pod, await values()), signal),
     ensureCheckoutSecret: (pod, values) => ensureNamed(k8s, 'Secret', { namespace: pod.namespace, name: pod.checkout!.credentialSecretName }, async () => checkoutSecretObject(pod, await values())),
     ensureVolume: (volume) => ensureNamed(k8s, 'PersistentVolumeClaim', volume, () => volumeObject(volume)),

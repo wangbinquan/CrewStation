@@ -10,6 +10,9 @@ import type { NativeExecutionCluster } from '../ports/cluster';
 import type { RepositoryScope } from '../ports/unitOfWork';
 import type { TaskRuntimeUseCaseDeps } from './dependencies';
 import { containerEnv } from './containerEnv';
+import { storageStart } from './business/storageStart';
+import { closeStorageAdmission, storageStopProved } from './business/storageStop';
+import { assertBusinessStorageMutable } from './business/finalizationGuard';
 
 export type NativeExecutionDeps = TaskRuntimeUseCaseDeps & { nativeCluster: NativeExecutionCluster };
 export type ExecutionLease = () => Promise<boolean>;
@@ -49,6 +52,7 @@ export function createNativeExecutionUseCase(deps: NativeExecutionDeps) {
       if (await scope.admissions.blocked(input.id)) throw conflict('业务执行准入已取消', { code: 'admission_cancelled' });
       const parent = await scope.environments.getById(input.parentTaskId);
       if (!parent || parent.native || parent.kind !== rule.parentKind || parent.state !== 'running' || !parent.connected) throw precondition(rule.unavailable);
+      assertBusinessStorageMutable(parent);
       if (input.businessSession && (!parent.render?.businessStorage || purpose !== 'subtask' || (input.businessSession.mode === 'create' && input.businessSession.key !== input.id))) throw precondition('原生会话必须绑定隔离业务卷和独立 Agent 身份');
       if (parent.render?.businessStorage && deps.creation !== 'ledger') throw precondition('隔离业务卷不支持回退到旧执行容器创建路径');
       const profile = await deps.profiles.getTaskProfile(input.profile ?? deps.settings.defaultProfile);
@@ -78,7 +82,7 @@ function executionEnvironment(deps: NativeExecutionDeps, input: CreateNativeExec
     traceId: parent.traceId, runnerTokenHash: hashRunnerToken(newRunnerToken()), connected: false, labels: parent.labels, ...(input.createdBy ? { createdBy: input.createdBy } : {}),
     native, message: `已受理，正在准备此${EXECUTION_NOUN[purpose]}的独立执行环境`, createdAt: now, updatedAt: now, lastActivityAt: now, startup: initialStartup(now),
     // 资源中心建出时的期望（I25 第二步，不含凭据）：镜像与资源取自受理时固定的档位；节点、父 Pod 与卷的 UID 在 native 里。
-    ...(deps.creation === 'ledger' ? { render: { ...(input.runtimeImage ? { runtimeImage: input.runtimeImage } : {}), image: native.image, workerUid: parent.render?.businessStorage ? parent.render.workerUid : deps.settings.workerUid, resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, start: 1, execution: { workspacePod: parent.podName }, ...(parent.render?.businessStorage ? { businessStorage: { ...parent.render.businessStorage, ...(input.businessSession ? { session: input.businessSession } : {}) } } : {}) } } : {}) };
+    ...(deps.creation === 'ledger' ? { render: { ...storageStart(parent.render?.completionPolicy), ...(parent.kind === 'dev-session' && parent.render?.developmentObjectPlanId ? { developmentObjectPlanId: parent.render.developmentObjectPlanId } : {}), ...(input.runtimeImage ? { runtimeImage: input.runtimeImage } : {}), image: native.image, workerUid: parent.render?.businessStorage ? parent.render.workerUid : deps.settings.workerUid, resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, start: 1, execution: { workspacePod: parent.podName }, ...(parent.render?.businessStorage ? { businessStorage: { ...parent.render.businessStorage, ...(input.businessSession ? { session: input.businessSession } : {}) } } : {}) } } : {}) };
 }
 
 /** 准备执行环境反复失败时给用户的话：只说这一个 Agent，不牵连其他 Agent、窗口与工作树。 */
@@ -142,7 +146,9 @@ export async function prepareNativeExecution(deps: NativeExecutionDeps, scope: R
 
 export async function cleanupNativeExecution(deps: NativeExecutionDeps, scope: RepositoryScope, env: TaskEnvironment, heartbeat: ExecutionLease): Promise<void> {
   await requireExecutionLease(heartbeat);
+  await closeStorageAdmission(deps, env);
   await deps.nativeCluster.cleanup(env);
+  if (!await storageStopProved(deps, env)) throw new Error('等待工作卷消费者停止证明');
   await requireExecutionLease(heartbeat);
   const n = env.native!, now = deps.clock.now();
   await scope.environments.update({ ...env, state: n.failureReason ? 'failed' : 'released', connected: false, updatedAt: now,
@@ -152,20 +158,30 @@ export async function cleanupNativeExecution(deps: NativeExecutionDeps, scope: R
 
 /** 父会话先等待所有引用结束，再删除其 Pod／工作卷；失败由同一持久作业接续。 */
 export async function cleanupWorkspace(deps: NativeExecutionDeps, scope: RepositoryScope, env: TaskEnvironment, heartbeat: ExecutionLease): Promise<void> {
+  if (env.render?.storageFinalization?.computeStopped) return;
   const active = (await scope.environments.listChildren(env.id)).filter((child) => child.native?.state !== 'finished');
   if (active.length) {
     for (const child of active) await scope.nativeQueue.enqueue(child.id);
     throw new Error('等待 CLI 执行环境回收后释放工作区');
   }
   await requireExecutionLease(heartbeat);
+  await closeStorageAdmission(deps, env);
   await deps.cluster.deletePod(env);
   if ((await deps.cluster.podPhase(env)).phase !== 'Missing') throw new Error('等待工作区容器退出');
+  if (!await storageStopProved(deps, env)) throw new Error('等待工作卷消费者停止证明');
   if (env.volumeMode === 'follow-container') {
     await deps.cluster.deleteVolume(env);
     if (env.render?.businessStorage && (!deps.businessStorageInspector || (await deps.businessStorageInspector.inspect(env)).volume)) throw new Error('等待业务工作卷回收确认');
   }
   await requireExecutionLease(heartbeat);
   const now = deps.clock.now(), reason = env.release!.reason;
+  if (env.render?.storageFinalization) {
+    // Compute has stopped, but the task still owns its volume and data binding until final reclaim.
+    await scope.environments.update({ ...env, connected: false, updatedAt: now, release: { reason, occupied: false },
+      render: { ...env.render, storageFinalization: { ...env.render.storageFinalization, computeStopped: true } }, message: '执行容器已停止，任务正在归档与回收工作卷' });
+    if (env.release!.occupied) await scope.quota.release(env);
+    return;
+  }
   await scope.environments.update(transition(env, 'released', now, { release: undefined, message: `released: ${reason}` }));
   if (env.release!.occupied) await scope.quota.release(env);
   await scope.events.publish(DomainTopic.taskReleased, { occurredAt: now.toISOString(), traceId: env.traceId, projectId: env.projectId, taskId: env.id, kind: env.kind, reason });

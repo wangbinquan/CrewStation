@@ -12,6 +12,7 @@ import { commitRecord } from './commit';
 import { splitChildrenIn } from './childTransfer';
 import { guardNamespaceRetirement } from './namespaceRetirement';
 import { guardCredentialRotation } from './projectQuiescence';
+import { guardTaskStorageDeclaration, guardTaskVolumeRelease } from './taskStorage';
 
 const MAX_CHILDREN = 32;
 
@@ -35,6 +36,7 @@ async function declareIn(scope: LedgerScope, module: string, input: ResourceDecl
   await guardCredentialRotation(scope, input.projectId, input.kind);
   const owner = { module, ref: input.ref };
   const existing = input.id ? await scope.records.get(input.id, { forUpdate: true }) : await scope.records.getByOwner(owner, input.kind, { forUpdate: true });
+  await guardTaskStorageDeclaration(scope, module, input, existing);
   if (existing) {
     if (existing.owner.module !== module || existing.owner.ref !== input.ref || existing.kind !== input.kind) throw conflict(`资源 ${existing.id} 已由 ${existing.owner.module}（${existing.kind}）声明`, { resourceId: existing.id });
     if (existing.desired === 'absent') throw conflict(`资源 ${existing.id} 已受理释放，不能重新声明；请声明一条新资源`, { resourceId: existing.id });
@@ -94,6 +96,7 @@ export const GENERIC_RELEASE_CODE = 'released';
 
 async function releaseIn(scope: LedgerScope, module: string, id: string, reason: ResourceReason, now: Date): Promise<LedgerRecord> {
   const record = await loadOwned(scope, module, id);
+  guardTaskVolumeRelease(record);
   if (record.desired === 'absent') {
     // 已受理释放：期望不再变；只有原来的原因是泛泛的「已释放」时，才补上后来知道的具体原因（例如先进入释放、释放完才写明是谁释放的）。
     if (record.releaseReason?.code !== GENERIC_RELEASE_CODE || reason.code === GENERIC_RELEASE_CODE) return record;

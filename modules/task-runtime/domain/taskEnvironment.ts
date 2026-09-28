@@ -47,6 +47,12 @@ export interface NativeExecution {
  * 每次（重新）启动是第几次（start）决定 Runner Secret 的名字，恢复换一个新的，旧的由孤儿回收删掉。之前受理的环境没有它，照旧由 task-runtime 自己建。
  */
 export interface WorkloadRender {
+  /** 开会话所选分支的对象档位；保卷重建与子执行继承，不读取生产发布。 */
+  readonly developmentObjectPlanId?: string;
+  readonly objectInputsGeneration?: number;
+  readonly storageFinalization?: { readonly operationId: string; readonly revision: number; readonly volumeUid: string | null; readonly computeStopped?: true };
+  readonly completionPolicy?: 'archive-and-delete';
+  readonly workloadConsumerId?: string;
   /** Durable operation marker: an old worker cannot restart a later failed recovery. */
   readonly businessRecovery?: { readonly operationId: string; readonly generation: number; readonly volumeUid: string };
   readonly runtimeConnectionDeadline?: { readonly generation: number; readonly at: string };
@@ -214,7 +220,7 @@ export function checkoutSecretOf(env: TaskEnvironment & { readonly render: Workl
 
 /** 所属模块要资源中心建出容器（领域条件 Provisioning）：工作区在创建中、还没绑定 Pod 实例；执行环境还在排队（准备好之前）。 */
 export function wantsProvisioning(env: TaskEnvironment): boolean {
-  return reconcilerCreates(env) && !env.render.rebuild && env.state === 'creating' && (env.native ? env.native.state === 'queued' : !env.podUid);
+  return reconcilerCreates(env) && !env.render.rebuild && !env.render.storageFinalization && env.state === 'creating' && (env.native ? env.native.state === 'queued' : !env.podUid);
 }
 
 export function podNameFor(taskId: TaskId): string {

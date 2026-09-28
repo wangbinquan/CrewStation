@@ -25,6 +25,7 @@ import type { IdentityUseCaseDeps } from './application/dependencies';
 import { devSessionTokenUseCases } from './application/devSessionTokens';
 import { ensureUserUseCase } from './application/ensureUser';
 import { forwardAuthServiceUseCase, resolveServiceSourceUseCase } from './application/forwardAuthService';
+import { resolveDevelopmentSource } from './application/source/development';
 import { forwardAuthUserUseCase } from './application/forwardAuthUser';
 import { loginDiscoveryUseCases } from './application/loginDiscovery';
 import { renderLoginErrorPage, renderLoginPage } from './application/loginPages';
@@ -187,6 +188,7 @@ export function createIdentityModule(deps: IdentityModuleDeps): IdentityModule {
     authorizeUserRequest: forwardAuthUserUseCase(useCaseDeps, forwarding),
     authorizeServiceRequest: forwardAuthServiceUseCase(useCaseDeps),
     resolveServiceSource: resolveServiceSourceUseCase(useCaseDeps),
+    resolveDevelopmentSource: resolveDevelopmentSource(useCaseDeps),
     ...loginPolicyUseCases(useCaseDeps),
     ...providerAdminUseCases(useCaseDeps),
     ...forwarding,

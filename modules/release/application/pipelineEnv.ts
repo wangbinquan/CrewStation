@@ -1,6 +1,6 @@
 import type { Manifest, ProjectId, ServiceId } from '@crewstation/contracts';
 import { PLATFORM_ENV } from '@crewstation/contracts';
-import { validation } from '@crewstation/kernel';
+import { precondition, validation } from '@crewstation/kernel';
 import type { PhysicalSlot } from '../domain/slots';
 import type { ReleaseUseCaseDeps } from './dependencies';
 
@@ -17,6 +17,9 @@ export async function renderSlotEnv(deps: Pick<ReleaseUseCaseDeps, 'config' | 'd
   if (blocking.length > 0) throw validation(`生产组配置缺少 Manifest env 段声明的键：${blocking.join('、')}`, { missing: blocking });
   const config = await deps.config.render(input.projectId, 'production');
   const data = await deps.data.envFor(input.serviceId, 'production');
+  const objectPlan = manifest.kind === 'DigitalWorker' ? manifest.spec.data?.objects.planId : undefined;
+  if (objectPlan && !deps.data.objectEnv) throw precondition('平台尚未提供对象存储');
+  const objects = objectPlan ? await deps.data.objectEnv!(input.serviceId, 'production', objectPlan) : {};
   const declared: Record<string, string> = {};
   for (const entry of manifest.spec.env) {
     const key = entry.configDefinitionId;
@@ -26,6 +29,7 @@ export async function renderSlotEnv(deps: Pick<ReleaseUseCaseDeps, 'config' | 'd
   const values: Record<string, string> = {
     ...data,
     ...declared,
+    ...objects,
     [PLATFORM_ENV.project]: input.projectSlug,
     [PLATFORM_ENV.service]: input.serviceName,
     [PLATFORM_ENV.slot]: input.physical,

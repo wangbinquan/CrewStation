@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import type { AllowlistDocument, ProjectId, ReleaseId, ServiceId, WorkloadIdentity } from '@crewstation/contracts';
+import type { AllowlistDocument, ProjectId, ReleaseId, ServiceId, TaskId, WorkloadIdentity } from '@crewstation/contracts';
 import { DomainTopic } from '@crewstation/contracts';
 import { newResourceId } from '@crewstation/kernel';
 import { eventbusMigrations, publishDomainEvent } from '@crewstation/eventbus';
@@ -27,6 +27,25 @@ const ingressRoutesOf = (namespace: string): string[] =>
 let prodPhysical: 'blue' | 'green' = 'blue';
 
 describe.skipIf(!available)('RFC-027 可信服务 Pod 发布身份', () => {
+  test('开发对象来源持久绑定任务与 Pod UID，旧删除事件不撤销同名新 Pod', async () => {
+    const taskId = newResourceId() as TaskId, ip = '10.244.35.1';
+    const pod = { metadata: { name: 'object-dev', namespace: 'cs-demo', uid: 'dev-first', labels: {
+      'app.kubernetes.io/managed-by': 'crewstation', 'crewstation.io/project': 'demo', 'crewstation.io/service': 'demo',
+      'crewstation.io/workload': 'dev-session', 'crewstation.io/task': taskId,
+    } }, status: { podIP: ip, phase: 'Running', conditions: [{ type: 'Ready', status: 'True' }] } };
+    await gateway.api.syncObservedPod(pod, false);
+    expect((await newGateway().api.lookupByIp(ip))?.developmentSource).toEqual({ taskId, podUid: 'dev-first', podName: 'object-dev', ip, ready: true });
+    const replacement = { ...pod, metadata: { ...pod.metadata, uid: 'dev-second' } };
+    await gateway.api.syncObservedPod(replacement, false);
+    await gateway.api.syncObservedPod(pod, true);
+    expect((await gateway.api.lookupByIp(ip))?.developmentSource?.podUid).toBe('dev-second');
+    expect((await gateway.api.lookupByIp(ip))?.source).toBeUndefined();
+    await gateway.api.syncObservedPod({ ...replacement, metadata: { ...replacement.metadata, deletionTimestamp: new Date().toISOString() } }, false);
+    expect((await gateway.api.lookupByIp(ip))?.developmentSource?.ready).toBe(false);
+    await gateway.api.syncObservedPod(replacement, true);
+    expect(await gateway.api.lookupByIp(ip)).toBeUndefined();
+  });
+
   test('观测保留实例 UID、release 和物理槽；同名替换后的旧删除事件不能撤销新实例', async () => {
     const release = newResourceId() as ReleaseId, ip = '10.244.27.1';
     const pod = { metadata: { name: 'source-pod', namespace: 'cs-demo', uid: 'uid-first', labels: {

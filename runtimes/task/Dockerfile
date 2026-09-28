@@ -57,8 +57,14 @@ RUN mkdir -p /opt/crewstation/bin \
   && chmod 0755 /opt/crewstation/bin/task-runner \
   && sh -n /opt/crewstation/bin/task-runner
 
+# 独立归档入口不加载 Runner、配置、模型驱动或业务环境。
+RUN printf '#!/bin/sh\ncd /app || exit 1\nexec %s run /app/runtimes/task/src/archive/main.ts "$@"\n' "$(command -v bun)" > /opt/crewstation/bin/archive-helper \
+  && chmod 0755 /opt/crewstation/bin/archive-helper \
+  && sh -n /opt/crewstation/bin/archive-helper
+
 ENV CS_WORKDIR=/work \
     NODE_ENV=production
+LABEL io.crewstation.storage-contract="1"
 VOLUME ["/work"]
 
 ENTRYPOINT ["/usr/bin/tini", "--"]

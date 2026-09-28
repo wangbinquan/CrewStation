@@ -13,6 +13,7 @@ const settings = loadPlatformSettings();
 const { db, close } = connectDatabase(settings.databaseUrl);
 const k8s = createK8sClient(loadClusterConfig());
 const platform = createPlatformModule({ db, k8s, settings, logger, instance: `${name}-${hostname()}` });
+await platform.api.storageContract.check();
 
 if (process.argv[2] === 'migrate') {
   const applied = await runMigrations(db, platform.api.migrations, logger);
@@ -22,6 +23,7 @@ if (process.argv[2] === 'migrate') {
 }
 
 const app = createApp({ name, readiness: () => databaseReady(db) });
+app.get('/internal/storage-contract', (c) => c.json({ name, storageContractVersion: platform.api.storageContract.version }));
 for (const router of platform.api.routers.events) app.route('/', router);
 const background = platform.api.background.events;
 for (const item of background) item.start();

@@ -2,6 +2,8 @@ import type { ClusterPurpose, ProjectId, ResourceConditionStatus, ResourceKind, 
 
 /** 台账里 task-runtime 关心的部分（结构上是 resources 模块 LedgerRecord 的子集）。 */
 export interface LedgerRecordRef {
+  readonly phase?: string;
+  readonly children?: readonly { readonly kind: string; readonly phase: string; readonly uid?: string }[];
   readonly id: string;
   readonly desired: 'present' | 'absent';
   readonly owner: { readonly module: string; readonly ref: string };

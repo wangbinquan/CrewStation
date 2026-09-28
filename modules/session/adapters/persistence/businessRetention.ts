@@ -4,6 +4,7 @@ import type { Database } from '@crewstation/persistence';
 import { conflict, notFound } from '@crewstation/kernel';
 import type { BusinessExecutionStore } from '../../ports/businessExecutions';
 import { businessExecutions as streams } from './businessTables';
+import { persistCompletionProof } from './completionProofs';
 
 export function businessRetention(db: Database): Pick<BusinessExecutionStore, 'consume' | 'expire'> {
   return {
@@ -14,6 +15,7 @@ export function businessRetention(db: Database): Pick<BusinessExecutionStore, 'c
       const row = (await tx.select().from(streams).where(key).for('update'))[0];
       if (!row) throw notFound('可靠执行', executionId);
       if (!row.complete || through !== row.persistedThrough || through !== row.receipt.lastSequence) throw conflict('只能确认已完整投影的终态执行');
+      await persistCompletionProof(tx, row);
       if (row.expired) return;
       if (!row.consumedAt) await tx.update(streams).set({ consumedAt: sql`clock_timestamp()` }).where(key);
     }),

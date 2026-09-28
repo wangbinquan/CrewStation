@@ -1,0 +1,112 @@
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { eq } from 'drizzle-orm';
+import type { BusinessExecutionFence } from '@crewstation/contracts';
+import type { TestDatabase } from '@crewstation/testkit';
+import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
+import { dataMigrations } from '../wiring';
+import { objectCatalogRepository } from '../adapters/persistence/objectCatalog';
+import { objectUploadRepository } from '../adapters/persistence/objectUploads';
+import { objectAttempts } from '../adapters/persistence/objectTables';
+import { backendFixture, controlFixture, objectId, sourceFixture } from './objectFixtures';
+
+const available = await testDatabaseAvailable();
+let tdb: TestDatabase;
+beforeAll(async () => { if (available) tdb = await createTestDatabase([dataMigrations]); });
+afterAll(async () => { await tdb?.drop(); });
+async function fixture(options: { quota?: number; transfers?: number; fenced?: boolean } = {}) {
+  const catalog = objectCatalogRepository(tdb.db), uploads = objectUploadRepository(tdb.db);
+  const backend = await catalog.registerBackend(backendFixture({ health: 'ready' }));
+  const source = { ...sourceFixture(), fenced: options.fenced ?? false }, control = controlFixture(source.serviceId);
+  const plan = await catalog.savePlan(objectId(), { name: 'Test', backendId: backend.id, quotaBytes: options.quota ?? 1000, maxObjectBytes: 1000, maxConcurrentTransfers: options.transfers ?? 4, enabled: true });
+  await catalog.authorizePlans(source.projectId, 1, [plan.id]);
+  const space = await catalog.ensureSpace({ ...source, id: objectId(), planId: plan.id, deploymentMode: 'local' });
+  const fence = { epoch: control.epoch, leaseId: control.leaseId, instanceId: control.instanceId } as BusinessExecutionFence;
+  if (source.fenced) await catalog.applyWriteControl(control);
+  const authority = { source, ...(source.fenced ? { fence } : {}) };
+  const input = { name: 'artifact', size: 100, sha256: 'a'.repeat(64), mediaType: 'text/plain', requestKey: objectId() };
+  return { catalog, uploads, backend, space, source, authority, input, control };
+}
+describe.skipIf(!available)('object transfers with PostgreSQL', () => {
+  test('idempotent admission reserves once and quota never oversells across API replicas', async () => {
+    const { uploads, catalog, space, authority, input } = await fixture({ quota: 150 });
+    const admitted = await Promise.all(Array.from({ length: 5 }, () => uploads.reserve(space.id, objectId(), input, authority)));
+    expect(new Set(admitted.map((r) => r.id)).size).toBe(1);
+    expect((await catalog.space(space.id))?.reservedBytes).toBe(100);
+    await expect(uploads.reserve(space.id, objectId(), { ...input, name: 'other' }, authority)).rejects.toThrow('幂等键');
+    await expect(uploads.reserve(space.id, objectId(), { ...input, requestKey: objectId() }, authority)).rejects.toThrow('容量不足');
+  });
+  test('one physical writer; read-back is required before publication and duplicate completion is inert', async () => {
+    const { uploads, catalog, backend, space, authority, input } = await fixture();
+    const upload = await uploads.reserve(space.id, objectId(), input, authority);
+    const claims = await Promise.allSettled([uploads.begin(upload.id, objectId(), objectId(), authority), uploads.begin(upload.id, objectId(), objectId(), authority)]);
+    expect(claims.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    const accepted = claims.find((r) => r.status === 'fulfilled');
+    if (!accepted || accepted.status !== 'fulfilled') throw new Error('no transfer');
+    const claim = accepted.value;
+    await uploads.requestCommit(upload.id, authority);
+    expect(await uploads.claimVerification(objectId())).toBeUndefined();
+    expect(await uploads.finish(claim.attempt, { receivedBytes: input.size, sha256: input.sha256 })).toBe(true);
+    expect((await uploads.get(upload.id))?.objectId).toBeNull();
+    const verify = (await uploads.claimVerification(objectId()))!;
+    expect(await uploads.claimVerification(objectId())).toBeUndefined();
+    const ready = await uploads.verified(verify.attempt, { size: input.size, sha256: input.sha256 });
+    expect(ready?.key).toBe(claim.attempt.key);
+    expect(await uploads.verified(verify.attempt, { size: input.size, sha256: input.sha256 })).toBeUndefined();
+    expect(await catalog.space(space.id)).toMatchObject({ usedBytes: 100, reservedBytes: 0, activeTransfers: 0, objectCount: 1 });
+    expect(await catalog.backend(backend.id)).toMatchObject({ reservedBytes: 100, activeTransfers: 0 });
+  });
+  test('lost PUT response keeps its physical and writer reservation; a retry gets a different key', async () => {
+    const { uploads, catalog, backend, space, authority, input } = await fixture();
+    const upload = await uploads.reserve(space.id, objectId(), input, authority);
+    const first = await uploads.begin(upload.id, objectId(), objectId(), authority);
+    await uploads.finish(first.attempt, { errorCode: 'connection_lost', uncertain: true });
+    const second = await uploads.begin(upload.id, objectId(), objectId(), authority);
+    expect(second.attempt.key).not.toBe(first.attempt.key);
+    expect(await catalog.backend(backend.id)).toMatchObject({ reservedBytes: 200, activeTransfers: 2 });
+    await uploads.finish(second.attempt, { receivedBytes: input.size, sha256: input.sha256 });
+    await uploads.requestCommit(upload.id, authority);
+    const verify = (await uploads.claimVerification(objectId()))!;
+    const ready = await uploads.verified(verify.attempt, { size: input.size, sha256: input.sha256 });
+    expect(ready?.key).toBe(second.attempt.key);
+    expect(await uploads.finish(first.attempt, { receivedBytes: input.size, sha256: input.sha256 })).toBe(false);
+    expect((await uploads.get(upload.id))?.readyAttemptId).toBe(second.attempt.id);
+    expect(await catalog.backend(backend.id)).toMatchObject({ reservedBytes: 200, activeTransfers: 0 });
+  });
+  test('expired stream cannot publish; unknown writer continues consuming concurrency', async () => {
+    const { uploads, catalog, backend, space, authority, input } = await fixture({ transfers: 1 });
+    const upload = await uploads.reserve(space.id, objectId(), input, authority);
+    const first = await uploads.begin(upload.id, objectId(), objectId(), authority);
+    const expired = { ...first.attempt, leaseUntil: '2020-01-01T00:00:00.000Z' };
+    await tdb.db.update(objectAttempts).set({ body: expired, leaseUntil: new Date(expired.leaseUntil) }).where(eq(objectAttempts.id, expired.id));
+    expect(await uploads.heartbeat(first.attempt, 10)).toBe(false);
+    expect(await uploads.recoverExpired()).toBe(1);
+    await expect(uploads.begin(upload.id, objectId(), objectId(), authority)).rejects.toThrow('并发已满');
+    expect(await uploads.finish(first.attempt, { receivedBytes: input.size, sha256: input.sha256 })).toBe(false);
+    expect((await uploads.get(upload.id))?.objectId).toBeNull();
+    expect(await catalog.backend(backend.id)).toMatchObject({ reservedBytes: 100, activeTransfers: 0 });
+  });
+  test('write handoff invalidates publication but a new authorized owner may commit verified bytes', async () => {
+    const { uploads, catalog, control, space, authority, input } = await fixture({ fenced: true });
+    const upload = await uploads.reserve(space.id, objectId(), input, authority);
+    const first = await uploads.begin(upload.id, objectId(), objectId(), authority);
+    await uploads.finish(first.attempt, { receivedBytes: input.size, sha256: input.sha256 });
+    await uploads.requestCommit(upload.id, authority);
+    const verify = (await uploads.claimVerification(objectId()))!;
+    const next = { ...control, controlVersion: 2, epoch: 2, leaseId: objectId(), instanceId: objectId() };
+    await catalog.applyWriteControl(next);
+    await expect(uploads.verified(verify.attempt, { size: input.size, sha256: input.sha256 })).rejects.toThrow('写入权限');
+    expect((await uploads.get(upload.id))?.objectId).toBeNull();
+    const nextAuthority = { source: authority.source, fence: { epoch: next.epoch, leaseId: next.leaseId, instanceId: next.instanceId } as BusinessExecutionFence };
+    await uploads.requestCommit(upload.id, nextAuthority);
+    expect((await uploads.verified(verify.attempt, { size: input.size, sha256: input.sha256 }))?.state).toBe('ready');
+  });
+  test('digest mismatch cannot become ready or release physical space before deletion', async () => {
+    const { uploads, catalog, backend, space, authority, input } = await fixture();
+    const upload = await uploads.reserve(space.id, objectId(), input, authority);
+    const first = await uploads.begin(upload.id, objectId(), objectId(), authority);
+    expect(await uploads.finish(first.attempt, { receivedBytes: input.size, sha256: 'b'.repeat(64) })).toBe(false);
+    await expect(uploads.begin(upload.id, objectId(), objectId(), authority)).rejects.toThrow('不能再次写入');
+    expect(await catalog.backend(backend.id)).toMatchObject({ reservedBytes: 100, activeTransfers: 0 });
+    expect((await uploads.get(upload.id))?.errorCode).toBe('object_digest_mismatch');
+  });
+});

@@ -128,4 +128,26 @@ describe.skipIf(!available)('RFC-027 持久执行意图与 outbox', () => {
     expect(await ops.get(input.id)).toMatchObject({ state: expected, errorCode: code });
     expect(JSON.stringify(await ops.get(input.id))).not.toContain(error.message);
   });
+
+  test('任务对象先预备再创建，丢回执不释放，明确失败才按可重试性释放', async () => {
+    for (const mode of ['success', 'lost-reply', 'unknown', 'quota', 'invalid'] as const) {
+      const ops = drizzleExecutionOperations(tdb.db), input = candidate();
+      const prepared = { ...input, intent: { ...input.intent, inputObjects: [{ objectId: newResourceId(), sha256: 'a'.repeat(64), path: 'input.bin' }], task: { ...input.intent.task, completionPolicy: 'archive-and-delete' as const } } };
+      await ops.reserve(prepared); const claimed = (await ops.claim({ id: input.id, owner: 'inputs', leaseSeconds: 30 }))!;
+      const calls: string[] = []; let environment: EnvironmentView | undefined;
+      await dispatchTaskAdmission({ operations: ops, taskInputs: {
+        prepare: async (request) => { expect(request.items).toEqual(prepared.intent.inputObjects); expect(request.taskId).toBe(input.intent.task.id); calls.push('prepare'); },
+        commit: async () => { calls.push('commit'); }, abort: async (_id, _generation, retryable) => { calls.push(`abort:${retryable}`); },
+      }, environments: {
+        createEnvironment: async (request) => {
+          calls.push('create'); expect(request.objectInputsGeneration).toBe(1);
+          if (mode === 'quota') throw quotaExceeded('full'); if (mode === 'invalid') throw validation('bad'); if (mode === 'unknown') throw new Error('unknown');
+          environment = { id: input.intent.task.id, projectId, state: 'creating', connected: false, traceId: input.intent.task.traceId, podName: 'input', profile: input.intent.task.taskProfileId };
+          if (mode === 'lost-reply') throw new Error('lost'); return environment;
+        }, getEnvironment: async () => environment,
+      } }, claimed);
+      expect(calls).toEqual(['prepare', 'create', ...(mode === 'success' || mode === 'lost-reply' ? ['commit'] : mode === 'quota' ? ['abort:true'] : mode === 'invalid' ? ['abort:false'] : [])]);
+      expect((await ops.get(input.id))?.state).toBe(mode === 'unknown' ? 'pending' : mode === 'quota' ? 'retryable-rejected' : mode === 'invalid' ? 'failed' : 'succeeded');
+    }
+  });
 });

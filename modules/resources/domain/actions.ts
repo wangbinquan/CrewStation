@@ -2,6 +2,7 @@ import type { ResourceAction, ResourceActionId, ResourceKind } from '@crewstatio
 import { kindRule } from './kinds';
 import type { LedgerRecord } from './record';
 import { condition } from './phase';
+import { protectedTaskVolume } from './taskStorage';
 
 /** 各种类有哪些生命周期操作（RFC-025 提案 §5.1）；是否可做按阶段算，角色裁剪在模块接口里做。 */
 const KIND_ACTIONS: Readonly<Partial<Record<ResourceKind, readonly ResourceActionId[]>>> = {
@@ -11,7 +12,7 @@ const KIND_ACTIONS: Readonly<Partial<Record<ResourceKind, readonly ResourceActio
   namespace: ['delete-namespace'],
 };
 
-type ActionInput = Pick<LedgerRecord, 'kind' | 'desired' | 'phase' | 'conditions'>;
+type ActionInput = Pick<LedgerRecord, 'kind' | 'desired' | 'phase' | 'conditions'> & { readonly spec?: LedgerRecord['spec'] };
 
 export function actionsFor(record: ActionInput): ResourceAction[] {
   return (KIND_ACTIONS[record.kind] ?? []).map((id) => evaluate(id, record));
@@ -28,6 +29,7 @@ function evaluate(id: ResourceActionId, record: ActionInput): ResourceAction {
   if (id === 'retry') return record.phase === 'failed' && record.desired === 'present' ? { id, enabled: true } : disabled('只有失败的才可以重试');
   if (id === 'delete-namespace') return record.desired === 'absent' ? disabled('已受理删除，正在回收') : { id, enabled: true };
   if (id === 'delete-volume') {
+    if (protectedTaskVolume(record)) return disabled('任务工作卷须通过终结归档与停止证明后回收');
     if (condition(record, 'PendingReclaim')?.status !== 'true') return disabled('只有待回收的工作卷可以删除');
     return record.desired === 'absent' ? disabled('已受理删除，正在回收') : { id, enabled: true };
   }

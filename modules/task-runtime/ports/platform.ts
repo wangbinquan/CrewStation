@@ -33,6 +33,9 @@ export interface SourceCheckoutSource {
 
 /** 由 config 与 data 模块提供：开发组配置与开发库／任务级数据访问的环境变量。 */
 export interface EnvironmentSources {
+  objectEnv?(serviceId: ServiceId, env: 'development', planId: string): Promise<Record<string, string>>;
+  taskInputEnv?(input: { taskId: TaskId; generation: number; consumerId: string }): Promise<Record<string, string>>;
+  bindTaskInputs?(consumerId: string, podUid: string): Promise<void>;
   /** 将平台默认任务镜像固定到仓库摘要，已受理环境及重建不重新解析。 */
   pinTaskImage?(image: string): Promise<string>;
   /** 仅内部已准入快照可调用；值只进入这次启动的不可变 Runner Secret。 */

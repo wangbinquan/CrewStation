@@ -33,6 +33,17 @@ async function restartTarget(environments: DevSessionUseCaseDeps['environments']
   return latest?.id === restartOf && latest.state === 'failed' && restartsFromScratch(latest.startup) ? latest : undefined;
 }
 
+/** 解析失败仍允许打开修复会话，由调用方把原因带给使用者。 */
+function readManifest(deps: Pick<DevSessionUseCaseDeps, 'manifests' | 'logger'>, text: string | undefined): { manifest?: Manifest; problem?: string } {
+  if (!text) return {};
+  try { return { manifest: deps.manifests.parse(text) }; }
+  catch (error) {
+    const problem = isPlatformError(error) ? error.message : String(error);
+    deps.logger.warn('dev session opened with an invalid manifest', { problem });
+    return { problem };
+  }
+}
+
 /** 一项目一会话（D46）：开会话选分支，容器就绪后 TaskRunner 按 Manifest 自动起预览；释放即回收。 */
 export function sessionLifecycleUseCases(deps: DevSessionUseCaseDeps) {
   const { environments, runner, scm, releases, authorizer, services, settings, clock } = deps;
@@ -49,18 +60,6 @@ export function sessionLifecycleUseCases(deps: DevSessionUseCaseDeps) {
 
   const previewOf = (env: EnvironmentView): Promise<PreviewState> => peekPreview(runner, env);
 
-  /** 解析 Manifest；失败不抛，把原因带出去由调用方决定要不要当成失败。 */
-  const readManifest = (text: string | undefined): { manifest?: Manifest; problem?: string } => {
-    if (!text) return {};
-    try {
-      return { manifest: deps.manifests.parse(text) };
-    } catch (error) {
-      const problem = isPlatformError(error) ? error.message : String(error);
-      deps.logger.warn('dev session opened with an invalid manifest', { problem });
-      return { problem };
-    }
-  };
-
   const svcOf = async (projectId: ProjectId) => {
     const svc = await services.resolveServiceOfProject(projectId);
     if (!svc) throw notFound('项目服务', projectId);
@@ -76,7 +75,7 @@ export function sessionLifecycleUseCases(deps: DevSessionUseCaseDeps) {
       const manifestText = await scm.readFile(svc.serviceId, input.branch, 'crewstation.yaml');
       // Manifest 坏了照样把会话开起来，只是没有预览：开发容器正是改这个文件的地方，
       // 在这里硬失败会把唯一的修复路径也一起关掉（RFC-001 让所有老仓库的 Manifest 一次性失效，实撞）。
-      const loaded = readManifest(manifestText);
+      const loaded = readManifest(deps, manifestText);
       const manifest = loaded.manifest;
       const dev = manifest?.spec.development;
       const preview = dev
@@ -84,7 +83,8 @@ export function sessionLifecycleUseCases(deps: DevSessionUseCaseDeps) {
         : manifest ? { command: manifest.spec.service.command, port: manifest.spec.service.port, healthPath: manifest.spec.service.healthPath } : undefined;
       const imageTaskId = newId('tsk') as TaskId;
       const runtimeImage = await reserveDevelopmentImage(deps, actor, projectId, { type: 'session', id: imageTaskId }, input.runtimeImageVersionId);
-      const env = await environments.createEnvironment({ ...(runtimeImage ? { runtimeImage, runtimeImageTaskId: imageTaskId } : {}), serviceId: svc.serviceId, kind: 'dev-session', branch: input.branch, createdBy: actor.userId, ...(preview ? { preview } : {}), labels: { 'crewstation.io/project': svc.slug, 'crewstation.io/service': svc.name } });
+      const developmentObjectPlanId = manifest?.apiVersion === 'crewstation/v3' && manifest.kind === 'DigitalWorker' ? manifest.spec.data?.objects?.planId : undefined;
+      const env = await environments.createEnvironment({ ...(runtimeImage ? { runtimeImage, runtimeImageTaskId: imageTaskId } : {}), ...(developmentObjectPlanId ? { developmentObjectPlanId } : {}), serviceId: svc.serviceId, kind: 'dev-session', branch: input.branch, createdBy: actor.userId, ...(preview ? { preview } : {}), labels: { 'crewstation.io/project': svc.slug, 'crewstation.io/service': svc.name } });
       if (runtimeImage) await deps.runtimeImages!.confirm(runtimeImage, { type: 'session', id: env.id });
       const dto = await toDto(env, svc.slug, 'starting');
       // 回收是顺带的：失败只记下来，不影响已经开好的新会话。

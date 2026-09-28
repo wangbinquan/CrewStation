@@ -22,6 +22,7 @@ import { ledgerReconciler } from './workers/ledgerReconciler';
 import { observationWorker } from './workers/observationWorker';
 import type { OrphanSweeperOptions } from './workers/orphanSweeper';
 import { orphanSweeper } from './workers/orphanSweeper';
+import type { ArchiveOwners } from './ports/ledger';
 
 /**
  * 调和器按期望渲染的种类：有人改了它们（标签、命名空间的额度上限）时 generation 不一定变、台账不记变更，
@@ -32,6 +33,8 @@ const RENDERED_KINDS: ReadonlySet<ObservedKind> = new Set(['IngressRoute', 'Midd
 
 /** 装配期注入：台账入口与旧所属对象由组合根从 resources／task-runtime 接上。 */
 export interface ClusterControlModuleDeps {
+  readonly volumeProbe?: { probeToken: string; probeRoot: string; probePort: number };
+  readonly archives?: ArchiveOwners;
   readonly k8s: K8sClient;
   readonly ledger: LedgerObservations;
   readonly legacy: LegacyOwners;
@@ -78,7 +81,7 @@ export function createClusterControlModule(deps: ClusterControlModuleDeps): Clus
   const reader = deps.reader ?? managedObjectReader(deps.k8s);
   const feed = deps.feed ?? managedObjectFeed(deps.k8s, { logger });
   const stats = newObservationStats();
-  const cluster = deps.cluster ?? kubernetesClusterWriter(deps.k8s);
+  const cluster = deps.cluster ?? kubernetesClusterWriter(deps.k8s, { systemNamespace: deps.systemNamespace, probeToken: '', probeRoot: '', probePort: 8095, ...deps.volumeProbe });
   const api: ClusterControlModuleApi = {
     name: 'cluster-control',
     inspectNamespaceRetirement: async (name, intent) => {
@@ -97,7 +100,7 @@ export function createClusterControlModule(deps: ClusterControlModuleDeps): Clus
   };
   const reconcileDeps = {
     ledger: deps.ledger, reader, feed, cluster, clock, systemNamespace: deps.systemNamespace, stats, logger, routeTargets: routeTargets(),
-    ...(deps.reconciler?.retryMs ? { retryMs: deps.reconciler.retryMs } : {}), ...(deps.explainer ? { explainer: deps.explainer } : {}), ...(deps.workloads ? { workloads: deps.workloads } : {}),
+    ...(deps.reconciler?.retryMs ? { retryMs: deps.reconciler.retryMs } : {}), ...(deps.explainer ? { explainer: deps.explainer } : {}), ...(deps.workloads ? { workloads: deps.workloads } : {}), ...(deps.archives ? { archives: deps.archives } : {}),
     ...(deps.slots ? { slots: deps.slots } : {}), ...(deps.jobs ? { jobs: deps.jobs } : {}),
   };
   const reconciler = ledgerReconciler(deps.ledger, feed, (id, enqueue, signal) => reconcileRecord({ ...reconcileDeps, ...(signal ? { signal } : {}) }, id, enqueue), logger, { ...deps.reconciler, ...(deps.leases ? { leases: deps.leases } : {}) });

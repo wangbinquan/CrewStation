@@ -1,3 +1,4 @@
+import { messages as observabilityZh } from '../features/observability/i18n/zh-CN';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider, createMemoryHistory, createRouter } from '@tanstack/react-router';
 import type { RouterHistory } from '@tanstack/react-router';
@@ -20,6 +21,7 @@ import { messages as logsZh } from '../features/logs/i18n/zh-CN';
 import { messages as clusterZh } from '../features/cluster/i18n/zh-CN';
 import { messages as eventsZh } from '../features/events/i18n/zh-CN';
 import { messages as tracesZh } from '../features/traces/i18n/zh-CN';
+import { messages as objectsZh } from '../features/object-storage/i18n/zh-CN';
 import { I18nProvider } from '../shared/lib/I18nProvider';
 import { mergeMessages } from '../shared/lib/i18n';
 import type { MessageCatalog } from '../shared/lib/i18n';
@@ -31,6 +33,7 @@ import { interactiveScope } from './interactiveScope';
  */
 const zh = mergeMessages([
   { source: 'app', messages: appZh },
+  { source: 'observability', messages: observabilityZh },
   { source: 'business-recovery', messages: businessRecoveryZh },
   { source: 'admin', messages: adminZh },
   { source: 'projects', messages: projectsZh },
@@ -44,6 +47,7 @@ const zh = mergeMessages([
   { source: 'catalog', messages: catalogZh },
   { source: 'cluster', messages: clusterZh },
   { source: 'traces', messages: tracesZh },
+  { source: 'object-storage', messages: objectsZh },
 ]);
 const catalog: MessageCatalog = { 'zh-CN': zh, 'en-US': zh };
 

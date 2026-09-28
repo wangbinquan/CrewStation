@@ -1,6 +1,7 @@
 import type { Clock, Logger } from '@crewstation/kernel';
 import type { LedgerUnitOfWork } from '../ports/repositories';
 import { commitRecord } from './commit';
+import { protectedTaskVolume } from '../domain/taskStorage';
 
 /** 已结束的记录保留 7 天后压缩；变更日志保留 24 小时（设计 §8.3，提案 Q5）。 */
 export const COMPACT_AFTER_MS = 7 * 24 * 3_600_000;
@@ -20,7 +21,7 @@ export async function expireRetention(uow: LedgerUnitOfWork, clock: Clock): Prom
   for (const candidate of due) {
     expired += await uow.run(async (scope) => {
       const record = await scope.records.get(candidate.id, { forUpdate: true });
-      if (!record || record.desired === 'absent' || record.phase !== 'failed' || !record.retainUntil) return 0;
+      if (!record || protectedTaskVolume(record) || record.desired === 'absent' || record.phase !== 'failed' || !record.retainUntil) return 0;
       await commitRecord(scope, record, { ...record, desired: 'absent', generation: record.generation + 1, releaseReason: RETENTION_EXPIRED }, clock.now());
       return 1;
     });

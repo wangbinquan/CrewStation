@@ -3,7 +3,7 @@ import { and, asc, eq, lt, or, sql } from 'drizzle-orm';
 import type { Database } from '@crewstation/persistence';
 import type { ExecutionLifecycles } from '../../../ports/executionLifecycle';
 import type { ExecutionTaskState } from '../../../domain/executionLifecycle';
-import { liveControl } from '../../../domain/executionControl';
+import { activeExecutionControl } from '../../../domain/executionControl';
 import { executionTransaction, readExecutionControl } from '../executionTransaction';
 import { lifecycleRow, requestLifecycle } from './lifecycleAdmission';
 import { executionLifecycles as ops, executionTaskStates as tasks } from './lifecycleTables';
@@ -36,7 +36,7 @@ async function claimLifecycle(db: Database, owner: string, id?: string) {
       if (!row.dispatched) {
         const control = await readExecutionControl(tx, row.serviceId);
         const draining = ['pause', 'close'].includes(row.action) && control?.migration && control.phase === 'frozen' && control.epoch === row.epoch;
-        if (!draining && (control || row.epoch !== null) && (!control || control.phase !== 'active' || !liveControl(control, now) || control.epoch !== row.epoch || (control.handoff && control.handoff.stage !== 'complete'))) return undefined;
+        if (!draining && (control || row.epoch !== null) && (!control || !activeExecutionControl(control, now) || control.epoch !== row.epoch)) return undefined;
       }
       const updated = (await tx.update(ops).set({ state: 'running', dispatched: true, owner, revision: row.revision + 1, leaseUntil: new Date(now.getTime() + 30_000), updatedAt: now }).where(eq(ops.id, row.id)).returning())[0]!;
       return lifecycleRow(updated);

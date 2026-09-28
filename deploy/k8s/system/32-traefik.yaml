@@ -65,6 +65,11 @@ spec:
             - --global.sendAnonymousUsage=false
             - --entryPoints.web.address=:8000/tcp
             - --entryPoints.websecure.address=:8443/tcp
+            # RFC-035: only object routes use this long-body entrypoint; ordinary web keeps its default deadline.
+            - --entryPoints.objects.address=:8088/tcp
+            - --entryPoints.objects.transport.respondingTimeouts.readTimeout=1805s
+            - --entryPoints.objects.transport.respondingTimeouts.writeTimeout=1805s
+            - --entryPoints.objects.transport.respondingTimeouts.idleTimeout=65s
             - --entryPoints.traefik.address=:9000/tcp
             - --ping=true
             - --ping.entryPoint=traefik
@@ -82,6 +87,8 @@ spec:
               containerPort: 8443
             - name: traefik
               containerPort: 9000
+            - name: objects
+              containerPort: 8088
           readinessProbe:
             httpGet:
               path: /ping
@@ -132,3 +139,6 @@ spec:
     - name: websecure
       port: 443
       targetPort: websecure
+    - name: objects
+      port: 8088
+      targetPort: objects

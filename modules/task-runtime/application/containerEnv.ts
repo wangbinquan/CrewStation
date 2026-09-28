@@ -39,6 +39,14 @@ export async function containerEnv(deps: Pick<TaskRuntimeUseCaseDeps, 'sources' 
   if (env.native) {
     values.CS_RUNNER_NATIVE_ID = env.native.runnerId;
   }
+  if (env.render?.developmentObjectPlanId) {
+    if (env.kind !== 'dev-session' || !deps.sources.objectEnv) throw precondition('开发对象空间端口未配置');
+    Object.assign(values, await deps.sources.objectEnv(env.serviceId, 'development', env.render.developmentObjectPlanId));
+  }
+  if (env.render?.objectInputsGeneration && !env.native) {
+    if (!deps.sources.taskInputEnv || !env.render.workloadConsumerId) throw precondition('任务输入授权未配置');
+    Object.assign(values, await deps.sources.taskInputEnv({ taskId: env.id, generation: env.render.objectInputsGeneration, consumerId: env.render.workloadConsumerId }));
+  }
   if (env.preview) {
     values.CS_PREVIEW_COMMAND = JSON.stringify(env.preview.command);
     values.CS_PREVIEW_PORT = String(env.preview.port);

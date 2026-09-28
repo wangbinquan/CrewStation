@@ -3,6 +3,7 @@ export { createApp } from './createApp';
 export { mapErrorToResponse } from './errorHandler';
 export type { ServeOptions } from './serve';
 export { serve } from './serve';
+export { serveStreams } from './serveStreams';
 export type { AppEnv, AppVariables, RequestIdentity } from './identity';
 export { identityFromHeaders, requireService, requireUser } from './identity';
 export type { DevSessionPrincipal, DevSessionTokenResolver } from './devSessionIdentity';

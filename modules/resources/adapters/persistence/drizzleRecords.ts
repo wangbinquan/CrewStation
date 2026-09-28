@@ -189,7 +189,8 @@ export function drizzleRecordRepository(db: Executor): RecordRepository {
     },
     resolveAlias: async (alias) => (await db.select({ id: aliases.resourceId }).from(aliases).where(and(eq(aliases.source, alias.source), eq(aliases.alias, alias.alias))))[0]?.id,
     retentionDue: async (limit) => hydrate(await db.select().from(records)
-      .where(and(lt(records.retainUntil, sql`now()`), eq(records.desired, 'present'), eq(records.phase, 'failed'))).orderBy(asc(records.retainUntil)).limit(limit)),
+      .where(and(lt(records.retainUntil, sql`now()`), eq(records.desired, 'present'), eq(records.phase, 'failed'),
+        sql`NOT (${records.kind} = 'volume' AND ${records.spec} ? 'taskStorage')`)).orderBy(asc(records.retainUntil)).limit(limit)),
     // 只压缩终态：期望已是「不要了」且已结束。期望仍在、此刻已结束的（下线的服务槽、暂停的业务工作区、待回收的工作卷）不是终态。
     compactable: async (stoppedBefore, limit) => (await db.select({ id: records.id }).from(records)
       .where(and(eq(records.desired, 'absent'), eq(records.phase, 'stopped'), lt(records.phaseSince, stoppedBefore), isNull(records.compactedAt))).orderBy(asc(records.phaseSince)).limit(limit)).map((row) => row.id),

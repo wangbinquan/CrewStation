@@ -1,3 +1,4 @@
+import { drizzleBusinessUsageSourceStore } from './adapters/persistence/businessUsageSources';
 import { legacyRunnerIdentity } from './adapters/persistence/legacyRunnerIdentity';
 import type { ResourceIdentityDirectory } from '@crewstation/persistence';
 import { join } from 'node:path';
@@ -65,6 +66,7 @@ export function createSessionModule(deps: SessionModuleDeps): SessionModule {
     clock: deps.clock ?? systemClock,
     logger: deps.logger ?? noopLogger,
   };
+  const usageSources = drizzleBusinessUsageSourceStore(deps.db);
   const hub = runnerHub(useCaseDeps);
   const dispatch = commandDispatch(useCaseDeps, hub);
   const streams = browserStreams(useCaseDeps, hub, dispatch);
@@ -73,6 +75,8 @@ export function createSessionModule(deps: SessionModuleDeps): SessionModule {
   const { upgradeWebSocket, websocket } = createBunWebSocket<ServerWebSocket>();
   const api: SessionModuleApi = {
     name: 'session',
+    readBusinessUsageMeasurement: usageSources.measurement, nextBusinessUsageSource: usageSources.next, acknowledgeBusinessUsageSource: usageSources.acknowledge,
+    getExecutionCompletionProof: (taskId, executionId) => useCaseDeps.businessExecutions!.completionProof(taskId, executionId),
     consumeBusinessExecution: (taskId, executionId, through, stopped) => useCaseDeps.businessExecutions!.consume(taskId, executionId, through, stopped),
     getBusinessExecution: (taskId, executionId) => useCaseDeps.businessExecutions!.get(taskId, executionId),
     listBusinessExecutionEvents: (taskId, executionId, after, limit) => useCaseDeps.businessExecutions!.list(taskId, executionId, after, limit),

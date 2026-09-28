@@ -24,6 +24,7 @@ spec:
           envFrom:
             - configMapRef: { name: crewstation-env }
             - configMapRef: { name: crewstation-metrics-env, optional: true }
+            - configMapRef: { name: crewstation-objects-env, optional: true }
             - secretRef: { name: crewstation-metrics, optional: true }
             - secretRef: { name: crewstation-secrets }
           env:

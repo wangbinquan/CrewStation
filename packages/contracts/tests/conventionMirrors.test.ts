@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
-import { IDENTITY_HEADERS, PLATFORM_ENV } from '../convention';
+import { IDENTITY_HEADERS, OBJECT_HEADERS, PLATFORM_ENV } from '../convention';
 import { EVENT_HEADERS } from '../events/delivery';
 import { PLATFORM_INTERNAL_HEADERS } from '../gateway/identity';
 import { TraceIdSchema } from '../ids';
@@ -38,7 +38,7 @@ describe('模板与接入容器里手抄的约定名', () => {
   });
 
   test('每个 x-cs-* 头名都出自约定表', () => {
-    const known = new Set<string>([...Object.values(IDENTITY_HEADERS), ...Object.values(EVENT_HEADERS), ...Object.values(PLATFORM_INTERNAL_HEADERS)]);
+    const known = new Set<string>([...Object.values(IDENTITY_HEADERS), ...Object.values(OBJECT_HEADERS), ...Object.values(EVENT_HEADERS), ...Object.values(PLATFORM_INTERNAL_HEADERS)]);
     const found = files.flatMap((path) => literals(path, /^x-cs-[a-z][a-z-]*[a-z]$/));
     expect(found.length).toBeGreaterThan(0);
     expect(found.filter((hit) => !known.has(hit.value))).toEqual([]);

@@ -7,7 +7,7 @@ import { executionTaskStates } from '../execution/lifecycleTables';
 import { executionLogs, subtaskProjections } from '../execution/projectionTables';
 import { executionSubtasks } from '../execution/subtaskTables';
 import { readExecutionControl } from '../executionTransaction';
-import { liveControl } from '../../../domain/executionControl';
+import { activeExecutionControl } from '../../../domain/executionControl';
 import { recoveryChildStopped } from '../../../domain/taskRecovery';
 import { contracts } from '../tables';
 
@@ -16,7 +16,7 @@ export async function recoveryCapability(tx: Executor, serviceId: string, action
 }
 export async function recoveryCapabilities(tx: Executor, serviceId: string, now: Date, epoch?: number): Promise<BusinessRecoveryAction[]> {
   const control = await readExecutionControl(tx, serviceId);
-  if (!control || control.phase !== 'active' || !liveControl(control, now) || (control.handoff && control.handoff.stage !== 'complete')) throw precondition('所属应用没有在线执行控制器', { code: 'application_controller_offline' });
+  if (!control || !activeExecutionControl(control, now)) throw precondition('所属应用没有在线执行控制器', { code: 'application_controller_offline' });
   if (epoch !== undefined && control.epoch !== epoch) throw precondition('恢复评估后执行权已变化', { code: 'recovery_assessment_stale' });
   const contract = (await tx.select({ spec: contracts.tasksSpec }).from(contracts).where(and(eq(contracts.serviceId, serviceId), eq(contracts.releaseId, control.activeReleaseId!))))[0];
   return contract?.spec?.recovery?.actions ?? [];

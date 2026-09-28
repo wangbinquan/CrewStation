@@ -1,5 +1,5 @@
-import type { BusinessStorage } from '@crewstation/contracts';
-import { BusinessStorageSchema, TaskIdSchema } from '@crewstation/contracts';
+import type { BusinessStorage, WorkloadConsumerIntent } from '@crewstation/contracts';
+import { BusinessStorageSchema, TaskIdSchema, WorkloadConsumerIntentSchema } from '@crewstation/contracts';
 
 /**
  * 工作区记录（开发会话、业务任务，RFC-025 I25）里调和器建出容器要用的期望，task-runtime 写、不含凭据：
@@ -7,6 +7,10 @@ import { BusinessStorageSchema, TaskIdSchema } from '@crewstation/contracts';
  * 记录是数据：字段不全或类型不对就不渲染，不猜。
  */
 export interface WorkloadPodRender {
+  readonly archive?: { readonly ownerTaskId: string; readonly bindOnly?: boolean };
+  readonly consumer?: WorkloadConsumerIntent;
+  /** Filled only after durable consumer registration against the observed original PVC. */
+  readonly consumerVolumeUid?: string;
   readonly expectedVolumeUid?: string;
   readonly runtimeInitialization?: true;
   readonly businessStorage?: BusinessStorage;
@@ -101,10 +105,19 @@ function podOf(recordId: string, pod: unknown, child: { readonly namespace?: str
   if (pod['runtimeInitialization'] !== undefined && pod['runtimeInitialization'] !== true) return undefined;
   const checkout = pod['checkout'], extras = extrasOf(pod);
   const businessStorage = pod['businessStorage'] === undefined ? undefined : BusinessStorageSchema.safeParse(pod['businessStorage']);
+  const consumer = pod['consumer'] === undefined ? undefined : WorkloadConsumerIntentSchema.safeParse(pod['consumer']);
+  const archive = pod['archive'];
+  if (archive !== undefined) {
+    if (!isFields(archive) || Object.keys(archive).some((key) => !['ownerTaskId', 'bindOnly'].includes(key)) || archive['bindOnly'] !== undefined && typeof archive['bindOnly'] !== 'boolean' || !TaskIdSchema.safeParse(archive['ownerTaskId']).success
+      || !consumer?.success || consumer.data.purpose !== 'archive' || !consumer.data.finalization || consumer.data.taskId !== archive['ownerTaskId'] || businessStorage || checkout
+      || pod['workspace'] || pod['nodeName'] || pod['runtimeInitialization'] || !text(pod['expectedVolumeUid']) || pod['workload'] !== 'archive-helper') return undefined;
+  } else if (consumer && (!consumer.success || consumer.data.purpose === 'archive' || !businessStorage?.success || consumer.data.taskId !== businessStorage.data.ownerTaskId)) return undefined;
   if (businessStorage && (!businessStorage.success || !TaskIdSchema.safeParse(recordId).success || !text(pod['pvc']) || pod['workload'] !== 'business-task' || checkout !== undefined || (businessStorage.data.initialize && businessStorage.data.ownerTaskId !== recordId))) return undefined;
   if ((checkout !== undefined && (!texts(checkout, ['repoUrl', 'branch', 'credentialSecretName']) || (checkout['ownedCredential'] !== undefined && typeof checkout['ownedCredential'] !== 'boolean'))) || !extras) return undefined;
   const resources = pod['resources'];
   return {
+    ...(isFields(archive) ? { archive: { ownerTaskId: archive['ownerTaskId'] as string, ...(archive['bindOnly'] === true ? { bindOnly: true } : {}) } } : {}),
+    ...(consumer?.success ? { consumer: consumer.data } : {}),
     ...(text(pod['expectedVolumeUid']) ? { expectedVolumeUid: pod['expectedVolumeUid'] } : {}),
     ...(pod['runtimeInitialization'] === true ? { runtimeInitialization: true as const } : {}),
     name: child.name, namespace: child.namespace, taskId: recordId, image: pod['image'] as string, workerUid: pod['workerUid'],
@@ -130,6 +143,7 @@ function previewOf(recordId: string, preview: unknown, service: { readonly names
 export function workloadRenderOf(recordId: string, spec: Spec): WorkloadRender | undefined {
   const pod = podOf(recordId, spec['pod'], spec.children.find((child) => child.kind === 'Pod'));
   if (!pod) return undefined;
+  if (pod.archive && spec['preview'] !== undefined) return undefined;
   const preview = previewOf(recordId, spec['preview'], spec.children.find((child) => child.kind === 'Service'));
   if (preview === false) return undefined;
   return { pod, ...(preview ? { preview } : {}) };

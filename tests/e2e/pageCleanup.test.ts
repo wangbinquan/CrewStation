@@ -8,14 +8,15 @@ import { openAdminSession } from './session';
  * 每跑一次门禁就留下 10 个登录页，几天累积上百个；cs-api 一重启它们一起涌入，连接池卡死、被探针反复重启。
  * 不需要集群：假浏览器记下开过、关过哪些页。
  */
-const saved = { auth: process.env.CS_E2E_AUTH, password: process.env.CS_E2E_PASSWORD, require: process.env.CS_TEST_REQUIRE };
+const saved = { auth: process.env.CS_E2E_AUTH, password: process.env.CS_E2E_PASSWORD, require: process.env.CS_TEST_REQUIRE, project: process.env.CS_E2E_PROJECT_ID };
 afterEach(() => {
-  for (const [key, value] of [['CS_E2E_AUTH', saved.auth], ['CS_E2E_PASSWORD', saved.password], ['CS_TEST_REQUIRE', saved.require]] as const) {
+  for (const [key, value] of [['CS_E2E_AUTH', saved.auth], ['CS_E2E_PASSWORD', saved.password], ['CS_TEST_REQUIRE', saved.require], ['CS_E2E_PROJECT_ID', saved.project]] as const) {
     if (value === undefined) delete process.env[key]; else process.env[key] = value;
   }
 });
 function usePasswordLogin(require = ''): void {
   delete process.env.CS_E2E_AUTH;
+  delete process.env.CS_E2E_PROJECT_ID;
   process.env.CS_E2E_PASSWORD = 'secret';
   process.env.CS_TEST_REQUIRE = require;
 }
@@ -63,4 +64,29 @@ test('点名实机（CS_TEST_REQUIRE=e2e）：照样关页，再把失败抛出�
   const f = fakeBrowser(async (expression) => (expression.startsWith('fetch(') ? Promise.reject(new Error('401')) : false));
   await expect(openAdminSession(async () => f.browser)).rejects.toThrow('管理员会话没有建立');
   expect(f.closed).toEqual(['page-1']);
+});
+
+test('显式选择验收项目：直接读取指定项目，不受首个项目或列表分页影响', async () => {
+  usePasswordLogin(); process.env.CS_E2E_PROJECT_ID = 'selected';
+  const requests: string[] = [];
+  const f = fakeBrowser(async (expression) => {
+    if (!expression.startsWith('fetch(')) return false;
+    requests.push(expression);
+    return { id: 'selected', name: '专用验收', state: 'active', serviceId: 'service', kind: 'DigitalWorker' };
+  });
+  const session = await openAdminSession(async () => f.browser);
+  expect(session?.project).toEqual({ id: 'selected', name: '专用验收' });
+  expect(requests).toHaveLength(1); expect(requests[0]).toContain('/v1/projects/selected');
+  await session?.close(); expect(f.closed).toEqual(['page-1']); expect(f.state.socketClosed).toBe(true);
+});
+
+test.each([
+  { id: 'selected', state: 'provisioning', serviceId: 'service', kind: 'DigitalWorker' },
+  { id: 'selected', state: 'active', serviceId: 'service', kind: 'APIProxy' },
+  { id: 'different', state: 'active', serviceId: 'service', kind: 'DigitalWorker' },
+])('指定不可用项目不回退到其他项目或静默跳过：%j', async (project) => {
+  usePasswordLogin(); process.env.CS_E2E_PROJECT_ID = 'selected';
+  const f = fakeBrowser(async (expression) => expression.startsWith('fetch(') ? project : false);
+  await expect(openAdminSession(async () => f.browser)).rejects.toThrow('不是已开通的数字人');
+  expect(f.closed).toEqual(['page-1']); expect(f.state.socketClosed).toBe(true);
 });

@@ -1,3 +1,22 @@
+import type { ServiceId } from '@crewstation/contracts';
+import { completeFinalizationPorts } from './application/storage/storageCapabilities';
+import type { ExecutionObservationAdmission } from './ports/executionSubtasks';
+import type { StorageControlSink } from './ports/storage/control';
+import type { TaskInputPreparation } from './ports/storage/taskInputs';
+import { finalizationRevisions, archiveRevisionIntake } from './application/finalization/revisions';
+import { storageOperator } from './application/finalization/operator';
+import { storageLossOperator } from './application/finalization/loss';
+import { finalizationIntake } from './application/finalization/intake';
+import { finalizationRoutes } from './http/finalizationRoutes';
+import { finalizationOperations } from './adapters/persistence/finalization/repository';
+import { finalizationCompletion } from './adapters/persistence/finalization/completion';
+import { prepareFinalizations } from './application/finalization/preparation';
+import { archiveFinalizations } from './application/finalization/archiving';
+import { cleanupFinalizations } from './application/finalization/cleanup';
+import type { FinalizationPreparation } from './ports/storage/preparation';
+import { taskStorageQueries, projectTaskStorageList } from './application/finalization/queries';
+import { storageControlOutbox } from './adapters/persistence/control-projection/repository';
+import { storageSynchronizedControls } from './application/storageControl';
 import { drizzleTaskRecoveryRequests } from './adapters/persistence/recovery/repository';
 import { recoveryQueries } from './adapters/persistence/recovery/queries';
 import { recoveryAdminUseCases } from './application/recovery/admin';
@@ -67,6 +86,11 @@ import { drizzleLegacyMutations } from './adapters/persistence/legacyMutations';
 import { legacyRuntimePorts, legacyWriteApi } from './application/legacyWriteBarrier';
 
 export interface BusinessTaskModuleDeps {
+  taskInputs?: TaskInputPreparation;
+  taskStorageStatus?: (serviceId: ServiceId) => Promise<{ available: boolean; reason: string | null }>;
+  finalizationPreparation?: FinalizationPreparation;
+  executionObservations?: ExecutionObservationAdmission;
+  storageControl?: StorageControlSink;
   legacyRecoveryProof?: LegacyRecoveryProof;
   agentSecrets?: ExecutionAgentSecrets;
   runtimeImages?: BusinessRuntimeImages;
@@ -110,17 +134,31 @@ export function createBusinessTaskModule(deps: BusinessTaskModuleDeps): Business
   const subtasks = subtaskUseCases(legacyDeps);
   const registerContracts = registerContractsUseCase(useCaseDeps);
   const recoveryRequests = drizzleTaskRecoveryRequests(deps.db);
-  const executionDeps = { ...useCaseDeps, recoveryRequests, sessions: drizzleExecutionSessions(deps.db), messages: drizzleExecutionMessages(deps.db), agentSecrets: deps.agentSecrets, materials: drizzleExecutionMaterials(deps.db), lifecycles: drizzleExecutionLifecycles(deps.db), runtimeImages: deps.runtimeImages, cancellations: drizzleExecutionCancellations(deps.db), projection: drizzleExecutionProjection(deps.db), subtasks: drizzleExecutionSubtasks(deps.db), cipher: executionCipher(deps.settings.secretKeyBase64), operations: drizzleExecutionOperations(deps.db), controls: drizzleExecutionControls(deps.db), sources: deps.executionSources ?? { resolve: async () => undefined } };
+  const finalizations = finalizationOperations(deps.db);
+  const prepareStorage = deps.finalizationPreparation ? prepareFinalizations(finalizations, finalizationCompletion(deps.db), deps.finalizationPreparation, deps.runner) : async () => 0;
+  const archiveStorage = deps.finalizationPreparation ? archiveFinalizations(finalizations, deps.finalizationPreparation.archive, deps.finalizationPreparation.runtime) : async () => 0;
+  const reviseStorage = deps.finalizationPreparation ? finalizationRevisions(finalizations, deps.finalizationPreparation) : async () => 0;
+  const cleanupStorage = deps.finalizationPreparation ? cleanupFinalizations(finalizations, deps.finalizationPreparation) : async () => 0;
+  const storedControls = drizzleExecutionControls(deps.db, !!deps.storageControl);
+  const synchronizedControls = deps.storageControl ? storageSynchronizedControls(storedControls, storageControlOutbox(deps.db), deps.storageControl, logger) : undefined;
+  const executionDeps = { ...useCaseDeps, storageStatus: completeFinalizationPorts(deps.finalizationPreparation) && deps.runner.getExecutionCompletionProof ? deps.taskStorageStatus : undefined, taskInputs: deps.taskInputs, executionObservations: deps.executionObservations, recoveryRequests, sessions: drizzleExecutionSessions(deps.db), messages: drizzleExecutionMessages(deps.db), agentSecrets: deps.agentSecrets, materials: drizzleExecutionMaterials(deps.db), lifecycles: drizzleExecutionLifecycles(deps.db), runtimeImages: deps.runtimeImages, cancellations: drizzleExecutionCancellations(deps.db), projection: drizzleExecutionProjection(deps.db), subtasks: drizzleExecutionSubtasks(deps.db), cipher: executionCipher(deps.settings.secretKeyBase64), operations: drizzleExecutionOperations(deps.db), controls: synchronizedControls ?? storedControls, sources: deps.executionSources ?? { resolve: async () => undefined } };
   const tasksV3 = executionTaskUseCases(executionDeps), { progressSubtask, ...subtasksV3 } = executionSubtaskUseCases(executionDeps);
   const { progressProjection, ...projectionV3 } = executionProjectionUseCases(executionDeps);
   const { progressCancellation, ...cancellationV3 } = executionCancellationUseCases(executionDeps);
   const { progressLifecycle, ...lifecycleV3 } = executionLifecycleUseCases(executionDeps);
   const { progressMessage, ...messagesV3 } = executionMessageUseCases(executionDeps);
   const v3 = { ...executionCapabilities(executionDeps), ...messagesV3, ...executionMaterialUseCases(executionDeps), ...lifecycleV3, ...executionRetryUseCases(executionDeps), ...cancellationV3, ...tasksV3, ...subtasksV3, ...projectionV3, ...executionControlUseCases(executionDeps), ...executionFileUseCases(executionDeps), ...executionOperationQueries(executionDeps),
-    ...recoveryIntakeUseCases(executionDeps), ...restartExecutionUseCase(executionDeps),
-    runOnce: async () => (await tasksV3.runOnce()) + (await progressSubtask()) + (await progressProjection()) + (await progressCancellation()) + (await progressLifecycle()) + (await progressMessage()) + (await recoveryRequests.reconcile()),
+    ...recoveryIntakeUseCases(executionDeps), ...restartExecutionUseCase(executionDeps), ...finalizationIntake(executionDeps, finalizations, deps.finalizationPreparation), ...archiveRevisionIntake(executionDeps, finalizations, deps.finalizationPreparation),
+    runOnce: async () => (await synchronizedControls?.syncPending() ?? 0) + (await tasksV3.runOnce()) + (await progressSubtask()) + (await progressProjection()) + (await progressCancellation()) + (await progressLifecycle()) + (await progressMessage()) + (await recoveryRequests.reconcile()) + (await prepareStorage()) + (await archiveStorage()) + (await cleanupStorage()) + (await reviseStorage()),
   };
   const api: BusinessTaskModuleApi = {
+    ...storageOperator(executionDeps, recoveryQueries(deps.db), finalizations, deps.finalizationPreparation),
+    ...storageLossOperator(deps.authorizer, recoveryQueries(deps.db), finalizations, deps.finalizationPreparation),
+    ...taskStorageQueries(recoveryQueries(deps.db), finalizations, deps.authorizer),
+    ...projectTaskStorageList(drizzleBusinessTaskList(deps.db), deps.authorizer),
+    acceptedArchiveRevision: async (id) => { const change = await finalizations.revision(id); return change?.state === 'pending' ? change : undefined; },
+    acceptedFinalization: async (id) => { const op = await finalizations.get(id); return op ? { id: op.id, projectId: op.projectId, serviceId: op.serviceId, spaceId: op.spaceId, taskId: op.view.taskId, taskGeneration: op.view.taskGeneration, volumeUid: op.volumeUid, outcome: op.view.outcome, archive: op.archive } : undefined; },
+    archiveTask: async (serviceId, taskId) => { const op = await executionDeps.operations.forTask(serviceId, taskId); return op ? { projectId: op.intent.projectId, completionPolicy: op.intent.task.completionPolicy ?? 'legacy' } : undefined; },
     ...recoveryAdminUseCases(executionDeps, recoveryQueries(deps.db)),
     ...taskListUseCases(drizzleBusinessTaskList(deps.db)),
     ...legacyRecoveryUseCases(useCaseDeps, legacyBarrier, deps.legacyRecoveryProof),
@@ -139,6 +177,7 @@ export function createBusinessTaskModule(deps: BusinessTaskModuleDeps): Business
   const service = serviceRoutes(api);
   service.route('/', executionRoutes(v3));
   service.route('/', recoveryIntakeRoutes(v3));
+  service.route('/', finalizationRoutes(v3));
   if (deps.identities) service.route('/', legacyServiceRoutes(api, legacyBusinessIdentity(deps.identities)));
   let timer: ReturnType<typeof setInterval> | undefined;
   return {
@@ -149,3 +188,6 @@ export function createBusinessTaskModule(deps: BusinessTaskModuleDeps): Business
     migrations: businessTaskMigrations,
   };
 }
+
+/** Read-only owner source; the composition root supplies its transaction snapshot. */
+export { readBusinessObservationFacts } from './adapters/persistence/task-list/repository';

@@ -7,6 +7,7 @@ import {
 import { TasksSpecSchema } from './tasks';
 
 const baseSpec = {
+  data: z.never().optional(),
   service: ServiceSpecSchema,
   development: DevelopmentSpecSchema.optional(),
   env: z.array(EnvEntrySchema).default([]),

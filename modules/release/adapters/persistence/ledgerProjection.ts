@@ -25,14 +25,17 @@ export async function syncSlotLedger(executor: Executor, deps: SlotProjectionDep
     if (!service) return;
     const policy = (await sources.offlinePolicy.get()) ?? DEFAULT_OFFLINE_POLICY;
     const tags = new Map<string, string>();
+    const objectReleases = new Set<string>();
     for (const releaseId of [slots.blue, slots.green].map((slot) => slot.releaseId ?? slot.offline?.releaseId).filter((id): id is ReleaseId => !!id)) {
       const release = await releases.getById(releaseId);
       if (release) tags.set(releaseId, release.tag);
+      if (release?.manifest?.kind === 'DigitalWorker' && release.manifest.spec.data?.objects) objectReleases.add(releaseId);
     }
     await executor.transaction(async (savepoint) => {
       const writer = deps.ledger.within(savepoint);
       for (const slot of projectSlots(slots, service, (id) => tags.get(id), policy)) {
-        await writer.declare({ kind: 'service-slot', ref: slot.ref, projectId: slot.projectId, spec: { children: slot.children, ...(slot.slot ? { slot: slot.slot } : {}) }, display: slot.display, conditions: slot.conditions });
+        const objects: Record<string, string> = slot.display.releaseId && objectReleases.has(slot.display.releaseId) ? { objectStorage: 'true' } : {};
+        await writer.declare({ kind: 'service-slot', ref: slot.ref, projectId: slot.projectId, spec: { children: slot.children, ...(slot.slot ? { slot: slot.slot } : {}) }, display: { ...slot.display, serviceId: slots.serviceId, ...objects }, conditions: slot.conditions });
       }
     });
   } catch (error) {

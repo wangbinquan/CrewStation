@@ -17,4 +17,15 @@
 
 本例没有自动清理历史任务：验证结束后显式 close 并观察平台资源回收。人工等待用 pause，恢复后读取同一 proof.txt 来检查卷内容；关闭后不能恢复。它不运行真实 aw，也不证明真实 Agent 档位的模型、skills、MCP 或原生会话能力。
 
+## 对象存储与整个任务结束后的自动回收
+
+可选的 RFC-035 路径使用同一份应用 PG；服务可以多副本运行，仍无 PVC。由管理员给项目授权对象档位后，在 Manifest `spec` 添加 `data: { objects: { planId: <已授权对象档位UUID> } }`，重新发布并运行迁移。平台注入 `CS_OBJECTS_URL` 和 `CS_OBJECT_SPACE_ID`，不向服务提供 Garage 凭据。新路径先读取实际 capabilities，不支持时明确拒绝；上面的 legacy 流程保持原行为。
+
+1. POST `/actions`：`{"action":"storage-command","requestKey":"storage-run-1"}` 创建 `archive-and-delete` 的 persistent 任务，在 `/work/proof.txt` 写标记。可附加 `inputObjects: [{objectId,sha256,path}]`，平台 pin 并在任务原卷内安全物化，服务不用下载到本机盘。任务／子任务受理暂时失败时原样重试。
+2. 需要保留日志时，在七天保留期内反复 POST `/actions`：`{"action":"storage-log-page","requestKey":"log-page-1","taskId":"<任务UUID>"}`。后续以新的页请求键和上次 `nextCursor` 作为 `after`；`hasMore` 为 true 时继续消费。页内容先写应用 PG，再以固定 SHA key 上传和 pin；503 或断线重试原键，不再读取一份变化后的页面，不盲目重发 PUT。页面限制 100 条／4 MiB，传输独立于普通 JSON 15 秒期限。
+3. 每个 NDJSON 包含范围头和原始事件（含 execution／attempt 标识）。范围头使用平台不透明游标，始终 `fullLog:false`；410 或 gap 保存 `export-incomplete`，不承诺缺失前文存在。此例是显式逐页消费，生产应用应把该循环纳入自己的持久调度，不等到最终终结时才读取可能已经过期的日志。
+4. 人工等待仍使用 pause，恢复用 resume，原任务的 PVC／PV 和输入物化世代保持。全部执行结束后 POST `/actions`：`{"action":"storage-finalize","requestKey":"finish-1","taskId":"<任务UUID>","expectedGeneration":1}`。样例固定成功结局，将 proof.txt 和已保存日志页封存为不可变清单；清单取得保护引用后释放应用临时 pin。终结提交后以 GET `/finalization?taskId=<任务UUID>` 观察归档、清理和最终回收。真实失败或取消结局应由业务自行选择 API 的 outcome，本示例动作仅演示成功结局。
+
+每个环节 Pod 退出和任务 pause 都不会删这个新策略任务的卷。只有整个任务终结、归档收据和实际停止／物理回收证明齐全才完成；活动执行不会被 finalize 自动取消。样例已封存清单后不再接收新日志页。归档产物可通过对象 API 或项目“对象存储”页面读取，与原任务卷独立。
+
 RFC-029 恢复接入：Manifest 显式声明 `resume-task`、`rebuild-workspace`、`retry-subtask`、`resume-subtask` 和 `restart-task`。只有持有当前执行权的控制器才会认领管理员提交的持久恢复请求；先在本业务数据库保存不可变目标，再以 `recovery:<请求编号>` 调用平台原卷恢复／重建或所选 fresh／native retry 接口。网络丢回执、实例切换和认领过期均保留这个键。已绑定的平台操作仍用原键重放，使额度不足或旧世代尚未派发的操作可被接续，平台保证不重复执行；实际成功或失败由平台观测决定，应用没有“上报成功”接口。此持久恢复请求允许控制器继续处理暂时失败的受理，普通 `/actions` 的 429 仍要求调用方显式重试。重建固定原卷与原镜像，只有实际就绪才完成；原生续跑必须携带原会话标识，缺失时拒绝，不能自动改成fresh。原卷不可用时，重新执行通过专用 restart 入口创建关联的新任务，继续沿用原契约、镜像及资源配置；回执记录新任务 ID，旧任务保持失败。新任务实际启动后才完成恢复请求，不自动重放旧子任务的外部副作用。

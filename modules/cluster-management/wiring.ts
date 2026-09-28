@@ -22,6 +22,7 @@ import { metricsExporter, metricsRoutes } from './http/metricsRoutes';
 import { measureStorageTargets } from './adapters/http/storageProbe';
 import { metricsWorkers } from './workers/metricsWorker';
 import type { MetricsOptions } from './ports/metrics';
+import { objectStorageHistory } from './application/objectStorageHistory';
 export interface ClusterManagementModuleDeps { metrics?: MetricsOptions; resolveReleaseId?: (legacy: string) => Promise<string | undefined>; physicalOperationId?: (id: string) => Promise<string>; db: Database; k8s: K8sClient; metadata: ClusterMetadata; domains: DomainOperations; isAdmin(id: UserId): Promise<boolean>; authorizeProject(actor: Actor, projectId: string): Promise<void>; systemNamespace: string; catalog: SystemComponent[]; instance: string; logger?: Logger; clock?: Clock; wait?: (ms: number) => Promise<void>; observationMs?: number; /** 资源中心的认领叠加（RFC-025 T13）：清单行换上标准记录，台账维护的对象不给直接删。 */ ledger?: LedgerClaims }
 export const clusterManagementMigrations: MigrationSet = { module: 'cluster-management', layer: 6, files: readMigrationDir(join(import.meta.dir, 'adapters/persistence/migrations')) };
 export function createClusterManagementModule(input: ClusterManagementModuleDeps) {
@@ -29,7 +30,9 @@ export function createClusterManagementModule(input: ClusterManagementModuleDeps
   const deps = { ...input, repository, cluster: kubernetesClusterReader(input.k8s, input.physicalOperationId), clock: input.clock ?? systemClock, wait: input.wait ?? ((ms: number) => Bun.sleep(ms)), observationMs: input.observationMs ?? 300_000 };
   const options = input.metrics ?? { enabled: false, exporterToken: '', prometheusUrl: '', prometheusToken: '', probeToken: '', probeRoot: '', probePort: 8095 };
   const metricsDeps = { repository: drizzleMetricsRepository(input.db), inventory: repository, reader: kubernetesMetricsReader(input.k8s), clock: deps.clock, options };
-  const metricsApi = metricQueries(metricsDeps, input.isAdmin, prometheusHistoryReader(options.prometheusUrl, options.prometheusToken));
+  const history = prometheusHistoryReader(options.prometheusUrl, options.prometheusToken);
+  const objectHistory = objectStorageHistory(history, options.enabled, () => deps.clock.now());
+  const metricsApi = metricQueries(metricsDeps, input.isAdmin, history);
   const metricsLifecycle = metricsWorkers(metricsDeps, input.db, input.instance, logger, measureStorageTargets);
   const api = clusterApi(deps); let abort = new AbortController();
   const operations = createWorker({ db: input.db, owner: `${input.instance}.cluster.operations`, kinds: [CLUSTER_OPERATION], concurrency: 2, leaseSeconds: 60, logger, handler: async (job, ctx) => {
@@ -46,6 +49,6 @@ export function createClusterManagementModule(input: ClusterManagementModuleDeps
   let timer: ReturnType<typeof setInterval> | undefined;
   const request = () => { void repository.requestRefresh().catch((error: unknown) => logger.warn('cluster refresh request failed', { error: String(error) })); };
   const lifecycle = { start: () => { abort = new AbortController(); collector.start(); operations.start(); request(); timer ??= setInterval(request, 30_000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; abort.abort(); await Promise.all([collector.stop(), operations.stop()]); } };
-  return { api, metricsApi, metricsDeps, internalHttp: [metricsExporter(metricsDeps)], http: [clusterRoutes(api, input.isAdmin), metricsRoutes(metricsApi, input.isAdmin)], workers: [lifecycle, metricsLifecycle], migrations: clusterManagementMigrations, collect: (signal = new AbortController().signal) => collectSnapshot(deps, AbortSignal.any([signal, AbortSignal.timeout(120_000)])), runOnce: async () => (await collector.runOnce()) + (await operations.runOnce()) };
+  return { api, metricsApi, metricsDeps, objectHistory, internalHttp: [metricsExporter(metricsDeps)], http: [clusterRoutes(api, input.isAdmin), metricsRoutes(metricsApi, input.isAdmin)], workers: [lifecycle, metricsLifecycle], migrations: clusterManagementMigrations, collect: (signal = new AbortController().signal) => collectSnapshot(deps, AbortSignal.any([signal, AbortSignal.timeout(120_000)])), runOnce: async () => (await collector.runOnce()) + (await operations.runOnce()) };
 }
 export type ClusterManagementModule = ReturnType<typeof createClusterManagementModule>;

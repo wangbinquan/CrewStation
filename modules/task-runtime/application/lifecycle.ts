@@ -31,6 +31,7 @@ export function lifecycleUseCases(deps: TaskRuntimeUseCaseDeps) {
     const env = await uow.run(async (scope) => {
       await scope.admissions.lock(original.projectId);
       const current = (await scope.environments.getById(taskId))!;
+      if (!current.native && current.render?.completionPolicy === 'archive-and-delete') throw precondition('此任务必须通过归档终结回收', { code: 'finalization_required' });
       if (current.state === 'released') return current;
       const rebuild = current.rebuildId ? await scope.rebuilds.get(current.rebuildId) : undefined;
       if (rebuild && rebuildIsActive(rebuild)) throw precondition('环境正在重建，请等待完成后再释放');

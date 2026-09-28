@@ -2,7 +2,7 @@ import type { ProjectId, ResourceKind } from '@crewstation/contracts';
 import { conflict } from '@crewstation/kernel';
 import type { LedgerScope } from '../ports/repositories';
 
-const CONSUMERS: readonly ResourceKind[] = ['dev-workspace', 'business-workspace', 'agent-execution', 'service-slot', 'build-job', 'migration-job'];
+const CONSUMERS: readonly ResourceKind[] = ['dev-workspace', 'business-workspace', 'agent-execution', 'archive-execution', 'service-slot', 'build-job', 'migration-job'];
 
 /** 与启动声明使用同一项目锁，空闲检查包括排队、启动、失败保留和回收中的使用者。 */
 export async function lockIdleProject(scope: LedgerScope, projectId: ProjectId): Promise<void> {

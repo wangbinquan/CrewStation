@@ -1,11 +1,13 @@
 import { Platform, PlatformError, type Fence, type Subtask, type Task } from './client';
 import { Controller, digest } from './control';
 import { Store } from './store';
+import { Objects, storageAction } from './storage';
+import { LogStore } from './storageLog';
 
 const json = (value: unknown, status = 200) => Response.json(value, { status });
 const id = (value: unknown): string => { if (typeof value !== 'string' || !/^[a-f0-9-]{36}$/.test(value)) throw new Error('资源 ID 无效'); return value; };
 // Port opens before DB recovery; startup/readiness use DB reachability, liveness only proves process responsiveness.
-export function createHandler(store: Store, platform: Platform, control: Controller) { return async (request: Request): Promise<Response> => {
+export function createHandler(store: Store, platform: Platform, control: Controller, objects?: Objects) { return async (request: Request): Promise<Response> => {
   const url = new URL(request.url);
   if (url.pathname === '/live') return json({ alive: true });
   if (url.pathname === '/ready') return json({ ready: await store.ready() }, await store.ready() ? 200 : 503);
@@ -17,6 +19,7 @@ export function createHandler(store: Store, platform: Platform, control: Control
       return json(await platform.call(`/v3/business-tasks/${id(url.searchParams.get('taskId'))}/events?${query}`));
     }
     if (request.method === 'GET' && url.pathname === '/task') return json(await platform.call(`/v3/business-tasks/${id(url.searchParams.get('taskId'))}`));
+    if (request.method === 'GET' && url.pathname === '/finalization') return json(await platform.call(`/v3/business-tasks/${id(url.searchParams.get('taskId'))}/finalization`));
     if (request.method === 'GET' && url.pathname === '/proof') return json(await platform.call(`/v3/business-tasks/${id(url.searchParams.get('taskId'))}/file?path=proof.txt`));
     if (request.method !== 'POST' || !['/actions', '/drain'].includes(url.pathname)) return json({ error: '不存在的入口' }, 404);
     const input = await request.json() as Record<string, unknown>;
@@ -29,14 +32,15 @@ export function createHandler(store: Store, platform: Platform, control: Control
     }
     const fence = control.fence, old = await store.admit(input.requestKey, digest(input), fence);
     if (old) return json(old);
-    const result = await perform(platform, input, fence);
+    const result = String(input.action).startsWith('storage-') ? await storageAction(platform, objects, new LogStore(store), input, fence) : await perform(platform, input, fence);
     await store.record(input.requestKey, result, fence); return json(result);
   } catch (error) { return error instanceof PlatformError ? json(error.body, error.status) : json({ error: error instanceof Error ? error.message : '动作失败' }, 409); }
 }; }
 
 if (import.meta.main) {
   const store = new Store(required('CS_DATABASE_URL')), platform = new Platform(required('CS_PLATFORM_API_URL')), control = new Controller(platform, store);
-  const server = Bun.serve({ hostname: '0.0.0.0', port: Number(process.env.PORT ?? 3000), fetch: createHandler(store, platform, control) });
+  const objects = process.env.CS_OBJECTS_URL ? new Objects(process.env.CS_OBJECTS_URL) : undefined;
+  const server = Bun.serve({ hostname: '0.0.0.0', port: Number(process.env.PORT ?? 3000), fetch: createHandler(store, platform, control, objects) });
   setInterval(() => void control.tick(), 5000); void control.tick();
   process.on('SIGTERM', () => { void server.stop().then(() => process.exit(0)); });
 }

@@ -22,6 +22,7 @@ export function requestLifecycle(db: Database): ExecutionLifecycles['request'] {
     if (prior && prior.state !== 'retryable-rejected' && !(prior.state === 'pending' && !prior.dispatched && (input.fence || input.stopAuthority))) { await bindRecoveryMutation(tx, now, recovery, { operationId: prior.id }); return lifecycleRow(prior); }
     const parent = (await tx.select().from(parents).where(and(eq(parents.serviceId, serviceId), sql`${parents.intent}->'task'->>'id' = ${taskId}`)))[0];
     if (!parent) throw notFound('业务任务', taskId);
+    if (action === 'close' && parent.intent.task.completionPolicy === 'archive-and-delete') throw precondition('此任务须显式终结、归档并回收工作卷', { code: 'finalization_required' });
     if (starting && authorization.stopAuthority) throw precondition('迁移停止权限不能恢复或新建执行');
     const epoch = await (starting ? authorizeExecution : authorizeStoppingExecution)(tx, serviceId, parent.intent.tasksSpec.executionControl === 'fenced', authorization, now);
     if (prior?.state === 'pending' && !prior.dispatched) {
@@ -56,5 +57,5 @@ async function assertNoActiveChildren(tx: Executor, serviceId: string, taskId: s
 /** 与准入、生命周期受理共用服务锁；预检之后发生的 pause 也不能被穿透。 */
 export async function assertTaskAcceptsExecution(tx: Executor, taskId: string): Promise<void> {
   const state = (await tx.select().from(tasks).where(eq(tasks.taskId, taskId)))[0];
-  if (state && (state.operationId || state.state !== 'running')) throw conflict('任务当前不能受理执行', { code: state.state === 'paused' ? 'task_paused' : 'task_not_running' });
+  if (state && (state.operationId || state.state !== 'running')) throw conflict('任务当前不能受理执行', { code: state.state === 'finalizing' ? 'task_finalizing' : state.state === 'paused' ? 'task_paused' : 'task_not_running' });
 }

@@ -2,7 +2,7 @@ import { and, asc, eq, lt, or, sql } from 'drizzle-orm';
 import type { Database } from '@crewstation/persistence';
 import { conflict } from '@crewstation/kernel';
 import type { ExecutionMessage } from '../../../domain/executionMessage';
-import { liveControl } from '../../../domain/executionControl';
+import { activeExecutionControl } from '../../../domain/executionControl';
 import type { ExecutionMessages } from '../../../ports/executionMessages';
 import { executionTransaction, authorizeExecution, readExecutionControl } from '../executionTransaction';
 import { assertTaskAcceptsExecution } from '../execution/lifecycleAdmission';
@@ -36,7 +36,7 @@ export function drizzleExecutionMessages(db: Database): ExecutionMessages {
     claim: (owner, id) => claimMessage(db, owner, id),
     checkpoint: (claim) => executionTransaction(db, claim.serviceId, async (tx, now) => {
       const control = await readExecutionControl(tx, claim.serviceId);
-      if (!claim.dispatched && (control || claim.epoch !== null) && (!control || control.phase !== 'active' || !liveControl(control, now) || control.epoch !== claim.epoch || (control.handoff && control.handoff.stage !== 'complete'))) return false;
+      if (!claim.dispatched && (control || claim.epoch !== null) && (!control || !activeExecutionControl(control, now) || control.epoch !== claim.epoch)) return false;
       const subtask = (await tx.select().from(tasks).where(eq(tasks.id, claim.subtaskId)).for('update'))[0];
       if (!claim.dispatched && (!subtask || subtask.view.state !== 'awaiting-input' || subtask.view.cancelRequestedAt)) return false;
       return (await tx.update(messages).set({ dispatched: true }).where(leased(claim)).returning()).length === 1;
@@ -52,7 +52,7 @@ async function claimMessage(db: Database, owner: string, id?: string): Promise<E
       if (!row) return undefined;
       if (!row.dispatched) {
         const control = await readExecutionControl(tx, row.serviceId);
-        if ((control || row.epoch !== null) && (!control || control.phase !== 'active' || !liveControl(control, now) || control.epoch !== row.epoch || (control.handoff && control.handoff.stage !== 'complete'))) return undefined;
+        if ((control || row.epoch !== null) && (!control || !activeExecutionControl(control, now) || control.epoch !== row.epoch)) return undefined;
       }
       return view((await tx.update(messages).set({ state: 'dispatching', owner, revision: row.revision + 1, leaseUntil: new Date(now.getTime() + 30_000), updatedAt: now }).where(eq(messages.id, row.id)).returning())[0]!);
     });

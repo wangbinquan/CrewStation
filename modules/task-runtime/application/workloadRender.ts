@@ -57,6 +57,10 @@ export function workloadRenderUseCases(deps: TaskRuntimeUseCaseDeps) {
     },
     bindWorkload: async (taskId: TaskId, podUid: string, secretUid?: string): Promise<void> => {
       const env = await current(taskId);
+      if (env.render?.objectInputsGeneration && !env.native) {
+        if (!deps.sources.bindTaskInputs || !env.render.workloadConsumerId) throw precondition('任务输入 Pod 绑定能力不可用');
+        await deps.sources.bindTaskInputs(env.render.workloadConsumerId, podUid);
+      }
       await deps.uow.run(async (scope) => {
         await scope.admissions.lock(env.projectId);
         const latest = await scope.environments.getById(taskId);
@@ -75,8 +79,8 @@ export function workloadRenderUseCases(deps: TaskRuntimeUseCaseDeps) {
 /** 建出之后的环境：工作区记下 Pod 实例；执行环境进入「启动中」（记下 Pod 与 Runner Secret 的实例），与本模块自己建时准备完的样子一样。 */
 function bound(deps: TaskRuntimeUseCaseDeps, env: TaskEnvironment, podUid: string, secretUid: string | undefined): TaskEnvironment {
   const now = deps.clock.now().toISOString();
-  if (env.render?.runtimeImage && env.render.runtimeConnectionDeadline?.generation !== env.render.start) {
-    env = { ...env, render: { ...env.render, runtimeConnectionDeadline: { generation: env.render.start, at: new Date(deps.clock.now().getTime() + 300_000).toISOString() } } };
+  if ((env.render?.runtimeImage || env.render?.objectInputsGeneration) && env.render.runtimeConnectionDeadline?.generation !== env.render.start) {
+    env = { ...env, render: { ...env.render, runtimeConnectionDeadline: { generation: env.render.start, at: new Date(deps.clock.now().getTime() + (env.render.objectInputsGeneration ? 60 * 60_000 : 300_000)).toISOString() } } };
   }
   const startup = env.startup ? { startup: completeStage(env.startup, 'queue', now) } : {};
   if (!env.native) return { ...env, podUid, ...startup };

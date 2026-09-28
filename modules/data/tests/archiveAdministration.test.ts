@@ -1,0 +1,61 @@
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import type { AcceptedArchiveFinalization, Actor, TaskId, UserId } from '@crewstation/contracts';
+import { forbidden } from '@crewstation/kernel';
+import { createTestDatabase, testDatabaseAvailable, type TestDatabase } from '@crewstation/testkit';
+import { dataMigrations } from '../wiring';
+import { archiveAdministration } from '../application/archiveAdministration';
+import { objectArchiveFixture } from './objectArchiveFixture';
+import { objectId } from './objectFixtures';
+import { archiveBindingRepository } from '../adapters/persistence/archive/bindings';
+import { archiveFinalization } from '../application/archiveFinalization';
+
+const available = await testDatabaseAvailable();
+describe.skipIf(!available)('explicit operator archive manifests', () => {
+  let tdb: TestDatabase;
+  beforeAll(async () => { tdb = await createTestDatabase([dataMigrations]); });
+  afterAll(async () => { await tdb?.drop(); });
+  test('owner/admin can prepare a reviewed plan while service authority is expired; unknown paths never imply an empty plan', async () => {
+    const f = await objectArchiveFixture(tdb.db), owner = objectId() as UserId, actor: Actor = { userId: owner, isAdmin: false };
+    const api = archiveAdministration({ ...f, tasks: { accepted: async () => undefined, read: async (serviceId, taskId) => serviceId === f.source.serviceId && taskId === f.taskId ? { projectId: f.source.projectId, completionPolicy: 'archive-and-delete' } : undefined },
+      authorizer: { authorize: async (who, project, action) => { expect(action).toBe('manage-task-storage'); if (project !== f.source.projectId || !who.isAdmin && who.userId !== owner) throw forbidden(); } } });
+    const scope = { taskId: f.taskId as TaskId, projectId: f.source.projectId, serviceId: f.source.serviceId };
+    await f.catalog.applyWriteControl({ serviceId: f.source.serviceId, controlVersion: 1, epoch: 1, leaseId: objectId(), instanceId: objectId(), podUid: objectId(), leaseUntil: '2000-01-01T00:00:00Z', phase: 'frozen' });
+    const input = { requestKey: 'operator-selection', reason: '应用已下线，保存指定报告', entries: [{ kind: 'file' as const, path: 'report.txt', name: 'report', required: true }] };
+    await expect(api.createPlan({ userId: objectId() as UserId, isAdmin: false }, scope, input)).rejects.toMatchObject({ kind: 'forbidden' });
+    await expect(api.createPlan(actor, scope, { ...input, entries: [] })).rejects.toThrow();
+    const plan = await api.createPlan(actor, scope, input); expect(plan).toMatchObject({ state: 'sealed', itemCount: 1 });
+    expect(await api.createPlan(actor, scope, input)).toEqual(plan);
+    expect((await f.plans.get(plan.id))!.operator).toEqual({ userId: owner, reason: input.reason });
+    expect(await api.preflight(actor, scope, { planId: plan.id, planRevision: plan.revision, digest: plan.digest! })).toEqual({ spaceId: f.space.id });
+    await expect(api.createPlan(actor, scope, { ...input, entries: [{ ...input.entries[0]!, path: 'changed.txt' }] })).rejects.toThrow();
+    await expect(api.preflight(actor, { ...scope, taskId: objectId() as TaskId }, { noArtifactsReason: 'wrong task' })).rejects.toMatchObject({ kind: 'not_found' });
+    expect(await api.preflight({ userId: objectId() as UserId, isAdmin: true }, scope, { noArtifactsReason: 'explicit no artifacts' })).toEqual({ spaceId: f.space.id });
+    await f.catalog.freeze({ id: objectId(), backendId: f.backend.id, kind: 'backup', epoch: 1, active: true });
+    await expect(api.createPlan(actor, scope, { ...input, requestKey: 'new-while-frozen' })).rejects.toMatchObject({ details: { code: 'object_storage_frozen' } });
+  });
+  test('revision previews page every removed required file without changing bindings; optionalizing a path is also a discard', async () => {
+    const f = await objectArchiveFixture(tdb.db), actor: Actor = { userId: objectId() as UserId, isAdmin: false }, bindings = archiveBindingRepository(tdb.db);
+    const entries = Array.from({ length: 102 }, (_, i) => ({ kind: 'file' as const, path: `reports/${i}.txt`, name: `report-${i}`, required: true }));
+    await f.plans.append(f.plan.id, { requestKey: 'p0', expectedRevision: 1, page: 0, entries: entries.slice(0, 100) }, f.authority);
+    await f.plans.append(f.plan.id, { requestKey: 'p1', expectedRevision: 2, page: 1, entries: entries.slice(100) }, f.authority);
+    const old = await f.plans.seal(f.plan.id, 'seal-old', 3, f.authority), scope = { taskId: f.taskId as TaskId, projectId: f.source.projectId, serviceId: f.source.serviceId };
+    const original: AcceptedArchiveFinalization = { ...scope, id: objectId(), taskGeneration: 2, spaceId: f.space.id, volumeUid: objectId(), outcome: 'failed', archive: { planId: old.id, planRevision: old.revision, digest: old.digest! } };
+    const tasks = { accepted: async () => original, read: async () => ({ projectId: scope.projectId, completionPolicy: 'archive-and-delete' as const }) };
+    await archiveFinalization(bindings, tasks).bind(original.id);
+    const api = archiveAdministration({ ...f, bindings, tasks, authorizer: { authorize: async (who) => { if (who.userId !== actor.userId) throw forbidden(); } } });
+    const next = await api.createPlan(actor, scope, { requestKey: 'replacement', reason: '只保留第一个文件，第二个改为可选', entries: [entries[0]!, { ...entries[1]!, required: false }] });
+    const input = { expectedRevision: 1, archive: { planId: next.id, planRevision: next.revision, digest: next.digest! }, offset: 0, limit: 100 };
+    const before = await bindings.get(original.id), preview = await api.assessRevision(actor, scope, original.id, input);
+    expect(preview).toMatchObject({ oldCount: 102, newCount: 2, discardedCount: 101, nextOffset: 100, volumeUid: original.volumeUid });
+    expect(preview.discarded).toHaveLength(100); expect(preview.discarded[0]).toEqual(entries[1]!);
+    expect((await api.assessRevision(actor, scope, original.id, { ...input, offset: 100 })).discarded).toEqual([entries[101]!]);
+    expect(await bindings.get(original.id)).toEqual(before);
+    await expect(api.assessRevision({ ...actor, userId: objectId() as UserId }, scope, original.id, input)).rejects.toMatchObject({ kind: 'forbidden' });
+    await expect(api.assessRevision(actor, { ...scope, taskId: objectId() as TaskId }, original.id, input)).rejects.toThrow();
+    await expect(api.assessRevision(actor, scope, original.id, { ...input, expectedRevision: 2 })).rejects.toMatchObject({ kind: 'conflict' });
+    await expect(api.assessRevision(actor, scope, original.id, { ...input, archive: { ...input.archive, planId: objectId() } })).rejects.toMatchObject({ kind: 'not_found' });
+    await expect(bindings.revise(original.id, { ...input, requestKey: 'revise', reason: 'replace', confirmDiscard: false }, f.authority)).rejects.toMatchObject({ details: { code: 'archive_discard_confirmation_required', discardedCount: preview.discardedCount } });
+    expect((await bindings.revise(original.id, { ...input, requestKey: 'revise', reason: 'replace', confirmDiscard: true }, f.authority)).revision).toBe(2);
+    await expect(api.assessRevision(actor, scope, original.id, input)).rejects.toMatchObject({ kind: 'conflict' });
+  });
+});

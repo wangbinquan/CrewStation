@@ -18,26 +18,82 @@ describe.skipIf(!available)('RFC-027 business workspace safe pause and original-
   let tdb: TestDatabase;
   beforeAll(async () => { tdb = await createTestDatabase([eventbusMigrations, queueMigrations, resourcesMigrations, taskRuntimeMigrations]); });
   afterAll(async () => { await tdb?.drop(); });
-  const fixture = async () => {
+  const fixture = async (completionPolicy?: 'archive-and-delete') => {
     const projectId = newResourceId() as ProjectId, serviceId = newResourceId() as ServiceId, profileId = newResourceId(), k8s = createFakeK8sClient();
     const resources = createResourcesModule({ db: tdb.db, quotas: { limitFor: async () => 4 }, authorizer: { projectAccess: async () => ({ operate: true }) }, isAdmin: async () => true });
     const owner = resources.api.owner('task-runtime'), ledger = { within: (tx: unknown) => owner.within(tx as object), live: async () => (await resources.api.list({})).filter((record) => record.owner.module === 'task-runtime'), occupancy: resources.api.occupancy };
     const profile = { id: profileId, name: 'task', cpu: '1', memory: '1Gi', storage: '1Gi', description: '' };
-    const make = (taskImage = 'test:runtime') => createTaskRuntimeModule({ db: tdb.db, k8s, ledger, creation: 'ledger', authorizer: { authorize: async () => {} }, isAdmin: async () => true,
+    const make = (taskImage = 'test:runtime') => createTaskRuntimeModule({ db: tdb.db, k8s, ledger, workloadSafety: resources.api.workloadSafety, creation: 'ledger', authorizer: { authorize: async () => {} }, isAdmin: async () => true,
       quotas: { quotaLimit: async () => 4 }, profiles: { devSessionProfile: async () => undefined, listTaskProfiles: async () => [profile], getTaskProfile: async () => profile },
       services: { resolveServiceById: async () => ({ projectId, namespace: 'cs-business-test', slug: 'business', name: 'business' }) },
       sources: { configEnv: async () => ({}), dataEnv: async () => ({}), taskDataEnv: async () => ({}) },
       settings: { taskImage, sessionUrl: 'ws://session', systemNamespace: 'cs-system', userDomain: 'localhost', serviceDomain: 'svc.localhost', workerUid: 10001, defaultProfile: profileId, userAuthMiddleware: 'auth', dropIdentityHeadersMiddleware: 'drop' },
     });
-    const runtime = make(), task = await runtime.api.createEnvironment({ serviceId, kind: 'business', volumeMode: 'persistent', businessStorage: 'isolated-v1', admission: { id: newResourceId() as TaskId, fingerprint: 'a'.repeat(64) } });
+    const runtime = make(), task = await runtime.api.createEnvironment({ serviceId, kind: 'business', volumeMode: 'persistent', businessStorage: 'isolated-v1', completionPolicy, admission: { id: newResourceId() as TaskId, fingerprint: 'a'.repeat(64) } });
     const env = (await drizzleUnitOfWork(tdb.db).read.environments.getById(task.id))!;
     const values = await runtime.api.runnerValues(task.id);
-    const volume = await k8s.create<K8sObject>({ apiVersion: 'v1', kind: 'PersistentVolumeClaim', metadata: { name: env.pvcName, namespace: env.namespace, labels: { 'crewstation.io/task': task.id } }, spec: { accessModes: ['ReadWriteOnce'] }, status: { phase: 'Bound' } });
-    const pod = await k8s.create<K8sObject>({ apiVersion: 'v1', kind: 'Pod', metadata: { name: task.podName, namespace: env.namespace, labels: { 'crewstation.io/task': task.id } }, spec: { nodeName: 'test-node', volumes: [{ name: 'work', persistentVolumeClaim: { claimName: env.pvcName } }] }, status: { phase: 'Running' } });
+    const volume = await k8s.create<K8sObject>({ apiVersion: 'v1', kind: 'PersistentVolumeClaim', metadata: { uid: crypto.randomUUID(), name: env.pvcName, namespace: env.namespace, labels: { 'crewstation.io/task': task.id } }, spec: { accessModes: ['ReadWriteOnce'] }, status: { phase: 'Bound' } });
+    const pod = await k8s.create<K8sObject>({ apiVersion: 'v1', kind: 'Pod', metadata: { uid: crypto.randomUUID(), name: task.podName, namespace: env.namespace, labels: { 'crewstation.io/task': task.id } }, spec: { nodeName: 'test-node', volumes: [{ name: 'work', persistentVolumeClaim: { claimName: env.pvcName } }] }, status: { phase: 'Running' } });
+    if (completionPolicy) {
+      await resources.api.observe({ child: { kind: 'PersistentVolumeClaim', namespace: env.namespace, name: env.pvcName, uid: volume.metadata.uid!, phase: 'Bound', ready: true } });
+      await resources.api.workloadSafety.register({ id: env.render!.workloadConsumerId!, taskId: task.id, resourceId: task.id, revision: 1, namespace: env.namespace, podName: env.podName, volumeUid: volume.metadata.uid!, purpose: 'business', finalization: null });
+      await resources.api.workloadSafety.grantStart(env.render!.workloadConsumerId!, { podUid: pod.metadata.uid!, nodeName: 'test-node', nodeUid: crypto.randomUUID() });
+    }
     await runtime.api.bindWorkload(task.id, pod.metadata.uid!);
     expect(await runtime.api.onRunnerConnected(task.id, values['CS_RUNNER_TOKEN']!)).toBe(true);
     return { runtime, make, task, env, values, pod, volume, resources, projectId, k8s };
   };
+
+  test('archive policy is durable across sequential Pods; generic close cannot bypass finalization', async () => {
+    const f = await fixture('archive-and-delete');
+    expect(f.env.render?.completionPolicy).toBe('archive-and-delete');
+    await expect(f.runtime.api.releaseEnvironment(f.task.id, 'business')).rejects.toMatchObject({ details: { code: 'finalization_required' } });
+    expect((await f.runtime.api.pauseEnvironment(f.task.id)).state).toBe('running');
+    expect(await f.resources.api.occupancy(f.projectId)).toBe(1);
+    const safety = f.resources.api.workloadSafety, registered = (await safety.get(f.env.render!.workloadConsumerId!))!;
+    expect(registered.admissionClosed).toBe(true);
+    // The isolated runtime fixture has no cluster observer; deliver its separate durable proof explicitly.
+    await safety.recordStop({ id: newResourceId(), consumer: registered.consumer, podUid: registered.startPermit!.podUid, nodeUid: registered.startPermit!.nodeUid, nodeName: registered.startPermit!.nodeName, type: 'kubelet-terminated', podResourceVersion: '99', observedAt: new Date().toISOString(), containers: [{ kind: 'container', name: 'runner', state: 'terminated', containerId: 'containerd://fixture', exitCode: 0 }] });
+    await f.resources.api.observeConditions(f.task.id, [{ type: 'WorkloadStopped', status: 'true', reason: registered.consumer.id }]);
+    await f.make().api.reconcile();
+    const resumed = await f.make().api.resumeEnvironment(f.task.id);
+    expect(resumed.state).toBe('creating');
+    const stored = await drizzleUnitOfWork(tdb.db).read.environments.getById(f.task.id);
+    expect(stored?.render?.completionPolicy).toBe('archive-and-delete');
+    expect(stored?.render?.workloadConsumerId).not.toBe(registered.consumer.id);
+    expect(stored?.podName).not.toBe(f.env.podName);
+    const volume = (await f.resources.api.list({ parentId: f.task.id, kind: 'volume' }))[0]!;
+    expect(volume).toMatchObject({ desired: 'present', spec: { reclaim: 'retain', taskStorage: { taskId: f.task.id, completionPolicy: 'archive-and-delete' } } });
+    expect(await f.k8s.get(Resources.PersistentVolumeClaim!, f.env.pvcName, f.env.namespace)).toEqual(f.volume);
+  });
+  test('finalization freezes new work without interrupting result delivery, then releases compute only after durable stop proof', async () => {
+    const f = await fixture('archive-and-delete'), input = { projectId: f.projectId, serviceId: f.env.serviceId, taskId: f.task.id, operationId: newResourceId(), revision: 1, volumeUid: f.volume.metadata.uid! };
+    await expect(f.runtime.api.freezeBusinessStorage({ ...input, volumeUid: crypto.randomUUID() })).rejects.toMatchObject({ details: { code: 'workspace_volume_changed' } });
+    await f.runtime.api.freezeBusinessStorage(input);
+    expect(await f.runtime.api.getEnvironment(f.task.id)).toMatchObject({ state: 'running', connected: true });
+    expect(await f.k8s.get(Resources.Pod!, f.env.podName, f.env.namespace)).toEqual(f.pod);
+    await expect(f.make().api.createNativeExecution({ id: newResourceId() as TaskId, parentTaskId: f.task.id, purpose: 'subtask', agentId: 'late', runnerId: newResourceId(), fingerprint: 'late' })).rejects.toMatchObject({ details: { code: 'task_finalizing' } });
+    await expect(f.runtime.api.resumeEnvironment(f.task.id)).rejects.toMatchObject({ details: { code: 'task_finalizing' } });
+    await expect(f.runtime.api.freezeBusinessStorage({ ...input, operationId: newResourceId() })).rejects.toMatchObject({ kind: 'conflict' });
+    expect(await f.runtime.api.stopBusinessStorage(input)).toMatchObject({ state: 'pending', digest: null });
+    const worker = f.runtime.workers[1] as Worker;
+    await worker.runOnce();
+    expect(await f.runtime.api.getEnvironment(f.task.id)).toMatchObject({ state: 'releasing', connected: false });
+    expect(await f.resources.api.occupancy(f.projectId)).toBe(1);
+    const safety = f.resources.api.workloadSafety, registered = (await safety.get(f.env.render!.workloadConsumerId!))!;
+    const { grantedAt: _grantedAt, ...permit } = registered.startPermit!;
+    await safety.recordStop({ id: newResourceId(), consumer: registered.consumer, ...permit, type: 'kubelet-terminated', podResourceVersion: '20', observedAt: new Date().toISOString(), containers: [{ kind: 'container', name: 'runner', state: 'terminated', containerId: 'containerd://finalized', exitCode: 0 }] });
+    await f.resources.api.observeConditions(f.task.id, [{ type: 'WorkloadStopped', status: 'true', reason: registered.consumer.id }]);
+    await tdb.db.execute(sql`UPDATE platform_infra.jobs SET run_at=now()-interval '1 second'`);
+    await worker.runOnce();
+    const result = await f.make().api.stopBusinessStorage(input);
+    expect(result).toMatchObject({ state: 'complete', count: 1 }); expect(result.digest).toHaveLength(64);
+    // Compute is returned while the task and its data binding remain owned until physical reclaim.
+    expect(await f.runtime.api.getEnvironment(f.task.id)).toMatchObject({ state: 'releasing', message: '执行容器已停止，任务正在归档与回收工作卷' });
+    expect(await f.resources.api.occupancy(f.projectId)).toBe(0);
+    expect(await f.k8s.get(Resources.PersistentVolumeClaim!, f.env.pvcName, f.env.namespace)).toEqual(f.volume);
+    expect((await f.resources.api.list({ parentId: f.task.id, kind: 'volume' }))[0]?.desired).toBe('present');
+  });
 
   test('delete acceptance retains quota; restart reconciles actual disappearance before one release, resume pins original volume', async () => {
     const f = await fixture(), remove = f.k8s.delete;

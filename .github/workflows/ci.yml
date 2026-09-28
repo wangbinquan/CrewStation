@@ -75,7 +75,8 @@ jobs:
     env:
       CS_TEST_DATABASE_URL: postgres://crewstation:crewstation-dev@127.0.0.1:55432/crewstation
       # 数据库是这个作业自己起的：连不上是故障。不点名的话，依赖它的六十来组用例会整层跳过、作业照绿。
-      CS_TEST_REQUIRE: database,prometheus
+      CS_TEST_REQUIRE: database,prometheus,garage
+      CS_TEST_GARAGE: '1'
       CS_TEST_PROMETHEUS_BIN: /tmp/prometheus-test/prometheus
       CS_TEST_PROMTOOL_BIN: /tmp/prometheus-test/promtool
     steps:

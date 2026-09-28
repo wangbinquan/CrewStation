@@ -1,5 +1,6 @@
 import type { BusinessExecutionTaskItem, BusinessExecutionTaskQuery } from '@crewstation/contracts';
 import { TaskRecoveryPanel } from '../../features/business-recovery/components/TaskRecoveryPanel';
+import { TaskStorageStatus } from '../../features/object-storage';
 import { QueryStatus } from '../../shared/ui/QueryStatus';
 import { useAdminPage } from '../../shared/admin/useAdminRead';
 import { useState } from 'react';
@@ -52,6 +53,7 @@ export function AdminBusinessRecoveryPage() {
           <ActionNote tone="neutral">{t('recovery.legacyHint')}</ActionNote>
         </>}
         <details><summary>{t('executionRecovery.identityDetails')}</summary><p>{current.id}</p><p>{current.callerIdentity}</p><p>{current.protocol}</p></details>
+        {current.protocol === 'v3' ? <TaskStorageStatus key={`storage:${current.id}`} taskId={current.id} /> : null}
         {current.protocol === 'legacy' ? <RecoveryTickets key={`${current.callerIdentity}:${current.id}`} identity={current.callerIdentity} taskId={current.id} /> : null}
       </Stack></Dialog> : null}
     </> : !me.isPending && !me.error ? <p>{t('admin.denied.title')}</p> : null}

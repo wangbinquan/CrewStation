@@ -4,8 +4,13 @@ import type { Clock, Logger } from '@crewstation/kernel';
 import type { TaskCluster } from '../ports/cluster';
 import type { EnvironmentSources, ProfileCatalog, ProjectAuthorizer, QuotaSource, ServiceResolver, SourceCheckoutSource, TaskRuntimeSettings, TestRunner } from '../ports/platform';
 import type { UnitOfWork } from '../ports/unitOfWork';
+import type { WorkloadSafetyPort, TaskVolumePort } from '../ports/workloadSafety';
+import type { UnprovisionedStorage } from '../ports/unprovisionedStorage';
 
 export interface TaskRuntimeUseCaseDeps {
+  unprovisionedStorage?: UnprovisionedStorage;
+  workloadSafety?: WorkloadSafetyPort;
+  taskVolumes?: TaskVolumePort;
   uow: UnitOfWork;
   cluster: TaskCluster;
   businessStorageInspector?: Pick<TaskRecoveryCluster, 'inspect'>;
@@ -30,11 +35,14 @@ export interface TaskRuntimeUseCaseDeps {
 }
 
 export interface CreateEnvironmentInput {
+  developmentObjectPlanId?: string;
   /** 开发镜像保留引用预先分配的身份，仅内部使用。 */
   runtimeImageTaskId?: TaskId;
   /** 由调用方预留并通过用途验证的不可变镜像快照，不从父任务继承。 */
   runtimeImage?: RuntimeImageExecutionSnapshot;
   businessStorage?: 'isolated-v1';
+  completionPolicy?: 'archive-and-delete';
+  objectInputsGeneration?: number;
   admission?: { id: TaskId; fingerprint: string };
   serviceId: ServiceId;
   kind: TaskKind;

@@ -1,6 +1,6 @@
 import type { BusinessRecoveryAssessment, ServiceId, SubtaskId } from '@crewstation/contracts';
 import { notFound } from '@crewstation/kernel';
-import { liveControl } from '../../domain/executionControl';
+import { activeExecutionControl } from '../../domain/executionControl';
 import { recoveryAssessment } from '../../domain/taskRecovery';
 import type { ExecutionOperation } from '../../domain/taskAdmission';
 import type { RecoveryQueries } from '../../ports/taskRecovery';
@@ -16,7 +16,7 @@ export async function assessRecovery(deps: BusinessExecutionDeps, queries: Recov
   if (subtaskId && !child) throw notFound('业务子任务', subtaskId);
   const reasons: string[] = [];
   if (!capability.length) reasons.push('application_recovery_unsupported');
-  if (!control || control.phase !== 'active' || !liveControl(control, now) || (control.handoff && control.handoff.stage !== 'complete')) reasons.push('application_controller_offline');
+  if (!control || !activeExecutionControl(control, now)) reasons.push('application_controller_offline');
   if (reasons.length) return { epoch, assessment: { taskId, actions: [], reasons } };
   let workspace;
   try { workspace = await deps.environments.inspectBusinessRecovery?.({ projectId: parent.intent.projectId, serviceId: parent.serviceId as ServiceId, taskId }); } catch { /* An unavailable observer supplies no positive resource proof. */ }

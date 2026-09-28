@@ -1,6 +1,6 @@
 import { and, asc, eq, isNull, lt, or, sql } from 'drizzle-orm';
 import type { Database } from '@crewstation/persistence';
-import { liveControl } from '../../domain/executionControl';
+import { activeExecutionControl } from '../../domain/executionControl';
 import { executionControls as controls, executionOperations as ops } from './executionTables';
 import { executionTransaction, readExecutionControl } from './executionTransaction';
 import { leaseSeconds, toOperation } from './operationRows';
@@ -13,6 +13,7 @@ export async function claimExecutionOperation(db: Database, input: { owner: stri
     (${ops.epoch} IS NULL AND NOT EXISTS (SELECT 1 FROM ${controls} WHERE ${controls.serviceId} = ${ops.serviceId})) OR
     EXISTS (SELECT 1 FROM ${controls} WHERE ${controls.serviceId} = ${ops.serviceId}
       AND ${controls.body}->>'phase' = 'active' AND (${controls.body}->>'epoch')::bigint = ${ops.epoch}
+      AND (${controls.body}->'storageSync' IS NULL OR ${controls.body}->'storageSync'->>'version' = ${controls.body}->'storageSync'->>'acknowledgedVersion')
       AND (${controls.body}->>'leaseExpiresAt')::timestamptz > clock_timestamp()
       AND (${controls.body}->'handoff' IS NULL OR ${controls.body}->'handoff'->>'stage' = 'complete'))) `;
   const candidates = await db.select({ id: ops.id, serviceId: ops.serviceId }).from(ops).where(and(ready, dispatchable, input.id ? eq(ops.id, input.id) : undefined)).orderBy(asc(ops.updatedAt), asc(ops.id)).limit(100);
@@ -23,7 +24,7 @@ export async function claimExecutionOperation(db: Database, input: { owner: stri
       const recovering = row.state === 'running' || row.errorCode === 'admission_unknown';
       const control = await readExecutionControl(tx, row.serviceId);
       if (!recovering && (control || row.epoch !== null)) {
-        if (!control || control.phase !== 'active' || !liveControl(control, now) || control.epoch !== row.epoch || (control.handoff && control.handoff.stage !== 'complete')) return undefined;
+        if (!control || !activeExecutionControl(control, now) || control.epoch !== row.epoch) return undefined;
       }
       const result = (await tx.update(ops).set({ state: 'running', errorCode: recovering ? 'admission_unknown' : row.errorCode,
         leaseOwner: input.owner, leaseUntil: new Date(now.getTime() + duration * 1000), revision: sql`${ops.revision} + 1`, attempts: sql`${ops.attempts} + 1`, updatedAt: now,

@@ -43,6 +43,7 @@ const JOB: KindRule = { quotaUnits: 0, primaryChild: 'Job', readyConditions: [],
 export const KIND_RULES: Readonly<Record<ResourceKind, KindRule>> = {
   'dev-workspace': { ...WORKLOAD, failedRetentionMs: 72 * HOUR },
   'agent-execution': WORKLOAD,
+  'archive-execution': { quotaUnits: 1, primaryChild: 'Pod', readyConditions: [], releasable: false },
   'business-workspace': WORKLOAD,
   volume: { quotaUnits: 0, primaryChild: 'PersistentVolumeClaim', readyConditions: [], releasable: false },
   // 命名空间（第四期，T11）：provisioning 写的每个项目一条，子对象是 Namespace 与 ResourceQuota；网络策略一组一条。都是稳定记录，归档不释放。
@@ -61,6 +62,7 @@ export const KIND_RULES: Readonly<Record<ResourceKind, KindRule>> = {
   database: { quotaUnits: 0, allChildren: true, readyConditions: [], releasable: false, stable: true },
   // 数据访问绑定：等负责人批准时是排队（Prepared 为假），生效（Granted）且临时角色在即运行中；收回、到期、拒绝即「不要了」。一次性记录。
   'data-binding': { quotaUnits: 0, allChildren: true, readyConditions: ['Granted'], releasable: false },
+  'object-space': { quotaUnits: 0, readyConditions: ['ObjectStorageReady'], releasable: false, stable: true },
 };
 
 export function kindRule(kind: ResourceKind): KindRule {

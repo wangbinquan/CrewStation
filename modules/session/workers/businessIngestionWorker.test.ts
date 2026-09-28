@@ -7,7 +7,7 @@ test('接收 worker 不重叠；stop 清除调度并等待已开始的数据库�
   let release!: () => void, reads = 0;
   const blocked = new Promise<void>((resolve) => { release = resolve; });
   const unexpected = async (): Promise<never> => { throw new Error('unexpected'); };
-  const store: BusinessExecutionStore = { consume: unexpected, expire: async () => 0, register: unexpected, ingest: unexpected, get: unexpected, list: unexpected, acknowledge: unexpected,
+  const store: BusinessExecutionStore = { completionProof: unexpected, consume: unexpected, expire: async () => 0, register: unexpected, ingest: unexpected, get: unexpected, list: unexpected, acknowledge: unexpected,
     pending: async () => { reads++; await blocked; return []; } };
   const worker = businessIngestionWorker({ store, connectedTasks: () => [], send: unexpected, logger: noopLogger });
   const first = worker.runOnce(), second = worker.runOnce();

@@ -1,3 +1,4 @@
+import { taskStorageCapabilities } from '../storage/storageCapabilities';
 import { admitWithRuntimeImage, bindTaskRuntimeImage } from '../taskRuntimeImage';
 import { conflict, newResourceId, notFound, precondition, quotaExceeded } from '@crewstation/kernel';
 import type { BusinessExecutionApi } from '../../api/executionApi';
@@ -26,6 +27,10 @@ export function executionTaskUseCases(deps: BusinessExecutionDeps): Pick<Busines
         if (operation.state === 'retryable-rejected') operation = await deps.operations.retryRejected(key, digest, authorization);
         else if (operation.state === 'pending' && input.fence) operation = await deps.operations.adoptPending(key, digest, authorization);
       } else {
+        if (input.completionPolicy === 'archive-and-delete') {
+          const storage = await taskStorageCapabilities(deps, context.serviceId);
+          if (!storage.finalization || input.inputObjects && !storage.taskInputs) throw precondition('归档终结与工作卷回收能力尚未就绪', { code: 'finalization_unavailable', reason: storage.unavailableReason });
+        }
         if (!context.authority.ready) throw precondition('来源 Pod 尚未就绪', { code: 'source_not_ready' });
         const candidate = taskAdmissionCandidate({ ...context, identity: context.workload.identity, project: context.workload.project, service: context.workload.service, epoch: input.fence?.epoch ?? null }, context.registration, input, traceId, deps.clock.now());
         const bound = await bindTaskRuntimeImage(candidate, deps.runtimeImages, input.runtimeImageVersionId);

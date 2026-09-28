@@ -1,3 +1,4 @@
+import { taskStorageCapabilities } from '../storage/storageCapabilities';
 import { BUSINESS_EXECUTION_LIMITS } from '@crewstation/contracts';
 import type { BusinessAgentCapabilities, BusinessCapabilitiesDto } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
@@ -31,6 +32,6 @@ export function executionCapabilities(deps: BusinessExecutionDeps): Pick<Busines
       const compute = await deps.compute.resolve(profile.compute, 'subtask', context.projectId);
       agentProfiles.push({ agentProfileId: profile.id, computeProfileId: compute.id, profileRevision: compute.revision, capabilities: testedAgentCapabilities(compute) });
     }
-    return { protocolVersion: 3, releaseId: context.authority.releaseId, limits: BUSINESS_EXECUTION_LIMITS, agentProfiles };
+    return { protocolVersion: 3, releaseId: context.authority.releaseId, limits: BUSINESS_EXECUTION_LIMITS, storage: await taskStorageCapabilities(deps, context.serviceId), agentProfiles };
   } };
 }

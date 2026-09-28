@@ -5,7 +5,7 @@ export type Semantic = typeof SEMANTICS[number];
 /** 排在前面的状态更需要关注：图例、横带汇总的「最差状态」都按这个顺序取。 */
 export const STATUS_ORDER = ['failed', 'pending', 'unknown', 'terminating', 'running', 'ready', 'succeeded', 'idle'] as const;
 export type NodeStatus = typeof STATUS_ORDER[number];
-export type NodeKind = 'route' | 'workload' | 'pod' | 'database' | 'volume' | 'job' | 'component' | 'external' | 'summary';
+export type NodeKind = 'route' | 'workload' | 'pod' | 'database' | 'object-space' | 'volume' | 'job' | 'component' | 'external' | 'summary';
 export const EDGE_KINDS = ['routes', 'owns', 'child', 'mounts', 'binds', 'uses', 'traffic', 'control', 'dial', 'push'] as const;
 export type EdgeKind = typeof EDGE_KINDS[number];
 export type Evidence = 'observed' | 'static';

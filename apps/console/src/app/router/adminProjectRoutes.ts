@@ -1,3 +1,4 @@
+import { ProjectRuntimeStatisticsPage, parseRuntimeSearch } from '../../features/observability';
 import { createRoute, redirect } from '@tanstack/react-router';
 import { adminRoute } from '../../features/admin';
 import { HistoricalConversationsPage } from '../../features/dev-session';
@@ -15,6 +16,8 @@ import { ProjectOperationsPage } from '../project/ProjectOperationsPage';
 import { ProjectSettingsPage } from '../project/ProjectSettingsPage';
 
 export const adminProjectRoute = createRoute({ getParentRoute: () => adminRoute, path: 'integrations/$projectId', component: AdminProjectLayout });
+const observability = createRoute({ getParentRoute: () => adminProjectRoute, path: 'observability', component: ProjectRuntimeStatisticsPage, validateSearch: parseRuntimeSearch });
+const observationTask = createRoute({ getParentRoute: () => adminProjectRoute, path: 'observability/tasks/$taskId', component: ProjectRuntimeStatisticsPage, validateSearch: parseRuntimeSearch });
 const overview = createRoute({ getParentRoute: () => adminProjectRoute, path: '/', component: ProjectOverviewPage });
 const development = createRoute({ getParentRoute: () => adminProjectRoute, path: 'dev-session', component: ProjectDevelopmentPage, validateSearch: parseDevelopmentSearch,
   beforeLoad: ({ search, params }) => { if (search.view === 'conversation') throw redirect({ to: '/admin/integrations/$projectId/dev-session/conversations', params, search: { agent: search.agent }, replace: true }); },
@@ -40,4 +43,4 @@ const settings = createRoute({ getParentRoute: () => adminProjectRoute, path: 's
 const resources = createRoute({ getParentRoute: () => adminProjectRoute, path: 'resources', validateSearch: parseResourceSearch,
   beforeLoad: ({ params, search }) => { redirectResource(params, search); },
 });
-export const adminProjectRoutes = adminProjectRoute.addChildren([overview, development, conversations, release, operations, settings, resources]);
+export const adminProjectRoutes = adminProjectRoute.addChildren([overview, observability, observationTask, development, conversations, release, operations, settings, resources]);

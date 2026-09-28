@@ -13,6 +13,13 @@ export const ServiceSourceBindingSchema = z.strictObject({
 });
 export type ServiceSourceBinding = z.infer<typeof ServiceSourceBindingSchema>;
 
+/** Development storage authority is tied to a current Pod incarnation, never a caller-supplied env. */
+export const DevelopmentSourceBindingSchema = z.strictObject({
+  podUid: z.string().min(1).max(128), podName: z.string().min(1).max(253), ip: z.union([z.ipv4(), z.ipv6()]),
+  taskId: TaskIdSchema, ready: z.boolean(),
+});
+export type DevelopmentSourceBinding = z.infer<typeof DevelopmentSourceBindingSchema>;
+
 /**
  * 平台内部头：**不属于**业务接入约定表 `IDENTITY_HEADERS`，业务服务永远收不到。
  * 用户域 ForwardAuth 只在目标是工作台时注入，让 cs-api 知道当前会话是怎么建立的（RFC-005 §7.1）。
@@ -28,6 +35,7 @@ export const WorkloadIdentitySchema = z.object({
   slot: z.enum(['preview', 'prod']).optional(),
   taskId: TaskIdSchema.optional(),
   source: ServiceSourceBindingSchema.optional(),
+  developmentSource: DevelopmentSourceBindingSchema.optional(),
 });
 
 /** Pod 身份索引：cs-controller 按 Pod 创建与删除增量维护，cs-auth 按源 Pod IP 反查。 */

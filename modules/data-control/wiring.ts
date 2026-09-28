@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import type { Clock, Logger } from '@crewstation/kernel';
 import { noopLogger, systemClock } from '@crewstation/kernel';
-import type { Database, Executor, MigrationSet } from '@crewstation/persistence';
+import type { Database, Executor, MigrationSet, Transaction } from '@crewstation/persistence';
 import { readMigrationDir } from '@crewstation/persistence';
 import type { DataControlModuleApi } from './api/moduleApi';
 import { secretboxCipher } from './adapters/crypto/secretboxCipher';
@@ -15,6 +15,14 @@ import type { DataPlaneReader, DataPlaneWriter } from './ports/dataPlane';
 import type { DataLedgerObservations } from './ports/ledger';
 import type { DataPlaneObserverOptions } from './workers/dataPlaneObserver';
 import { dataPlaneObserver } from './workers/dataPlaneObserver';
+import { objectEndpointStore } from './adapters/persistence/objectEndpoints';
+import { probeObjectBucket } from './adapters/http/objectProbe';
+import { observeGarage } from './adapters/http/garageObservation';
+import { s3ObjectPlane } from './adapters/http/s3Objects';
+import { objectEndpointUseCases } from './application/objectEndpoints';
+import { objectTransferMetrics } from './application/objectMetrics';
+import { prepareObjectCredentialRotation } from './application/objectCredentialRotation';
+import { prepareObjectRestore } from './application/objectRestore';
 
 /** 装配期注入：台账入口由组合根从 resources 接上；数据面用与 data 供给同一个管理连接。 */
 export interface DataControlModuleDeps {
@@ -61,6 +69,24 @@ export function createDataControlModule(deps: DataControlModuleDeps): DataContro
     name: 'data-control', credentialOf: async (resourceId) => (vault ? credentialOf(vault, resourceId) : undefined),
     stageRotation: (id, transaction) => stageCredentialRotation({ ledger: deps.ledger, ...rotationVault(transaction) }, id),
     finishRotation: (id, transaction) => finishCredentialRotation({ plane, ...rotationVault(transaction) }, id),
+    ...(vault ? { objects: createObjectPlane(deps.db!, vault.cipher) } : {}),
   };
   return { api, migrations: dataControlMigrations, observer, stats: () => ({ ...stats }) };
+}
+
+function createObjectPlane(db: Database, cipher: ReturnType<typeof secretboxCipher>) {
+  const endpoints = objectEndpointUseCases({ store: objectEndpointStore(db), cipher, probe: probeObjectBucket, observePhysical: observeGarage });
+  const meter = objectTransferMetrics();
+  const prepareRotation = prepareObjectCredentialRotation({ store: objectEndpointStore(db), within: (tx) => objectEndpointStore(tx as Transaction), cipher, probe: probeObjectBucket });
+  const restore = prepareObjectRestore({ store: objectEndpointStore(db), within: (tx) => objectEndpointStore(tx as Transaction), cipher, probe: probeObjectBucket });
+  const prepareRestore = async (input: Parameters<typeof restore>[0], signal: AbortSignal) => ({ ...await restore(input, signal), bytes: s3ObjectPlane({ endpoint: async (location) => {
+    const target = input.find((p) => p.backendId === location.backendId && p.targetRevision === location.placementRevision);
+    if (!target) throw new Error('Unselected restore location'); return target;
+  } }) });
+  return { ...s3ObjectPlane({ endpoint: endpoints.resolve, meter }), configure: endpoints.configure, probe: endpoints.probe, prepareRotation, prepareRestore, metrics: meter.render };
+}
+
+/** Trusted operational composition, using the same encrypted endpoint registry as the platform. */
+export function createObjectStoragePlane(db: Database, secretKeyBase64: string) {
+  return createObjectPlane(db, secretboxCipher(secretKeyBase64));
 }

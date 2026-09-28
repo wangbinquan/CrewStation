@@ -7,6 +7,8 @@ export interface ObservedObject {
     readonly name: string;
     readonly namespace?: string;
     readonly uid?: string;
+    readonly resourceVersion?: string;
+    readonly finalizers?: readonly string[];
     readonly generation?: number;
     readonly labels?: Readonly<Record<string, string>>;
     readonly annotations?: Readonly<Record<string, string>>;

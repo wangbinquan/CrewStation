@@ -21,6 +21,9 @@ import { readView } from './application/views';
 import { viewerAccess } from './application/access';
 import { readClaims } from './application/claims';
 import { drizzleLedgerUnitOfWork } from './adapters/persistence/drizzleLedger';
+import { workloadSafetyRepository } from './adapters/persistence/safety/repository';
+import { taskVolumeRepository } from './adapters/persistence/safety/volumes';
+import { commitRecord } from './application/commit';
 import type { QuotaLimits, ResourceAuthorizer } from './ports/platform';
 import { resourceRoutes } from './http/resourceRoutes';
 
@@ -71,6 +74,8 @@ export function createResourcesModule(deps: ResourcesModuleDeps): ResourcesModul
   };
   const api: ResourcesModuleApi = {
     name: 'resources',
+    workloadSafety: workloadSafetyRepository(deps.db),
+    taskVolumes: taskVolumeRepository(deps.db, (tx, previous, draft, now) => commitRecord(uow.within(tx), previous, draft, now)),
     retireNamespace: (id, uid, inspect) => uow.run((scope) => retireNamespaceIn(scope, id, uid, inspect, clock.now())),
     owner,
     withIdleProject: (projectId, fn) => deps.db.transaction(async (tx) => { await lockIdleProject(uow.within(tx), projectId); return fn(tx); }),

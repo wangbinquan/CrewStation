@@ -30,10 +30,11 @@ case "$*" in
   *bootstrap-admin*) if [ "\${TEST_BOOTSTRAP_FAIL:-}" = 1 ]; then echo 'bootstrap failed: database unavailable' >&2; exit 1; fi ;;
   *'apply -f -'*) cat >/dev/null ;;
 esac`);
-  executable('bin/bun', `echo 'metrics configured'`);
+  executable('bin/bun', `printf 'bun %s\\n' "$*" >> "$TEST_ROOT/kubectl.log"; echo 'metrics configured'`);
   executable('bin/curl', `printf '{"mode":"%s"}' "\${TEST_MODE:-bootstrap}"`);
   executable('deploy/local/seed-catalog.sh', `touch "$TEST_ROOT/catalog-seeded"`);
   executable('deploy/local/install-dev-auth.sh', `touch "$TEST_ROOT/dev-auth-installed"`);
+  executable('deploy/local/install-object-storage.sh', `touch "$TEST_ROOT/storage-installed"`);
   // 网络插件检查与迁移另有 calicoCni.test.ts；这里只看 install-platform.sh 按 --check 的结果决定调不调迁移，且在装平台之前。
   executable('deploy/local/calico-cni.sh', `
 printf 'calico-cni %s\\n' "\${1:-migrate}" >> "$TEST_ROOT/kubectl.log"
@@ -93,6 +94,28 @@ describe('首次安装必须交由用户创建管理员', () => {
     const result = await install(root, { TEST_MODE: 'ready', CS_ADMIN_USERNAME: 'my-admin', CS_ADMIN_PASSWORD: 'my-chosen-password' });
     expect(result.code).toBe(0);
     expect(result.commands).not.toContain('bootstrap-admin');
+    expect(existsSync(join(root, 'catalog-seeded'))).toBe(true);
+  });
+
+  test('OIDC 管理员的显式会话可登记存储，不需要密码或重建身份', async () => {
+    const root = fixture();
+    const result = await install(root, { TEST_MODE: 'ready', CS_INSTALL_OBJECT_STORAGE: '1', CS_OBJECT_STORAGE_SESSION_FILE: '/private/operator-session' });
+    expect(result.code).toBe(0);
+    expect(existsSync(join(root, 'storage-installed'))).toBe(true);
+    expect(result.commands.match(/object-storage\/register.ts/g)).toHaveLength(1);
+    expect(result.commands).toContain('storage-contract-enable');
+    expect(result.commands).not.toContain('bootstrap-admin');
+    expect(existsSync(join(root, 'catalog-seeded'))).toBe(false);
+  });
+
+  test('初始化未完成时会话文件不能绕过；双凭据只登记一次', async () => {
+    const root = fixture(), options = { CS_INSTALL_OBJECT_STORAGE: '1', CS_OBJECT_STORAGE_SESSION_FILE: '/private/operator-session' };
+    const pending = await install(root, options);
+    expect(pending.code).toBe(0);
+    expect(pending.commands).not.toContain('object-storage/register.ts');
+    const ready = await install(root, { ...options, TEST_MODE: 'ready', CS_ADMIN_USERNAME: 'my-admin', CS_ADMIN_PASSWORD: 'chosen-password' });
+    expect(ready.code).toBe(0);
+    expect(ready.commands.match(/object-storage\/register.ts/g)).toHaveLength(1);
     expect(existsSync(join(root, 'catalog-seeded'))).toBe(true);
   });
 

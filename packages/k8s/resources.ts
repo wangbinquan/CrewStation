@@ -8,6 +8,7 @@ export interface ObjectMeta {
   generation?: number;
   creationTimestamp?: string;
   deletionTimestamp?: string;
+  finalizers?: string[];
   ownerReferences?: Array<{ apiVersion: string; kind: string; name: string; uid: string; controller?: boolean; blockOwnerDeletion?: boolean }>;
 }
 
@@ -27,6 +28,7 @@ export interface ResourceRef {
 }
 
 const KNOWN: ResourceRef[] = [
+  { apiVersion: 'coordination.k8s.io/v1', kind: 'Lease', plural: 'leases', namespaced: true },
   { apiVersion: 'v1', kind: 'Node', plural: 'nodes', namespaced: false },
   { apiVersion: 'v1', kind: 'PersistentVolume', plural: 'persistentvolumes', namespaced: false },
   { apiVersion: 'v1', kind: 'Namespace', plural: 'namespaces', namespaced: false },

@@ -16,6 +16,12 @@ const reliableQuery = z.object({ after: z.coerce.number().int().min(0).max(Numbe
 /** 进程间接口（只在系统命名空间内可达）：业务任务与开发会话模块经它向 TaskRunner 下发命令、读取持久事件。 */
 export function internalRoutes(dispatch: ReturnType<typeof commandDispatch>, deps: Pick<SessionUseCaseDeps, 'events' | 'businessExecutions'>): Hono<AppEnv> {
   const r = new Hono<AppEnv>();
+  r.get('/internal/tasks/:taskId/executions/:executionId/completion-proof', async (c) => {
+    if (!deps.businessExecutions) throw precondition('可靠执行存储未启用');
+    const found = await deps.businessExecutions.completionProof(TaskIdSchema.parse(c.req.param('taskId')), c.req.param('executionId'));
+    if (!found) throw notFound('执行终态证明', c.req.param('executionId'));
+    return c.json(found);
+  });
   r.post('/internal/tasks/:taskId/executions/:executionId/consumed', async (c) => {
     if (!deps.businessExecutions) throw precondition('可靠执行存储未启用');
     const input = await parseBody(c, z.strictObject({ through: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), stopped: z.boolean().optional() }));

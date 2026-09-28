@@ -16,6 +16,10 @@ import { applyJob } from './jobApply';
 import { enqueueRoutesOfSlot, explainerFor, targetKey } from './routeExplainer';
 import { applySlot } from './slotApply';
 import { applyVolume, applyWorkload } from './workloadApply';
+import { applyArchive } from './archiveApply';
+import type { ArchiveOwners } from '../ports/ledger';
+import { reconcileWorkloadSafety } from './workloadSafety';
+import { reconcileTaskVolume } from './storage/taskVolume';
 
 /** 删的顺序（设计 §6.2）：先工作负载（Deployment、Job、Pod），再 Secret、Service、路由与它引用的中间件；PVC 只随工作卷记录删。 */
 const REMOVAL_ORDER: readonly ObservedKind[] = ['Deployment', 'Job', 'Pod', 'Secret', 'Service', 'IngressRoute', 'Middleware', 'PersistentVolumeClaim'];
@@ -31,6 +35,7 @@ const WAIT_MS = 2_000;
 export type Enqueue = (id: string, afterMs?: number) => void;
 
 export interface ReconcileDeps {
+  readonly archives?: ArchiveOwners;
   readonly ledger: LedgerObservations;
   readonly reader?: ManagedObjectReader;
   readonly signal?: AbortSignal;
@@ -88,7 +93,7 @@ async function observeRecord(deps: ReconcileDeps, record: LedgerRecordView): Pro
 async function removeChildren(deps: ReconcileDeps, record: LedgerRecordView, kinds: readonly ObservedKind[] = REMOVAL_ORDER): Promise<void> {
   const targets = targetsOf(record);
   for (const kind of kinds) {
-    if (kind === 'PersistentVolumeClaim' && record.kind !== 'volume') continue;
+    if (kind === 'PersistentVolumeClaim' && (record.kind !== 'volume' || record.spec['taskStorage'])) continue;
     for (const child of targets.filter((target) => target.kind === kind)) {
       const cached = deps.feed.cached(kind, child.namespace, child.name), uid = cached?.metadata.uid;
       if (!cached || !uid || cached.metadata.deletionTimestamp) continue;
@@ -112,6 +117,10 @@ async function settleVolume(deps: ReconcileDeps, volume: LedgerRecordView): Prom
   if (volume.conditions.some((entry) => entry.type === 'PendingReclaim' && entry.status === 'true')) return;
   const parent = await deps.ledger.get(volume.parentId);
   if (!parent || parent.desired !== 'absent' || parent.phase !== 'stopped') return;
+  if (volume.spec['taskStorage']) {
+    await deps.ledger.observeConditions(volume.id, [{ type: 'PendingReclaim', status: 'true', reason: 'task-finalization-required', message: '任务工作卷等待终结归档与停止证明，执行容器结束不会删除工作卷' }]);
+    return;
+  }
   const expired = parent.releaseReason?.code === RETENTION_EXPIRED;
   if (!expired && volume.spec['reclaim'] !== 'retain') return;
   const message = expired ? '失败会话的保留期已满，容器已回收；工作卷留作待回收，由管理员确认后删除' : '上级已结束，持久工作卷留作待回收，由管理员确认后删除';
@@ -258,6 +267,7 @@ async function applyNetworkPolicies(deps: ReconcileDeps, record: LedgerRecordVie
  * 它的删除仍是 release 的领域操作（下线），所以也不算「维护中」。构建、迁移 Job（T8）建一次，结束后删凭据、Job 交给 TTL。
  */
 const APPLIERS: Readonly<Record<string, (deps: ReconcileDeps, record: LedgerRecordView, enqueue: Enqueue) => Promise<void>>> = {
+  'archive-execution': applyArchive,
   route: applyRoute, 'rate-limit-policy': applyMiddlewares, namespace: applyNamespace, 'network-policy-set': applyNetworkPolicies,
   'dev-workspace': applyWorkload, 'business-workspace': applyWorkload, 'agent-execution': applyWorkload, volume: applyVolume, 'service-slot': (deps, record) => applySlot(deps, record),
   'build-job': (deps, record) => applyJob(deps, record), 'migration-job': (deps, record) => applyJob(deps, record),
@@ -270,6 +280,8 @@ const APPLIERS: Readonly<Record<string, (deps: ReconcileDeps, record: LedgerReco
 export async function reconcileRecord(deps: ReconcileDeps, id: string, enqueue: Enqueue): Promise<void> {
   const record = await deps.ledger.get(id);
   if (!record) return;
+  await reconcileWorkloadSafety(deps, record, enqueue);
+  if (record.spec['workloadConsumerId'] && record.conditions.some((c) => c.type === 'Failed' && c.status === 'true')) await removeChildren(deps, record, ['Pod']);
   await observeRecord(deps, record);
   await observeControlledPods(deps, record, enqueue);
   // 槽变了（上线、下线、部署就绪）：指向它的路由重新核对该指槽还是指说明页（D13）。
@@ -280,6 +292,7 @@ export async function reconcileRecord(deps: ReconcileDeps, id: string, enqueue: 
     if (current?.generation === record.generation && current.conditions.some((entry) => entry.type === 'Paused' && entry.status === 'true')) await removeChildren(deps, record, ['Secret']);
   }
   if (record.desired === 'present') await APPLIERS[record.kind]?.(deps, record, enqueue);
+  await reconcileTaskVolume(deps, record, enqueue);
   if (record.desired === 'absent') {
     if (record.kind === 'namespace') await retireNamespace(deps, record);
     if (record.kind === 'route') await arbitrateRoute(deps, record, enqueue);

@@ -3,6 +3,8 @@ import { ResourceIdSchema, TraceIdSchema } from '../../ids';
 import { VolumeModeSchema } from '../../manifest/tasks';
 import { BusinessExecutionFenceSchema } from './control';
 import { BusinessRecoveryExecutionSchema } from './recovery';
+import { CompletionPolicySchema } from '../object-storage/values';
+import { TaskInputObjectsSchema } from '../object-storage/taskInputs';
 import { BusinessCwdSchema, BusinessEnvironmentNameSchema, BusinessGenerationSchema, BusinessRequestKeySchema, BusinessTaskContractVersionSchema } from './executionValues';
 
 const mutation = { requestKey: BusinessRequestKeySchema, fence: BusinessExecutionFenceSchema.optional() };
@@ -10,8 +12,11 @@ export const CreateBusinessTaskV3Schema = z.strictObject({
   ...mutation, taskContractVersion: BusinessTaskContractVersionSchema,
   runtimeImageVersionId: ResourceIdSchema.optional(),
   volumeMode: VolumeModeSchema.optional(), taskProfileId: ResourceIdSchema.optional(), traceId: TraceIdSchema.optional(),
+  completionPolicy: CompletionPolicySchema.optional(),
+  inputObjects: TaskInputObjectsSchema.optional(),
   labels: z.record(z.string().min(1).max(128), z.string().max(1024)).default({}),
-});
+}).refine((input) => input.completionPolicy !== 'archive-and-delete' || input.volumeMode === 'persistent', '归档回收必须显式选择 persistent 工作卷')
+  .refine((input) => !input.inputObjects || input.completionPolicy === 'archive-and-delete', '对象输入需要归档终结策略保护引用');
 
 export const BusinessCommandEnvironmentSchema = z.record(BusinessEnvironmentNameSchema, z.string().max(32768).refine((value) => !value.includes('\0'), '环境变量值不能含 NUL'));
 const invocation = { ...mutation, name: z.string().trim().min(1).max(80), cwd: BusinessCwdSchema.optional() };

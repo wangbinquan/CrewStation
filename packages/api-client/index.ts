@@ -34,6 +34,8 @@ export type { ResourcesResource } from './resources/resources';
 export { newDraftResourceId } from './resourceId';
 export { createBusinessExecutionClient } from './businessApiClient';
 export type { BusinessExecutionClient } from './businessApiClient';
+export { createServiceStorageClient } from './serviceStorageClient';
+export type { ServiceStorageClient, ObjectContentUpload } from './serviceStorageClient';
 
 export type { RuntimeImagesResource, DevelopmentRuntimeImages } from './resources/runtimeImages';
 

@@ -1,4 +1,6 @@
+import { systemObservabilityRoute, systemObservationTaskRoute, projectObservabilityRoute, projectObservationTaskRoute } from './observabilityRoutes';
 import { businessRecoveryRoute } from './businessRecoveryRoute';
+import { objectStorageRoute, projectObjectStorageRoute } from './objectStorageRoute';
 import { runtimeImagesRoute, runtimeImageDetailRoute } from './runtimeImagesRoute';
 import { clusterRoute } from './clusterRoute';
 // 路由树装配：app/ 只负责骨架，页面路由由各 feature 的 index.ts 导出。
@@ -36,6 +38,9 @@ export const routeTree = rootRoute.addChildren([
       projectSettingsRoute,
       projectResourcesRoute,
       projectOperationsRoute,
+      projectObservabilityRoute,
+      projectObservationTaskRoute,
+      projectObjectStorageRoute,
       projectDevelopmentRoute,
       historicalConversationsRoute,
       releaseRoute,
@@ -51,6 +56,9 @@ export const routeTree = rootRoute.addChildren([
     runtimeImagesRoute,
     runtimeImageDetailRoute,
     businessRecoveryRoute,
+    systemObservabilityRoute,
+    systemObservationTaskRoute,
+    objectStorageRoute,
     adminOverviewRoute,
     adminProjectsRoute,
     adminProjectComputeRoute,

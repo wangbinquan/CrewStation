@@ -13,6 +13,7 @@ export const BusinessCapabilitiesDtoSchema = z.strictObject({
     summaryBytes: z.number().int().positive(), fileChunkBytes: z.number().int().positive(), eventPageDefault: z.number().int().positive(), eventPageMax: z.number().int().positive(),
     retentionDays: z.number().int().positive(), leaseSeconds: z.number().int().positive(), renewSeconds: z.number().int().positive(),
   }),
+  storage: z.strictObject({ version: z.literal(1), objects: z.boolean(), taskInputs: z.boolean(), finalization: z.boolean(), unavailableReason: z.string().nullable() }).optional(),
   agentProfiles: z.array(z.strictObject({ agentProfileId: ResourceIdSchema, computeProfileId: ResourceIdSchema, profileRevision: BusinessGenerationSchema, capabilities: BusinessAgentCapabilitiesSchema })),
 });
 

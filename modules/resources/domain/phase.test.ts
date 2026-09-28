@@ -29,6 +29,24 @@ describe('阶段规则（RFC-025 设计 §2.3）', () => {
     expect(computePhase({ ...pending, conditions: [cond('ReleasePending', 'false')] }).phase).toBe('stopped');
   });
 
+  test('protected workload retains occupancy until the exact consumer stop proof survives Pod deletion or pause', () => {
+    const pending = record({ kind: 'business-workspace', desired: 'absent', spec: { children: [], workloadConsumerId: 'consumer-2' }, children: [] });
+    expect(computePhase(pending).phase).toBe('stopping');
+    expect(computePhase({ ...pending, conditions: [cond('WorkloadStopped', 'true', { reason: 'consumer-1' })] }).phase).toBe('stopping');
+    expect(computePhase({ ...pending, conditions: [cond('WorkloadStopped', 'true', { reason: 'consumer-2' })] }).phase).toBe('stopped');
+    const paused = { ...pending, desired: 'present' as const, conditions: [cond('Paused', 'true')] };
+    expect(computePhase(paused).phase).toBe('stopping');
+    expect(computePhase({ ...paused, conditions: [...paused.conditions, cond('WorkloadStopped', 'true', { reason: 'consumer-2' })] }).phase).toBe('stopped');
+  });
+
+  test('archive helper termination alone does not release quota before the exact stop proof', () => {
+    const helper = record({ kind: 'archive-execution', purpose: 'archive-helper', spec: { children: [{ kind: 'Pod', namespace: 'cs-demo', name: 'task-1' }], workloadConsumerId: 'archive-consumer' }, children: [pod('Succeeded', false)] });
+    expect(computePhase(helper).phase).toBe('stopping');
+    expect(computePhase({ ...helper, conditions: [cond('WorkloadStopped', 'true', { reason: 'old-consumer' })] }).phase).toBe('stopping');
+    expect(computePhase({ ...helper, desired: 'absent', children: [], conditions: [cond('WorkloadStopped', 'true', { reason: 'archive-consumer' })] }).phase).toBe('stopped');
+    expect(computePhase({ ...helper, children: [pod('Running', true)] }).phase).toBe('ready');
+  });
+
   test('还没有 Pod：未准备好是排队中，否则分配中；Pod 在建或未就绪是启动中，原因带上等待说明', () => {
     expect(computePhase(record({ kind: 'agent-execution', conditions: [cond('Prepared', 'false')] })).phase).toBe('pending');
     expect(computePhase(record()).phase).toBe('provisioning');

@@ -1,10 +1,14 @@
-import type { RunnerBusinessEvent, StoredBusinessExecutionDto, RunnerCommand, RunnerEvent, RunnerHello, TaskId } from '@crewstation/contracts';
+import type { ExecutionCompletionProof, RunnerUsageMeasurement, RunnerUsageSourceIdentity, RunnerUsageSourcePage, RunnerBusinessEvent, StoredBusinessExecutionDto, RunnerCommand, RunnerEvent, RunnerHello, TaskId } from '@crewstation/contracts';
 
 export interface StoredEventDto { seq: number; at: string; event: RunnerEvent }
 
 /** session 模块对外能力（本进程内）；跨进程调用走 internal HTTP，客户端在 packages/session-client。 */
 export interface SessionModuleApi {
   readonly name: 'session';
+  nextBusinessUsageSource(): Promise<RunnerUsageSourcePage | undefined>;
+  readBusinessUsageMeasurement(source: RunnerUsageSourceIdentity, recordId: string, revision: number): Promise<RunnerUsageMeasurement | undefined>;
+  acknowledgeBusinessUsageSource(taskId: TaskId, executionId: string, through: number): Promise<void>;
+  getExecutionCompletionProof(taskId: TaskId, executionId: string): Promise<ExecutionCompletionProof | undefined>;
   consumeBusinessExecution(taskId: TaskId, executionId: string, through: number, stopped?: boolean): Promise<void>;
   getBusinessExecution(taskId: TaskId, executionId: string): Promise<StoredBusinessExecutionDto | undefined>;
   listBusinessExecutionEvents(taskId: TaskId, executionId: string, after: number, limit: number): Promise<RunnerBusinessEvent[]>;

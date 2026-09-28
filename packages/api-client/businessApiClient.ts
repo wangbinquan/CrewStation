@@ -5,7 +5,7 @@ import type {
   BusinessSubtaskMessageV3Input, BusinessSubtaskMutationInput, BusinessSubtaskV3Dto, BusinessTaskMutationInput, BusinessTaskV3Dto,
   CreateBusinessTaskV3Input, RetryBusinessSubtaskV3Input, SubmitBusinessSubtaskV3Input,
   BusinessRecoveryClaim, BusinessRecoveryClaimReceipt, BusinessRecoveryRead, BusinessRecoveryReject, BusinessRecoveryRequest,
-  RebuildBusinessTaskInput, RestartBusinessTaskInput,
+  RebuildBusinessTaskInput, RestartBusinessTaskInput, FinalizeBusinessTask, ReviseBusinessArchive, BusinessFinalizationDto,
 } from '@crewstation/contracts';
 import { IDENTITY_HEADERS } from '@crewstation/contracts';
 import type { RequestOptions, TransportOptions } from './httpTransport';
@@ -33,6 +33,9 @@ export interface BusinessExecutionClient {
   rebuild(taskId: string, input: RebuildBusinessTaskInput): Promise<BusinessOperationDto>;
   restart(taskId: string, input: RestartBusinessTaskInput): Promise<BusinessTaskV3Dto>;
   close(taskId: string, input: BusinessTaskMutationInput): Promise<BusinessOperationDto>;
+  finalize(taskId: string, input: FinalizeBusinessTask): Promise<BusinessFinalizationDto>;
+  finalization(taskId: string): Promise<BusinessFinalizationDto | null>;
+  reviseArchive(taskId: string, input: ReviseBusinessArchive): Promise<BusinessFinalizationDto>;
   material(taskId: string, input: BusinessMaterialRequestInput): Promise<BusinessMaterialDto>;
   events(taskId: string, query?: BusinessEventQueryInput): Promise<BusinessEventPage>;
   eventStreamUrl(taskId: string, query?: Omit<BusinessEventQueryInput, 'limit'>): string;
@@ -70,6 +73,8 @@ export function createBusinessExecutionClient(options: TransportOptions): Busine
     pause: (id, input) => post(`${task(id)}/pause`, input), resume: (id, input) => post(`${task(id)}/resume`, input), close: (id, input) => post(`${task(id)}/close`, input),
     rebuild: (id, input) => post(`${task(id)}/rebuild`, input),
     restart: (id, input) => post(`${task(id)}/restart`, input),
+    finalize: (id, input) => post(`${task(id)}/finalize`, input), finalization: (id) => get(`${task(id)}/finalization`),
+    reviseArchive: (id, input) => post(`${task(id)}/finalization/archive`, input),
     material: (id, input) => post(`${task(id)}/materials`, input), events: (id, query) => get(`${task(id)}/events`, query),
     eventStreamUrl: (id, query) => buildUrl(transport.baseUrl, `${task(id)}/events/stream`, query),
     file: (id, query) => get(`${task(id)}/file`, query), files: (id, query) => get(`${task(id)}/files`, query),

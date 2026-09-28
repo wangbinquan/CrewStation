@@ -9,6 +9,8 @@ export class Store {
     await this.db`CREATE TABLE IF NOT EXISTS execution_sample_control (id integer PRIMARY KEY CHECK(id=1), epoch bigint NOT NULL, owner text, phase text NOT NULL, expires_at timestamptz)`;
     await this.db`CREATE TABLE IF NOT EXISTS execution_sample_requests (request_key text PRIMARY KEY, digest text NOT NULL, response jsonb)`;
     await this.db`CREATE TABLE IF NOT EXISTS execution_sample_recovery (request_id text PRIMARY KEY, request jsonb NOT NULL, response jsonb)`;
+    await this.db`CREATE TABLE IF NOT EXISTS execution_sample_log_state (task_id text PRIMARY KEY, cursor text, pending_key text, complete boolean NOT NULL DEFAULT true, sealed boolean NOT NULL DEFAULT false, sealed_key text, manifest jsonb)`;
+    await this.db`CREATE TABLE IF NOT EXISTS execution_sample_log_chunks (request_key text PRIMARY KEY, task_id text NOT NULL, draft jsonb NOT NULL)`;
   }
   async ready(): Promise<boolean> { try { await this.db`SELECT epoch FROM execution_sample_control LIMIT 1`; return true; } catch { return false; } }
   async prepare(epoch: number, owner: string | null, phase: 'preparing' | 'active' | 'frozen', expiresAt: string | null): Promise<void> {

@@ -13,17 +13,6 @@ import_image() { # tag
   docker save "$1" | docker exec -i "$NODE" ctr -n k8s.io images import --no-unpack=false - >/dev/null
 }
 
-# 网络插件：集群还不是 Calico（Docker Desktop 自带的 kindnet 还在、calico-node 没全部就绪，或还有 Pod 用着 kindnet
-# 分配的地址）时，先整体迁过去：装 Calico、删 kindnet、按依赖重建旧地址上的全部 Pod。开发会话走集群管理的
-# 「管理员重启工作区」，保留工作卷，会话里的 CLI 要重开（作者 2026-09-23 裁定）。已经迁完时 --check 返回 0，什么都不动。
-CNI_STATUS=0
-"$ROOT/deploy/local/calico-cni.sh" --check || CNI_STATUS=$?
-case "$CNI_STATUS" in
-  0) ;;
-  10) log "网络插件迁移到 Calico，并重建旧地址上的全部 Pod"; "$ROOT/deploy/local/calico-cni.sh" ;;
-  *) echo "检查网络插件失败（calico-cni.sh --check 退出码 $CNI_STATUS）" >&2; exit "$CNI_STATUS" ;;
-esac
-
 if [[ "${SKIP_BUILD:-}" != "1" ]]; then
   log "构建镜像"
   docker build -q -f "$ROOT/deploy/docker/control-plane.Dockerfile" -t cs-control-plane:dev "$ROOT"
@@ -41,12 +30,27 @@ if [[ "${SKIP_BUILD:-}" != "1" ]]; then
     docker build -q -f "$ROOT/runtimes/task/Dockerfile" -t cs-task-runtime:dev "$ROOT"
   fi
   # 没建出来的镜像不导入，否则 docker save 会在这里失败。
-  for img in cs-control-plane:dev cs-builder:dev cs-console:dev cs-task-runtime:dev; do
+  for img in cs-builder:dev; do
     [[ -n "$(docker images -q "$img")" ]] || { log "跳过导入 $img（本地没有这个镜像）"; continue; }
     import_image "$img"
   done
 fi
 
+# The checked configuration IDs are imported and every deployment is rendered with immutable manifest digests.
+PINNED_DIRECTORY="$(mktemp -d "${TMPDIR:-/tmp}/cs-install-targets.XXXXXX")"
+trap 'rm -rf "$PINNED_DIRECTORY"' EXIT
+bun run "$ROOT/deploy/local/object-storage/targets.ts" bind "$PINNED_DIRECTORY/targets.json"
+apply_manifest() {
+  bun run "$ROOT/deploy/local/object-storage/targets.ts" render "$PINNED_DIRECTORY/targets.json" "$1" | kubectl apply -f - >/dev/null
+}
+# Compatibility is checked before any workload or CNI mutation.
+CNI_STATUS=0
+"$ROOT/deploy/local/calico-cni.sh" --check || CNI_STATUS=$?
+case "$CNI_STATUS" in
+  0) ;;
+  10) log "网络插件迁移到 Calico，并重建旧地址上的全部 Pod"; "$ROOT/deploy/local/calico-cni.sh" ;;
+  *) echo "检查网络插件失败（calico-cni.sh --check 退出码 $CNI_STATUS）" >&2; exit "$CNI_STATUS" ;;
+esac
 log "机密：crewstation-secrets"
 DB_URL="$(kubectl -n $NS get secret postgres-credentials -o jsonpath='{.data.url}' | base64 -d)"
 [[ -n "$DB_URL" ]] || { echo "postgres-credentials 缺少 url" >&2; exit 1; }
@@ -71,23 +75,30 @@ kubectl -n $NS create secret generic crewstation-secrets \
 
 log "配置集群指标凭据"
 bun run "$ROOT/deploy/local/configure-metrics.ts"
+if [[ "${CS_INSTALL_OBJECT_STORAGE:-}" == "1" ]]; then
+  bash "$ROOT/deploy/local/install-object-storage.sh" --infrastructure-only
+fi
 log "应用平台清单"
 kubectl apply -f "$ROOT/deploy/k8s/system/21-image-build-policy.yaml" >/dev/null
-kubectl apply -f "$ROOT/deploy/k8s/platform/00-rbac.yaml" -f "$ROOT/deploy/k8s/platform/10-config.yaml" >/dev/null
+apply_manifest "$ROOT/deploy/k8s/platform/00-rbac.yaml"
+apply_manifest "$ROOT/deploy/k8s/platform/10-config.yaml"
 kubectl -n $NS delete job crewstation-migrate --ignore-not-found >/dev/null
-kubectl apply -f "$ROOT/deploy/k8s/platform/20-migrate-job.yaml" >/dev/null
+apply_manifest "$ROOT/deploy/k8s/platform/20-migrate-job.yaml"
 log "等待迁移 Job"
 if ! kubectl -n $NS wait --for=condition=complete job/crewstation-migrate --timeout=180s >/dev/null 2>&1; then
   kubectl -n $NS logs job/crewstation-migrate --tail=50 || true
   echo "迁移失败" >&2; exit 1
 fi
-for f in 30-cs-api 31-cs-auth 32-cs-controller 33-cs-session 34-cs-events 35-console 36-mcp-capabilities 37-mcp-operations 38-cluster-metrics 40-gateway 41-registry-gateway; do kubectl apply -f "$ROOT/deploy/k8s/platform/$f.yaml" >/dev/null; done
+for f in 30-cs-api 31-cs-auth 32-cs-controller 33-cs-session 34-cs-events 35-console 36-mcp-capabilities 37-mcp-operations 38-cluster-metrics 40-gateway 41-registry-gateway; do apply_manifest "$ROOT/deploy/k8s/platform/$f.yaml"; done
 for d in cs-api cs-auth cs-controller cs-session cs-events console mcp-capabilities mcp-operations; do
   kubectl -n $NS rollout restart deployment/$d >/dev/null 2>&1 || true
   kubectl -n $NS rollout status deployment/$d --timeout=180s
 done
 kubectl -n $NS rollout status statefulset/prometheus --timeout=180s
 kubectl -n $NS rollout status daemonset/cs-storage-probe --timeout=180s
+if [[ "${CS_INSTALL_OBJECT_STORAGE:-}" == "1" ]]; then
+  kubectl -n $NS exec deployment/cs-api -- bun run apps/cs-api/src/main.ts storage-contract-enable
+fi
 # 首次安装只提供初始化入口；只有明确的无人值守选项才允许提前建号。
 source "$ROOT/deploy/local/initial-admin.sh"
 source "$ROOT/deploy/local/admin-credentials.sh"
@@ -95,15 +106,23 @@ CONSOLE_URL="${CS_CONSOLE_URL:-http://console.cs.localhost}"
 prepare_initial_admin "$ROOT" "$NS" "$CONSOLE_URL"
 
 # 平台底座镜像推进集群内仓库（RFC-006 §7.1）：档位镜像 FROM 它构建，档位保存时按摘要固定。
-if [[ "${CS_SKIP_TASK_RUNTIME:-}" == "1" ]]; then log "跳过推送平台底座（CS_SKIP_TASK_RUNTIME=1）"; else "$ROOT/deploy/local/publish-base-image.sh"; fi
+if [[ "${CS_SKIP_TASK_RUNTIME:-}" == "1" ]]; then log "跳过推送平台底座（CS_SKIP_TASK_RUNTIME=1）"; else
+  CS_BASE_IMAGE_SOURCE="$(bun run "$ROOT/deploy/local/object-storage/targets.ts" task-image "$PINNED_DIRECTORY/targets.json")" "$ROOT/deploy/local/publish-base-image.sh"
+fi
 
 # 需要管理员登录的步骤必须等用户完成初始化；显式提供凭据时保留自动播种。
 ADMIN_CREDENTIALS_AVAILABLE=0
 if [[ "$ADMIN_SETUP_PENDING" == "0" ]] && resolve_admin_credentials "$ROOT" 2>/dev/null; then
   ADMIN_CREDENTIALS_AVAILABLE=1
   "$ROOT/deploy/local/seed-catalog.sh"
+  if [[ "${CS_INSTALL_OBJECT_STORAGE:-}" == "1" && -z "${CS_OBJECT_STORAGE_SESSION_FILE:-}" ]]; then
+    CS_ADMIN_USERNAME="$ADMIN_USERNAME" CS_ADMIN_PASSWORD="$ADMIN_PASSWORD" bun run "$ROOT/deploy/local/object-storage/register.ts"
+  fi
 else
   log "套餐目录待管理员配置：创建并登录后在管理空间配置，或设置 CS_ADMIN_USERNAME／CS_ADMIN_PASSWORD 运行 deploy/local/seed-catalog.sh。"
+fi
+if [[ "$ADMIN_SETUP_PENDING" == "0" && "${CS_INSTALL_OBJECT_STORAGE:-}" == "1" && -n "${CS_OBJECT_STORAGE_SESSION_FILE:-}" ]]; then
+  bun run "$ROOT/deploy/local/object-storage/register.ts"
 fi
 
 # RFC-007：本机默认带上真实 OIDC 的一键角色入口；CI 和不需要角色验收的环境可显式跳过。

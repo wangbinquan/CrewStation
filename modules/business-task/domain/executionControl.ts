@@ -14,6 +14,7 @@ export interface MigrationFreeze {
   preparationDigest?: string; receiptPodUid?: string;
 }
 export interface ExecutionControl extends Omit<BusinessControlDto, 'leaseId' | 'operationId' | 'migration'> {
+  storageSync?: { version: number; acknowledgedVersion: number };
   migration?: MigrationFreeze;
   serviceId: string; leaseId: string | null; leasePodUid: string | null; preparationDigest: string | null; handoff?: ExecutionHandoff;
 }
@@ -21,6 +22,12 @@ export interface ExecutionControl extends Omit<BusinessControlDto, 'leaseId' | '
 export const CONTROL_LEASE_SECONDS = 30;
 export function liveControl(control: ExecutionControl, now: Date): boolean {
   return control.leaseId !== null && control.leaseExpiresAt !== null && Date.parse(control.leaseExpiresAt) > now.getTime();
+}
+export function storageControlAcknowledged(control: ExecutionControl): boolean {
+  return !control.storageSync || control.storageSync.acknowledgedVersion === control.storageSync.version;
+}
+export function activeExecutionControl(control: ExecutionControl, now: Date): boolean {
+  return control.phase === 'active' && liveControl(control, now) && storageControlAcknowledged(control) && (!control.handoff || control.handoff.stage === 'complete');
 }
 export function nextEpoch(epoch: number): number {
   if (!Number.isSafeInteger(epoch + 1)) throw precondition('执行世代已达安全上限');
@@ -41,7 +48,7 @@ export function assertExecutionFence(control: ExecutionControl | undefined, auth
   if (!control || !authorization?.fence) staleControl();
   const { source, fence } = authorization;
   assertControlLease(control, source, { ...fence, expectedEpoch: fence.epoch }, now);
-  if (control.phase !== 'active' || (control.handoff && control.handoff.stage !== 'complete')) staleControl();
+  if (!activeExecutionControl(control, now)) staleControl();
   return control.epoch;
 }
 export function controlDto(control: ExecutionControl | undefined, now: Date): BusinessControlDto {
@@ -50,7 +57,7 @@ export function controlDto(control: ExecutionControl | undefined, now: Date): Bu
   return {
     ...(control.migration ? { migration: { operationId: control.migration.operationId, targetReleaseId: control.migration.targetReleaseId, applicationReady: !!control.migration.preparationDigest } } : {}),
     activeReleaseId: control.activeReleaseId, physicalSlot: control.physicalSlot, epoch: control.epoch,
-    phase: !live && ['active', 'preparing'].includes(control.phase) ? (control.handoff && control.handoff.stage !== 'complete' ? 'frozen' : 'inactive') : control.phase,
+    phase: !live && ['active', 'preparing'].includes(control.phase) ? (control.handoff && control.handoff.stage !== 'complete' ? 'frozen' : 'inactive') : control.phase === 'active' && !storageControlAcknowledged(control) ? 'preparing' : control.phase,
     leaseOwner: live ? control.leaseOwner : null, leaseExpiresAt: live ? control.leaseExpiresAt : null,
     ...(live && control.leaseId ? { leaseId: control.leaseId } : {}), ...(control.handoff ? { operationId: control.handoff.operationId } : {}),
   };

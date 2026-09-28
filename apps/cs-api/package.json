@@ -10,6 +10,7 @@
     "migrate": "bun run src/main.ts migrate"
   },
   "dependencies": {
+    "@crewstation/contracts": "workspace:*",
     "@crewstation/http": "workspace:*",
     "@crewstation/k8s": "workspace:*",
     "@crewstation/kernel": "workspace:*",

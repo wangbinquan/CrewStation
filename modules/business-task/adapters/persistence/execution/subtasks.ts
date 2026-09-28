@@ -6,7 +6,7 @@ import type { Database, Executor } from '@crewstation/persistence';
 import type { TaskId } from '@crewstation/contracts';
 import type { ExecutionSubtask } from '../../../domain/executionSubtask';
 import type { ExecutionSubtasks, SubtaskCandidate } from '../../../ports/executionSubtasks';
-import { liveControl, type ExecutionAuthorization } from '../../../domain/executionControl';
+import { activeExecutionControl, type ExecutionAuthorization } from '../../../domain/executionControl';
 import { ownedRecovery } from '../recovery/ownership';
 import { authorizeExecution, executionTransaction, readExecutionControl } from '../executionTransaction';
 import { executionSubtasks as tasks } from './subtaskTables';
@@ -20,6 +20,10 @@ const ready = () => or(eq(tasks.dispatch, 'pending'), eq(tasks.dispatch, 'unknow
 /** One versioned journal for request identity, immutable input, and dispatch ownership. */
 export function drizzleExecutionSubtasks(db: Database): ExecutionSubtasks {
   return {
+    forRuntimeExecution: async (runtimeTaskId, executionId) => {
+      const [row] = await db.select().from(tasks).where(and(sql`${tasks.view}->>'executionId' = ${executionId}`, sql`COALESCE(${tasks.runtimeTaskId}, ${tasks.taskId}) = ${runtimeTaskId}`)).limit(1);
+      return row && rowView(row);
+    },
     checkpointRuntime: async (claim) => (await db.update(tasks).set({ runtimeDispatched: true }).where(and(leased(claim), sql`NOT (${tasks.view} ? 'cancelRequestedAt')`)).returning()).length === 1,
     markRuntimeReleased: (subtask) => executionTransaction(db, subtask.serviceId, async (tx) => { const rows = await tx.update(tasks).set({ runtimeReleased: true }).where(and(eq(tasks.id, subtask.view.id), sql`${tasks.view}->>'state' IN ('succeeded','failed','cancelled')`)).returning(); if (rows.length) await releaseSessionHome(tx, rowView(rows[0]!)); }),
     cleanupCandidates: async (limit) => (await db.select().from(tasks).where(sql`${tasks.runtimeTaskId} IS NOT NULL AND ${tasks.runtimeReleased} = false AND ${tasks.view}->>'state' IN ('succeeded','failed','cancelled') AND NOT EXISTS (SELECT 1 FROM business_task.execution_messages m WHERE m.subtask_id=${tasks.id} AND m.state NOT IN ('succeeded','failed'))`).orderBy(asc(tasks.updatedAt)).limit(limit)).map(rowView),
@@ -57,7 +61,7 @@ export function drizzleExecutionSubtasks(db: Database): ExecutionSubtasks {
     checkpoint: (claim, incarnation) => executionTransaction(db, claim.serviceId, async (tx, now) => {
       if (!claim.incarnation) {
         const control = await readExecutionControl(tx, claim.serviceId);
-        if ((control || claim.fenced) && (!control || control.phase !== 'active' || !liveControl(control, now) || control.epoch !== claim.epoch || (control.handoff && control.handoff.stage !== 'complete'))) return false;
+        if ((control || claim.fenced) && (!control || !activeExecutionControl(control, now) || control.epoch !== claim.epoch)) return false;
       }
       return (await tx.update(tasks).set({ incarnation, updatedAt: now }).where(and(leased(claim), sql`NOT (${tasks.view} ? 'cancelRequestedAt')`, or(sql`${tasks.incarnation} IS NULL`, eq(tasks.incarnation, incarnation)))).returning()).length === 1;
     }),
@@ -86,7 +90,7 @@ async function claimSubtask(db: Database, owner: string, id?: string): Promise<E
       if (!row.incarnation && !(row.runtimeDispatched && !row.runtimeAdmitted)) {
         const control = await readExecutionControl(tx, row.serviceId);
         if (control || row.epoch !== null) {
-          if (!control || control.phase !== 'active' || !liveControl(control, now) || control.epoch !== row.epoch || (control.handoff && control.handoff.stage !== 'complete')) {
+          if (!control || !activeExecutionControl(control, now) || control.epoch !== row.epoch) {
             if (row.dispatch !== 'pending') await tx.update(tasks).set({ dispatch: 'pending', owner: null, leaseUntil: null, updatedAt: now }).where(eq(tasks.id, row.id));
             return undefined;
           }

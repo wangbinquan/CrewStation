@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { MeasurementRequestSchema } from './protocol';
 import type { MeasurementResponse } from './protocol';
 import { measureDirectory } from './measure';
+import { AbsenceRequestSchema, directoryAbsent } from './absence';
 
 export function createFilesystemMetricsHandler(options: { token: string; roots: Record<string, string>; timeoutMs?: number }) {
   if (options.token.length < 32) throw new Error('A dedicated measurement token of at least 32 characters is required');
@@ -11,11 +12,16 @@ export function createFilesystemMetricsHandler(options: { token: string; roots: 
     if (path === '/healthz' && request.method === 'GET') return Response.json({ ok: true });
     const supplied = Buffer.from(request.headers.get('authorization') ?? '');
     if (credential.length !== supplied.length || !timingSafeEqual(credential, supplied)) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    if (path !== '/measure' || request.method !== 'POST') return new Response(null, { status: 404 });
+    if (!['/measure', '/absence'].includes(path) || request.method !== 'POST') return new Response(null, { status: 404 });
     if (busy) return Response.json({ error: 'A measurement is already running' }, { status: 409 });
     if (Number(request.headers.get('content-length')) > 16_384) return new Response(null, { status: 413 });
     busy = true;
     try {
+      if (path === '/absence') {
+        const target = AbsenceRequestSchema.parse(JSON.parse(await boundedBody(request))), root = options.roots[target.rootId];
+        if (!root) throw new Error('Unknown root');
+        return Response.json({ key: target.key, absent: await directoryAbsent(root, target.directory), observedAt: new Date().toISOString() });
+      }
       const body = await boundedBody(request), parsed = MeasurementRequestSchema.safeParse(JSON.parse(body));
       if (!parsed.success) return Response.json({ error: 'Invalid measurement targets' }, { status: 400 });
       const items: MeasurementResponse['items'] = [], requestSignal = AbortSignal.any([request.signal, AbortSignal.timeout(55_000)]);

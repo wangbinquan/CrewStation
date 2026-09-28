@@ -4,8 +4,9 @@ import { isPlatformError, precondition } from '@crewstation/kernel';
 import type { ExecutionOperation, OperationLease } from '../domain/taskAdmission';
 import type { ExecutionOperations } from '../ports/executionOperations';
 import type { Environments } from '../ports/runtime';
+import type { TaskInputPreparation } from '../ports/storage/taskInputs';
 
-export interface TaskAdmissionDispatchDeps { runtimeImages?: BusinessRuntimeImages; operations: ExecutionOperations; environments: Pick<Environments, 'createEnvironment' | 'getEnvironment' | 'restartBusinessWorkspace'> }
+export interface TaskAdmissionDispatchDeps { taskInputs?: TaskInputPreparation; runtimeImages?: BusinessRuntimeImages; operations: ExecutionOperations; environments: Pick<Environments, 'createEnvironment' | 'getEnvironment' | 'restartBusinessWorkspace'> }
 
 /** 固定 taskId 贯穿意图和资源准入；丢回执后先对账，不能把已建资源改成容量拒绝。 */
 export async function dispatchTaskAdmission(deps: TaskAdmissionDispatchDeps, operation: ExecutionOperation): Promise<void> {
@@ -13,6 +14,10 @@ export async function dispatchTaskAdmission(deps: TaskAdmissionDispatchDeps, ope
   const lease = { id: operation.id, owner: operation.lease.owner, revision: operation.revision };
   const task = operation.intent.task;
   try {
+    if (operation.intent.inputObjects) {
+      if (!deps.taskInputs) throw precondition('任务对象输入能力未配置');
+      await deps.taskInputs.prepare({ projectId: operation.intent.projectId, serviceId: task.serviceId, taskId: task.id, generation: task.generation, items: operation.intent.inputObjects });
+    }
     if (task.runtimeImage) {
       if (!deps.runtimeImages) throw new Error('任务镜像确认端口尚未配置');
       await deps.runtimeImages.confirmTask(task.runtimeImage, task.id);
@@ -24,8 +29,11 @@ export async function dispatchTaskAdmission(deps: TaskAdmissionDispatchDeps, ope
     } else await deps.environments.createEnvironment({
       admission: { id: task.id as TaskId, fingerprint: operation.effectiveDigest }, serviceId: task.serviceId as ServiceId, kind: 'business',
       businessStorage: 'isolated-v1', ...(task.runtimeImage ? { runtimeImage: task.runtimeImage } : {}),
+      ...(task.completionPolicy === 'archive-and-delete' ? { completionPolicy: task.completionPolicy } : {}),
+      ...(operation.intent.inputObjects ? { objectInputsGeneration: task.generation } : {}),
       volumeMode: task.volumeMode, profile: task.taskProfileId, traceId: task.traceId as TraceId, labels: operation.intent.environmentLabels,
     });
+    if (operation.intent.inputObjects) await deps.taskInputs!.commit(task.id, task.generation);
     await deps.operations.settle(lease, 'succeeded');
   } catch (error) {
     await reconcileAdmission(deps, operation, lease, error);
@@ -35,6 +43,7 @@ export async function dispatchTaskAdmission(deps: TaskAdmissionDispatchDeps, ope
 async function reconcileAdmission(deps: TaskAdmissionDispatchDeps, operation: ExecutionOperation, lease: OperationLease, error: unknown): Promise<void> {
   try {
     if (await deps.environments.getEnvironment(operation.intent.task.id as TaskId)) {
+      if (operation.intent.inputObjects) await deps.taskInputs!.commit(operation.intent.task.id, operation.intent.task.generation);
       await deps.operations.settle(lease, 'succeeded');
       return;
     }
@@ -47,8 +56,10 @@ async function reconcileAdmission(deps: TaskAdmissionDispatchDeps, operation: Ex
     // 上一 worker 的调用可能尚在网络／资源准入临界区；一次不存在查询不能证明它不会迟到成功。
     await deps.operations.settle(lease, 'pending', 'admission_unknown');
   } else if (isPlatformError(error) && error.kind === 'quota_exceeded') {
+    if (operation.intent.inputObjects) await deps.taskInputs?.abort(operation.intent.task.id, operation.intent.task.generation, true);
     await deps.operations.settle(lease, 'retryable-rejected', 'quota_exceeded');
   } else if (isPlatformError(error) && ['validation', 'forbidden', 'not_found', 'precondition', 'conflict'].includes(error.kind)) {
+    if (operation.intent.inputObjects) await deps.taskInputs?.abort(operation.intent.task.id, operation.intent.task.generation, false);
     await deps.operations.settle(lease, 'failed', operation.intent.restartOf ? String(error.details?.['code'] ?? error.kind) : error.kind);
   } else {
     await deps.operations.settle(lease, 'pending', 'admission_unknown');

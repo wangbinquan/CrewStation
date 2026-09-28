@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { ProjectId, ReleaseId, ServiceId } from '@crewstation/contracts';
+import { ManifestSchema } from '@crewstation/contracts';
 import { eventbusMigrations } from '@crewstation/eventbus';
 import type { Logger } from '@crewstation/kernel';
 import type { ResourcesModule } from '@crewstation/module-resources';
@@ -127,6 +128,24 @@ describe.skipIf(!available)('服务槽投影进资源台账（RFC-025 第三期�
     const broken = drizzleUnitOfWork(database.db, { ledger: { within: () => ({ declare: async () => { throw new Error('台账暂时不可用'); }, find: async () => undefined, report: async () => undefined }) }, services, logger });
     await broken.run(async (scope) => { await scope.ledger?.job({ kind: 'build-job', releaseId, tag: 'v0.1.1', projectId, namespace: 'cs-demo', jobName: 'build-x' }); });
     expect(warnings).toContain('resource ledger job projection failed');
+  });
+
+  test('对象空间消费边由当前槽实际发布声明决定，切回旧版不残留对象标记', async () => {
+    const uow = drizzleUnitOfWork(database.db, { ledger, services, logger }), objectsRelease = Bun.randomUUIDv7() as ReleaseId;
+    await uow.run(async (scope) => {
+      const original = (await scope.releases.getById(releaseId))!;
+      const manifest = ManifestSchema.parse({ apiVersion: 'crewstation/v3', kind: 'DigitalWorker', spec: { service: { command: ['app'], port: 3000, servicePlanId: projectId }, data: { objects: { planId: projectId } } } });
+      await scope.releases.insert({ ...original, id: objectsRelease, tag: 'v1.0.0-objects', manifest });
+      const slots = (await scope.slots.get(serviceId))!;
+      await scope.slots.save(withSlot(slots, { physical: 'blue', releaseId: objectsRelease, state: 'ready', replicas: 1, readyReplicas: 1, updatedAt: now }, now));
+    });
+    expect((await slotRecord(serviceId, 'blue'))?.display).toMatchObject({ serviceId, releaseId: objectsRelease, objectStorage: 'true' });
+    expect((await slotRecord(serviceId, 'green'))?.display.objectStorage).toBeUndefined();
+    await uow.run(async (scope) => {
+      const slots = (await scope.slots.get(serviceId))!;
+      await scope.slots.save(withSlot(slots, { ...slots.blue, releaseId }, now));
+    });
+    expect((await slotRecord(serviceId, 'blue'))?.display.objectStorage).toBeUndefined();
   });
 
   test('补投影工作器：启动即跑一次、此后按周期；失败只记告警；停止时等本轮跑完', async () => {

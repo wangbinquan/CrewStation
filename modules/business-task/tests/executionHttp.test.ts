@@ -33,6 +33,14 @@ describe.skipIf(!available)('RFC-027 v3 真实 HTTP 与持久受理', () => {
     expect(await drizzleExecutionOperations(tdb.db).find({ serviceId: f.serviceId, parentId: '', kind: 'create-task', requestKey: 'create' })).toBeUndefined();
   });
 
+  test('归档终结链未装配时明确拒绝新策略，不能丢弃字段后启动普通任务', async () => {
+    const f = await active(), requestKey = newResourceId();
+    const response = await f.request(root, { requestKey, taskContractVersion: 'v1', volumeMode: 'persistent', completionPolicy: 'archive-and-delete', fence: f.fence });
+    expect(response.status).toBe(412); expect(await response.json()).toMatchObject({ details: { code: 'finalization_unavailable' } });
+    expect(f.behavior.starts).toBe(0);
+    expect(await drizzleExecutionOperations(tdb.db).find({ serviceId: f.serviceId, parentId: '', kind: 'create-task', requestKey })).toBeUndefined();
+  });
+
   test('首次 201、重复 200：并发和重建模块仍是同任务、原 trace 和固定 defaults；GET 不启动执行', async () => {
     const f = await active(), body = { requestKey: 'one', taskContractVersion: 'v1', fence: f.fence };
     const responses = await Promise.all(Array.from({ length: 8 }, () => f.request(root, body, 'trusted', { 'x-cs-trace-id': 'a'.repeat(32) })));

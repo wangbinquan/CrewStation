@@ -6,8 +6,11 @@ import {
 } from './serviceSpec';
 import { TasksSpecSchema } from './tasks';
 import { requireRuntimeImageManifestVersion } from './runtimeImages';
+import { ObjectStorageDeclarationSchema } from '../api/object-storage/requests';
+import { requireObjectStorageManifestVersion } from './objectStorage';
 
 const baseSpec = {
+  data: z.never().optional(),
   service: ServiceSpecSchema,
   development: DevelopmentSpecSchema.optional(),
   env: z.array(EnvEntrySchema).default([]),
@@ -19,6 +22,7 @@ export const DigitalWorkerManifestSchema = z.object({
   kind: z.literal('DigitalWorker'),
   spec: z.object({
     ...baseSpec,
+    data: ObjectStorageDeclarationSchema.optional(),
     apis: z.object({
       requested: z.array(RequestedApiSchema).default([]),
       exposes: ExposedApiSchema.optional(),
@@ -26,7 +30,7 @@ export const DigitalWorkerManifestSchema = z.object({
     subscriptions: z.array(SubscriptionSchema).default([]),
     tasks: TasksSpecSchema.optional(),
   }),
-}).superRefine(requireRuntimeImageManifestVersion);
+}).superRefine(requireRuntimeImageManifestVersion).superRefine(requireObjectStorageManifestVersion);
 
 export const ApiProxyManifestSchema = z.object({
   apiVersion: ManifestApiVersionSchema,

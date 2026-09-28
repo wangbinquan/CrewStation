@@ -1,5 +1,7 @@
+import { appendBusinessUsageSources } from './businessUsageSources';
 import { assertBusinessStreamOpen, lockBusinessStream } from './stoppedExecutions';
 import { businessRetention } from './businessRetention';
+import { readCompletionProof } from './completionProofs';
 import { and, asc, eq, gt, inArray, lt, or, sql } from 'drizzle-orm';
 import type { RunnerBusinessEvent, RunnerBusinessReceipt, TaskId } from '@crewstation/contracts';
 import { BusinessExecutionEventSchema, BusinessExecutionReceiptSchema, businessFrameOutputBytes } from '@crewstation/contracts';
@@ -41,6 +43,7 @@ async function locked(tx: Executor, taskId: TaskId, executionId: string): Promis
 /** 每条执行一个短行锁；重复和乱序先落库，只有连续水位才允许 ACK Runner。 */
 export function drizzleBusinessExecutionStore(db: Database): BusinessExecutionStore {
   return {
+    completionProof: (taskId, executionId) => readCompletionProof(db, taskId, executionId),
     ...businessRetention(db),
     register: (taskId, raw) => db.transaction(async (tx) => {
       const receipt = checkedReceipt(raw);
@@ -60,6 +63,7 @@ export function drizzleBusinessExecutionStore(db: Database): BusinessExecutionSt
         sameExecution(current.receipt, receipt);
         if (current.receipt.phase === 'finished' && batch.some((event) => event.sequence > current.receipt.lastSequence)) throw conflict('不能在最终水位之后追加事件');
         const added = await appendBatch(tx, taskId, receipt.executionId, batch);
+        await appendBusinessUsageSources(tx, taskId, receipt, added.map((item) => item.event));
         const outputBytes = current.outputBytes + added.reduce((sum, item) => sum + businessFrameOutputBytes(item.event.frame), 0);
         if (outputBytes > 64 * 1024 * 1024) throw validation('执行输出超过平台容量');
         const candidate = receipt.lastSequence >= current.receipt.lastSequence && current.receipt.phase !== 'finished' ? receipt : current.receipt;

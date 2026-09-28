@@ -1,0 +1,10 @@
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 145px), 1fr)); gap: 12px; margin: 0; }
+.stats div { min-width: 0; }
+.stats dt { color: var(--cs-color-text-muted); font-size: 12px; }
+.stats dd { margin: 4px 0 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr)); gap: 12px; }
+.code { overflow-wrap: anywhere; font-family: var(--cs-font-mono); font-size: 12px; }
+.muted { color: var(--cs-color-text-muted); font-size: 12px; }
+.warning { color: var(--cs-tone-warning-fg); }
+.compact { display: block; margin-top: 3px; }
+.formGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 16px; }

@@ -125,6 +125,58 @@ spec:
       middlewares: [{ name: drop-identity-headers }, { name: forward-auth-user }, { name: rate-limit-platform-api }, { name: in-flight-platform-api }]
       services: [{ name: cs-api, port: 8080 }]
 ---
+# RFC-035 用户观测路由；服务专用 /v3/objects 与执行路由不在用户域开放。
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: console-object-storage
+  namespace: crewstation-system
+spec:
+  entryPoints: [web]
+  routes:
+    - match: Host(`console.cs.localhost`) && PathRegexp(`^/v3/(admin/object-storage(/|$)|projects/[^/]+/object-storage(/|$)|object-storage(/|$))`)
+      kind: Rule
+      priority: 90
+      middlewares: [{ name: drop-identity-headers }, { name: forward-auth-user }, { name: rate-limit-platform-api }, { name: in-flight-platform-api }]
+      services: [{ name: cs-api, port: 8080 }]
+---
+# RFC-035 transfer concurrency is separate from ordinary console API requests.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: in-flight-object-storage
+  namespace: crewstation-system
+spec:
+  inFlightReq: { amount: 64 }
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: console-object-download
+  namespace: crewstation-system
+spec:
+  entryPoints: [web]
+  routes:
+    - match: Host(`console.cs.localhost`) && Method(`GET`) && PathRegexp(`^/v3/object-storage/objects/[^/]+/content$`)
+      kind: Rule
+      priority: 96
+      middlewares: [{ name: drop-identity-headers }, { name: forward-auth-user }, { name: rate-limit-platform-api }, { name: in-flight-object-storage }]
+      services: [{ name: cs-api, port: 8087 }]
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: platform-object-storage
+  namespace: crewstation-system
+spec:
+  entryPoints: [objects]
+  routes:
+    - match: Host(`api.svc.cs.internal`) && PathRegexp(`^/v3/objects(/|$)`)
+      kind: Rule
+      priority: 90
+      middlewares: [{ name: drop-identity-headers }, { name: forward-auth-service }, { name: in-flight-object-storage }]
+      services: [{ name: cs-api, port: 8087 }]
+---
 # 资源推送流（SSE 长连接，RFC-025 §8）：限建连的频率，不挂并发上限。
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute

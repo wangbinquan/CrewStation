@@ -15,6 +15,10 @@
         "traceId": "x-cs-trace-id",
         "requestId": "x-cs-request-id"
       },
+      "OBJECT_HEADERS": {
+        "fence": "x-cs-object-fence",
+        "sha256": "x-cs-object-sha256"
+      },
       "PLATFORM_ENV": {
         "project": "CS_PROJECT",
         "service": "CS_SERVICE",
@@ -26,6 +30,8 @@
         "internalApiBase": "CS_INTERNAL_API_BASE",
         "jwksUrl": "CS_JWKS_URL",
         "databaseUrl": "CS_DATABASE_URL",
+        "objectSpaceId": "CS_OBJECT_SPACE_ID",
+        "objectsUrl": "CS_OBJECTS_URL",
         "port": "PORT",
         "taskId": "CS_TASK_ID",
         "traceId": "CS_TRACE_ID"
@@ -38,6 +44,7 @@
       "TOKEN_CLAIMS": {
         "sourceIp": "cs_source_ip",
         "sourcePodUid": "cs_source_pod_uid",
+        "sourceTaskId": "cs_source_task_id",
         "sourceReleaseId": "cs_source_release_id",
         "sourcePhysicalSlot": "cs_source_physical_slot",
         "issuer": "crewstation",
@@ -87,6 +94,13 @@
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "additionalProperties": false,
           "properties": {
+            "completionPolicy": {
+              "enum": [
+                "archive-and-delete",
+                "legacy"
+              ],
+              "type": "string"
+            },
             "fence": {
               "additionalProperties": false,
               "properties": {
@@ -110,6 +124,35 @@
                 "leaseId"
               ],
               "type": "object"
+            },
+            "inputObjects": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "objectId": {
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                    "type": "string"
+                  },
+                  "path": {
+                    "maxLength": 1024,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "sha256": {
+                    "pattern": "^[a-f0-9]{64}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "objectId",
+                  "path",
+                  "sha256"
+                ],
+                "type": "object"
+              },
+              "maxItems": 100,
+              "minItems": 1,
+              "type": "array"
             },
             "labels": {
               "additionalProperties": {
@@ -1133,6 +1176,13 @@
               "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
               "type": "string"
             },
+            "completionPolicy": {
+              "enum": [
+                "archive-and-delete",
+                "legacy"
+              ],
+              "type": "string"
+            },
             "contractDigest": {
               "pattern": "^[a-f0-9]{64}$",
               "type": "string"
@@ -1491,6 +1541,7 @@
                 "closing",
                 "creating",
                 "failed",
+                "finalizing",
                 "paused",
                 "pausing",
                 "running"
@@ -2444,6 +2495,7 @@
                               "closing",
                               "creating",
                               "failed",
+                              "finalizing",
                               "paused",
                               "pausing",
                               "running"
@@ -3357,6 +3409,38 @@
             "releaseId": {
               "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "type": "string"
+            },
+            "storage": {
+              "additionalProperties": false,
+              "properties": {
+                "finalization": {
+                  "type": "boolean"
+                },
+                "objects": {
+                  "type": "boolean"
+                },
+                "taskInputs": {
+                  "type": "boolean"
+                },
+                "unavailableReason": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "version": {
+                  "const": 1,
+                  "type": "number"
+                }
+              },
+              "required": [
+                "finalization",
+                "objects",
+                "taskInputs",
+                "unavailableReason",
+                "version"
+              ],
+              "type": "object"
             }
           },
           "required": [
@@ -3364,6 +3448,1547 @@
             "limits",
             "protocolVersion",
             "releaseId"
+          ],
+          "type": "object"
+        }
+      },
+      "CreateObjectUpload": {
+        "direction": "business-to-platform",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "fence": {
+              "additionalProperties": false,
+              "properties": {
+                "epoch": {
+                  "maximum": 9007199254740991,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "instanceId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "leaseId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "epoch",
+                "instanceId",
+                "leaseId"
+              ],
+              "type": "object"
+            },
+            "mediaType": {
+              "default": "application/octet-stream",
+              "maxLength": 255,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "type": "string"
+            },
+            "name": {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            "requestKey": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u001f\\u007f]+$",
+              "type": "string"
+            },
+            "sha256": {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            "size": {
+              "maximum": 1073741824,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "name",
+            "requestKey",
+            "sha256",
+            "size"
+          ],
+          "type": "object"
+        }
+      },
+      "CommitObjectUpload": {
+        "direction": "business-to-platform",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "fence": {
+              "additionalProperties": false,
+              "properties": {
+                "epoch": {
+                  "maximum": 9007199254740991,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "instanceId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "leaseId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "epoch",
+                "instanceId",
+                "leaseId"
+              ],
+              "type": "object"
+            },
+            "requestKey": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u001f\\u007f]+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "requestKey"
+          ],
+          "type": "object"
+        }
+      },
+      "DeleteStoredObject": {
+        "direction": "business-to-platform",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "expectedRevision": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "fence": {
+              "additionalProperties": false,
+              "properties": {
+                "epoch": {
+                  "maximum": 9007199254740991,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "instanceId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "leaseId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "epoch",
+                "instanceId",
+                "leaseId"
+              ],
+              "type": "object"
+            },
+            "requestKey": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u001f\\u007f]+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "expectedRevision",
+            "requestKey"
+          ],
+          "type": "object"
+        }
+      },
+      "ObjectReference": {
+        "direction": "business-to-platform",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "fence": {
+              "additionalProperties": false,
+              "properties": {
+                "epoch": {
+                  "maximum": 9007199254740991,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "instanceId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "leaseId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "epoch",
+                "instanceId",
+                "leaseId"
+              ],
+              "type": "object"
+            },
+            "ownerId": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            "ownerType": {
+              "enum": [
+                "application",
+                "material-version"
+              ],
+              "type": "string"
+            },
+            "requestKey": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u001f\\u007f]+$",
+              "type": "string"
+            },
+            "revision": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "ownerId",
+            "ownerType",
+            "requestKey",
+            "revision"
+          ],
+          "type": "object"
+        }
+      },
+      "ObjectPageQuery": {
+        "direction": "business-to-platform",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "cursor": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            "limit": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "CreateArchivePlan": {
+        "direction": "business-to-platform",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "fence": {
+              "additionalProperties": false,
+              "properties": {
+                "epoch": {
+                  "maximum": 9007199254740991,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "instanceId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "leaseId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "epoch",
+                "instanceId",
+                "leaseId"
+              ],
+              "type": "object"
+            },
+            "requestKey": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u001f\\u007f]+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "requestKey"
+          ],
+          "type": "object"
+        }
+      },
+      "ArchivePlanPage": {
+        "direction": "business-to-platform",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "entries": {
+              "items": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "expectedSize": {
+                        "maximum": 1073741824,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "kind": {
+                        "const": "file",
+                        "type": "string"
+                      },
+                      "name": {
+                        "maxLength": 255,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "path": {
+                        "maxLength": 1024,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "required": {
+                        "default": true,
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "name",
+                      "path"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "object",
+                        "type": "string"
+                      },
+                      "name": {
+                        "maxLength": 255,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "objectId": {
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "name",
+                      "objectId"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "maxItems": 100,
+              "minItems": 1,
+              "type": "array"
+            },
+            "expectedRevision": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "fence": {
+              "additionalProperties": false,
+              "properties": {
+                "epoch": {
+                  "maximum": 9007199254740991,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "instanceId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "leaseId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "epoch",
+                "instanceId",
+                "leaseId"
+              ],
+              "type": "object"
+            },
+            "page": {
+              "maximum": 99,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "requestKey": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u001f\\u007f]+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "entries",
+            "expectedRevision",
+            "page",
+            "requestKey"
+          ],
+          "type": "object"
+        }
+      },
+      "SealArchivePlan": {
+        "direction": "business-to-platform",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "expectedRevision": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "fence": {
+              "additionalProperties": false,
+              "properties": {
+                "epoch": {
+                  "maximum": 9007199254740991,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "instanceId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "leaseId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "epoch",
+                "instanceId",
+                "leaseId"
+              ],
+              "type": "object"
+            },
+            "requestKey": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u001f\\u007f]+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "expectedRevision",
+            "requestKey"
+          ],
+          "type": "object"
+        }
+      },
+      "ArchivePlanEntriesQuery": {
+        "direction": "business-to-platform",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "expectedRevision": {
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "type": "integer"
+            },
+            "limit": {
+              "default": 100,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "offset": {
+              "default": 0,
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "expectedRevision"
+          ],
+          "type": "object"
+        }
+      },
+      "FinalizeBusinessTask": {
+        "direction": "business-to-platform",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "archive": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "digest": {
+                      "pattern": "^[a-f0-9]{64}$",
+                      "type": "string"
+                    },
+                    "planId": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                      "type": "string"
+                    },
+                    "planRevision": {
+                      "maximum": 9007199254740991,
+                      "minimum": 1,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "digest",
+                    "planId",
+                    "planRevision"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "noArtifactsReason": {
+                      "maxLength": 1024,
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "noArtifactsReason"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "expectedGeneration": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "fence": {
+              "additionalProperties": false,
+              "properties": {
+                "epoch": {
+                  "maximum": 9007199254740991,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "instanceId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "leaseId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "epoch",
+                "instanceId",
+                "leaseId"
+              ],
+              "type": "object"
+            },
+            "outcome": {
+              "enum": [
+                "cancelled",
+                "failed",
+                "succeeded"
+              ],
+              "type": "string"
+            },
+            "requestKey": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u001f\\u007f]+$",
+              "type": "string"
+            },
+            "stopAuthority": {
+              "additionalProperties": false,
+              "properties": {
+                "epoch": {
+                  "maximum": 9007199254740991,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "operationId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "epoch",
+                "operationId"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "archive",
+            "expectedGeneration",
+            "outcome",
+            "requestKey"
+          ],
+          "type": "object"
+        }
+      },
+      "ReviseBusinessArchive": {
+        "direction": "business-to-platform",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "archive": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "digest": {
+                      "pattern": "^[a-f0-9]{64}$",
+                      "type": "string"
+                    },
+                    "planId": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                      "type": "string"
+                    },
+                    "planRevision": {
+                      "maximum": 9007199254740991,
+                      "minimum": 1,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "digest",
+                    "planId",
+                    "planRevision"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "noArtifactsReason": {
+                      "maxLength": 1024,
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "noArtifactsReason"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "confirmDiscard": {
+              "default": false,
+              "type": "boolean"
+            },
+            "expectedGeneration": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "expectedRevision": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "fence": {
+              "additionalProperties": false,
+              "properties": {
+                "epoch": {
+                  "maximum": 9007199254740991,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "instanceId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "leaseId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "epoch",
+                "instanceId",
+                "leaseId"
+              ],
+              "type": "object"
+            },
+            "reason": {
+              "maxLength": 1024,
+              "minLength": 1,
+              "type": "string"
+            },
+            "requestKey": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u001f\\u007f]+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "archive",
+            "expectedGeneration",
+            "expectedRevision",
+            "reason",
+            "requestKey"
+          ],
+          "type": "object"
+        }
+      },
+      "ObjectSpaceDto": {
+        "direction": "platform-to-business",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "backendId": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "backendPlacementRevision": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "createdAt": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+              "type": "string"
+            },
+            "deletingBytes": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "env": {
+              "enum": [
+                "development",
+                "production"
+              ],
+              "type": "string"
+            },
+            "health": {
+              "enum": [
+                "degraded",
+                "ready",
+                "unavailable",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            "id": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "objectCount": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "planId": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "planRevision": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "projectId": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "quotaBytes": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "reservedBytes": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "revision": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "serviceId": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "serviceSlug": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "usedBytes": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "backendId",
+            "backendPlacementRevision",
+            "createdAt",
+            "deletingBytes",
+            "env",
+            "health",
+            "id",
+            "objectCount",
+            "planId",
+            "planRevision",
+            "projectId",
+            "quotaBytes",
+            "reservedBytes",
+            "revision",
+            "serviceId",
+            "usedBytes"
+          ],
+          "type": "object"
+        }
+      },
+      "StoredObjectDto": {
+        "direction": "platform-to-business",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "createdAt": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+              "type": "string"
+            },
+            "id": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "mediaType": {
+              "type": "string"
+            },
+            "message": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "name": {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            "referenceCount": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "revision": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "sha256": {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            "size": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "spaceId": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "state": {
+              "enum": [
+                "degraded",
+                "deleted",
+                "deleting",
+                "ready",
+                "staging",
+                "verifying"
+              ],
+              "type": "string"
+            },
+            "verifiedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "createdAt",
+            "id",
+            "mediaType",
+            "message",
+            "name",
+            "referenceCount",
+            "revision",
+            "sha256",
+            "size",
+            "spaceId",
+            "state",
+            "verifiedAt"
+          ],
+          "type": "object"
+        }
+      },
+      "StoredObjectPage": {
+        "direction": "platform-to-business",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "createdAt": {
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                    "type": "string"
+                  },
+                  "id": {
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                    "type": "string"
+                  },
+                  "mediaType": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "name": {
+                    "maxLength": 255,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "referenceCount": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "revision": {
+                    "maximum": 9007199254740991,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "sha256": {
+                    "pattern": "^[a-f0-9]{64}$",
+                    "type": "string"
+                  },
+                  "size": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "spaceId": {
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                    "type": "string"
+                  },
+                  "state": {
+                    "enum": [
+                      "degraded",
+                      "deleted",
+                      "deleting",
+                      "ready",
+                      "staging",
+                      "verifying"
+                    ],
+                    "type": "string"
+                  },
+                  "verifiedAt": {
+                    "anyOf": [
+                      {
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "createdAt",
+                  "id",
+                  "mediaType",
+                  "message",
+                  "name",
+                  "referenceCount",
+                  "revision",
+                  "sha256",
+                  "size",
+                  "spaceId",
+                  "state",
+                  "verifiedAt"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "nextCursor": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "required": [
+            "items",
+            "nextCursor"
+          ],
+          "type": "object"
+        }
+      },
+      "ObjectUploadDto": {
+        "direction": "platform-to-business",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "createdAt": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+              "type": "string"
+            },
+            "errorCode": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "id": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "nextRetryAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "objectId": {
+              "anyOf": [
+                {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "operationId": {
+              "anyOf": [
+                {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "receivedBytes": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "size": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "spaceId": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "state": {
+              "enum": [
+                "aborted",
+                "failed",
+                "ready",
+                "uploading",
+                "verifying",
+                "waiting"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "createdAt",
+            "errorCode",
+            "id",
+            "nextRetryAt",
+            "objectId",
+            "operationId",
+            "receivedBytes",
+            "retryable",
+            "size",
+            "spaceId",
+            "state"
+          ],
+          "type": "object"
+        }
+      },
+      "ArchivePlanDto": {
+        "direction": "platform-to-business",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "byteCount": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "createdAt": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+              "type": "string"
+            },
+            "digest": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-f0-9]{64}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "id": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "itemCount": {
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "revision": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "state": {
+              "enum": [
+                "aborted",
+                "bound",
+                "draft",
+                "sealed"
+              ],
+              "type": "string"
+            },
+            "taskId": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "byteCount",
+            "createdAt",
+            "digest",
+            "id",
+            "itemCount",
+            "revision",
+            "state",
+            "taskId"
+          ],
+          "type": "object"
+        }
+      },
+      "ArchivePlanEntriesDto": {
+        "direction": "platform-to-business",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "items": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "expectedSize": {
+                        "maximum": 1073741824,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "kind": {
+                        "const": "file",
+                        "type": "string"
+                      },
+                      "name": {
+                        "maxLength": 255,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "path": {
+                        "maxLength": 1024,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "required": {
+                        "default": true,
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "name",
+                      "path",
+                      "required"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "object",
+                        "type": "string"
+                      },
+                      "name": {
+                        "maxLength": 255,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "objectId": {
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "name",
+                      "objectId"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "maxItems": 100,
+              "type": "array"
+            },
+            "nextOffset": {
+              "anyOf": [
+                {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "revision": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "items",
+            "nextOffset",
+            "revision"
+          ],
+          "type": "object"
+        }
+      },
+      "BusinessFinalizationDto": {
+        "direction": "platform-to-business",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "artifactsReady": {
+              "type": "boolean"
+            },
+            "computeStopped": {
+              "type": "boolean"
+            },
+            "createdAt": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+              "type": "string"
+            },
+            "errorCode": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "message": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "nextRetryAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "operationId": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "outcome": {
+              "enum": [
+                "cancelled",
+                "failed",
+                "succeeded"
+              ],
+              "type": "string"
+            },
+            "phase": {
+              "enum": [
+                "archived",
+                "archiving",
+                "cleaning",
+                "completed",
+                "draining",
+                "requested"
+              ],
+              "type": "string"
+            },
+            "phaseState": {
+              "enum": [
+                "blocked",
+                "pending",
+                "retrying",
+                "revising",
+                "running"
+              ],
+              "type": "string"
+            },
+            "receipt": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "createdAt": {
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                      "type": "string"
+                    },
+                    "disposition": {
+                      "enum": [
+                        "archived",
+                        "empty",
+                        "loss",
+                        "never-provisioned"
+                      ],
+                      "type": "string"
+                    },
+                    "finalizationId": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                      "type": "string"
+                    },
+                    "finalizationRevision": {
+                      "maximum": 9007199254740991,
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "id": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                      "type": "string"
+                    },
+                    "itemCount": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "lossActorId": {
+                      "anyOf": [
+                        {
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "lossReason": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "manifestDigest": {
+                      "pattern": "^[a-f0-9]{64}$",
+                      "type": "string"
+                    },
+                    "noArtifactsReason": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "taskGeneration": {
+                      "maximum": 9007199254740991,
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "taskId": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                      "type": "string"
+                    },
+                    "volumeUid": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "createdAt",
+                    "disposition",
+                    "finalizationId",
+                    "finalizationRevision",
+                    "id",
+                    "itemCount",
+                    "lossActorId",
+                    "lossReason",
+                    "manifestDigest",
+                    "noArtifactsReason",
+                    "taskGeneration",
+                    "taskId",
+                    "volumeUid"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "revision": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "storageReclaimed": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "taskGeneration": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "taskId": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "updatedAt": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+              "type": "string"
+            },
+            "volumeDisposition": {
+              "enum": [
+                "deleted",
+                "lost",
+                "never-provisioned",
+                "pending",
+                "unknown"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "artifactsReady",
+            "computeStopped",
+            "createdAt",
+            "errorCode",
+            "message",
+            "nextRetryAt",
+            "operationId",
+            "outcome",
+            "phase",
+            "phaseState",
+            "receipt",
+            "retryable",
+            "revision",
+            "storageReclaimed",
+            "taskGeneration",
+            "taskId",
+            "updatedAt",
+            "volumeDisposition"
           ],
           "type": "object"
         }
@@ -3422,6 +5047,28 @@
                           "type": "array"
                         }
                       },
+                      "type": "object"
+                    },
+                    "data": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "objects": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "planId": {
+                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "planId"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "objects"
+                      ],
                       "type": "object"
                     },
                     "development": {
@@ -4044,6 +5691,9 @@
                       ],
                       "type": "object"
                     },
+                    "data": {
+                      "not": {}
+                    },
                     "development": {
                       "properties": {
                         "command": {
@@ -4374,6 +6024,9 @@
                 },
                 "spec": {
                   "properties": {
+                    "data": {
+                      "not": {}
+                    },
                     "development": {
                       "properties": {
                         "command": {
@@ -5289,6 +6942,14 @@
         "－ schemas/Manifest/oneOf[0]/properties/apiVersion/const（原值 \"crewstation/v2\"）",
         "－ schemas/Manifest/oneOf[1]/properties/apiVersion/const（原值 \"crewstation/v2\"）",
         "－ schemas/Manifest/oneOf[2]/properties/apiVersion/const（原值 \"crewstation/v2\"）"
+      ]
+    },
+    {
+      "date": "2026-09-28",
+      "basis": "RFC-035 作者批准的能力影响清单及 D1-D8：仅显式 archive-and-delete 新任务进入 finalizing，legacy 保持；已启用存储合同限制旧版本回退",
+      "changes": [
+        "＋ schemas/BusinessTaskV3Dto/properties/state/enum{finalizing}",
+        "＋ schemas/BusinessEventPage/properties/items/items/oneOf[0]/properties/data/properties/state/enum{finalizing}"
       ]
     }
   ]

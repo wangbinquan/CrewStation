@@ -94,7 +94,7 @@ function conditionsOf(env: TaskEnvironment): ProjectedCondition[] {
     { type: 'Paused', status: env.state === 'paused' ? 'true' : 'false' },
     { type: 'Rebuilding', status: env.rebuildId && env.state === 'creating' ? 'true' : 'false' },
   ];
-  if (env.render?.businessStorage) conditions.push({ type: 'ReleasePending', status: env.state === 'releasing' && (!!env.native || !!env.release?.occupied) ? 'true' : 'false', reason: 'execution-cleanup-pending', message: '执行资源尚未完成回收确认' });
+  if (env.render?.businessStorage) conditions.push({ type: 'ReleasePending', status: (env.render.completionPolicy && env.businessWorkspace?.phase === 'pausing') || (env.state === 'releasing' && (!!env.native || !!env.release?.occupied)) ? 'true' : 'false', reason: 'execution-cleanup-pending', message: '执行资源尚未完成回收确认' });
   if (env.native) conditions.push({ type: 'Prepared', status: env.native.state === 'queued' ? 'false' : 'true' });
   if (env.render) conditions.push(provisioningOf(env));
   return conditions;
@@ -113,6 +113,7 @@ function workloadRender(env: TaskEnvironment): ProjectedRecord['render'] {
   if (!reconcilerCreates(env)) return undefined;
   const { image, workerUid, resources, checkout } = env.render;
   const pod = {
+    ...(env.render.completionPolicy ? { consumer: { id: env.render.workloadConsumerId, taskId: env.native?.parentTaskId ?? env.id, revision: env.render.start, purpose: env.native ? 'agent' : 'business', finalization: null } } : {}),
     ...(env.businessWorkspace ? { expectedVolumeUid: env.businessWorkspace.volumeUid } : {}),
     ...(env.render.runtimeImage ? { runtimeInitialization: true } : {}),
     ...(env.render.businessStorage ? { businessStorage: { ...env.render.businessStorage, initialize: !env.native && !env.rebuildId && env.render.start === 1 } } : {}),
@@ -123,7 +124,7 @@ function workloadRender(env: TaskEnvironment): ProjectedRecord['render'] {
     // 检出（I25）：没带 Secret 名的，凭据 Secret 由资源中心按这一次启动建（ownedCredential），令牌建的时候向本模块要。
     ...(checkout ? { checkout: { repoUrl: checkout.repoUrl, branch: checkout.branch, credentialSecretName: checkoutSecretOf(env)!, ...(checkout.credentialSecretName ? {} : { ownedCredential: true }) } } : {}),
   };
-  return { pod, ...(env.render.rebuild ? { rebuild: env.render.rebuild } : {}), ...(env.preview ? { preview: { port: env.preview.port, kind: env.kind } } : {}) };
+  return { pod, ...(env.render.workloadConsumerId ? { workloadConsumerId: env.render.workloadConsumerId } : {}), ...(env.render.rebuild ? { rebuild: env.render.rebuild } : {}), ...(env.preview ? { preview: { port: env.preview.port, kind: env.kind } } : {}) };
 }
 
 /**
@@ -153,7 +154,7 @@ function workloadChildren(env: TaskEnvironment): ProjectedRecord['children'] {
   // 资源中心建出的环境（I25）：每次启动一个 Runner Secret（检出用的 Git 凭据由资源中心建的也归这一次启动），预览与 Pod 同名。
   if (reconcilerCreates(env)) {
     const checkout = env.render.checkout && !env.render.checkout.credentialSecretName ? [at('Secret', checkoutSecretOf(env)!)] : [];
-    return [at('Pod', env.podName), at('Secret', runnerSecretOf(env)), ...checkout, ...(env.preview ? [at('Service', env.rebuildId ? podNameFor(env.id) : env.podName), at('IngressRoute', env.rebuildId ? podNameFor(env.id) : env.podName)] : [])];
+    return [at('Pod', env.podName), at('Secret', runnerSecretOf(env)), ...(env.render.completionPolicy ? [at('Secret', `${env.podName}-admission`)] : []), ...checkout, ...(env.preview ? [at('Service', env.rebuildId ? podNameFor(env.id) : env.podName), at('IngressRoute', env.rebuildId ? podNameFor(env.id) : env.podName)] : [])];
   }
   const route = env.rebuildId ? podNameFor(env.id) : env.podName;
   return [
@@ -175,13 +176,15 @@ export function projectEnvironment(env: TaskEnvironment, previewRoute: WorkloadR
   };
   // Agent 执行挂父工作区的卷；档位测试用一次性的空目录。只有工作区自己有工作卷。保留期满回收的会话，卷不随之删除（D8、D9）。
   const ownsVolume = !env.native && env.kind !== 'profile-test';
-  const volumeReleased = release && env.volumeMode === 'follow-container' && release.code !== RETENTION_EXPIRED ? release : undefined;
+  const protectedVolume = env.render?.completionPolicy === 'archive-and-delete';
+  const volumeReleased = !protectedVolume && release && env.volumeMode === 'follow-container' && release.code !== RETENTION_EXPIRED ? release : undefined;
   const volume: ProjectedRecord | undefined = ownsVolume ? {
     kind: 'volume', ref: `${env.id}/work`, projectId: env.projectId, parentId: env.id,
-    children: [{ kind: 'PersistentVolumeClaim', namespace: env.namespace, name: env.pvcName }], reclaim: env.volumeMode === 'follow-container' ? 'delete' : 'retain',
-    display: { mode: env.volumeMode }, conditions: env.render ? [{ ...provisioningOf(env), ...(env.businessWorkspace ? { status: 'false' as const } : {}) }] : [], ...(volumeReleased ? { release: volumeReleased } : {}),
+    children: [{ kind: 'PersistentVolumeClaim', namespace: env.namespace, name: env.pvcName }], reclaim: !protectedVolume && env.volumeMode === 'follow-container' ? 'delete' : 'retain',
+    display: { mode: env.volumeMode, ...(protectedVolume ? { completionPolicy: 'archive-and-delete' } : {}) }, conditions: env.render ? [{ ...provisioningOf(env), ...(env.businessWorkspace ? { status: 'false' as const } : {}) }] : [], ...(volumeReleased ? { release: volumeReleased } : {}),
     // 资源中心建出的环境（I25）：卷由调和器照这里建，只在要建出容器时建一次，卷丢了不补建（数据不能凭空换成空卷）。
-    ...(reconcilerCreates(env) && !env.render.rebuild && !env.businessWorkspace ? { render: { pvc: { size: env.render.resources.storage, labels: { 'crewstation.io/task': env.id, 'crewstation.io/project': env.labels['crewstation.io/project'] ?? '' } } } } : {}),
+    ...(protectedVolume || (reconcilerCreates(env) && !env.render.rebuild && !env.businessWorkspace) ? { render: { ...(protectedVolume ? { taskStorage: { taskId: env.id, completionPolicy: 'archive-and-delete' } } : {}),
+      ...(reconcilerCreates(env) && !env.render.rebuild && !env.businessWorkspace ? { pvc: { size: env.render.resources.storage, labels: { 'crewstation.io/task': env.id, 'crewstation.io/project': env.labels['crewstation.io/project'] ?? '' } } } : {}) } } : {}),
   } : undefined;
   const name = env.rebuildId ? podNameFor(env.id) : env.podName;
   const route: ProjectedRecord | undefined = split ? {

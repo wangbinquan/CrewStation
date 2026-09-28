@@ -8,6 +8,7 @@ import type { TaskPodSpec, TaskSourceCheckout } from '../ports/cluster';
 import type { TaskRuntimeSettings } from '../ports/platform';
 import { containerEnv } from './containerEnv';
 import type { CreateEnvironmentInput, TaskRuntimeUseCaseDeps } from './dependencies';
+import { storageStart } from './business/storageStart';
 export type { CreateEnvironmentInput } from './dependencies';
 import { admissionFingerprint, admitEnvironment, matchAdmission } from './environmentAdmission';
 
@@ -89,7 +90,7 @@ export function createEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
       startup: initialStartup(now, input.branch && deps.checkout ? { checkout: input.branch } : {}),
     };
     // 由资源中心建出（I25）：只到登记为止，期望随记录进台账，卷、Runner Secret、Pod 与预览由调和器照它建。
-    const rendered = deps.creation === 'ledger' ? { ...env, render: { ...workloadRenderOf(settings, profile, await renderedCheckoutOf(deps, input.serviceId, input.branch), previewRouteOf(settings, env, svc.slug).previewRoute), image, ...(input.runtimeImage ? { runtimeImage: input.runtimeImage } : {}), ...(input.businessStorage ? { businessStorage: { version: 1 as const, ownerTaskId: id } } : {}) } } : undefined;
+    const rendered = deps.creation === 'ledger' ? { ...env, render: { ...workloadRenderOf(settings, profile, await renderedCheckoutOf(deps, input.serviceId, input.branch), previewRouteOf(settings, env, svc.slug).previewRoute), image, ...storageStart(input.completionPolicy), ...(input.developmentObjectPlanId ? { developmentObjectPlanId: input.developmentObjectPlanId } : {}), ...(input.objectInputsGeneration ? { objectInputsGeneration: input.objectInputsGeneration } : {}), ...(input.runtimeImage ? { runtimeImage: input.runtimeImage } : {}), ...(input.businessStorage ? { businessStorage: { version: 1 as const, ownerTaskId: id } } : {}) } } : undefined;
     const admitted = await admitEnvironment(deps, rendered ?? env, limit);
     if (rendered) return admitted;
     try {

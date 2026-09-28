@@ -1,8 +1,27 @@
 import type { Actor, DataEnv, DataResourceDto, DecideTaskDataBinding, ProjectId, RequestTaskDataBinding, ServiceId, TaskDataBindingDto, TaskDataBindingState, TaskId } from '@crewstation/contracts';
+import type { ObjectStorageAdminApi } from './objectStorageApi';
+import type { ObjectServiceApi } from './objectServiceApi';
+import type { ArchiveFinalizationApi } from './archiveFinalizationApi';
+import type { ArchiveHelperApi } from './archiveHelperApi';
+import type { ArchiveAdministrationApi } from './archiveAdministrationApi';
+import type { ArchiveServiceApi } from './archiveServiceApi';
+import type { TaskInputApi } from './taskInputApi';
 
 /** data 模块对外能力：服务数据供给与环境变量渲染、开发会话的数据访问绑定。 */
 export interface DataModuleApi {
+  readonly storageContract: { version: number; check(): Promise<{ requiredVersion: number; enabled: boolean }>; enable(): Promise<void> };
   readonly name: 'data';
+  taskStorageStatus(serviceId: ServiceId): Promise<{ available: boolean; reason: string | null }>;
+  readonly objects?: ObjectStorageAdminApi;
+  readonly taskInputs?: TaskInputApi;
+  readonly objectService?: ObjectServiceApi;
+  readonly archiveFinalization?: ArchiveFinalizationApi;
+  readonly archiveHelper?: ArchiveHelperApi;
+  readonly archiveService?: ArchiveServiceApi;
+  readonly archiveAdministration?: ArchiveAdministrationApi;
+  /** Internal module handshake; not exposed as a user/service HTTP mutation. */
+  applyObjectWriteControl(input: { serviceId: ServiceId; controlVersion: number; epoch: number; leaseId: string; instanceId: string; podUid: string | null; leaseUntil: string; phase: 'active' | 'frozen' }): Promise<boolean>;
+  objectEnv?(serviceId: ServiceId, env: DataEnv, planId: string): Promise<Record<string, string>>;
   ensureServiceData(serviceId: ServiceId): Promise<DataResourceDto[]>;
   envFor(serviceId: ServiceId, env: DataEnv): Promise<Record<string, string>>;
   listResources(actor: Actor, projectId: ProjectId): Promise<DataResourceDto[]>;

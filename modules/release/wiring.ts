@@ -27,6 +27,7 @@ import type { ReleaseUseCaseDeps } from './application/dependencies';
 import { pipelineStepUseCase } from './application/pipeline';
 import { publishUseCase } from './application/publish';
 import { activeWebhookIngress } from './application/activeWebhookIngress';
+import { releaseObjectStorage } from './application/objectStorage';
 import { releaseQueries } from './application/queries';
 import { switchTrafficUseCase } from './application/switchTraffic';
 import { releaseRoutes } from './http/releaseRoutes';
@@ -121,6 +122,7 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
   const api: ReleaseModuleApi = {
     name: 'release',
     activeWebhookIngress: activeWebhookIngress(useCaseDeps.uow.read),
+    objectStorageContract: releaseObjectStorage(useCaseDeps.uow.read),
     imageHistory: releaseImageHistory(deps.db),
     ...releaseHandoffUseCases(useCaseDeps),
     ...slotMaintenanceUseCases({ ...useCaseDeps, slotControl: kubernetesSlotControl(deps.k8s, deps.physicalOperationId), isAdmin: deps.isAdmin }),
