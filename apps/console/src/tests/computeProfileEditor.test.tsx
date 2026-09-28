@@ -20,7 +20,7 @@ const control = (label: string) => {
   return found.querySelector<Control>('input, select, textarea')!;
 };
 const button = (label: string) => [...document.querySelectorAll('button')].find((node) => node.textContent === label)!;
-const activeTab = () => document.querySelector('[role="tab"][aria-selected="true"]')?.textContent;
+const activeTab = () => document.querySelector('[data-editor-section]')?.closest('[role="tabpanel"]')?.parentElement?.querySelector('[role="tab"][aria-selected="true"]')?.textContent;
 async function openTab(label: string) {
   const tab = [...document.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((node) => node.textContent?.startsWith(label));
   if (!tab) throw new Error(`没有分组「${label}」`);
