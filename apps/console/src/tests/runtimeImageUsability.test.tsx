@@ -55,6 +55,11 @@ test('长目录末行进入独立路由，返回恢复搜索、分页与滚动�
   await act(async () => { last.focus(); last.click(); }); await app.settle();
   expect(app.path()).toBe(`/admin/runtime-images/${riImage}`); expect(document.querySelectorAll('dialog[open]')).toHaveLength(0); expect(main().scrollTop).toBe(0);
   expect(app.text()).toContain('基本信息'); expect(app.text()).not.toContain('设为默认开放');
+  // 2026-09-28 镜像返回入口曾在卡片外左侧，与算力档位详情卡片标题右侧的轻量按钮不一致。
+  const back = [...document.querySelectorAll<HTMLButtonElement>('main button')].find((button) => button.textContent === '返回镜像列表')!;
+  expect(back.closest('section')?.querySelector(':scope > header h2')?.textContent).toBe('Python tools');
+  expect(back.closest('section')?.querySelector(':scope > header button')).toBe(back);
+  expect(back.className.split(' ')).toContain('ghost');
   await app.click('技术标识'); expect(dialog().textContent).toContain(riImage); await act(async () => dialog().dispatchEvent(new Event('cancel', { cancelable: true }))); await app.settle(); expect(document.querySelectorAll('dialog[open]')).toHaveLength(0);
   await app.click('构建配置'); expect(app.text()).toContain('生成镜像版本');
   await app.click('返回镜像列表'); expect(app.search()).toEqual({ q: 'Tools', before: riId(200) }); expect(main().scrollTop).toBe(1600);

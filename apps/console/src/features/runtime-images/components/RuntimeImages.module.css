@@ -1,5 +1,8 @@
 .stack { display: grid; gap: 12px; min-width: 0; }
 .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.revisionControls { align-items: flex-end; --cs-select-height: 32px; --cs-select-padding-block: 4px; }
+.detailCard > header { flex-wrap: wrap; }
+.detailCard > header h2 { min-width: 0; overflow-wrap: anywhere; }
 .field { display: grid; gap: 6px; min-width: 0; }
 .field input, .field select, .field textarea { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
 .field textarea { font-family: var(--cs-font-mono, monospace); font-size: 12px; }

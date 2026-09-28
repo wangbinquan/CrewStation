@@ -20,9 +20,10 @@ const available = await browserAvailable();
 let browser: Browser | undefined, page: Page, context: string;
 const source = '../../apps/console/src/';
 const read = (path: string) => Bun.file(new URL(`${source}${path}`, import.meta.url)).text();
-const [tokens, base, select, field, native] = await Promise.all([
+const [tokens, base, select, field, native, actions, button, card, image] = await Promise.all([
   read('app/theme/tokens.css'), read('app/theme/base.css'), read('shared/ui/selection/Select.css'),
   read('shared/ui/FormField.module.css'), read('features/dev-session/components/native/NativeWorkspace.module.css'),
+  read('shared/ui/ActionRow.module.css'), read('shared/ui/Button.module.css'), read('shared/ui/Card.module.css'), read('features/runtime-images/components/RuntimeImages.module.css'),
 ]);
 
 beforeAll(async () => {
@@ -156,6 +157,46 @@ describe.skipIf(!available)('统一下拉控件的真实浏览器外观与操作
     expect(fallback.appearance).toBe('none'); expect(fallback.arrow).not.toBe('none'); expect(fallback.radius).toBe('8px');
     expect(await page.eval<string>('document.activeElement.id')).toBe('status');
     expect(await page.eval<string>('new FormData(document.querySelector("form")).get("status")')).toBe('ready');
+    expect(page.takeErrors()).toEqual([]);
+  });
+});
+
+describe.skipIf(!available)('镜像构建配置操作区布局', () => {
+  test.each([1280, 390, 320])('%dpx：修订选择与操作按钮对齐或换行且不溢出', async (width) => {
+    await page.goto('about:blank');
+    await page.cmd('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 1, mobile: false });
+    await page.eval(`document.body.innerHTML = ${JSON.stringify(`<style>${tokens}${base.replace(/@import[^;]+;/g, '')}${select}${field}${actions}${button}${image}
+      main { width: calc(100% - 32px); max-width: 1000px; margin: 24px auto; }
+    </style><main><div class="row revisionControls"><label class="field"><span class="label">已保存的构建配置</span><select id="revision"><option>21 · 任务 · 123456789abc</option></select></label><div class="actions"><button class="button primary" id="build">生成镜像版本</button><button class="button">修改构建配置</button></div></div></main>`)};`);
+    const bounds = await page.eval<{ selectTop: number; selectBottom: number; buttonTop: number; buttonBottom: number; overflow: number }>(`(() => {
+      const choice = document.querySelector('#revision').getBoundingClientRect(), action = document.querySelector('#build').getBoundingClientRect();
+      return { selectTop: choice.top, selectBottom: choice.bottom, buttonTop: action.top, buttonBottom: action.bottom, overflow: document.documentElement.scrollWidth - innerWidth };
+    })()`);
+    // 2026-09-28 构建配置的带标签下拉框高于按钮；实测控件边缘，避免仅断言样式类名。
+    if (width === 1280) {
+      expect(Math.abs(bounds.selectTop - bounds.buttonTop)).toBeLessThanOrEqual(1);
+      expect(Math.abs(bounds.selectBottom - bounds.buttonBottom)).toBeLessThanOrEqual(1);
+    } else expect(bounds.buttonTop - bounds.selectBottom).toBeGreaterThanOrEqual(8);
+    expect(bounds.overflow).toBeLessThanOrEqual(1);
+    expect(page.takeErrors()).toEqual([]);
+  });
+});
+
+describe.skipIf(!available)('镜像详情返回入口布局', () => {
+  test.each([1280, 390, 320])('%dpx：长镜像名称和返回按钮留在同一卡片标题内', async (width) => {
+    await page.goto('about:blank');
+    await page.cmd('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 1, mobile: false });
+    await page.eval(`document.body.innerHTML = ${JSON.stringify(`<style>${tokens}${base.replace(/@import[^;]+;/g, '')}${button}${card}${image}
+      main { width: calc(100% - 32px); max-width: 1000px; margin: 24px auto; }
+    </style><main><section class="card detailCard"><header class="header"><h2 class="title">runtime/python-tooling-with-a-long-configuration-name</h2><div class="extra"><button class="button ghost" id="back">返回镜像列表</button></div></header><div class="body">镜像详情</div></section></main>`)};`);
+    const bounds = await page.eval<{ titleRight: number; titleBottom: number; backLeft: number; backTop: number; backRight: number; headerRight: number; overflow: number }>(`(() => {
+      const title = document.querySelector('h2').getBoundingClientRect(), back = document.querySelector('#back').getBoundingClientRect(), header = document.querySelector('.header').getBoundingClientRect();
+      return { titleRight: title.right, titleBottom: title.bottom, backLeft: back.left, backTop: back.top, backRight: back.right, headerRight: header.right, overflow: document.documentElement.scrollWidth - innerWidth };
+    })()`);
+    // 2026-09-28 返回入口改到详情卡片标题区后，窄屏长名称仍需给按钮留下可见位置。
+    expect(bounds.backRight).toBeLessThanOrEqual(bounds.headerRight);
+    expect(bounds.overflow).toBeLessThanOrEqual(1);
+    expect(width === 1280 ? bounds.backLeft - bounds.titleRight : bounds.backTop - bounds.titleBottom).toBeGreaterThanOrEqual(8);
     expect(page.takeErrors()).toEqual([]);
   });
 });

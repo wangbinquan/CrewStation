@@ -45,14 +45,14 @@ export function ImageDetail({ projectId, imageId, editable, admin, manageable, i
     <p className={styles.note}>{t(owned ? 'images.detailHint' : 'images.sharedNote')}</p>
     {build.data ? <ActionNote tone="success">{t('images.buildAccepted', { id: build.data.id })}</ActionNote> : null}
     {!image.error && image.data ? <Tabs label={t('images.detail')} value={tab} onChange={setTab} items={[{ value: 'settings', label: t('images.manage') }, ...(owned && editable ? [{ value: 'recipe', label: t('images.recipeTab') }] : []), { value: 'versions', label: t('images.versions') }, ...(owned && editable ? [{ value: 'builds', label: t('images.buildTab') }, { value: 'grants', label: t('images.grants') }] : []), { value: 'history', label: t('images.history') }]}>
-    {tab === 'recipe' && owned && editable ? <><p>{t('images.recipeWorkflow')}</p><div className={styles.row}>
+    {tab === 'recipe' && owned && editable ? <><p>{t('images.recipeWorkflow')}</p><div className={`${styles.row} ${styles.revisionControls}`}>
       <FormField label={t('images.revision')}><select value={revisionId || revisions.data?.items[0]?.id || ''} onChange={(event) => setRevisionId(event.target.value)}>
         {revisionId && !revisions.data?.items.some((revision) => revision.id === revisionId) ? <option value={revisionId}>{revisionId}</option> : null}
         {revisions.data?.items.map((revision) => <option key={revision.id} value={revision.id}>{revision.revision} · {t(`images.usage.${revision.source.usage}`)} · {revision.commitSha?.slice(0, 12) ?? t(revision.source.kind === 'inline' ? 'images.sourceInline' : 'images.sourceExisting')}</option>)}
       </select></FormField>
-      {before ? <Button onClick={() => { setBefore(undefined); setRevisionId(''); }}>{t('images.first')}</Button> : null}
-      {revisions.data?.items.length === 20 ? <Button onClick={() => { setBefore(revisions.data!.items.at(-1)!.id); setRevisionId(''); }}>{t('images.next')}</Button> : null}
-      {editable ? <><Button variant="primary" disabled={!image.data?.enabled || !revisions.data?.items.length || build.isPending || !!revisions.error} onClick={() => build.mutate()}>{t('images.build')}</Button><Button disabled={!image.data?.enabled} onClick={() => { if (!draft && revisions.data?.items[0]) { const current = revisions.data.items.find((r) => r.id === revisionId) ?? revisions.data.items[0]; const initial = JSON.stringify({ sourceProjectId: current.sourceProjectId, source: current.source, initializer: current.initializer, tools: current.tools }, null, 2); setBaseline(initial); setDraft(initial); } setEditing(true); }}>{t('images.editRecipe')}</Button></> : null}
+      <ActionRow>{before ? <Button onClick={() => { setBefore(undefined); setRevisionId(''); }}>{t('images.first')}</Button> : null}
+        {revisions.data?.items.length === 20 ? <Button onClick={() => { setBefore(revisions.data!.items.at(-1)!.id); setRevisionId(''); }}>{t('images.next')}</Button> : null}
+        {editable ? <><Button variant="primary" disabled={!image.data?.enabled || !revisions.data?.items.length || build.isPending || !!revisions.error} onClick={() => build.mutate()}>{t('images.build')}</Button><Button disabled={!image.data?.enabled} onClick={() => { if (!draft && revisions.data?.items[0]) { const current = revisions.data.items.find((r) => r.id === revisionId) ?? revisions.data.items[0]; const initial = JSON.stringify({ sourceProjectId: current.sourceProjectId, source: current.source, initializer: current.initializer, tools: current.tools }, null, 2); setBaseline(initial); setDraft(initial); } setEditing(true); }}>{t('images.editRecipe')}</Button></> : null}</ActionRow>
     </div><QueryStatus isPending={revisions.isPending} error={revisions.error} />
     {revisions.data?.items[0] ? <RecipeSummary revision={revisions.data.items.find((r) => r.id === revisionId) ?? revisions.data.items[0]} /> : null}
     {build.error ? <ActionNote tone="error">{errorMessage(build.error)}</ActionNote> : null}
@@ -67,5 +67,5 @@ export function ImageDetail({ projectId, imageId, editable, admin, manageable, i
       <p>{t('images.newRecipeHint')}</p><RecipeEditor projectId={projectId} value={draft} onChange={setDraft} onPendingChange={setUploading} />
     </FormDialog> : null}
   </div>;
-  return standalone ? <CatalogPage title={image.data?.name ?? t('images.detail')} description={t('images.managementHint')}><ActionRow><Button onClick={onClose}>{t('images.backToCatalog')}</Button></ActionRow><Card>{content}</Card></CatalogPage> : <Dialog title={image.data?.name ?? t('images.detail')} size="large" initialFocus="dialog" onClose={onClose}>{content}</Dialog>;
+  return standalone ? <CatalogPage title={t('images.adminTitle')} description={t('images.managementHint')}><Card className={styles.detailCard} title={image.data?.name ?? t('images.detail')} extra={<Button variant="ghost" onClick={onClose}>{t('images.backToCatalog')}</Button>}>{content}</Card></CatalogPage> : <Dialog title={image.data?.name ?? t('images.detail')} size="large" initialFocus="dialog" onClose={onClose}>{content}</Dialog>;
 }
