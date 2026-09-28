@@ -15,8 +15,12 @@ describe.skipIf(!available)('RFC-027 independent durable Agent execution', () =>
   test('immutable parent profile, private material and separate Pod survive duplicate admission and missing start reply', async () => {
     const f = await executionAgentFixture(tdb.db);
     const responses = await Promise.all(Array.from({ length: 4 }, () => f.request(f.path, f.input)));
-    expect(responses.every((r) => [200, 202].includes(r.status))).toBe(true);
+    // RFC-027 design §3：首次稳定句柄可返回 201；并发调和持有 dispatching 时不保证四份回执全是 202。
+    // 逐份断言保留失败状态码，不能把 409／500 淹没成一个 false（CI 36490908412）。
+    for (const response of responses) expect([200, 201, 202]).toContain(response.status);
+    expect(responses.filter((r) => r.status === 201).length).toBeLessThanOrEqual(1);
     const views = await Promise.all(responses.map((r) => r.json() as Promise<BusinessSubtaskV3Dto>));
+    for (const view of views) expect(view).toMatchObject({ taskId: f.task.id, kind: 'agent', state: 'pending', process: 'not-started' });
     expect(new Set(views.map((v) => v.id)).size).toBe(1); expect(new Set(f.creates.map((c) => c.id)).size).toBe(1);
     const view = views[0]!; expect(view).toMatchObject({ computeProfileId: f.computeId, profileRevision: 1, agentProfileId: f.profileId });
     const stored = (await drizzleExecutionSubtasks(tdb.db).get(f.serviceId, f.task.id, view.id))!;

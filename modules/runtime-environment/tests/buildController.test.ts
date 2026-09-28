@@ -13,10 +13,6 @@ async function setup() {
   const build = await f.api.startBuild(f.admin, f.project, image.id, { revisionId: revision.id, requestKey: 'build' });
   return { f, driver, image, build, read: () => f.api.getBuild(f.admin, f.project, image.id, build.id) };
 }
-async function untilCalled(calls: string[], length: number) {
-  for (let attempt = 0; attempt < 100 && calls.length < length; attempt++) await Bun.sleep(1);
-  expect(calls.length).toBeGreaterThanOrEqual(length);
-}
 
 describe.skipIf(!available)('构建控制器恢复、物理停止与可信产物', () => {
   test('只有完整回收后发布版本，日志有上限且游标去重，终态重复调和无副作用', async () => {
@@ -43,9 +39,9 @@ describe.skipIf(!available)('构建控制器恢复、物理停止与可信产物
     const { f, driver, build, image, read } = await setup();
     driver.state('succeeded'); driver.block();
     const oldWorker = f.api.runBuild(build.id);
-    await untilCalled(driver.calls, 1);
-    await f.api.cancelBuild(f.admin, f.project, image.id, build.id, 'cancel');
-    driver.unblock(); await oldWorker;
+    // CI 36490908412：数据库调度可超过 100ms，按驱动真正开始的事件建立取消竞态。
+    try { await driver.started; await f.api.cancelBuild(f.admin, f.project, image.id, build.id, 'cancel'); }
+    finally { driver.unblock(); await oldWorker; }
     expect(driver.calls).not.toContain('inspect');
     await f.api.runBuild(build.id);
     expect(await read()).toMatchObject({ state: 'cancelling' });
@@ -57,12 +53,14 @@ describe.skipIf(!available)('构建控制器恢复、物理停止与可信产物
 
   test('租约过期由新控制器接管，旧控制器返回不能覆盖已完成记录', async () => {
     const { f, driver, build, image, read } = await setup();
-    driver.block(); const first = f.api.runBuild(build.id); await untilCalled(driver.calls, 1);
-    await f.api.runBuild(build.id); expect(driver.calls).toHaveLength(1);
-    f.advance(60001); driver.state('succeeded'); driver.stopped(true);
-    await f.api.runBuild(build.id);
-    expect(await read()).toMatchObject({ state: 'succeeded' });
-    driver.unblock(); await first;
+    driver.block(); const first = f.api.runBuild(build.id);
+    try {
+      await driver.started;
+      await f.api.runBuild(build.id); expect(driver.calls).toHaveLength(1);
+      f.advance(60001); driver.state('succeeded'); driver.stopped(true);
+      await f.api.runBuild(build.id);
+      expect(await read()).toMatchObject({ state: 'succeeded' });
+    } finally { driver.unblock(); await first; }
     expect(await read()).toMatchObject({ state: 'succeeded' });
     expect(await f.api.listVersions(f.developer, f.project, image.id, { limit: 10 })).toHaveLength(1);
   });
