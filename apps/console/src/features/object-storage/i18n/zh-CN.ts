@@ -1,5 +1,13 @@
 import type { Messages } from '../../../shared/lib/i18n';
 export const messages = {
+  'objects.overview.title': '对象存储状态', 'objects.overview.open': '管理对象存储',
+  'objects.overview.hint': '全平台逻辑容量，包含开发与生产空间；空间配额不代表磁盘容量。每 30 秒自动更新。',
+  'objects.overview.backends': '存储后端', 'objects.overview.readyCount': '就绪 {ready} / {total}',
+  'objects.overview.used': '逻辑已用', 'objects.overview.quota': '空间配额合计',
+  'objects.overview.ready': '就绪', 'objects.overview.attention': '需要关注', 'objects.overview.unknown': '待观测', 'objects.overview.unconfigured': '未配置',
+  'objects.overview.loadingBackends': '正在读取存储后端…', 'objects.overview.loadingSpaces': '正在读取对象空间…',
+  'objects.overview.backendError': '存储后端读取失败：{message}', 'objects.overview.spaceError': '对象空间读取失败：{message}',
+  'objects.overview.invalid': '对象存储回执不完整，请稍后重试。',
   'objects.backupHistory': '备份与恢复记录', 'objects.backupScope': '备份覆盖 CS 元数据和已发布对象。业务自身数据库及尚未归档的任务工作卷需另外备份。',
   'objects.backupState.draining': '正在等待在途写入与删除结束', 'objects.backupState.exporting': '正在导出并校验备份', 'objects.backupState.succeeded': '备份已校验完成',
   'objects.backupState.failed': '本次备份失败', 'objects.backupState.aborted': '本次备份已由运维终止',

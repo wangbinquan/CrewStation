@@ -1,6 +1,14 @@
 import type { MessagesShapedLike } from '../../../shared/lib/i18n';
 import type { messages as zh } from './zh-CN';
 export const messages: MessagesShapedLike<typeof zh> = {
+  'objects.overview.title': 'Object storage status', 'objects.overview.open': 'Manage object storage',
+  'objects.overview.hint': 'Platform-wide logical capacity across development and production spaces; space quotas are not disk capacity. Updates every 30 seconds.',
+  'objects.overview.backends': 'Storage backends', 'objects.overview.readyCount': 'Ready {ready} / {total}',
+  'objects.overview.used': 'Logical usage', 'objects.overview.quota': 'Total space quota',
+  'objects.overview.ready': 'Ready', 'objects.overview.attention': 'Needs attention', 'objects.overview.unknown': 'Awaiting observation', 'objects.overview.unconfigured': 'Not configured',
+  'objects.overview.loadingBackends': 'Loading storage backends…', 'objects.overview.loadingSpaces': 'Loading object spaces…',
+  'objects.overview.backendError': 'Could not read storage backends: {message}', 'objects.overview.spaceError': 'Could not read object spaces: {message}',
+  'objects.overview.invalid': 'Incomplete object storage response. Please try again later.',
   'objects.backupHistory': 'Backup and restore records', 'objects.backupScope': 'Covers CS metadata and published objects. Application databases and unarchived task workspaces require separate backups.',
   'objects.backupState.draining': 'Waiting for writes and deletions to drain', 'objects.backupState.exporting': 'Exporting and verifying backup', 'objects.backupState.succeeded': 'Backup verified',
   'objects.backupState.failed': 'Backup failed', 'objects.backupState.aborted': 'Backup aborted by operator',
