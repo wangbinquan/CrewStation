@@ -3,6 +3,7 @@
 import type { ClusterResource, DataResourceDto, DevSessionDto, ResourceRecord, SlotDto } from '@crewstation/contracts';
 import type { Translate } from '../lib/useT';
 import type { Topology, TopologyBand, TopologyEdge, TopologyNode } from '../ui/topology/topologyModel';
+import { appendStorage, resourceNode } from './storageTopology';
 import { recordBands, recordStatus } from './recordBands';
 import { databaseNode, durationText, factText, podFacts, podStatus, purposeSemantic, workloadStatus } from './topologyText';
 
@@ -123,9 +124,8 @@ function jobsBand(a: Assembly): void {
 }
 
 /** 用途待核对的 Pod 不猜成任何一带：单列并标待核对。按记录画任务两带时，这两类 Pod 由记录代表，不再落进这里。 */
-function otherBand(a: Assembly, fromRecords: boolean): void {
-  const placed = new Set(a.nodes.map((n) => n.id));
-  const others = a.pods.filter((r) => !placed.has(r.uid) && !(fromRecords && (DEV_PURPOSES.has(r.purpose) || BUSINESS_PURPOSES.has(r.purpose))));
+function otherBand(a: Assembly): void {
+  const others = a.pods.filter((r) => !resourceNode(a, r, a.input.records));
   if (others.length === 0) return;
   a.bands.push({ id: 'other', title: a.t('topology.band.other'), semantic: 'platform' });
   for (const p of others) a.nodes.push({ ...podNode(a, p, 'other', 'other'), status: 'unknown', statusText: a.t('topology.status.unknown') });
@@ -142,7 +142,12 @@ export function buildProjectTopology(input: ProjectTopologyInput, t: Translate):
   if (input.records) recordTaskBands(a, input.records);
   else { inventoryDevBand(a); inventoryBusinessBand(a); }
   jobsBand(a);
-  otherBand(a, !!input.records);
+  otherBand(a);
+  for (const r of a.workloads) if (!resourceNode(a, r, input.records)) {
+    if (!a.bands.some((b) => b.id === 'other')) a.bands.push({ id: 'other', title: t('topology.band.other'), semantic: 'platform' });
+    a.nodes.push({ id: r.uid, resourceId: r.resourceId, kind: 'workload', semantic: purposeSemantic(r.purpose), title: r.name, subtitle: r.kind, lane: 1, band: 'other', ...workloadStatus(r, t), abnormal: r.abnormal });
+  }
+  const missingBindings = appendStorage(a, resources, input.records ?? [], t);
   const edgeIds = new Set(a.nodes.map((n) => n.id));
-  return { id: `project:${input.project.id}`, title: t('topology.project.title', { name: input.project.name }), lanes: [t('topology.lane.entry'), t('topology.lane.workloads'), t('topology.lane.pods'), t('topology.lane.data')], bands: a.bands, nodes: a.nodes, edges: a.edges.filter((e) => edgeIds.has(e.from) && edgeIds.has(e.to)), observedAt: snapshot.observedAt, complete: snapshot.complete, incompleteReason: snapshot.incompleteReason };
+  return { id: `project:${input.project.id}`, title: t('topology.project.title', { name: input.project.name }), lanes: [t('topology.lane.entry'), t('topology.lane.workloads'), t('topology.lane.pods'), t('topology.lane.data'), ...(resources.some((r) => r.kind === 'PersistentVolume') ? [t('topology.lane.physicalStorage')] : [])], bands: a.bands, nodes: a.nodes, edges: a.edges.filter((e) => edgeIds.has(e.from) && edgeIds.has(e.to)), observedAt: snapshot.observedAt, complete: snapshot.complete && missingBindings === 0, incompleteReason: [snapshot.incompleteReason, ...(missingBindings ? [t('topology.incomplete.binding')] : [])].filter(Boolean).join(' · ') };
 }

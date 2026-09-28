@@ -148,6 +148,7 @@ test('cluster topology tab walks system → projects → pod layer and reuses th
   expect(page.text()).toContain('crewstation-system 命名空间'); expect(page.text()).toContain('虚线为静态架构标注，不是实测');
   expect(nodes()).toContain('cs-api'); expect(nodes()).toContain('users');
   await clickNode('cs-api'); expect(page.text()).toContain('uid-cs-api');
+  await page.click('关闭详情');
   await page.click('项目层 · 1'); expect(page.search()).toMatchObject({ layer: 'projects' });
   expect(page.text()).toContain('正常 · 1 个项目'); expect(nodes()).toEqual([`project:${f.projectId}`]);
   await clickNode(`project:${f.projectId}`); expect(precedes(byText('button', '展开该项目的 Pod 层'), document.querySelector('dl'))).toBe(true);
@@ -156,5 +157,6 @@ test('cluster topology tab walks system → projects → pod layer and reuses th
   expect(page.text()).toContain('项目层 › 集群验收'); expect(nodes()).toContain('uid-original'); expect(nodes()).toContain('route:preview');
   await clickNode('uid-original'); expect(page.text()).toContain('工作卷仍被引用');
   expect(precedes(byText('button', '重启'), document.querySelector('section[aria-label="资源详情"] [role="tablist"]'))).toBe(true);
+  await page.click('关闭详情');
   await page.click('返回项目层'); expect(page.search()).toMatchObject({ layer: 'projects' });
 });

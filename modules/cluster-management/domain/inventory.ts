@@ -14,7 +14,7 @@ export interface SystemComponent { kind: string; name: string; component: string
 export interface InventorySnapshot { id: string; startedAt: string; finishedAt: string; sources: ClusterSource[]; resources: ClusterResource[]; facts: InventoryFacts }
 export const workloadKinds = new Set(['Deployment', 'StatefulSet', 'DaemonSet', 'Job', 'CronJob', 'ReplicaSet', 'ReplicationController']);
 export const networkKinds = new Set(['Service', 'Ingress', 'IngressRoute', 'Middleware', 'NetworkPolicy']);
-export const collectedKinds = [...workloadKinds, 'Pod', ...networkKinds, 'PersistentVolumeClaim', 'ConfigMap', 'Secret', 'ServiceAccount', 'ResourceQuota', 'HorizontalPodAutoscaler', 'Namespace'];
+export const collectedKinds = [...workloadKinds, 'Pod', ...networkKinds, 'PersistentVolumeClaim', 'PersistentVolume', 'ConfigMap', 'Secret', 'ServiceAccount', 'ResourceQuota', 'HorizontalPodAutoscaler', 'Namespace'];
 export const objectRecord = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 export const objectArray = (value: unknown): Record<string, unknown>[] => Array.isArray(value) ? value.map(objectRecord) : [];
 export const stringRecord = (value: unknown): Record<string, string> => Object.fromEntries(Object.entries(objectRecord(value)).filter((e): e is [string, string] => typeof e[1] === 'string'));

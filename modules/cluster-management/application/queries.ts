@@ -28,11 +28,11 @@ export function projectCounts(s: InventorySnapshot): ClusterProjectCounts[] {
   });
 }
 const PROJECT_RESOURCE_LIMIT = 500;
-const kindRank = (r: ClusterResource): number => (r.kind === 'Pod' ? 0 : r.view === 'workloads' ? 1 : r.kind === 'PersistentVolumeClaim' ? 2 : r.kind === 'Service' ? 3 : 4);
+const kindRank = (r: ClusterResource): number => (r.kind === 'Pod' ? 0 : r.view === 'workloads' ? 1 : ['PersistentVolumeClaim', 'PersistentVolume'].includes(r.kind) ? 2 : r.kind === 'Service' ? 3 : 4);
 /** 项目成员的只读盘点：同一份快照按项目过滤，Pod 与工作负载优先保留，管理动作一律清空。 */
 export function projectResourcesIn(s: InventorySnapshot, projectId: string): ProjectClusterResources {
   const rows = s.resources.filter((r) => r.ownership.scope === 'project' && r.ownership.projectId === projectId).sort((a, b) => kindRank(a) - kindRank(b) || `${a.kind}/${a.name}/${a.uid}`.localeCompare(`${b.kind}/${b.name}/${b.uid}`));
-  return { snapshotId: s.id, observedAt: s.finishedAt, complete: completeSnapshot(s), sources: s.sources, items: rows.slice(0, PROJECT_RESOURCE_LIMIT).map((r) => ({ ...r, availableActions: [] })), truncated: rows.length > PROJECT_RESOURCE_LIMIT };
+  return { snapshotId: s.id, observedAt: s.finishedAt, complete: completeSnapshot(s) && rows.length <= PROJECT_RESOURCE_LIMIT, sources: s.sources, items: rows.slice(0, PROJECT_RESOURCE_LIMIT).map((r) => ({ ...r, availableActions: [] })), truncated: rows.length > PROJECT_RESOURCE_LIMIT };
 }
 export async function projectResources(deps: ClusterDeps, actor: Actor, projectId: string, snapshotId?: string): Promise<ProjectClusterResources> {
   await deps.authorizeProject(actor, projectId);

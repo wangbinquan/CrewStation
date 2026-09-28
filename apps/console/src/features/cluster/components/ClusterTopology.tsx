@@ -1,7 +1,7 @@
 // 集群管理「拓扑」页签（RFC-019）：系统层 → 项目层 → Pod 层；Pod 层与系统层的详情复用 RFC-010 的资源详情。
 import { useMemo, useState } from 'react';
 import type { ReactElement } from 'react';
-import type { ClusterResource, ClusterSummary } from '@crewstation/contracts';
+import type { ClusterSummary } from '@crewstation/contracts';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
 import { useApiQuery } from '../../../shared/api/useApi';
@@ -9,6 +9,7 @@ import { useT } from '../../../shared/lib/useT';
 import { useAdminResources } from '../../../shared/resources/useAdminResources';
 import { buildProjectTopology } from '../../../shared/topology/projectTopology';
 import { buildProjectsLayer, columnsFor, MORE_NODE_ID } from '../../../shared/topology/projectsLayer';
+import { readTopologyResources } from '../../../shared/topology/readTopologyResources';
 import { buildSystemTopology } from '../../../shared/topology/systemTopology';
 import { Button } from '../../../shared/ui/Button';
 import { Card } from '../../../shared/ui/Card';
@@ -26,18 +27,6 @@ import styles from './Cluster.module.css';
 type Layer = NonNullable<ClusterSearch['layer']>;
 interface Props { readonly search: ClusterSearch; readonly change: (patch: ClusterSearch) => void; readonly go: (next: ClusterSearch) => void; readonly summary?: ClusterSummary; readonly snapshotId?: string }
 
-/** 单个项目的资源可能超过一页（100）：顺着游标最多读 5 页，再多就标不完整。 */
-async function readProjectResources(projectId: string, snapshotId: string): Promise<{ items: ClusterResource[]; complete: boolean; snapshotId: string }> {
-  const items: ClusterResource[] = []; let cursor: string | undefined, complete = true;
-  for (let page = 0; page < 5; page += 1) {
-    const result = await api.cluster.resources({ scope: 'project', projectId, limit: 100, snapshotId, cursor });
-    items.push(...result.items); complete = complete && result.complete;
-    if (!result.nextCursor) return { items, complete, snapshotId: result.snapshotId };
-    cursor = result.nextCursor;
-  }
-  return { items, complete: false, snapshotId };
-}
-
 export function ClusterTopology({ search, change, go, summary, snapshotId }: Props): ReactElement {
   const t = useT(), layer: Layer = search.layer ?? 'system', projectId = layer === 'project' ? search.projectId : undefined;
   // 选中随层级作用域：换层或换项目后旧选中自然失效，不需要在 effect 里清空。
@@ -46,10 +35,10 @@ export function ClusterTopology({ search, change, go, summary, snapshotId }: Pro
   const selected = selection?.scope === scope ? selection.id : undefined, setSelected = (id: string | undefined) => setSelection({ scope, id });
   const [main, width] = useContainerWidth<HTMLDivElement>();
   const snapshot = useMemo(() => ({ id: snapshotId ?? '', observedAt: summary?.finishedAt ?? '', complete: summary?.complete ?? false, incompleteReason: summary && !summary.complete ? summary.sources.filter((s) => s.state === 'error' || s.state === 'stale').map((s) => `${s.kind}${s.reason ? `（${s.reason}）` : ''}`).join('、') : undefined }), [snapshotId, summary]);
-  const systemQuery = { scope: 'system' as const, view: 'workloads' as const, limit: 100, snapshotId };
-  const system = useApiQuery(queryKeys.cluster('topology-system', systemQuery), () => api.cluster.resources(systemQuery), { enabled: layer === 'system' && !!snapshotId, keepPrevious: (previous) => sameApartFromSnapshot(previous, systemQuery) });
+  const systemQuery = { scope: 'system' as const, snapshotId };
+  const system = useApiQuery(queryKeys.cluster('topology-system', systemQuery), () => readTopologyResources(systemQuery), { enabled: layer === 'system' && !!snapshotId, keepPrevious: (previous) => sameApartFromSnapshot(previous, systemQuery) });
   const projectQuery = { projectId, snapshotId };
-  const projectResources = useApiQuery(queryKeys.cluster('topology-project', projectQuery), () => readProjectResources(projectId!, snapshotId!), { enabled: layer === 'project' && !!projectId && !!snapshotId, keepPrevious: (previous) => sameApartFromSnapshot(previous, projectQuery) });
+  const projectResources = useApiQuery(queryKeys.cluster('topology-project', projectQuery), () => readTopologyResources({ scope: 'project', projectId: projectId!, snapshotId: snapshotId! }), { enabled: layer === 'project' && !!projectId && !!snapshotId, keepPrevious: (previous) => sameApartFromSnapshot(previous, projectQuery) });
   const project = useApiQuery(queryKeys.project(projectId ?? ''), () => api.projects.get(projectId!), { enabled: layer === 'project' && !!projectId });
   const serviceId = project.data?.serviceId;
   const records = useAdminResources(layer !== 'system');
@@ -58,10 +47,10 @@ export function ClusterTopology({ search, change, go, summary, snapshotId }: Pro
   const dataResources = useApiQuery(queryKeys.dataResources(projectId ?? ''), () => api.tasks.listDataResources(projectId!), { enabled: layer === 'project' && !!projectId });
   const topology = useMemo(() => {
     if (!summary) return undefined;
-    if (layer === 'system') return system.data ? buildSystemTopology({ resources: system.data.items, summary, snapshot }, t) : undefined;
+    if (layer === 'system') return system.data ? buildSystemTopology({ resources: system.data.items, summary, snapshot: { ...snapshot, complete: snapshot.complete && system.data.complete, incompleteReason: system.data.truncated ? t('topology.incomplete.limit') : snapshot.incompleteReason } }, t) : undefined;
     if (layer === 'projects') return buildProjectsLayer({ projects: summary.projects, columns: columnsFor(width), expanded, snapshot }, t);
     if (!project.data || !projectResources.data || !records.data) return undefined;
-    return buildProjectTopology({ project: { id: project.data.id, name: project.data.name, kind: project.data.kind, namespace: project.data.namespace }, resources: projectResources.data.items, records: records.data.items.filter((record) => record.projectId === projectId), slots: slots.data?.items ?? [], devSession: devSession.data && !devSession.error ? devSession.data : undefined, dataResources: dataResources.data?.items ?? [], snapshot: { ...snapshot, complete: snapshot.complete && projectResources.data.complete && !records.error } }, t);
+    return buildProjectTopology({ project: { id: project.data.id, name: project.data.name, kind: project.data.kind, namespace: project.data.namespace }, resources: projectResources.data.items, records: records.data.items.filter((record) => record.projectId === projectId), slots: slots.data?.items ?? [], devSession: devSession.data && !devSession.error ? devSession.data : undefined, dataResources: dataResources.data?.items ?? [], snapshot: { ...snapshot, complete: snapshot.complete && projectResources.data.complete && !records.error, incompleteReason: projectResources.data.truncated ? t('topology.incomplete.limit') : snapshot.incompleteReason } }, t);
   }, [layer, summary, snapshot, system.data, projectResources.data, project.data, projectId, records.data, records.error, slots.data, devSession.data, devSession.error, dataResources.data, width, expanded, t]);
   const projectName = (id: string | undefined): string | undefined => summary?.projects.find((p) => p.id === id)?.name;
   const select = (id: string | undefined) => { if (id === MORE_NODE_ID) { setExpanded(true); return; } setSelected(id); };

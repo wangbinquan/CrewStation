@@ -6,7 +6,7 @@ export type Semantic = typeof SEMANTICS[number];
 export const STATUS_ORDER = ['failed', 'pending', 'unknown', 'terminating', 'running', 'ready', 'succeeded', 'idle'] as const;
 export type NodeStatus = typeof STATUS_ORDER[number];
 export type NodeKind = 'route' | 'workload' | 'pod' | 'database' | 'volume' | 'job' | 'component' | 'external' | 'summary';
-export const EDGE_KINDS = ['routes', 'owns', 'child', 'mounts', 'uses', 'traffic', 'control', 'dial', 'push'] as const;
+export const EDGE_KINDS = ['routes', 'owns', 'child', 'mounts', 'binds', 'uses', 'traffic', 'control', 'dial', 'push'] as const;
 export type EdgeKind = typeof EDGE_KINDS[number];
 export type Evidence = 'observed' | 'static';
 

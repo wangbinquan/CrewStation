@@ -27,8 +27,9 @@ test('nodes render as focusable buttons; click and Enter select; selection dims 
   await act(async () => { nodeEl('route').dispatchEvent(new MouseEvent('click', { bubbles: true })); }); await rendered.settle();
   expect(nodeEl('route').getAttribute('aria-pressed')).toBe('true'); expect(document.querySelector('[aria-label="详情"]')?.textContent).toBe('route');
   expect(dimmed('deploy')).toBe(false); expect(dimmed('pod')).toBe(false); expect(dimmed('ws')).toBe(true); expect(dimmed('cli')).toBe(true);
-  await act(async () => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); }); await rendered.settle();
-  expect(document.querySelector('[aria-label="详情"]')).toBeNull(); expect(dimmed('ws')).toBe(false);
+  await act(async () => { document.querySelector('dialog')!.dispatchEvent(new Event('cancel', { cancelable: true })); }); await rendered.settle();
+  expect(document.querySelectorAll('[aria-label="详情"]')).toHaveLength(0);
+  await act(async () => { nodeEl('route').blur(); }); await rendered.settle(); expect(dimmed('ws')).toBe(false);
   await act(async () => { nodeEl('cli').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); }); await rendered.settle();
   expect(document.querySelector('[aria-label="选中"]')?.textContent).toBe('cli');
   expect(nodeEl('cli').getAttribute('aria-label')).toContain('cli，等待中');
@@ -51,21 +52,18 @@ test('filters dim without removing, the attention chip counts abnormal nodes, an
   expect(rendered.text()).not.toContain('快照完整');
 });
 
-// 2026-09-23 作者裁定：宽屏整块长满到窗口底边，详情在图的右侧自成一栏、各自滚动（集群管理与项目「部署与运行形态」共用）。
-test('the workspace measures its height down to the window bottom and gives the detail its own column beside the diagram', async () => {
+test('node details open in a shared dialog and keep the graph scroll and filters intact', async () => {
   rendered = await renderElement(<Harness />, {});
-  const root = document.querySelector('svg[role="group"]')!.closest('.page') as HTMLElement;
-  expect(root.style.getPropertyValue('--viewport-fill')).toMatch(/^\d+px$/);
-  expect(document.querySelector('.workspace')!.className).toBe('workspace');
-  await act(async () => { nodeEl('route').dispatchEvent(new MouseEvent('click', { bubbles: true })); }); await rendered.settle();
-  const detail = document.querySelector('[aria-label="详情"]')!.parentElement!;
-  expect([detail.className, detail.parentElement!.className, detail.previousElementSibling!.className]).toEqual(['detail', 'workspace hasDetail', 'main']);
-  expect(detail.previousElementSibling!.contains(document.querySelector('svg[role="group"]'))).toBe(true);
-  // 详情栏自己滚：换选另一个节点时换一个栏，新详情从顶上看起。
-  detail.scrollTop = 120;
+  const stage = document.querySelector('svg[role="group"]')!.parentElement!;
+  stage.scrollTop = 300;
+  await rendered.click('开发会话');
   await act(async () => { nodeEl('cli').dispatchEvent(new MouseEvent('click', { bubbles: true })); }); await rendered.settle();
-  const next = document.querySelector('[aria-label="详情"]')!.parentElement!;
-  expect(next.textContent).toBe('cli'); expect(next === detail).toBe(false); expect(next.scrollTop).toBe(0);
+  expect(document.querySelectorAll('dialog[open]')).toHaveLength(1);
+  expect(document.querySelector('dialog [aria-label="详情"]')?.textContent).toBe('cli');
+  expect(document.querySelectorAll('.workspace > .detail')).toHaveLength(0);
+  await act(async () => { document.querySelector('dialog')!.dispatchEvent(new Event('cancel', { cancelable: true })); }); await rendered.settle();
+  expect(document.querySelectorAll('dialog[open]')).toHaveLength(0);
+  expect(stage.scrollTop).toBe(300); expect(dimmed('route')).toBe(true);
 });
 
 test('a partial snapshot still gets a warning line naming the failed sources', async () => {

@@ -62,8 +62,8 @@
 .arrow { fill: var(--cs-topo-edge); }
 .edge_routes .edgePath { stroke: var(--cs-topo-gateway-stroke); stroke-width: 2; }
 .arrow.edge_routes { fill: var(--cs-topo-gateway-stroke); }
-.edge_uses .edgePath, .edge_mounts .edgePath { stroke: var(--cs-topo-data-stroke); }
-.arrow.edge_uses, .arrow.edge_mounts { fill: var(--cs-topo-data-stroke); }
+.edge_binds .edgePath, .edge_uses .edgePath, .edge_mounts .edgePath { stroke: var(--cs-topo-data-stroke); }
+.arrow.edge_binds, .arrow.edge_uses, .arrow.edge_mounts { fill: var(--cs-topo-data-stroke); }
 .edge_child .edgePath { stroke-dasharray: 2 3; }
 .edge_push .edgePath { stroke: var(--cs-topo-business-stroke); }
 .arrow.edge_push { fill: var(--cs-topo-business-stroke); }
@@ -83,7 +83,7 @@
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--topo-status, var(--cs-tone-neutral-fg)); flex-shrink: 0; }
 .line { display: inline-block; width: 22px; height: 0; border-top: 2px solid var(--cs-topo-edge); }
 .edge_routes .line { border-color: var(--cs-topo-gateway-stroke); }
-.edge_uses .line, .edge_mounts .line { border-color: var(--cs-topo-data-stroke); }
+.edge_binds .line, .edge_uses .line, .edge_mounts .line { border-color: var(--cs-topo-data-stroke); }
 .edge_child .line { border-top-style: dotted; }
 .edge_push .line { border-color: var(--cs-topo-business-stroke); }
 .edge_control .line { border-color: var(--cs-topo-build-stroke); }

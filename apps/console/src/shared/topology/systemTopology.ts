@@ -1,8 +1,9 @@
 // 集群系统层：平台组件的观测状态（盘点）＋ 项目命名空间的聚合卡（摘要）＋ 静态架构标注（常量表）。
 import type { ClusterResource, ClusterSummary } from '@crewstation/contracts';
 import type { Translate } from '../lib/useT';
-import type { Topology, TopologyEdge, TopologyNode } from '../ui/topology/topologyModel';
+import type { Topology, TopologyBand, TopologyEdge, TopologyNode } from '../ui/topology/topologyModel';
 import { STATIC_COMPONENTS, STATIC_EDGES, STATIC_EXTERNALS, SYSTEM_LANES } from './staticArchitecture';
+import { appendStorage } from './storageTopology';
 import { workloadStatus } from './topologyText';
 
 export interface SystemTopologyInput {
@@ -28,7 +29,12 @@ export function buildSystemTopology(input: SystemTopologyInput, t: Translate): T
     nodes.push({ id: component.id, kind: component.kind, semantic: component.semantic, title: observed?.name ?? component.names[0]!, subtitle: t(component.subtitleKey), status: state.status, statusText: state.statusText, lane: component.lane, band, row: component.row, box, abnormal: observed?.abnormal, resourceId: observed?.resourceId,
       meta: observed ? [observed.kind, t('topology.pod.restarts', { count: observed.restarts })] : [t('topology.system.notObserved')], facts: observed ? [[t('topology.fact.kind'), observed.kind], [t('topology.workload.replicasLabel'), `${observed.readyReplicas ?? 0}／${observed.desired ?? 0}`], [t('topology.fact.restarts'), String(observed.restarts)], [t('topology.fact.uid'), observed.uid]] : [] });
   }
-  for (const external of STATIC_EXTERNALS) nodes.push({ id: external.id, kind: 'external', semantic: 'external', title: t(external.titleKey), subtitle: t(external.subtitleKey), status: 'idle', statusText: t('topology.system.external'), lane: 4, band, row: external.row });
+  for (const r of input.resources.filter((r) => (r.view === 'workloads' && r.topLevel || r.kind === 'Pod' && r.standalone) && !nodes.some((n) => n.resourceId === r.resourceId))) {
+    nodes.push({ id: r.uid, resourceId: r.resourceId, kind: 'component', semantic: 'platform', title: r.name, subtitle: r.kind, lane: 2, band, box, ...workloadStatus(r, t), abnormal: r.abnormal });
+  }
+  for (const external of STATIC_EXTERNALS) nodes.push({ id: external.id, kind: 'external', semantic: 'external', title: t(external.titleKey), subtitle: t(external.subtitleKey), status: 'idle', statusText: t('topology.system.external'), lane: input.resources.some((r) => r.kind === 'PersistentVolume') ? 5 : 4, band, row: external.row });
   const edges: TopologyEdge[] = STATIC_EDGES.map((edge) => ({ from: edge.from, to: edge.to, kind: edge.kind, evidence: 'static', ...(edge.labelKey ? { label: t(edge.labelKey) } : {}) }));
-  return { id: 'system', title: t('topology.system.title'), lanes: SYSTEM_LANES.map((lane) => t(`topology.lane.${lane}`)), bands: [{ id: band, title: t('topology.system.cluster'), semantic: 'platform', boxes: [{ id: box, title: t('topology.system.namespace'), semantic: 'platform', note: t('topology.system.namespaceNote', { count: input.resources.filter((r) => r.view === 'workloads' && r.topLevel).length }) }] }], nodes, edges, observedAt: input.snapshot.observedAt, complete, incompleteReason: input.snapshot.incompleteReason };
+  const bands: TopologyBand[] = [{ id: band, title: t('topology.system.cluster'), semantic: 'platform', boxes: [{ id: box, title: t('topology.system.namespace'), semantic: 'platform', note: t('topology.system.namespaceNote', { count: input.resources.filter((r) => r.view === 'workloads' && r.topLevel).length }) }] }];
+  const missingBindings = appendStorage({ nodes, edges, bands }, input.resources, [], t, true);
+  return { id: 'system', title: t('topology.system.title'), lanes: [...SYSTEM_LANES.slice(0, 4), ...(input.resources.some((r) => r.kind === 'PersistentVolume') ? ['physicalStorage'] : []), 'external'].map((lane) => t(`topology.lane.${lane}`)), bands, nodes, edges, observedAt: input.snapshot.observedAt, complete: complete && missingBindings === 0, incompleteReason: [input.snapshot.incompleteReason, ...(missingBindings ? [t('topology.incomplete.binding')] : [])].filter(Boolean).join(' · ') };
 }

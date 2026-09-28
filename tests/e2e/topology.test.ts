@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, test } from 'bun:test';
 import { ClusterSummarySchema, ProjectClusterResourcesSchema, ResourceViewSchema } from '../../packages/contracts';
-import type { ResourceRecord } from '../../packages/contracts';
+import type { ClusterResource, ResourceRecord } from '../../packages/contracts';
 import type { Page } from './cdp';
 import { apiGet, e2eAvailable, e2eVisitor, open, signIn } from './consoleSession';
 import { openAdminSession } from './session';
@@ -29,6 +29,10 @@ describe.skipIf(!session)('deployed deployment topology (RFC-019)', () => {
     expect(await page.eval<string>(`document.querySelector('[data-node-id="cs-api"]').getAttribute('aria-label')`)).toContain('副本');
     const summary = ClusterSummarySchema.parse(await apiGet(page, '/v1/admin/cluster/summary'));
     if (summary.complete) expect(summary.projects.every((p) => typeof p.pods === 'number' && typeof p.workloads === 'number')).toBe(true);
+    const all: ClusterResource[] = []; let cursor: string | undefined;
+    do { const q = new URLSearchParams({ scope: 'system', snapshotId: summary.snapshotId, limit: '100', ...(cursor ? { cursor } : {}) }); const result = await apiGet<{ items: ClusterResource[]; nextCursor?: string }>(page, '/v1/admin/cluster/resources?' + q); all.push(...result.items); cursor = result.nextCursor; } while (cursor);
+    const text = await page.bodyText();
+    for (const r of all.filter((r) => ['PersistentVolumeClaim', 'PersistentVolume'].includes(r.kind) || r.view === 'workloads' && r.topLevel)) expect(text).toContain(r.name);
     const count = summary.projects.length;
     await clickButton(page, `项目层 · ${count}`);
     // 2026-09-23 起各层不再有提示行，按地址确认已进入项目层。
@@ -47,7 +51,7 @@ describe.skipIf(!session)('deployed deployment topology (RFC-019)', () => {
     const inventory = ProjectClusterResourcesSchema.parse(await apiGet(page, `/v1/projects/${id}/cluster-resources`));
     const records = ResourceViewSchema.parse(await apiGet(page, `/v1/projects/${id}/resources`)).items;
     expect(inventory.items.every((item) => item.availableActions.length === 0)).toBe(true);
-    const pods = inventory.items.filter((item) => item.kind === 'Pod');
+    const pods = inventory.items.filter((item) => ['Pod', 'PersistentVolumeClaim', 'PersistentVolume'].includes(item.kind));
     await open(page, `/admin/cluster?tab=topology&layer=project&projectId=${id}&scope=project`); await waitForNodes(page);
     let ids = await nodeIds(page); for (const pod of pods) expect(ids).toContain(nodeIdFor(records, pod.uid));
     expect(await page.bodyText()).toContain('项目层 ›');
@@ -57,7 +61,7 @@ describe.skipIf(!session)('deployed deployment topology (RFC-019)', () => {
     // 盘点里 PVC 的 facts 值是 JSON（如 capacity {"storage":"10Gi"}），卡片上要显示成量，不能原样上图。
     const pvc = inventory.items.find((item) => item.kind === 'PersistentVolumeClaim' && Object.values(item.facts).some((value) => value.startsWith('{')));
     if (pvc) expect(await page.eval<string>(`document.querySelector('[data-node-id="${nodeIdFor(records, pvc.uid)}"]').textContent`)).not.toContain('{"');
-    const first = pods[0];
+    const first = pods.find((item) => item.kind === 'Pod');
     if (first) {
       await page.eval(`document.querySelector('[data-node-id="${nodeIdFor(records, first.uid)}"]').dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
       await page.waitUntil(`document.body.innerText.includes('这里只读')`, 10_000, 200);

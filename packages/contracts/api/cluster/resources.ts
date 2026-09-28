@@ -22,6 +22,7 @@ export const ClusterResourceSchema = z.object({
   view: ClusterViewSchema, ownership: ClusterOwnershipSchema, purpose: ClusterPurposeSchema, phase: z.string(), ready: z.boolean(), abnormal: z.boolean(), reason: z.string(), topLevel: z.boolean(), standalone: z.boolean(),
   desired: z.number().optional(), actual: z.number().optional(), readyReplicas: z.number().optional(), restarts: z.number(), node: z.string().optional(),
   labels: z.record(z.string(), z.string()), owners: z.array(z.object({ kind: z.string(), name: z.string(), uid: z.string(), resourceId: z.string().optional() })), references: z.array(z.string()), containers: z.array(ClusterContainerSchema), facts: z.record(z.string(), z.string()),
+  mounts: z.array(z.object({ claimName: z.string(), container: z.string(), mountPath: z.string(), subPath: z.string().optional(), subPathExpr: z.string().optional(), readOnly: z.boolean(), init: z.boolean() })).optional(),
   taskId: z.string().optional(), parentTaskId: z.string().optional(), agentId: z.string().optional(), terminalId: z.string().optional(), releaseId: z.string().optional(), serviceId: z.string().optional(), physicalSlot: z.enum(['blue', 'green']).optional(), slotRole: z.enum(['prod', 'preview']).optional(), profile: z.string().optional(), profileRevision: z.number().optional(), domainRevision: z.string().optional(),
   availableActions: z.array(ClusterActionCapabilitySchema),
   ledger: ClusterLedgerSchema.optional(),

@@ -11,7 +11,7 @@ export async function collectSnapshot(deps: ClusterDeps, signal: AbortSignal): P
   let facts;
   try { facts = await deps.metadata.read(); } catch (error) { facts = { projects: previous?.facts.projects ?? [], tasks: previous?.facts.tasks ?? [], releases: previous?.facts.releases ?? [], retained: previous?.facts.retained ?? [], complete: false, reason: String(error) }; }
   const namespaces = [...new Set([deps.systemNamespace, ...facts.projects.map((p) => p.namespace)])];
-  const jobs = collectedKinds.flatMap((kind) => kind === 'Namespace' ? [{ kind, namespace: '', selector: undefined as string | undefined }] : [...namespaces.map((namespace) => ({ kind, namespace, selector: undefined as string | undefined })), { kind, namespace: '', selector: 'app.kubernetes.io/managed-by=crewstation' }]);
+  const jobs = collectedKinds.flatMap((kind) => (kind === 'Namespace' || kind === 'PersistentVolume') ? [{ kind, namespace: '', selector: undefined as string | undefined }] : [...namespaces.map((namespace) => ({ kind, namespace, selector: undefined as string | undefined })), { kind, namespace: '', selector: 'app.kubernetes.io/managed-by=crewstation' }]);
   const objects: ResourceObject[] = [], sources: ClusterSource[] = [], stale = new Map<string, ClusterSource>();
   const one = async (source: typeof jobs[number]): Promise<void> => {
     const key = `${source.namespace || '*'}/${source.kind}`, old = previous?.sources.find((s) => s.key === key);

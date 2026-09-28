@@ -1,3 +1,4 @@
+import { boundClaim } from './storageTopology';
 import type { ClusterOwnership } from '@crewstation/contracts';
 import type { InventoryFacts, ResourceObject, SystemComponent } from './inventory';
 import { objectArray, objectRecord, resourceKey } from './inventory';
@@ -23,6 +24,8 @@ export function referencesOf(obj: ResourceObject): string[] {
     for (const svc of objectArray(route.services)) add('Service', svc.name);
     for (const mid of objectArray(route.middlewares)) add('Middleware', mid.name);
   }
+  if (obj.kind === 'PersistentVolumeClaim' && typeof spec.volumeName === 'string' && spec.volumeName) keys.add(`/PersistentVolume/${spec.volumeName}`);
+  if (obj.kind === 'PersistentVolume') { const ref = objectRecord(spec.claimRef); if (ref.namespace && ref.name) keys.add(`${String(ref.namespace)}/PersistentVolumeClaim/${String(ref.name)}`); }
   add('Secret', objectRecord(spec.tls).secretName);
   if (obj.kind === 'ServiceAccount') for (const s of [...objectArray(obj.secrets), ...objectArray(obj.imagePullSecrets)]) add('Secret', s.name);
   if (obj.kind === 'StatefulSet') for (const claim of objectArray(spec.volumeClaimTemplates)) for (let i = 0; i < Math.min(1000, Number(spec.replicas ?? 1)); i++) add('PersistentVolumeClaim', `${objectRecord(claim.metadata).name}-${obj.metadata.name}-${i}`);
@@ -59,6 +62,10 @@ export function resourceGraph(objects: ResourceObject[], facts: InventoryFacts, 
     if (!changed) break;
   }
   const ownership = (obj: ResourceObject): ClusterOwnership | undefined => {
+    if (obj.kind === 'PersistentVolume') {
+      const claim = boundClaim(obj, byKey);
+      return claim ? ownership(claim) : undefined;
+    }
     const ns = obj.kind === 'Namespace' ? obj.metadata.name : obj.metadata.namespace;
     const task = facts.tasks.find((t) => t.namespace === ns && t.podName === obj.metadata.name && (!!t.podUid && t.podUid === obj.metadata.uid));
     if (obj.kind === 'Pod' && task?.kind === 'profile-test') return { scope: 'system', component: 'profile-test' };

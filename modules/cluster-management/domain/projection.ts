@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { ClusterPurpose, ClusterResource } from '@crewstation/contracts';
 import type { InventoryFacts, ResourceObject, SystemComponent } from './inventory';
 import { networkKinds, objectRecord, workloadKinds } from './inventory';
+import { storageMounts } from './storageTopology';
 import { resourceGraph, referencesOf } from './resourceGraph';
 import { containerDetails, resourceStatus, visibleFacts } from './resourceStatus';
 import { resourceCapabilities } from './resourceCapabilities';
@@ -47,7 +48,7 @@ export function projectResources(objects: ResourceObject[], facts: InventoryFact
       ownership, purpose: purposeOf(obj, task, project?.kind, system), ...resourceStatus(obj, containers), topLevel: !parent || !(obj.kind === 'ReplicaSet' && parent.kind === 'Deployment' || obj.kind === 'Job' && parent.kind === 'CronJob'), standalone: obj.kind === 'Pod' && !obj.metadata.ownerReferences?.some((owner) => owner.controller),
       ...(obj.metadata.creationTimestamp ? { createdAt: obj.metadata.creationTimestamp } : {}), ...(obj.metadata.deletionTimestamp ? { deletingAt: obj.metadata.deletionTimestamp } : {}), ...(obj.metadata.generation !== undefined ? { generation: obj.metadata.generation } : {}),
       labels, owners: (obj.metadata.ownerReferences ?? []).map((o) => { const found = graph.byUid.get(o.uid); return { kind: o.kind, name: o.name, uid: o.uid, ...(found && found.metadata.namespace === ns && found.kind === o.kind && found.metadata.name === o.name ? { resourceId: resourceId(found) } : {}) }; }),
-      references: referencesOf(obj), containers, facts: visibleFacts(obj), availableActions: [],
+      references: referencesOf(obj), containers, mounts: storageMounts(obj), facts: visibleFacts(obj), availableActions: [],
       ...(task ? { taskId: task.taskId, profile: task.profile, domainRevision: task.revision, ...(task.parentTaskId ? { parentTaskId: task.parentTaskId } : {}), ...(task.agentId ? { agentId: task.agentId } : {}), ...(task.terminalId ? { terminalId: task.terminalId } : {}), ...(task.profileRevision === undefined ? {} : { profileRevision: task.profileRevision }) } : {}),
       ...(slot ? { serviceId: slot.serviceId, physicalSlot: slot.physical, slotRole: slot.role, domainRevision: slot.revision, ...(slot.releaseId ? { releaseId: slot.releaseId } : {}) } : labels['crewstation.io/release'] ? { releaseId: labels['crewstation.io/release'] } : {}),
     };

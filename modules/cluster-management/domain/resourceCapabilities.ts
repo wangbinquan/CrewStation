@@ -11,6 +11,7 @@ export function resourceCapabilities(row: ClusterResource, facts: InventoryFacts
   if (!facts.complete) return denyAll(facts.reason ?? '平台归属信息读取不完整');
   if (row.ownership.scope === 'unresolved') return denyAll(row.ownership.reason);
   if (row.deletingAt) return denyAll('资源正在终止，请等待当前操作完成');
+  if (row.kind === 'PersistentVolume') return denyAll('持久卷绑定由存储供应器管理，仅支持查看');
   if (row.kind === 'Namespace') return denyAll('命名空间由项目和安装流程管理');
   if (row.ownership.scope === 'project' && row.ownership.archived) return denyAll('项目已归档，请先核对项目清理状态');
   if (row.taskId) {

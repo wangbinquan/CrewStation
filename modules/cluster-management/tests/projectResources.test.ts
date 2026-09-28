@@ -32,7 +32,9 @@ beforeAll(async () => {
   await k8s.create({ ...object('Deployment', 'demo-green', 'cs-demo', { replicas: 1 }), status: { replicas: 1, readyReplicas: 1, availableReplicas: 1 } });
   await k8s.create({ ...object('Pod', 'demo-green-1', 'cs-demo', { containers: [{ name: 'app', image: 'registry.cs.internal/demo:v0.1.4' }] }), status: { phase: 'Running', conditions: [{ type: 'Ready', status: 'True' }], containerStatuses: [{ name: 'app', ready: true, restartCount: 0, state: { running: {} } }] } });
   await k8s.create({ ...object('Pod', 'subtask-1', 'cs-demo', { containers: [{ name: 'app', image: 'registry.cs.internal/task:1' }] }), status: { phase: 'Pending', conditions: [{ type: 'PodScheduled', status: 'False', reason: 'Unschedulable', message: '0/1 nodes are available: Insufficient cpu' }] } });
-  await k8s.create(object('PersistentVolumeClaim', 'task-work', 'cs-demo'));
+  const claim = await k8s.create(object('PersistentVolumeClaim', 'task-work', 'cs-demo', { volumeName: 'bound-volume' }));
+  await k8s.create(object('PersistentVolume', 'bound-volume', '', { claimRef: { namespace: 'cs-demo', name: 'task-work', uid: claim.metadata.uid } }));
+  await k8s.create(object('PersistentVolume', 'foreign-volume', '', { claimRef: { namespace: 'foreign', name: 'claim', uid: 'foreign' } }));
   await k8s.create(object('ConfigMap', 'settings', 'cs-demo'));
   await k8s.create(object('Pod', 'coredns', 'kube-system'));
   await module.collect();
@@ -50,6 +52,8 @@ describe.skipIf(!available)('project-scoped read-only inventory (RFC-019)', () =
     expect(page.items.find((item) => item.name === 'subtask-1')).toMatchObject({ phase: 'Pending', ready: false });
     expect(Number.isNaN(Date.parse(page.observedAt))).toBe(false);
     expect(page.truncated).toBe(false);
+    expect(page.items.filter((r) => r.kind === 'PersistentVolume').map((r) => r.name)).toEqual(['bound-volume']);
+    expect(page.sources.filter((s) => s.kind === 'PersistentVolume')).toHaveLength(1);
     const summary = ClusterSummarySchema.parse(await module.api.summary(admin, query));
     expect(page.snapshotId).toBe(summary.snapshotId);
     // 管理员走同一条用例也拿不到动作；同一快照的管理员列表则仍带动作能力。
@@ -90,6 +94,6 @@ describe.skipIf(!available)('project-scoped read-only inventory (RFC-019)', () =
     expect(page.truncated).toBe(true); expect(page.items).toHaveLength(500);
     expect(page.items.filter((item) => item.kind === 'Pod')).toHaveLength(150); expect(page.items.filter((item) => item.kind === 'Deployment')).toHaveLength(60);
     expect(page.items.every((item) => item.availableActions.length === 0)).toBe(true);
-    expect(page.complete).toBe(true); expect(page.observedAt).toBe('2026-09-22T00:00:30.000Z');
+    expect(page.complete).toBe(false); expect(page.observedAt).toBe('2026-09-22T00:00:30.000Z');
   });
 });

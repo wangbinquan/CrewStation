@@ -81,7 +81,7 @@ function workspaceGroup(parts: BandParts, workspace: ResourceRecord, executions:
   for (const execution of mine) { parts.nodes.push(workloadNode(execution, band, input, t)); parts.edges.push({ from: workspace.id, to: execution.id, kind: 'child', evidence: 'observed' }); }
   for (const volume of volumes.filter((v) => v.parentId === workspace.id)) {
     parts.nodes.push(volumeNode(volume, band, input, t));
-    for (const holder of [workspace, ...mine]) parts.edges.push({ from: holder.id, to: volume.id, kind: 'mounts', evidence: 'observed' });
+    // Physical mount edges are assembled from the inventory, never inferred from task ancestry.
   }
 }
 
