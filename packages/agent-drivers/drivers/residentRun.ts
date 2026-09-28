@@ -47,6 +47,9 @@ export class ResidentAgentRun extends AgentRunBase {
       ...(this.spec.resumeSessionId === undefined ? {} : { resumeSessionId: this.spec.resumeSessionId }),
       resident: true,
     });
+    const captureUsage = this.usageObserver?.beginTurn();
+    if (this.spec.nativeUsageTreeV1 === 1) await this.beginNativeCapture(plan.env, this.sessionId ?? this.spec.resumeSessionId, true);
+    if (this.cancelled || this.events.closed) return;
     let stream: DriverChildProcessWithStdin;
     try {
       stream = this.context.host.spawnWithStdin({ cmd: plan.cmd, cwd: this.context.cwd, env: plan.env });
@@ -59,11 +62,10 @@ export class ResidentAgentRun extends AgentRunBase {
     if (this.spec.initialPrompt !== undefined && this.spec.initialPrompt.length > 0) {
       this.writeFrame(stream, this.spec.initialPrompt);
     }
-    await this.consume(stream);
+    await this.consume(stream, captureUsage);
   }
 
-  private async consume(stream: DriverChildProcessWithStdin): Promise<void> {
-    let captureUsage = this.usageObserver?.beginTurn();
+  private async consume(stream: DriverChildProcessWithStdin, captureUsage: ReturnType<NonNullable<typeof this.usageObserver>['beginTurn']> | undefined): Promise<void> {
     let result: Awaited<ReturnType<typeof pumpTurn>>;
     try {
       result = await pumpTurn(stream, {

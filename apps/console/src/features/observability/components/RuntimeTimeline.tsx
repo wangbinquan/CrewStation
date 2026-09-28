@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import type { RuntimeTaskObservation } from '@crewstation/contracts';
+import type { RuntimeTaskObservation, RuntimeNativeCapture } from '@crewstation/contracts';
 import { useT } from '../../../shared/lib/useT';
 import { Stack } from '../../../shared/ui/Stack';
 import { Card } from '../../../shared/ui/Card';
 import { Button } from '../../../shared/ui/Button';
 import { ActionRow } from '../../../shared/ui/ActionRow';
+import { FormField } from '../../../shared/ui/FormField';
 import { Dialog } from '../../../shared/ui/dialog/Dialog';
 import { RuntimeMetrics, RuntimeTokenBuckets } from './RuntimeMetrics';
 import { runtimeDate, runtimeDuration } from '../model/runtimeFormat';
@@ -33,8 +34,34 @@ export function RuntimeTimeline({ task }: { task: RuntimeTaskObservation }) {
     </Card>
     {selected ? <Dialog title={selected.name + ' · ' + t('runtime.attemptNumber', { count: selected.attempt })} size="large" onClose={() => setSelected(undefined)}>
       <Stack><RuntimeMetrics metrics={selected.metrics} duration={selected.durationMs} /><RuntimeTokenBuckets metrics={selected.metrics} />
+        {selected.kind === 'agent' ? <NativeCaptureSummary key={selected.id} captures={selected.nativeCaptures ?? []} /> : null}
         <dl className={styles.facts}><dt>{t('runtime.start')}</dt><dd>{selected.startedAt ? runtimeDate(selected.startedAt) : '—'}</dd><dt>{t('runtime.end')}</dt><dd>{selected.endedAt ? runtimeDate(selected.endedAt) : t(selected.open ? 'runtime.runningUntil' : 'runtime.timingUnknown')}</dd><dt>{t('runtime.executionId')}</dt><dd>{selected.executionId ?? '—'}</dd></dl>
       </Stack>
     </Dialog> : null}
   </>;
+}
+
+function NativeCaptureSummary({ captures }: { captures: RuntimeNativeCapture[] }) {
+  const t = useT(), [selectedId, select] = useState<string>();
+  const ordered = [...captures].sort((a, b) => b.proof.turnIndex - a.proof.turnIndex || b.proof.observedAt.localeCompare(a.proof.observedAt));
+  const selected = ordered.find((capture) => capture.id === selectedId) ?? ordered[0];
+  return <Card title={t('runtime.native.title')} stacked>
+    {!selected ? <p>{t('runtime.reason.native-capture-unobserved')}</p> : <Stack>
+      <FormField label={t('runtime.native.turn')}><select value={selected.id} onChange={(event) => select(event.target.value)}>
+        {ordered.map((capture) => <option key={capture.id} value={capture.id}>{t('runtime.native.turnNumber', { count: capture.proof.turnIndex + 1 })} · {runtimeDate(capture.proof.observedAt)} · {capture.sourceId.slice(-8)}</option>)}
+      </select></FormField>
+      <p><strong>{t('runtime.native.state.' + selected.state)}</strong> · {t('runtime.native.turns', { count: captures.length })}</p>
+      <dl className={styles.facts}>
+        <dt>{t('runtime.native.steps')}</dt><dd>{selected.receivedSteps} / {selected.proof.emitted}</dd>
+        <dt>{t('runtime.native.baseline')}</dt><dd>{selected.receivedBaselineSteps} / {selected.proof.baselineSteps}</dd>
+        <dt>{t('runtime.native.unresolved')}</dt><dd>{selected.unresolvedBaselineSteps}</dd>
+        <dt>{t('runtime.native.revised')}</dt><dd>{selected.revisedBaselineSteps}</dd>
+        <dt>{t('runtime.native.root')}</dt><dd>{selected.proof.root ?? '—'}</dd>
+        <dt>{t('runtime.native.observedAt')}</dt><dd>{runtimeDate(selected.proof.observedAt)}</dd>
+      </dl>
+      {selected.historicalRevisionGap ? <p>{t('runtime.native.historicalGap')}</p> : null}
+      {selected.issues.length ? <ul>{[...new Set(selected.issues)].map((issue) => { const key = 'runtime.native.issue.' + issue, label = t(key); return <li key={issue} title={issue}>{label === key ? t('runtime.native.issue.other') : label}</li>; })}</ul> : null}
+      <p className={styles.hint}>{t('runtime.native.hint')}</p>
+    </Stack>}
+  </Card>;
 }

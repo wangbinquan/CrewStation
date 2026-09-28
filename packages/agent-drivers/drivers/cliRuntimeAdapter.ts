@@ -2,6 +2,7 @@
 // 因此对具体 CLI 一无所知。源里没有这层抽象（agent-workflow 的 RuntimeDriver 把装配、解析、
 // 会话捕获、清单读取全挂在一个对象上）；这里只留 CrewStation 实际要的四件事。
 
+import type { NativeCaptureInput, NativeUsageCapture } from './usage/nativeCapture';
 import type { UsageNormalizer } from './usage/capture';
 import type { KnownAgentProtocol } from '@crewstation/contracts';
 import type { NormalizedEvent } from '../contract/normalizedEvent';
@@ -18,6 +19,7 @@ export interface TurnInput {
 
 export interface PreparedRuntime {
   normalizeUsage?: UsageNormalizer;
+  nativeUsageCapture?(input: NativeCaptureInput, env: Readonly<Record<string, string | undefined>>): NativeUsageCapture;
   /** 组装一次拉起的 argv／env／stdin 约定。 */
   plan(input: TurnInput): SpawnPlan;
   parseEvent(line: string): NormalizedEvent | null;

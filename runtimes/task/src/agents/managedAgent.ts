@@ -77,7 +77,7 @@ export class ManagedAgentProcess implements AgentProcess {
   }
 
   private async forward(inner: AgentProcess): Promise<void> {
-    try { for await (const event of inner.events) this.events.push(event); }
+    try { for await (const event of inner.events) { if (this.spec.businessEvents) await this.events.writeProcessed(event); else this.events.push(event); } }
     catch (error) {
       if (this.spec.businessEvents) this.events.fail(new RunnerCommandError('execution_unknown', 'Agent 事件流异常，进程退出尚未证明'));
       else this.events.push(this.event('error', { error: { code: 'driver_failed', message: error instanceof Error ? error.message : String(error) } }));

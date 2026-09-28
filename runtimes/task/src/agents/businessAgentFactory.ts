@@ -11,11 +11,11 @@ import { RunnerCommandError } from '../commandError';
 
 /** Only the platform-mounted native session directory survives cleanup of transient launch material. */
 export function businessAgentFactory(deps: Omit<AgentSupervisorDeps, 'emit'>, persistentHome: string | undefined) {
-  return async (command: StartAgentCommand, usageObservationsV1?: 1): Promise<AgentProcess> => {
+  return async (command: StartAgentCommand, usageObservationsV1?: 1, native?: { nativeUsageTreeV1?: 1; nativeUsageLineageKey?: string }): Promise<AgentProcess> => {
     if (!persistentHome) throw new RunnerCommandError('unsupported_capability', 'Agent 缺少平台原生会话卷');
     if (!isKnownProtocol(command.launch.protocol)) throw new RunnerCommandError('protocol_unsupported', '业务 Agent 需要结构化驱动');
     const cwd = await deps.paths.resolveCwd(command.cwd);
-    const inner = new ManagedAgentProcess({ ...command, businessEvents: true, usageObservationsV1 }, {
+    const inner = new ManagedAgentProcess({ ...command, businessEvents: true, usageObservationsV1, ...native }, {
       driver: deps.drivers.forProtocol(command.launch.protocol), beforeStart: deps.beforeStart, launcher: deps.launcher,
       cwd, persistentHome, commandEnv: command.env, material: command.beforeStart, processAttemptId: command.processAttemptId, logger: deps.logger,
     });

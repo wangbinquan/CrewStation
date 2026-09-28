@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { NativeUsageProofSchema, NativeUsageBaselineSchema } from './nativeUsage';
 import type { TaskId } from '../ids';
 import { ExecutionUsageObservationSchema } from '../api/observability/executionObservations';
 
@@ -22,6 +23,7 @@ export const RunnerUsageMeasurementSchema = z.strictObject({
     ctx.addIssue({ code: 'custom', path: ['coveredThroughTurn'], message: '原生轮次覆盖水位无效' });
 });
 export const RunnerUsageCaptureSchema = z.strictObject({
+  nativeProof: NativeUsageProofSchema.optional(), nativeBaseline: NativeUsageBaselineSchema.optional(),
   version: z.literal(1), measurements: z.array(RunnerUsageMeasurementSchema).max(100),
   diagnostics: z.array(z.string().min(1).max(120)).max(20),
 });

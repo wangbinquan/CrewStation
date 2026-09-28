@@ -1,4 +1,4 @@
-import type { RuntimeFactQuery, RuntimeTaskFact } from '@crewstation/contracts';
+import type { RuntimeFactQuery, RuntimeTaskFact, RunnerUsageCapture, RuntimeNativeCapture } from '@crewstation/contracts';
 import type { ExecutionObservationIdentity, RunnerUsageMeasurement, RunnerUsageSourceIdentity, RunnerUsageSourcePage } from '@crewstation/contracts';
 import type { ExecutionUsageObservation, ExecutionObservation, ExecutionValuationObservation, ProjectId, TaskId, ExecutionCostVisibilityDto, SetExecutionCostVisibility } from '@crewstation/contracts';
 import type { ActualPricingModel } from './tokenPricing';
@@ -8,6 +8,7 @@ export interface UsageTaskScope { projectId: ProjectId; taskId: TaskId }
 export interface UsageSourcePage extends UsageTaskScope {
   sourceId: string; expectedCursor: string | null; nextCursor: string;
   events: Array<{ eventId: string; measurement: UsageEvidence }>;
+  native?: Array<{ identity: ExecutionObservationIdentity; capture: RunnerUsageCapture }>;
 }
 export interface UsageLedgerTransaction {
   cursor(): Promise<string | null>;
@@ -18,15 +19,16 @@ export interface UsageLedgerTransaction {
   current(measurement: UsageEvidence): Promise<ExecutionUsageObservation | undefined>;
   append(event: UsageSourcePage['events'][number], fingerprint: string): Promise<void>;
   project(value: ExecutionUsageObservation): Promise<void>;
+  capture(identity: ExecutionObservationIdentity, frame: RunnerUsageCapture): Promise<void>;
   advance(nextCursor: string, fingerprint: string): Promise<void>;
 }
 export interface UsageChanges {
-  items: ExecutionObservation[]; nextCursor: number; persistedThrough: number; hasMore: boolean;
+  items: ExecutionObservation[]; captureIncomplete: boolean; nextCursor: number; persistedThrough: number; hasMore: boolean;
 }
 export interface UsageSnapshotQuery { snapshotId?: string; cursor?: string; limit: number }
 export interface UsageSnapshot {
   snapshotId: string; snapshotThrough: number; expiresAt: number; createdAt: number; visibilityRevision: number;
-  items: ExecutionObservation[]; nextCursor: string | null;
+  items: ExecutionObservation[]; captureIncomplete: boolean; nextCursor: string | null;
 }
 export interface UsageLedgerStore {
   snapshot(scope: UsageTaskScope, query: UsageSnapshotQuery, now: number, visibilityRevision: number): Promise<UsageSnapshot>;
@@ -70,6 +72,7 @@ export interface RuntimeStatisticsSnapshot {
   tasks: RuntimeTaskFact[];
   observations: ExecutionObservation[];
   costVisible: Readonly<Record<string, boolean>>;
+  nativeCaptures?: RuntimeNativeCapture[];
   partial: boolean;
 }
 export interface RuntimeStatisticsSource {

@@ -1,8 +1,9 @@
 import { RuntimeExportQuerySchema, RuntimeExportSchema, ProjectRuntimeStatisticsSchema, SystemRuntimeStatisticsSchema, RuntimeTaskObservationSchema, RuntimeStatisticsQuerySchema } from '@crewstation/contracts';
-import type { RuntimeExportQuery, RuntimeExport, RuntimeUsageMetrics, RuntimeStatisticsQuery, RuntimeFactQuery, RuntimeTaskFact, RuntimeTaskObservation, RuntimeAttemptFact, RuntimeAttemptSummary, RuntimeStatistics, RuntimeAgentStatistics, ExecutionObservation } from '@crewstation/contracts';
+import type { RuntimeExportQuery, RuntimeExport, RuntimeUsageMetrics, RuntimeStatisticsQuery, RuntimeFactQuery, RuntimeTaskFact, RuntimeTaskObservation, RuntimeAttemptFact, RuntimeAttemptSummary, RuntimeNativeCapture, RuntimeStatistics, RuntimeAgentStatistics, ExecutionObservation } from '@crewstation/contracts';
 import { notFound } from '@crewstation/kernel';
 import { aggregateRuntimeMetrics as aggregate, runtimeUsageMetrics } from '../domain/cnyPricing';
 import { selectRuntimeUsage } from '../domain/tokenUsage';
+import { qualifyNativeMetrics } from '../domain/usageProjection';
 import { intervalDurations } from '../domain/executionIntervals';
 import type { RuntimeStatisticsSource, RuntimeStatisticsSnapshot } from '../ports/usageLedger';
 import type { Actor, ProjectId, ExecutionObservationPage, ExecutionObservationQuery, SetExecutionCostVisibility, TaskId } from '@crewstation/contracts';
@@ -27,16 +28,16 @@ async function read(deps: ObservationReadDeps, caller: ExecutionObservationCalle
   const visibility = await deps.visibility.read(scope.projectId), now = deps.clock.now();
   const prefix = cursorPrefix(scope);
   const base = { schemaVersion: 1 as const, capability: 'executionObservationsV1' as const, ...scope,
-    firstAvailableCursor: prefix + '0', visibilityRevision: visibility.revision, costVisibility: visibility.visibility, gaps: [] };
+    firstAvailableCursor: prefix + '0', visibilityRevision: visibility.revision, costVisibility: visibility.visibility };
   let page: ExecutionObservationPage;
   if ('snapshot' in query) {
     const snapshot = await deps.ledger.snapshot(scope, query, now.getTime(), visibility.revision);
-    page = { ...base, mode: 'snapshot', items: snapshot.items, nextCursor: snapshot.nextCursor,
+    page = { ...base, gaps: snapshot.captureIncomplete ? [{ after: null, through: prefix + snapshot.snapshotThrough, reason: 'capture-incomplete' }] : [], mode: 'snapshot', items: snapshot.items, nextCursor: snapshot.nextCursor,
       snapshotId: snapshot.snapshotId, snapshotThrough: prefix + snapshot.snapshotThrough, persistedThrough: prefix + snapshot.snapshotThrough,
       asOf: new Date(snapshot.createdAt).toISOString(), expiresAt: new Date(snapshot.expiresAt).toISOString() };
   } else {
     const changes = await deps.ledger.changes(scope, readCursor(query.after, scope), query.limit);
-    page = { ...base, mode: 'incremental', items: changes.items, nextCursor: changes.hasMore ? prefix + changes.nextCursor : null,
+    page = { ...base, gaps: changes.captureIncomplete ? [{ after: null, through: prefix + changes.persistedThrough, reason: 'capture-incomplete' }] : [], mode: 'incremental', items: changes.items, nextCursor: changes.hasMore ? prefix + changes.nextCursor : null,
       persistedThrough: prefix + changes.persistedThrough, asOf: now.toISOString() };
   }
   if ((await deps.visibility.read(scope.projectId)).revision !== visibility.revision) throw conflict('金额可见性已变更，请重新读取观测');
@@ -69,19 +70,22 @@ const limits = { tasks: 200, attempts: 2000, records: 20000 };
 function attemptRecords(task: RuntimeTaskFact, attempt: RuntimeAttemptFact, rows: ExecutionObservation[]) {
   return rows.filter(({ identity: i }) => i.projectId === task.projectId && i.taskId === task.id && i.subtaskId === attempt.id && i.executionId === attempt.executionId && i.executionGeneration === attempt.attempt);
 }
-function attemptSummary(task: RuntimeTaskFact, attempt: RuntimeAttemptFact, rows: ExecutionObservation[], visible: boolean, asOf: number, partial: boolean): RuntimeAttemptSummary {
+function attemptSummary(task: RuntimeTaskFact, attempt: RuntimeAttemptFact, rows: ExecutionObservation[], visible: boolean, asOf: number, partial: boolean, captures: RuntimeNativeCapture[]): RuntimeAttemptSummary {
   const start = attempt.startedAt === null ? null : Date.parse(attempt.startedAt);
   const open = attempt.endedAt === null && running.has(attempt.state) && !terminal.has(task.state) && task.closedAt === null;
   const end = attempt.endedAt === null ? open ? asOf : null : Date.parse(attempt.endedAt);
   const durationMs = start !== null && end !== null && start <= end && end <= asOf ? end - start : null;
-  return { ...attempt, durationMs, open: open && durationMs !== null, metrics: runtimeUsageMetrics(attemptRecords(task, attempt, rows), visible, attempt.kind === 'agent' ? 1 : 0, partial) };
+  const nativeCaptures = captures.filter(({ identity: i }) => i.projectId === task.projectId && i.taskId === task.id && i.subtaskId === attempt.id && i.executionId === attempt.executionId && i.executionGeneration === attempt.attempt);
+  const metrics = runtimeUsageMetrics(attemptRecords(task, attempt, rows), visible, attempt.kind === 'agent' ? 1 : 0, partial);
+  return { ...attempt, durationMs, open: open && durationMs !== null, nativeCaptures, metrics: attempt.kind === 'agent' ? qualifyNativeMetrics(metrics, nativeCaptures, attemptRecords(task, attempt, rows)) : metrics };
 }
 function taskSummary(task: RuntimeTaskFact, snapshot: RuntimeStatisticsSnapshot, scope: 'project' | 'system', asOf: string): RuntimeTaskObservation {
   const now = Date.parse(asOf), visible = scope === 'system' || snapshot.costVisible[task.projectId] === true;
   const rows = snapshot.observations.filter((row) => row.identity.taskId === task.id && row.identity.projectId === task.projectId);
-  const unmatched = rows.some((r) => !task.attempts.some((a) => a.executionId === r.identity.executionId && a.id === r.identity.subtaskId && a.attempt === r.identity.executionGeneration));
+  const captures = (snapshot.nativeCaptures ?? []).filter((row) => row.identity.taskId === task.id && row.identity.projectId === task.projectId);
+  const unmatched = [...rows, ...captures].some((r) => !task.attempts.some((a) => a.executionId === r.identity.executionId && a.id === r.identity.subtaskId && a.attempt === r.identity.executionGeneration));
   const partial = snapshot.partial || task.attemptsPartial || unmatched;
-  const attempts = task.attempts.map((a) => attemptSummary(task, a, rows, visible, now, partial));
+  const attempts = task.attempts.map((a) => attemptSummary(task, a, rows, visible, now, partial, captures));
   const intervals = attempts.flatMap((a) => a.durationMs === null || a.startedAt === null ? [] : [{ start: Date.parse(a.startedAt), end: Date.parse(a.startedAt) + a.durationMs }]);
   const durations = intervalDurations(intervals, { from: 0, to: now, asOf: now });
   const unknownIntervals = attempts.filter((a) => a.durationMs === null).length;
@@ -127,7 +131,7 @@ function systemDistributions(tasks: RuntimeTaskObservation[], snapshot: RuntimeS
     return grouped(selection.selected, (r) => JSON.stringify(r.record.modelRef)).map((selected) => {
       const usage = selected.map(({ record, contribution, whole }) => ({ ...record, projection: { ...record.projection, contribution, complete: whole && record.projection.complete } }));
       const values = rows.filter((r) => r.kind === 'valuation' && selected.some((s) => s.whole && s.record.recordId === r.recordId && s.record.sourceId === r.sourceId));
-      return { modelRef: selected[0]!.record.modelRef, metrics: runtimeUsageMetrics([...usage, ...values], true, 1, snapshot.partial || selection.incomplete) };
+      return { modelRef: selected[0]!.record.modelRef, metrics: qualifyNativeMetrics(runtimeUsageMetrics([...usage, ...values], true, 1, snapshot.partial || selection.incomplete), attempt.nativeCaptures ?? [], rows) };
     });
   });
   const models = grouped(byModel, (r) => JSON.stringify(r.modelRef)).map((rows) => ({ modelRef: rows[0]!.modelRef, metrics: aggregate(rows.map((r) => r.metrics)) }));

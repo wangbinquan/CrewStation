@@ -14,7 +14,7 @@ import type { BusinessFiles } from '../files/businessFiles';
 import { createBusinessFiles } from '../files/businessFiles';
 
 export interface BusinessCommands {
-  info(usageObservationsV1?: 1): Promise<{ incarnation: string; limits: JournalLimits; usageObservationsV1?: 1 }>;
+  info(usageObservationsV1?: 1, nativeUsageTreeV1?: 1): Promise<{ incarnation: string; limits: JournalLimits; usageObservationsV1?: 1; nativeUsageTreeV1?: 1 }>;
   start(input: CommandOf<'startBusinessCommand'>): Promise<unknown>;
   sendMessage(input: CommandOf<'sendBusinessMessage'>): Promise<unknown>;
   getMessage(input: CommandOf<'getBusinessMessage'>): Promise<unknown>;
@@ -28,7 +28,7 @@ export interface BusinessCommands {
 }
 
 /** 只有配置了受保护持久目录才启用；完整 Agent／文件能力落地前不宣告 businessExecutionV3。 */
-export function createBusinessCommands(deps: Omit<BusinessExecDeps, 'journal'>, directory: string | undefined, limits: JournalLimits, createAgent?: (command: StartAgentCommand, usageObservationsV1?: 1) => Promise<AgentProcess>): BusinessCommands {
+export function createBusinessCommands(deps: Omit<BusinessExecDeps, 'journal'>, directory: string | undefined, limits: JournalLimits, createAgent?: (command: StartAgentCommand, usageObservationsV1?: 1, native?: { nativeUsageTreeV1?: 1; nativeUsageLineageKey?: string }) => Promise<AgentProcess>): BusinessCommands {
   if (!directory) return disabledCommands();
   const incarnation = randomUUID(), journal = new ExecutionJournal(directory, incarnation, limits);
   const supervisor = new BusinessExecSupervisor({ ...deps, journal });
@@ -37,13 +37,13 @@ export function createBusinessCommands(deps: Omit<BusinessExecDeps, 'journal'>, 
   return {
     ...messages,
     files: createBusinessFiles(deps.paths.root),
-    info: async (version) => ({ incarnation, limits, ...(version === 1 && createAgent ? { usageObservationsV1: 1 as const } : {}) }),
+    info: async (version, nativeVersion) => ({ incarnation, limits, ...(version === 1 && createAgent ? { usageObservationsV1: 1 as const, ...(nativeVersion === 1 ? { nativeUsageTreeV1: 1 as const } : {}) } : {}) }),
     startAgent: async (input) => {
       if (!createAgent) throw new RunnerCommandError('unsupported_capability', 'Runner 未启用业务 Agent');
       if (input.incarnation !== incarnation) throw new RunnerCommandError('execution_incarnation_changed', 'Runner 已更换，先查询旧执行回执');
       const digest = new Bun.CryptoHasher('sha256').update(businessAgentDigestInput(input.agent, input.digestNonce)).digest('hex');
       if (digest !== input.payloadDigest) throw new RunnerCommandError('execution_conflict', 'Agent 执行参数摘要不匹配');
-      return agents.start(input, () => createAgent(input.agent, input.usageObservationsV1));
+      return agents.start(input, () => createAgent(input.agent, input.usageObservationsV1, { nativeUsageTreeV1: input.nativeUsageTreeV1, nativeUsageLineageKey: input.nativeUsageLineageKey }));
     },
     start: async (input) => {
       if (input.incarnation !== incarnation) throw new RunnerCommandError('execution_incarnation_changed', 'Runner 已更换，先查询旧执行回执');

@@ -40,6 +40,7 @@ function contentFingerprint(capture: RunnerUsageCapture): string {
 /** One observer per accepted Agent; revisions and native turn attribution survive process restarts. */
 export function createUsageObserver(normalize: UsageNormalizer, agentId: string, resumeSessionId?: string) {
   let turn = 0, revision = 0;
+  let current: { turnIndex: number; turnId: string } | undefined;
   const contexts = new Map<string, SeenUsage>(), pending = new Map<string, PendingUsage>();
   const capture = (event: NormalizedEvent, at: number, turnContext: { turnIndex: number; turnId: string }, retry = false): RunnerUsageCapture | undefined => {
     const raw = parseJsonObjectLine(event.rawLine);
@@ -63,10 +64,17 @@ export function createUsageObserver(normalize: UsageNormalizer, agentId: string,
     } catch { return { version: 1, measurements: [], diagnostics: ['usage-normalization-failed'] }; }
   };
   return {
-    beginTurn(): UsageCapture {
+    beginTurn(includesRecord?: (sessionId: string, nativeId: string) => boolean): UsageCapture {
       const turnIndex = turn++, turnId = jsonHash({ agentId, turnIndex });
-      return (event, at) => capture(event, at, { turnIndex, turnId });
+      current = { turnIndex, turnId };
+      return (event, at) => {
+        const raw = parseJsonObjectLine(event.rawLine), nativeId = identifier(raw?.uuid ?? object(raw?.part)?.id);
+        if (includesRecord && event.sessionId && nativeId && !includesRecord(event.sessionId, nativeId)) return undefined;
+        return capture(event, at, { turnIndex, turnId });
+      };
     },
+    currentTurn() { if (!current) throw new Error('Usage turn has not begun'); return current; },
+    nextRevision() { return ++revision; },
     /** Numeric-only corrections. The caller must not re-emit legacy BusinessUsage or lifecycle events. */
     retryModels(at: number, budgetMs = 50): RunnerUsageCapture[] {
       const rows: RunnerUsageCapture[] = [], deadline = performance.now() + budgetMs;

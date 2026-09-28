@@ -39,7 +39,8 @@ export async function dispatchBusinessAgent(deps: BusinessExecutionDeps, claimed
     incarnation = info.incarnation;
     const result = BusinessExecutionReceiptSchema.parse(await deps.runner.sendCommand(env.id, { id: newResourceId(), type: 'startBusinessAgent', executionId: claimed.view.executionId,
       attempt: claimed.view.attempt, incarnation, payloadDigest: claimed.payloadDigest, digestNonce: plan.nonce, agent: command,
-      ...(info.usageObservationsV1 === 1 ? { usageObservationsV1: 1 as const } : {}) }));
+      ...(info.usageObservationsV1 === 1 ? { usageObservationsV1: 1 as const } : {}),
+      ...(info.usageObservationsV1 === 1 && info.nativeUsageTreeV1 === 1 ? { nativeUsageTreeV1: 1 as const, nativeUsageLineageKey: plan.sessionKey } : {}) }));
     await acceptReceipt(deps, { ...claimed, incarnation, runtimeAdmitted: true }, result);
   } catch (error) {
     const code = isPlatformError(error) ? String(error.details?.code ?? error.kind) : 'dispatch_unknown';
@@ -88,10 +89,17 @@ export async function cleanupAgentEnvironments(deps: BusinessExecutionDeps): Pro
 
 /** Capability omission is the legacy path; transient failures must not silently change an accepted launch. */
 async function observationInfo(deps: BusinessExecutionDeps, taskId: TaskId) {
+  const send = (capabilities: { usageObservationsV1?: 1; nativeUsageTreeV1?: 1 }) => deps.runner.sendCommand(taskId, { id: newResourceId(), type: 'businessExecutionInfo', ...capabilities });
   try {
-    return BusinessExecutionInfoSchema.parse(await deps.runner.sendCommand(taskId, { id: newResourceId(), type: 'businessExecutionInfo', usageObservationsV1: 1 }));
+    return BusinessExecutionInfoSchema.parse(await send({ usageObservationsV1: 1, nativeUsageTreeV1: 1 }));
   } catch (error) {
-    if (!isPlatformError(error) || error.details?.code !== 'unsupported_capability' || error.details?.capability !== 'usageObservationsV1') throw error;
-    return BusinessExecutionInfoSchema.parse(await deps.runner.sendCommand(taskId, { id: newResourceId(), type: 'businessExecutionInfo' }));
+    if (!isPlatformError(error) || error.details?.code !== 'unsupported_capability') throw error;
+    if (error.details.capability === 'usageObservationsV1') return BusinessExecutionInfoSchema.parse(await send({}));
+    if (error.details.capability !== 'nativeUsageTreeV1') throw error;
+    try { return BusinessExecutionInfoSchema.parse(await send({ usageObservationsV1: 1 })); }
+    catch (fallback) {
+      if (!isPlatformError(fallback) || fallback.details?.code !== 'unsupported_capability' || fallback.details.capability !== 'usageObservationsV1') throw fallback;
+      return BusinessExecutionInfoSchema.parse(await send({}));
+    }
   }
 }

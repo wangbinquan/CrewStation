@@ -60,6 +60,7 @@ function toDriverSpec(spec: AgentSpec): DriverAgentSpec {
   return {
     businessEvents: spec.businessEvents,
     usageObservationsV1: spec.usageObservationsV1,
+    nativeUsageTreeV1: spec.nativeUsageTreeV1, nativeUsageLineageKey: spec.nativeUsageLineageKey,
     ...(spec.businessSkills === undefined ? {} : { businessSkills: spec.businessSkills }),
     agentId: spec.agentId,
     compute: spec.compute,

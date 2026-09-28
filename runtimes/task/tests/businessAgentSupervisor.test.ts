@@ -75,3 +75,16 @@ test('RFC-034 numeric evidence is durably replayed unchanged with the legacy usa
   expect(frame.type === 'agent' && frame.event.usageCapture).toEqual(usageCapture);
   expect(JSON.stringify(frame)).not.toContain('private raw');
 });
+
+
+test('managed event queue rejects unconsumed receipts and acknowledges only completed consumer handling', async () => {
+  for (const consumed of [false, true]) {
+    const queue = createEventQueue<string>(10), iterator = queue[Symbol.asyncIterator]();
+    const receipt = queue.writeProcessed('abcd').then(() => null, (error: unknown) => error);
+    if (consumed) expect((await iterator.next()).value).toBe('abcd');
+    const waiting = queue.writeProcessed('efgh').then(() => null, (error: unknown) => error);
+    const blocked = queue.writeProcessed('ijkl').then(() => null, (error: unknown) => error);
+    await iterator.return?.();
+    for (const result of [receipt, waiting, blocked]) expect(await result).toBeInstanceOf(Error);
+  }
+});

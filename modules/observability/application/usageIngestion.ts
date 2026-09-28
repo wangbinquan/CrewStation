@@ -1,4 +1,4 @@
-import { RunnerUsageCaptureSchema, type RunnerUsageSourcePage, type ExecutionObservationIdentity, ExecutionUsageObservationSchema, ProjectIdSchema, TaskIdSchema } from '@crewstation/contracts';
+import { RunnerUsageCaptureSchema, ExecutionObservationIdentitySchema, type RunnerUsageSourcePage, type ExecutionObservationIdentity, ExecutionUsageObservationSchema, ProjectIdSchema, TaskIdSchema } from '@crewstation/contracts';
 import { conflict, jsonHash, precondition, validation, type Logger } from '@crewstation/kernel';
 import { z } from 'zod';
 import { rebuildUsageProjection, type UsageEvidence } from '../domain/usageProjection';
@@ -10,6 +10,7 @@ const pageSchema = z.strictObject({
   projectId: ProjectIdSchema, taskId: TaskIdSchema, sourceId: key,
   expectedCursor: key.nullable(), nextCursor: key,
   events: z.array(z.strictObject({ eventId: key, measurement: evidenceSchema })).max(500),
+  native: z.array(z.strictObject({ identity: ExecutionObservationIdentitySchema, capture: RunnerUsageCaptureSchema })).max(5).optional(),
 });
 function parsedPage(input: UsageSourcePage): UsageSourcePage {
   const parsed = pageSchema.safeParse(input);
@@ -20,6 +21,7 @@ function parsedPage(input: UsageSourcePage): UsageSourcePage {
     // Complete public cross-field checks use an honest initial projection.
     ExecutionUsageObservationSchema.parse(rebuildUsageProjection([measurement]));
   }
+  for (const row of parsed.data.native ?? []) if (row.identity.projectId !== input.projectId || row.identity.taskId !== input.taskId) throw validation('原生证明与任务身份不一致');
   return parsed.data;
 }
 async function append(tx: UsageLedgerTransaction, event: UsageSourcePage['events'][number]): Promise<boolean> {
@@ -61,6 +63,7 @@ export function usageIngestion(store: UsageLedgerStore) {
       if (await tx.cursor() !== input.expectedCursor) throw conflict('来源游标已更新');
       let applied = 0;
       for (const event of input.events) if (await append(tx, event)) applied++;
+      for (const row of input.native ?? []) await tx.capture(row.identity, row.capture);
       await tx.advance(input.nextCursor, fingerprint);
       return { cursor: input.nextCursor, applied, duplicate: input.events.length - applied };
     });
@@ -80,7 +83,8 @@ function runnerPage(page: RunnerUsageSourcePage, identity: ExecutionObservationI
         modelRef: actualModel === null ? null : jsonHash(actualModel) },
     }));
   });
-  return { projectId: identity.projectId, taskId: identity.taskId, sourceId, expectedCursor: page.after === 0 ? null : `runner:${page.after}`, nextCursor: `runner:${page.through}`, events };
+  return { projectId: identity.projectId, taskId: identity.taskId, sourceId, expectedCursor: page.after === 0 ? null : `runner:${page.after}`, nextCursor: `runner:${page.through}`, events,
+    native: page.events.map((event) => ({ identity, capture: event.capture })) };
 }
 
 /** The source is acknowledged only after evidence, projection and cursor have committed together. */

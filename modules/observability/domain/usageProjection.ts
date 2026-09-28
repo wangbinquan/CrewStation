@@ -1,4 +1,4 @@
-import type { ExecutionUsageObservation } from '@crewstation/contracts';
+import type { ExecutionUsageObservation, ExecutionObservationIdentity, NativeUsageProof, NativeUsageStep, NativeUsageBaseline, RunnerUsageMeasurement, RuntimeNativeCapture, RuntimeUsageMetrics, ExecutionObservation } from '@crewstation/contracts';
 import { jsonHash } from '@crewstation/kernel';
 import { subtractTokenBaseline, TOKEN_BUCKETS, type TokenUsage } from './tokenUsage';
 
@@ -92,4 +92,59 @@ export function rebuildUsageProjection(evidence: readonly UsageEvidence[], previ
   if (previous && jsonHash(previous) === jsonHash(candidate)) return previous;
   if (projectionRevision === Number.MAX_SAFE_INTEGER) throw new RangeError('Usage projection revision exhausted');
   return { ...candidate, projection: { ...candidate.projection, projectionRevision: projectionRevision + 1 } };
+}
+
+
+export interface NativeCaptureDocument {
+  id: string; identity: ExecutionObservationIdentity; sourceId: string; proof: NativeUsageProof;
+  began: boolean; baselineRoot: string | null; historicalRevisionGap: boolean;
+}
+export type NativeBaselineEntry = NativeUsageBaseline['steps'][number];
+export const nativeRecordId = (step: NativeUsageStep) => `opencode:step:${jsonHash({ session: step.sessionId, id: step.id })}`;
+export const nativeCaptureId = (identity: ExecutionObservationIdentity, sourceId: string, turn: string) => jsonHash({ identity, sourceId, turn });
+export const nativeStepKey = (lineageKey: string, root: string, recordId: string) => jsonHash({ lineageKey, root, recordId });
+export function nativeStepFingerprint(step: NativeUsageStep): string {
+  return jsonHash({ session: step.sessionId, parent: step.parentSessionId, ancestors: step.ancestors, usage: step.usage, model: step.actualModel });
+}
+export function nativeMeasurementFingerprint(row: RunnerUsageMeasurement): string {
+  return jsonHash({ session: row.scope?.session, parent: row.scope?.parentSession, ancestors: row.scope?.ancestors, usage: row.usage, model: row.actualModel });
+}
+export function compareNativeBaseline(row: NativeBaselineEntry, owners: readonly { id: string; fingerprint: string }[]): { status: 'same' | 'revised' | 'unresolved'; owner: string | null } {
+  if (owners.length !== 1) return { status: 'unresolved', owner: null };
+  const owner = owners[0]!;
+  const revised = owner.fingerprint !== nativeStepFingerprint(row.before) ||
+    row.afterObserved && (row.after === null || owner.fingerprint !== nativeStepFingerprint(row.after));
+  return { status: revised ? 'revised' : 'same', owner: owner.id };
+}
+export function nativeCaptureSummary(value: NativeCaptureDocument, counts: { steps: number; baselines: number; unresolved: number; revised: number }): RuntimeNativeCapture {
+  const issues = new Set(value.proof.issues);
+  if (!value.began && value.proof.state !== 'unsupported') issues.add('native-baseline-not-started');
+  if (value.proof.state === 'complete' && (counts.steps !== value.proof.emitted || counts.baselines !== value.proof.baselineSteps)) issues.add('native-evidence-incomplete');
+  if (counts.unresolved) issues.add('native-owner-unresolved');
+  if (counts.revised || value.historicalRevisionGap) issues.add('native-prior-revision-gap');
+  const state = value.proof.state === 'complete' && issues.size ? 'partial' : value.proof.state;
+  return { id: value.id, identity: value.identity, sourceId: value.sourceId, proof: value.proof, state, issues: [...issues],
+    receivedSteps: counts.steps, receivedBaselineSteps: counts.baselines, unresolvedBaselineSteps: counts.unresolved,
+    revisedBaselineSteps: counts.revised, historicalRevisionGap: value.historicalRevisionGap };
+}
+
+/** Native traversal quality qualifies the known subtotal without changing its value. */
+export function qualifyNativeMetrics(metrics: RuntimeUsageMetrics, captures: readonly RuntimeNativeCapture[], observations: readonly ExecutionObservation[]): RuntimeUsageMetrics {
+  const missing = observations.some((row) => row.kind === 'usage' && !captures.some((capture) => capture.sourceId === row.sourceId && capture.proof.turn === row.scope?.turn && capture.proof.turnIndex === row.scope.turnIndex && capture.proof.root === row.scope.root));
+  const complete = !missing && captures.length > 0 && captures.every((capture) => capture.state === 'complete');
+  if (complete && metrics.records === 0 && captures.every((capture) => capture.receivedSteps === 0 && capture.proof.emitted === 0 && capture.proof.steps === capture.proof.baselineSteps)) {
+    const reasons = metrics.reasons.filter((reason) => reason !== 'usage-missing');
+    return { ...metrics, observedExecutions: 1, reasons,
+      tokens: { ...metrics.tokens, hasKnown: true, complete: !metrics.partial, unknownBuckets: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } },
+      cost: { ...metrics.cost, amount: metrics.cost.visible ? '0' : null, complete: metrics.cost.visible && !metrics.partial } };
+  }
+  if (complete) return metrics;
+  const reasons = new Set(metrics.reasons);
+  if (!captures.length || missing) reasons.add('native-capture-unobserved');
+  for (const capture of captures) {
+    if (capture.state !== 'complete') reasons.add('native-capture-' + capture.state);
+    if (capture.historicalRevisionGap || capture.revisedBaselineSteps) reasons.add('native-prior-revision-gap');
+    if (capture.unresolvedBaselineSteps) reasons.add('native-owner-unresolved');
+  }
+  return { ...metrics, reasons: [...reasons], tokens: { ...metrics.tokens, complete: false }, cost: { ...metrics.cost, complete: false } };
 }

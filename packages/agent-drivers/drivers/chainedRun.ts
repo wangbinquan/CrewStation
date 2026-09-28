@@ -6,6 +6,8 @@ import type { AgentEvent, KnownAgentProtocol } from '@crewstation/contracts';
 import { DriverStateError } from '../contract/agentDriver';
 import type { DriverAgentSpec, DriverLaunchContext } from '../contract/agentDriver';
 import type { DriverChildProcess } from '../contract/processHost';
+import type { SpawnPlan } from '../contract/spawnPlan';
+import type { NativeUsageCapture } from './usage/nativeCapture';
 import type { PreparedRuntime } from './cliRuntimeAdapter';
 import { AgentRunBase, failureMessage } from './agentRunBase';
 import { pumpTurn } from './turnPump';
@@ -45,33 +47,41 @@ export class ChainedAgentRun extends AgentRunBase {
   private async runTurn(prompt: string): Promise<void> {
     if (this.cancelled || this.events.closed) return;
     let turnError: string | null = null;
+    let native: NativeUsageCapture | undefined;
+    const captureUsage = this.usageObserver?.beginTurn((session, id) => native?.includesRecord(session, id) ?? true);
     let child: DriverChildProcess;
     try {
-      child = this.spawn(prompt);
+      const plan = this.prepared.plan({ prompt, resumeSessionId: this.resumeIdFor(), resident: false });
+      if (this.spec.nativeUsageTreeV1 === 1) native = await this.beginNativeCapture(plan.env, this.resumeIdFor());
+      if (this.cancelled || this.events.closed) return;
+      child = this.spawn(plan);
     } catch (error) {
+      await this.finishNativeCapture(native, ['native-process-not-started']);
       this.finishFailed('spawn_failed', error instanceof Error ? error.message : String(error), null);
       return;
     }
     this.child = child;
-    let result: Awaited<ReturnType<typeof pumpTurn>>;
+    let result: Awaited<ReturnType<typeof pumpTurn>> | undefined;
     try {
       result = await pumpTurn(child, {
       businessEvents: this.spec.businessEvents,
-      captureUsage: this.usageObserver?.beginTurn(),
+      captureUsage,
       host: this.context.host,
       logger: this.context.logger,
       usage: this.usage,
       emit: (type, fields, at) => this.emit(type, fields, at),
       push: (event: AgentEvent) => this.push(event),
       parseEvent: (line) => this.prepared.parseEvent(line),
-      onSessionId: (sessionId) => this.claimSession(sessionId),
+      onSessionId: (sessionId) => { native?.observeSession(sessionId); this.claimSession(sessionId); },
       onTurnFinished: (error) => {
         turnError = error;
       },
     });
     } finally {
-      this.retryUsageModels();
-      this.child = undefined;
+      try {
+        this.retryUsageModels();
+        await this.finishNativeCapture(native, result?.drained ? [] : ['native-output-incomplete']);
+      } finally { this.child = undefined; }
     }
     if (this.cancelled) return;
     this.concludeTurn(result, turnError);
@@ -96,12 +106,7 @@ export class ChainedAgentRun extends AgentRunBase {
     this.push(this.emit('status', { status: 'waiting' }));
   }
 
-  private spawn(prompt: string): DriverChildProcess {
-    const plan = this.prepared.plan({
-      prompt,
-      ...(this.resumeIdFor() === undefined ? {} : { resumeSessionId: this.resumeIdFor() }),
-      resident: false,
-    });
+  private spawn(plan: SpawnPlan): DriverChildProcess {
     const spec = { cmd: plan.cmd, cwd: this.context.cwd, env: plan.env };
     if (plan.stdin.mode === 'ignore') return this.context.host.spawnPiped(spec);
     if (plan.stdin.mode === 'stream') throw new DriverStateError('driver_misconfigured', '链式运行不接受常驻输入流');

@@ -2,6 +2,7 @@
 import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
+import { RuntimeNativeCaptureSchema } from '@crewstation/contracts';
 import { renderApp } from './renderApp';
 import { openDialog } from './confirmDialogDriver';
 import { runtimeStatisticsFixture } from './runtimeStatisticsFixture';
@@ -87,4 +88,23 @@ test('CSV download requests the visible filters and keeps export errors separate
     expect(clicks).toEqual([{ name: 'statistics.csv', href: 'blob:runtime-export-test' }]); expect(page.text()).toContain('已导出 1 行');
     f.state.error = true; await page.click('导出当前范围 CSV'); expect(page.text()).toContain('Ledger temporarily unavailable'); expect(clicks).toHaveLength(1);
   } finally { URL.createObjectURL = create; URL.revokeObjectURL = revoke; HTMLAnchorElement.prototype.click = originalClick; }
+});
+
+test('native capture evidence stays inside the selected attempt dialog, follows refresh and preserves focus', async () => {
+  const f = runtimeStatisticsFixture(), task = f.details[0]!, attempt = task.attempts[0]!;
+  const capture = RuntimeNativeCaptureSchema.parse({ id: 'native-proof', identity: { projectId: task.projectId, taskId: task.id, subtaskId: attempt.id, executionId: attempt.executionId, executionGeneration: attempt.attempt }, sourceId: 'runner',
+    proof: { contract: 'opencode-child-steps-v1', lineageKey: 'session', turn: 'turn', turnIndex: 0, state: 'pending', root: 'root', observedAt: f.from,
+      baseline: { kind: 'fresh', fingerprint: null }, fingerprint: null, sessions: 0, steps: 0, emitted: 0, baselineSteps: 0, priorRevisionGap: false, issues: [] },
+    state: 'pending', receivedSteps: 0, receivedBaselineSteps: 0, unresolvedBaselineSteps: 0, revisedBaselineSteps: 0, historicalRevisionGap: false, issues: [] });
+  attempt.nativeCaptures = [capture];
+  page = await renderApp('/admin/observability/tasks/' + task.id + '?' + f.query);
+  const bar = document.querySelector<HTMLButtonElement>('[aria-label="Agent 0 · 第 1 次 · 10.0 s"]')!;
+  expect(page.text()).not.toContain('原生采集完整性'); bar.focus(); await act(async () => bar.click()); await page.settle();
+  expect(openDialog().textContent).toContain('原生采集完整性'); expect(openDialog().textContent).toContain('采集中');
+  expect(openDialog().querySelectorAll('select option')).toHaveLength(1);
+  attempt.nativeCaptures = [{ ...capture, state: 'partial', historicalRevisionGap: true, issues: ['native-prior-revision-gap', 'collector-new-gap'], revisedBaselineSteps: 1 }];
+  await page.reread(); expect(openDialog().textContent).toContain('部分采集'); expect(openDialog().textContent).toContain('历史修订尚未补算');
+  expect(openDialog().textContent).toContain('历史步骤已修订，原任务数值待核对'); expect(openDialog().textContent).toContain('采集器报告了其他数据缺口，请查看运行日志。');
+  await act(async () => openDialog().dispatchEvent(new Event('cancel', { cancelable: true }))); await page.settle();
+  expect(document.activeElement).toBe(bar); expect(document.querySelector('dialog')).toBeNull();
 });

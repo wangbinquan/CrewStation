@@ -27,7 +27,7 @@ export const BusinessExecutionFrameSchema = z.discriminatedUnion('type', [
 ]);
 export const BusinessExecutionEventSchema = z.object({ sequence: Sequence, occurredAt: z.iso.datetime(), frame: BusinessExecutionFrameSchema }).strict();
 export const BusinessExecutionInfoSchema = z.object({
-  usageObservationsV1: z.literal(1).optional(),
+  usageObservationsV1: z.literal(1).optional(), nativeUsageTreeV1: z.literal(1).optional(),
   incarnation: z.uuid(), limits: z.object({ outputBytes: Sequence, spoolBytes: Sequence, eventBytes: Sequence }).strict(),
 }).strict();
 export type RunnerBusinessReceipt = z.infer<typeof BusinessExecutionReceiptSchema>;
@@ -39,7 +39,8 @@ export type StoredBusinessExecutionDto = z.infer<typeof StoredBusinessExecutionS
 
 /** 与旧 exec 分开，避免把仅有内存重放的旧 Runner 误判成可靠执行。 */
 export const BusinessExecutionCommands = [
-  z.object({ ...command('businessExecutionInfo'), usageObservationsV1: z.literal(1).optional() }).strict(),
+  z.object({ ...command('businessExecutionInfo'), usageObservationsV1: z.literal(1).optional(), nativeUsageTreeV1: z.literal(1).optional() }).strict()
+    .refine((value) => value.nativeUsageTreeV1 !== 1 || value.usageObservationsV1 === 1, '原生子树采集必须同时请求扩展用量'),
   z.object({ ...command('startBusinessCommand'), executionId: ExecutionId, attempt: z.number().int().positive(),
     incarnation: z.uuid(), payloadDigest: z.string().regex(/^[a-f0-9]{64}$/),
     command: z.array(z.string().max(32768).refine((value) => !value.includes('\0'))).min(1).max(1024),

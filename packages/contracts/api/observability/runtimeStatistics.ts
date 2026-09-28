@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { RuntimeNativeCaptureSchema } from '../../taskrunner/nativeUsage';
 import { ProjectIdSchema, ResourceIdSchema, ServiceIdSchema, TaskIdSchema } from '../../ids';
 
 const at = z.iso.datetime();
@@ -39,7 +40,7 @@ export const RuntimeTaskSummarySchema = RuntimeTaskFactSchema.omit({ attempts: t
   attemptCount: z.number().int().nonnegative(), metrics: RuntimeUsageMetricsSchema, wallMs: z.number().nonnegative().nullable(),
   cumulativeMs: z.number().nonnegative(), activeUnionMs: z.number().nonnegative(), unknownIntervals: z.number().int().nonnegative(),
 });
-export const RuntimeAttemptSummarySchema = RuntimeAttemptFactSchema.extend({ metrics: RuntimeUsageMetricsSchema, durationMs: z.number().nonnegative().nullable(), open: z.boolean() });
+export const RuntimeAttemptSummarySchema = RuntimeAttemptFactSchema.extend({ nativeCaptures: z.array(RuntimeNativeCaptureSchema).max(2000).optional(), metrics: RuntimeUsageMetricsSchema, durationMs: z.number().nonnegative().nullable(), open: z.boolean() });
 export const RuntimeTaskObservationSchema = RuntimeTaskSummarySchema.extend({
   scope: z.enum(['project', 'system']), asOf: at, attempts: z.array(RuntimeAttemptSummarySchema), partial: z.boolean(),
 });

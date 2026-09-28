@@ -129,6 +129,7 @@ export * from './api/market/appIcon';
 export * from './api/observability/executionObservations';
 
 export * from './taskrunner/usageObservation';
+export * from './taskrunner/nativeUsage';
 export * from './api/object-storage/taskInputs';
 
 export * from './api/observability/runtimeStatistics';

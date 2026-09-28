@@ -1,8 +1,10 @@
-import { and, asc, desc, eq, gt, lte } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, lte, sql } from 'drizzle-orm';
 import { conflict, gone, newResourceId, notFound, validation } from '@crewstation/kernel';
-import type { Database } from '@crewstation/persistence';
+import type { Database, Executor } from '@crewstation/persistence';
+import type { ExecutionObservationIdentity } from '@crewstation/contracts';
+import { nativeCaptureId } from '../../domain/usageProjection';
 import type { UsageSnapshot, UsageSnapshotQuery } from '../../ports/usageLedger';
-import { usageChanges, usageHeads, usageSnapshots } from './usageLedgerTables';
+import { nativeCaptureHistory, usageChanges, usageHeads, usageSnapshots } from './usageLedgerTables';
 
 const lifetimeMs = 30 * 60 * 1000;
 async function snapshotRecord(db: Database, taskKey: string, snapshotId: string | undefined, now: number, visibilityRevision: number) {
@@ -34,5 +36,19 @@ export async function usageSnapshot(db: Database, taskKey: string, query: UsageS
     .orderBy(asc(usageChanges.meterKey), desc(usageChanges.sequence)).limit(query.limit + 1);
   const items = rows.slice(0, query.limit);
   return { snapshotId: snapshot.id, snapshotThrough: snapshot.through, visibilityRevision: snapshot.visibilityRevision, expiresAt: snapshot.expiresAt, createdAt: snapshot.createdAt,
-    items: items.map((row) => row.document), nextCursor: rows.length > query.limit ? items.at(-1)!.meterKey : null };
+    items: items.map((row) => row.document), captureIncomplete: await captureIncompleteAt(db, taskKey, snapshot.through), nextCursor: rows.length > query.limit ? items.at(-1)!.meterKey : null };
+}
+
+/** Completeness is read from immutable proof history at the same numeric watermark.
+ * Distinct turns prevent a later complete turn from hiding an earlier missing proof. */
+export async function captureIncompleteAt(db: Executor, taskKey: string, through: number): Promise<boolean> {
+  const captures = await db.selectDistinctOn([nativeCaptureHistory.captureId], { id: nativeCaptureHistory.captureId, document: nativeCaptureHistory.document })
+    .from(nativeCaptureHistory).where(and(eq(nativeCaptureHistory.taskKey, taskKey), lte(nativeCaptureHistory.sequence, through)))
+    .orderBy(asc(nativeCaptureHistory.captureId), desc(nativeCaptureHistory.sequence)).limit(501);
+  if (captures.length > 500 || captures.some((row) => row.document.state !== 'complete')) return true;
+  const sources = await db.selectDistinct({ identity: sql<ExecutionObservationIdentity>`${usageChanges.document}->'identity'`,
+    sourceId: sql<string>`${usageChanges.document}->>'sourceId'`, turn: sql<string | null>`${usageChanges.document}->'scope'->>'turn'` })
+    .from(usageChanges).where(and(eq(usageChanges.taskKey, taskKey), lte(usageChanges.sequence, through), sql`${usageChanges.document}->>'kind' = 'usage'`)).limit(501);
+  const known = new Set(captures.map((row) => row.id));
+  return sources.length > 500 || sources.some((row) => !row.turn || !known.has(nativeCaptureId(row.identity, row.sourceId, row.turn)));
 }

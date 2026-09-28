@@ -1,7 +1,7 @@
 // RFC-034: both scopes and every drill-down use the same direct task/attempt facts.
 import { expect, test } from 'bun:test';
 import type { Actor, ProjectId, TaskId, UserId, RuntimeTaskFact, RuntimeAttemptFact } from '@crewstation/contracts';
-import { ExecutionUsageObservationSchema, RuntimeTaskFactSchema } from '@crewstation/contracts';
+import { ExecutionUsageObservationSchema, RuntimeTaskFactSchema, RuntimeNativeCaptureSchema } from '@crewstation/contracts';
 import { newResourceId } from '@crewstation/kernel';
 import { runtimeStatisticsUseCases } from './executionObservations';
 import type { RuntimeStatisticsSnapshot } from '../ports/usageLedger';
@@ -90,8 +90,48 @@ test('all views and CSV share filtered contributions; Agent price-profile revisi
   const f = setup(tasks, { observations });
   const page = await f.api.systemRuntimeStatistics(actor, { ...query, q: 'First' });
   expect(page.tasks).toHaveLength(1); expect(page.agents).toHaveLength(1); expect(page.metrics.tokens.total).toBe('100'); expect(page.agents[0]?.metrics.tokens.total).toBe('100'); expect(page.models[0]?.metrics.tokens.total).toBe('100');
-  const csv = await f.api.systemRuntimeExport(actor, { window: query, view: 'agents', q: 'First' }); expect(csv.rows).toBe(1); expect(csv.content).toContain('"100","true"');
+  const csv = await f.api.systemRuntimeExport(actor, { window: query, view: 'agents', q: 'First' }); expect(csv.rows).toBe(1); expect(csv.content).toContain('"100","false"'); expect(csv.content).toContain('native-capture-unobserved');
   const all = await f.api.systemRuntimeExport(actor, { window: query, view: 'agents' });
   expect(all.rows).toBe(2); expect(all.content).toContain('"group_key","agent_id","profile_id","profile_revision","kind"');
   expect(all.content).toContain(`"${a.profileId}","7","agent"`); expect(all.content).toContain(`"${a.profileId}","8","agent"`);
+});
+
+function nativeSummary(a: RuntimeAttemptFact, state: 'pending' | 'complete' | 'partial' | 'unsupported' = 'complete') {
+  return RuntimeNativeCaptureSchema.parse({
+    id: 'capture-' + a.id, identity: { projectId, taskId: a.taskId, subtaskId: a.id, executionId: a.executionId!, executionGeneration: a.attempt }, sourceId: 'runner',
+    proof: { contract: 'opencode-child-steps-v1' as const, lineageKey: 'session', turn: 'turn', turnIndex: 0, state, root: 'root', observedAt: at,
+      baseline: { kind: 'fresh' as const, fingerprint: null }, fingerprint: state === 'complete' ? 'final' : null, sessions: 1, steps: 0, emitted: 0, baselineSteps: 0, priorRevisionGap: false, issues: [] },
+    state, issues: [], receivedSteps: 0, receivedBaselineSteps: 0, unresolvedBaselineSteps: 0, revisedBaselineSteps: 0, historicalRevisionGap: false,
+  });
+}
+test('only complete native empty turns prove zero; pending, unsupported and other execution identities stay unknown', async () => {
+  const a = attempt(), complete = nativeSummary(a);
+  const f = setup([task([a])], { nativeCaptures: [complete] });
+  const all = await f.api.systemRuntimeStatistics(actor, query);
+  expect(all.metrics.tokens).toMatchObject({ total: '0', hasKnown: true, complete: true });
+  expect(all.metrics.cost).toMatchObject({ amount: '0', complete: true }); expect(all.metrics.observedExecutions).toBe(1);
+  const hidden = await f.api.projectRuntimeTask(actor, projectId, taskId);
+  expect(hidden.metrics.cost).toMatchObject({ amount: null, complete: false, visible: false }); expect(hidden.attempts[0]?.nativeCaptures).toEqual([complete]);
+  for (const state of ['pending', 'partial', 'unsupported'] as const) {
+    const row = await setup([task([a])], { nativeCaptures: [nativeSummary(a, state)] }).api.systemRuntimeTask(actor, taskId);
+    expect(row.metrics.tokens.hasKnown).toBe(false); expect(row.metrics.reasons).toContain('native-capture-' + state);
+  }
+  const mismatch = await setup([task([a])], { nativeCaptures: [{ ...complete, identity: { ...complete.identity, executionGeneration: 2 } }] }).api.systemRuntimeTask(actor, taskId);
+  expect(mismatch.metrics.tokens.hasKnown).toBe(false); expect(mismatch.attempts[0]!.nativeCaptures).toEqual([]); expect(mismatch.metrics.reasons).toContain('identity-unmatched');
+  const extra = await setup([task([a])], { nativeCaptures: [complete, { ...complete, id: 'orphan-proof', identity: { ...complete.identity, executionGeneration: 2 } }] }).api.systemRuntimeTask(actor, taskId);
+  expect(extra.metrics.tokens.complete).toBe(false); expect(extra.partial).toBe(true); expect(extra.metrics.reasons).toContain('identity-unmatched');
+});
+test('proofs never hide unobserved turns and historical gaps keep known tokens as a lower bound', async () => {
+  const a = attempt(), usage = { input: '10', output: '0', cacheRead: '0', cacheWrite: '0' };
+  const observation = ExecutionUsageObservationSchema.parse({ kind: 'usage', identity: nativeSummary(a).identity, sourceId: 'runner', recordId: 'step', revision: 1,
+    occurredAt: at, observedAt: at, adapterVersion: 'test', modelRef: null, reporting: 'delta', inclusion: 'self', coverage: 'complete', validity: 'valid',
+    scope: { root: 'root', session: 'root', parentSession: null, ancestors: [], turn: 'missing-turn', turnIndex: 1, level: 'request' }, coveredThroughTurn: null, usage, basis: { kind: 'invocation' },
+    projection: { projectionRevision: 1, observedRevision: 1, contribution: usage, coveredThrough: { input: 1, output: 1, cacheRead: 1, cacheWrite: 1 }, complete: true, issues: [] } });
+  const f = setup([task([a])], { observations: [observation], nativeCaptures: [nativeSummary(a)] });
+  const data = await f.api.systemRuntimeStatistics(actor, query);
+  expect(data.metrics.tokens).toMatchObject({ total: '10', complete: false }); expect(data.metrics.reasons).toContain('native-capture-unobserved');
+  expect(data.models[0]?.metrics.tokens.complete).toBe(false);
+  const revised = { ...nativeSummary(a, 'partial'), historicalRevisionGap: true };
+  const detail = await setup([task([a])], { observations: [observation], nativeCaptures: [revised] }).api.systemRuntimeTask(actor, taskId);
+  expect(detail.metrics.tokens.total).toBe('10'); expect(detail.metrics.reasons).toContain('native-prior-revision-gap');
 });

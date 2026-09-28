@@ -363,3 +363,33 @@ test('RFC-034 output-pump failure still emits the model revision before surfacin
   expect(usage.filter((event) => event.usage)).toHaveLength(1);
   expect(usage[1]!.usageCapture!.measurements[0]!.actualModel).toMatchObject({ provider: 'actual', model: 'model' });
 });
+
+// RFC-034: the actual one-shot driver persists pending before spawn and the subtree proof after final numbers.
+test('native child capture uses final process environment and shares root revisions before completion', async () => {
+  recordOpencodeBinaryVersion('/bin/opencode', '1.18.29');
+  const frame = JSON.stringify({ type: 'step_finish', sessionID: 'root-native', part: { id: 'root-step', sessionID: 'root-native', messageID: 'root-message', tokens: { input: 9, output: 2, cache: { read: 3, write: 0 } } } });
+  const host = createFakeProcessHost([{ stdout: [frame] }]), ctx = context(host), file = join(tmpdir(), `cs-native-driver-${crypto.randomUUID()}.db`); roots.push(file); ctx.env.OPENCODE_DB = file;
+  const db = new Database(file);
+  db.exec('CREATE TABLE session(id TEXT PRIMARY KEY,parent_id TEXT); CREATE TABLE message(id TEXT PRIMARY KEY,session_id TEXT,data TEXT); CREATE TABLE part(id TEXT PRIMARY KEY,session_id TEXT,message_id TEXT,time_created INTEGER,data TEXT)');
+  for (const [session, parent, id, input] of [['root-native', null, 'root', 9], ['child-native', 'root-native', 'child', 13]] as const) {
+    db.query('INSERT INTO session VALUES (?,?)').run(session, parent);
+    db.query('INSERT INTO message VALUES (?,?,?)').run(id + '-message', session, JSON.stringify({ role: 'assistant', providerID: 'actual-provider', modelID: 'actual-model' }));
+    db.query('INSERT INTO part VALUES (?,?,?,?,?)').run(id + '-step', session, id + '-message', Date.now(), JSON.stringify({ type: 'step-finish', tokens: { input, output: 2, cache: { read: 3, write: 0 } } }));
+  }
+  const events = await collect(createOpencodeDriver(() => '/bin/opencode').start(openSpec({ businessEvents: true, usageObservationsV1: 1, nativeUsageTreeV1: 1, nativeUsageLineageKey: 'business-session' }), ctx)); db.close();
+  const captures = events.flatMap((event) => event.usageCapture ? [event.usageCapture] : []);
+  expect(captures[0]!.nativeProof).toMatchObject({ state: 'pending', lineageKey: 'business-session' });
+  expect(captures.at(-1)!.nativeProof).toMatchObject({ state: 'complete', emitted: 2, sessions: 2, steps: 2 });
+  const records = captures.flatMap((frame) => frame.measurements), root = records.filter((r) => r.scope?.session === 'root-native');
+  expect(root).toHaveLength(2); expect(root[0]!.recordId).toBe(root[1]!.recordId); expect(root[1]!.revision).toBeGreaterThan(root[0]!.revision);
+  expect(records.find((r) => r.scope?.session === 'child-native')).toMatchObject({ usage: { input: '13' }, scope: { root: 'root-native', ancestors: ['root-native'], parentSession: 'root-native' } });
+  expect(events.at(-1)?.type).toBe('completed'); expect(events.at(-2)?.usageCapture?.nativeProof?.state).toBe('complete');
+});
+
+test('unavailable native store preserves business completion with a partial proof', async () => {
+  recordOpencodeBinaryVersion('/bin/opencode', '1.18.29');
+  const frame = JSON.stringify({ type: 'step_finish', sessionID: 'root', part: { id: 'step', tokens: { input: 9, output: 2, cache: { read: 3, write: 0 } } } });
+  const host = createFakeProcessHost([{ stdout: [frame] }]), ctx = context(host); ctx.env.OPENCODE_DB = ':memory:';
+  const events = await collect(createOpencodeDriver(() => '/bin/opencode').start(openSpec({ businessEvents: true, usageObservationsV1: 1, nativeUsageTreeV1: 1, nativeUsageLineageKey: 'lineage' }), ctx));
+  expect(events.at(-1)?.type).toBe('completed'); expect(events.at(-2)?.usageCapture?.nativeProof).toMatchObject({ state: 'partial', issues: ['native-store-unavailable'] });
+});

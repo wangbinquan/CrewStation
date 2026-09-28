@@ -48,3 +48,11 @@ test('旧底座 Runner（协议 1）的 hello：令牌有效才回写原因，�
   expect(protocolMismatchOf({ type: 'result', id: 'r' })).toBeUndefined();
   expect(rejections).toHaveLength(1);
 });
+
+test('native-tree observation requires its own negotiated capability without changing legacy launch support', () => {
+  const command: RunnerCommand = { id: 'native', type: 'businessExecutionInfo', usageObservationsV1: 1, nativeUsageTreeV1: 1 };
+  const old = { ...base, businessExecutionV3: 1 as const, usageObservationsV1: 1 as const };
+  expect(() => assertLaunchSupported(command, old)).toThrow(expect.objectContaining({ details: expect.objectContaining({ code: 'unsupported_capability', capability: 'nativeUsageTreeV1' }) }));
+  expect(() => assertLaunchSupported(command, { ...old, nativeUsageTreeV1: 1 })).not.toThrow();
+  expect(() => assertLaunchSupported({ id: 'usage', type: 'businessExecutionInfo', usageObservationsV1: 1 }, old)).not.toThrow();
+});

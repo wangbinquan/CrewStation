@@ -1,7 +1,7 @@
-import { bigint, text, primaryKey, index } from 'drizzle-orm/pg-core';
+import { bigint, boolean, integer, text, primaryKey, index } from 'drizzle-orm/pg-core';
 import { jsonDocument } from '@crewstation/persistence';
-import type { ExecutionUsageObservation, ExecutionObservation, ExecutionValuationObservation } from '@crewstation/contracts';
-import type { UsageEvidence } from '../../domain/usageProjection';
+import type { ExecutionUsageObservation, ExecutionObservation, ExecutionValuationObservation, RuntimeNativeCapture } from '@crewstation/contracts';
+import type { UsageEvidence, NativeCaptureDocument, NativeBaselineEntry } from '../../domain/usageProjection';
 import { observabilitySchema } from './schema';
 
 export const usageHeads = observabilitySchema.table('usage_heads', {
@@ -44,3 +44,22 @@ export const executionValuationReceipts = observabilitySchema.table('execution_v
   taskKey: text('task_key').notNull(), requestKey: text('request_key').notNull(), fingerprint: text('fingerprint').notNull(),
   document: jsonDocument('document').$type<ExecutionValuationObservation>().notNull(),
 }, (t) => [primaryKey({ columns: [t.taskKey, t.requestKey] })]);
+
+
+export const nativeCaptures = observabilitySchema.table('native_captures', {
+  id: text('id').primaryKey(), taskKey: text('task_key').notNull(), sourceId: text('source_id').notNull(), turn: text('turn').notNull(),
+  lineageKey: text('lineage_key').notNull(), root: text('root'), finalized: boolean('finalized').notNull(),
+  document: jsonDocument('document').$type<NativeCaptureDocument>().notNull(), summary: jsonDocument('summary').$type<RuntimeNativeCapture>().notNull(),
+}, (t) => [index('native_capture_task').on(t.taskKey, t.id), index('native_capture_turn').on(t.taskKey, t.sourceId, t.turn)]);
+export const nativeCaptureHistory = observabilitySchema.table('native_capture_history', {
+  taskKey: text('task_key').notNull(), sequence: bigint('sequence', { mode: 'number' }).notNull(), captureId: text('capture_id').notNull(),
+  document: jsonDocument('document').$type<RuntimeNativeCapture>().notNull(),
+}, (t) => [primaryKey({ columns: [t.taskKey, t.sequence] }), index('native_capture_boundary').on(t.taskKey, t.captureId, t.sequence)]);
+export const nativeSteps = observabilitySchema.table('native_steps', {
+  captureId: text('capture_id').notNull(), recordId: text('record_id').notNull(), taskKey: text('task_key').notNull(), nativeKey: text('native_key').notNull(),
+  root: text('root').notNull(), revision: bigint('revision', { mode: 'number' }).notNull(), fingerprint: text('fingerprint').notNull(),
+}, (t) => [primaryKey({ columns: [t.captureId, t.recordId] }), index('native_step_owner').on(t.taskKey, t.nativeKey, t.captureId)]);
+export const nativeBaselines = observabilitySchema.table('native_baselines', {
+  captureId: text('capture_id').notNull(), ordinal: integer('ordinal').notNull(), taskKey: text('task_key').notNull(), nativeKey: text('native_key').notNull(),
+  document: jsonDocument('document').$type<NativeBaselineEntry>().notNull(), status: text('status').notNull(), ownerId: text('owner_id'),
+}, (t) => [primaryKey({ columns: [t.captureId, t.ordinal] }), index('native_baseline_owner').on(t.taskKey, t.nativeKey, t.captureId)]);

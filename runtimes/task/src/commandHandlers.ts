@@ -38,7 +38,7 @@ export function buildCommandHandlers(targets: CommandTargets): CommandHandlers {
   return {
     runtimeInitializationStatus: async () => targets.initialization?.status() ?? { enabled: false, state: 'succeeded', steps: [], checks: [] },
     cancelRuntimeInitialization: async () => targets.initialization ? targets.initialization.cancel() : { enabled: false, state: 'succeeded', steps: [], checks: [] },
-    businessExecutionInfo: (command) => targets.business.info(command.usageObservationsV1),
+    businessExecutionInfo: (command) => targets.business.info(command.usageObservationsV1, command.nativeUsageTreeV1),
     sendBusinessMessage: (c) => targets.business.sendMessage(c),
     getBusinessMessage: (c) => targets.business.getMessage(c),
     startBusinessAgent: (c) => targets.business.startAgent(c),

@@ -77,7 +77,7 @@ function createPendingRun(spec: DriverAgentSpec): PendingRun {
     attach(run) {
       attached = run;
       void (async () => {
-        try { for await (const item of run.events) events.push(item); events.close(); }
+        try { for await (const item of run.events) { if (spec.businessEvents) await events.writeProcessed(item); else events.push(item); } events.close(); }
         catch (error) { events.fail(error); await run.cancel().catch(() => undefined); }
       })();
       ready?.();

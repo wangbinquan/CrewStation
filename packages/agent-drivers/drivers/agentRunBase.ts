@@ -2,6 +2,7 @@
 // ← agent-workflow `execution/agentProcess.ts` 的 outcome 映射思路，但那里的产物是一条汇总记录，
 // 这里的产物是一条 AgentEvent 流。
 
+import { unsupportedNativeUsageCapture, type NativeUsageCapture } from './usage/nativeCapture';
 import { createUsageObserver } from './usage/capture';
 import type { AgentEvent, AgentEventType, KnownAgentProtocol } from '@crewstation/contracts';
 import type { DriverAgentProcess, DriverAgentSpec, DriverLaunchContext } from '../contract/agentDriver';
@@ -55,6 +56,25 @@ export abstract class AgentRunBase implements DriverAgentProcess {
 
   protected retryUsageModels(): void {
     for (const usageCapture of this.usageObserver?.retryModels(Date.now()) ?? []) this.push(this.emit('usage', { usageCapture }));
+  }
+
+  protected async beginNativeCapture(env: Readonly<Record<string, string | undefined>>, resumeSessionId?: string, resident = false): Promise<NativeUsageCapture | undefined> {
+    if (this.spec.nativeUsageTreeV1 !== 1 || !this.usageObserver || !this.spec.nativeUsageLineageKey) return undefined;
+    const turn = this.usageObserver.currentTurn();
+    const input = { lineageKey: this.spec.nativeUsageLineageKey, turn: turn.turnId, turnIndex: turn.turnIndex,
+      resumeSessionId, nextRevision: () => this.usageObserver!.nextRevision() };
+    const capture = !resident && this.prepared.nativeUsageCapture ? this.prepared.nativeUsageCapture(input, env) : unsupportedNativeUsageCapture(input);
+    await this.events.writeProcessed(this.emit('usage', { usageCapture: capture.begin(Date.now()) }));
+    return capture;
+  }
+
+  protected async finishNativeCapture(capture: NativeUsageCapture | undefined, issues: string[] = []): Promise<void> {
+    for (const usageCapture of capture?.finish(this.sessionId ?? this.spec.resumeSessionId, Date.now(), issues) ?? []) {
+      const event = this.emit('usage', { usageCapture });
+      // The final receipt also leaves room for the following business terminal event.
+      if (usageCapture.nativeProof) await this.events.writeProcessed(event);
+      else await this.events.write(event);
+    }
   }
 
   protected push(event: AgentEvent): void {
