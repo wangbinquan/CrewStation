@@ -118,9 +118,11 @@
 | `e083c77e8cdf4f460a1a0056de752201970663e7` | Kubernetes UID、绑定前准入与终态助手恢复 | `36472884363`：归档修正用例通过；旧 PG 轮换测试因客户端退出与服务端连接消失的时序竞争失败，gate 随之失败。 |
 | `f5a4196bc3bff491f8bdf7d83aeb641813aee642` | 轮换测试等待 PG 实际关闭连接；12 轮各 5 项／38 断言通过 | [36474805326](https://github.com/wangbinquan/CrewStation/actions/runs/36474805326) 六项通过，包括 gate 与独立集群 e2e。 |
 
-本机初次整个平台使用 `0f180d6a` 三类固定 digest 构建，迁移 Job、应用与探针就绪后启用新合同。后续修正从原已核对镜像叠加**已提交的精确文件**构建并过正式兼容预检；不将共享工作树 RFC034 在制修改打入镜像。当前 API／controller 为 `docker.io/library/cs-control-plane@sha256:b2f654750273cc00e054b16d33c5beb447a88c95e3adf5a70399076bde50a768`（`e083c77e`），其它本次未改生产文件的角色保持 `0f180d6a`；console 为 `sha256:d41ac6a72987a7215255445e41fbc01e68d5326995a19fbbfc5a5f386f3eb755`，Runner 为 `sha256:83d00f1d7dd0718d40838f88c060665b697ac5775c9711647014f99381df5f66`。
+本机初次整个平台使用 `0f180d6a` 三类固定 digest 构建，迁移 Job、应用与探针就绪后启用新合同。后续修正从原已核对镜像叠加**已提交的精确文件**构建并过正式兼容预检；不将共享工作树 RFC034 在制修改打入镜像。UTC `19:34` 本轮验收的 API／controller 为 `docker.io/library/cs-control-plane@sha256:b2f654750273cc00e054b16d33c5beb447a88c95e3adf5a70399076bde50a768`（`e083c77e`），其它本次未改生产文件的角色保持 `0f180d6a`；console 为 `sha256:d41ac6a72987a7215255445e41fbc01e68d5326995a19fbbfc5a5f386f3eb755`，Runner 为 `sha256:83d00f1d7dd0718d40838f88c060665b697ac5775c9711647014f99381df5f66`。
 
 部署证据 `/tmp/cs-rfc035-deployment-0f180d6a669dffac502a73aca3259c93adc97867.json`、`/tmp/cs-rfc035-controller-overlay.json`；最终文档提交的精确 SHA CI 另在交付回执确认，不能用实现的绿色运行代替文档提交的结论。
+
+交付只读复核在 UTC `20:16–20:18` 发现 RFC034 并行部署已更新平台；没有重新覆盖其镜像。实际 OCI manifest 的 config digest 与本机镜像修订逐项对应，控制面和 console 均为 `987b68dcf23768d9db74a4f5cc245801640d4be1`，分别运行 `sha256:9c0a47d9c8784ba24e708e59f620d6baa6a8a466317c2e6debbc763ed8871420`、`sha256:3d8e74ba64da85089bad123d1b97516f9d1625b98449f24fe25ce3140fb26d68`。该修订包含 `e083c77e`，也包含在已通过 CI 的 `f5a4196b` 中；另从真实 API 容器读回六个归档关键文件，哈希与 `e083c77e` 完全一致。所有平台 Deployment 就绪、样例两槽仍各 2 Ready 且无 PVC、两任务 PVC 仍为零。此项是后续部署的内容继承与就绪证明，不冒充在新镜像上重新跑过整套任务链。证据 `/tmp/cs-rfc035-successor-images.json`、`/tmp/cs-rfc035-final-deployed-readiness.json`。
 
 部署后对最初盘点的 **45 个既有业务 Pod/PVC（20 个 PVC）** 逐一比较 namespace／kind／name／UID，全部一致；新建两任务的 PVC 数为零。终结后对主任务 resume 返回 HTTP 409／`task_closed`。证据 `/tmp/cs-rfc035-final-resources.json`。共享主干期间 RFC034 的 `987b68dc` 独立发布，输出完整保留；后续测试修正不改变本批应用镜像。
 
