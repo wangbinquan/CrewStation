@@ -1,9 +1,9 @@
-import type { ProjectRuntimeImagePolicy, RuntimeImageGrants } from '@crewstation/contracts';
+import type { ProjectRuntimeImagePolicy, RuntimeImageGrants, RuntimeImageCatalogEntryDto } from '@crewstation/contracts';
 import type { ImageBuild, ImageRevision, ImageValidation, ImageVersion, RuntimeImage, ImageReference, ImageLogChunk, DevelopmentImagePolicy } from '../domain/records';
 
 export interface Page { readonly before?: string; readonly limit: number; readonly search?: string }
 export interface ImageRepository {
-  listAll(page: Page): Promise<RuntimeImage[]>;
+  listAll(page: Page): Promise<RuntimeImageCatalogEntryDto[]>;
   get(id: string, lock?: boolean): Promise<RuntimeImage | undefined>;
   list(projectId: string, page: Page, includeShared?: boolean, policy?: ProjectRuntimeImagePolicy): Promise<RuntimeImage[]>;
   insert(image: RuntimeImage): Promise<void>;

@@ -49,8 +49,8 @@ metadata:
   namespace: crewstation-system
 spec:
   rateLimit:
-    average: 20
-    burst: 40
+    average: 100
+    burst: 200
     period: 1s
     sourceCriterion:
       requestHeaderName: x-cs-user-id
@@ -63,7 +63,7 @@ metadata:
   namespace: crewstation-system
 spec:
   inFlightReq:
-    amount: 16
+    amount: 64
     sourceCriterion:
       requestHeaderName: x-cs-user-id
 ---

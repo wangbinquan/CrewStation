@@ -28,7 +28,7 @@ export function AdminRuntimeImagesPage({ filter: controlled, onChange, onManage 
         <CatalogSearch key={search} value={search} label={t('images.search')} onSearch={(q) => change(q)} actions={<Button variant="primary" onClick={() => setAdding(true)}>{t('images.add')}</Button>} />
         <QueryStatus isPending={query.isPending} error={query.error} isEmpty={items.length === 0} emptyTitle={t(search ? 'images.noMatches' : 'images.empty')} />
         {items.length ? <DataTable className={catalogStyles.profileTable} columns={[t('images.name'), t('images.latestVersion'), t('images.latestBuild'), t('images.validationStatus'), t('images.actions')]}>
-          {items.map((image) => <ImageCatalogRow key={image.id} image={image} projectId={undefined} editable onOpen={() => onManage ? onManage(image.id) : setSelected({ id: image.id, tab: 'versions' })} />)}
+          {items.map((image) => <ImageCatalogRow key={image.id} image={image} summary={image.summary} projectId={undefined} editable onOpen={() => onManage ? onManage(image.id) : setSelected({ id: image.id, tab: 'versions' })} />)}
         </DataTable> : null}
         <CatalogPagination scope="admin-images" userId={me.data?.id} filter={[search, 30]} cursor={before} next={items.length === 30 ? items.at(-1)?.id : undefined} count={query.error || query.isPending ? undefined : items.length} disabled={query.isPending || !!query.error} onChange={(cursor) => change(search, cursor)} />
       </Card>

@@ -1,4 +1,4 @@
-import type { CreateRuntimeImageSetup, ProjectRuntimeImagePolicyDto, SaveProjectRuntimeImagePolicy, RuntimeImageGrants } from '@crewstation/contracts';
+import type { CreateRuntimeImageSetup, ProjectRuntimeImagePolicyDto, SaveProjectRuntimeImagePolicy, RuntimeImageGrants, RuntimeImageCatalogEntryDto } from '@crewstation/contracts';
 import type { RuntimeImageHistoryQuery, RuntimeImageHistoryPage } from '@crewstation/contracts';
 import type {
   SaveDevelopmentRuntimeImages, Actor, CreateRuntimeImageRequest, CreateRuntimeImageRevision, RuntimeImageBuildDto, RuntimeImageDto, RuntimeImageLogPage, RuntimeImageLogQuery,
@@ -23,7 +23,7 @@ export interface RuntimeEnvironmentModuleApi extends RuntimeImageBindings {
   cancelValidation(actor: Actor, projectId: string | undefined, versionId: string, validationId: string, requestKey: string): Promise<RuntimeImageValidationDto>;
   reconcileBuilds(): Promise<void>;
   runBuild(buildId: string): Promise<void>;
-  adminCatalog(actor: Actor, page: RuntimeImagePageQuery): Promise<RuntimeImageDto[]>;
+  adminCatalog(actor: Actor, page: RuntimeImagePageQuery): Promise<RuntimeImageCatalogEntryDto[]>;
   listImages(actor: Actor, projectId: string, page: RuntimeImagePageQuery): Promise<RuntimeImageDto[]>;
   getImage(actor: Actor, projectId: string | undefined, imageId: string): Promise<RuntimeImageDto>;
   createImage(actor: Actor, projectId: string | undefined, input: CreateRuntimeImageRequest): Promise<RuntimeImageDto>;

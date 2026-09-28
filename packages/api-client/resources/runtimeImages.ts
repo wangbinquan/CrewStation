@@ -1,4 +1,4 @@
-import type { CreateRuntimeImageSetup, ProjectRuntimeImagePolicyDto, SaveProjectRuntimeImagePolicy, RuntimeImageGrants } from '@crewstation/contracts';
+import type { CreateRuntimeImageSetup, ProjectRuntimeImagePolicyDto, SaveProjectRuntimeImagePolicy, RuntimeImageGrants, RuntimeImageCatalogEntryDto } from '@crewstation/contracts';
 import type { RuntimeImageHistoryQuery, RuntimeImageHistoryPage } from '@crewstation/contracts';
 import type { CreateRuntimeImageRequest, CreateRuntimeImageRevision, RuntimeImageBuildDto, RuntimeImageDto, RuntimeImageLogPage, RuntimeImagePageQuery, RuntimeImageRevisionDto, RuntimeImageVersionDto, RuntimeImageValidationDto, SaveDevelopmentRuntimeImages, StartImageValidation, StartRuntimeImageBuild, UpdateRuntimeImageRequest } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
@@ -13,7 +13,7 @@ export interface RuntimeImagesResource {
   saveProjectPolicy(projectId: string, input: SaveProjectRuntimeImagePolicy): Promise<ProjectRuntimeImagePolicyDto>;
   createSetup(projectId: string | undefined, input: CreateRuntimeImageSetup): Promise<{ image: RuntimeImageDto; revision: RuntimeImageRevisionDto }>;
   history(projectId: string | undefined, imageId: string, page?: Partial<RuntimeImageHistoryQuery>): Promise<RuntimeImageHistoryPage>;
-  adminCatalog(page?: Partial<RuntimeImagePageQuery>): Promise<ItemsPage<RuntimeImageDto>>;
+  adminCatalog(page?: Partial<RuntimeImagePageQuery>): Promise<ItemsPage<RuntimeImageCatalogEntryDto>>;
   list(projectId: string, page?: Partial<RuntimeImagePageQuery>): Promise<ItemsPage<RuntimeImageDto>>;
   create(projectId: string | undefined, input: CreateRuntimeImageRequest): Promise<RuntimeImageDto>;
   get(projectId: string | undefined, imageId: string): Promise<RuntimeImageDto>;

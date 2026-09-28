@@ -17,8 +17,8 @@ describe('平台自身路由的限流（RFC-025 T10，设计 §7.3）', () => {
   test('平台接口在用户 ForwardAuth 之后挂令牌桶与并发上限，都按网关注入的用户头分桶；取值是内置默认', () => {
     expect(chain('console-api')).toEqual(['drop-identity-headers', 'forward-auth-user', 'rate-limit-platform-api', 'in-flight-platform-api']);
     const middleware = (name: string) => docs.find((doc) => doc.kind === 'Middleware' && doc.metadata.name === name)!.spec;
-    expect(middleware('rate-limit-platform-api').rateLimit).toEqual({ average: 20, burst: 40, period: '1s', sourceCriterion: { requestHeaderName: 'x-cs-user-id' } });
-    expect(middleware('in-flight-platform-api').inFlightReq).toEqual({ amount: 16, sourceCriterion: { requestHeaderName: 'x-cs-user-id' } });
+    expect(middleware('rate-limit-platform-api').rateLimit).toEqual({ average: 100, burst: 200, period: '1s', sourceCriterion: { requestHeaderName: 'x-cs-user-id' } });
+    expect(middleware('in-flight-platform-api').inFlightReq).toEqual({ amount: 64, sourceCriterion: { requestHeaderName: 'x-cs-user-id' } });
   });
 
   test('长连接不挂并发上限：资源推送流单独一条、优先于平台接口；任务流照旧；登录单独按 IP 限流', () => {

@@ -88,7 +88,7 @@ describe.skipIf(!available)('网关限流策略（RFC-025 设计 §7.3、T10）'
     const current = await withLedger.api.getRateLimits(admin);
     await withLedger.api.setRateLimits(admin, { ...DEFAULT_RATE_LIMITS, expectedRevision: current.revision });
     expect(declared.map((entry) => entry.ref)).toEqual(['platform', `project:${demoProject}`]);
-    expect(declared[0]?.display).toMatchObject({ scope: 'platform', perUser: '20/s·40' });
+    expect(declared[0]?.display).toMatchObject({ scope: 'platform', perUser: '100/s·200' });
     declared.length = 0;
     const own = await withLedger.api.getProjectRateLimits(admin, demoProject);
     await withLedger.api.setProjectRateLimits(admin, demoProject, { override: { userDomain: { perUser: { average: 5, burst: 10 }, perHost: { average: 50, burst: 100 } } }, expectedRevision: own.revision });

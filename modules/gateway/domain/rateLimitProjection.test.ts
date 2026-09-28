@@ -10,12 +10,12 @@ describe('限流策略投影进资源台账（RFC-025 设计 §7.3）', () => {
       spec: {
         children: [{ kind: 'Middleware', namespace: 'crewstation-system', name: 'rate-limit-platform-api' }, { kind: 'Middleware', namespace: 'crewstation-system', name: 'in-flight-platform-api' }, { kind: 'Middleware', namespace: 'crewstation-system', name: 'rate-limit-auth-ip' }],
         middlewares: [
-          { namespace: 'crewstation-system', name: 'rate-limit-platform-api', rateLimit: { average: 20, burst: 40, key: { header: 'x-cs-user-id' } } },
-          { namespace: 'crewstation-system', name: 'in-flight-platform-api', inFlight: { amount: 16, key: { header: 'x-cs-user-id' } } },
+          { namespace: 'crewstation-system', name: 'rate-limit-platform-api', rateLimit: { average: 100, burst: 200, key: { header: 'x-cs-user-id' } } },
+          { namespace: 'crewstation-system', name: 'in-flight-platform-api', inFlight: { amount: 64, key: { header: 'x-cs-user-id' } } },
           { namespace: 'crewstation-system', name: 'rate-limit-auth-ip', rateLimit: { average: 20, burst: 40, key: { ip: true } } },
         ],
       },
-      display: { scope: 'platform', perUser: '20/s·40', inFlightPerUser: '16' },
+      display: { scope: 'platform', perUser: '100/s·200', inFlightPerUser: '64' },
     });
   });
 

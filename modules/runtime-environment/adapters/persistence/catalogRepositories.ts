@@ -1,3 +1,4 @@
+import { readAdminCatalog } from './catalogSummary';
 import type { Executor } from '@crewstation/persistence';
 import { and, desc, eq, lt, max, or, inArray, sql, exists } from 'drizzle-orm';
 import type { ImageRepository, RevisionRepository, VersionRepository } from '../../ports/repositories';
@@ -5,7 +6,7 @@ import { imageRevisions, imageVersions, runtimeImages, imageProjectGrants, proje
 
 export function imageRepository(db: Executor): ImageRepository {
   return {
-    listAll: async (page) => (await db.select().from(runtimeImages).where(and(page.before ? lt(runtimeImages.id, page.before) : undefined, page.search ? sql`strpos(lower(${runtimeImages.name} || ' ' || (${runtimeImages.payload}->>'description')), lower(${page.search})) > 0` : undefined)).orderBy(desc(runtimeImages.id)).limit(page.limit)).map((row) => row.payload),
+    listAll: (page) => readAdminCatalog(db, page),
     get: async (id, lock) => { const q = db.select().from(runtimeImages).where(eq(runtimeImages.id, id)); return (await (lock ? q.for('update') : q))[0]?.payload; },
     list: async (projectId, page, includeShared = false, policy) => (await db.select().from(runtimeImages).where(and(
       policy?.mode === 'restricted' ? (policy.allowedImageIds.length ? inArray(runtimeImages.id, policy.allowedImageIds) : sql`false`) : or(includeShared ? eq(runtimeImages.defaultVisible, true) : undefined, exists(db.select().from(imageProjectGrants).where(and(eq(imageProjectGrants.imageId, runtimeImages.id), eq(imageProjectGrants.projectId, projectId))))),

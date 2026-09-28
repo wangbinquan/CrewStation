@@ -64,3 +64,13 @@ export type RuntimeImageVersionDto = z.infer<typeof RuntimeImageVersionDtoSchema
 export type RuntimeImageValidationDto = z.infer<typeof RuntimeImageValidationDtoSchema>;
 export type RuntimeImageExecutionSnapshot = z.infer<typeof RuntimeImageExecutionSnapshotSchema>;
 export type RuntimeImageLogPage = z.infer<typeof RuntimeImageLogPageSchema>;
+
+/** 管理目录直接返回列表摘要；不携带构建内部状态、凭据、配方或验证输出。 */
+export const RuntimeImageCatalogSummarySchema = z.object({
+  version: RuntimeImageVersionDtoSchema.pick({ id: true, digest: true, architecture: true, state: true }).nullable(),
+  build: RuntimeImageBuildDtoSchema.pick({ id: true, state: true, updatedAt: true, error: true }).nullable(),
+  validation: z.object({ id: ResourceIdSchema, state: RuntimeImageValidationStateSchema, usage: z.enum(['task', 'agent', 'service']) }).nullable(),
+});
+export const RuntimeImageCatalogEntryDtoSchema = RuntimeImageDtoSchema.extend({ summary: RuntimeImageCatalogSummarySchema });
+export type RuntimeImageCatalogSummary = z.infer<typeof RuntimeImageCatalogSummarySchema>;
+export type RuntimeImageCatalogEntryDto = z.infer<typeof RuntimeImageCatalogEntryDtoSchema>;
