@@ -30,13 +30,13 @@ export function ObjectStorageOverview() {
     : !backends || !spaces ? 'unknown' : !backends.length ? 'unconfigured' : health.includes('unknown') ? 'unknown' : 'ready';
   const bytes = (key: 'usedBytes' | 'quotaBytes' | 'reservedBytes' | 'deletingBytes') => storageBytes(spaces ? spaces.reduce((sum, space) => sum + space[key], 0) : null);
   const ready = backends?.filter((b) => b.state !== 'offline' && b.health === 'ready').length;
-  return <Card title={t('objects.overview.title')} compact stacked
+  return <Card title={t('objects.title')} compact stacked
     extra={<Badge tone={state === 'ready' ? 'success' : state === 'attention' ? 'warning' : 'neutral'}>{t(`objects.overview.${state}`)}</Badge>}
     actions={<ButtonLink to="/admin/object-storage">{t('objects.overview.open')}</ButtonLink>}
     footer={t('objects.overview.hint')}>
     <QueryStatus isPending={backendsQuery.isPending} error={backendsQuery.error} loadingKey="objects.overview.loadingBackends" errorKey="objects.overview.backendError" />
     <QueryStatus isPending={spacesQuery.isPending} error={spacesQuery.error} loadingKey="objects.overview.loadingSpaces" errorKey="objects.overview.spaceError" />
-    <DefinitionList layout="grid" items={[
+    <DefinitionList items={[
       { label: t('objects.overview.backends'), value: backends ? t('objects.overview.readyCount', { ready: ready!, total: backends.length }) : '—' },
       { label: t('objects.spaces'), value: spaces?.length ?? '—' },
       { label: t('objects.overview.used'), value: bytes('usedBytes') },

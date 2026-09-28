@@ -31,21 +31,24 @@ function fixture() {
   }) as typeof fetch;
   return { state, backend, calls };
 }
-function card() { return [...document.querySelectorAll('main h2')].find((h) => h.textContent === '对象存储状态')!.closest('section')!; }
+function card() { return [...document.querySelectorAll('main h2')].find((h) => h.textContent === '对象存储')!.closest('section')!; }
 function values() { return Object.fromEntries([...card().querySelectorAll('dl > div')].map((row) => [row.querySelector('dt')!.textContent, row.querySelector('dd')!.textContent])); }
 
-test('overview storage card precedes todos, aggregates both environments without adding backend budgets and opens the management route', async () => {
+test('overview storage summary shares the entry grid, aggregates both environments and opens the management route once', async () => {
   const f = fixture(); page = await renderApp('/admin');
-  const cluster = [...document.querySelectorAll('main h2')].find((h) => h.textContent === '集群状态')!.closest('section')!;
+  // 摘要曾独占总览一整行，原入口仍在下方；锁定单一卡片与其他入口并列，避免再次画成独立宽面板。
+  expect(document.querySelectorAll('main a[href="/admin/object-storage"]')).toHaveLength(1);
+  const grid = document.querySelector('#admin-entries-observability + div')!;
+  expect([...grid.children].includes(card())).toBe(true);
+  expect([...grid.children].map((entry) => entry.querySelector('h2')?.textContent)).toEqual(['运行观测与统计', '集群管理', '业务执行恢复', '对象存储', '网关']);
   const todo = document.querySelector('#admin-todo-title')!.closest('section')!;
-  expect(cluster.compareDocumentPosition(card()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(card().compareDocumentPosition(todo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(todo.compareDocumentPosition(card()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(values()).toEqual({ 存储后端: '就绪 1 / 1', 对象空间: '2', 逻辑已用: '3 KiB', 空间配额合计: '3 GiB', 上传预留: '1 KiB', 待删除: '30 B' });
   expect(card().textContent).toContain('空间配额不代表磁盘容量');
   expect(f.calls.map((c) => c.url.pathname).sort()).toEqual(['/v3/admin/object-storage/backends', '/v3/admin/object-storage/spaces']);
   expect(f.calls.every((c) => c.method === 'GET' && c.url.search === '')).toBe(true);
   expect(document.querySelectorAll('#admin-entries-observability + div a[href="/admin/object-storage"]')).toHaveLength(1);
-  await page.click('管理对象存储'); expect(page.path()).toBe('/admin/object-storage');
+  await page.click('打开对象存储'); expect(page.path()).toBe('/admin/object-storage');
 });
 
 test('loading is unknown; only successfully observed empty storage renders zero and not configured', async () => {
