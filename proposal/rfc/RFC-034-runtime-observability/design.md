@@ -1,6 +1,6 @@
 # RFC-034 技术与交互设计
 
-状态：Draft。所有接口和表名均为候选合同，需设计评审后实施。
+状态：In Progress。设计功能门通过，用户已批准完整实施及提交上库；各批实现与验收证据见 plan.md。
 
 ## 1. 模块落位
 
@@ -51,12 +51,12 @@ pricingRef?, sourceCost?, currency?
 
 - event-key 幂等写；同键不同内容记录冲突，不静默覆盖。
 - delta 仅首次记账；累计 scope 保存最新有效值与版本，修订以差额更正投影，不将每个快照求和。
-- 版本/时序不明时不能用“最后到达”覆盖新值；无法判定的冲突降低完整性。累计下降若无 reset/revision 证据，进入待对账。
+- 版本/时序不明时不能用“最后到达”覆盖新值；无法判定的冲突降低完整性。累计下降若无明确有效纠正/reset 证据，进入待对账。崩溃错误终态中的失效零值不覆盖已知消耗。原生恢复会话先按 nativeSessionId/lineage/generation 与模型范围扣除已知基线，再归属本次执行；基线未知不能把历史总量全算给新执行。
 - parent inclusive 和 child 同时出现时仅选可加的贡献集合；无法拆分的余额归“未归因”，不同时给所有 Agent。
 - Claude/OpenCode 的现有映射分别有 final/step 语义；上游版本样本固定之前不能宣称四桶完全互斥。CLI 只解析交互活动不能推出 Token。
 - complete 在 usage scope 层定义；任务完整需要预期执行集合闭合、全部支持且最终事件到达、无未修复 gap。结束事件不自动把 partial 变 complete。
 - 用量不采样。模型和工具详细 spans 可采样，但界面分别标明，不能从被采样的 spans 重建成本账本。
-- 金额用 decimal 或人民币微单位整数，价格以生效日期/采购版本/模型修订快照固定；不以当前价格覆盖历史。用户可见金额统一 CNY，原采购币种仅留在管理员审计来源元数据，不能与人民币混加。
+- 金额持久化为精确 decimal 字符串（至少 12 位小数）或人民币 pico 元整数（10^-12 元），禁止逐调用按微元舍入；价格以生效日期/采购版本/模型修订快照固定；不以当前价格覆盖历史。用户可见金额统一 CNY，原采购币种仅留在管理员审计来源元数据，不能与人民币混加。
 
 ## 3.1 人民币价格配置与历史快照
 
@@ -115,6 +115,22 @@ ledger + aggregate delta + checkpoint 同事务。多个 worker 以租约和 fen
 
 Project/tenant 时间筛选返回可见资源时段，不能仅用“现在的项目标签”重归属历史。跨项目共享 trace 保留边界；系统项目总和与全平台的差额显示平台专用/共享未分配，而非强行摊平。
 
+## 6.1 托管 AW 的执行级观测合同
+
+正式新增 `GET /v3/business-tasks/:taskId/observations?after=&limit=`，由 observability 的独立 HTTP adapter 提供，不改变已有严格 BusinessUsage 事件。复用 requireService 与 business-task 已有服务身份/任务归属查询入口，由 platform 注入 `executionAccess` port；只返回调用服务所属项目和任务的执行事实，不能以管理员价格接口替代。
+
+固定返回 `schemaVersion=1`、`taskId`、`items`、`nextCursor`、`persistedThrough`、`asOf`、`firstAvailableCursor`、`gaps`、`visibilityRevision`、`costVisibility` 和能力标识 `executionObservationsV1`。游标针对已提交的观测日志，页大小 1–500；到达页尾不表示执行完结；过期水位显式要求重新读取当前快照，不假装没有事件。
+
+每项保留 `projectId/taskId/subtaskId/executionId/executionGeneration` 与 `sourceId/recordId/revision`，usage 项为四桶、实际模型的可公开引用、包含范围、完整性与发生时间。valuation 项独立包含 `valuationId/valuationRevision/usageRevision/priceVersionRef/currency=CNY/amountDecimal/completeness`，单价、平台采购成本和内部模型名称不出现在此 DTO。未知/未开放金额使用 `availability=unpriced|not-authorized|pending`，不伪造 0；Token 仍按原权限返回。
+
+项目金额授权复用明确的项目观测配置 `executionCostVisibility=hidden|project-members-and-services`，默认 hidden，管理员在价格配置中显式开启后才回传执行估值。这是估算可见性，不是计费或预算扣费；项目页面与服务使用同一设置。配置保存与单价保存独立，页面给出开启后的可见范围。授权撤回后新查询不再返回金额；AW 保存金额可见性版本并在刷新时清除不可见金额缓存，历史账本仍在 CS 保留。
+
+每个增量响应（包括空页）返回当前金额可见性及单调版本。首次接入、游标过期或 `visibilityRevision` 变化时，AW 调用同路径 `?snapshot=true&cursor=` 读取分页当前快照；首批返回冻结的 `snapshotId/snapshotThrough/visibilityRevision`，后续页固定该版本。快照包含全部当前 usage 与当时允许返回的 valuation；版本变化或快照过期返回明确重取状态，不混用不同快照页。完成后原子替换本任务投影，再从 `snapshotThrough` 之后追增量。撤回时一收到 hidden 就停止展示旧费用，开启时即使任务无新事件也触发快照补回历史金额；重取中明确显示同步中。
+
+usage 同时携带完整祖先路径、原生轮次范围以及 CS 已提交的 `projection`（独立单调 projectionRevision、最高原生 observedRevision、四桶 contribution、逐桶 coveredThrough、完整性与问题标识）。增量与冻结快照都返回该完整当前投影；projectionRevision 随每次已提交当前状态变化推进，迟到旧原生修订触发重建时也递增；valuation.usageRevision 引用该投影修订。AW 按 projectionRevision 替换，不对 CS 已扣过恢复基线的 contribution 再次求差。这样首次同步或撤回后重取不依赖客户端保存旧修订，也能保留“旧 input 水位 0、最新 output 水位 1”的混合状态。
+
+AW 将 CS execution/generation 映射到已有 invocation，固定 `executionAuthority=crewstation`；同一 usage 修订重放只替换一次，valuation 后到或校正不增加第二笔 Token。平台断线不切换本地费率，恢复后从持久游标续传。两端必须验证跨页重放、usage/valuation 乱序、价格切换、模型不匹配、未开放金额、撤回可见性与明确发生的采集缺口。该合同与独立部署共用计量语义，但不依赖 AW 本地 runtime 二进制。
+
 ## 7. 服务与平台观测
 
 网关 RED：请求数、HTTP 5xx/4xx/429 分开、请求完成延迟，按 route template/service/release/environment 有界标签；路径参数和查询不做 label。WebSocket/SSE 以连接成功、断开、滞后单独定义，不塞进普通 HTTP 延迟。
@@ -137,6 +153,18 @@ release 在切流时写角色映射历史；prod/preview 筛选以事件发生�
 
 预算（待实测）：100K 执行/10M usage 时，七天常用概览 warm P95 <1s，首批 200 时间段 <1s，payload <300KB gzip；异步导出限制行数/执行时间，数据库分页与 rollup 合并，不浏览器拉全量。采集压测单列断连恢复与 write amplification。
 
+人民币估值还必须受执行受理时冻结的 `priceBookRevision` 上界约束。修订 0 表示当时目录为空，后续发布价格不能进入这次执行的历史估算；匹配同时保留档位 ID、档位修订、实际 provider/model/条件与 acceptedAt。未携带合法目录修订不能隐式使用当前最新价格。
+
+执行价格快照在业务子任务准入的 prepare 阶段取得并持久化，完成后才允许 reserve；首次受理和重试都固定选定档位，幂等重放不重取价格。prepare 尚未调用业务 reserve，故其失败可确定释放本候选预留的运行镜像；业务 reserve 的提交歧义仍按原恢复机制保留引用。采集和估值投影失败不会停止已受理的执行。没有用量或业务受理事实的候选价格绑定不构成执行统计。
+
+估值写入以明确的 usage projectionRevision 做比较更新，valuationRevision 独立单调增长；同步日志与用量共享任务提交水位，但分别占据计量单元。金额可见性仅影响查询投影，不修改平台持久估值。公开 API 的输入输出值类型不依赖持久端口，平台的能力适配由本模块 ports 声明并在唯一 wiring 装配。
+
+数值来源采用可选 `usageObservationsV1` 能力协商：平台仅对显式支持的新 Runner 请求采集，旧 info 请求维持原响应。规范数值附在既有 usage 事件中，独立严格合同保存原生记录、修订、四桶、覆盖与基线；运行过程不等待统计投影。根 final/step 先落入可靠执行日志，后续必须在原日志消费/过期之前留下独立持久数值来源，再由可重放后台消费者投影，不能依赖短期原日志保留期。
+
+Session 数值副本在与原事件相同的事务内提交，但独立保留；后台只读取原日志已证明连续的水位。已发送但尚未确认的页固定上界，避免丢失确认期间新事件改变重放内容。业务 owner 以不可变执行资料核对来源后，观测 owner 提交数值账本及游标，最后确认 Session 来源；controller 的周期工作可合并并发、停止等待当前事务及重启恢复，错误来源不阻塞其他执行。
+
+后台估值基于已提交用量投影的当前原生修订读取模型证据，而非直接拿本次页中的最后一条；迟到旧证据重建不会误用旧模型。估值沿用独立修订、幂等回执和 CAS，模型/价格失败保留已提交 Token 与来源待处理状态，金额未知保持 null，不选择运行时默认模型。
+
 ## 9. 实施测试矩阵
 
 - 领域：互斥 Token、缓存包含关系、delta/cumulative、下调修订、父子 scope、unknown vs zero、币种和价格版本。
@@ -146,3 +174,22 @@ release 在切流时写角色映射历史；prod/preview 筛选以事件发生�
 - 故障：source persist/ledger/checkpoint 各边界断点、duplicate/late/gap、部分系统采集失败、价格服务不可用。
 - 浏览器：长列表末行新路由/Dialog、返回位置、Esc/焦点、390/768/1440px、双语/主题、运行中段、缺失状态。
 - 实机：两个项目不同权限、至少业务/开发/平台测试三种来源，驱动固定版本，指标与 owner/资源 UID 对账；本次设计不创建这些真实资源。
+
+
+## 13. OpenCode 实际模型补全
+
+根调用的 step_finish 数值先持久化；OpenCode driver 按本次子进程的最终环境解析原生 SQLite，仅以 step.id/sessionID/messageID 精确关联 assistant 消息的 providerID/modelID。依据为官方 v1.18.29 的 `packages/core/src/session/sql.ts`、`packages/opencode/src/session/message-v2.ts` 和 `packages/core/src/database/database.ts`。支持 OPENCODE_DB 绝对/数据目录相对路径；:memory:、缺路径或读失败保持未知，不推断配置默认模型。标准发布通道使用 opencode.db；自定义通道须给出原生 OPENCODE_DB 才能定位。
+
+同 record 可由 modelRef=null 单向补全实际引用；已有非空引用改变仍为冲突。原生数值不增加第二条 record。每个 Agent 保留最多 200 条待补模型证据，在本轮进程退出后、completed/cancelled 之前重试一次，仅发 usageCapture，不重发旧 BusinessUsage。超出容量留下明确诊断；未恢复的记录继续未定价，不将短期队列当成永久补采保证。已证实模型按原生 session/part 身份保留，短暂读失败后的数值修订继续使用该证据。Claude provider、原生子 Agent 和长期补采另验，不在此批次宣告完成。
+
+
+补充：模型元数据的原生证据修订保存为 projection.modelRevision；只补全未知模型时允许它晚于已接受数字 revision。下降样本不改变 Token 贡献、水位和 partial，但其可靠实际模型可以补齐计价。估值按 modelRevision 读取原生模型证据，旧投影缺该字段时沿用数字 revision。已有模型冲突与 invalid-final 不能覆盖证据；金额继续只使用 CNY。
+
+
+## 正式统计首个读取闭环
+
+首批正式读取使用 PostgreSQL repeatable-read 同一快照，Business Task owner 提供旧协议与 v3 任务/尝试事实，observability owner 读取 canonical 用量、独立估值和项目费用可见性。跨模块的 Executor 仅由 wiring 交给 owner 的只读工厂；应用层只依赖数值快照，不读取其他模块表。按任务开始时间选择生命周期 cohort，最多 200 任务、2,000 尝试和20,000用量/估值记录；截断、未知和零独立表达。
+
+项目与系统分别提供 DTO 和 HTTP 入口。系统页显式管理员读取；项目页即使由管理员进入也采用项目费用策略和项目字段，不带内部模型或价格配置。模型在系统统计中先按已观测的不透明引用分布，不猜默认模型。业务任务、Agent/命令、各尝试、项目和系统总数只相加互斥 canonical 贡献；原生父子覆盖先归一，不能重复计费。
+
+对应正式页提供总览、任务/Agent 下钻、人民币消耗、性能/质量，URL 保留时间与选择，Card/Stack/ActionRow/DataTable/Tabs 负责布局。此首个读取闭环的来源范围明确为业务任务；开发/档位测试、服务RED、容量与完整异常仍按已批准总计划继续接入，不能由首批查询冒充完成。

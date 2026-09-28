@@ -115,12 +115,24 @@ describe('原生终端附着', () => {
     const f = fixture({ renewMs: 5 }); await ready(f);
     await f.attachment.claim();
     await Bun.sleep(30); expect(claimTypes(f)).toBe(1);
-    f.attachment.setActive(true); await Bun.sleep(30);
-    const whileActive = claimTypes(f); expect(whileActive).toBeGreaterThan(2);
-    f.attachment.setActive(false); await Bun.sleep(5); const stopped = claimTypes(f); await Bun.sleep(30);
-    expect(claimTypes(f)).toBe(stopped);
-    f.attachment.setActive(true); await Bun.sleep(30); expect(claimTypes(f)).toBeGreaterThan(stopped);
-    f.attachment.dispose();
+    // 全量门禁中事件循环可能超过 30ms 才调度一次；以真实续约回执证明恢复，不能假设计时器次数。
+    const renewed = (count: number) => new Promise<void>((resolve, reject) => {
+      const original = f.control.result;
+      const timeout = setTimeout(() => { f.control.result = original; reject(new Error('terminal renewal did not arrive')); }, 2000);
+      f.control.result = async () => {
+        const result = await original();
+        if (claimTypes(f) >= count) { clearTimeout(timeout); f.control.result = original; resolve(); }
+        return result;
+      };
+    });
+    try {
+      const first = renewed(3); f.attachment.setActive(true); await first;
+      expect(claimTypes(f)).toBeGreaterThan(2);
+      f.attachment.setActive(false); const stopped = claimTypes(f); await Bun.sleep(30);
+      expect(claimTypes(f)).toBe(stopped);
+      const resumed = renewed(stopped + 1); f.attachment.setActive(true); await resumed;
+      expect(claimTypes(f)).toBeGreaterThan(stopped);
+    } finally { f.attachment.dispose(); }
   });
 
   // 2026-09-23 实机：离开终端 8 秒后 OpenCode 查询终端，xterm 的一串自动应答走 terminalInput 把租约续到了 39.5 秒才释放；

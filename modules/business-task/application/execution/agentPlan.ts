@@ -2,7 +2,7 @@ import { agentCommand, agentPayloadDigest } from './agentMaterial';
 import { prepareAgentResume } from './agentResume';
 import { randomBytes } from 'node:crypto';
 import { BusinessOutputMaterialSchema, BusinessMaterialRequestSchema, PLATFORM_AGENT_PERMISSION } from '@crewstation/contracts';
-import type { BusinessSubtaskV3Dto, ServiceId, TaskId, SubmitBusinessSubtaskV3 } from '@crewstation/contracts';
+import type { BusinessSubtaskV3Dto, ProjectId, ServiceId, TaskId, SubmitBusinessSubtaskV3 } from '@crewstation/contracts';
 import { notFound, precondition, validation } from '@crewstation/kernel';
 import { materialSecretReferences, validateBusinessMaterial } from '../../domain/businessMaterials';
 import { requireBusinessAgent } from './capabilities';
@@ -60,4 +60,12 @@ export async function prepareAgentPlan(deps: BusinessExecutionDeps, parent: Exec
     if (!plan.runtimeImage) throw precondition('业务 Agent 运行镜像选择未返回固定快照', { code: 'unsupported_capability' });
   }
   return { plan, payloadDigest: agentPayloadDigest(command, plan.nonce), view: { ...view, image: plan.runtimeImage?.image ?? resolved.image, agentProfileId: profile.id, computeProfileId: resolved.id, profileRevision: resolved.revision, ...(plan.runtimeImage ? { runtimeImage: plan.runtimeImage } : {}), ...(stored ? { materialDigest: stored.view.digest } : {}) } };
+}
+
+/** Freeze this attempt's price catalogue before durable admission can dispatch it.
+ * Replayed admission uses the prior receipt and never captures a new price head. */
+export async function acceptSubtaskObservation(deps: BusinessExecutionDeps, projectId: ProjectId, view: BusinessSubtaskV3Dto, plan?: ExecutionAgentPlan): Promise<void> {
+  await deps.executionObservations?.accept({ identity: { projectId, taskId: view.taskId, subtaskId: view.id,
+    executionId: view.executionId, executionGeneration: view.attempt },
+    profile: plan ? { id: plan.compute.id, revision: plan.compute.revision, protocol: plan.compute.protocol } : null });
 }

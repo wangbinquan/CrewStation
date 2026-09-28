@@ -50,6 +50,7 @@ export const RunnerHelloSchema = z.object({
     previewControl: z.literal(1).optional(),
     /** RFC-027: reliable business execution, materials and replay; omitted by older runners. */
     businessExecutionV3: z.literal(1).optional(),
+    usageObservationsV1: z.literal(1).optional(),
     /** RFC-028：逐容器初始化、工具检查、持久去重和命令门控。 */
     runtimeInitialization: z.literal(1).optional(),
     /** 2026-09-23：输入控制记住持有人、同一用户的另一视图直接转移，换人或释放即推 `terminalControl` 事件。同样用能力位而不升协议版本。 */
@@ -96,6 +97,7 @@ export const StartAgentCommandSchema = z.object({
 
 /** A v3 Agent has its own durable execution identity and async receipt. */
 export const StartBusinessAgentCommandSchema = z.object({
+  usageObservationsV1: z.literal(1).optional(),
   ...cmd('startBusinessAgent'), executionId: z.string().min(1).max(128), attempt: z.number().int().positive(),
   incarnation: z.uuid(), payloadDigest: z.string().regex(/^[a-f0-9]{64}$/),
   digestNonce: z.string().regex(/^[a-f0-9]{64}$/),

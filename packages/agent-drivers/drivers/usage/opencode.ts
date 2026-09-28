@@ -1,0 +1,14 @@
+import { buckets, common, identifier, object, readUsage, scope, type UsageNormalizer } from './capture';
+import { jsonHash } from '@crewstation/kernel';
+
+/** Pinned native step-finish fields; stdout has no reliable actual provider/model. */
+export const normalizeOpencodeUsage: UsageNormalizer = (raw, context, diagnostics) => {
+  if (raw.type !== 'step_finish') return [];
+  const part = object(raw.part), id = identifier(part?.id), tokens = object(part?.tokens), cache = object(tokens?.cache);
+  if (!id) { diagnostics.push('missing-step-identity'); return []; }
+  if (part?.sessionID !== undefined && part.sessionID !== context.sessionId) { diagnostics.push('step-session-mismatch'); return []; }
+  const usage = readUsage({ input: tokens?.input, output: tokens?.output, cacheRead: cache?.read, cacheWrite: cache?.write }, diagnostics);
+  return [{ ...common(raw, context), recordId: `opencode:step:${jsonHash({ session: context.sessionId, id })}`,
+    adapterVersion: 'opencode-step-finish/cs@1', reporting: 'delta', inclusion: 'self', scope: scope(context, 'request'),
+    coverage: buckets.every((key) => usage[key] !== null) ? 'complete' : 'partial', validity: 'valid', usage, basis: { kind: 'invocation' } }];
+};

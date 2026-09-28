@@ -85,12 +85,12 @@ test('资源说明结构不完整时给出会自动重读的错误，不让整�
   expect(page.search().tab).toBe('members');
 });
 
-describe('五个项目入口与旧链接兼容', () => {
-  test('项目名与 slug 取实际项目，五项生命周期顺序导航；概览页头请求一次仓库地址，不请求配额与形态之外的详情', async () => {
+describe('六个项目入口与旧链接兼容', () => {
+  test('项目名与 slug 取实际项目，六项生命周期顺序导航；概览页头请求一次仓库地址，不请求配额与形态之外的详情', async () => {
     const f = fixture(); page = await renderApp(`/projects/${projectId}`);
     const links = [...document.querySelectorAll('[aria-label="项目页面"] a')];
     // RFC-020 D2：「开发资源」不再是入口，左栏顺序即生命周期。
-    expect(links.map((link) => link.textContent)).toEqual(['概览', '开发', '发布与上线', '运行与诊断', '项目设置']);
+    expect(links.map((link) => link.textContent)).toEqual(['概览', '开发', '发布与上线', '运行与诊断', '运行观测与统计', '项目设置']);
     expect(page.text()).toContain('团队知识助理'); expect(page.text()).toContain('team-knowledge');
     expect(document.querySelector('header.bar')?.textContent).not.toContain(projectId);
     // 页头的仓库链接跟着摘要走：这份夹具没有摘要，就不该去读仓库或成员。

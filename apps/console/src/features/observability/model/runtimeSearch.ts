@@ -1,0 +1,16 @@
+export const RUNTIME_TABS = ['overview', 'tasks', 'agents', 'usage', 'performance'] as const;
+export type RuntimeTab = typeof RUNTIME_TABS[number];
+export interface RuntimeSearch { tab?: RuntimeTab; from?: string; to?: string; q?: string; state?: string; agent?: string; quality?: string }
+const date = (value: unknown) => typeof value === 'string' && Number.isFinite(Date.parse(value)) ? new Date(value).toISOString() : undefined;
+export function parseRuntimeSearch(raw: Record<string, unknown>): RuntimeSearch {
+  const text = (key: string) => typeof raw[key] === 'string' && raw[key]!.length <= 1000 ? raw[key] as string : undefined;
+  const tab = RUNTIME_TABS.find((value) => value === raw['tab']), from = date(raw['from']), to = date(raw['to']);
+  return { ...(tab ? { tab } : {}), ...(from && to && from < to ? { from, to } : {}),
+    ...(text('q') ? { q: text('q') } : {}), ...(text('state') ? { state: text('state') } : {}), ...(text('agent') ? { agent: text('agent') } : {}), ...(text('quality') ? { quality: text('quality') } : {}) };
+}
+export function runtimeWindow(search: RuntimeSearch, now = Date.now()) {
+  return { from: search.from ?? new Date(now - 86400000).toISOString(), to: search.to ?? new Date(now).toISOString(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+}
+export function localDateInput(iso: string): string {
+  const value = new Date(iso); return new Date(value.getTime() - value.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}

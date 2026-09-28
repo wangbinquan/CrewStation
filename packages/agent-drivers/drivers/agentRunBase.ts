@@ -2,6 +2,7 @@
 // ← agent-workflow `execution/agentProcess.ts` 的 outcome 映射思路，但那里的产物是一条汇总记录，
 // 这里的产物是一条 AgentEvent 流。
 
+import { createUsageObserver } from './usage/capture';
 import type { AgentEvent, AgentEventType, KnownAgentProtocol } from '@crewstation/contracts';
 import type { DriverAgentProcess, DriverAgentSpec, DriverLaunchContext } from '../contract/agentDriver';
 import { DriverStateError } from '../contract/agentDriver';
@@ -23,6 +24,7 @@ export abstract class AgentRunBase implements DriverAgentProcess {
   protected sessionId: string | undefined;
   protected cancelled = false;
   protected child: DriverChildProcess | undefined;
+  protected readonly usageObserver: ReturnType<typeof createUsageObserver> | undefined;
 
   constructor(
     protected readonly spec: DriverAgentSpec,
@@ -32,6 +34,8 @@ export abstract class AgentRunBase implements DriverAgentProcess {
   ) {
     this.events = createEventStream<AgentEvent>(spec.businessEvents ? 4 * 1024 * 1024 : undefined);
     this.event = createAgentEventFactory(spec.agentId);
+    this.usageObserver = spec.businessEvents && spec.usageObservationsV1 === 1 && prepared.normalizeUsage
+      ? createUsageObserver(prepared.normalizeUsage, spec.agentId, spec.resumeSessionId) : undefined;
   }
 
   abstract send(text: string): Promise<void>;
@@ -47,6 +51,10 @@ export abstract class AgentRunBase implements DriverAgentProcess {
     if (this.events.closed) return;
     this.push(this.event('cancelled', { result: this.result() }));
     this.close();
+  }
+
+  protected retryUsageModels(): void {
+    for (const usageCapture of this.usageObserver?.retryModels(Date.now()) ?? []) this.push(this.emit('usage', { usageCapture }));
   }
 
   protected push(event: AgentEvent): void {

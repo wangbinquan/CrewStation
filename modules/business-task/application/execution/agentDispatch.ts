@@ -1,4 +1,4 @@
-import type { ServiceId } from '@crewstation/contracts';
+import type { ServiceId, TaskId } from '@crewstation/contracts';
 import { BusinessExecutionInfoSchema, BusinessExecutionReceiptSchema } from '@crewstation/contracts';
 import { isPlatformError, newResourceId, precondition } from '@crewstation/kernel';
 import type { ExecutionAgentPlan } from '../../domain/executionAgent';
@@ -31,14 +31,15 @@ export async function dispatchBusinessAgent(deps: BusinessExecutionDeps, claimed
       else await fail(deps, claimed, 'secret_version_unavailable');
       return;
     }
-    const info = BusinessExecutionInfoSchema.parse(await deps.runner.sendCommand(env.id, { id: newResourceId(), type: 'businessExecutionInfo' }));
+    const info = await observationInfo(deps, env.id);
     if (incarnation && incarnation !== info.incarnation) { await unknown(deps, claimed, 'execution_incarnation_changed'); return; }
     if (!await deps.subtasks.checkpoint(claimed, info.incarnation)) {
       await deps.subtasks.settle(claimed, { dispatch: 'pending', runtimeAdmitted: true, view: claimed.view }); return;
     }
     incarnation = info.incarnation;
     const result = BusinessExecutionReceiptSchema.parse(await deps.runner.sendCommand(env.id, { id: newResourceId(), type: 'startBusinessAgent', executionId: claimed.view.executionId,
-      attempt: claimed.view.attempt, incarnation, payloadDigest: claimed.payloadDigest, digestNonce: plan.nonce, agent: command }));
+      attempt: claimed.view.attempt, incarnation, payloadDigest: claimed.payloadDigest, digestNonce: plan.nonce, agent: command,
+      ...(info.usageObservationsV1 === 1 ? { usageObservationsV1: 1 as const } : {}) }));
     await acceptReceipt(deps, { ...claimed, incarnation, runtimeAdmitted: true }, result);
   } catch (error) {
     const code = isPlatformError(error) ? String(error.details?.code ?? error.kind) : 'dispatch_unknown';
@@ -83,4 +84,14 @@ export async function cleanupAgentEnvironments(deps: BusinessExecutionDeps): Pro
     } catch { deps.logger.warn('business Agent environment cleanup pending', { subtaskId: subtask.view.id }); }
   }
   return count;
+}
+
+/** Capability omission is the legacy path; transient failures must not silently change an accepted launch. */
+async function observationInfo(deps: BusinessExecutionDeps, taskId: TaskId) {
+  try {
+    return BusinessExecutionInfoSchema.parse(await deps.runner.sendCommand(taskId, { id: newResourceId(), type: 'businessExecutionInfo', usageObservationsV1: 1 }));
+  } catch (error) {
+    if (!isPlatformError(error) || error.details?.code !== 'unsupported_capability' || error.details?.capability !== 'usageObservationsV1') throw error;
+    return BusinessExecutionInfoSchema.parse(await deps.runner.sendCommand(taskId, { id: newResourceId(), type: 'businessExecutionInfo' }));
+  }
 }

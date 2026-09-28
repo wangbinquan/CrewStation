@@ -6,12 +6,15 @@ import type { ExecutionLifecycle } from '../domain/executionLifecycle';
 import type { BusinessExecutionDeps } from './execution/dependencies';
 
 /** A returned winner or an explicit transaction rejection proves this candidate cannot be dispatched. */
-export async function admitWithRuntimeImage<T>(images: Pick<BusinessRuntimeImages, 'release'> | undefined, snapshot: RuntimeImageExecutionSnapshot | undefined, owner: { type: 'task' | 'agent'; id: TaskId }, admit: () => Promise<T>, admittedOwner: (result: T) => string | null | undefined): Promise<T> {
+export async function admitWithRuntimeImage<T>(images: Pick<BusinessRuntimeImages, 'release'> | undefined, snapshot: RuntimeImageExecutionSnapshot | undefined, owner: { type: 'task' | 'agent'; id: TaskId }, admit: () => Promise<T>, admittedOwner: (result: T) => string | null | undefined, prepare?: () => Promise<void>): Promise<T> {
   const release = async () => {
     if (!snapshot) return;
     if (!images?.release) throw new Error('未采用的镜像预留缺少释放端口');
     await images.release(snapshot, owner);
   };
+  // Preparation runs before business admission. Even a lost preparation reply
+  // proves reserve was never called, so its unused runtime image can be released.
+  try { await prepare?.(); } catch (error) { await release(); throw error; }
   let result: T;
   try { result = await admit(); }
   catch (error) {

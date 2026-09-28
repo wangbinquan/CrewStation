@@ -1,3 +1,4 @@
+import { tokenPricingMessages } from './tokenPricing.en-US';
 import { projectResourceMessages } from './projectResources.en-US';
 import type { MessagesShapedLike } from '../../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
@@ -8,6 +9,7 @@ import { settingsMessages } from './settings.en-US';
 import { rateLimitMessages } from './rateLimits.en-US';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
+  ...tokenPricingMessages,
   ...projectComputeMessages,
   ...settingsMessages,
   ...rateLimitMessages,

@@ -21,3 +21,14 @@ test('全部可靠命令都要求显式能力，旧 exec 保留旧协议', () =>
   }
   expect(() => assertLaunchSupported(RunnerCommandSchema.parse({ id: 'legacy', type: 'exec', execId: 'x', command: ['true'] }), capabilities)).not.toThrow();
 });
+
+
+test('RFC-034 observation negotiation preserves old info shape and refuses opt-in to an old Runner before RPC', () => {
+  const caps: RunnerHello['capabilities'] = { protocols: ['opencode'], preview: false, pty: true, businessExecutionV3: 1 };
+  const legacy = RunnerCommandSchema.parse({ id: 'old-info', type: 'businessExecutionInfo' });
+  const requested = RunnerCommandSchema.parse({ id: 'new-info', type: 'businessExecutionInfo', usageObservationsV1: 1 });
+  expect(() => assertLaunchSupported(legacy, caps)).not.toThrow();
+  expect(() => assertLaunchSupported(requested, caps)).toThrow('扩展用量');
+  expect(() => assertLaunchSupported(requested, { ...caps, usageObservationsV1: 1 })).not.toThrow();
+  expect(RunnerCommandSchema.safeParse({ ...requested, usageObservationsV1: 2 }).success).toBe(false);
+});

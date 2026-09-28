@@ -17,13 +17,13 @@ export interface AdminFieldProps {
   readonly title?: string;
   readonly disabled?: boolean;
   readonly readOnly?: boolean;
-  readonly inputMode?: 'numeric';
+  readonly inputMode?: 'numeric' | 'decimal';
   readonly hint?: string;
   readonly error?: string;
   /** 多行文本（脚本、文件模板）；给出行数即渲染 textarea。 */
   readonly rows?: number;
   readonly monospace?: boolean;
-  readonly type?: 'text' | 'password';
+  readonly type?: 'text' | 'password' | 'datetime-local';
 }
 
 /** 管理页表单里绑到字符串状态的一格；排版与外观全部来自 shared 的 FormField，这里只决定控件类型。 */

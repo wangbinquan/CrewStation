@@ -1,10 +1,21 @@
+import type { RuntimeFactPage, RuntimeFactQuery } from '@crewstation/contracts';
+import { executionValuations, valueRunnerUsagePage } from './application/executionValuations';
+import { drizzleExecutionValuations, drizzleUsageLedger, readRuntimeStatisticsLedger } from './adapters/persistence/drizzleUsageLedger';
+import { runnerUsageReconciliation, usageIngestion } from './application/usageIngestion';
+import { executionObservationUseCases, runtimeStatisticsUseCases } from './application/executionObservations';
+import { executionObservationRoutes } from './http/executionObservationRoutes';
+import type { ExecutionObservationAccess, RunnerUsageSource } from './ports/usageLedger';
 import { join } from 'node:path';
+import { drizzleCostVisibility, drizzleExecutionPricing, drizzleTokenPriceStore } from './adapters/persistence/drizzleTokenPricing';
+import { tokenPricingUseCases } from './application/tokenPricing';
+import { tokenPricingRoutes } from './http/tokenPricingRoutes';
+import type { PricingProfileDirectory } from './ports/tokenPricing';
 import type { ProjectId, UserId } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import type { K8sClient } from '@crewstation/k8s';
 import type { Clock, Logger } from '@crewstation/kernel';
-import { noopLogger, systemClock } from '@crewstation/kernel';
-import type { Database, MigrationSet } from '@crewstation/persistence';
+import { noopLogger, precondition, systemClock } from '@crewstation/kernel';
+import type { Database, Executor, MigrationSet } from '@crewstation/persistence';
 import { readMigrationDir } from '@crewstation/persistence';
 import type { Hono } from 'hono';
 import { kubernetesClusterObserver } from './adapters/k8s/clusterObserver';
@@ -20,6 +31,10 @@ import type { TraceChainSources } from './ports/traceSources';
 
 export interface ObservabilityModuleDeps {
   db: Database;
+  runtimeTasks?: (executor: Executor, query: RuntimeFactQuery) => Promise<RuntimeFactPage>;
+  pricingProfiles?: PricingProfileDirectory;
+  executionAccess?: ExecutionObservationAccess;
+  usageSource?: RunnerUsageSource;
   k8s: K8sClient;
   authorizer: ProjectAuthorizer;
   services: ServiceResolver;
@@ -56,16 +71,36 @@ export function createObservabilityModule(deps: ObservabilityModuleDeps): Observ
     authorizer: deps.authorizer, services: deps.services, slots: deps.slots, ...(deps.records ? { records: deps.records } : {}), clock: deps.clock ?? systemClock, logger,
   };
   const alerting = alertingUseCases(useCaseDeps);
-  const api: ObservabilityModuleApi = {
-    name: 'observability', ...logsAndHealthUseCases(useCaseDeps), ...alerting,
+  const ledger = drizzleUsageLedger(deps.db), executionPricing = drizzleExecutionPricing(deps.db);
+  const observations = executionObservationUseCases({ ledger, visibility: drizzleCostVisibility(deps.db), authorizer: deps.authorizer, clock: useCaseDeps.clock,
+    access: deps.executionAccess ?? { task: async () => { throw precondition('执行观测来源尚未接入'); } } });
+  const valuations = drizzleExecutionValuations(deps.db), valueUsage = executionValuations({ store: valuations, pricing: executionPricing, clock: useCaseDeps.clock });
+  const reconcileUsage = deps.usageSource ? runnerUsageReconciliation({ source: deps.usageSource, store: ledger, logger, value: valueRunnerUsagePage({ store: valuations, source: deps.usageSource, value: valueUsage }) }) : async () => 0;
+  const runtimeStatistics = runtimeStatisticsUseCases({ authorizer: deps.authorizer, clock: useCaseDeps.clock, source: {
+    read: (query) => deps.db.transaction(async (tx) => {
+      if (!deps.runtimeTasks) throw precondition('运行统计任务来源尚未接入');
+      return readRuntimeStatisticsLedger(tx, await deps.runtimeTasks(tx, query));
+    }, { isolationLevel: 'repeatable read', accessMode: 'read only' }),
+  } });
+  const api: ObservabilityModuleApi = { ...runtimeStatistics,
+    name: 'observability', reconcileExecutionUsage: reconcileUsage, valueExecutionUsage: valueUsage,
+    acceptExecutionPrice: (input) => executionPricing.accept(input, useCaseDeps.clock.now()), ...observations, ingestExecutionUsage: usageIngestion(ledger), ...logsAndHealthUseCases(useCaseDeps), ...alerting,
+    ...tokenPricingUseCases({ store: drizzleTokenPriceStore(deps.db), profiles: deps.pricingProfiles ?? { list: async () => [] }, clock: useCaseDeps.clock }),
     ...traceChainUseCases({ authorizer: deps.authorizer, chains: deps.traces, clock: useCaseDeps.clock }),
   };
   let timer: ReturnType<typeof setInterval> | undefined;
   const sweepAll = async (): Promise<void> => { for (const projectId of await (deps.listProjectIds?.() ?? Promise.resolve([]))) await alerting.sweepProject(projectId).catch((e: unknown) => logger.warn('alert sweep failed', { projectId, error: String(e) })); };
   return {
     api,
-    http: [observabilityRoutes(api, deps.isAdmin)],
-    workers: [{ start: () => { timer ??= setInterval(() => void sweepAll(), 30_000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } }],
+    http: [observabilityRoutes(api, deps.isAdmin), tokenPricingRoutes(api, deps.isAdmin), executionObservationRoutes(api, deps.isAdmin)],
+    workers: [...(deps.usageSource ? [executionUsageWorker(reconcileUsage, logger)] : []), { start: () => { timer ??= setInterval(() => void sweepAll(), 30_000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } }],
     migrations: observabilityMigrations,
   };
+}
+
+function executionUsageWorker(reconcile: () => Promise<number>, logger: Logger) {
+  let timer: ReturnType<typeof setInterval> | undefined, running: Promise<void> | undefined;
+  const tick = () => running ??= reconcile().then(() => {}, () => { logger.warn('execution usage source unavailable'); }).finally(() => { running = undefined; });
+  return { start: () => { if (!timer) { timer = setInterval(() => { void tick(); }, 1000); void tick(); } },
+    stop: async () => { if (timer) clearInterval(timer); timer = undefined; await running; } };
 }

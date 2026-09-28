@@ -14,6 +14,8 @@ export function assertLaunchSupported(command: RunnerCommand, capabilities: Runn
   if (BUSINESS_EXECUTION_COMMANDS.has(command.type) && capabilities.businessExecutionV3 !== 1) {
     throw new PlatformError('precondition', '当前任务容器未声明可靠业务执行能力', { code: 'unsupported_capability', capability: 'businessExecutionV3' });
   }
+  if ((command.type === 'startBusinessAgent' || command.type === 'businessExecutionInfo') && command.usageObservationsV1 === 1 && capabilities.usageObservationsV1 !== 1)
+    throw new PlatformError('precondition', '当前任务容器未声明扩展用量证据能力', { code: 'unsupported_capability', capability: 'usageObservationsV1' });
   if (command.type === 'startBusinessAgent') { assertLaunchSupported(command.agent, capabilities); return; }
   if (command.type !== 'startAgent' && command.type !== 'startAgentTerminal' && command.type !== 'probeTerminal') return;
   const material = command.beforeStart;

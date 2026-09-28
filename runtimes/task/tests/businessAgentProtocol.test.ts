@@ -19,14 +19,17 @@ test('durable Agent start over WS keeps native HOME, uses beforeStart and normal
   const drivers = echoDriverFactory(), tr = await startTestRunner(session.url, { businessJournalDir: journal, businessSessionDir: home }, { drivers }); cleanups.push(() => tr.dispose());
   await tr.runner.whenConnected();
   const info = RunnerResultPayloads.businessExecutionInfo.parse(await session.call({ id: 'info', type: 'businessExecutionInfo' }));
+  expect(info.usageObservationsV1).toBeUndefined();
+  const observed = RunnerResultPayloads.businessExecutionInfo.parse(await session.call({ id: 'observation-info', type: 'businessExecutionInfo', usageObservationsV1: 1 }));
+  expect(observed.usageObservationsV1).toBe(1);
   const agent = StartAgentCommandSchema.parse({ id: 'agent', type: 'startAgent', agentId: 'agent', processAttemptId: 'attempt-one', compute: 'profile', profileRevision: 1,
     launch: { protocol: 'opencode', binaryPath: '/usr/bin/opencode' }, permission: 'full', mode: 'interactive', initialPrompt: 'hello protected-model-secret agent',
     beforeStart: { profile: '01a0bf5d-8f4b-7001-8458-107366e7de39', revision: 1, contentHash: 'hash', steps: [], vars: { APP_VALUE: 'platform-value' }, secrets: { KEY: 'protected-model-secret' }, configFile: { kind: 'none' }, captureOutput: false } });
   const digestNonce = 'a'.repeat(64), payloadDigest = new Bun.CryptoHasher('sha256').update(businessAgentDigestInput(agent, digestNonce)).digest('hex');
-  const command = { id: 'start', type: 'startBusinessAgent', executionId: 'agent-execution', attempt: 1, incarnation: info.incarnation, payloadDigest, digestNonce, agent };
+  const command = { id: 'start', type: 'startBusinessAgent', usageObservationsV1: observed.usageObservationsV1, executionId: 'agent-execution', attempt: 1, incarnation: info.incarnation, payloadDigest, digestNonce, agent };
   const first = RunnerResultPayloads.businessExecution.parse(await session.call(command)); expect(first.result).toBeNull();
   await session.waitFor(() => drivers.starts.length === 1 ? true : undefined);
-  const started = drivers.starts[0]!; expect(started.context.env.HOME).toBe(home); expect(started.context.env.KEY).toBe('protected-model-secret'); expect(started.spec.businessEvents).toBe(true);
+  const started = drivers.starts[0]!; expect(started.context.env.HOME).toBe(home); expect(started.context.env.KEY).toBe('protected-model-secret'); expect(started.spec.businessEvents).toBe(true); expect(started.spec.usageObservationsV1).toBe(1);
   await session.call({ ...command, id: 'duplicate' }); expect(drivers.starts).toHaveLength(1);
   await expect(session.call({ ...command, id: 'mutated', agent: { ...agent, initialPrompt: 'changed' } })).rejects.toMatchObject({ code: 'execution_conflict' });
   await session.call({ id: 'cancel', type: 'cancelBusinessExecution', executionId: command.executionId });

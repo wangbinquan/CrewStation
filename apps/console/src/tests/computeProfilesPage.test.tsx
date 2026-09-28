@@ -52,7 +52,7 @@ describe('算力档位列表（RFC-006）', () => {
   test('一张表就是全部：没有运行环境页签，五列保留关键状态，详细配置进入弹窗', async () => {
     await open();
     const text = page!.text();
-    expect(document.querySelectorAll('[role="tab"]')).toHaveLength(0);
+    expect([...document.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent)).toEqual(['算力档位', 'Token 成本']);
     expect(text).not.toContain('运行环境');
     for (const header of ['档位', '执行配置', '状态', '操作']) expect([...document.querySelectorAll('th')].map((th) => th.textContent)).toContain(header);
     const claude = row('claude-daily').textContent!;

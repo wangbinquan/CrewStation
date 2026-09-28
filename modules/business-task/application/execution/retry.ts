@@ -1,5 +1,5 @@
 import { dispatchBusinessAgent } from './agentDispatch';
-import { prepareAgentPlan } from './agentPlan';
+import { acceptSubtaskObservation, prepareAgentPlan } from './agentPlan';
 import { prepareAgentFreshRetry } from './agentResume';
 import { admitWithRuntimeImage } from '../taskRuntimeImage';
 import { subtaskResponse } from './subtasks';
@@ -59,7 +59,7 @@ export function executionRetryUseCases(deps: BusinessExecutionDeps): Pick<Busine
         sealedPayload: await deps.cipher.seal(JSON.stringify(agent?.plan ?? { ...payload, requestKey })), payloadDigest: agent?.payloadDigest ?? previous.payloadDigest, fenced: previous.fenced, epoch: fence?.epoch ?? null,
         view: agent?.view ?? view,
         }, authorization);
-      }, (result) => result.subtask.runtimeTaskId);
+      }, (result) => result.subtask.runtimeTaskId, () => acceptSubtaskObservation(deps, parent.intent.projectId, agent?.view ?? view, agent?.plan));
       const claim = await deps.subtasks.claim(newResourceId(), saved.subtask.view.id);
       if (claim) { if (claim.view.kind === 'agent') await dispatchBusinessAgent(deps, claim); else await dispatchBusinessCommand(deps, claim); }
       return subtaskResponse((await deps.subtasks.get(context.serviceId, taskId, saved.subtask.view.id))!, saved.created);

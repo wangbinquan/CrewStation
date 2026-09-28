@@ -63,8 +63,12 @@ export class ResidentAgentRun extends AgentRunBase {
   }
 
   private async consume(stream: DriverChildProcessWithStdin): Promise<void> {
-    const result = await pumpTurn(stream, {
+    let captureUsage = this.usageObserver?.beginTurn();
+    let result: Awaited<ReturnType<typeof pumpTurn>>;
+    try {
+      result = await pumpTurn(stream, {
       businessEvents: this.spec.businessEvents,
+      captureUsage: (event, at) => captureUsage?.(event, at),
       host: this.context.host,
       logger: this.context.logger,
       usage: this.usage,
@@ -72,10 +76,13 @@ export class ResidentAgentRun extends AgentRunBase {
       push: (event: AgentEvent) => this.push(event),
       parseEvent: (line) => this.prepared.parseEvent(line),
       onSessionId: (sessionId) => this.claimSession(sessionId),
-      onTurnFinished: (error) => this.onTurnFinished(error),
+      onTurnFinished: (error) => { this.onTurnFinished(error); captureUsage = this.usageObserver?.beginTurn(); },
     });
-    this.stream = undefined;
-    this.child = undefined;
+    } finally {
+      this.retryUsageModels();
+      this.stream = undefined;
+      this.child = undefined;
+    }
     if (this.cancelled) return;
     if (result.exitCode !== 0) {
       const code = this.prepared.detectSessionNotFound(result.stderrTail) ? 'session_not_found' : 'agent_failed';

@@ -3,6 +3,14 @@ import { loadPlatformSettings, portFrom } from './platformSettings';
 
 const base = { CS_DATABASE_URL: 'postgres://test:test@localhost/test', CS_SECRET_KEY: 'test', POD_IP: '10.244.0.106' };
 
+test('RF1 object storage needs an explicit local installation mode; spelling errors cannot bypass production durability', () => {
+  expect(loadPlatformSettings(base).objectStorage?.deploymentMode).toBe('production');
+  expect(loadPlatformSettings(base).objectStorage?.apiUrl).toBe(`http://api.${loadPlatformSettings(base).serviceDomain}:8088`);
+  expect(loadPlatformSettings({ ...base, CS_OBJECT_API_URL: 'https://api.test:8088' }).objectStorage?.apiUrl).toBe('https://api.test:8088');
+  expect(loadPlatformSettings({ ...base, CS_OBJECT_STORAGE_MODE: 'local' }).objectStorage?.deploymentMode).toBe('local');
+  expect(() => loadPlatformSettings({ ...base, CS_OBJECT_STORAGE_MODE: 'Local' })).toThrow('CS_OBJECT_STORAGE_MODE');
+});
+
 test('缺省任务镜像与受管底座一致，准入可以解析摘要；显式镜像配置不被替换', () => {
   const defaults = loadPlatformSettings(base);
   expect(defaults.taskImage).toBe(`${defaults.registryBase}/${defaults.baseImage.repository}:${defaults.baseImage.tag}`);

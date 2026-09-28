@@ -1,3 +1,4 @@
+import { tokenPricingMessages } from './tokenPricing.zh-CN';
 import { projectResourceMessages } from './projectResources.zh-CN';
 import type { Messages } from '../../../shared/lib/i18n';
 import { authMessages } from './auth.zh-CN';
@@ -7,6 +8,7 @@ import { settingsMessages } from './settings.zh-CN';
 import { rateLimitMessages } from './rateLimits.zh-CN';
 
 export const messages = {
+  ...tokenPricingMessages,
   ...projectComputeMessages,
   ...settingsMessages,
   ...rateLimitMessages,

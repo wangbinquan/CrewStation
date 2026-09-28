@@ -1,4 +1,4 @@
-import { prepareAgentPlan } from './agentPlan';
+import { acceptSubtaskObservation, prepareAgentPlan } from './agentPlan';
 import { admitWithRuntimeImage } from '../taskRuntimeImage';
 import { dispatchBusinessAgent, cleanupAgentEnvironments } from './agentDispatch';
 import { businessCommandDigestInput, BusinessExecutionInfoSchema } from '@crewstation/contracts';
@@ -52,7 +52,7 @@ export function executionSubtaskUseCases(deps: BusinessExecutionDeps): Pick<Busi
         sealedPayload: await deps.cipher.seal(JSON.stringify(agent?.plan ?? { ...payload, requestKey: input.requestKey })),
         payloadDigest: agent?.payloadDigest ?? commandDigest,
         fenced: context.parent.intent.tasksSpec.executionControl === 'fenced', epoch: input.fence?.epoch ?? null, view: agent?.view ?? view,
-      }, authority), (result) => result.subtask.runtimeTaskId);
+      }, authority), (result) => result.subtask.runtimeTaskId, () => acceptSubtaskObservation(deps, context.parent.intent.projectId, agent?.view ?? view, agent?.plan));
       await progress(saved.subtask.view.id);
       return subtaskResponse((await deps.subtasks.get(context.serviceId, taskId, saved.subtask.view.id))!, saved.created);
     },

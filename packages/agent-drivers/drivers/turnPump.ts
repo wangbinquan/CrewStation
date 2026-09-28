@@ -2,6 +2,7 @@
 // ← agent-workflow `execution/managedProcess.ts` 的流泵与排水段，去掉 Windows spool、
 // 预激活 launcher、PID 收据与行截断回调（行上限由宿主 streamPump.ts 负责）。
 
+import type { UsageCapture } from './usage/capture';
 import type { AgentEvent, AgentEventType } from '@crewstation/contracts';
 import type { Logger } from '@crewstation/kernel';
 import type { DriverChildProcess, ProcessHost } from '../contract/processHost';
@@ -15,6 +16,7 @@ export const DRAIN_GRACE_MS = 2000;
 
 export interface TurnPumpDeps {
   businessEvents?: boolean;
+  captureUsage?: UsageCapture;
   host: ProcessHost;
   logger: Logger;
   usage: TokenUsage;
@@ -66,7 +68,10 @@ function handleStdoutLine(line: string, deps: TurnPumpDeps): void {
     return;
   }
   accumulateTokens(deps.usage, event);
-  if (deps.businessEvents && event.businessUsage) deps.push(deps.emit('usage', { usage: event.businessUsage }, event.timestamp));
+  if (deps.businessEvents && event.businessUsage) {
+    const usageCapture = deps.captureUsage?.(event, Date.now());
+    deps.push(deps.emit('usage', { usage: event.businessUsage, ...(usageCapture ? { usageCapture } : {}) }, event.timestamp));
+  }
   if (event.sessionId !== undefined) deps.onSessionId(event.sessionId);
   const mapped = toAgentEvent(event, deps.emit);
   if (mapped !== null) deps.push(mapped);

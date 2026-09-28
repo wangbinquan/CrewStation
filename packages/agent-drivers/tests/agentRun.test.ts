@@ -1,3 +1,4 @@
+import { Database } from 'bun:sqlite';
 // 运行循环：用假 ProcessHost 回放 stdout，不需要安装任何真实 CLI。
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { rmSync } from 'node:fs';
@@ -278,3 +279,87 @@ async function waitFor(predicate: () => boolean, timeoutMs = 2000): Promise<void
     await Bun.sleep(2);
   }
 }
+
+
+test('RFC-034 opt-in root captures travel with legacy usage events while unselected drivers stay unchanged', async () => {
+  recordOpencodeBinaryVersion('/bin/opencode', '1.18.29');
+  const frame = JSON.stringify({ type: 'step_finish', sessionID: 'native-usage', part: { id: 'step-usage', tokens: { input: 9, output: 2, cache: { read: 3, write: 0 } } } });
+  for (const enabled of [false, true]) {
+    const host = createFakeProcessHost([{ stdout: [frame] }]);
+    const events = await collect(createOpencodeDriver(() => '/bin/opencode').start(openSpec({ businessEvents: true, ...(enabled ? { usageObservationsV1: 1 as const } : {}) }), context(host)));
+    const usage = events.find((event) => event.type === 'usage')!;
+    expect(usage.usage?.inputTokens).toBe(9);
+    if (enabled) expect(usage.usageCapture?.measurements[0]).toMatchObject({ actualModel: null, usage: { input: '9', output: '2', cacheRead: '3', cacheWrite: '0' } });
+    else expect(usage.usageCapture).toBeUndefined();
+  }
+});
+
+test('RFC-034 resident Claude retains tree identity and advances coverage without including the configured model', async () => {
+  let turns = 0;
+  const host = createFakeProcessHost([{ stdout: [], onFrame: () => {
+    turns++; return [JSON.stringify({ type: 'result', uuid: `result-${turns}`, session_id: 'resident-native', usage: { input_tokens: turns }, modelUsage: { 'actual-model': { inputTokens: turns, outputTokens: 2, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 } } })];
+  } }]);
+  const agent = createClaudeCodeDriver(() => '/bin/claude').start(spec({ mode: 'interactive', businessEvents: true, usageObservationsV1: 1, resumeSessionId: 'resident-native' }), context(host));
+  const events: AgentEvent[] = [];
+  const done = (async () => { for await (const event of agent.events) events.push(event); })();
+  await waitFor(() => events.some((event) => event.type === 'status'));
+  await agent.send('another turn');
+  await waitFor(() => events.filter((event) => event.type === 'status').length === 2);
+  await agent.cancel(); await done;
+  const evidence = events.flatMap((event) => event.usageCapture?.measurements ?? []);
+  expect(evidence).toHaveLength(2); expect(evidence[0]?.recordId).toBe(evidence[1]?.recordId);
+  expect(evidence.map((item) => item.coveredThroughTurn)).toEqual([0, 1]);
+  expect(evidence[1]).toMatchObject({ actualModel: { model: 'actual-model', provider: null }, basis: { kind: 'native-session', baseline: null } });
+});
+
+
+test('RFC-034 native model retry precedes success or failure and never repeats legacy usage', async () => {
+  recordOpencodeBinaryVersion('/bin/opencode', '1.18.29');
+  const frame = JSON.stringify({ type: 'step_finish', sessionID: 'native-usage', part: { id: 'step-usage', messageID: 'message-usage', sessionID: 'native-usage', tokens: { input: 9, output: 2, cache: { read: 3, write: 0 } } } });
+  for (const exitCode of [0, 1, 143]) {
+    const host = createFakeProcessHost([{ stdout: [frame], exitCode, ...(exitCode === 143 ? { onFrame: () => [] } : {}) }]), ctx = context(host), file = join(ctx.runDir!, 'opencode.db');
+    ctx.env.OPENCODE_DB = file;
+    const pump = host.pumpLines;
+    host.pumpLines = (stream, onLine) => pump(stream, (line) => {
+      onLine(line);
+      const db = new Database(file);
+      db.exec('CREATE TABLE message(id TEXT PRIMARY KEY, session_id TEXT, data TEXT); CREATE TABLE part(id TEXT PRIMARY KEY, message_id TEXT, session_id TEXT, data TEXT)');
+      db.query('INSERT INTO message VALUES(?,?,?)').run('message-usage', 'native-usage', JSON.stringify({ role: 'assistant', providerID: 'actual-provider', modelID: 'actual-model' }));
+      db.query('INSERT INTO part VALUES(?,?,?,?)').run('step-usage', 'message-usage', 'native-usage', JSON.stringify({ type: 'step-finish' })); db.close();
+    });
+    const agent = createOpencodeDriver(() => '/bin/opencode').start(openSpec({ businessEvents: true, usageObservationsV1: 1 }), ctx);
+    const collecting = collect(agent);
+    if (exitCode === 143) { await waitFor(() => host.spawns.length === 1); await agent.cancel(); }
+    const events = await collecting;
+    const usage = events.filter((e) => e.type === 'usage');
+    expect(usage).toHaveLength(2); expect(usage.filter((e) => e.usage)).toHaveLength(1);
+    expect(usage[0]!.usageCapture!.measurements[0]!.actualModel).toBeNull();
+    expect(usage[1]!.usageCapture!.measurements[0]!.actualModel).toMatchObject({ provider: 'actual-provider', model: 'actual-model' });
+    expect(usage[1]!.usageCapture!.measurements[0]!.recordId).toBe(usage[0]!.usageCapture!.measurements[0]!.recordId);
+    expect(events.at(-1)?.type).toBe(exitCode === 0 ? 'completed' : exitCode === 143 ? 'cancelled' : 'error');
+    expect(events.at(-1)?.result?.usage).toMatchObject({ input: 9, output: 2, total: 14 });
+  }
+});
+
+
+test('RFC-034 output-pump failure still emits the model revision before surfacing the original error', async () => {
+  recordOpencodeBinaryVersion('/bin/opencode', '1.18.29');
+  const frame = JSON.stringify({ type: 'step_finish', sessionID: 'native', part: { id: 'step', messageID: 'message', sessionID: 'native', tokens: { input: 9, output: 2, cache: { read: 3, write: 0 } } } });
+  const host = createFakeProcessHost([{ stdout: [frame] }]), ctx = context(host), file = join(ctx.runDir!, 'native.db'); ctx.env.OPENCODE_DB = file;
+  const original = host.pumpLines, failure = new Error('stdout read interrupted');
+  host.pumpLines = (stream, onLine) => original(stream, (line) => {
+    onLine(line);
+    const db = new Database(file);
+    db.exec('CREATE TABLE message(id TEXT PRIMARY KEY, session_id TEXT, data TEXT); CREATE TABLE part(id TEXT PRIMARY KEY, message_id TEXT, session_id TEXT, data TEXT)');
+    db.query('INSERT INTO message VALUES(?,?,?)').run('message', 'native', JSON.stringify({ role: 'assistant', providerID: 'actual', modelID: 'model' }));
+    db.query('INSERT INTO part VALUES(?,?,?,?)').run('step', 'message', 'native', JSON.stringify({ type: 'step-finish' })); db.close();
+    throw failure;
+  });
+  const events: AgentEvent[] = [], agent = createOpencodeDriver(() => '/bin/opencode').start(openSpec({ businessEvents: true, usageObservationsV1: 1 }), ctx);
+  let caught: unknown;
+  try { for await (const event of agent.events) events.push(event); } catch (error) { caught = error; }
+  expect(caught).toBe(failure);
+  const usage = events.filter((event) => event.type === 'usage'); expect(usage).toHaveLength(2);
+  expect(usage.filter((event) => event.usage)).toHaveLength(1);
+  expect(usage[1]!.usageCapture!.measurements[0]!.actualModel).toMatchObject({ provider: 'actual', model: 'model' });
+});

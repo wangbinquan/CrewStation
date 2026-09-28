@@ -13,6 +13,7 @@ export interface DriverAgentSpec {
   businessSkills?: BusinessMaterialRequest['skills'];
   /** RFC-027: opt-in usage frames; legacy Agent event ordering is unchanged. */
   businessEvents?: boolean;
+  usageObservationsV1?: 1;
   agentId: string;
   /** 算力档位名（RFC-001）：平台透传，驱动不解释，只在 started 事件里回显。 */
   compute: string;

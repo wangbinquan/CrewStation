@@ -53,8 +53,11 @@ export class ChainedAgentRun extends AgentRunBase {
       return;
     }
     this.child = child;
-    const result = await pumpTurn(child, {
+    let result: Awaited<ReturnType<typeof pumpTurn>>;
+    try {
+      result = await pumpTurn(child, {
       businessEvents: this.spec.businessEvents,
+      captureUsage: this.usageObserver?.beginTurn(),
       host: this.context.host,
       logger: this.context.logger,
       usage: this.usage,
@@ -66,7 +69,10 @@ export class ChainedAgentRun extends AgentRunBase {
         turnError = error;
       },
     });
-    this.child = undefined;
+    } finally {
+      this.retryUsageModels();
+      this.child = undefined;
+    }
     if (this.cancelled) return;
     this.concludeTurn(result, turnError);
   }

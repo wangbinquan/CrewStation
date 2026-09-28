@@ -1,3 +1,4 @@
+import { RunnerUsageCaptureSchema } from './usageObservation';
 import { BusinessUsageSchema } from '../api/business/events';
 import { z } from 'zod';
 import { AgentPermissionSchema } from '../manifest/tasks';
@@ -14,6 +15,8 @@ export const AgentEventSchema = z.object({
   at: z.iso.datetime(),
   type: AgentEventTypeSchema,
   usage: BusinessUsageSchema.optional(),
+  /** RFC-034 opt-in numeric evidence; the legacy BusinessUsage payload stays unchanged. */
+  usageCapture: RunnerUsageCaptureSchema.optional(),
   /** CLI 原生会话 ID，出现后可用于 resume。 */
   sessionId: z.string().optional(),
   /**

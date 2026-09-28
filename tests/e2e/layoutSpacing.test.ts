@@ -69,6 +69,28 @@ async function sampleToIssueSpacing(page: Page) {
 }
 
 describe.skipIf(!session)('卡片操作区的真实布局间距', () => {
+  test.each([1280, 390])('%dpx：算力页签内的档位与镜像卡片保持标准目录间距', async (width) => {
+    const page = session!.admin;
+    await viewport(page, width);
+    await open(page, '/admin/compute');
+    const actual = await page.eval<{ gap: number; expected: number; overflow: number }>(`(() => {
+      const panel = document.querySelector('main [role="tabpanel"]');
+      const create = [...(panel?.querySelectorAll('button') ?? [])].find((node) => node.textContent.trim() === '新建档位');
+      const heading = [...(panel?.querySelectorAll('h2') ?? [])].find((node) => node.textContent.trim() === '平台仓库与底座镜像');
+      const profiles = create?.closest('section'), images = heading?.closest('section');
+      if (!profiles || !images) throw new Error('Missing compute profile or runtime image card');
+      return {
+        gap: images.getBoundingClientRect().top - profiles.getBoundingClientRect().bottom,
+        expected: Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cs-space-4')),
+        overflow: document.documentElement.scrollWidth - innerWidth,
+      };
+    })()`);
+    expect(actual.gap).toBeCloseTo(actual.expected, 0);
+    expect(actual.gap).toBeGreaterThan(0);
+    expect(actual.overflow).toBeLessThanOrEqual(1);
+    expect(page.takeErrors()).toEqual([]);
+  }, 45_000);
+
   test.each([1280, 390])('%dpx：镜像示例与凭据操作之间留白，按钮保持自然尺寸', async (width) => {
     const page = session!.admin;
     await viewport(page, width);

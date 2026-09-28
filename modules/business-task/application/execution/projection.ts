@@ -1,11 +1,11 @@
 import { executionRunnerTaskId } from '../../domain/executionSubtask';
-import { notFound } from '@crewstation/kernel';
+import { conflict, notFound } from '@crewstation/kernel';
 import type { BusinessExecutionApi, BusinessExecutionCaller } from '../../api/executionApi';
 import type { TaskId } from '@crewstation/contracts';
 import type { BusinessExecutionDeps } from './dependencies';
 import { executionSource } from './source';
 
-export function executionProjectionUseCases(deps: BusinessExecutionDeps): Pick<BusinessExecutionApi, 'events' | 'output'> & { progressProjection(): Promise<number> } {
+export function executionProjectionUseCases(deps: BusinessExecutionDeps): Pick<BusinessExecutionApi, 'events' | 'output' | 'resolveUsageSource'> & { progressProjection(): Promise<number> } {
   const source = executionSource(deps);
   const owned = async (caller: BusinessExecutionCaller, taskId: TaskId) => {
     const context = await source(caller);
@@ -13,6 +13,16 @@ export function executionProjectionUseCases(deps: BusinessExecutionDeps): Pick<B
     return context.serviceId;
   };
   return {
+    resolveUsageSource: async (input) => {
+      const subtask = await deps.subtasks.forRuntimeExecution(input.runtimeTaskId, input.executionId);
+      if (!subtask) return undefined;
+      if (subtask.view.attempt !== input.attempt || subtask.incarnation !== input.incarnation || subtask.payloadDigest !== input.payloadDigest)
+        throw conflict('数值来源与业务执行代次不一致');
+      const parent = await deps.operations.forTask(subtask.serviceId, subtask.taskId);
+      if (!parent) return undefined;
+      return { projectId: parent.intent.projectId, taskId: subtask.taskId, subtaskId: subtask.view.id,
+        executionId: subtask.view.executionId, executionGeneration: subtask.view.attempt };
+    },
     events: async (caller, taskId, query) => deps.projection.events(await owned(caller, taskId), taskId, query),
     output: async (caller, taskId, subtaskId) => deps.projection.output(await owned(caller, taskId), taskId, subtaskId),
     progressProjection: async () => {
