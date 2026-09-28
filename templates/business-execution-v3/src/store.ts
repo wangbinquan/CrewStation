@@ -4,7 +4,7 @@ import type { RecoveryRequest } from './recovery';
 
 export class Store {
   readonly db: SQL;
-  constructor(url: string) { this.db = new SQL(url); }
+  constructor(url: string) { this.db = new SQL(url, { max: 2, idleTimeout: 30 }); }
   async migrate(): Promise<void> {
     await this.db`CREATE TABLE IF NOT EXISTS execution_sample_control (id integer PRIMARY KEY CHECK(id=1), epoch bigint NOT NULL, owner text, phase text NOT NULL, expires_at timestamptz)`;
     await this.db`CREATE TABLE IF NOT EXISTS execution_sample_requests (request_key text PRIMARY KEY, digest text NOT NULL, response jsonb)`;

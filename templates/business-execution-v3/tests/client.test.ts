@@ -75,6 +75,19 @@ describe.skipIf(!available)('RFC-027 standalone fenced service customer', () => 
     expect(await (await f.request(`/proof?taskId=${f.taskId}`)).json()).toMatchObject({ contentBase64: btoa('preserved') });
     expect((await f.request('/actions', {})).status).toBe(400);
   });
+  test('two service replicas bound their database connections during concurrent requests', async () => {
+    await fixture();
+    const other = new Store(database.url);
+    try {
+      // Real two-replica rollout exhausted the shared PG server with the default ten connections per process.
+      const connections = await Promise.all([store, other].map(async (replica) => {
+        const rows = await Promise.all(Array.from({ length: 6 }, () => replica.db`SELECT pg_backend_pid() AS pid, pg_sleep(0.02)`));
+        return new Set(rows.map((result) => result[0]!.pid));
+      }));
+      for (const active of connections) expect(active.size).toBeLessThanOrEqual(2);
+      expect(new Set(connections.flatMap((active) => [...active])).size).toBeLessThanOrEqual(4);
+    } finally { await other.db.close(); }
+  });
   test('new epoch rejects old application transactions; migration permits drain and route delay never activates', async () => {
     const f = await fixture(); await store.migrate(); await f.controller.tick();
     const old = f.controller.fence;
