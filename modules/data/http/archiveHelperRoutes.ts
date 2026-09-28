@@ -15,7 +15,7 @@ export function archiveHelperRoutes(api: ArchiveHelperApi) {
     const { id } = parseParams(c, z.object({ id: ResourceIdSchema }));
     const authorization = c.req.header('authorization');
     if (!authorization?.startsWith('Bearer ') || authorization.length > 263) throw forbidden('缺少归档助手凭证');
-    const podUid = ResourceIdSchema.safeParse(c.req.header('x-cs-archive-pod-uid'));
+    const podUid = z.uuid().safeParse(c.req.header('x-cs-archive-pod-uid'));
     if (!podUid.success) throw forbidden('缺少归档助手 Pod 身份');
     return { id, token: authorization.slice(7), podUid: podUid.data };
   };

@@ -60,7 +60,8 @@ export function archiveExecution(deps: ArchiveExecutionDeps): ArchiveExecutionAp
           if (e.state === 'stopping') { await stop(e); continue; }
           if (e.state !== 'admitted') continue;
           const record = await store.record(e.id), pod = record?.children?.find((child) => child.kind === 'Pod');
-          if (e.expiresAt && runtime.clock.now().getTime() >= Date.parse(e.expiresAt) - 10 * 60_000 || e.podUid && pod && ['Succeeded', 'Failed', 'absent'].includes(pod.phase)) await stop(e);
+          const terminated = pod?.uid && ['Succeeded', 'Failed'].includes(pod.phase) || e.podUid && pod?.phase === 'absent';
+          if (terminated || e.expiresAt && runtime.clock.now().getTime() >= Date.parse(e.expiresAt) - 10 * 60_000) await stop(e);
         } catch (error) { runtime.logger.warn('archive execution reconciliation pending', { id: e.id, error: error instanceof Error ? error.message : String(error) }); }
       }
     },

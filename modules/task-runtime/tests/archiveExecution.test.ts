@@ -108,6 +108,18 @@ describe.skipIf(!available)('independent archive execution with PostgreSQL resou
     await expect(f.runtime.api.archiveExecution!.stop({ ...f.input, serviceId: newResourceId() as ServiceId })).rejects.toMatchObject({ kind: 'conflict' });
     expect(f.closed).toEqual([]); expect((await f.store.active(f.input.taskId))?.state).toBe('admitted');
   });
+  test('a terminal helper whose bind callback failed still enters durable stop, retaining its volume and quota until proof', async () => {
+    for (const phase of ['Failed', 'Succeeded']) {
+      const f = await fixture(), { id } = await f.runtime.api.archiveExecution!.ensure(f.input), e = (await f.store.get(id))!;
+      await f.resources.api.observe({ child: { kind: 'Pod', namespace: e.namespace, name: e.podName, uid: crypto.randomUUID(), phase, ready: false } });
+      expect((await f.store.get(id))?.podUid).toBeNull();
+      await f.make().api.archiveExecution!.reconcile();
+      expect((await f.store.get(id))?.state).toBe('stopping');
+      expect(await f.resources.api.workloadSafety.admissionClosed(e.consumerId)).toBe(true);
+      expect(f.closed).toEqual([]); expect(await f.resources.api.occupancy(f.input.projectId)).toBe(1);
+      expect((await f.ledger.within(tdb.db).find(`${f.input.taskId}/work`, 'volume'))?.desired).toBe('present');
+    }
+  });
   test('final task release waits for the physical reclaim proof and is replayable after owner restart', async () => {
     const f = await fixture(), cleanup = f.runtime.api.storageCleanup!, stop = await cleanup.prepare(f.input);
     expect(stop.state).toBe('complete');

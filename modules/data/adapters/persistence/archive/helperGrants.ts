@@ -1,4 +1,5 @@
 import { and, desc, eq, sql } from 'drizzle-orm';
+import { z } from 'zod';
 import { ArchiveHelperFailureSchema, OBJECT_STORAGE_LIMITS, ObjectDigestSchema, ResourceIdSchema } from '@crewstation/contracts';
 import { conflict, forbidden, jsonHash, precondition, validation } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
@@ -115,7 +116,7 @@ function helperFailures(db: Database): Pick<ArchiveHelperRepository, 'fail' | 'f
 }
 
 async function bindGrant(db: Database, id: string, podUid: string): Promise<void> {
-  ResourceIdSchema.parse(podUid);
+  z.uuid().parse(podUid);
   return objectStorageTransaction(db, async (tx, now) => {
     const grant = (await tx.select().from(archiveHelperGrants).where(eq(archiveHelperGrants.id, id)))[0]?.body;
     if (!grant || grant.closedAt || Date.parse(grant.expiresAt) <= now.getTime()) throw precondition('归档助手不再等待绑定');

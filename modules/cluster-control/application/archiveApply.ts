@@ -6,8 +6,10 @@ import { prepareWorkloadAdmission, reconcileWorkloadAdmission } from './workload
 
 /** The parent may already be paused or gone. Only the original volume and finalization admission grant matter. */
 export async function applyArchive(deps: WorkloadApplyDeps & { archives?: ArchiveOwners }, record: LedgerRecordView, enqueue: (id: string, delay?: number) => void): Promise<void> {
-  await reconcileWorkloadAdmission(deps, record, enqueue);
-  if (record.desired !== 'present' || !deps.archives || !record.conditions.some((c) => c.type === 'Provisioning' && c.status === 'true')) return;
+  const provisioning = record.conditions.some((c) => c.type === 'Provisioning' && c.status === 'true');
+  // A replay can find an already scheduled Pod whose credential binding has not committed yet.
+  if (!provisioning) await reconcileWorkloadAdmission(deps, record, enqueue);
+  if (record.desired !== 'present' || !deps.archives || !provisioning) return;
   try {
   const render = workloadRenderOf(record.id, record.spec);
   if (!render?.pod.archive || render.preview) throw precondition('归档助手期望无效');

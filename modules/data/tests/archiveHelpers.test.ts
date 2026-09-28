@@ -44,10 +44,10 @@ describe.skipIf(!available)('archive helper HTTP and durable file confirmation',
     };
     const deps = { ...f, uploads, helpers, bindings, plane, owner: objectId(), secretKeyBase64: Buffer.alloc(32, 1).toString('base64') };
     const api = archiveHelpers(deps), issue = { id: objectId(), bindingId: intent.id, revision: 1, consumerId: objectId(), expiresAt: new Date(Date.now() + 60 * 60_000).toISOString() };
-    const caller = { id: issue.id, podUid: objectId(), ...(await api.issue(issue)) };
+    const caller = { id: issue.id, podUid: crypto.randomUUID(), ...(await api.issue(issue)) };
     if (bindPod) await api.bind(issue.id, caller.podUid);
     const app = createApp({ name: 'archive-test' }); app.route('/', archiveHelperRoutes(api));
-    const request = (path: string, method = 'GET', body?: string, token = caller.token, raw = false, podUid = caller.podUid) => app.request(`/internal/archive-helpers/${caller.id}${path}`, {
+    const request = (path: string, method = 'GET', body?: string, token = caller.token, raw = false, podUid: string = caller.podUid) => app.request(`/internal/archive-helpers/${caller.id}${path}`, {
       method, headers: { authorization: `Bearer ${token}`, 'x-cs-archive-pod-uid': podUid, ...(body === undefined ? {} : { 'content-length': String(Buffer.byteLength(body)), 'content-type': raw ? 'application/octet-stream' : 'application/json' }) }, ...(body === undefined ? {} : { body }),
     });
     return { ...deps, api, caller, issue, request, finalization, intent };
@@ -64,11 +64,15 @@ describe.skipIf(!available)('archive helper HTTP and durable file confirmation',
     expect((await f.request('/entries')).status).toBe(403);
     await f.api.bind(f.issue.id, f.caller.podUid); await f.api.bind(f.issue.id, f.caller.podUid);
     expect((await f.request('/entries')).status).toBe(200);
-    const replacement = objectId();
+    const replacement = crypto.randomUUID();
     expect((await f.request('/entries', 'GET', undefined, f.caller.token, false, replacement)).status).toBe(403);
     await expect(f.api.bind(f.issue.id, replacement)).rejects.toMatchObject({ kind: 'conflict' });
     await expect(f.api.complete({ ...f.caller, podUid: replacement })).rejects.toMatchObject({ kind: 'forbidden' });
     await expect(f.api.fail({ ...f.caller, podUid: replacement }, { path: null, code: 'archive_transfer_failed' })).rejects.toMatchObject({ kind: 'forbidden' });
+    for (const invalid of ['', 'pod-name', 'not-a-uuid']) {
+      expect((await f.request('/entries', 'GET', undefined, f.caller.token, false, invalid)).status).toBe(403);
+      await expect(f.api.bind(f.issue.id, invalid)).rejects.toThrow();
+    }
     await f.api.close(f.issue.id);
     await expect(f.api.bind(f.issue.id, f.caller.podUid)).rejects.toMatchObject({ kind: 'precondition' });
   });

@@ -12,7 +12,7 @@ describe.skipIf(!available)('positive Pod termination recovers durable read occu
   beforeAll(async () => { tdb = await createTestDatabase([dataMigrations]); });
   afterAll(async () => { await tdb?.drop(); });
   test('only the stopped Pod loses read leases; tombstones reject late reads and unknown PUTs stay protected', async () => {
-    const f = await objectArchiveFixture(tdb.db), uid = objectId(), owner = `${uid}:${objectId()}`, other = `${objectId()}:${objectId()}`;
+    const f = await objectArchiveFixture(tdb.db), uid = crypto.randomUUID(), owner = `${uid}:${objectId()}`, other = `${crypto.randomUUID()}:${objectId()}`;
     const a = await f.content.acquireRead(f.object.id, objectId(), owner, f.source), b = await f.content.acquireRead(f.object.id, objectId(), other, f.source);
     const uploads = objectUploadRepository(tdb.db), upload = await uploads.reserve(f.space.id, objectId(), { requestKey: objectId(), name: 'pending', mediaType: 'text/plain', size: 1, sha256: 'a'.repeat(64) }, f.authority);
     const writer = await uploads.begin(upload.id, objectId(), owner, f.authority); await uploads.finish(writer.attempt, { errorCode: 'connection_lost', uncertain: true });
