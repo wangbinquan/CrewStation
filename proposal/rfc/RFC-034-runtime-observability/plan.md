@@ -226,3 +226,12 @@ Bun静态bundle构建通过；最初品牌SVG解析与macOS大小写文件名冲
 正式构建更新后，系统平台健康页在 1280px 与 390px、中英文均无 document/main 横向溢出；首屏无刷新动作，原 Pod UID、样本时间、重启次数与未支持应用指标声明保留。浏览器视口已恢复。实际本机工作台当前需要登录，管理员浏览器会话授权仍待用户回复；未自动切换身份。
 
 修正候选完整门禁已终态通过：结构、全仓 lint、后端类型及 console 类型全部通过；4104 pass／142 skip／0 fail，26,095 断言（830 文件，617.28 秒）。20 个源码/用例文件指纹与本轮候选清单一致，未因主干中的无关变更重复跑全量。真实集群浏览器验收在本轮按环境跳过，不能算作本机正式页验收。
+
+
+### 资源与健康批次发布及本机部署（2026-09-29）
+
+提交 `987b68dcf23768d9db74a4f5cc245801640d4be1` 已推送；其精确 SHA CI `36474426282` 已终态 success，五个作业均成功。前述本地完整门禁 4104 pass／142 skip／0 fail 与此发布候选对应。
+
+经已批准的本机部署，在 `crewstation-system` 更新 console、cs-api、cs-auth、cs-controller、cs-events、cs-session、mcp-capabilities、mcp-operations 八个 Deployment；全部 observedGeneration 与 generation 一致且 Ready=1。镜像通过仓库对象存储兼容预检后按不可变摘要绑定：console 为 `sha256:3d8e74ba64da85089bad123d1b97516f9d1625b98449f24fe25ce3140fb26d68`，control-plane 为 `sha256:9c0a47d9c8784ba24e708e59f620d6baa6a8a466317c2e6debbc763ed8871420`，revision 标签均为上述提交，storage-contract=1。部署完成于 `2026-09-28T20:04:41.519Z`；仅更新上述容器镜像，没有重新创建会话或任务资源。
+
+`http://console.cs.localhost/auth/login` 可读 HTTP 200。正式浏览器仍停在登录页，管理员浏览器会话的身份授权待用户回复；现有几何/键盘证据仍属于正式构建加只读 HTTP 夹具，未将其记为真实平台数据验收。完整 RFC 和 AW 托管接线继续实施。
