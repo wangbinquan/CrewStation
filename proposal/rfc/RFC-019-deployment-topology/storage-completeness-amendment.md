@@ -30,4 +30,10 @@
 
 一次完整 `bun run check` 完成：3635 pass／117 环境 skip／1 fail（718 文件、561.54 秒）。唯一失败是未改动的本机 GitLab 会话凭据推送收到 401；GitLab 日志确认令牌签发 201、有效期为次日，随后的 Git 请求认证失败。原用例独立诊断 5/5 通过、临时项目已清理，但不能据此宣称波动根因已解决，也不能把完整门禁写成全绿。源码候选指纹未变化，不重复全量运行；最终发布结论另核对精确 SHA 的六项 CI。
 
-本机实机将在部署新镜像后只读验收；旧版上的环境 skip 不算 UI 验收。保留已有业务 Pod/PVC，对比部署前后 UID。
+实现提交 47f4e36d 已推送，并部署 cs-controller、cs-api、console，镜像 tag 为 topology-47f4e36d；三者 Ready，cs-auth 保持原独立版本。其 CI 36368532680 的 static/unit/module/console/gate 均通过，e2e 失败于两条旧侧栏断言与一条按截断可见文字校验 PV 全名的断言。修订为共享 Dialog 的视口、末节点焦点/滚动验证，以及节点完整可访问名称校验；产品源码未变。
+
+本机新版本盘点 719 项，26 PVC、25 PV、25 条 UID 校验绑定，系统与 20 个项目的工作负载/Pod/PVC/PV 对照无遗漏；31 个系统图节点、RFC028 项目 22 个节点，浏览器无错误。部署前后 78 个业务 Pod/存储对象 UID 保持，未新建或重建业务资源。
+
+修订后的实机用例顺序执行 14 pass／1 非管理员身份环境 skip／0 fail、140 断言；1440/1024/390 × 中英文 × 明暗主题 12 组真实几何、详情可见性、关闭焦点和滚动保持通过。首次并行浏览器验收曾有两次窄屏宽度断言失败；顺序尺寸诊断与最终验收均未复现，保留日志及失败时元素诊断，不据此宣称波动根因已闭合。窄屏临时脚本曾缺原生按钮所需按键事件，改为点击后通过，宽屏仍验 Enter/Esc。
+
+验收证据位于 /tmp/cs-topology-verified.json、/tmp/cs-topology-browser-results.json、/tmp/cs-topology-live-diagnostic.log、/tmp/cs-topology-resources-{before,after}.json。测试与文档修订后须核对其精确 SHA CI；已部署镜像对应的全部产品源码与修订后相同。

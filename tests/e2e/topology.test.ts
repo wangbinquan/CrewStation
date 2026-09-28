@@ -31,8 +31,9 @@ describe.skipIf(!session)('deployed deployment topology (RFC-019)', () => {
     if (summary.complete) expect(summary.projects.every((p) => typeof p.pods === 'number' && typeof p.workloads === 'number')).toBe(true);
     const all: ClusterResource[] = []; let cursor: string | undefined;
     do { const q = new URLSearchParams({ scope: 'system', snapshotId: summary.snapshotId, limit: '100', ...(cursor ? { cursor } : {}) }); const result = await apiGet<{ items: ClusterResource[]; nextCursor?: string }>(page, '/v1/admin/cluster/resources?' + q); all.push(...result.items); cursor = result.nextCursor; } while (cursor);
-    const text = await page.bodyText();
-    for (const r of all.filter((r) => ['PersistentVolumeClaim', 'PersistentVolume'].includes(r.kind) || r.view === 'workloads' && r.topLevel)) expect(text).toContain(r.name);
+    // SVG 的可见文字会省略长名称；完整身份在节点的可访问名称中。
+    const labels = await page.eval<string[]>(`[...document.querySelectorAll('[data-node-id]')].map((n) => n.getAttribute('aria-label').split('，')[0])`);
+    for (const r of all.filter((r) => ['PersistentVolumeClaim', 'PersistentVolume'].includes(r.kind) || r.view === 'workloads' && r.topLevel)) expect(labels).toContain(r.name);
     const count = summary.projects.length;
     await clickButton(page, `项目层 · ${count}`);
     // 2026-09-23 起各层不再有提示行，按地址确认已进入项目层。
@@ -76,7 +77,9 @@ describe.skipIf(!session)('deployed deployment topology (RFC-019)', () => {
     try {
       await open(page, '/admin/cluster?tab=topology');
       await page.waitUntil(`document.querySelectorAll('[data-node-id], [aria-label="部署与运行形态（列表）"]').length > 0`, 60_000, 500);
-      expect(await page.eval<number>('document.documentElement.scrollWidth - innerWidth')).toBeLessThanOrEqual(1);
+      const overflow = await page.eval<number>('document.documentElement.scrollWidth - innerWidth');
+      if (overflow > 1) console.error('topology overflow', width, await page.eval(`Array.from(document.querySelectorAll('body *')).map((e) => ({ tag: e.tagName, cls: e.getAttribute('class'), right: e.getBoundingClientRect().right, text: e.textContent?.slice(0, 80) })).filter((e) => e.right > innerWidth + 1).slice(-15)`));
+      expect(overflow).toBeLessThanOrEqual(1);
       if (width >= 1024) {
         const measured = await page.eval<{ frame: number; svg: number }>(`(() => { const svg = document.querySelector('svg[role="group"]'); return { frame: svg.parentElement.clientWidth, svg: svg.getBoundingClientRect().width }; })()`);
         expect(Math.abs(measured.frame - measured.svg)).toBeLessThanOrEqual(8);

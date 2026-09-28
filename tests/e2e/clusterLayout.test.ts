@@ -4,7 +4,7 @@ import { e2eAvailable, open } from './consoleSession';
 import { openAdminSession } from './session';
 
 // 2026-09-23 裁定的集群管理页：只有「拓扑｜资源清单」两个页签，缺省拓扑；状态条（集群容量、受管资源计数、采集状态）在管理总览最上面。
-// 宽屏（≥1100px）两个页签与项目「部署与运行形态」都长满一屏：图框、详情栏、表格区各自滚动，整页不出纵向滚动条。
+// 宽屏（≥1100px）两个页签与项目「部署与运行形态」都长满一屏：图框、表格区各自滚动，拓扑详情使用统一弹窗，整页不出纵向滚动条。
 // 外壳宽屏时可能是文档滚，也可能是定高的 main 自己滚（同日另一项裁定），两种多出来的高度都算整页溢出。
 const available = await e2eAvailable(), session = available ? await openAdminSession() : undefined;
 afterAll(async () => { await session?.close(); }, 30_000);
@@ -14,16 +14,21 @@ const viewport = (page: Page, width: number, height: number) => page.cmd('Emulat
 const overflow = (page: Page) => page.eval<number>(`(() => { const main = document.querySelector('main'); return Math.max(0, document.documentElement.scrollHeight - innerHeight) + Math.max(0, main.scrollHeight - main.clientHeight); })()`);
 const scrolled = (page: Page) => page.eval<number>(`Math.round(scrollY + document.querySelector('main').scrollTop)`);
 const detailLoaded = `!!document.querySelector('section[aria-label="资源详情"]') && !/载入中/.test(document.querySelector('section[aria-label="资源详情"]').innerText)`;
-/** 形态图工作区的两栏：图框所在的左栏与紧挨着的详情栏（没打开详情时为 null），以及图例底边。 */
-const workspace = (page: Page) => page.eval<{ mainRight: number; detailLeft: number | null; detailBottom: number | null; legendBottom: number }>(`(() => {
-  const column = document.querySelector('svg[role="group"]').parentElement.parentElement.parentElement, detail = column.nextElementSibling;
-  return { mainRight: Math.round(column.getBoundingClientRect().right), detailLeft: detail ? Math.round(detail.getBoundingClientRect().left) : null,
-    detailBottom: detail ? Math.round(detail.getBoundingClientRect().bottom) : null, legendBottom: Math.round(document.querySelector('main [aria-label="图例"]').getBoundingClientRect().bottom) };
+/** 图保持原位，详情必须出现在统一弹窗且完全位于视口内。 */
+const workspace = (page: Page) => page.eval<{ dialog: { top: number; left: number; right: number; bottom: number } | null; legendBottom: number }>(`(() => {
+  const detail = document.querySelector('dialog[open][data-cs-dialog]'), rect = detail?.getBoundingClientRect();
+  return { dialog: rect ? { top: rect.top, left: rect.left, right: rect.right, bottom: rect.bottom } : null,
+    legendBottom: Math.round(document.querySelector('main [aria-label="图例"]').getBoundingClientRect().bottom) };
 })()`);
+const expectDialogInViewport = async (page: Page, width: number, height: number) => {
+  const { dialog } = await workspace(page); expect(dialog).not.toBeNull();
+  expect(dialog!.top).toBeGreaterThanOrEqual(0); expect(dialog!.left).toBeGreaterThanOrEqual(0);
+  expect(dialog!.right).toBeLessThanOrEqual(width); expect(dialog!.bottom).toBeLessThanOrEqual(height);
+};
 const views = 'main [role="group"][aria-label="资源清单"]';
 
 describe.skipIf(!session)('deployed cluster management layout', () => {
-  test.each([[1440, 900], [1280, 800]])('at %i×%i the page opens on the topology with only two tabs and fills one screen, with the detail beside the diagram', async (width, height) => {
+  test.each([[1440, 900], [1280, 800]])('at %i×%i the page opens on the topology with only two tabs and fills one screen, with the detail in a shared dialog', async (width, height) => {
     const page = session!.admin;
     await viewport(page, width, height);
     try {
@@ -36,13 +41,16 @@ describe.skipIf(!session)('deployed cluster management layout', () => {
       expect(await overflow(page)).toBeLessThanOrEqual(1);
       // 图框与图例一直排到窗口底边（扣掉主区下内边距），图比可用高度高时在图框里滚。
       const closed = await workspace(page);
-      expect(closed.legendBottom).toBeGreaterThan(height - 40); expect(closed.legendBottom).toBeLessThanOrEqual(height); expect(closed.detailLeft).toBeNull();
-      await page.eval(`document.querySelector('[data-node-id="cs-api"]').dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
+      expect(closed.legendBottom).toBeGreaterThan(height - 40); expect(closed.legendBottom).toBeLessThanOrEqual(height); expect(closed.dialog).toBeNull();
+      const frameScroll = await page.eval<number>(`(() => { const n = [...document.querySelectorAll('[data-node-id]')].at(-1); window.topologyOpener = n; n.scrollIntoView({block:'center'}); n.focus({preventScroll:true}); const top = document.querySelector('svg[role="group"]').parentElement.scrollTop; n.dispatchEvent(new MouseEvent('click', { bubbles: true })); return top; })()`);
       await page.waitUntil(detailLoaded, 30_000, 200);
-      // 打开详情后仍是一屏：详情栏贴在图的右侧、与图例同一条底边，内容再长也在栏里滚。
+      // 长图最后一个节点的详情也必须立即出现在视口内，关闭后保留原图滚动与焦点。
       expect(await overflow(page)).toBeLessThanOrEqual(1);
-      const beside = await workspace(page);
-      expect(beside.detailLeft!).toBeGreaterThan(beside.mainRight); expect(Math.abs(beside.detailBottom! - beside.legendBottom)).toBeLessThanOrEqual(2);
+      await expectDialogInViewport(page, width, height);
+      await page.cmd('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', windowsVirtualKeyCode: 27 });
+      await page.cmd('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', windowsVirtualKeyCode: 27 });
+      await page.waitUntil(`!document.querySelector('dialog[open]') && document.activeElement === window.topologyOpener`);
+      expect(await page.eval<number>(`document.querySelector('svg[role="group"]').parentElement.scrollTop`)).toBe(frameScroll);
       expect(page.takeErrors()).toEqual([]);
     } finally { await page.cmd('Emulation.clearDeviceMetricsOverride'); }
   }, 120_000);
@@ -139,7 +147,7 @@ describe.skipIf(!session)('deployed cluster management layout', () => {
     expect(page.takeErrors()).toEqual([]);
   }, 90_000);
 
-  test.skipIf(!session?.project)('the project deployment topology uses the same workspace: one screen, the read-only detail beside the diagram', async () => {
+  test.skipIf(!session?.project)('the project deployment topology uses the same workspace: one screen, the read-only detail in a shared dialog', async () => {
     const page = session!.admin, id = session!.project!.id;
     await viewport(page, 1440, 900);
     try {
@@ -149,8 +157,7 @@ describe.skipIf(!session)('deployed cluster management layout', () => {
       await page.eval(`document.querySelector('[data-node-id]').dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
       await page.waitUntil(`!!document.querySelector('[data-node-id][aria-pressed="true"]')`, 10_000, 200); await Bun.sleep(500);
       expect(await overflow(page)).toBeLessThanOrEqual(1);
-      const columns = await workspace(page);
-      expect(columns.detailLeft!).toBeGreaterThan(columns.mainRight); expect(Math.abs(columns.detailBottom! - columns.legendBottom)).toBeLessThanOrEqual(2);
+      await expectDialogInViewport(page, 1440, 900);
       expect(page.takeErrors()).toEqual([]);
     } finally { await page.cmd('Emulation.clearDeviceMetricsOverride'); }
   }, 120_000);
