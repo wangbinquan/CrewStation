@@ -1,8 +1,10 @@
 import { expect, test } from 'bun:test';
 import { TaskIdSchema, WORKLOAD_STOP_FINALIZER } from '@crewstation/contracts';
+import { createFakeK8sClient, LABELS, Resources } from '@crewstation/k8s';
 import type { WorkloadPodRender } from '../../../domain/workloadRender';
 import { workloadRenderOf } from '../../../domain/workloadRender';
 import { workloadPodObject } from '../workloadObjects';
+import { assertPinnedVolume } from '../pinnedVolume';
 
 const taskId = TaskIdSchema.parse(Bun.randomUUIDv7()), executionId = TaskIdSchema.parse(Bun.randomUUIDv7());
 function pod(patch: Partial<WorkloadPodRender> = {}): WorkloadPodRender {
@@ -11,6 +13,19 @@ function pod(patch: Partial<WorkloadPodRender> = {}): WorkloadPodRender {
     secret: 'archive-one-grant', expectedVolumeUid: 'original-pvc', consumerVolumeUid: 'original-pvc', archive: { ownerTaskId: taskId },
     consumer: { id: Bun.randomUUIDv7(), taskId, revision: 1, purpose: 'archive', finalization: { operationId: Bun.randomUUIDv7(), revision: 1 } }, ...patch };
 }
+test('archive and binding helpers validate the original task-owned PVC before Pod creation', async () => {
+  const k8s = createFakeK8sClient(), input = pod();
+  const volume = { apiVersion: 'v1', kind: 'PersistentVolumeClaim', metadata: { name: input.pvc!, namespace: input.namespace, uid: input.expectedVolumeUid!, labels: { [LABELS.task]: taskId } }, status: { phase: 'Bound' } };
+  await k8s.create(volume);
+  // Real finalization used the distinct archive execution ID here and rejected its own original task volume.
+  for (const bindOnly of [false, true]) await expect(assertPinnedVolume(k8s, pod({ archive: { ownerTaskId: taskId, bindOnly } }))).resolves.toBeUndefined();
+  for (const metadata of [{ ...volume.metadata, uid: 'replacement' }, { ...volume.metadata, labels: { [LABELS.task]: executionId } }, { ...volume.metadata, deletionTimestamp: new Date().toISOString() }]) {
+    await k8s.apply({ ...volume, metadata });
+    await expect(assertPinnedVolume(k8s, input)).rejects.toThrow('工作卷实例已变化');
+  }
+  await k8s.delete(Resources.PersistentVolumeClaim!, input.pvc!, input.namespace);
+  await expect(assertPinnedVolume(k8s, input)).rejects.toThrow('工作卷实例已变化');
+});
 test('archive has one readonly work subPath, bounded scratch and a first gate without work; no parent, root init or Runner credentials', () => {
   const rendered = workloadPodObject(pod()), serialized = JSON.stringify(rendered);
   const spec = rendered.spec as { containers: Array<Record<string, unknown>>; volumes: unknown[]; initContainers: Array<Record<string, unknown>>; automountServiceAccountToken: boolean; restartPolicy: string };
