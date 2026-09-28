@@ -1,0 +1,5 @@
+.metric { display: inline-flex; flex-direction: column; align-items: flex-start; vertical-align: top; gap: var(--cs-space-1); font-variant-numeric: tabular-nums; }
+.metric strong { font-weight: 600; }
+.metric small { color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }
+.metric[data-state="stale"], .metric[data-state="error"] { color: var(--cs-color-warning); }
+.reason { overflow-wrap: anywhere; max-width: 40ch; }

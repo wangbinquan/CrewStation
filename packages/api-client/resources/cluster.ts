@@ -1,10 +1,12 @@
-import type { ClusterCapacity, ClusterNode, ClusterNodesPage, ClusterObservationQuery, ClusterUsagePage, ClusterUsageQuery, ClusterHistory, ClusterHistoryQuery, ClusterHistoryResources, ClusterHistoryResourcesQuery } from '@crewstation/contracts';
+import type { ProjectResourceMetrics, ProjectResourceMetricsQuery, ProjectResourceHistoryQuery, ClusterCapacity, ClusterNode, ClusterNodesPage, ClusterObservationQuery, ClusterUsagePage, ClusterUsageQuery, ClusterHistory, ClusterHistoryQuery, ClusterHistoryResources, ClusterHistoryResourcesQuery } from '@crewstation/contracts';
 import type { ClusterSummary, ClusterFilter, ClusterPage, ClusterDetail, ClusterEvents, ClusterLogs, ClusterLogsQuery, ClusterInspection, ClusterInspectRequest, ClusterOperation, ClusterOperationRequest, ClusterOperationQuery, ProjectClusterResources, ProjectClusterResourcesQuery } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import { segment } from '../requestUrl';
 export function clusterResource(transport: Transport) {
   const base = '/v1/admin/cluster', resource = (id: string) => `${base}/resources/${segment(id)}`;
   return {
+    projectUsage: (projectId: string, query: Partial<ProjectResourceMetricsQuery> = {}) => transport.request<ProjectResourceMetrics>('GET', `/v1/projects/${segment(projectId)}/cluster-usage`, { query }),
+    projectHistory: (projectId: string, query: ProjectResourceHistoryQuery) => transport.request<ClusterHistory>('GET', `/v1/projects/${segment(projectId)}/cluster-history`, { query: { ...query, metrics: query.metrics.join(',') } }),
     capacity: () => transport.request<ClusterCapacity>('GET', `${base}/capacity`),
     nodes: (query: Partial<ClusterObservationQuery> = {}) => transport.request<ClusterNodesPage>('GET', `${base}/nodes`, { query }),
     node: (id: string, observationId?: string) => transport.request<ClusterNode>('GET', `${base}/nodes/${segment(id)}`, { query: { observationId } }),

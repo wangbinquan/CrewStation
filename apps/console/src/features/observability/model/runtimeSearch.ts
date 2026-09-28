@@ -1,4 +1,4 @@
-export const RUNTIME_TABS = ['overview', 'tasks', 'agents', 'usage', 'performance'] as const;
+export const RUNTIME_TABS = ['overview', 'tasks', 'agents', 'usage', 'performance', 'resources', 'health'] as const;
 export type RuntimeTab = typeof RUNTIME_TABS[number];
 export interface RuntimeSearch { tab?: RuntimeTab; from?: string; to?: string; q?: string; state?: string; agent?: string; quality?: string }
 const date = (value: unknown) => typeof value === 'string' && Number.isFinite(Date.parse(value)) ? new Date(value).toISOString() : undefined;

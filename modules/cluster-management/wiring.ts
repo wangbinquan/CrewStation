@@ -32,7 +32,7 @@ export function createClusterManagementModule(input: ClusterManagementModuleDeps
   const metricsDeps = { repository: drizzleMetricsRepository(input.db), inventory: repository, reader: kubernetesMetricsReader(input.k8s), clock: deps.clock, options };
   const history = prometheusHistoryReader(options.prometheusUrl, options.prometheusToken);
   const objectHistory = objectStorageHistory(history, options.enabled, () => deps.clock.now());
-  const metricsApi = metricQueries(metricsDeps, input.isAdmin, history);
+  const metricsApi = metricQueries(metricsDeps, input.isAdmin, history, input.authorizeProject);
   const metricsLifecycle = metricsWorkers(metricsDeps, input.db, input.instance, logger, measureStorageTargets);
   const api = clusterApi(deps); let abort = new AbortController();
   const operations = createWorker({ db: input.db, owner: `${input.instance}.cluster.operations`, kinds: [CLUSTER_OPERATION], concurrency: 2, leaseSeconds: 60, logger, handler: async (job, ctx) => {

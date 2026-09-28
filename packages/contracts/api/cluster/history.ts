@@ -17,3 +17,8 @@ export type ClusterHistory = z.infer<typeof ClusterHistorySchema>;
 export type ClusterHistoryResource = z.infer<typeof ClusterHistoryResourceSchema>;
 export type ClusterHistoryResourcesQuery = z.infer<typeof ClusterHistoryResourcesQuerySchema>;
 export type ClusterHistoryResources = z.infer<typeof ClusterHistoryResourcesSchema>;
+
+export const ProjectResourceHistoryQuerySchema = z.object({ from: ClusterHistoryQuerySchema.shape.from, to: ClusterHistoryQuerySchema.shape.to, metrics: ClusterHistoryQuerySchema.shape.metrics }).strict().refine((v) => {
+  const duration = Date.parse(v.to) - Date.parse(v.from); return duration > 0 && duration <= 7 * 86_400_000;
+}, { message: 'Choose a positive range of at most 7 days' });
+export type ProjectResourceHistoryQuery = z.infer<typeof ProjectResourceHistoryQuerySchema>;

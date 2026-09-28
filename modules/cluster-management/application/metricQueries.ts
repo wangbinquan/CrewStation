@@ -1,4 +1,4 @@
-import type { Actor, ClusterObservationQuery, ClusterUsageQuery, ClusterHistoryQuery, ClusterHistoryResourcesQuery, ClusterMetrics, UserId } from '@crewstation/contracts';
+import type { ProjectResourceMetrics, ProjectResourceMetricsQuery, ProjectResourceHistoryQuery, Actor, ClusterObservationQuery, ClusterUsageQuery, ClusterHistoryQuery, ClusterHistoryResourcesQuery, ClusterMetrics, UserId } from '@crewstation/contracts';
 import { forbidden, notFound, PlatformError } from '@crewstation/kernel';
 import type { MetricsDeps } from './observeMetrics';
 import type { MetricsObservation } from '../domain/observations';
@@ -21,7 +21,7 @@ export function currentObservation(input: MetricsObservation, now: number): Metr
   if (now - Date.parse(capacity.observedAt) > 45_000) capacity.state = 'stale';
   return result;
 }
-export function metricQueries(deps: MetricsDeps, isAdmin: (id: UserId) => Promise<boolean>, reader: HistoryReader) {
+export function metricQueries(deps: MetricsDeps, isAdmin: (id: UserId) => Promise<boolean>, reader: HistoryReader, authorizeProject: (actor: Actor, projectId: string) => Promise<void> = async () => { throw forbidden('Project resource observation is not available'); }) {
   const guard = async (actor: Actor) => { if (!actor.isAdmin || !await isAdmin(actor.userId)) throw forbidden('仅平台管理员可查看集群指标'); };
   const read = async (id?: string) => {
     const observation = id ? await deps.repository.observation(id) : await deps.repository.latest();
@@ -30,6 +30,15 @@ export function metricQueries(deps: MetricsDeps, isAdmin: (id: UserId) => Promis
     return currentObservation(observation, deps.clock.now().getTime());
   };
   return {
+    projectUsage: async (actor: Actor, projectId: string, query: ProjectResourceMetricsQuery): Promise<ProjectResourceMetrics> => {
+      await authorizeProject(actor, projectId);
+      const observation = await read(query.observationId), rows = observation.usages.filter((u) => u.scope === 'project' && u.projectId === projectId).sort((a, b) => a.resourceId.localeCompare(b.resourceId));
+      const next = query.cursor + query.limit;
+      return { observationId: observation.id, observedAt: observation.capacity.observedAt, projectId, total: rows.length, state: observation.capacity.state, complete: observation.identitiesComplete,
+        items: rows.slice(query.cursor, next).map(({ resourceId, uid, kind, namespace, name, phase, metrics }) => ({ resourceId, uid, kind, namespace, name, phase, metrics })),
+        summary: usageSummary(rows, deps.clock.now().getTime(), Date.parse(observation.capacity.observedAt)), ...(next < rows.length ? { nextCursor: next } : {}) };
+    },
+    projectHistory: async (actor: Actor, projectId: string, query: ProjectResourceHistoryQuery) => { await authorizeProject(actor, projectId); return queryHistory(deps, reader, { ...query, scope: 'project', projectId }); },
     capacity: async (actor: Actor) => { await guard(actor); return (await read()).capacity; },
     nodes: async (actor: Actor, query: ClusterObservationQuery) => {
       await guard(actor); const observation = await read(query.observationId), rows = [...observation.nodes].sort((a, b) => a.name.localeCompare(b.name)), next = query.cursor + query.limit;

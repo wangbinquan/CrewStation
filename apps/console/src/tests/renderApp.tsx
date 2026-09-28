@@ -70,9 +70,9 @@ export interface RenderedApp {
 }
 
 /** 用真实路由树渲染整个工作台；只有 fetch 是假的。 */
-export async function renderApp(initialPath: string, previousPath?: string, history?: RouterHistory, options?: { readonly scrollRestoration?: boolean }): Promise<RenderedApp> {
+export async function renderApp(initialPath: string, previousPath?: string, history?: RouterHistory, options?: { readonly scrollRestoration?: boolean; readonly retainQueryCache?: boolean }): Promise<RenderedApp> {
   const router = createRouter({ routeTree, history: history ?? createMemoryHistory({ initialEntries: previousPath ? [previousPath, initialPath] : [initialPath] }), scrollRestoration: options?.scrollRestoration, scrollToTopSelectors: [MAIN_SCROLL_SELECTOR], defaultErrorComponent: RouteErrorPanel });
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: options?.retainQueryCache ? 300_000 : 0, staleTime: options?.retainQueryCache ? 30_000 : 0 } } });
   const host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);

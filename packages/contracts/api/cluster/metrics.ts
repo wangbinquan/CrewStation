@@ -27,3 +27,13 @@ export type ClusterObservationQuery = z.infer<typeof ClusterObservationQuerySche
 export type ClusterNodesPage = z.infer<typeof ClusterNodesPageSchema>;
 export type ClusterUsageQuery = z.infer<typeof ClusterUsageQuerySchema>;
 export type ClusterUsagePage = z.infer<typeof ClusterUsagePageSchema>;
+
+/** Project projection: no node topology or other projects; stable snapshot pagination. */
+export const ProjectResourceMetricsQuerySchema = ClusterObservationQuerySchema.extend({ observationId: z.string().min(1).max(100).optional() }).strict().refine((q) => q.cursor === 0 || q.observationId !== undefined, { message: 'Continuation requires an observationId' });
+export const ProjectResourceMetricsSchema = z.object({
+  observationId: z.string(), observedAt: z.string(), projectId: z.string().uuid(), state: ClusterMetricStateSchema, complete: z.boolean(),
+  items: z.array(ClusterUsageSchema.pick({ resourceId: true, uid: true, kind: true, namespace: true, name: true, phase: true, metrics: true })),
+  summary: ClusterUsageSummarySchema, total: z.number().int().nonnegative(), nextCursor: z.number().int().nonnegative().optional(),
+});
+export type ProjectResourceMetrics = z.infer<typeof ProjectResourceMetricsSchema>;
+export type ProjectResourceMetricsQuery = z.infer<typeof ProjectResourceMetricsQuerySchema>;

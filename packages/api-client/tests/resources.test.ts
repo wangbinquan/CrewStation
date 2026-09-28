@@ -67,3 +67,12 @@ describe('429：网关限流与平台额度不足分开', () => {
     expect(retryAfterSeconds(null, now)).toBeUndefined();
   });
 });
+
+test('RFC-034 project metrics and history use dedicated project routes with fixed snapshot pagination', async () => {
+  const f = recorder(), client = createApiClient({ baseUrl: 'https://console.example', fetch: f.fetchImpl });
+  await client.cluster.projectUsage(PROJECT, { observationId: 'snapshot-1', cursor: 100, limit: 100 });
+  await client.cluster.projectHistory(PROJECT, { from: '2026-09-28T00:00:00.000Z', to: '2026-09-28T01:00:00.000Z', metrics: ['cpu', 'memory'] });
+  const [usage, history] = f.calls.map((c) => new URL(c.url));
+  expect(usage!.pathname).toBe(`/v1/projects/${PROJECT}/cluster-usage`); expect(usage!.searchParams.get('observationId')).toBe('snapshot-1'); expect(usage!.searchParams.get('cursor')).toBe('100');
+  expect(history!.pathname).toBe(`/v1/projects/${PROJECT}/cluster-history`); expect(history!.searchParams.get('metrics')).toBe('cpu,memory'); expect(f.calls.every((c) => c.method === 'GET')).toBe(true);
+});

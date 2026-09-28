@@ -18,6 +18,8 @@ async function chooseVersion(releaseId: string) { await act(async () => { versio
 // RFC-021 M2、M19、M23、B3：待验证卡写明何时因何自动下线，提醒之后负责人可以推迟一个周期；请求带上看到的到期时间。
 test('负责人看到回退保留期的到期时间与提醒，推迟 72 小时下线带确认值；推迟后按钮消失到下一次提醒', async () => {
   const f = slotLifecycleFixture(); page = await renderApp(`/projects/${projectId}/release`);
+  // Full-suite load can leave the async slot query pending after renderApp's first three turns.
+  for (let attempt = 0; attempt < 8 && !button('推迟 72 小时下线'); attempt++) await page.settle();
   expect(previewCard()).toContain('作为回退目标保留到'); expect(previewCard()).toContain('之后自动下线'); expect(previewCard()).toContain('提醒负责人');
   await click('推迟 72 小时下线');
   expect(f.writes).toEqual([{ method: 'POST', path: `/v1/services/${serviceId}/slots/preview/postpone`, body: { expectedDeadline: at(74) } }]);
