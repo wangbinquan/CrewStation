@@ -103,6 +103,15 @@ describe.skipIf(!available)('数据面快照：平台数据库集群上带平台
       await expect(plane.rotatePassword({ role: names.role, password })).rejects.toThrow('仍有连接');
       expect((await old<{ one: number }[]>`SELECT 1 AS one`)[0]?.one).toBe(1);
       await old.end();
+      // Client shutdown can resolve before PostgreSQL removes the backend from pg_stat_activity.
+      const deadline = Date.now() + 2_000;
+      let active;
+      do {
+        active = await admin`SELECT 1 FROM pg_stat_activity WHERE usename = ${names.role}`;
+        if (active.length === 0) break;
+        await Bun.sleep(20);
+      } while (Date.now() < deadline);
+      expect(active).toHaveLength(0);
       await plane.rotatePassword({ role: names.role, password });
       const rejected = postgres(target.toString(), { max: 1, onnotice: () => undefined, connect_timeout: 2 });
       try { expect(await rejected`SELECT 1`.then(() => true, () => false)).toBe(false); } finally { await rejected.end(); }
