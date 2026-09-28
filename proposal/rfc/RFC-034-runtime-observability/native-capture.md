@@ -57,3 +57,11 @@ RunnerUsageCapture v1 新增可选 nativeProof/nativeBaseline 数值字段，受
 最终证明也等待三层处理回执，避免队列临界容量下业务终态溢出；暂停最终证明消费的真实流水线回归先红后绿。当前组合40/0、165断言；最终独立静态功能门 PASS。本结论不等于全部 RFC 或真实 OpenCode 实机验收完成。
 
 完整候选门禁（2026-09-29）：`bun run check` 通过，4150 pass、142 skip、0 fail、26362 断言，835 文件，651.36 秒；需要已授权真实环境的用例保持 skip，不作为实机证据。候选53路径哈希与门禁开始时一致。正式代码只读预览已验证中英文、3轮选择、Esc回到泳道按钮、390px弹窗无横向溢出及1280px标准16px卡片间距；预览为合成数值，正式登录/真实模型验收另行记录。发布与本机升级继续。
+
+## 6. 本批发布和本机部署
+
+实现提交 `6b5a7355e899fe5ca7b1eb8b2c2cf2f9434cdc7e` 已推送，推后 main/origin 0/0。精确 CI [36496556715](https://github.com/wangbinquan/CrewStation/actions/runs/36496556715) 六项全部 success（含 gate 和实机 e2e）。在主 checkout 对这个已提交 SHA 使用 git archive 提供构建上下文，三个镜像均带相同 OCI revision，未包含之后的在制品。
+
+已通过存储合同1预检，`rfc034-native-migrate-6b5a7355` 成功执行唯一新增迁移 `observability/0011_native_captures.sql`。2026-09-28T23:22:45.779Z 八个平台 Deployment 全部 rollout 成功，随后核对 observedGeneration==generation 且 readyReplicas==replicas==1。console digest `sha256:02df9889599ec074c2dafde9bfa9d5aeeeeb50b61ba68b5bd077e678e2fb86d4`，控制面 digest `sha256:3bd9be51374c320c4de2902ffc56e9947374ee402e46933ef10a0d99e1f47c61`；新任务底座为 `registry.crewstation-system.svc.cluster.local:5000/crewstation/task-runtime@sha256:7b56494dc379e0de8a18aba1ae0e3d7cc16dd398eda9f162fdff3067e8419380`。
+
+部署只更改上述八服务的容器镜像和 CS_TASK_IMAGE；已固定 digest 的既有算力档位仍使用其原镜像，旧 Runner 保持显式能力降级，不将底座发布称为所有既有执行已启用新采集。登录入口 HTTP 200；正式管理员浏览器身份授权仍待回复，没有自动登录。正式代码只读夹具新增项目详情验收：键盘进入统一泳道弹窗，费用未开放时保持隐藏，采集详情可见，Esc 返回原按钮；临时预览进程均已停止。这些预览不替代真实任务运行验收。
