@@ -318,3 +318,5 @@ Stage 1 首次完整候选门禁回执：2026-09-29T22:12:32Z，4225 pass／142 
 
 
 Stage 1 修正候选完整门禁回执：2026-09-29T22:29:20Z，结构/lint/两侧类型全部通过；4226 pass／142 skip／0 fail、26,792断言、845文件，830.04秒。37源码/测试+4文档共41路径指纹全部一致。独立Stage 1实现功能门及旧导航有界等待修复复核均PASS（复核未运行测试）。只补回执后精确发布；同源代码不再重跑完整本地门禁。数字协议/Runner底座通过不代表生产来源已接通；Session PG/outbox、owner原键/CNY受理/排空与两级正式明细仍继续。该本机门禁未运行真实登录/模型/平台资源E2E，hosted精确CI及实机验收单独记录。
+
+Stage 1 底座发布回执（2026-09-30）：`fc491a4d6b31c6476d3222209ced880810936c3e` 已精确推送；[CI 36640100860](https://github.com/wangbinquan/CrewStation/actions/runs/36640100860) 六项 success。候选完整4226/142 skip/0与独立功能门 PASS 已记录。生产开发采集仍关闭，本机平台仍94aabd6d，Session PG/outbox、owner原键/CNY受理/排空及两级明细尚未完成；CS-R02继续，见[剩余清单](./remaining-work.md)。

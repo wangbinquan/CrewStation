@@ -15,7 +15,7 @@
 | 正式页与 CSV 移除 | `84ae1bbbbed1a0f7b9f5de4550e78e4c7e12aa14`；[CI 36508083945](https://github.com/wangbinquan/CrewStation/actions/runs/36508083945) 六项 success；2026-09-29 01:31:46Z 本机八 Deployment Ready | 正式构建加只读夹具的浏览器证据不是实际身份/模型验收 |
 | 开发身份/账本基础 | `ca2ff256317b8ebc5cb914c1310865f916996345`；完整 4191 pass/142 skip/0 fail；[CI 36512613256](https://github.com/wangbinquan/CrewStation/actions/runs/36512613256) success | 已随 v2 本机部署；生产开发来源仍关闭，实际开发采集待完成，不能显示开发已知零 |
 | 采集证明 v2 服务端 | 独立功能门 PASS；冻结 15 路径指纹一致；2026-09-29 03:00:12Z 完整门禁结束：4197 pass/142 skip/0 fail、26633 断言、838 文件 | 已随 `94aabd6dfe641e46bbfc2e736f0632c7fdf6fc12` 推送；[CI 36619175682](https://github.com/wangbinquan/CrewStation/actions/runs/36619175682) 六项 success；本机八组件已升级；与 AW 实际联动/托管验收待完成 |
-| 开发 Agent Stage 1（本地门禁通过，待精确发布） | [内部身份与总体接入](./development-usage.md)；[headless 实施细化](./development-headless.md#9-stage-1-实现检查点2026-09-30在制)；协议/Runner/双卷绑定/驱动底座，79 定向回归通过 | 独立实现功能门PASS，完整4226/142/0通过、41路径指纹一致；精确发布/CI待回执。生产关闭。Session PG/outbox、owner 固定原键/价格/排空、查询与正式两级界面仍须接通及验收 |
+| 开发 Agent Stage 1（已推送/CI通过，生产关闭） | [内部身份与总体接入](./development-usage.md)；[headless 实施细化](./development-headless.md#9-stage-1-实现检查点2026-09-30底座已发布)；协议/Runner/双卷绑定/驱动底座，79 定向回归通过 | 独立实现功能门PASS，完整4226/142/0通过、41路径指纹一致；`fc491a4d6b31c6476d3222209ced880810936c3e` 已推送，[CI 36640100860](https://github.com/wangbinquan/CrewStation/actions/runs/36640100860) 六项 success。生产关闭。Session PG/outbox、owner 固定原键/价格/排空、查询与正式两级界面仍须接通及验收 |
 
 源码锚点：[统计合同](../../../packages/contracts/api/observability/runtimeStatistics.ts) 的 `sourceScope` 仍为业务任务、cohort 仍为 started；[platform 装配](../../../modules/platform/wiring.ts) 仅注入业务事实/业务数值来源；[开发生命周期](../../../modules/dev-session/application/agentExecution.ts) 仍由普通事件结束并回收；[平台健康说明](../../../apps/console/src/features/observability/i18n/zh-CN.ts) 明确应用级指标尚未采集。
 
@@ -38,10 +38,10 @@ CS-R01 的失败若不影响开发设计，可以并行推进文档与其他非�
 - 与 AW-R02 联合验证纯空树为零、没有证明为未知、迟到量与历史修订、跨页恢复、v1/v2 升降、费用开放/撤回；证明整条链只有一笔用量/估值。
 - 退出证据：两仓 SHA、CI 终态、服务 API/Runner 版本、实际部署及原始合同/真实同步对拍。RFC-370 托管准入仍由其 owner 关闭。
 
-### CS-R02 开发 Agent 持久数字链路〔Runner Stage 1 在制，生产未开启；T1～3/T9、PO-02/04/06〕
+### CS-R02 开发 Agent 持久数字链路〔Runner Stage 1 已发布/CI通过，生产未开启；T1～3/T9、PO-02/04/06〕
 
 - [headless 细化设计](./development-headless.md) 已通过独立功能设计门：存储跨进程/容器/Pod、旧 Runner、日志故障、稳定重发、可读末尾排空及不可取回缺口已明确；实现仍须逐条符合该合同。
-- Stage 1 已有可选协议、稳定摘要、Runner 数字日志、双卷归属、同步采集 sink、读/ACK/重放；独立实现功能门 PASS，首轮完整门禁4225/142/1因旧导航异步断言失败，已补测试等待并通过23项回归及独立复核，修正候选完整4226/142/0通过，41路径指纹一致；精确发布/CI尚待回执。新 render 仍未被生产准入选择，现有 Pod 不迁移/重建。
+- Stage 1 已有可选协议、稳定摘要、Runner 数字日志、双卷归属、同步采集 sink、读/ACK/重放；独立实现功能门 PASS，首轮完整门禁4225/142/1因旧导航异步断言失败，已补测试等待并通过23项回归及独立复核，修正候选完整4226/142/0通过，41路径指纹一致；已随 `fc491a4d6b31c6476d3222209ced880810936c3e` 精确发布，[CI 36640100860](https://github.com/wangbinquan/CrewStation/actions/runs/36640100860) 六项 success。新 render 仍未被生产准入选择，现有 Pod 不迁移/重建。
 - 下一阶段 owner 在首次发送前固定原 journal 键，Session PG 逐页复制及公平 outbox；接通价格受理、可读末尾/不可取回缺口屏障和两级明细后才启用真实来源。
 - 实现受理时冻结项目/工作区/Agent/实际环境/算力修订/CNY 目录；Runner 独立数字 journal 与能力协商；Session 连续持久副本和公平 outbox；账本/估值成功后确认消费。
 - 普通终态事件不能直接当数值完成；正常数值出口需数字复制到 finalThrough，中断出口需先排空可读末尾，或持久实际已复制水位及明确不可取回缺口；取消、父工作区释放、强制清理及 Pod 丢失都有完整或中断证据。不得因补采自动重复模型调用。
@@ -144,3 +144,9 @@ CS-R01 的失败若不影响开发设计，可以并行推进文档与其他非�
 - 本机：2026-09-29 19:46:51.122Z 部署完成，公开 `/auth/login` 返回 HTTP 200。八组件 generation/observedGeneration 相等、Ready=1：console 199，API 193，auth 91，controller 158，events 61，Session 110，两个 MCP 各57。
 - 镜像：console `sha256:ce1c2a64b0542841dcd7dd7ba98213dfbe8ad3643a250808fc85e84cd7f6f321`；control-plane `sha256:b9c0e7f8b6a3f2af2fd364b1b35d976894307306f89437293069affd1ff29e68`；默认 Runner `sha256:426f1987e5d9f0be7e2cf295897d43d0c6deac720fd897521adf0ad7457d9926`。storage-contract=1，无新迁移。已有档位固定的镜像/既有执行未重建。
 - 边界：上述 hosted E2E 与本机 rollout 不能替代真实开发用量、AW 托管装配和身份/模型验收；CS-R01 的实际联合验收仍未关闭，CS-R02～13继续。
+
+### CS-R02 Stage 1 发布回执（2026-09-30）
+
+- 源码提交：`fc491a4d6b31c6476d3222209ced880810936c3e`；41 路径精确提交，推后 main/origin 同步。独立实现功能门 PASS；修正候选完整4226 pass/142 skip/0 fail，原失败与修复历史保留。
+- [精确 CI 36640100860](https://github.com/wangbinquan/CrewStation/actions/runs/36640100860) 已终态 success：static、unit、module、console、gate、e2e 六项全部成功。
+- 本机仍为 `94aabd6dfe641e46bbfc2e736f0632c7fdf6fc12`。本批尚未部署，生产开发采集继续关闭；Session PG/outbox、owner 原键/CNY受理/排空、两级明细及真实开发验收仍未闭环，CS-R02 保持进行中。

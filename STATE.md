@@ -1,3 +1,7 @@
+## 2026-09-30 RFC-034 开发数字底座精确发布回执
+
+`fc491a4d6b31c6476d3222209ced880810936c3e` 已推送并与 origin/main 同步；CI36640100860终态六项success，独立功能门PASS、完整4226/142skip/0及41路径指纹一致。仅Stage 1协议/Runner/双卷绑定/驱动底座：生产开发采集仍关闭，本批未本机部署，当前平台仍94aabd6d。Session PG/outbox、owner原键/价格/排空及两级明细继续。RFC与CS-R02保持In Progress，详见[剩余工作](proposal/rfc/RFC-034-runtime-observability/remaining-work.md)。
+
 ## 2026-09-30 RFC-034 开发采集 Stage 1 完整门禁通过
 
 修正候选结构/lint/两侧类型通过，4226 pass/142 skip/0 fail（26,792断言、845文件、830.04秒）；37源码/测试+4文档共41路径指纹未变。独立Stage 1功能门和旧导航等待修复复核均PASS。首次门禁失败及修复历史保留；只补回执后精确提交/推送，hosted CI继续。生产未选择新render，当前平台部署仍94aabd6d；Session PG/outbox、owner原键/CNY价格/排空与正式两级明细待完成，不关闭CS-R02或两RFC。

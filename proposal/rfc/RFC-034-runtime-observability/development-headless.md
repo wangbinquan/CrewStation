@@ -74,7 +74,7 @@ dev-session 提供按 acceptedAt 时间窗和 projectId 有界分页的执行事
 
 最终复审回执（2026-09-30）：独立只读功能设计门 PASS。稳定受理摘要、receipt 优先恢复、Runner/PG 水位分离、可读数字排空及不可取回缺口两个反例均已关闭。该结论仅确认可实施，未运行测试，不替代实现功能门、精确 CI 或真实开发采集验收。
 
-## 9. Stage 1 实现检查点（2026-09-30，在制）
+## 9. Stage 1 实现检查点（2026-09-30，底座已发布）
 
 当前实现限定为协议/Runner/Pod 底座：可选 developmentUsageV1、严格稳定受理与 FULL/WAL 数字日志、独立双卷绑定、分页/确认/重放、原生采集 sink 和旧 Runner/浏览器协商保护。没有任何生产准入路径选择 developmentUsageStorage；Session PG 副本/outbox、owner 固定原键及价格受理、排空清理屏障、来源事实与正式界面均在下一阶段。因此实际开发来源继续关闭，不能将此底座当成 CS-R02 完成。
 
@@ -85,3 +85,5 @@ Stage 1 首次完整候选门禁回执：2026-09-29T22:12:32Z，4225 pass／142 
 
 
 Stage 1 修正候选完整门禁回执：2026-09-29T22:29:20Z，结构/lint/两侧类型全部通过；4226 pass／142 skip／0 fail、26,792断言、845文件，830.04秒。37源码/测试+4文档共41路径指纹全部一致。独立Stage 1实现功能门及旧导航有界等待修复复核均PASS（复核未运行测试）。只补回执后精确发布；同源代码不再重跑完整本地门禁。数字协议/Runner底座通过不代表生产来源已接通；Session PG/outbox、owner原键/CNY受理/排空与两级正式明细仍继续。该本机门禁未运行真实登录/模型/平台资源E2E，hosted精确CI及实机验收单独记录。
+
+Stage 1 精确发布与 hosted 回执：`fc491a4d6b31c6476d3222209ced880810936c3e` 已推送；[CI 36640100860](https://github.com/wangbinquan/CrewStation/actions/runs/36640100860) 终态 success，static/unit/module/console/gate/e2e 六项全部成功。没有将新 render 选入生产准入，也没有部署本批或创建真实开发验证资源。本机仍94aabd6d；Session/owner/价格/排空及两级正式明细继续，不以本回执关闭CS-R02。
