@@ -1,3 +1,7 @@
+## 2026-09-30 RFC-034 剩余工作索引入口
+
+RFC总索引的034条目从过期Draft改为In Progress，并直接链接[13项剩余清单](proposal/rfc/RFC-034-runtime-observability/remaining-work.md)。本次只更新自有观测登记，其他RFC记录保持。代码和部署仍为94aabd6d；已验证文档检查点693ef50c六项CI成功，后续回执c1b0970c已推送，最终文档CI继续记录，未将开发采集或整个RFC写为完成。
+
 ## 2026-09-30 RFC-034 剩余工作文档精确 CI 回执
 
 693ef50c9ff0fa4d4e60409e7d3b876e02945795 的 CI36622441175 已终态六项 success。补入剩余清单和实施计划，并将开发设计的前两轮 FAIL 明确为历史，当前最终设计门仍为 PASS。只有文档变化，代码和本机部署保持94aabd6d；开发实际采集、CLI/算力测试及真实联动等13项仍按[remaining-work](proposal/rfc/RFC-034-runtime-observability/remaining-work.md)推进，不宣告RFC完成。
