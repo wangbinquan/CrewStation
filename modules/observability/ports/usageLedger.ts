@@ -1,6 +1,7 @@
-import type { RuntimeFactQuery, RuntimeTaskFact, RunnerUsageCapture, RuntimeNativeCapture } from '@crewstation/contracts';
-import type { ExecutionObservationIdentity, RunnerUsageMeasurement, RunnerUsageSourceIdentity, RunnerUsageSourcePage } from '@crewstation/contracts';
-import type { ExecutionUsageObservation, ExecutionObservation, ExecutionValuationObservation, ProjectId, TaskId, ExecutionCostVisibilityDto, SetExecutionCostVisibility } from '@crewstation/contracts';
+import type { ExecutionObservation, RuntimeNativeCapture } from '@crewstation/contracts';
+import type { RuntimeFactQuery, RuntimeTaskFact, RunnerUsageCapture } from '@crewstation/contracts';
+import type { UsageExecutionIdentity, RunnerUsageMeasurement, RunnerUsageSourceIdentity, RunnerUsageSourcePage } from '@crewstation/contracts';
+import type { UsageRecord, UsageObservation, UsageValuation, ProjectId, TaskId, ExecutionCostVisibilityDto, SetExecutionCostVisibility } from '@crewstation/contracts';
 import type { ActualPricingModel } from './tokenPricing';
 import type { UsageEvidence } from '../domain/usageProjection';
 
@@ -8,7 +9,7 @@ export interface UsageTaskScope { projectId: ProjectId; taskId: TaskId }
 export interface UsageSourcePage extends UsageTaskScope {
   sourceId: string; expectedCursor: string | null; nextCursor: string;
   events: Array<{ eventId: string; measurement: UsageEvidence }>;
-  native?: Array<{ identity: ExecutionObservationIdentity; capture: RunnerUsageCapture }>;
+  native?: Array<{ identity: UsageExecutionIdentity; capture: RunnerUsageCapture }>;
 }
 export interface UsageLedgerTransaction {
   cursor(): Promise<string | null>;
@@ -16,19 +17,19 @@ export interface UsageLedgerTransaction {
   eventFingerprint(eventId: string): Promise<string | undefined>;
   revisionFingerprint(measurement: UsageEvidence): Promise<string | undefined>;
   evidence(measurement: UsageEvidence, afterRevision: number, limit: number): Promise<UsageEvidence[]>;
-  current(measurement: UsageEvidence): Promise<ExecutionUsageObservation | undefined>;
+  current(measurement: UsageEvidence): Promise<UsageRecord | undefined>;
   append(event: UsageSourcePage['events'][number], fingerprint: string): Promise<void>;
-  project(value: ExecutionUsageObservation): Promise<void>;
-  capture(identity: ExecutionObservationIdentity, frame: RunnerUsageCapture): Promise<void>;
+  project(value: UsageRecord): Promise<void>;
+  capture(identity: UsageExecutionIdentity, frame: RunnerUsageCapture): Promise<void>;
   advance(nextCursor: string, fingerprint: string): Promise<void>;
 }
 export interface UsageChanges {
-  items: ExecutionObservation[]; captureIncomplete: boolean; nextCursor: number; persistedThrough: number; hasMore: boolean;
+  items: UsageObservation[]; captureIncomplete: boolean; nextCursor: number; persistedThrough: number; hasMore: boolean;
 }
 export interface UsageSnapshotQuery { snapshotId?: string; cursor?: string; limit: number }
 export interface UsageSnapshot {
   snapshotId: string; snapshotThrough: number; expiresAt: number; createdAt: number; visibilityRevision: number;
-  items: ExecutionObservation[]; captureIncomplete: boolean; nextCursor: string | null;
+  items: UsageObservation[]; captureIncomplete: boolean; nextCursor: string | null;
 }
 export interface UsageLedgerStore {
   snapshot(scope: UsageTaskScope, query: UsageSnapshotQuery, now: number, visibilityRevision: number): Promise<UsageSnapshot>;
@@ -51,13 +52,13 @@ export type UsageMeasurementRef = Pick<UsageEvidence, 'identity' | 'sourceId' | 
 export interface ExecutionValuationRequest {
   measurement: UsageMeasurementRef; usageRevision: number; model: ActualPricingModel | null; requestKey: string;
 }
-export interface ExecutionValuationReceipt { fingerprint: string; document: ExecutionValuationObservation }
+export interface ExecutionValuationReceipt { fingerprint: string; document: UsageValuation }
 export interface ExecutionValuationStore {
-  pendingNativeRepairs(scope: UsageTaskScope, limit: number): Promise<Array<{ usage: ExecutionUsageObservation; modelEvidence: RunnerUsageMeasurement | null }>>;
-  usage(ref: UsageMeasurementRef): Promise<ExecutionUsageObservation | undefined>;
+  pendingNativeRepairs(scope: UsageTaskScope, limit: number): Promise<Array<{ usage: UsageRecord; modelEvidence: RunnerUsageMeasurement | null }>>;
+  usage(ref: UsageMeasurementRef): Promise<UsageRecord | undefined>;
   receipt(scope: UsageTaskScope, requestKey: string): Promise<ExecutionValuationReceipt | undefined>;
   /** Compare the current usage revision, replace the valuation and append its sync change atomically. */
-  commit(input: ExecutionValuationRequest, fingerprint: string, basisFingerprint: string, draft: ExecutionValuationObservation): Promise<ExecutionValuationObservation>;
+  commit(input: ExecutionValuationRequest, fingerprint: string, basisFingerprint: string, draft: UsageValuation): Promise<UsageValuation>;
 }
 
 /** Cross-owner operations are bound only by platform wiring. */
@@ -65,7 +66,7 @@ export interface RunnerUsageSource {
   next(): Promise<RunnerUsageSourcePage | undefined>;
   measurement(source: RunnerUsageSourceIdentity, recordId: string, revision: number): Promise<RunnerUsageMeasurement | undefined>;
   acknowledge(taskId: TaskId, executionId: string, through: number): Promise<void>;
-  resolve(input: RunnerUsageSourceIdentity): Promise<ExecutionObservationIdentity | undefined>;
+  resolve(input: RunnerUsageSourceIdentity): Promise<UsageExecutionIdentity | undefined>;
 }
 
 

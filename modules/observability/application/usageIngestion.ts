@@ -1,16 +1,16 @@
-import { RunnerUsageCaptureSchema, ExecutionObservationIdentitySchema, type RunnerUsageSourcePage, type ExecutionObservationIdentity, ExecutionUsageObservationSchema, ProjectIdSchema, TaskIdSchema } from '@crewstation/contracts';
+import { RunnerUsageCaptureSchema, UsageExecutionIdentitySchema, type RunnerUsageSourcePage, type UsageExecutionIdentity, UsageRecordSchema, ProjectIdSchema, TaskIdSchema } from '@crewstation/contracts';
 import { conflict, jsonHash, precondition, validation, type Logger } from '@crewstation/kernel';
 import { z } from 'zod';
 import { rebuildUsageProjection, type UsageEvidence } from '../domain/usageProjection';
 import type { RunnerUsageSource, UsageLedgerStore, UsageLedgerTransaction, UsageSourcePage } from '../ports/usageLedger';
 
 const key = z.string().min(1).max(512);
-const evidenceSchema = z.strictObject(ExecutionUsageObservationSchema.shape).omit({ projection: true });
+const evidenceSchema = z.strictObject(UsageRecordSchema.shape).omit({ projection: true });
 const pageSchema = z.strictObject({
   projectId: ProjectIdSchema, taskId: TaskIdSchema, sourceId: key,
   expectedCursor: key.nullable(), nextCursor: key,
   events: z.array(z.strictObject({ eventId: key, measurement: evidenceSchema })).max(500),
-  native: z.array(z.strictObject({ identity: ExecutionObservationIdentitySchema, capture: RunnerUsageCaptureSchema })).max(5).optional(),
+  native: z.array(z.strictObject({ identity: UsageExecutionIdentitySchema, capture: RunnerUsageCaptureSchema })).max(5).optional(),
 });
 function parsedPage(input: UsageSourcePage): UsageSourcePage {
   const parsed = pageSchema.safeParse(input);
@@ -19,7 +19,7 @@ function parsedPage(input: UsageSourcePage): UsageSourcePage {
     if (measurement.identity.projectId !== input.projectId || measurement.identity.taskId !== input.taskId || measurement.sourceId !== input.sourceId)
       throw validation('用量证据与来源页身份不一致');
     // Complete public cross-field checks use an honest initial projection.
-    ExecutionUsageObservationSchema.parse(rebuildUsageProjection([measurement]));
+    UsageRecordSchema.parse(rebuildUsageProjection([measurement]));
   }
   for (const row of parsed.data.native ?? []) if (row.identity.projectId !== input.projectId || row.identity.taskId !== input.taskId) throw validation('原生证明与任务身份不一致');
   return parsed.data;
@@ -43,7 +43,7 @@ async function append(tx: UsageLedgerTransaction, event: UsageSourcePage['events
     }
     const previous = await tx.current(event.measurement);
     const projection = rebuildUsageProjection([...retained, event.measurement], previous);
-    ExecutionUsageObservationSchema.parse(projection);
+    UsageRecordSchema.parse(projection);
     if (projection !== previous) await tx.project(projection);
   }
   await tx.append(event, fingerprint);
@@ -70,7 +70,7 @@ export function usageIngestion(store: UsageLedgerStore) {
   };
 }
 
-function runnerPage(page: RunnerUsageSourcePage, identity: ExecutionObservationIdentity): UsageSourcePage {
+function runnerPage(page: RunnerUsageSourcePage, identity: UsageExecutionIdentity): UsageSourcePage {
   if (identity.executionId !== page.executionId || identity.executionGeneration !== page.attempt || !Number.isSafeInteger(page.after) || page.after < 0 ||
       page.events.length < 1 || page.events.length > 5 || page.through !== page.events.at(-1)?.sequence) throw validation('数值来源页身份或水位不一致');
   const sourceId = 'runner:' + jsonHash({ runtimeTaskId: page.runtimeTaskId, executionId: page.executionId, attempt: page.attempt, incarnation: page.incarnation, payloadDigest: page.payloadDigest });

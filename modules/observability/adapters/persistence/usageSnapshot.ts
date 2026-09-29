@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gt, lte, sql } from 'drizzle-orm';
 import { conflict, gone, newResourceId, notFound, validation } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
-import type { ExecutionObservationIdentity } from '@crewstation/contracts';
+import type { UsageExecutionIdentity } from '@crewstation/contracts';
 import { nativeCaptureId } from '../../domain/usageProjection';
 import type { UsageSnapshot, UsageSnapshotQuery } from '../../ports/usageLedger';
 import { nativeCaptureHistory, usageChanges, usageHeads, usageSnapshots } from './usageLedgerTables';
@@ -46,7 +46,7 @@ export async function captureIncompleteAt(db: Executor, taskKey: string, through
     .from(nativeCaptureHistory).where(and(eq(nativeCaptureHistory.taskKey, taskKey), lte(nativeCaptureHistory.sequence, through)))
     .orderBy(asc(nativeCaptureHistory.captureId), desc(nativeCaptureHistory.sequence)).limit(501);
   if (captures.length > 500 || captures.some((row) => row.document.state !== 'complete')) return true;
-  const sources = await db.selectDistinct({ identity: sql<ExecutionObservationIdentity>`${usageChanges.document}->'identity'`,
+  const sources = await db.selectDistinct({ identity: sql<UsageExecutionIdentity>`${usageChanges.document}->'identity'`,
     sourceId: sql<string>`${usageChanges.document}->>'sourceId'`, turn: sql<string | null>`${usageChanges.document}->'scope'->>'turn'` })
     .from(usageChanges).where(and(eq(usageChanges.taskKey, taskKey), lte(usageChanges.sequence, through), sql`${usageChanges.document}->>'kind' = 'usage'`)).limit(501);
   const known = new Set(captures.map((row) => row.id));

@@ -1,9 +1,9 @@
-import type { ExecutionUsageObservation, ExecutionObservationIdentity, NativeUsageProof, NativeUsageOrder, NativeUsageStep, NativeUsageBaseline, RunnerUsageMeasurement, RuntimeNativeCapture, RuntimeUsageMetrics, ExecutionObservation } from '@crewstation/contracts';
+import type { UsageRecord, UsageExecutionIdentity, NativeUsageProof, NativeUsageOrder, NativeUsageStep, NativeUsageBaseline, RunnerUsageMeasurement, UsageNativeCapture, RuntimeUsageMetrics, UsageObservation } from '@crewstation/contracts';
 import { jsonHash } from '@crewstation/kernel';
 import { subtractTokenBaseline, TOKEN_BUCKETS, type TokenUsage } from './tokenUsage';
 
-export type UsageEvidence = Omit<ExecutionUsageObservation, 'projection'>;
-type Projection = ExecutionUsageObservation['projection'];
+export type UsageEvidence = Omit<UsageRecord, 'projection'>;
+type Projection = UsageRecord['projection'];
 type Issue = Projection['issues'][number];
 interface Fold {
   reported: UsageEvidence;
@@ -76,7 +76,7 @@ function fold(next: UsageEvidence, before?: Fold): Fold {
 
 /** Rebuild one meter from retained native evidence, in native revision order.
  * A late older sample may change the projection without changing observedRevision. */
-export function rebuildUsageProjection(evidence: readonly UsageEvidence[], previous?: ExecutionUsageObservation): ExecutionUsageObservation {
+export function rebuildUsageProjection(evidence: readonly UsageEvidence[], previous?: UsageRecord): UsageRecord {
   if (evidence.length === 0) throw new RangeError('Cannot rebuild usage without retained evidence');
   const byRevision = new Map<number, UsageEvidence>();
   for (const sample of evidence) {
@@ -96,15 +96,15 @@ export function rebuildUsageProjection(evidence: readonly UsageEvidence[], previ
 
 
 export interface NativeCaptureDocument {
-  id: string; identity: ExecutionObservationIdentity; sourceId: string; proof: NativeUsageProof;
+  id: string; identity: UsageExecutionIdentity; sourceId: string; proof: NativeUsageProof;
   began: boolean; baselineRoot: string | null; historicalRevisionGap: boolean;
 }
 export type NativeBaselineEntry = NativeUsageBaseline['steps'][number];
 export interface NativeRepair {
-  ownerId: string; captureId: string; ordinal: number; order: NativeUsageOrder; step: NativeUsageStep; modelRef: string | null; scope: NonNullable<ExecutionUsageObservation['scope']>;
+  ownerId: string; captureId: string; ordinal: number; order: NativeUsageOrder; step: NativeUsageStep; modelRef: string | null; scope: NonNullable<UsageRecord['scope']>;
 }
 /** A correction is attached to the original request and never borrows a native revision. */
-export function nativeRepairCandidate(owner: NativeCaptureDocument, source: NativeCaptureDocument, row: NativeBaselineEntry, usage: ExecutionUsageObservation, accepted?: NativeRepair): Omit<NativeRepair, 'ordinal'> | undefined {
+export function nativeRepairCandidate(owner: NativeCaptureDocument, source: NativeCaptureDocument, row: NativeBaselineEntry, usage: UsageRecord, accepted?: NativeRepair): Omit<NativeRepair, 'ordinal'> | undefined {
   const before = row.before, after = row.after, order = source.proof.order, origin = owner.proof.order, baseline = source.proof.baseline.order;
   if (!row.afterObserved || !after || !order || !origin || !baseline || !source.proof.fingerprint || !source.began ||
       source.proof.state === 'pending' || source.proof.state === 'unsupported' || source.proof.baseline.kind !== 'resume' ||
@@ -127,13 +127,13 @@ export function nativeRepairCandidate(owner: NativeCaptureDocument, source: Nati
   return { ownerId: owner.id, captureId: source.id, order, step: after, modelRef: usage.modelRef, scope };
 }
 /** A repair retains its request scope and permits only one-way model refinement. */
-export function reconcileNativeRepairModel(value: ExecutionUsageObservation, repair: NativeRepair): NativeRepair | undefined {
+export function reconcileNativeRepairModel(value: UsageRecord, repair: NativeRepair): NativeRepair | undefined {
   if (value.basis.kind !== 'invocation' || value.reporting !== 'delta' || value.inclusion !== 'self' ||
       jsonHash(value.scope) !== jsonHash(repair.scope) || repair.modelRef !== null && repair.modelRef !== value.modelRef) return;
   return repair.modelRef === value.modelRef ? repair : { ...repair, modelRef: value.modelRef };
 }
 /** Compare only the final projection, after an independently proved historical overlay. */
-export function projectNativeRepair(value: ExecutionUsageObservation, previous: ExecutionUsageObservation | undefined, repair?: NativeRepair): ExecutionUsageObservation {
+export function projectNativeRepair(value: UsageRecord, previous: UsageRecord | undefined, repair?: NativeRepair): UsageRecord {
   const revision = previous?.projection.projectionRevision ?? 0;
   let projection = { ...value.projection, projectionRevision: revision };
   if (repair) {
@@ -149,7 +149,7 @@ export function projectNativeRepair(value: ExecutionUsageObservation, previous: 
 }
 
 export const nativeRecordId = (step: NativeUsageStep) => `opencode:step:${jsonHash({ session: step.sessionId, id: step.id })}`;
-export const nativeCaptureId = (identity: ExecutionObservationIdentity, sourceId: string, turn: string) => jsonHash({ identity, sourceId, turn });
+export const nativeCaptureId = (identity: UsageExecutionIdentity, sourceId: string, turn: string) => jsonHash({ identity, sourceId, turn });
 export const nativeStepKey = (lineageKey: string, root: string, recordId: string) => jsonHash({ lineageKey, root, recordId });
 export function nativeStepFingerprint(step: NativeUsageStep): string {
   return jsonHash({ session: step.sessionId, parent: step.parentSessionId, ancestors: step.ancestors, usage: step.usage, model: step.actualModel });
@@ -164,7 +164,7 @@ export function compareNativeBaseline(row: NativeBaselineEntry, owners: readonly
     row.afterObserved && (row.after === null || owner.fingerprint !== nativeStepFingerprint(row.after));
   return { status: revised ? 'revised' : 'same', owner: owner.id };
 }
-export function nativeCaptureSummary(value: NativeCaptureDocument, counts: { steps: number; baselines: number; unresolved: number; revised: number; corrected?: number }): RuntimeNativeCapture {
+export function nativeCaptureSummary(value: NativeCaptureDocument, counts: { steps: number; baselines: number; unresolved: number; revised: number; corrected?: number }): UsageNativeCapture {
   const issues = new Set(value.proof.issues);
   if (!value.began && value.proof.state !== 'unsupported') issues.add('native-baseline-not-started');
   if ((value.proof.state === 'complete' || value.proof.state === 'partial' && value.proof.issues.length === 1 && value.proof.issues[0] === 'native-prior-revision-gap') && (counts.steps !== value.proof.emitted || counts.baselines !== value.proof.baselineSteps)) issues.add('native-evidence-incomplete');
@@ -179,7 +179,7 @@ export function nativeCaptureSummary(value: NativeCaptureDocument, counts: { ste
 }
 
 /** Native traversal quality qualifies the known subtotal without changing its value. */
-export function qualifyNativeMetrics(metrics: RuntimeUsageMetrics, captures: readonly RuntimeNativeCapture[], observations: readonly ExecutionObservation[]): RuntimeUsageMetrics {
+export function qualifyNativeMetrics(metrics: RuntimeUsageMetrics, captures: readonly UsageNativeCapture[], observations: readonly UsageObservation[]): RuntimeUsageMetrics {
   const missing = observations.some((row) => row.kind === 'usage' && !captures.some((capture) => capture.sourceId === row.sourceId && capture.proof.turn === row.scope?.turn && capture.proof.turnIndex === row.scope.turnIndex && capture.proof.root === row.scope.root));
   const complete = !missing && captures.length > 0 && captures.every((capture) => capture.state === 'complete');
   if (complete && metrics.records === 0 && captures.every((capture) => capture.receivedSteps === 0 && capture.proof.emitted === 0 && capture.proof.steps === capture.proof.baselineSteps)) {

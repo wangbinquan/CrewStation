@@ -1,21 +1,21 @@
 import type { ProjectRuntimeStatistics, RuntimeStatisticsQuery, RuntimeTaskObservation, SystemRuntimeStatistics } from '@crewstation/contracts';
-import type { ExecutionCostVisibilityDto, ExecutionObservationPage, ExecutionObservationQuery, SetExecutionCostVisibility, ExecutionValuationObservation, ExecutionObservationIdentity, ExecutionUsageObservation } from '@crewstation/contracts';
+import type { ExecutionCostVisibilityDto, ExecutionObservationPage, ExecutionObservationQuery, SetExecutionCostVisibility, UsageValuation, UsageExecutionIdentity, UsageRecord } from '@crewstation/contracts';
 import type { Actor, AlertDto, HealthDto, LogEntryDto, LogQuery, ProjectId, TaskId, TraceChainDto, TraceEventDto, TraceEventsQuery, TraceId, TraceListQuery, TraceSummaryDto } from '@crewstation/contracts';
 
 import type { TokenPricingApi } from './tokenPricingApi';
 
 /** Public input/output values are independent of persistence ports. Wiring checks their structural compatibility. */
 export interface ExecutionPriceInput {
-  identity: ExecutionObservationIdentity;
+  identity: UsageExecutionIdentity;
   profile: { id: string; revision: number; protocol: 'opencode' | 'claude-code' | 'terminal' } | null;
 }
 export interface AcceptedExecutionPrice extends ExecutionPriceInput { acceptedAt: string; priceBookRevision: number }
 export interface UsageSourcePage {
   projectId: ProjectId; taskId: TaskId; sourceId: string; expectedCursor: string | null; nextCursor: string;
-  events: Array<{ eventId: string; measurement: Omit<ExecutionUsageObservation, 'projection'> }>;
+  events: Array<{ eventId: string; measurement: Omit<UsageRecord, 'projection'> }>;
 }
 export interface ExecutionValuationRequest {
-  measurement: Pick<ExecutionUsageObservation, 'identity' | 'sourceId' | 'recordId'>;
+  measurement: Pick<UsageRecord, 'identity' | 'sourceId' | 'recordId'>;
   usageRevision: number; requestKey: string; model: { provider: string; model: string; condition: string | null } | null;
 }
 export interface ExecutionObservationCaller { identity: string; token?: string }
@@ -32,7 +32,7 @@ export interface ObservabilityModuleApi extends TokenPricingApi {
   /** Internal durable source ingestion; never an HTTP write endpoint. */
   ingestExecutionUsage(input: UsageSourcePage): Promise<{ cursor: string | null; applied: number; duplicate: number }>;
   /** Separate durable valuation; references one committed usage projection revision. */
-  valueExecutionUsage(input: ExecutionValuationRequest): Promise<ExecutionValuationObservation>;
+  valueExecutionUsage(input: ExecutionValuationRequest): Promise<UsageValuation>;
   executionObservations(caller: ExecutionObservationCaller, taskId: TaskId, query: ExecutionObservationQuery): Promise<ExecutionObservationPage>;
   executionCostVisibility(actor: Actor, projectId: ProjectId): Promise<ExecutionCostVisibilityDto>;
   setExecutionCostVisibility(actor: Actor, projectId: ProjectId, input: SetExecutionCostVisibility): Promise<ExecutionCostVisibilityDto>;

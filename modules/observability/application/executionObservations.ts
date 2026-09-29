@@ -7,7 +7,7 @@ import { qualifyNativeMetrics } from '../domain/usageProjection';
 import { intervalDurations } from '../domain/executionIntervals';
 import type { RuntimeStatisticsSource, RuntimeStatisticsSnapshot } from '../ports/usageLedger';
 import type { Actor, ProjectId, ExecutionObservationPage, ExecutionObservationQuery, SetExecutionCostVisibility, TaskId } from '@crewstation/contracts';
-import { ExecutionObservationPageSchema, ExecutionObservationQuerySchema } from '@crewstation/contracts';
+import { ExecutionObservationSchema, ExecutionObservationPageSchema, ExecutionObservationQuerySchema } from '@crewstation/contracts';
 import { conflict, forbidden, jsonHash, validation, type Clock } from '@crewstation/kernel';
 import type { ExecutionCostVisibilityStore, ExecutionObservationAccess, ExecutionObservationCaller, UsageLedgerStore, UsageTaskScope } from '../ports/usageLedger';
 import type { ProjectAuthorizer } from '../ports/sources';
@@ -32,12 +32,12 @@ async function read(deps: ObservationReadDeps, caller: ExecutionObservationCalle
   let page: ExecutionObservationPage;
   if ('snapshot' in query) {
     const snapshot = await deps.ledger.snapshot(scope, query, now.getTime(), visibility.revision);
-    page = { ...base, gaps: snapshot.captureIncomplete ? [{ after: null, through: prefix + snapshot.snapshotThrough, reason: 'capture-incomplete' }] : [], mode: 'snapshot', items: snapshot.items, nextCursor: snapshot.nextCursor,
+    page = { ...base, gaps: snapshot.captureIncomplete ? [{ after: null, through: prefix + snapshot.snapshotThrough, reason: 'capture-incomplete' }] : [], mode: 'snapshot', items: snapshot.items.map((item) => ExecutionObservationSchema.parse(item)), nextCursor: snapshot.nextCursor,
       snapshotId: snapshot.snapshotId, snapshotThrough: prefix + snapshot.snapshotThrough, persistedThrough: prefix + snapshot.snapshotThrough,
       asOf: new Date(snapshot.createdAt).toISOString(), expiresAt: new Date(snapshot.expiresAt).toISOString() };
   } else {
     const changes = await deps.ledger.changes(scope, readCursor(query.after, scope), query.limit);
-    page = { ...base, gaps: changes.captureIncomplete ? [{ after: null, through: prefix + changes.persistedThrough, reason: 'capture-incomplete' }] : [], mode: 'incremental', items: changes.items, nextCursor: changes.hasMore ? prefix + changes.nextCursor : null,
+    page = { ...base, gaps: changes.captureIncomplete ? [{ after: null, through: prefix + changes.persistedThrough, reason: 'capture-incomplete' }] : [], mode: 'incremental', items: changes.items.map((item) => ExecutionObservationSchema.parse(item)), nextCursor: changes.hasMore ? prefix + changes.nextCursor : null,
       persistedThrough: prefix + changes.persistedThrough, asOf: now.toISOString() };
   }
   if ((await deps.visibility.read(scope.projectId)).revision !== visibility.revision) throw conflict('金额可见性已变更，请重新读取观测');

@@ -1,5 +1,6 @@
+import { ExecutionUsageObservationSchema, ExecutionValuationObservationSchema, RuntimeNativeCaptureSchema } from '@crewstation/contracts';
 import { and, asc, eq, gt, lte, inArray, sql } from 'drizzle-orm';
-import { ExecutionValuationObservationSchema, RuntimeNativeCaptureSchema, type ExecutionObservationIdentity, type RunnerUsageCapture, type RuntimeFactPage } from '@crewstation/contracts';
+import { UsageValuationSchema, UsageNativeCaptureSchema, type UsageExecutionIdentity, type RunnerUsageCapture, type RuntimeFactPage } from '@crewstation/contracts';
 import { conflict, validation, jsonHash } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
 import type { ExecutionValuationRequest, ExecutionValuationStore, UsageMeasurementRef, UsageLedgerStore, UsageLedgerTransaction, UsageTaskScope } from '../../ports/usageLedger';
@@ -119,7 +120,7 @@ async function persistValuation(db: Executor, input: ExecutionValuationRequest, 
   if (previous?.basisFingerprint === basisFingerprint) return previous.document;
   const revision = (previous?.document.valuationRevision ?? 0) + 1;
   if (!Number.isSafeInteger(revision) || sequence >= Number.MAX_SAFE_INTEGER) throw new RangeError('Execution valuation sequence exhausted');
-  const document = ExecutionValuationObservationSchema.parse({ ...draft, valuationRevision: revision, revision });
+  const document = UsageValuationSchema.parse({ ...draft, valuationRevision: revision, revision });
   await db.insert(executionValuations).values({ meterKey, taskKey, basisFingerprint, document }).onConflictDoUpdate({ target: executionValuations.meterKey, set: { basisFingerprint, document } });
   await db.insert(usageChanges).values({ taskKey, meterKey, sequence: sequence + 1, document });
   await db.update(usageHeads).set({ sequence: sequence + 1 }).where(eq(usageHeads.taskKey, taskKey));
@@ -166,15 +167,15 @@ export async function readRuntimeStatisticsLedger(db: Executor, facts: RuntimeFa
   const captures = await db.select({ summary: nativeCaptures.summary }).from(nativeCaptures).where(inArray(nativeCaptures.taskKey, keys)).orderBy(asc(nativeCaptures.id)).limit(2001);
   const projects = [...new Set(facts.items.map((task) => task.projectId))];
   const policies = await db.select().from(costVisibility).where(inArray(costVisibility.projectId, projects));
-  return { tasks: facts.items, observations: [...usage.slice(0, 20000).map((r) => r.document), ...valued.slice(0, remaining).map((r) => r.document)],
+  return { tasks: facts.items, observations: [...usage.slice(0, 20000).map((r) => ExecutionUsageObservationSchema.parse(r.document)), ...valued.slice(0, remaining).map((r) => ExecutionValuationObservationSchema.parse(r.document))],
     costVisible: Object.fromEntries(policies.map((r) => [r.projectId, r.document.visibility === 'project-members-and-services'])),
-    nativeCaptures: captures.slice(0, 2000).map((row) => row.summary),
+    nativeCaptures: captures.slice(0, 2000).map((row) => RuntimeNativeCaptureSchema.parse(row.summary)),
     partial: facts.partial || usage.length > 20000 || valued.length > remaining || captures.length > 2000 };
 }
 
 
 async function captureRow(db: Executor, id: string) { return (await db.select().from(nativeCaptures).where(eq(nativeCaptures.id, id)).limit(1))[0]; }
-async function persistProof(db: Executor, taskKey: string, sourceId: string, identity: ExecutionObservationIdentity, proof: NonNullable<RunnerUsageCapture['nativeProof']>) {
+async function persistProof(db: Executor, taskKey: string, sourceId: string, identity: UsageExecutionIdentity, proof: NonNullable<RunnerUsageCapture['nativeProof']>) {
   const id = nativeCaptureId(identity, sourceId, proof.turn), previous = await captureRow(db, id), before = previous?.document;
   if (before && (before.proof.lineageKey !== proof.lineageKey || before.proof.turnIndex !== proof.turnIndex || jsonHash(before.proof.baseline) !== jsonHash(proof.baseline))) throw conflict('原生证明身份或基线冲突');
   if (before && before.proof.state !== 'pending' && jsonHash(before.proof) !== jsonHash(proof)) throw conflict('原生最终证明内容冲突');
@@ -187,7 +188,7 @@ async function persistProof(db: Executor, taskKey: string, sourceId: string, ide
   await db.insert(nativeCaptures).values(row).onConflictDoUpdate({ target: nativeCaptures.id, set: { document, root: proof.root, finalized } });
   return id;
 }
-async function persistNativeMeasurements(db: Executor, taskKey: string, sourceId: string, identity: ExecutionObservationIdentity, frame: RunnerUsageCapture, affected: Set<string>, nativeKeys: Set<string>) {
+async function persistNativeMeasurements(db: Executor, taskKey: string, sourceId: string, identity: UsageExecutionIdentity, frame: RunnerUsageCapture, affected: Set<string>, nativeKeys: Set<string>) {
   for (const measurement of frame.measurements) {
     if (!measurement.scope || measurement.scope.level !== 'request' || measurement.reporting !== 'delta' || measurement.inclusion !== 'self') continue;
     const id = nativeCaptureId(identity, sourceId, measurement.scope.turn), capture = await captureRow(db, id);
@@ -206,7 +207,7 @@ async function persistNativeMeasurements(db: Executor, taskKey: string, sourceId
     affected.add(id); nativeKeys.add(nativeKey);
   }
 }
-async function persistNativeBaseline(db: Executor, taskKey: string, sourceId: string, identity: ExecutionObservationIdentity, baseline: NonNullable<RunnerUsageCapture['nativeBaseline']>, affected: Set<string>, nativeKeys: Set<string>) {
+async function persistNativeBaseline(db: Executor, taskKey: string, sourceId: string, identity: UsageExecutionIdentity, baseline: NonNullable<RunnerUsageCapture['nativeBaseline']>, affected: Set<string>, nativeKeys: Set<string>) {
   const id = nativeCaptureId(identity, sourceId, baseline.turn), capture = await captureRow(db, id);
   if (!capture || capture.lineageKey !== baseline.lineageKey || capture.document.proof.baseline.kind !== 'resume' || capture.document.baselineRoot !== baseline.root || baseline.offset + baseline.steps.length > 10000) throw conflict('原生恢复基线没有对应的已接收证明');
   for (const [index, document] of baseline.steps.entries()) {
@@ -282,7 +283,7 @@ async function projectNativeCapture(db: Executor, taskKey: string, id: string, s
   const document = nativeCaptureSummary(capture, counts);
   if (Number(stepCount!.mismatched)) { document.state = 'partial'; document.issues.push('native-root-changed'); }
   if (baselineCount!.maximum !== null && Number(baselineCount!.maximum) + 1 !== counts.baselines) { document.state = 'partial'; document.issues.push('native-evidence-incomplete'); }
-  const summary = RuntimeNativeCaptureSchema.parse(document);
+  const summary = UsageNativeCaptureSchema.parse(document);
   const history = await db.select({ sequence: nativeCaptureHistory.sequence }).from(nativeCaptureHistory).where(and(eq(nativeCaptureHistory.taskKey, taskKey), eq(nativeCaptureHistory.captureId, id))).limit(1);
   if (history.length && jsonHash(summary) === jsonHash(current.summary)) return sequence;
   if (sequence >= Number.MAX_SAFE_INTEGER) throw new RangeError('Native capture sequence exhausted');
@@ -290,7 +291,7 @@ async function projectNativeCapture(db: Executor, taskKey: string, id: string, s
   await db.insert(nativeCaptureHistory).values({ taskKey, sequence: ++sequence, captureId: id, document: summary });
   return sequence;
 }
-async function persistNativeFrame(db: Executor, taskKey: string, sourceId: string, identity: ExecutionObservationIdentity, frame: RunnerUsageCapture, sequence: number): Promise<number> {
+async function persistNativeFrame(db: Executor, taskKey: string, sourceId: string, identity: UsageExecutionIdentity, frame: RunnerUsageCapture, sequence: number): Promise<number> {
   const affected = new Set<string>(), nativeKeys = new Set<string>(), meters = new Set<string>();
   if (frame.nativeProof) {
     const id = await persistProof(db, taskKey, sourceId, identity, frame.nativeProof); affected.add(id);

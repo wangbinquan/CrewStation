@@ -1,4 +1,4 @@
-import { ExecutionObservationIdentitySchema, ExecutionValuationObservationSchema, type ExecutionValuationObservation, type TokenPriceVersion, type RunnerUsageSourcePage } from '@crewstation/contracts';
+import { UsageExecutionIdentitySchema, UsageValuationSchema, type UsageValuation, type TokenPriceVersion, type RunnerUsageSourcePage } from '@crewstation/contracts';
 import { conflict, jsonHash, notFound, validation, type Clock } from '@crewstation/kernel';
 import { z } from 'zod';
 import { valueTokenUsage } from '../domain/cnyPricing';
@@ -7,7 +7,7 @@ import type { ExecutionValuationRequest, ExecutionValuationStore, RunnerUsageSou
 
 const key = z.string().min(1).max(512);
 const request = z.strictObject({
-  measurement: z.strictObject({ identity: ExecutionObservationIdentitySchema, sourceId: key, recordId: key }),
+  measurement: z.strictObject({ identity: UsageExecutionIdentitySchema, sourceId: key, recordId: key }),
   usageRevision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER), requestKey: z.string().min(8).max(128),
   model: z.strictObject({ provider: z.string().min(1).max(200), model: z.string().min(1).max(300), condition: z.string().min(1).max(200).nullable() }).nullable(),
 });
@@ -21,7 +21,7 @@ function amount(price: TokenPriceVersion | undefined, usage: NonNullable<Awaited
 
 /** Independent valuation projection: retries never write or add token usage. */
 export function executionValuations(deps: { store: ExecutionValuationStore; pricing: ExecutionPriceStore; clock: Clock }) {
-  return async (raw: ExecutionValuationRequest): Promise<ExecutionValuationObservation> => {
+  return async (raw: ExecutionValuationRequest): Promise<UsageValuation> => {
     const parsed = request.safeParse(raw);
     if (!parsed.success) throw validation('估值证据无效');
     const input = parsed.data, fingerprint = jsonHash(input);
@@ -36,7 +36,7 @@ export function executionValuations(deps: { store: ExecutionValuationStore; pric
     // Price lookup finishes before the ledger transaction, including with a one-connection pool.
     const price = await deps.pricing.price(input.measurement.identity, input.model);
     const basisFingerprint = jsonHash({ usageRevision: input.usageRevision, model: input.model, priceVersion: price?.id ?? null });
-    const draft = ExecutionValuationObservationSchema.parse({ ...input.measurement, kind: 'valuation',
+    const draft = UsageValuationSchema.parse({ ...input.measurement, kind: 'valuation',
       valuationId: jsonHash(input.measurement), revision: 1, valuationRevision: 1, usageRevision: input.usageRevision,
       occurredAt: usage.occurredAt, observedAt: deps.clock.now().toISOString(), currency: 'CNY', ...amount(price, usage) });
     return deps.store.commit(input, fingerprint, basisFingerprint, draft);

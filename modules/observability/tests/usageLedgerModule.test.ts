@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { ExecutionObservationIdentitySchema, ExecutionUsageObservationSchema, type ExecutionObservation } from '@crewstation/contracts';
+import { ExecutionObservationIdentitySchema, ExecutionUsageObservationSchema } from '@crewstation/contracts';
 import { createTestDatabase, testDatabaseAvailable, type TestDatabase } from '@crewstation/testkit';
 import { usageIngestion } from '../application/usageIngestion';
 import { drizzleUsageLedger } from '../adapters/persistence/drizzleUsageLedger';
@@ -7,7 +7,7 @@ import type { UsageEvidence } from '../domain/usageProjection';
 import type { UsageLedgerStore, UsageSourcePage } from '../ports/usageLedger';
 import { observabilityMigrations } from '../wiring';
 
-const usage = (item: ExecutionObservation | undefined) => ExecutionUsageObservationSchema.parse(item);
+const usage = (item: unknown) => ExecutionUsageObservationSchema.parse(item);
 const available = await testDatabaseAvailable();
 let tdb: TestDatabase;
 beforeAll(async () => { if (available) tdb = await createTestDatabase([observabilityMigrations]); });

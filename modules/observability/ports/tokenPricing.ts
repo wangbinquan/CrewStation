@@ -1,4 +1,4 @@
-import type { Actor, ExecutionObservationIdentity, SaveTokenPrice, TokenPricePageQuery, TokenPriceVersion } from '@crewstation/contracts';
+import type { Actor, UsageExecutionIdentity, SaveTokenPrice, TokenPricePageQuery, TokenPriceVersion } from '@crewstation/contracts';
 
 export interface PricingProfile {
   id: string; name: string; revision: number;
@@ -33,7 +33,7 @@ export interface TokenPriceStore {
 
 /** The owner supplies the immutable execution identity and selected profile before launch. */
 export interface ExecutionPriceInput {
-  identity: ExecutionObservationIdentity;
+  identity: UsageExecutionIdentity;
   profile: { id: string; revision: number; protocol: 'opencode' | 'claude-code' | 'terminal' } | null;
 }
 export interface AcceptedExecutionPrice extends ExecutionPriceInput {

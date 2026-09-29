@@ -127,6 +127,7 @@ export * from './api/runtimeImages/projectPolicy';
 export * from './api/market/appIcon';
 
 export * from './api/observability/executionObservations';
+export * from './api/observability/usageLedger';
 
 export * from './taskrunner/usageObservation';
 export * from './taskrunner/nativeUsage';

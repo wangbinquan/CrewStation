@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ExecutionObservationIdentitySchema, ResourceIdSchema } from '@crewstation/contracts';
+import { UsageExecutionIdentitySchema, ResourceIdSchema } from '@crewstation/contracts';
 import type { ExecutionPriceStore, ExecutionPriceInput, AcceptedExecutionPrice } from '../../ports/tokenPricing';
 import { ExecutionCostVisibilityDtoSchema, SetExecutionCostVisibilitySchema } from '@crewstation/contracts';
 import { conflict, jsonHash, validation } from '@crewstation/kernel';
@@ -80,7 +80,7 @@ export function drizzleCostVisibility(db: Database): ExecutionCostVisibilityStor
   };
 }
 
-const executionPriceInput = z.strictObject({ identity: ExecutionObservationIdentitySchema,
+const executionPriceInput = z.strictObject({ identity: UsageExecutionIdentitySchema,
   profile: z.strictObject({ id: ResourceIdSchema, revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER), protocol: z.enum(['opencode', 'claude-code', 'terminal']) }).nullable() });
 const pricingModel = z.strictObject({ provider: z.string().min(1).max(200), model: z.string().min(1).max(300), condition: z.string().min(1).max(200).nullable() });
 const executionPriceWhere = (identity: ExecutionPriceInput['identity']) => and(eq(acceptedExecutionPrices.executionId, identity.executionId), eq(acceptedExecutionPrices.generation, identity.executionGeneration));
@@ -116,9 +116,9 @@ async function acceptPrice(db: Database, raw: ExecutionPriceInput, now: Date): P
 export function drizzleExecutionPricing(db: Database): ExecutionPriceStore {
   return {
     accept: (input, now) => acceptPrice(db, input, now),
-    get: async (identity) => (await acceptedPrice(db, ExecutionObservationIdentitySchema.parse(identity)))?.document,
+    get: async (identity) => (await acceptedPrice(db, UsageExecutionIdentitySchema.parse(identity)))?.document,
     price: async (identity, actual) => {
-      const binding = (await acceptedPrice(db, ExecutionObservationIdentitySchema.parse(identity)))?.document;
+      const binding = (await acceptedPrice(db, UsageExecutionIdentitySchema.parse(identity)))?.document;
       if (!binding?.profile || binding.profile.protocol === 'terminal' || actual === null) return undefined;
       const model = pricingModel.parse(actual);
       return selected(db, { ...model, profileId: binding.profile.id, profileRevision: binding.profile.revision,

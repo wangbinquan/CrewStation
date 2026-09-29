@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { ExecutionObservationIdentitySchema, ExecutionObservationPageSchema, IDENTITY_HEADERS, type Actor, type UserId } from '@crewstation/contracts';
+import { DevelopmentUsageIdentitySchema, ExecutionObservationIdentitySchema, ExecutionObservationPageSchema, IDENTITY_HEADERS, type Actor, type UserId } from '@crewstation/contracts';
 import { createApp } from '@crewstation/http';
 import { createFakeK8sClient } from '@crewstation/k8s';
 import { fixedClock } from '@crewstation/kernel';
@@ -127,5 +127,17 @@ describe.skipIf(!available)('RFC-034 execution observations HTTP and visibility 
       } },
     });
     await expect(api.executionObservations({ identity: 'fixture/fixture' }, f.scope.taskId, { snapshot: 'true', limit: 1 })).rejects.toMatchObject({ kind: 'conflict' });
+  });
+});
+
+// Internal owner mistakes must fail at the reader; they cannot widen the service's public v1 page.
+describe.skipIf(!available)('RFC-034 business observation ownership boundary', () => {
+  test('incremental and frozen snapshot reads reject development documents in a business task scope', async () => {
+    const f = fixture();
+    const identity = DevelopmentUsageIdentitySchema.parse({ ...f.scope, sourceKind: 'development-agent', agentId: Bun.randomUUIDv7(), executionId: Bun.randomUUIDv7(), executionGeneration: 1 });
+    await f.module.api.ingestExecutionUsage({ ...f.scope, sourceId: 'development', expectedCursor: null, nextCursor: 'first',
+      events: [{ eventId: 'first', measurement: { ...f.measurement, sourceId: 'development', identity } }] });
+    for (const query of [{ limit: 200 }, { snapshot: 'true' as const, limit: 200 }])
+      await expect(f.module.api.executionObservations({ identity: 'fixture/fixture' }, f.scope.taskId, query)).rejects.toThrow();
   });
 });
