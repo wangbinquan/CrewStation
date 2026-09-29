@@ -108,6 +108,7 @@
     "modules/observability/adapters/persistence/migrations/0009_execution_prices.sql": "1fb7a4d09df8143ec0deb9af9d759d4e6c1833dde9046d90db8aa4809cb35430",
     "modules/observability/adapters/persistence/migrations/0010_execution_valuations.sql": "ac50e62f1d30b61f354ba25a0cab0301ba513863ad647574e281c45c49cdef26",
     "modules/observability/adapters/persistence/migrations/0011_native_captures.sql": "d831b3a20c8f580fb94798dc60ffd6bd8744e5ccd2bbe541601547bb416fd8bb",
+    "modules/observability/adapters/persistence/migrations/0012_native_repairs.sql": "095d97fd1015058a8b986658afadc641c51020624d216638ff8000676e4f63f4",
     "modules/project/adapters/persistence/migrations/0001_create_schema.sql": "8cb29f5022308ccafceedb3e0b1130e8bc13fc2d831e5146d9dd34abe30b8abe",
     "modules/project/adapters/persistence/migrations/0002_core_tables.sql": "29e544627de379d3f7ab195cbacf8959f234b7c661a2ed5402ab29ffc8483f22",
     "modules/project/adapters/persistence/migrations/0003_compute_profiles.sql": "1ca73704b0fa919337946e02244842673141e27d337033c111478a9405f82ba6",

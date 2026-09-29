@@ -1,10 +1,11 @@
 // RFC-034: native child snapshots must preserve exact usage, resume exclusion and incomplete evidence.
 import { Database } from 'bun:sqlite';
 import { afterEach, expect, test } from 'bun:test';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { NativeUsageStep } from '@crewstation/contracts';
+import { NativeUsageProofSchema, type NativeUsageStep } from '@crewstation/contracts';
+import { readOrderedNativeUsageSnapshot } from '../drivers/usage/orderedNativeSnapshot';
 import { createNativeUsageCapture, unsupportedNativeUsageCapture } from '../drivers/usage/nativeCapture';
 import { readNativeUsageSnapshot, type NativeUsageSnapshot } from '../drivers/usage/nativeSnapshot';
 
@@ -115,4 +116,66 @@ test('native timestamps outside the four-digit ISO contract remain unknown', () 
   const s = store(); s.session('root'); s.part('future', 'root', numeric(), 253402300800000);
   const value = readNativeUsageSnapshot(s.path, 'root');
   expect(value.steps[0]!.occurredAt).toBeNull(); expect(value.issues).toContain('native-time-unavailable'); s.db.close();
+});
+
+// Historical corrections require a persisted order acquired before the native read.
+test('ordered snapshots retain one epoch across reopen and hold the order lock before reading', () => {
+  const s = store(); s.session('root'); s.part('S', 'root', numeric());
+  const first = readOrderedNativeUsageSnapshot(s.path, 'root');
+  expect(first.order?.sequence).toBe(1);
+  let locked = false;
+  const second = readOrderedNativeUsageSnapshot(s.path, 'root', { clock: () => {
+    if (!locked) {
+      const contender = new Database(s.path + '.crewstation-usage.sqlite');
+      try { expect(() => contender.exec('BEGIN IMMEDIATE')).toThrow('locked'); locked = true; }
+      finally { contender.close(); }
+    }
+    return 0;
+  } });
+  expect(locked).toBe(true); expect(second.order).toEqual({ epoch: first.order!.epoch, sequence: 2 });
+  expect(second.fingerprint).toBe(first.fingerprint); expect(second.issues).toEqual([]); s.db.close();
+});
+test('a different process holding the order lock leaves numbers readable and retries monotonically', async () => {
+  const s = store(); s.session('root'); s.part('S', 'root', numeric());
+  const first = readOrderedNativeUsageSnapshot(s.path, 'root');
+  const program = `import { Database } from 'bun:sqlite';
+    const db = new Database(process.argv[1]); db.exec('BEGIN IMMEDIATE');
+    process.stdout.write('ready'); await Bun.stdin.stream().getReader().read(); db.exec('ROLLBACK'); db.close();`;
+  const child = Bun.spawn([process.execPath, '-e', program, s.path + '.crewstation-usage.sqlite'], { stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' });
+  try {
+    const reader = child.stdout.getReader();
+    expect(new TextDecoder().decode((await reader.read()).value)).toBe('ready'); reader.releaseLock();
+    const blocked = readOrderedNativeUsageSnapshot(s.path, 'root');
+    expect(blocked.order).toBeUndefined(); expect(blocked.steps[0]!.usage.input).toBe('10');
+    expect(blocked.issues).toContain('native-order-unavailable');
+  } finally { child.stdin.write('release'); child.stdin.end(); await child.exited; s.db.close(); }
+  expect(child.exitCode).toBe(0);
+  expect(readOrderedNativeUsageSnapshot(s.path, 'root').order).toEqual({ epoch: first.order!.epoch, sequence: 2 });
+});
+test('unwritable or exhausted order stores preserve numbers without issuing a false order', () => {
+  const s = store(); s.session('root'); s.part('S', 'root', numeric());
+  const sidecar = s.path + '.crewstation-usage.sqlite'; mkdirSync(sidecar);
+  expect(readOrderedNativeUsageSnapshot(s.path, 'root')).toMatchObject({ steps: [{ usage: { input: '10' } }], issues: ['native-order-unavailable'] });
+  rmSync(sidecar, { recursive: true });
+  const before = readOrderedNativeUsageSnapshot(s.path, 'root'), db = new Database(sidecar);
+  db.query('UPDATE snapshot_order SET sequence=?').run(Number.MAX_SAFE_INTEGER); db.close();
+  const exhausted = readOrderedNativeUsageSnapshot(s.path, 'root');
+  expect(exhausted.order).toBeUndefined(); expect(exhausted.steps).toEqual(before.steps);
+  expect(exhausted.issues).toContain('native-order-unavailable');
+  rmSync(sidecar); expect(readOrderedNativeUsageSnapshot(s.path, 'root').order?.epoch).not.toBe(before.order!.epoch);
+  expect(readOrderedNativeUsageSnapshot(null, 'root').issues).toContain('native-order-unavailable'); s.db.close();
+});
+test('resume preserves native order evidence and an epoch reset cannot certify completion', () => {
+  let value = { ...snapshot([step('old')]), order: { epoch: 'epoch', sequence: 1 } };
+  const c = collector(() => value, 'root');
+  expect(c.begin(at).nativeProof?.baseline.order).toEqual(value.order);
+  value = { ...value, order: { epoch: 'recreated', sequence: 2 } };
+  const final = c.finish('root', at + 1).at(-1)!.nativeProof!;
+  expect(final.state).toBe('partial'); expect(final.issues).toContain('native-order-inconsistent');
+  expect(NativeUsageProofSchema.safeParse({ ...final, state: 'complete', issues: [] }).success).toBe(false);
+  const valid = { ...final, state: 'complete', issues: [], order: { epoch: 'epoch', sequence: 2 } };
+  expect(NativeUsageProofSchema.safeParse(valid).success).toBe(true);
+  expect(NativeUsageProofSchema.safeParse({ ...valid, order: { epoch: 'epoch', sequence: 1 } }).success).toBe(false);
+  expect(NativeUsageProofSchema.safeParse({ ...valid, order: undefined }).success).toBe(false);
+  expect(NativeUsageProofSchema.safeParse({ ...valid, order: undefined, baseline: { kind: 'resume', fingerprint: 'fingerprint' } }).success).toBe(true);
 });

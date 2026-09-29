@@ -1,9 +1,9 @@
 import { Database } from 'bun:sqlite';
 import { jsonHash } from '@crewstation/kernel';
-import type { NativeUsageStep } from '@crewstation/contracts';
+import type { NativeUsageStep, NativeUsageOrder } from '@crewstation/contracts';
 import { identifier, object, readUsage } from './capture';
 
-export interface NativeUsageSnapshot { steps: NativeUsageStep[]; sessions: number; fingerprint: string | null; issues: string[] }
+export interface NativeUsageSnapshot { order?: NativeUsageOrder; steps: NativeUsageStep[]; sessions: number; fingerprint: string | null; issues: string[] }
 interface PartRow { id: string; session_id: string; message_id: string; time_created: number; kind: string; tokens: string | null; provider: string | null; model: string | null }
 interface Session { id: string; parent_id: string | null }
 interface ScanNode { id: string; ancestors: string[] }

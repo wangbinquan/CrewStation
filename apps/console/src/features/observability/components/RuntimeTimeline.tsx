@@ -56,6 +56,7 @@ function NativeCaptureSummary({ captures }: { captures: RuntimeNativeCapture[] }
         <dt>{t('runtime.native.baseline')}</dt><dd>{selected.receivedBaselineSteps} / {selected.proof.baselineSteps}</dd>
         <dt>{t('runtime.native.unresolved')}</dt><dd>{selected.unresolvedBaselineSteps}</dd>
         <dt>{t('runtime.native.revised')}</dt><dd>{selected.revisedBaselineSteps}</dd>
+        <dt>{t('runtime.native.corrected')}</dt><dd>{selected.correctedBaselineSteps ?? 0}</dd>
         <dt>{t('runtime.native.root')}</dt><dd>{selected.proof.root ?? '—'}</dd>
         <dt>{t('runtime.native.observedAt')}</dt><dd>{runtimeDate(selected.proof.observedAt)}</dd>
       </dl>

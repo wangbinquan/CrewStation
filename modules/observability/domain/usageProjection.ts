@@ -1,4 +1,4 @@
-import type { ExecutionUsageObservation, ExecutionObservationIdentity, NativeUsageProof, NativeUsageStep, NativeUsageBaseline, RunnerUsageMeasurement, RuntimeNativeCapture, RuntimeUsageMetrics, ExecutionObservation } from '@crewstation/contracts';
+import type { ExecutionUsageObservation, ExecutionObservationIdentity, NativeUsageProof, NativeUsageOrder, NativeUsageStep, NativeUsageBaseline, RunnerUsageMeasurement, RuntimeNativeCapture, RuntimeUsageMetrics, ExecutionObservation } from '@crewstation/contracts';
 import { jsonHash } from '@crewstation/kernel';
 import { subtractTokenBaseline, TOKEN_BUCKETS, type TokenUsage } from './tokenUsage';
 
@@ -100,6 +100,54 @@ export interface NativeCaptureDocument {
   began: boolean; baselineRoot: string | null; historicalRevisionGap: boolean;
 }
 export type NativeBaselineEntry = NativeUsageBaseline['steps'][number];
+export interface NativeRepair {
+  ownerId: string; captureId: string; ordinal: number; order: NativeUsageOrder; step: NativeUsageStep; modelRef: string | null; scope: NonNullable<ExecutionUsageObservation['scope']>;
+}
+/** A correction is attached to the original request and never borrows a native revision. */
+export function nativeRepairCandidate(owner: NativeCaptureDocument, source: NativeCaptureDocument, row: NativeBaselineEntry, usage: ExecutionUsageObservation, accepted?: NativeRepair): Omit<NativeRepair, 'ordinal'> | undefined {
+  const before = row.before, after = row.after, order = source.proof.order, origin = owner.proof.order, baseline = source.proof.baseline.order;
+  if (!row.afterObserved || !after || !order || !origin || !baseline || !source.proof.fingerprint || !source.began ||
+      source.proof.state === 'pending' || source.proof.state === 'unsupported' || source.proof.baseline.kind !== 'resume' ||
+      order.epoch !== origin.epoch || order.epoch !== baseline.epoch || order.sequence <= origin.sequence || order.sequence <= baseline.sequence ||
+      owner.identity.projectId !== source.identity.projectId || owner.identity.taskId !== source.identity.taskId ||
+      owner.proof.lineageKey !== source.proof.lineageKey || owner.proof.root !== source.proof.root ||
+      usage.basis.kind !== 'invocation' || usage.reporting !== 'delta' || usage.inclusion !== 'self' || usage.scope?.level !== 'request') return;
+  const scope = usage.scope;
+  if (scope.turn !== owner.proof.turn || scope.turnIndex !== owner.proof.turnIndex) return;
+  for (const step of [before, after]) {
+    if (nativeRecordId(step) !== usage.recordId || scope.root !== owner.proof.root || scope.session !== step.sessionId ||
+        scope.parentSession !== step.parentSessionId || jsonHash(scope.ancestors) !== jsonHash(step.ancestors)) return;
+  }
+  const retained = accepted?.ownerId === owner.id && accepted.order.epoch === order.epoch &&
+    (accepted.order.sequence > order.sequence || accepted.order.sequence === order.sequence && nativeStepFingerprint(accepted.step) === nativeStepFingerprint(after));
+  // Late model metadata cannot revoke already accepted numeric evidence. This
+  // exception only reuses the same/later retained order, never a new correction.
+  if (TOKEN_BUCKETS.some((bucket) => after.usage[bucket] === null) ||
+      (after.actualModel === null ? null : jsonHash(after.actualModel)) !== usage.modelRef && !(after.actualModel === null && retained)) return;
+  return { ownerId: owner.id, captureId: source.id, order, step: after, modelRef: usage.modelRef, scope };
+}
+/** A repair retains its request scope and permits only one-way model refinement. */
+export function reconcileNativeRepairModel(value: ExecutionUsageObservation, repair: NativeRepair): NativeRepair | undefined {
+  if (value.basis.kind !== 'invocation' || value.reporting !== 'delta' || value.inclusion !== 'self' ||
+      jsonHash(value.scope) !== jsonHash(repair.scope) || repair.modelRef !== null && repair.modelRef !== value.modelRef) return;
+  return repair.modelRef === value.modelRef ? repair : { ...repair, modelRef: value.modelRef };
+}
+/** Compare only the final projection, after an independently proved historical overlay. */
+export function projectNativeRepair(value: ExecutionUsageObservation, previous: ExecutionUsageObservation | undefined, repair?: NativeRepair): ExecutionUsageObservation {
+  const revision = previous?.projection.projectionRevision ?? 0;
+  let projection = { ...value.projection, projectionRevision: revision };
+  if (repair) {
+    const issues = projection.issues.filter((issue) => issue !== 'unexplained-decrease');
+    const turn = value.scope!.turnIndex;
+    projection = { ...projection, contribution: { ...repair.step.usage }, complete: issues.length === 0, issues,
+      coveredThrough: { input: turn, output: turn, cacheRead: turn, cacheWrite: turn } };
+  }
+  const candidate = { ...value, projection };
+  if (previous && jsonHash(candidate) === jsonHash(previous)) return previous;
+  if (revision === Number.MAX_SAFE_INTEGER) throw new RangeError('Usage projection revision exhausted');
+  return { ...candidate, projection: { ...projection, projectionRevision: revision + 1 } };
+}
+
 export const nativeRecordId = (step: NativeUsageStep) => `opencode:step:${jsonHash({ session: step.sessionId, id: step.id })}`;
 export const nativeCaptureId = (identity: ExecutionObservationIdentity, sourceId: string, turn: string) => jsonHash({ identity, sourceId, turn });
 export const nativeStepKey = (lineageKey: string, root: string, recordId: string) => jsonHash({ lineageKey, root, recordId });
@@ -116,16 +164,18 @@ export function compareNativeBaseline(row: NativeBaselineEntry, owners: readonly
     row.afterObserved && (row.after === null || owner.fingerprint !== nativeStepFingerprint(row.after));
   return { status: revised ? 'revised' : 'same', owner: owner.id };
 }
-export function nativeCaptureSummary(value: NativeCaptureDocument, counts: { steps: number; baselines: number; unresolved: number; revised: number }): RuntimeNativeCapture {
+export function nativeCaptureSummary(value: NativeCaptureDocument, counts: { steps: number; baselines: number; unresolved: number; revised: number; corrected?: number }): RuntimeNativeCapture {
   const issues = new Set(value.proof.issues);
   if (!value.began && value.proof.state !== 'unsupported') issues.add('native-baseline-not-started');
-  if (value.proof.state === 'complete' && (counts.steps !== value.proof.emitted || counts.baselines !== value.proof.baselineSteps)) issues.add('native-evidence-incomplete');
+  if ((value.proof.state === 'complete' || value.proof.state === 'partial' && value.proof.issues.length === 1 && value.proof.issues[0] === 'native-prior-revision-gap') && (counts.steps !== value.proof.emitted || counts.baselines !== value.proof.baselineSteps)) issues.add('native-evidence-incomplete');
   if (counts.unresolved) issues.add('native-owner-unresolved');
   if (counts.revised || value.historicalRevisionGap) issues.add('native-prior-revision-gap');
-  const state = value.proof.state === 'complete' && issues.size ? 'partial' : value.proof.state;
+  if (!counts.revised && !counts.unresolved && !value.historicalRevisionGap && counts.baselines === value.proof.baselineSteps) issues.delete('native-prior-revision-gap');
+  const repaired = value.proof.state === 'partial' && value.proof.issues.length === 1 && value.proof.issues[0] === 'native-prior-revision-gap' && issues.size === 0;
+  const state = repaired ? 'complete' : value.proof.state === 'complete' && issues.size ? 'partial' : value.proof.state;
   return { id: value.id, identity: value.identity, sourceId: value.sourceId, proof: value.proof, state, issues: [...issues],
     receivedSteps: counts.steps, receivedBaselineSteps: counts.baselines, unresolvedBaselineSteps: counts.unresolved,
-    revisedBaselineSteps: counts.revised, historicalRevisionGap: value.historicalRevisionGap };
+    revisedBaselineSteps: counts.revised, correctedBaselineSteps: counts.corrected ?? 0, historicalRevisionGap: value.historicalRevisionGap };
 }
 
 /** Native traversal quality qualifies the known subtotal without changing its value. */

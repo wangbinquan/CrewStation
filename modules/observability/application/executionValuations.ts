@@ -57,5 +57,15 @@ export function valueRunnerUsagePage(deps: { store: ExecutionValuationStore; sou
       const input = { measurement: ref, usageRevision: current.projection.projectionRevision, model };
       await deps.value({ ...input, requestKey: jsonHash(input) });
     }
+    // Repair owners may belong to older sources absent from this Runner page.
+    const pending = await deps.store.pendingNativeRepairs(page, 200);
+    for (const { usage, modelEvidence } of pending) {
+      const actual = modelEvidence?.actualModel ?? null;
+      if (usage.modelRef !== null && (!actual || jsonHash(actual) !== usage.modelRef)) throw notFound('历史修订尚无对应的已选模型证据');
+      const model = usage.modelRef !== null && actual?.provider && actual.model ? { provider: actual.provider, model: actual.model, condition: actual.condition } : null;
+      const input = { measurement: { identity: usage.identity, sourceId: usage.sourceId, recordId: usage.recordId }, usageRevision: usage.projection.projectionRevision, model };
+      await deps.value({ ...input, requestKey: jsonHash(input) });
+    }
+    if ((await deps.store.pendingNativeRepairs(page, 1)).length) throw conflict('历史修订估值继续处理中');
   };
 }

@@ -21,7 +21,7 @@ function measurement(input: NativeCaptureInput, step: NativeUsageStep, root: str
 function proof(input: NativeCaptureInput, baseline: NativeUsageSnapshot | undefined, at: number, patch: Partial<NativeUsageProof>): NativeUsageProof {
   return { contract: 'opencode-child-steps-v1', lineageKey: input.lineageKey, turn: input.turn, turnIndex: input.turnIndex,
     state: 'pending', root: input.resumeSessionId ?? null, observedAt: new Date(at).toISOString(),
-    baseline: { kind: input.resumeSessionId ? 'resume' : 'fresh', fingerprint: baseline?.fingerprint ?? null },
+    baseline: { kind: input.resumeSessionId ? 'resume' : 'fresh', fingerprint: baseline?.fingerprint ?? null, ...(baseline?.order ? { order: baseline.order } : {}) },
     fingerprint: null, sessions: 0, steps: 0, emitted: 0, baselineSteps: baseline?.steps.length ?? 0,
     priorRevisionGap: false, issues: [], ...patch };
 }
@@ -61,6 +61,7 @@ export function createNativeUsageCapture(input: NativeCaptureInput, read: (root:
       const session = root ?? input.resumeSessionId, snapshot = session ? snapshotOf(session) : undefined;
       const issues = new Set([...observedIssues, ...extra, ...(snapshot?.issues ?? ['native-root-unavailable'])]);
       if (!begun) issues.add('native-baseline-not-started');
+      if (input.resumeSessionId && (baseline?.order || snapshot?.order) && (!baseline?.order || !snapshot?.order || baseline.order.epoch !== snapshot.order.epoch || baseline.order.sequence >= snapshot.order.sequence)) issues.add('native-order-inconsistent');
       if (input.resumeSessionId && !baseline?.fingerprint) issues.add('native-baseline-unavailable');
       if (session && ((input.resumeSessionId && session !== input.resumeSessionId) || (observedRoot && session !== observedRoot))) issues.add('native-root-changed');
       const before = new Map((baseline?.steps ?? []).map((step) => [step.id, step]));
@@ -82,7 +83,7 @@ export function createNativeUsageCapture(input: NativeCaptureInput, read: (root:
       }
       output.push(frame(proof(input, baseline, at, { state: snapshot?.fingerprint && !issues.size ? 'complete' : 'partial', root: session ?? null,
         fingerprint: snapshot?.fingerprint ?? null, sessions: snapshot?.sessions ?? 0, steps: snapshot?.steps.length ?? 0, emitted,
-        priorRevisionGap, issues: [...issues] })));
+        priorRevisionGap, issues: [...issues], ...(snapshot?.order ? { order: snapshot.order } : {}) })));
       return output.map((value) => RunnerUsageCaptureSchema.parse(value));
     },
   };

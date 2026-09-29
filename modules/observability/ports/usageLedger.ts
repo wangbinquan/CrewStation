@@ -53,6 +53,7 @@ export interface ExecutionValuationRequest {
 }
 export interface ExecutionValuationReceipt { fingerprint: string; document: ExecutionValuationObservation }
 export interface ExecutionValuationStore {
+  pendingNativeRepairs(scope: UsageTaskScope, limit: number): Promise<Array<{ usage: ExecutionUsageObservation; modelEvidence: RunnerUsageMeasurement | null }>>;
   usage(ref: UsageMeasurementRef): Promise<ExecutionUsageObservation | undefined>;
   receipt(scope: UsageTaskScope, requestKey: string): Promise<ExecutionValuationReceipt | undefined>;
   /** Compare the current usage revision, replace the valuation and append its sync change atomically. */

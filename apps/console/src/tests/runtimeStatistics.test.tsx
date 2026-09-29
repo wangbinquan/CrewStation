@@ -105,6 +105,12 @@ test('native capture evidence stays inside the selected attempt dialog, follows 
   attempt.nativeCaptures = [{ ...capture, state: 'partial', historicalRevisionGap: true, issues: ['native-prior-revision-gap', 'collector-new-gap'], revisedBaselineSteps: 1 }];
   await page.reread(); expect(openDialog().textContent).toContain('部分采集'); expect(openDialog().textContent).toContain('历史修订尚未补算');
   expect(openDialog().textContent).toContain('历史步骤已修订，原任务数值待核对'); expect(openDialog().textContent).toContain('采集器报告了其他数据缺口，请查看运行日志。');
+  attempt.nativeCaptures = [{ ...capture, state: 'complete', correctedBaselineSteps: 1 }];
+  await page.reread();
+  expect(openDialog().textContent).toContain('已校正历史步骤');
+  expect(openDialog().textContent).not.toContain('历史修订尚未补算');
+  const corrected = [...openDialog().querySelectorAll('dt')].find((row) => row.textContent === '已校正历史步骤');
+  expect(corrected?.nextElementSibling?.textContent).toBe('1');
   await act(async () => openDialog().dispatchEvent(new Event('cancel', { cancelable: true }))); await page.settle();
   expect(document.activeElement).toBe(bar); expect(document.querySelector('dialog')).toBeNull();
 });

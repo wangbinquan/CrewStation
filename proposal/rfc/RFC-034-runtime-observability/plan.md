@@ -235,3 +235,13 @@ Bun静态bundle构建通过；最初品牌SVG解析与macOS大小写文件名冲
 经已批准的本机部署，在 `crewstation-system` 更新 console、cs-api、cs-auth、cs-controller、cs-events、cs-session、mcp-capabilities、mcp-operations 八个 Deployment；全部 observedGeneration 与 generation 一致且 Ready=1。镜像通过仓库对象存储兼容预检后按不可变摘要绑定：console 为 `sha256:3d8e74ba64da85089bad123d1b97516f9d1625b98449f24fe25ce3140fb26d68`，control-plane 为 `sha256:9c0a47d9c8784ba24e708e59f620d6baa6a8a466317c2e6debbc763ed8871420`，revision 标签均为上述提交，storage-contract=1。部署完成于 `2026-09-28T20:04:41.519Z`；仅更新上述容器镜像，没有重新创建会话或任务资源。
 
 `http://console.cs.localhost/auth/login` 可读 HTTP 200。正式浏览器仍停在登录页，管理员浏览器会话的身份授权待用户回复；现有几何/键盘证据仍属于正式构建加只读 HTTP 夹具，未将其记为真实平台数据验收。完整 RFC 和 AW 托管接线继续实施。
+
+
+### 原生证据与历史修订增量（2026-09-29）
+
+原生子树、轮次证明、持久采集已发布并按精确SHA本机部署，见[native-capture](./native-capture.md) §6。部署回执87d2d0aa的CI36500392717六项成功。当前历史原归属修订与原价CNY补算见[native-repair](./native-repair.md)：独立功能门PASS，完整候选验证和本批发布/升级待完成。两份RFC整体继续，不以该增量代替Claude来源、托管空树同步、服务RED等剩余验收。
+
+历史修订首轮完整门禁4179/142skip/1fail；旧驱动缺口原因断言随新增持久顺序诊断补齐，生产候选未变。定向38/0与独立复核PASS，修正候选完整门禁继续。并行总览小卡片f95e06ee已发布，后续本批镜像从包含它的main提交构建，保留其全部输出。
+
+
+修正候选完整门禁已终态通过：结构、全仓 lint、后端及 console 类型全部通过；4180 pass／142 skip／0 fail，26,516 断言，835 文件，876.94 秒。22 路径指纹与冻结候选一致。真实集群浏览器/模型执行未包含在这次本地门禁内；发布后的精确 SHA CI 与本机升级单独记录。

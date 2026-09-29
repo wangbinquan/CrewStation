@@ -391,5 +391,7 @@ test('unavailable native store preserves business completion with a partial proo
   const frame = JSON.stringify({ type: 'step_finish', sessionID: 'root', part: { id: 'step', tokens: { input: 9, output: 2, cache: { read: 3, write: 0 } } } });
   const host = createFakeProcessHost([{ stdout: [frame] }]), ctx = context(host); ctx.env.OPENCODE_DB = ':memory:';
   const events = await collect(createOpencodeDriver(() => '/bin/opencode').start(openSpec({ businessEvents: true, usageObservationsV1: 1, nativeUsageTreeV1: 1, nativeUsageLineageKey: 'lineage' }), ctx));
-  expect(events.at(-1)?.type).toBe('completed'); expect(events.at(-2)?.usageCapture?.nativeProof).toMatchObject({ state: 'partial', issues: ['native-store-unavailable'] });
+  // RFC-034: absent native storage also has no persisted snapshot order; business completion is unchanged.
+  expect(events.at(-1)?.type).toBe('completed'); expect(events.at(-2)?.usageCapture?.nativeProof).toMatchObject({ state: 'partial', issues: ['native-store-unavailable', 'native-order-unavailable'] });
+  expect(events.at(-2)?.usageCapture?.nativeProof?.order).toBeUndefined();
 });
