@@ -4,6 +4,8 @@
 
 ## 当前已实现与实际部署
 
+当前本机平台版本：`94aabd6dfe641e46bbfc2e736f0632c7fdf6fc12`，2026-09-29 19:46:51Z 部署完成；精确 CI 六项成功，八组件全部 Ready=1，storage-contract=1。开发身份底座已随本批部署，但生产开发采集仍未开启。
+
 正式项目/系统统计已有业务任务、Agent/尝试、四桶 Token、人民币估值、基础泳道、算力贡献下钻和采集质量；项目与算力显示名称，保留稳定 ID/受理修订。已有价格配置与冻结目录、OpenCode 根/子树采集、原归属修订和原价补算；资源/容量和当前服务槽/平台 Pod 健康已有入口。
 
 页面修正、实际 Token 柱形数字、时间按钮对齐、项目/算力名称和取消 CSV 已在本机部署。当前业务统计来源仍被合同显式限定为 `business-tasks`；开发内部身份扩展不能当成开发 Token 已接通。
@@ -11,9 +13,9 @@
 | 批次 | 已有证据 | 尚缺的关闭条件 |
 | --- | --- | --- |
 | 正式页与 CSV 移除 | `84ae1bbbbed1a0f7b9f5de4550e78e4c7e12aa14`；[CI 36508083945](https://github.com/wangbinquan/CrewStation/actions/runs/36508083945) 六项 success；2026-09-29 01:31:46Z 本机八 Deployment Ready | 正式构建加只读夹具的浏览器证据不是实际身份/模型验收 |
-| 开发身份/账本基础 | `ca2ff256317b8ebc5cb914c1310865f916996345`；完整 4191 pass/142 skip/0 fail；[CI 36512613256](https://github.com/wangbinquan/CrewStation/actions/runs/36512613256) success | 生产开发来源关闭，尚未部署此批；不能显示开发已知零 |
-| 采集证明 v2 服务端 | 独立功能门 PASS；冻结 15 路径指纹一致；2026-09-29 03:00:12Z 完整门禁结束：4197 pass/142 skip/0 fail、26633 断言、838 文件 | 当前候选待精确提交/推送、hosted CI、本机部署及与 AW 联合验收 |
-| 下一批开发 Agent | [内部身份与总体接入](./development-usage.md)；[headless 实施细化草案](./development-headless.md) | 草案尚待独立设计门；持久范围、故障/清理路径通过后才能实施 |
+| 开发身份/账本基础 | `ca2ff256317b8ebc5cb914c1310865f916996345`；完整 4191 pass/142 skip/0 fail；[CI 36512613256](https://github.com/wangbinquan/CrewStation/actions/runs/36512613256) success | 已随 v2 本机部署；生产开发来源仍关闭，实际开发采集待完成，不能显示开发已知零 |
+| 采集证明 v2 服务端 | 独立功能门 PASS；冻结 15 路径指纹一致；2026-09-29 03:00:12Z 完整门禁结束：4197 pass/142 skip/0 fail、26633 断言、838 文件 | 已随 `94aabd6dfe641e46bbfc2e736f0632c7fdf6fc12` 推送；[CI 36619175682](https://github.com/wangbinquan/CrewStation/actions/runs/36619175682) 六项 success；本机八组件已升级；与 AW 实际联动/托管验收待完成 |
+| 下一批开发 Agent | [内部身份与总体接入](./development-usage.md)；[headless 实施细化草案](./development-headless.md) | 稳定重发、末尾排空/缺口和日志失败清理合同已复审 PASS；仍需实现、门禁、部署及真实采集验收 |
 
 源码锚点：[统计合同](../../../packages/contracts/api/observability/runtimeStatistics.ts) 的 `sourceScope` 仍为业务任务、cohort 仍为 started；[platform 装配](../../../modules/platform/wiring.ts) 仅注入业务事实/业务数值来源；[开发生命周期](../../../modules/dev-session/application/agentExecution.ts) 仍由普通事件结束并回收；[平台健康说明](../../../apps/console/src/features/observability/i18n/zh-CN.ts) 明确应用级指标尚未采集。
 
@@ -29,7 +31,7 @@ CS-R01 的失败若不影响开发设计，可以并行推进文档与其他非�
 
 ## 待办清单
 
-### CS-R01 v2 发布、部署与 AW 对拍〔实现通过本地门禁；T3/T11、PO-04/10/13〕
+### CS-R01 v2 发布、部署与 AW 对拍〔已推送/CI成功/已部署，实际联合验收待完成；T3/T11、PO-04/10/13〕
 
 - 精确发布本批默认 v1/显式 v2 服务端；capture、usage、valuation 共用持久水位，分页上限、固定快照、版本错用和费用权限均保留严格验证。
 - 等待精确 SHA hosted CI；构建该提交镜像，经现有存储合同预检后更新本机平台服务，记录镜像摘要、配置和 rollout。旧执行/算力档位固定的 Runner 不自动替换。
@@ -38,9 +40,9 @@ CS-R01 的失败若不影响开发设计，可以并行推进文档与其他非�
 
 ### CS-R02 开发 Agent 持久数字链路〔只有身份/计价底座；T1～3/T9、PO-02/04/06〕
 
-- 先关闭 [headless 草案](./development-headless.md) 的设计门：存储跨进程/容器/Pod 的边界、旧 Runner 兼容、日志故障与用户执行生命周期、所有清理入口必须明确。
+- [headless 细化设计](./development-headless.md) 已通过独立功能设计门：存储跨进程/容器/Pod、旧 Runner、日志故障、稳定重发、可读末尾排空及不可取回缺口已明确；实现仍须逐条符合该合同。
 - 实现受理时冻结项目/工作区/Agent/实际环境/算力修订/CNY 目录；Runner 独立数字 journal 与能力协商；Session 连续持久副本和公平 outbox；账本/估值成功后确认消费。
-- 普通终态事件不能直接当数值完成；持久 finalThrough 到达后才正常回收，取消、父工作区释放、强制清理及 Pod 丢失都有完整或中断证据。不得因补采自动重复模型调用。
+- 普通终态事件不能直接当数值完成；正常数值出口需数字复制到 finalThrough，中断出口需先排空可读末尾，或持久实际已复制水位及明确不可取回缺口；取消、父工作区释放、强制清理及 Pod 丢失都有完整或中断证据。不得因补采自动重复模型调用。
 - 退出证据：真实 PG 与实际驱动链的重复、乱序、同版冲突、丢 ACK、容器重启、日志/Pod 丢失、多页末尾、排空屏障、旧 Runner；未采集保持未知，不拿 DTO 测试替代。
 
 ### CS-R03 开发 CLI 原生采集〔尚未接通；T1/T3/T6、PO-02/05/06〕
@@ -131,3 +133,11 @@ CS-R01 的失败若不影响开发设计，可以并行推进文档与其他非�
 ## 回执模板
 
 每项完成追加：CS-R 编号；实际实现范围；完整提交 SHA；独立功能门；定向/完整候选结果；hosted CI URL 与终态；实际运行或夹具；本机部署/Runner/档位版本；剩余限制。待授权、未实现和失败分别记录，不以“已加页面”关闭采集任务。
+
+
+### CS-R01 本批发布/部署回执（2026-09-30）
+
+- 实现提交：`94aabd6dfe641e46bbfc2e736f0632c7fdf6fc12`；[CI 36619175682](https://github.com/wangbinquan/CrewStation/actions/runs/36619175682) static/unit/module/console/gate/e2e 六项 success。完整候选门禁 4197 pass／142 skip／0 fail，代码/测试/夹具指纹未因后续文档变化而改变。
+- 本机：2026-09-29 19:46:51.122Z 部署完成，公开 `/auth/login` 返回 HTTP 200。八组件 generation/observedGeneration 相等、Ready=1：console 199，API 193，auth 91，controller 158，events 61，Session 110，两个 MCP 各57。
+- 镜像：console `sha256:ce1c2a64b0542841dcd7dd7ba98213dfbe8ad3643a250808fc85e84cd7f6f321`；control-plane `sha256:b9c0e7f8b6a3f2af2fd364b1b35d976894307306f89437293069affd1ff29e68`；默认 Runner `sha256:426f1987e5d9f0be7e2cf295897d43d0c6deac720fd897521adf0ad7457d9926`。storage-contract=1，无新迁移。已有档位固定的镜像/既有执行未重建。
+- 边界：上述 hosted E2E 与本机 rollout 不能替代真实开发用量、AW 托管装配和身份/模型验收；CS-R01 的实际联合验收仍未关闭，CS-R02～13继续。

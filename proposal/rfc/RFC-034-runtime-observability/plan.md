@@ -293,3 +293,12 @@ Bun静态bundle构建通过；最初品牌SVG解析与macOS大小写文件名冲
 
 
 批次17冻结候选完整门禁于2026-09-29T03:00:12Z终态通过：4197 pass／142 skip／0 fail、26,633断言、838文件；结构/lint/两侧类型通过。15个候选路径指纹全部一致。随后仅更新待办与回执文档，不重新跑同内容全量；精确发布、hosted CI和本机升级仍须单独记录。
+
+
+批次17发布回执（2026-09-30）：`94aabd6dfe641e46bbfc2e736f0632c7fdf6fc12` 已精确推送，main/origin 同步、索引/工作树空；包含已通过候选门禁的 v2 服务端及剩余工作清单，不含开发采集实现。[CI 36619175682](https://github.com/wangbinquan/CrewStation/actions/runs/36619175682) 和本机部署继续。headless 细化首轮独立设计门 FAIL，现补受理意图摘要/receipt 优先恢复和 Session 持久中断清理出口，复审未返回前不写 PASS。
+
+
+开发细化最终设计复审（2026-09-30）：[development-headless](./development-headless.md) 功能设计门 PASS；已关闭稳定重发及日志故障末尾排空/缺口两个反例。两仓剩余工作清单的范围、依赖、取消项及发布状态回填亦通过只读复核。生产采集和实现验收均未开启，不提前关闭 CS-R02～05。
+
+
+批次17精确 CI 与部署回执：`94aabd6dfe641e46bbfc2e736f0632c7fdf6fc12` 的 [CI 36619175682](https://github.com/wangbinquan/CrewStation/actions/runs/36619175682) 六项全成功；本机于2026-09-29T19:46:51.122Z完成八组件滚动升级，Ready=1、generation=observedGeneration，默认 Runner 配置按精确 digest 更新，storage-contract=1、无新迁移。完整镜像摘要与组件代次见 [CS-R01 回执](./remaining-work.md#cs-r01-本批发布部署回执2026-09-30)。本机登录与业务/开发真实身份模型验收分别记录；联合实际对拍、开发采集及其他 RFC 余项继续。
