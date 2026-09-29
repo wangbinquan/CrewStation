@@ -1,5 +1,5 @@
-import { RuntimeExportQuerySchema, RuntimeExportSchema, ProjectRuntimeStatisticsSchema, SystemRuntimeStatisticsSchema, RuntimeTaskObservationSchema, RuntimeStatisticsQuerySchema } from '@crewstation/contracts';
-import type { RuntimeExportQuery, RuntimeExport, RuntimeUsageMetrics, RuntimeStatisticsQuery, RuntimeFactQuery, RuntimeTaskFact, RuntimeTaskObservation, RuntimeAttemptFact, RuntimeAttemptSummary, RuntimeNativeCapture, RuntimeStatistics, RuntimeAgentStatistics, ExecutionObservation } from '@crewstation/contracts';
+import { ProjectRuntimeStatisticsSchema, SystemRuntimeStatisticsSchema, RuntimeTaskObservationSchema, RuntimeStatisticsQuerySchema } from '@crewstation/contracts';
+import type { RuntimeStatisticsQuery, RuntimeFactQuery, RuntimeTaskFact, RuntimeTaskObservation, RuntimeAttemptFact, RuntimeAttemptSummary, RuntimeNativeCapture, RuntimeStatistics, RuntimeAgentStatistics, ExecutionObservation } from '@crewstation/contracts';
 import { notFound } from '@crewstation/kernel';
 import { aggregateRuntimeMetrics as aggregate, runtimeUsageMetrics } from '../domain/cnyPricing';
 import { selectRuntimeUsage } from '../domain/tokenUsage';
@@ -106,7 +106,7 @@ function agentStatistics(tasks: RuntimeTaskObservation[]): RuntimeAgentStatistic
   const key = ({ task, attempt: a }: typeof pairs[number]) => JSON.stringify([task.projectId, a.agentId ?? a.executionId ?? a.id, a.profileId, a.profileRevision, a.kind]);
   return grouped(pairs, key).map((group) => {
     const first = group[0]!, a = first.attempt;
-    return { key: key(first), projectId: first.task.projectId, agentId: a.agentId, profileId: a.profileId, profileRevision: a.profileRevision, kind: a.kind, name: a.name,
+    return { key: key(first), projectId: first.task.projectId, projectName: first.task.projectName, agentId: a.agentId, profileId: a.profileId, profileName: a.profileName, profileRevision: a.profileRevision, kind: a.kind, name: a.name,
       metrics: aggregate(group.map((x) => x.attempt.metrics)), tasks: grouped(group, (x) => x.task.id).map((rows) => ({ taskId: rows[0]!.task.id, metrics: aggregate(rows.map((x) => x.attempt.metrics)), attempts: rows.length })) };
   });
 }
@@ -123,9 +123,14 @@ function durationStatistics(tasks: RuntimeTaskObservation[]) {
   const percentile = (p: number) => samples.length ? samples[Math.ceil(samples.length * p) - 1]! : null;
   return { samples: samples.length, p50Ms: percentile(.5), p95Ms: percentile(.95), maxMs: samples.at(-1) ?? null };
 }
+function profileStatistics(tasks: RuntimeTaskObservation[]) {
+  const attempts = tasks.flatMap((task) => task.attempts.filter((a) => a.kind === 'agent').map((attempt) => ({ task, attempt })));
+  const key = ({ attempt: a }: typeof attempts[number]) => JSON.stringify([a.profileId, a.profileRevision]);
+  return grouped(attempts, key).map((rows) => ({ key: key(rows[0]!), profileId: rows[0]!.attempt.profileId, profileName: rows[0]!.attempt.profileName, profileRevision: rows[0]!.attempt.profileRevision,
+    metrics: aggregate(rows.map((r) => r.attempt.metrics)), tasks: grouped(rows, (r) => r.task.id).map((parts) => ({ taskId: parts[0]!.task.id, metrics: aggregate(parts.map((r) => r.attempt.metrics)), attempts: parts.length })) }));
+}
 function systemDistributions(tasks: RuntimeTaskObservation[], snapshot: RuntimeStatisticsSnapshot) {
   const attempts = tasks.flatMap((task) => task.attempts.filter((a) => a.kind === 'agent').map((attempt) => ({ task, attempt })));
-  const profiles = grouped(attempts, ({ attempt: a }) => JSON.stringify([a.profileId, a.profileRevision])).map((rows) => ({ profileId: rows[0]!.attempt.profileId, profileRevision: rows[0]!.attempt.profileRevision, metrics: aggregate(rows.map((r) => r.attempt.metrics)) }));
   const byModel = attempts.flatMap(({ task, attempt }) => {
     const rows = attemptRecords(task, attempt, snapshot.observations), selection = selectRuntimeUsage(rows.filter((r) => r.kind === 'usage'));
     return grouped(selection.selected, (r) => JSON.stringify(r.record.modelRef)).map((selected) => {
@@ -135,39 +140,18 @@ function systemDistributions(tasks: RuntimeTaskObservation[], snapshot: RuntimeS
     });
   });
   const models = grouped(byModel, (r) => JSON.stringify(r.modelRef)).map((rows) => ({ modelRef: rows[0]!.modelRef, metrics: aggregate(rows.map((r) => r.metrics)) }));
-  return { profiles, models };
+  return { models };
 }
 function statistics(snapshot: RuntimeStatisticsSnapshot, query: RuntimeStatisticsQuery, asOf: string, projectId?: ProjectId): RuntimeStatistics {
-  const scope = projectId === undefined ? 'system' : 'project', tasks = snapshot.tasks.map((t) => taskSummary(t, snapshot, scope, asOf)).filter((task) => (!query.q || `${task.name} ${task.id} ${task.projectId}`.toLowerCase().includes(query.q.toLowerCase())) && (!query.state || task.state === query.state) && (!query.quality || task.metrics.reasons.includes(query.quality)));
+  const scope = projectId === undefined ? 'system' : 'project', tasks = snapshot.tasks.map((t) => taskSummary(t, snapshot, scope, asOf)).filter((task) => (!query.q || `${task.name} ${task.id} ${task.projectName ?? ''} ${task.projectId}`.toLowerCase().includes(query.q.toLowerCase())) && (!query.state || task.state === query.state) && (!query.quality || task.metrics.reasons.includes(query.quality)));
   const quality = new Map<string, string[]>();
   for (const task of tasks) for (const reason of task.metrics.reasons) { const ids = quality.get(reason) ?? []; ids.push(task.id); quality.set(reason, ids); }
-  const projects = grouped(tasks, (t) => t.projectId).map((rows) => ({ projectId: rows[0]!.projectId, tasks: rows.length, metrics: aggregate(rows.map((r) => r.metrics)) }));
+  const projects = grouped(tasks, (t) => t.projectId).map((rows) => ({ projectId: rows[0]!.projectId, projectName: rows[0]!.projectName, tasks: rows.length, metrics: aggregate(rows.map((r) => r.metrics)) }));
   const common = { asOf, projectionVersion: 1, cohort: 'started', filters: query, partial: snapshot.partial || tasks.some((t) => t.partial), limits,
     metrics: aggregate(tasks.map((t) => t.metrics), snapshot.partial, projectId === undefined || snapshot.costVisible[projectId] === true),
-    tasks: tasks.map(({ attempts: _a, scope: _s, asOf: _at, partial: _p, ...task }) => task), agents: agentStatistics(tasks), projects,
+    tasks: tasks.map(({ attempts: _a, scope: _s, asOf: _at, partial: _p, ...task }) => task), agents: agentStatistics(tasks), projects, profiles: profileStatistics(tasks),
     trend: trends(tasks, query), durations: durationStatistics(tasks), quality: [...quality].map(([reason, taskIds]) => ({ reason, taskIds })), sourceScope: 'business-tasks' };
   return projectId === undefined ? SystemRuntimeStatisticsSchema.parse({ ...common, scope, ...systemDistributions(tasks, snapshot) }) : ProjectRuntimeStatisticsSchema.parse({ ...common, scope, projectId });
-}
-
-function exportStatistics(data: RuntimeStatistics, query: RuntimeExportQuery): RuntimeExport {
-  const tasks = data.tasks.filter((task) => (!query.q || `${task.name} ${task.id} ${task.projectId}`.toLowerCase().includes(query.q.toLowerCase())) &&
-    (!query.state || task.state === query.state) && (!query.quality || task.metrics.reasons.includes(query.quality)));
-  const ids = new Set(tasks.map((task) => task.id));
-  const columns = ['as_of', 'window_from', 'window_to', 'timezone', 'source_scope', 'scope', 'view', 'project_id', 'id', 'name', 'group_key', 'agent_id', 'profile_id', 'profile_revision', 'kind', 'state', 'tasks', 'attempts', 'wall_ms', 'cumulative_ms', 'active_union_ms',
-    'input_tokens', 'cache_read_tokens', 'cache_write_tokens', 'output_tokens', 'known_tokens', 'tokens_complete', 'input_unknown', 'cache_read_unknown', 'cache_write_unknown', 'output_unknown', 'currency', 'known_cost', 'cost_visible', 'cost_complete', 'quality', 'result_partial'];
-  const metrics = (m: RuntimeUsageMetrics) => [m.tokens.input, m.tokens.cacheRead, m.tokens.cacheWrite, m.tokens.output, m.tokens.hasKnown ? m.tokens.total : '', m.tokens.complete,
-    m.tokens.unknownBuckets.input, m.tokens.unknownBuckets.cacheRead, m.tokens.unknownBuckets.cacheWrite, m.tokens.unknownBuckets.output,
-    'CNY', m.cost.visible ? m.cost.amount ?? '' : '', m.cost.visible, m.cost.complete, m.reasons.join('|'), data.partial || m.partial];
-  const prefix = [data.asOf, data.filters.from, data.filters.to, data.filters.timezone, data.sourceScope, data.scope, query.view];
-  const rows = query.view === 'tasks' ? tasks.map((t) => [...prefix, t.projectId, t.id, t.name, '', '', '', '', '', t.state, 1, t.attemptCount, t.wallMs ?? '', t.cumulativeMs, t.activeUnionMs, ...metrics(t.metrics)]) :
-    data.agents.filter((a) => !query.agent || a.key === query.agent).flatMap((a) => {
-      const contributions = a.tasks.filter((task) => ids.has(task.taskId));
-      return contributions.length ? [[...prefix, a.projectId, a.agentId ?? a.key, a.name, a.key, a.agentId ?? '', a.profileId ?? '', a.profileRevision ?? '', a.kind, '', contributions.length, contributions.reduce((n, t) => n + t.attempts, 0), '', '', '', ...metrics(aggregate(contributions.map((t) => t.metrics)))]] : [];
-    });
-  // Text cells stay text in spreadsheet applications; decimal counters and CNY retain their exact spelling.
-  const cell = (value: string | number | boolean) => { const raw = String(value), text = /^[=+@\-\t\r]/.test(raw) ? "'" + raw : raw; return '"' + text.replaceAll('"', '""') + '"'; };
-  return RuntimeExportSchema.parse({ filename: `crewstation-${data.scope}-${query.view}-${data.asOf.slice(0, 10)}.csv`, mediaType: 'text/csv;charset=utf-8',
-    content: '\uFEFF' + [columns, ...rows].map((row) => row.map(cell).join(',')).join('\r\n') + '\r\n', asOf: data.asOf, rows: rows.length, partial: data.partial, bounded: true });
 }
 
 export function runtimeStatisticsUseCases(deps: StatisticsDeps) {
@@ -187,9 +171,7 @@ export function runtimeStatisticsUseCases(deps: StatisticsDeps) {
     await authorize(actor, projectId); if (!task) throw notFound('找不到本范围内的任务');
     return taskSummary(task, snapshot, projectId === undefined ? 'system' : 'project', asOf);
   };
-  const exportRead = async (actor: Actor, raw: RuntimeExportQuery, projectId?: ProjectId) => { const query = RuntimeExportQuerySchema.parse(raw); return exportStatistics(await overview(actor, query.window, projectId), query); };
-  return { projectRuntimeExport: (actor: Actor, projectId: ProjectId, query: RuntimeExportQuery) => exportRead(actor, query, projectId),
-    systemRuntimeExport: (actor: Actor, query: RuntimeExportQuery) => exportRead(actor, query),
+  return {
     projectRuntimeStatistics: async (actor: Actor, projectId: ProjectId, query: RuntimeStatisticsQuery) => ProjectRuntimeStatisticsSchema.parse(await overview(actor, query, projectId)),
     systemRuntimeStatistics: async (actor: Actor, query: RuntimeStatisticsQuery) => SystemRuntimeStatisticsSchema.parse(await overview(actor, query)),
     projectRuntimeTask: (actor: Actor, projectId: ProjectId, taskId: TaskId) => detail(actor, taskId, projectId), systemRuntimeTask: (actor: Actor, taskId: TaskId) => detail(actor, taskId) };

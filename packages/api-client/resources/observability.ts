@@ -1,4 +1,4 @@
-import type { RuntimeExportQuery, RuntimeExport, ProjectRuntimeStatistics, RuntimeStatisticsQuery, RuntimeTaskObservation, SystemRuntimeStatistics } from '@crewstation/contracts';
+import type { ProjectRuntimeStatistics, RuntimeStatisticsQuery, RuntimeTaskObservation, SystemRuntimeStatistics } from '@crewstation/contracts';
 import type { ExecutionCostVisibilityDto, SetExecutionCostVisibility, ExecutionObservationPage, ExecutionObservationQuery, AlertDto, HealthDto, LogEntryDto, SaveTokenPrice, TokenPriceHistory, TokenPriceProfile, TokenPriceVersion } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
@@ -9,8 +9,6 @@ import { segment } from '../requestUrl';
 export type ExecutionObservationInput = ExecutionObservationQuery extends infer Q ? Q extends ExecutionObservationQuery ? Omit<Q, 'limit'> & { limit?: number } : never : never;
 
 export interface ObservabilityResource {
-  projectRuntimeExport(projectId: string, query: RuntimeExportQuery): Promise<RuntimeExport>;
-  systemRuntimeExport(query: RuntimeExportQuery): Promise<RuntimeExport>;
   projectRuntimeStatistics(projectId: string, query: RuntimeStatisticsQuery): Promise<ProjectRuntimeStatistics>;
   systemRuntimeStatistics(query: RuntimeStatisticsQuery): Promise<SystemRuntimeStatistics>;
   projectRuntimeTask(projectId: string, taskId: string): Promise<RuntimeTaskObservation>;
@@ -33,8 +31,6 @@ export function observabilityResource(transport: Transport): ObservabilityResour
   const pricing = '/v1/admin/observability/pricing/profiles';
   const visibility = (id: string) => '/v1/admin/observability/projects/' + segment(id) + '/cost-visibility';
   return {
-    projectRuntimeExport: (id, body) => transport.request('POST', project(id) + '/observability/exports', { body }),
-    systemRuntimeExport: (body) => transport.request('POST', '/v1/admin/observability/exports', { body }),
     projectRuntimeStatistics: (id, query) => transport.request('GET', project(id) + '/observability/statistics', { query: { ...query } }),
     systemRuntimeStatistics: (query) => transport.request('GET', '/v1/admin/observability/statistics', { query: { ...query } }),
     projectRuntimeTask: (id, taskId) => transport.request('GET', project(id) + '/observability/tasks/' + segment(taskId)),

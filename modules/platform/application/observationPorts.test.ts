@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { BusinessTaskV3DtoSchema, ExecutionObservationIdentitySchema, ComputeProfileListSchema, ProjectIdSchema, UserIdSchema } from '@crewstation/contracts';
-import { businessObservationAdmission, observationPorts, observationSlotRecords, observationUsageSource } from './observationPorts';
+import { businessObservationAdmission, observationNames, observationPorts, observationSlotRecords, observationUsageSource } from './observationPorts';
 
 const id = (n: number) => '01a0bf5d-8f4b-7111-8111-' + String(n).padStart(12, '0');
 const task = BusinessTaskV3DtoSchema.parse({ id: id(1), serviceId: id(2), state: 'running', releaseId: id(3),
@@ -61,4 +61,14 @@ test('numeric projection wiring preserves both owner resolution and journal ackn
     { readBusinessUsageMeasurement: async () => undefined, nextBusinessUsageSource: async () => { calls.push('next'); return undefined; }, acknowledgeBusinessUsageSource: async (...args) => { calls.push(args); } });
   expect(await source.next()).toBeUndefined(); expect(await source.resolve(input)).toEqual(owner);
   await source.acknowledge(task.id, owner.executionId, 12); expect(calls).toEqual(['next', input, [task.id, owner.executionId, 12]]);
+});
+
+
+test('name metadata is fetched once from each owning catalog and indexed by stable IDs', async () => {
+  const calls: string[] = [], read = observationNames({
+    projects: { listClusterProjects: async () => { calls.push('projects'); return [{ projectId: id(1), name: 'Project display' }]; } },
+    profiles: { listDisplayNames: async () => { calls.push('profiles'); return [{ id: id(2), name: 'Compute display' }]; } },
+  });
+  expect(await read()).toEqual({ projects: { [id(1)]: 'Project display' }, profiles: { [id(2)]: 'Compute display' } });
+  expect(calls.sort()).toEqual(['profiles', 'projects']);
 });

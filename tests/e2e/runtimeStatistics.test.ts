@@ -19,7 +19,7 @@ describe.skipIf(!session)('RFC-034 formal runtime observation', () => {
         await open(page, root + '?' + f.query);
         await page.eval(`document.querySelector('header button[lang="${locale}"]').click()`); await settle(page);
         const actual = await measureRuntimeOverview(page);
-        expect(actual.bars).toBe(24); expect(actual.gap).toBeCloseTo(actual.expectedGap, 0); expect(actual.gap).toBeGreaterThan(0); expect(actual.sectionGap).toBeCloseTo(actual.expectedSectionGap, 0);
+        expect(actual.bars).toBe(24); expect(actual.tokenLabels).toEqual(['2,400', ...Array.from({ length: 23 }, () => '0')]); expect(actual.alignedRange).toBe(true); expect(actual.noExport).toBe(true); expect(actual.gap).toBeCloseTo(actual.expectedGap, 0); expect(actual.gap).toBeGreaterThan(0); expect(actual.sectionGap).toBeCloseTo(actual.expectedSectionGap, 0);
         expect(actual.overflow).toBeLessThanOrEqual(1); expect(actual.mainOverflow).toBeLessThanOrEqual(1); expect(actual.chartOverflow).toBeLessThanOrEqual(1);
         for (const tab of ['tasks', 'agents', 'usage', 'performance']) {
           await open(page, root + '?tab=' + tab + '&' + f.query);

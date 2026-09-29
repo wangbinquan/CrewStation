@@ -1,4 +1,4 @@
-import type { ObservationUsageJournal, ObservationUsageOwner, ObservationAdmissionInput, ObservationPriceOwner, ObservationProfiles, ObservationProjects, ObservationResourceLedger, ObservationTasks } from '../ports/executionObservations';
+import type { ObservationNameSources, ObservationUsageJournal, ObservationUsageOwner, ObservationAdmissionInput, ObservationPriceOwner, ObservationProfiles, ObservationProjects, ObservationResourceLedger, ObservationTasks } from '../ports/executionObservations';
 import { precondition } from '@crewstation/kernel';
 
 /** Use owner APIs to bind an execution to its project and expose the pricing catalog. */
@@ -32,4 +32,12 @@ export function observationSlotRecords(resources: ObservationResourceLedger) {
 
 export function observationUsageSource(owner: ObservationUsageOwner, journal: ObservationUsageJournal) {
   return { measurement: journal.readBusinessUsageMeasurement, next: journal.nextBusinessUsageSource, acknowledge: journal.acknowledgeBusinessUsageSource, resolve: owner.resolveUsageSource };
+}
+
+/** Current display names are metadata; IDs and accepted profile revisions remain the accounting keys. */
+export function observationNames(sources: ObservationNameSources) {
+  return async () => {
+    const [projects, profiles] = await Promise.all([sources.projects.listClusterProjects(), sources.profiles.listDisplayNames()]);
+    return { projects: Object.fromEntries(projects.map((p) => [p.projectId, p.name])), profiles: Object.fromEntries(profiles.map((p) => [p.id, p.name])) };
+  };
 }

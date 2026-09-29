@@ -71,5 +71,7 @@ export interface AgentRuntimeModuleApi {
   launchMaterial(ref: ProfileRevisionRef): Promise<ProfileLaunchMaterial>;
   /** 发布校验：只看存在性与协议。 */
   lookupForRelease(selector: ComputeProfileSelector): Promise<{ id: string; name: string; terminalOnly: boolean } | undefined>;
+  /** 当前目录名称，供历史运行展示；包含已隐藏或停用档位，不解析启动材料。 */
+  listDisplayNames(): Promise<Array<{ id: string; name: string }>>;
   listNames(): Promise<string[]>;
 }

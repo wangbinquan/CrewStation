@@ -12,8 +12,6 @@ import { Button } from '../../../shared/ui/Button';
 import { Tabs } from '../../../shared/ui/Tabs';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { ButtonLink } from '../../../shared/ui/navigation/ButtonLink';
-import { RuntimeExportButton } from '../components/RuntimeExportButton';
-import { ActionRow } from '../../../shared/ui/ActionRow';
 import type { ReactNode } from 'react';
 import { RuntimeResourceMetrics } from '../components/RuntimeResourceMetrics';
 import { RuntimeHealth } from '../components/RuntimeHealth';
@@ -49,7 +47,7 @@ function RuntimeOverviewPage({ projectId, go }: PageProps) {
   return <Stack className={styles.page} data-runtime-statistics>
     <PageHeader title={t(projectId ? 'runtime.projectTitle' : 'runtime.systemTitle')} description={t(operations ? 'runtime.operationsDescription' : 'runtime.description')}
       meta={data ? t('runtime.snapshot', { at: runtimeDate(data.asOf, window.timezone), zone: window.timezone }) : undefined}
-      actions={operations ? undefined : <ActionRow><RuntimeExportButton projectId={projectId} window={window} search={search} disabled={!data} />{!projectId ? <ButtonLink to="/admin/compute" search={{ tab: 'pricing' }}>{t('runtime.configurePricing')}</ButtonLink> : null}</ActionRow>} />
+      actions={!operations && !projectId ? <ButtonLink to="/admin/compute" search={{ tab: 'pricing' }}>{t('runtime.configurePricing')}</ButtonLink> : undefined} />
     {!operations ? <RuntimeFilters key={window.from + window.to} window={window} search={search} change={change} states={[...new Set([...(data?.tasks.map((task) => task.state) ?? []), ...(search.state ? [search.state] : [])])]} /> : null}
     {!operations ? <QueryStatus isPending={query.isPending} error={query.error} /> : null}
     <RuntimeViewTabs projectId={projectId} search={search} change={change}>{search.tab === 'resources' ? <RuntimeResourceMetrics projectId={projectId} search={search} change={change} /> : search.tab === 'health' ? <RuntimeHealth projectId={projectId} /> : data ? <Stack><p className={styles.hint}>{t('runtime.scopeHint', { tasks: data.limits.tasks, attempts: data.limits.attempts, records: data.limits.records })}</p>

@@ -1,4 +1,4 @@
-import type { RuntimeExportQuery, RuntimeExport, ProjectRuntimeStatistics, RuntimeStatisticsQuery, RuntimeTaskObservation, SystemRuntimeStatistics } from '@crewstation/contracts';
+import type { ProjectRuntimeStatistics, RuntimeStatisticsQuery, RuntimeTaskObservation, SystemRuntimeStatistics } from '@crewstation/contracts';
 import type { ExecutionCostVisibilityDto, ExecutionObservationPage, ExecutionObservationQuery, SetExecutionCostVisibility, ExecutionValuationObservation, ExecutionObservationIdentity, ExecutionUsageObservation } from '@crewstation/contracts';
 import type { Actor, AlertDto, HealthDto, LogEntryDto, LogQuery, ProjectId, TaskId, TraceChainDto, TraceEventDto, TraceEventsQuery, TraceId, TraceListQuery, TraceSummaryDto } from '@crewstation/contracts';
 
@@ -22,8 +22,6 @@ export interface ExecutionObservationCaller { identity: string; token?: string }
 
 export interface ObservabilityModuleApi extends TokenPricingApi {
   readonly name: 'observability';
-  projectRuntimeExport(actor: Actor, projectId: ProjectId, query: RuntimeExportQuery): Promise<RuntimeExport>;
-  systemRuntimeExport(actor: Actor, query: RuntimeExportQuery): Promise<RuntimeExport>;
   projectRuntimeStatistics(actor: Actor, projectId: ProjectId, query: RuntimeStatisticsQuery): Promise<ProjectRuntimeStatistics>;
   systemRuntimeStatistics(actor: Actor, query: RuntimeStatisticsQuery): Promise<SystemRuntimeStatistics>;
   projectRuntimeTask(actor: Actor, projectId: ProjectId, taskId: TaskId): Promise<RuntimeTaskObservation>;

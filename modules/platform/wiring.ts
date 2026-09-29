@@ -1,4 +1,4 @@
-import { businessObservationAdmission, observationPorts, observationSlotRecords, observationUsageSource } from './application/observationPorts';
+import { businessObservationAdmission, observationNames, observationPorts, observationSlotRecords, observationUsageSource } from './application/observationPorts';
 import { executionWriterObserver, migrationWriterObserver, legacyOwnerObserver } from './adapters/executionWriters';
 import { webhookAwareAllowlist } from './application/webhookIngress';
 import { objectStorageSources } from './application/objectStorageSources';
@@ -361,7 +361,7 @@ function composeAggregates(deps: PlatformModuleDeps, late: Late, core: ReturnTyp
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, apiCatalog, isAdmin } = core;
   const serviceOfProject = project.api.resolveServiceOfProject;
-  const observability = createObservabilityModule({ runtimeTasks: readBusinessObservationFacts, usageSource: observationUsageSource(runtime.businessTask.api.v3, runtime.session.api), ...observationPorts(runtime.businessTask.api.v3, project.api, core.agentRuntime.api),
+  const observability = createObservabilityModule({ runtimeTasks: readBusinessObservationFacts, runtimeNames: observationNames({ projects: project.api, profiles: core.agentRuntime.api }), usageSource: observationUsageSource(runtime.businessTask.api.v3, runtime.session.api), ...observationPorts(runtime.businessTask.api.v3, project.api, core.agentRuntime.api),
     db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, services: { resolveServiceOfProject: serviceOfProject }, slots: delivery.release.api,
     records: observationSlotRecords(resources.api),
     // 调用链（Design §14）：每个来源按项目读取，跨模块接口仅在组合根装配。

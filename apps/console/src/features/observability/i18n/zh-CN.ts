@@ -1,4 +1,7 @@
 export const messages = {
+  "runtime.nameUnavailable": "名称暂不可用",
+  "runtime.profileHint": "按算力档位及受理修订汇总。点击名称查看其各任务消耗；目录名称更新不会改变历史计量。",
+
   "runtime.projectResourceIncomplete": "项目资源来源不完整，当前可能只有旧记录；无法确认空项目或完整总量。",
   "runtime.resourcePartialPage": "当前页 {shown} 条，已知记录 {total} 条；来源不完整。",
   "runtime.tab.resources": "资源与容量",
@@ -70,10 +73,6 @@ export const messages = {
   "runtime.healthObserved": "采样时间未知（来源未提供）",
   "runtime.healthRead": "本次读取时间 {at}",
 
-  "runtime.export": "导出当前范围 CSV",
-  "runtime.exporting": "正在导出…",
-  "runtime.exportPartial": "已导出 {count} 行；读取范围或证据存在缺口，CSV 保留完整性标记。",
-  "runtime.exportComplete": "已导出 {count} 行当前有界快照；费用单位为 CNY。",
 
   "runtime.title": "运行观测与统计",
   "runtime.projectTitle": "项目运行观测与统计",

@@ -83,7 +83,7 @@ export function createAgentRuntimeModule(deps: AgentRuntimeModuleDeps): AgentRun
   const api: AgentRuntimeModuleApi = {
     name: 'agent-runtime',
     ...projectComputePolicyUseCases(useCaseDeps), ...projectProfileUseCases(useCaseDeps),
-    listProfiles: queries.listProfiles, getProfile: queries.getProfile, listSummaries: queries.listSummaries,
+    listProfiles: queries.listProfiles, getProfile: queries.getProfile, listSummaries: queries.listSummaries, listDisplayNames: queries.listDisplayNames,
     ...profileWriteUseCases(useCaseDeps),
     ...profileSettingUseCases(useCaseDeps),
     stopClusterTest: tests.stopClusterTest,

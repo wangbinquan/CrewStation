@@ -1,7 +1,7 @@
 import type { ProjectId, TaskId, TraceId, UserId } from '@crewstation/contracts';
-import { RuntimeExportQuerySchema, RuntimeStatisticsQuerySchema, LogQuerySchema, ProjectIdSchema, TaskIdSchema, TraceEventsQuerySchema, TraceIdSchema, TraceListQuerySchema } from '@crewstation/contracts';
+import { RuntimeStatisticsQuerySchema, LogQuerySchema, ProjectIdSchema, TaskIdSchema, TraceEventsQuerySchema, TraceIdSchema, TraceListQuerySchema } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
-import { actorFrom, parseBody, parseParams, parseQuery } from '@crewstation/http';
+import { actorFrom, parseParams, parseQuery } from '@crewstation/http';
 import type { Context } from 'hono';
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -32,7 +32,5 @@ export function observabilityRoutes(api: ObservabilityModuleApi, isAdmin: (userI
     const p = parseParams(c, projectParams.extend({ taskId: TaskIdSchema })); return c.json(await api.projectRuntimeTask(await actor(c), p.projectId as ProjectId, p.taskId as TaskId));
   });
   r.get('/v1/admin/observability/tasks/:taskId', async (c) => c.json(await api.systemRuntimeTask(await actor(c), parseParams(c, z.object({ taskId: TaskIdSchema })).taskId as TaskId)));
-  r.post('/v1/projects/:projectId/observability/exports', async (c) => c.json(await api.projectRuntimeExport(await actor(c), pid(c), await parseBody(c, RuntimeExportQuerySchema))));
-  r.post('/v1/admin/observability/exports', async (c) => c.json(await api.systemRuntimeExport(await actor(c), await parseBody(c, RuntimeExportQuerySchema))));
   return r;
 }

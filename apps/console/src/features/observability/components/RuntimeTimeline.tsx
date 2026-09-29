@@ -35,7 +35,7 @@ export function RuntimeTimeline({ task }: { task: RuntimeTaskObservation }) {
     {selected ? <Dialog title={selected.name + ' · ' + t('runtime.attemptNumber', { count: selected.attempt })} size="large" onClose={() => setSelected(undefined)}>
       <Stack><RuntimeMetrics metrics={selected.metrics} duration={selected.durationMs} /><RuntimeTokenBuckets metrics={selected.metrics} />
         {selected.kind === 'agent' ? <NativeCaptureSummary key={selected.id} captures={selected.nativeCaptures ?? []} /> : null}
-        <dl className={styles.facts}><dt>{t('runtime.start')}</dt><dd>{selected.startedAt ? runtimeDate(selected.startedAt) : '—'}</dd><dt>{t('runtime.end')}</dt><dd>{selected.endedAt ? runtimeDate(selected.endedAt) : t(selected.open ? 'runtime.runningUntil' : 'runtime.timingUnknown')}</dd><dt>{t('runtime.executionId')}</dt><dd>{selected.executionId ?? '—'}</dd></dl>
+        <dl className={styles.facts}><dt>{t('runtime.project')}</dt><dd>{task.projectName ?? t('runtime.nameUnavailable')}</dd><dt>{t('runtime.profile')}</dt><dd>{selected.profileName ?? t('runtime.nameUnavailable')} · r{selected.profileRevision ?? '—'}<span className={styles.identity}>{selected.profileId ?? '—'}</span></dd><dt>{t('runtime.start')}</dt><dd>{selected.startedAt ? runtimeDate(selected.startedAt) : '—'}</dd><dt>{t('runtime.end')}</dt><dd>{selected.endedAt ? runtimeDate(selected.endedAt) : t(selected.open ? 'runtime.runningUntil' : 'runtime.timingUnknown')}</dd><dt>{t('runtime.executionId')}</dt><dd>{selected.executionId ?? '—'}</dd></dl>
       </Stack>
     </Dialog> : null}
   </>;

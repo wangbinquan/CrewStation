@@ -6,7 +6,7 @@ const window = { from: '2026-09-28T00:00:00.000Z', to: '2026-09-29T00:00:00.000Z
 const metrics = { tokens: { input: '90071992547409930001', cacheRead: '0', cacheWrite: '0', output: '0', total: '90071992547409930001', hasKnown: true, complete: true, unknownBuckets: { input: 0, cacheRead: 0, cacheWrite: 0, output: 0 } },
   cost: { currency: 'CNY', amount: '0', complete: true, visible: true }, executions: 1, observedExecutions: 1, records: 1, reasons: [], partial: false };
 const common = { asOf: window.to, projectionVersion: 1, cohort: 'started', filters: window, partial: false, limits: { tasks: 200, attempts: 2000, records: 20000 },
-  metrics, tasks: [], agents: [], projects: [], trend: [], durations: { samples: 0, p50Ms: null, p95Ms: null, maxMs: null }, quality: [], sourceScope: 'business-tasks' };
+  metrics, tasks: [], agents: [], projects: [], profiles: [], trend: [], durations: { samples: 0, p50Ms: null, p95Ms: null, maxMs: null }, quality: [], sourceScope: 'business-tasks' };
 
 test('statistics query rejects reversed, empty and unknown-timezone windows', () => {
   expect(RuntimeStatisticsQuerySchema.parse(window)).toEqual(window);

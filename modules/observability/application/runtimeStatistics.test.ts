@@ -64,25 +64,7 @@ test('stable Agent identity survives task names while unknown same-name instance
 });
 
 
-test('bounded exports filter tasks on the server and restrict Agent totals to matching task contributions', async () => {
-  const a = attempt(), secondId = newResourceId() as TaskId, b = attempt({ taskId: secondId, agentId: a.agentId, profileId: a.profileId });
-  const f = setup([task([a], { name: '=SUM(1,2)\n"first"' }), task([b], { id: secondId, name: 'Second task' })], { partial: true });
-  const result = await f.api.systemRuntimeExport(actor, { window: query, view: 'tasks', q: 'SUM' });
-  expect(result).toMatchObject({ bounded: true, rows: 1, partial: true, asOf: at, mediaType: 'text/csv;charset=utf-8' });
-  expect(result.content.startsWith('\uFEFF"as_of"')).toBe(true); expect(result.content).toContain('"CNY"');
-  expect(result.content).toContain('"\'=SUM(1,2)\n""first"""'); expect(result.content).not.toContain('Second task');
-  const agent = await f.api.systemRuntimeExport(actor, { window: query, view: 'agents', q: 'Second' });
-  expect(agent.rows).toBe(1); expect(agent.content).toContain('"agent","","1","1"');
-  expect((await f.api.systemRuntimeExport(actor, { window: query, view: 'agents', agent: 'absent' })).rows).toBe(0);
-  expect((await f.api.systemRuntimeExport(actor, { window: query, view: 'tasks', state: 'failed' })).rows).toBe(0);
-  expect((await f.api.systemRuntimeExport(actor, { window: query, view: 'tasks', quality: 'timing-missing' })).rows).toBe(0);
-  const project = await f.api.projectRuntimeExport(actor, projectId, { window: query, view: 'tasks' });
-  expect(project.content).toContain('"CNY","","false","false"'); expect(f.counts().auth).toBe(2);
-  await expect(f.api.systemRuntimeExport({ ...actor, isAdmin: false }, { window: query, view: 'tasks' })).rejects.toMatchObject({ kind: 'forbidden' });
-});
-
-
-test('all views and CSV share filtered contributions; Agent price-profile revisions remain identifiable', async () => {
+test('all views share filtered contributions; Agent price-profile revisions remain identifiable', async () => {
   const a = attempt({ profileRevision: 7 }), otherId = newResourceId() as TaskId;
   const b = attempt({ taskId: otherId, agentId: a.agentId, profileId: a.profileId, profileRevision: 8 });
   const tasks = [task([a], { name: 'First' }), task([b], { id: otherId, name: 'Second' })];
@@ -90,10 +72,13 @@ test('all views and CSV share filtered contributions; Agent price-profile revisi
   const f = setup(tasks, { observations });
   const page = await f.api.systemRuntimeStatistics(actor, { ...query, q: 'First' });
   expect(page.tasks).toHaveLength(1); expect(page.agents).toHaveLength(1); expect(page.metrics.tokens.total).toBe('100'); expect(page.agents[0]?.metrics.tokens.total).toBe('100'); expect(page.models[0]?.metrics.tokens.total).toBe('100');
-  const csv = await f.api.systemRuntimeExport(actor, { window: query, view: 'agents', q: 'First' }); expect(csv.rows).toBe(1); expect(csv.content).toContain('"100","false"'); expect(csv.content).toContain('native-capture-unobserved');
-  const all = await f.api.systemRuntimeExport(actor, { window: query, view: 'agents' });
-  expect(all.rows).toBe(2); expect(all.content).toContain('"group_key","agent_id","profile_id","profile_revision","kind"');
-  expect(all.content).toContain(`"${a.profileId}","7","agent"`); expect(all.content).toContain(`"${a.profileId}","8","agent"`);
+  expect(page.profiles[0]?.metrics.tokens.total).toBe('100');
+  const all = await f.api.systemRuntimeStatistics(actor, query);
+  expect(all.profiles).toHaveLength(2); expect(all.profiles.map((p) => p.profileRevision)).toEqual([7, 8]);
+  expect(all.profiles.map((p) => p.tasks[0]!.metrics.tokens.total)).toEqual(['100', '200']);
+  const project = await f.api.projectRuntimeStatistics(actor, projectId, query);
+  expect(project.profiles).toHaveLength(2); expect(project.profiles.every((p) => !p.metrics.cost.visible)).toBe(true);
+
 });
 
 function nativeSummary(a: RuntimeAttemptFact, state: 'pending' | 'complete' | 'partial' | 'unsupported' = 'complete') {
@@ -134,4 +119,16 @@ test('proofs never hide unobserved turns and historical gaps keep known tokens a
   const revised = { ...nativeSummary(a, 'partial'), historicalRevisionGap: true };
   const detail = await setup([task([a])], { observations: [observation], nativeCaptures: [revised] }).api.systemRuntimeTask(actor, taskId);
   expect(detail.metrics.tokens.total).toBe('10'); expect(detail.metrics.reasons).toContain('native-prior-revision-gap');
+});
+
+
+test('current names remain separate from IDs and accepted revisions in every projection', async () => {
+  const a = attempt({ profileName: 'Primary compute', profileRevision: 7 });
+  const f = setup([task([a], { projectName: 'Customer workspace' })]);
+  const page = await f.api.systemRuntimeStatistics(actor, { ...query, q: 'Customer workspace' });
+  expect(page.tasks).toHaveLength(1); expect(page.projects[0]).toMatchObject({ projectId, projectName: 'Customer workspace' });
+  expect(page.agents[0]).toMatchObject({ projectName: 'Customer workspace', profileName: 'Primary compute', profileRevision: 7 });
+  expect(page.profiles[0]).toMatchObject({ profileId: a.profileId, profileName: 'Primary compute', profileRevision: 7, tasks: [{ taskId }] });
+  const detail = await f.api.systemRuntimeTask(actor, taskId);
+  expect(detail.projectName).toBe('Customer workspace'); expect(detail.attempts[0]?.profileName).toBe('Primary compute');
 });

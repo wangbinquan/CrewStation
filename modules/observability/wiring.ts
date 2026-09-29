@@ -31,6 +31,7 @@ import type { TraceChainSources } from './ports/traceSources';
 
 export interface ObservabilityModuleDeps {
   db: Database;
+  runtimeNames?: () => Promise<{ projects: Record<string, string>; profiles: Record<string, string> }>;
   runtimeTasks?: (executor: Executor, query: RuntimeFactQuery) => Promise<RuntimeFactPage>;
   pricingProfiles?: PricingProfileDirectory;
   executionAccess?: ExecutionObservationAccess;
@@ -77,10 +78,20 @@ export function createObservabilityModule(deps: ObservabilityModuleDeps): Observ
   const valuations = drizzleExecutionValuations(deps.db), valueUsage = executionValuations({ store: valuations, pricing: executionPricing, clock: useCaseDeps.clock });
   const reconcileUsage = deps.usageSource ? runnerUsageReconciliation({ source: deps.usageSource, store: ledger, logger, value: valueRunnerUsagePage({ store: valuations, source: deps.usageSource, value: valueUsage }) }) : async () => 0;
   const runtimeStatistics = runtimeStatisticsUseCases({ authorizer: deps.authorizer, clock: useCaseDeps.clock, source: {
-    read: (query) => deps.db.transaction(async (tx) => {
-      if (!deps.runtimeTasks) throw precondition('运行统计任务来源尚未接入');
-      return readRuntimeStatisticsLedger(tx, await deps.runtimeTasks(tx, query));
-    }, { isolationLevel: 'repeatable read', accessMode: 'read only' }),
+    read: async (query) => {
+      const snapshot = await deps.db.transaction(async (tx) => {
+        if (!deps.runtimeTasks) throw precondition('运行统计任务来源尚未接入');
+        return readRuntimeStatisticsLedger(tx, await deps.runtimeTasks(tx, query));
+      }, { isolationLevel: 'repeatable read', accessMode: 'read only' });
+      // Resolve current display metadata after releasing the ledger transaction, including single-connection pools.
+      const names = await deps.runtimeNames?.().catch(() => {
+        if (query.q) throw precondition('项目名称目录暂不可用，当前搜索无法完成，请稍后重试');
+        logger.warn('runtime display names unavailable'); return undefined;
+      });
+      if (!names) return snapshot;
+      return { ...snapshot, tasks: snapshot.tasks.map((task) => ({ ...task, projectName: names.projects[task.projectId] ?? null,
+        attempts: task.attempts.map((attempt) => ({ ...attempt, profileName: attempt.profileId ? names.profiles[attempt.profileId] ?? null : null })) })) };
+    },
   } });
   const api: ObservabilityModuleApi = { ...runtimeStatistics,
     name: 'observability', reconcileExecutionUsage: reconcileUsage, valueExecutionUsage: valueUsage,

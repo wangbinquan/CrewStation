@@ -5,3 +5,5 @@
   gap: var(--cs-space-2);
   min-width: 0;
 }
+
+.actions.end:not([hidden]) { align-items: flex-end; }

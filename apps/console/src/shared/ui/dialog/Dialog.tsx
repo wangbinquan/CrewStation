@@ -33,6 +33,8 @@ export interface DialogProps {
    * 不给就聚焦正文里第一个可编辑控件，没有就聚焦弹窗本身。
    */
   readonly initialFocus?: RefObject<HTMLElement | null> | 'dialog';
+  /** 路由返回后重建的弹窗，可指向当前页面的稳定触发按钮。 */
+  readonly returnFocusTo?: RefObject<HTMLElement | null>;
   /**
    * 所在的一片被藏起（DialogVisibility）时仍然显示。只给离开确认用：它回应的是一次正在等待的导航，藏起来就再也答不了；
    * 其余弹窗随所在的一片藏起、重新显示时照原样回来。
@@ -61,7 +63,7 @@ export function Dialog(props: DialogProps): ReactElement | null {
   return hidden && !props.persistent ? null : <DialogFrame {...props} />;
 }
 
-function DialogFrame({ title, children, footer, onClose, busy = false, size = 'medium', role = 'dialog', describedBy, onSubmit, initialFocus }: DialogProps): ReactElement {
+function DialogFrame({ title, children, footer, onClose, busy = false, size = 'medium', role = 'dialog', describedBy, onSubmit, initialFocus, returnFocusTo }: DialogProps): ReactElement {
   const t = useT(), titleId = useId(), host = useDialogHost();
   const dialog = useRef<HTMLDialogElement>(null), body = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | null | undefined>(undefined);
@@ -73,8 +75,10 @@ function DialogFrame({ title, children, footer, onClose, busy = false, size = 'm
     const target = initialFocus === 'dialog' ? node : initialFocus?.current ?? body.current?.querySelector<HTMLElement>(DIALOG_FIELD_SELECTOR) ?? node;
     target?.focus();
     // 卸载时元素随之移出顶层，不调用 close()，免得卸载后再派发 close 事件。
-    return () => returnFocus(opener.current ?? null);
-  }, [initialFocus]);
+    // 路由往返会重建触发按钮；关闭时读取最新引用，不能冻结为打开时的旧 DOM。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => returnFocus(returnFocusTo?.current ?? opener.current ?? null);
+  }, [initialFocus, returnFocusTo]);
   // Esc：浏览器先派发 cancel，拦下后由调用方决定关闭；进行中不关。
   const cancel = (event: SyntheticEvent): void => { event.stopPropagation(); event.preventDefault(); if (!busy) onClose(); };
   const close = (event: SyntheticEvent): void => { event.stopPropagation(); onClose(); };

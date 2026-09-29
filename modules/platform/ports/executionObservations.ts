@@ -27,3 +27,8 @@ export interface ObservationUsageJournal {
   readBusinessUsageMeasurement(source: RunnerUsageSourceIdentity, recordId: string, revision: number): Promise<RunnerUsageMeasurement | undefined>;
   acknowledgeBusinessUsageSource(taskId: TaskId, executionId: string, through: number): Promise<void>;
 }
+
+export interface ObservationNameSources {
+  projects: { listClusterProjects(): Promise<Array<{ projectId: string; name: string }>> };
+  profiles: { listDisplayNames(): Promise<Array<{ id: string; name: string }>> };
+}

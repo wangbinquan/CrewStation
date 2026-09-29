@@ -1,7 +1,7 @@
 import { useLayoutEffect } from 'react';
 import type { RuntimeSearch } from '../model/runtimeSearch';
 const saved = new Map<string, { main: number; window: number; taskId: string }>();
-export const runtimeReturnKey = (scope: string, s: RuntimeSearch) => JSON.stringify([scope, s.from, s.to, s.tab, s.q, s.state, s.agent, s.quality]);
+export const runtimeReturnKey = (scope: string, s: RuntimeSearch) => JSON.stringify([scope, s.from, s.to, s.tab, s.q, s.state, s.agent, s.profile, s.quality]);
 export function rememberRuntimeList(key: string, taskId: string) {
   if (saved.size >= 20) saved.delete(saved.keys().next().value!);
   saved.set(key, { main: document.querySelector('main')?.scrollTop ?? 0, window: window.scrollY, taskId });

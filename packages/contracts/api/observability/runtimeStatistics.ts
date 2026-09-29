@@ -14,11 +14,11 @@ export type RuntimeStatisticsQuery = z.infer<typeof RuntimeStatisticsQuerySchema
 export const RuntimeAttemptFactSchema = z.strictObject({
   id: ResourceIdSchema, taskId: TaskIdSchema, name: z.string(), kind: z.enum(['agent', 'command']),
   state: z.string(), attempt: z.number().int().positive(), executionId: ResourceIdSchema.nullable(),
-  agentId: ResourceIdSchema.nullable(), profileId: ResourceIdSchema.nullable(), profileRevision: z.number().int().nonnegative().nullable(),
+  agentId: ResourceIdSchema.nullable(), profileId: ResourceIdSchema.nullable(), profileName: z.string().nullish(), profileRevision: z.number().int().nonnegative().nullable(),
   createdAt: at, startedAt: at.nullable(), endedAt: at.nullable(),
 });
 export const RuntimeTaskFactSchema = z.strictObject({
-  id: TaskIdSchema, projectId: ProjectIdSchema, serviceId: ServiceIdSchema, name: z.string(),
+  id: TaskIdSchema, projectId: ProjectIdSchema, projectName: z.string().nullish(), serviceId: ServiceIdSchema, name: z.string(),
   protocol: z.enum(['legacy', 'v3']), state: z.string(), createdAt: at, closedAt: at.nullable(),
   traceId: z.string().nullable(), attempts: z.array(RuntimeAttemptFactSchema), attemptsPartial: z.boolean(),
 });
@@ -48,7 +48,7 @@ export type RuntimeTaskSummary = z.infer<typeof RuntimeTaskSummarySchema>;
 export type RuntimeAttemptSummary = z.infer<typeof RuntimeAttemptSummarySchema>;
 export type RuntimeTaskObservation = z.infer<typeof RuntimeTaskObservationSchema>;
 export const RuntimeAgentStatisticsSchema = z.strictObject({
-  key: z.string(), projectId: ProjectIdSchema, agentId: ResourceIdSchema.nullable(), profileId: ResourceIdSchema.nullable(), profileRevision: z.number().int().nonnegative().nullable(),
+  key: z.string(), projectId: ProjectIdSchema, projectName: z.string().nullish(), agentId: ResourceIdSchema.nullable(), profileId: ResourceIdSchema.nullable(), profileName: z.string().nullish(), profileRevision: z.number().int().nonnegative().nullable(),
   kind: z.enum(['agent', 'command']), name: z.string(), metrics: RuntimeUsageMetricsSchema,
   tasks: z.array(z.strictObject({ taskId: TaskIdSchema, metrics: RuntimeUsageMetricsSchema, attempts: z.number().int().nonnegative() })),
 });
@@ -57,7 +57,8 @@ const common = {
   asOf: at, projectionVersion: z.literal(1), cohort: z.literal('started'), filters: RuntimeStatisticsQuerySchema,
   partial: z.boolean(), limits: z.strictObject({ tasks: z.number(), attempts: z.number(), records: z.number() }),
   metrics: RuntimeUsageMetricsSchema, tasks: z.array(RuntimeTaskSummarySchema), agents: z.array(RuntimeAgentStatisticsSchema),
-  projects: z.array(z.strictObject({ projectId: ProjectIdSchema, tasks: z.number(), metrics: RuntimeUsageMetricsSchema })),
+  projects: z.array(z.strictObject({ projectId: ProjectIdSchema, projectName: z.string().nullish(), tasks: z.number(), metrics: RuntimeUsageMetricsSchema })),
+  profiles: z.array(z.strictObject({ key: z.string(), profileId: ResourceIdSchema.nullable(), profileName: z.string().nullish(), profileRevision: z.number().nullable(), metrics: RuntimeUsageMetricsSchema, tasks: z.array(z.strictObject({ taskId: TaskIdSchema, metrics: RuntimeUsageMetricsSchema, attempts: z.number().int().nonnegative() })) })),
   trend: z.array(z.strictObject({ from: at, to: at, tasks: z.number(), metrics: RuntimeUsageMetricsSchema })),
   durations: z.strictObject({ samples: z.number().int().nonnegative(), p50Ms: z.number().nullable(), p95Ms: z.number().nullable(), maxMs: z.number().nullable() }),
   quality: z.array(z.strictObject({ reason: z.string(), taskIds: z.array(TaskIdSchema) })),
@@ -67,20 +68,7 @@ const common = {
 export const ProjectRuntimeStatisticsSchema = z.strictObject({ ...common, scope: z.literal('project'), projectId: ProjectIdSchema });
 export const SystemRuntimeStatisticsSchema = z.strictObject({ ...common, scope: z.literal('system'),
   models: z.array(z.strictObject({ modelRef: z.string().nullable(), metrics: RuntimeUsageMetricsSchema })),
-  profiles: z.array(z.strictObject({ profileId: ResourceIdSchema.nullable(), profileRevision: z.number().nullable(), metrics: RuntimeUsageMetricsSchema })),
 });
 export type ProjectRuntimeStatistics = z.infer<typeof ProjectRuntimeStatisticsSchema>;
 export type SystemRuntimeStatistics = z.infer<typeof SystemRuntimeStatisticsSchema>;
 export type RuntimeStatistics = ProjectRuntimeStatistics | SystemRuntimeStatistics;
-
-/** Synchronous export is bounded by the same read budget as the formal statistics page. */
-export const RuntimeExportQuerySchema = z.strictObject({
-  window: RuntimeStatisticsQuerySchema, view: z.enum(['tasks', 'agents']),
-  q: z.string().max(1000).optional(), state: z.string().max(100).optional(), quality: z.string().max(100).optional(), agent: z.string().max(1000).optional(),
-});
-export const RuntimeExportSchema = z.strictObject({
-  filename: z.string(), mediaType: z.literal('text/csv;charset=utf-8'), content: z.string(),
-  asOf: at, rows: z.number().int().nonnegative().max(2000), partial: z.boolean(), bounded: z.literal(true),
-});
-export type RuntimeExportQuery = z.infer<typeof RuntimeExportQuerySchema>;
-export type RuntimeExport = z.infer<typeof RuntimeExportSchema>;

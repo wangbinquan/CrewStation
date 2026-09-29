@@ -68,6 +68,15 @@ beforeAll(async () => {
 afterAll(async () => { await tdb?.drop(); });
 
 describe.skipIf(!available)('算力档位模块（RFC-006）', () => {
+  test('historical observation names include hidden and disabled profiles without changing their visibility', async () => {
+    const profile = await createProfile(admin, claude({ name: 'historical-name' }));
+    try {
+      await mod.api.setDefaultVisible(admin, profile.id, false); await mod.api.setEnabled(admin, profile.id, false);
+      expect((await mod.api.listDisplayNames()).find((p) => p.id === profile.id)).toEqual({ id: profile.id, name: 'historical-name' });
+      expect((await mod.api.listSummaries()).some((p) => p.id === profile.id)).toBe(false);
+    } finally { await mod.api.removeProfile(admin, profile.id, true); }
+  });
+
   test('建档：镜像规范化并按摘要固定、凭据只回「已设置」、自动排测试；测试通过前租户不可选', async () => {
     const created = await createProfile(admin, claude());
     expect(created).toMatchObject({ name: 'glm-claude', protocol: 'claude-code', revision: 1, image: 'registry.cs.svc:5000/runtime/glm:1.2', imageDigest: digests.get('runtime/glm:1.2'), binaryPath: '/opt/glm/bin/claude', model: 'glm-4.6', enabled: true, isDefault: false, defaultVisible: true });

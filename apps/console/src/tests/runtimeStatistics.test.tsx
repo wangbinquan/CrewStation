@@ -34,6 +34,7 @@ test('last Agent details use the shared modal, Esc returns focus and task drill 
   await act(async () => openDialog().dispatchEvent(new Event('cancel', { cancelable: true }))); await page.settle(); expect(document.activeElement).toBe(trigger);
   await page.click('Agent 23'); await page.click('Task 23'); expect(page.path()).toContain('/tasks/');
   await page.click('返回统计列表'); expect(page.search().tab).toBe('agents'); expect(openDialog().textContent).toContain('Agent 23');
+  await act(async () => openDialog().dispatchEvent(new Event('cancel', { cancelable: true }))); await page.settle(); expect(document.activeElement?.textContent).toBe('Agent 23');
 });
 test('attempt swimlane opens immediate details and zoom only changes the local timeline', async () => {
   const f = runtimeStatisticsFixture(); page = await renderApp('/admin/observability/tasks/' + f.details[0]!.id + '?' + f.query);
@@ -76,18 +77,35 @@ test('exact amounts, unknown/zero and invalid URL windows do not collapse', () =
 });
 
 
-test('CSV download requests the visible filters and keeps export errors separate from the page', async () => {
-  const f = runtimeStatisticsFixture(), create = URL.createObjectURL, revoke = URL.revokeObjectURL;
-  const clicks: Array<{ name: string; href: string }> = [], originalClick = HTMLAnchorElement.prototype.click;
-  URL.createObjectURL = () => 'blob:runtime-export-test'; URL.revokeObjectURL = () => {};
-  HTMLAnchorElement.prototype.click = function () { clicks.push({ name: this.download, href: this.href }); };
-  try {
-    page = await renderApp('/admin/observability?tab=agents&q=Task&state=closed&quality=timing-missing&' + f.query);
-    expect(document.querySelectorAll('tbody tr')).toHaveLength(1); expect(page.text()).toContain('Agent 0'); expect(page.text()).not.toContain('Agent 1');
-    await page.click('导出当前范围 CSV'); expect(f.exports).toEqual([{ window: { from: f.from, to: f.to, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }, view: 'agents', q: 'Task', state: 'closed', quality: 'timing-missing' }]);
-    expect(clicks).toEqual([{ name: 'statistics.csv', href: 'blob:runtime-export-test' }]); expect(page.text()).toContain('已导出 1 行');
-    f.state.error = true; await page.click('导出当前范围 CSV'); expect(page.text()).toContain('Ledger temporarily unavailable'); expect(clicks).toHaveLength(1);
-  } finally { URL.createObjectURL = create; URL.revokeObjectURL = revoke; HTMLAnchorElement.prototype.click = originalClick; }
+test('both scopes show named profile contributions and have no CSV operation', async () => {
+  const f = runtimeStatisticsFixture();
+  page = await renderApp('/admin/observability?tab=usage&' + f.query);
+  expect(page.text()).not.toContain('CSV');
+  const trigger = [...document.querySelectorAll<HTMLButtonElement>('tbody button')].find((b) => b.textContent === 'Compute 23 · r7')!;
+  trigger.focus(); await act(async () => trigger.click()); await page.settle();
+  expect(openDialog().textContent).toContain('Task 23'); expect(openDialog().textContent).toContain(f.details[23]!.projectName!);
+  expect(openDialog().textContent).toContain('¥0.25'); expect(openDialog().textContent).not.toContain('¥6');
+  await act(async () => openDialog().dispatchEvent(new Event('cancel', { cancelable: true }))); await page.settle(); expect(document.activeElement).toBe(trigger);
+  await page.click('Compute 23 · r7'); await page.click('Task 23');
+  expect(page.text()).toContain(f.details[23]!.projectName!); expect(page.text()).toContain('Compute 23 · r7');
+  await page.click('返回统计列表'); expect(page.search().profile).toBe(f.data.profiles[23]!.key); expect(openDialog().textContent).toContain('Task 23');
+  await act(async () => openDialog().dispatchEvent(new Event('cancel', { cancelable: true }))); await page.settle(); expect(document.activeElement?.textContent).toBe('Compute 23 · r7');
+  page.unmount(); page = undefined;
+  page = await renderApp('/projects/' + f.projectId + '/observability?tab=usage&' + f.query);
+  expect(page.text()).not.toContain('CSV'); await page.click('Compute 23 · r7');
+  expect(openDialog().textContent).toContain('Task 23'); expect(openDialog().textContent).not.toContain('¥');
+  expect(f.reads.every((url) => !url.includes('/exports'))).toBe(true);
+});
+
+test('each trend column prints exact tokens and unknown or zero has no positive bar', async () => {
+  const f = runtimeStatisticsFixture();
+  for (const [i, total] of ['90071992547409930001', '0', '0', '2500'].entries()) {
+    const row = f.data.trend[i]!; row.metrics = { ...row.metrics, tokens: { ...row.metrics.tokens, total, hasKnown: i !== 2, complete: i < 2 } };
+  }
+  page = await renderApp('/admin/observability?' + f.query);
+  const columns = document.querySelectorAll<HTMLButtonElement>('[aria-label="任务与 Token 趋势"] button');
+  expect([...columns].slice(0, 4).map((b) => b.firstElementChild?.textContent)).toEqual(['90,071,992,547,409,930,001', '0', '—', '≥ 2,500']);
+  expect(columns[1]!.lastElementChild?.children.length).toBe(0); expect(columns[2]!.lastElementChild?.children.length).toBe(0);
 });
 
 test('native capture evidence stays inside the selected attempt dialog, follows refresh and preserves focus', async () => {

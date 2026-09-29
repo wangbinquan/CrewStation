@@ -1,4 +1,7 @@
 export const messages = {
+  "runtime.nameUnavailable": "Name unavailable",
+  "runtime.profileHint": "Grouped by compute profile and accepted revision. Select a name for per-task usage; current directory names do not change historical accounting.",
+
   "runtime.projectResourceIncomplete": "Project resource collection is incomplete and may contain old records. Empty scope or complete totals cannot be established.",
   "runtime.resourcePartialPage": "This page has {shown} of {total} known records; collection is incomplete.",
   "runtime.tab.resources": "Resources and capacity",
@@ -70,10 +73,6 @@ export const messages = {
   "runtime.healthObserved": "Sample time unknown (not supplied by source)",
   "runtime.healthRead": "Read at {at}",
 
-  "runtime.export": "Export current range · CSV",
-  "runtime.exporting": "Exporting…",
-  "runtime.exportPartial": "Exported {count} rows. The bounded result or evidence is partial; CSV retains quality flags.",
-  "runtime.exportComplete": "Exported {count} rows from the bounded snapshot. Currency: CNY.",
 
   "runtime.title": "Runtime observability",
   "runtime.projectTitle": "Project runtime observability",

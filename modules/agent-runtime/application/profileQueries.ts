@@ -30,6 +30,7 @@ export function profileQueries(deps: AgentRuntimeUseCaseDeps) {
   };
   return {
     current, load, referencingProjects,
+    listDisplayNames: async () => (await uow.read.profiles.list()).map(({ id, name }) => ({ id, name })),
     listProfiles: async (actor: Actor): Promise<ComputeProfileList> => {
       adminOnly(actor);
       const rows = await Promise.all((await uow.read.profiles.list()).map(current));
