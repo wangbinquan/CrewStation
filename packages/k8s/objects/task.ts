@@ -6,6 +6,7 @@ import { ingressRouteObject } from './traefik';
 import type { ContainerSpec } from './workloads';
 import { podObject } from './workloads';
 import type { BusinessStorage } from '@crewstation/contracts';
+import { DEVELOPMENT_USAGE_BINDING_DIRECTORY, DEVELOPMENT_USAGE_DIRECTORY } from '@crewstation/contracts';
 import { businessStorageMounts } from './businessStorage';
 
 /**
@@ -40,6 +41,7 @@ export interface TaskPodInput {
   /** 工作目录的卷：任务用自己的 PVC；档位测试用 Pod 内的临时目录（RFC-006 §5.2）。 */
   readonly workVolume: { readonly pvc: string } | { readonly emptyDir: true };
   readonly businessStorage?: BusinessStorage;
+  readonly developmentUsageStorage?: { readonly version: 1 };
   /** 明文环境变量（旧形状）；新形状的凭据都在 Runner Secret 里，经 `envFromSecret` 引用。 */
   readonly env?: Readonly<Record<string, string>>;
   readonly envFromSecret?: string;
@@ -80,14 +82,15 @@ function checkoutContainer(image: string, source: TaskCheckout, uid: number): Co
 
 /** 任务容器的 Pod：Runner 作 PID 1 之下的主进程，工作卷挂在 /work，有分支时先由 init 容器检出源码。 */
 export function taskPodObject(input: TaskPodInput): K8sObject {
+  if (input.developmentUsageStorage && (input.developmentUsageStorage.version !== 1 || input.workload !== 'dev-session' || !('pvc' in input.workVolume) || input.businessStorage || input.checkout)) throw new Error('开发数值日志只用于独立开发 Agent，保持原工作卷布局');
   if (input.businessStorage && (input.workload !== 'business-task' || !('pvc' in input.workVolume) || input.checkout)) throw new Error('可靠业务执行需要独立业务 PVC 布局且不得检出源码');
   const business = input.businessStorage && 'pvc' in input.workVolume ? businessStorageMounts({ taskId: input.taskId, image: input.image, workerUid: input.workerUid, pvc: input.workVolume.pvc, storage: input.businessStorage }) : undefined;
   const pod = podObject({
     name: input.name, namespace: input.namespace, image: input.image, imagePullPolicy: 'IfNotPresent', command: [...TASK_RUNNER_COMMAND], runAsUser: 0,
     labels: { [LABELS.project]: input.project, [LABELS.service]: input.service, [LABELS.workload]: input.workload, [LABELS.task]: input.taskId },
-    env: [...Object.entries(input.env ?? {}).filter(([name]) => !business?.env.some((entry) => entry.name === name) && name !== 'CS_RUNTIME_POD_UID').map(([name, value]) => ({ name, value })), ...(business?.env ?? []), ...(input.runtimeInitialization ? [{ name: 'CS_RUNTIME_POD_UID', valueFrom: { fieldRef: { fieldPath: 'metadata.uid' } } }] : [])],
+    env: [...Object.entries(input.env ?? {}).filter(([name]) => !business?.env.some((entry) => entry.name === name) && name !== 'CS_RUNTIME_POD_UID').map(([name, value]) => ({ name, value })), ...(business?.env ?? []), ...(input.runtimeInitialization || input.developmentUsageStorage ? [{ name: 'CS_RUNTIME_POD_UID', valueFrom: { fieldRef: { fieldPath: 'metadata.uid' } } }] : [])],
     resources: { cpu: input.resources.cpu, memory: input.resources.memory, ephemeralStorage: input.resources.storage },
-    volumes: [...(business?.volumes ?? ['emptyDir' in input.workVolume ? { name: 'work', mountPath: '/work', emptyDir: true } : { name: 'work', mountPath: '/work', pvc: input.workVolume.pvc }]), ...(input.runtimeInitialization ? [{ name: 'runtime-initialization', mountPath: '/run/crewstation/runtime-initialization', emptyDir: true }] : [])],
+    volumes: [...(business?.volumes ?? ['emptyDir' in input.workVolume ? { name: 'work', mountPath: '/work', emptyDir: true } : { name: 'work', mountPath: '/work', pvc: input.workVolume.pvc }]), ...(input.runtimeInitialization ? [{ name: 'runtime-initialization', mountPath: '/run/crewstation/runtime-initialization', emptyDir: true }] : []), ...(input.developmentUsageStorage ? [{ name: 'development-usage', mountPath: DEVELOPMENT_USAGE_DIRECTORY, emptyDir: true }, { name: 'development-usage-binding', mountPath: DEVELOPMENT_USAGE_BINDING_DIRECTORY, emptyDir: true }] : [])],
     ...(business ? { initContainers: [business.init] } : input.checkout ? { initContainers: [checkoutContainer(input.image, input.checkout, input.workerUid)] } : {}),
   });
   for (const [key, value] of Object.entries(input.labels ?? {})) pod.metadata.labels![key] = value;

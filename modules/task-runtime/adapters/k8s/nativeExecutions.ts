@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import type { K8sClient, K8sObject, ResourceRef } from '@crewstation/k8s';
 import { LABELS, Resources, resourcesMatch, secretObject } from '@crewstation/k8s';
+import { DEVELOPMENT_USAGE_BINDING_DIRECTORY, DEVELOPMENT_USAGE_DIRECTORY } from '@crewstation/contracts';
 import { isPlatformError, precondition } from '@crewstation/kernel';
 import type { TaskEnvironment } from '../../domain/taskEnvironment';
 import { EXECUTION_INTENT_ANNOTATION, nativeIntent, nativeIntentMatches, taskLabelMatches, WORKSPACE_TASK_LABEL } from '../../domain/physicalIdentity';
@@ -63,7 +64,20 @@ function verifyPod(pod: K8sObject, env: TaskEnvironment): string {
     || !isDeepStrictEqual(spec.affinity, { nodeAffinity: { requiredDuringSchedulingIgnoredDuringExecution: { nodeSelectorTerms: [{ matchFields: [{ key: 'metadata.name', operator: 'In', values: [n.nodeName] }] }] } } })) {
     throw precondition('CLI 容器与已受理的资源、工作卷或节点不一致');
   }
+  if (env.render?.developmentUsageStorage) verifyDevelopmentStorage(pod, env);
   return uid;
+}
+
+function verifyDevelopmentStorage(pod: K8sObject, env: TaskEnvironment): void {
+  const spec = pod.spec as { volumes?: Array<{ name?: string; emptyDir?: unknown }>; containers: Array<{ env?: Array<{ name: string; valueFrom?: unknown }>; volumeMounts?: Array<{ name?: string; mountPath?: string; readOnly?: boolean }> }> };
+  const container = spec.containers[0]!;
+  const volume = spec.volumes?.filter((v) => v.name === 'development-usage');
+  const mount = container.volumeMounts?.filter((v) => v.name === 'development-usage');
+  const bindingVolume = spec.volumes?.filter((v) => v.name === 'development-usage-binding');
+  const bindingMount = container.volumeMounts?.filter((v) => v.name === 'development-usage-binding');
+  if (env.native?.purpose !== 'agent' || volume?.length !== 1 || !isDeepStrictEqual(volume[0]?.emptyDir, {}) || mount?.length !== 1 || mount[0]?.mountPath !== DEVELOPMENT_USAGE_DIRECTORY || mount[0]?.readOnly === true
+    || bindingVolume?.length !== 1 || !isDeepStrictEqual(bindingVolume[0]?.emptyDir, {}) || bindingMount?.length !== 1 || bindingMount[0]?.mountPath !== DEVELOPMENT_USAGE_BINDING_DIRECTORY || bindingMount[0]?.readOnly === true
+    || !isDeepStrictEqual(container.env?.find((e) => e.name === 'CS_RUNTIME_POD_UID')?.valueFrom, { fieldRef: { fieldPath: 'metadata.uid' } })) throw precondition('开发数值私有日志布局与受理快照不一致');
 }
 
 /** 所有写入只针对本次执行 Pod／Secret；接口没有创建、修改或删除 PVC 的能力。 */

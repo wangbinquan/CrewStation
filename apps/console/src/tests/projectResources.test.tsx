@@ -8,6 +8,11 @@ const originalFetch = globalThis.fetch;
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 const topicTab = () => document.querySelector('[role="tablist"][aria-label="资源主题"] [aria-selected="true"]')?.textContent;
+async function waitForTopicContent(value: string) {
+  // The redirected route renders before its capabilities query settles; wait for the asserted content.
+  for (let attempt = 0; attempt < 40 && !page!.text().includes(value); attempt++) await page!.settle();
+}
+
 async function chooseTopic(label: string) {
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[role="tablist"][aria-label="资源主题"] [role="tab"]')].find((node) => node.textContent === label)!.click()); await page!.settle();
 }
@@ -109,8 +114,10 @@ test('平台约定按代码怎么用它分到四类：运行环境、接收事�
 
 test('旧链接里「平台接入」的 MCP 与业务任务小节落到它们现在的家', async () => {
   projectResourcesFixture(); page = await renderApp(`/projects/${id}/resources?section=guide&topic=mcp`);
+  await waitForTopicContent('https://mcp.test');
   expect(topicTab()).toBe('Agent 工具'); expect(page.text()).toContain('https://mcp.test');
   page.unmount(); page = await renderApp(`/projects/${id}/resources?section=guide&topic=tasks`);
+  await waitForTopicContent('/business-tasks');
   expect(topicTab()).toBe('调用接口'); expect(page.text()).toContain('/business-tasks');
 });
 

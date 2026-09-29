@@ -18,6 +18,8 @@ export interface ManagedAgentDeps {
   commandEnv: Record<string, string>;
   material: BeforeStartMaterial;
   processAttemptId: string;
+  usageSink?: AgentLaunchContext['usageSink'];
+  usageInterrupted?: () => void;
   persistentHome?: string;
   logger: Logger;
 }
@@ -70,7 +72,7 @@ export class ManagedAgentProcess implements AgentProcess {
     }
     if (this.cancelled) return;
     const env = this.deps.launcher.baseEnv({ ...this.deps.commandEnv, ...outcome.env, ...(this.spec.businessEvents ? { HOME: outcome.home, XDG_DATA_HOME: join(outcome.home, '.local/share'), XDG_CONFIG_HOME: join(outcome.home, '.config'), XDG_STATE_HOME: join(outcome.home, '.local/state') } : {}) });
-    const context: AgentLaunchContext = { cwd: this.deps.cwd, env, launcher: this.deps.launcher, logger: this.deps.logger, managed: { home: outcome.home, runDir: outcome.runDir, ...(outcome.configFile ? { configFile: outcome.configFile } : {}) } };
+    const context: AgentLaunchContext = { usageSink: this.deps.usageSink, cwd: this.deps.cwd, env, launcher: this.deps.launcher, logger: this.deps.logger, managed: { home: outcome.home, runDir: outcome.runDir, ...(outcome.configFile ? { configFile: outcome.configFile } : {}) } };
     try { this.inner = this.deps.driver.start(this.spec, context); }
     catch { this.events.push(this.event('error', { error: { code: 'spawn_failed', message: 'Agent 进程未能创建' } })); this.events.close(); return; }
     void this.forward(this.inner);
@@ -79,6 +81,7 @@ export class ManagedAgentProcess implements AgentProcess {
   private async forward(inner: AgentProcess): Promise<void> {
     try { for await (const event of inner.events) { if (this.spec.businessEvents) await this.events.writeProcessed(event); else this.events.push(event); } }
     catch (error) {
+      try { this.deps.usageInterrupted?.(); } catch { this.deps.logger.warn('numeric stream interruption unavailable'); }
       if (this.spec.businessEvents) this.events.fail(new RunnerCommandError('execution_unknown', 'Agent 事件流异常，进程退出尚未证明'));
       else this.events.push(this.event('error', { error: { code: 'driver_failed', message: error instanceof Error ? error.message : String(error) } }));
     }

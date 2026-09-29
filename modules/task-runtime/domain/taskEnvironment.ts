@@ -49,6 +49,8 @@ export interface NativeExecution {
 export interface WorkloadRender {
   /** 开会话所选分支的对象档位；保卷重建与子执行继承，不读取生产发布。 */
   readonly developmentObjectPlanId?: string;
+  /** RFC-034 opt-in for a newly admitted headless execution; legacy renders omit it. */
+  readonly developmentUsageStorage?: { readonly version: 1 };
   readonly objectInputsGeneration?: number;
   readonly storageFinalization?: { readonly operationId: string; readonly revision: number; readonly volumeUid: string | null; readonly computeStopped?: true };
   readonly completionPolicy?: 'archive-and-delete';

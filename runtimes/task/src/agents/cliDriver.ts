@@ -76,7 +76,7 @@ function toDriverSpec(spec: AgentSpec): DriverAgentSpec {
 }
 
 function toDriverContext(context: AgentLaunchContext): DriverLaunchContext {
-  return { cwd: context.cwd, env: context.env, logger: context.logger, host: createProcessHost(context.launcher), managed: context.managed, runDir: context.managed.runDir };
+  return { usageSink: context.usageSink, cwd: context.cwd, env: context.env, logger: context.logger, host: createProcessHost(context.launcher), managed: context.managed, runDir: context.managed.runDir };
 }
 
 /** 把 ProcessLauncher 与本运行时的进程／流工具包成驱动包声明的 ProcessHost 端口。 */

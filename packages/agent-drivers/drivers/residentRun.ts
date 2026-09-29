@@ -70,7 +70,7 @@ export class ResidentAgentRun extends AgentRunBase {
     try {
       result = await pumpTurn(stream, {
       businessEvents: this.spec.businessEvents,
-      captureUsage: (event, at) => captureUsage?.(event, at),
+      captureUsage: captureUsage ? (event, at) => captureUsage?.(event, at) : undefined,
       host: this.context.host,
       logger: this.context.logger,
       usage: this.usage,

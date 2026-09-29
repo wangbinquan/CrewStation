@@ -305,3 +305,16 @@ Bun静态bundle构建通过；最初品牌SVG解析与macOS大小写文件名冲
 
 
 剩余文档验证回执（2026-09-30）：`693ef50c9ff0fa4d4e60409e7d3b876e02945795` 的 [CI 36622441175](https://github.com/wangbinquan/CrewStation/actions/runs/36622441175) 终态 success，static/unit/module/console/gate/e2e 六项成功。本次仅补齐该回执及开发细化的复核历史表述，代码与已部署的 `94aabd6d` 相同，不重复全量本地门禁或重建运行资源；真实开发采集与两级运行验收仍按剩余清单推进。
+
+
+## 实施批次 18：开发 headless 数字日志底座（Stage 1，在制）
+
+按 [development-headless](./development-headless.md) §8.1 落地可选数值协议、固定启动摘要与 reserve-before-Hook、独立 FULL/WAL 日志及双 emptyDir 绑定、分页/ACK/原键重放、同步原生数值 sink、旧 Runner 与浏览器控制能力隔离。平台生产准入不选择新 render，开发来源仍关闭；本批不代替 Session PG/outbox、冻结价格/结束屏障和正式项目/系统采集闭环。
+
+首轮实现功能门 FAIL 的两个 P2 已补回归与修正：数字库整体丢失时独立绑定拒绝重新创建空库；终态 SQL 写失败时 info/ACK 保留当前进程已知终态，重启不假冒完成。普通驱动流异常也在包装错误前记录 missing-terminal。79 相关用例/412 断言通过；契约金样无变化，结构3338文件和本批36源文件 lint通过。独立 Stage 1 静态实现功能门 PASS（只读，未运行测试）；冻结单次完整门禁、精确发布与 hosted CI 待回执，不写本批完成。
+
+
+Stage 1 首次完整候选门禁回执：2026-09-29T22:12:32Z，4225 pass／142 skip／1 fail、26,792断言、845文件，635.93秒，40路径指纹未变化。唯一失败是旧 tasks 参考链接正确迁移后，测试未等能力目录结束“读取中”就断言 /business-tasks。只在 projectResources.test.tsx 增加最多40次 settle 的条件等待，保留两条原链接、主题及内容断言；23项导航回归/107断言和单文件lint通过，独立只读复核 PASS（未运行测试）。初次失败不算通过；因测试候选改变，冻结37源码/测试+4文档后重跑一次完整门禁。本机本轮真实登录/模型/资源 E2E 不可用，hosted精确CI和真实验收另记。
+
+
+Stage 1 修正候选完整门禁回执：2026-09-29T22:29:20Z，结构/lint/两侧类型全部通过；4226 pass／142 skip／0 fail、26,792断言、845文件，830.04秒。37源码/测试+4文档共41路径指纹全部一致。独立Stage 1实现功能门及旧导航有界等待修复复核均PASS（复核未运行测试）。只补回执后精确发布；同源代码不再重跑完整本地门禁。数字协议/Runner底座通过不代表生产来源已接通；Session PG/outbox、owner原键/CNY受理/排空与两级正式明细仍继续。该本机门禁未运行真实登录/模型/平台资源E2E，hosted精确CI及实机验收单独记录。

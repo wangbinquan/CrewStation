@@ -1,3 +1,5 @@
+import { openDevelopmentUsage } from './agents/openDevelopmentUsage';
+import type { DevelopmentUsageJournal } from './agents/developmentUsageJournal';
 import { profileBusinessStorage } from './storage/profileBusinessStorage';
 import type { AgentProtocol, RunnerHello } from '@crewstation/contracts';
 import { TASKRUNNER_PROTOCOL_VERSION } from '@crewstation/contracts';
@@ -46,6 +48,8 @@ export interface RunnerHooks {
   exit?: (code: number) => void;
   /** 测试注入驱动工厂（按档位协议取驱动）；缺省两种已知协议的 CLI 驱动。 */
   drivers?: AgentDriverFactory;
+  /** Unit-test injection; the production journal is opened only from the selected private Pod mount. */
+  developmentUsageJournal?: DevelopmentUsageJournal;
 }
 
 /** hello 宣告的是本 Runner 代码理解的协议；二进制在不在、能不能起由档位测试证明（RFC-006 §4.2）。 */
@@ -88,6 +92,7 @@ class TaskRunner implements RunnerHandle {
     private readonly nativeTerminals: NativeTerminalSupervisor,
     private readonly preview: PreviewSupervisor,
     private readonly initialization: RuntimeInitialization,
+    private readonly developmentUsage?: DevelopmentUsageJournal,
   ) {}
 
   static async create(config: RunnerConfig, hooks: RunnerHooks, logger: Logger): Promise<TaskRunner> {
@@ -107,7 +112,8 @@ class TaskRunner implements RunnerHandle {
     const interpreters = await detectInterpreters(launcher, (b) => Bun.which(b));
     const beforeStart = new BeforeStartRunner({ afterSteps: (request, env, signal) => initialization.checkAgentTools(request.processAttemptId, env, signal), launcher, interpreters, emit, logger: logger.child({ component: 'before-start' }), ...(config.agentRunDir ? { baseDir: config.agentRunDir } : {}) });
     logger.info('before-start interpreters detected', { interpreters: interpreters.list.map((i) => `${i.language}=${i.version ?? '?'}`) });
-    const agents = createAgentSupervisor({ drivers, launcher, paths, beforeStart, emit, logger: logger.child({ component: 'agents' }) });
+    const developmentUsage = hooks.developmentUsageJournal ?? (process.platform === 'linux' && probeCurrentUid() === 0 ? openDevelopmentUsage(config, logger) : undefined);
+    const agents = createAgentSupervisor({ developmentUsage, drivers, launcher, paths, beforeStart, emit, logger: logger.child({ component: 'agents' }) });
     const probes = createTerminalProbes({ beforeStart, launcher, paths, logger: logger.child({ component: 'probe' }) });
     const execs = createExecSupervisor({ launcher, paths, emit, logger: logger.child({ component: 'exec' }) });
     const business = createBusinessCommands({ launcher, paths, logger: logger.child({ component: 'business-exec' }) }, config.businessJournalDir, { outputBytes: 64 * 1024 * 1024, spoolBytes: 64 * 1024 * 1024, eventBytes: 256 * 1024 }, businessAgentFactory({ drivers, launcher, paths, beforeStart, logger }, config.businessSessionDir));
@@ -120,14 +126,14 @@ class TaskRunner implements RunnerHandle {
     const comparisons = createWorkspaceComparisons({ git, paths, launcher });
     const apiInvoker = createApiInvoker(config.internalApiBase);
     const runnerRef: { current?: TaskRunner } = {};
-    const handlers = buildCommandHandlers({ initialization, agents, probes, execs, business, terminals, nativeTerminals, files, preview, verifyContract, invokeApi: apiInvoker.invoke, workspaceStatus: () => readWorkspaceStatus(git, paths), comparisons, fetchComparisonHistory: (url, sha) => fetchComparisonHistory(git, url, sha), requestShutdown: (grace) => void runnerRef.current?.shutdown(grace) });
+    const handlers = buildCommandHandlers({ developmentUsage, initialization, agents, probes, execs, business, terminals, nativeTerminals, files, preview, verifyContract, invokeApi: apiInvoker.invoke, workspaceStatus: () => readWorkspaceStatus(git, paths), comparisons, fetchComparisonHistory: (url, sha) => fetchComparisonHistory(git, url, sha), requestShutdown: (grace) => void runnerRef.current?.shutdown(grace) });
     const hello = (): RunnerHello => ({
       type: 'hello',
       protocolVersion: TASKRUNNER_PROTOCOL_VERSION,
       taskId: config.taskId,
       runnerToken: config.runnerToken,
       workdir: paths.root,
-      capabilities: { ...(config.businessJournalDir && process.platform === 'linux' ? { businessExecutionV3: 1 as const, usageObservationsV1: 1 as const, nativeUsageTreeV1: 1 as const } : {}), protocols: [...RUNNER_PROTOCOLS], pty: terminals.backend !== undefined, preview: preview.enabled, ...(apiInvoker.enabled ? { apiInvocations: 1 as const } : {}), previewControl: 1 as const, terminalControl: 1 as const, runtimeInitialization: 1 as const, interpreters: interpreters.list },
+      capabilities: { ...(developmentUsage ? { developmentUsageV1: 1 as const, usageObservationsV1: 1 as const, nativeUsageTreeV1: 1 as const } : {}), ...(config.businessJournalDir && process.platform === 'linux' ? { businessExecutionV3: 1 as const, usageObservationsV1: 1 as const, nativeUsageTreeV1: 1 as const } : {}), protocols: [...RUNNER_PROTOCOLS], pty: terminals.backend !== undefined, preview: preview.enabled, ...(apiInvoker.enabled ? { apiInvocations: 1 as const } : {}), previewControl: 1 as const, terminalControl: 1 as const, runtimeInitialization: 1 as const, interpreters: interpreters.list },
     });
     const dispatcherRef: { current?: CommandDispatcher } = {};
     const link = createSessionLink({
@@ -142,7 +148,7 @@ class TaskRunner implements RunnerHandle {
     linkRef.current = link;
     const dispatcher = createCommandDispatcher(handlers, link, logger.child({ component: 'dispatch' }), (command) => initialization.assertCommand(command));
     dispatcherRef.current = dispatcher;
-    const runner = new TaskRunner(config, hooks, logger, paths, launcher, link, dispatcher, agents, probes, execs, business, terminals, nativeTerminals, preview, initialization);
+    const runner = new TaskRunner(config, hooks, logger, paths, launcher, link, dispatcher, agents, probes, execs, business, terminals, nativeTerminals, preview, initialization, developmentUsage);
     runnerRef.current = runner;
     return runner;
   }
@@ -187,6 +193,7 @@ class TaskRunner implements RunnerHandle {
     await Promise.allSettled([this.initialization.close(), this.agents.cancelAll(), this.terminals.closeAll(), this.nativeTerminals.closeAll(), this.execs.cancelAll(), this.preview.stop()]);
     await this.dispatcher.drain();
     await this.business.stop();
+    this.developmentUsage?.close();
     this.logger.info('drained');
   }
 }

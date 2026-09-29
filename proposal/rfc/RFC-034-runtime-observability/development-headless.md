@@ -17,9 +17,9 @@
 
 ## 3. Runner 存储与兼容
 
-开发卷现有根目录直接作为 /work 挂给 worker；不迁移其布局，不套用业务卷初始化器。新建独立开发 Agent Pod 的 render 快照选择 developmentUsageStorage v1，增加独立磁盘 emptyDir 挂载到 /run/crewstation/development-usage；Runner 创建 root 所有的 0700 私有子目录。现有 Pod 和旧 render 不追加验证条件，不重建正在运行的执行。
+开发卷现有根目录直接作为 /work 挂给 worker；不迁移其布局，不套用业务卷初始化器。新建独立开发 Agent Pod 的 render 快照选择 developmentUsageStorage v1，增加两个分别独立的磁盘 emptyDir：数字库挂到 /run/crewstation/development-usage，持久归属绑定挂到 /run/crewstation/development-usage-binding；Runner 在两处创建 root 所有的 0700 私有子目录。现有 Pod 和旧 render 不追加验证条件，不重建正在运行的执行。
 
-明确持久边界：本地 journal 跨 Runner/容器重启、Session PostgreSQL 跨 Pod 丢失。emptyDir 不跨 Pod 删除；若 Pod 在提交数值前丢失，已提交贡献保留，余量标记未知/中断。不得把新 Pod 的空日志当成旧执行完成，也不得因观测补偿自动重启模型。Pod UID、持久 marker 和 journal incarnation 绑定；同 Pod 日志/marker 丢失时拒绝声称采集能力，禁止重新造零值。
+明确持久边界：本地 journal 跨 Runner/容器重启、Session PostgreSQL 跨 Pod 丢失。emptyDir 不跨 Pod 删除；若 Pod 在提交数值前丢失，已提交贡献保留，余量标记未知/中断。不得把新 Pod 的空日志当成旧执行完成，也不得因观测补偿自动重启模型。Pod UID、持久 marker 和 journal incarnation 绑定；同 Pod 日志/marker 丢失时拒绝声称采集能力，禁止重新造零值。 独立绑定包含版本、Pod UID、项目、父工作区、实际执行 UUID 与 journalId；启动先读绑定，再验证数据库及原本地标记，缺失或替换时不创建新库，也不声明能力。数字库存在而独立绑定缺失同样拒绝。两个独立卷同时完全丢失时，本地不能证明首次运行；是否已有受理必须由 Session/owner 的持久原键判定。
 
 Runner 仅在日志可打开且平台显式请求时提供 developmentUsageV1；不借用 businessExecutionV3 的受理状态或输出。协议版本不升级，新增可选能力和专用 info/read/ack 命令。控制面先查询能力，再向 startAgent 发送带完整数值受理键的可选配置；不向不支持的 Runner 发送新命令。旧 Runner 的 startAgent、sendMessage、cancelAgent 与流式语义保持。
 
@@ -27,9 +27,10 @@ Runner 仅在日志可打开且平台显式请求时提供 developmentUsageV1；
 
 - info 返回受理键、journal incarnation、持久末水位、已确认水位与 running/finished/unknown 状态；未受理与能力不支持分别表示。
 - dev-session 首次受理时保存不可变 StartIntent、随机 digestNonce 与 SHA256 启动意图摘要。StartIntent 的版本、项目/父工作区/执行 UUID/代次/Agent、固定算力修订、实际权限、prompt/cwd/resume/systemPrompt 与 MCP 目标名称/URL 构成规范 JSON；prompt 等已有 owner 请求保留在 owner 中，journal 仅存摘要与数字。算力修订固定 launch/启动前模板；重签 MCP 令牌、解密凭据和当次传输材料不进入摘要，不改变同一次受理。
+- 首次发送 startAgent 前，owner 必须先持久固定原 journalId、incarnation、payloadDigest、Pod UID 和执行 UUID；之后重连、超时及重试只查询这组原键，禁止从新的无键 info 采用另一组键重新受理同一执行。两卷共同丢失后的新空库无法匹配原键，只登记来源不可用/未知，不再次调用模型。
 - 每次派发先按执行键查询 Session/Runner 原 receipt。已有相同意图 receipt 时直接恢复状态/数字游标，不再重签材料、运行 Hook 或创建模型；未知/超时不能当作未受理。只有健康原日志明确未受理时才准备当次材料。Runner 对首次命令核对稳定字段与 StartIntent，reserve 先持久摘要和身份，再调用 ManagedAgentProcess；并发重复由 reserve 返回原 receipt，不第二次 spawn。修改稳定意图必须新执行 UUID，不能借替换凭据改变 launch。旧 incarnation 的历史 active receipt 变 unknown，不能猜测成功或再次 spawn。
 - capture 复用 RunnerUsageCapture 数字及原生证明合同，独立 sequence 从 1 连续；不存 prompt、文本输出或模型凭据。真实轮次的成对边界另存为受限枚举数字帧，不用进程驻留时长推算活跃时长。
-- SQLite WAL + synchronous FULL；每次追加先落盘，才让 usage 事件的 writeProcessed 返回。普通文字不占数值队列、不影响数值水位。
+- SQLite WAL + synchronous FULL；驱动调用独立同步 usageSink，追加先落盘再返回；业务路径保留原 writeProcessed 顺序，开发普通文字不占数值队列、不影响数值水位。
 - 每页最多 5 个 capture（每 capture 仍最多 100 条 measurement），总页上限 1 MiB；单事件和总 spool 有硬上限。保留终态/缺口控制帧空间，溢出或写入失败使采集进入 partial/unknown，不能静默丢记录后报告 complete。
 - 观测故障不自动重启或结束用户模型：启动前日志不可用按未支持路径显式登记；启动后失败保留已有数值及错误质量，普通执行生命周期继续。若连续水位无法继续，冻结最后可信水位 N，info 通过独立有界控制回执声明 interrupted、原因、受理键/incarnation/Pod UID 和 N；这不是 sequence=N+1 的帧，也不能作为数字 complete 或新的 ACK。Session 在自己的 PG 中持久中断事实及水位，Runner 磁盘失败不妨碍该回执传递。
 - 若日志/marker 丢失或 Runner 重启后无法读原状态，Session 按既有 receipt、同一 owner 环境及 Pod UID 绑定中断，可信水位只能取已有 PG persistedThrough；不从新空日志提高水位。身份无法核对时标 source-unavailable，等待重连或 owner 的明确结束/释放事实，禁止声称已排空。数值中断本身不结束正在运行的模型。
@@ -72,3 +73,15 @@ dev-session 提供按 acceptedAt 时间窗和 projectId 有界分页的执行事
 
 
 最终复审回执（2026-09-30）：独立只读功能设计门 PASS。稳定受理摘要、receipt 优先恢复、Runner/PG 水位分离、可读数字排空及不可取回缺口两个反例均已关闭。该结论仅确认可实施，未运行测试，不替代实现功能门、精确 CI 或真实开发采集验收。
+
+## 9. Stage 1 实现检查点（2026-09-30，在制）
+
+当前实现限定为协议/Runner/Pod 底座：可选 developmentUsageV1、严格稳定受理与 FULL/WAL 数字日志、独立双卷绑定、分页/确认/重放、原生采集 sink 和旧 Runner/浏览器协商保护。没有任何生产准入路径选择 developmentUsageStorage；Session PG 副本/outbox、owner 固定原键及价格受理、排空清理屏障、来源事实与正式界面均在下一阶段。因此实际开发来源继续关闭，不能将此底座当成 CS-R02 完成。
+
+初次实现只读复核 FAIL 的两个恢复反例已补实现与回归：整个数字目录丢失后不能用新空库重新提供能力；SQL 终态写入失败时当前进程保留真实终态和中断，ACK/info 不退回运行中，而重启只读持久证据保持 unknown。额外覆盖普通驱动流异常包装前的 missing-terminal 标记，避免将异常流退出计为完整。79 相关用例/412 断言通过，契约金样不变、3338 源文件结构检查与 36 本批源文件 lint 通过；独立 Stage 1 静态实现功能门 PASS（只读，未运行测试）；完整候选门禁待回执。
+
+
+Stage 1 首次完整候选门禁回执：2026-09-29T22:12:32Z，4225 pass／142 skip／1 fail、26,792断言、845文件，635.93秒，40路径指纹未变化。唯一失败是旧 tasks 参考链接正确迁移后，测试未等能力目录结束“读取中”就断言 /business-tasks。只在 projectResources.test.tsx 增加最多40次 settle 的条件等待，保留两条原链接、主题及内容断言；23项导航回归/107断言和单文件lint通过，独立只读复核 PASS（未运行测试）。初次失败不算通过；因测试候选改变，冻结37源码/测试+4文档后重跑一次完整门禁。本机本轮真实登录/模型/资源 E2E 不可用，hosted精确CI和真实验收另记。
+
+
+Stage 1 修正候选完整门禁回执：2026-09-29T22:29:20Z，结构/lint/两侧类型全部通过；4226 pass／142 skip／0 fail、26,792断言、845文件，830.04秒。37源码/测试+4文档共41路径指纹全部一致。独立Stage 1实现功能门及旧导航有界等待修复复核均PASS（复核未运行测试）。只补回执后精确发布；同源代码不再重跑完整本地门禁。数字协议/Runner底座通过不代表生产来源已接通；Session PG/outbox、owner原键/CNY受理/排空与两级正式明细仍继续。该本机门禁未运行真实登录/模型/平台资源E2E，hosted精确CI及实机验收单独记录。

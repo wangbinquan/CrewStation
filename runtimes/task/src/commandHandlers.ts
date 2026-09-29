@@ -1,4 +1,6 @@
 import type { AgentSupervisor } from './agents/agentSupervisor';
+import type { DevelopmentUsageJournal } from './agents/developmentUsageJournal';
+import { RunnerCommandError } from './commandError';
 import type { TerminalProbes } from './agents/terminalProbe';
 import type { CommandHandlers } from './commandDispatcher';
 import type { ContractVerifier } from './contract/verifyContract';
@@ -14,6 +16,7 @@ import type { RuntimeInitialization } from './initialization/runtimeInitializati
 
 export interface CommandTargets {
   initialization?: RuntimeInitialization;
+  developmentUsage?: DevelopmentUsageJournal;
   invokeApi: (input: RunnerApiInvocation) => Promise<ApiInvocationResult>;
   agents: AgentSupervisor;
   probes: TerminalProbes;
@@ -35,7 +38,14 @@ const ack = (): Record<string, never> => ({});
 
 /** 协议命令 → 各监督器；无内容的命令统一回 `{}`（RunnerResultPayloads.ack）。 */
 export function buildCommandHandlers(targets: CommandTargets): CommandHandlers {
+  const development = (): DevelopmentUsageJournal => {
+    if (!targets.developmentUsage) throw new RunnerCommandError('development_usage_unsupported', '当前 Runner 未提供开发数值日志');
+    return targets.developmentUsage;
+  };
   return {
+    developmentUsageInfo: async (c) => development().info(c.key),
+    readDevelopmentUsageEvents: async (c) => development().read(c.key, c.after, c.limit),
+    ackDevelopmentUsageEvents: async (c) => development().acknowledge(c.key, c.through),
     runtimeInitializationStatus: async () => targets.initialization?.status() ?? { enabled: false, state: 'succeeded', steps: [], checks: [] },
     cancelRuntimeInitialization: async () => targets.initialization ? targets.initialization.cancel() : { enabled: false, state: 'succeeded', steps: [], checks: [] },
     businessExecutionInfo: (command) => targets.business.info(command.usageObservationsV1, command.nativeUsageTreeV1),

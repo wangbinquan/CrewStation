@@ -52,7 +52,7 @@ export async function pumpTurn(child: DriverChildProcess, deps: TurnPumpDeps): P
   await child.exited;
   const drained = await Promise.race([settled.then(() => true), Bun.sleep(DRAIN_GRACE_MS).then(() => false)]);
   if (!drained) await deps.host.killTree(child, 0);
-  if (deps.businessEvents || drained) {
+  if (deps.businessEvents || deps.captureUsage || drained) {
     const result = await settled;
     if (!result.ok) throw result.error;
   }
@@ -68,9 +68,9 @@ function handleStdoutLine(line: string, deps: TurnPumpDeps): void {
     return;
   }
   accumulateTokens(deps.usage, event);
-  if (deps.businessEvents && event.businessUsage) {
+  if ((deps.businessEvents || deps.captureUsage) && event.businessUsage) {
     const usageCapture = deps.captureUsage?.(event, Date.now());
-    deps.push(deps.emit('usage', { usage: event.businessUsage, ...(usageCapture ? { usageCapture } : {}) }, event.timestamp));
+    if (deps.businessEvents || usageCapture) deps.push(deps.emit('usage', { usage: event.businessUsage, ...(usageCapture ? { usageCapture } : {}) }, event.timestamp));
   }
   if (event.sessionId !== undefined) deps.onSessionId(event.sessionId);
   const mapped = toAgentEvent(event, deps.emit);

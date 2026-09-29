@@ -15,6 +15,7 @@ import { AgentProtocolSchema, LaunchSpecSchema } from './launch';
 import { BusinessExecutionCommands, BusinessExecutionEventSchema, BusinessExecutionInfoSchema, BusinessExecutionReceiptSchema } from './businessExecution';
 import { RuntimeInitializationStatusSchema } from './runtimeInitialization';
 import { BusinessDirectoryDtoSchema, BusinessFileDtoSchema } from '../api/business/files';
+import { DevelopmentUsageAdmissionSchema, DevelopmentUsageCommands, DevelopmentUsageInfoSchema, DevelopmentUsagePageSchema, DevelopmentUsageReceiptSchema } from './developmentUsage';
 
 /**
  * TaskRunner ↔ cs-session 协议版本；不兼容变更递增，双方在 hello 时校验。
@@ -50,6 +51,7 @@ export const RunnerHelloSchema = z.object({
     previewControl: z.literal(1).optional(),
     /** RFC-027: reliable business execution, materials and replay; omitted by older runners. */
     businessExecutionV3: z.literal(1).optional(),
+    developmentUsageV1: z.literal(1).optional(),
     usageObservationsV1: z.literal(1).optional(),
     nativeUsageTreeV1: z.literal(1).optional(),
     /** RFC-028：逐容器初始化、工具检查、持久去重和命令门控。 */
@@ -58,7 +60,7 @@ export const RunnerHelloSchema = z.object({
     terminalControl: z.literal(1).optional(),
     /** 容器内实际可用的脚本解释器清单；缺少所需语言的启动在执行前被拒。 */
     interpreters: z.array(RunnerInterpreterSchema).optional(),
-  }).refine((value) => value.nativeUsageTreeV1 !== 1 || value.usageObservationsV1 === 1, '原生子树能力依赖扩展用量能力'),
+  }).refine((value) => (value.nativeUsageTreeV1 !== 1 && value.developmentUsageV1 !== 1) || value.usageObservationsV1 === 1, '原生子树或开发日志能力依赖扩展用量能力'),
 });
 
 const cmd = <T extends string>(type: T) => ({ id: z.string().min(1), type: z.literal(type) });
@@ -82,6 +84,7 @@ const ProfileLaunchShape = {
 };
 
 export const StartAgentCommandSchema = z.object({
+  developmentUsage: DevelopmentUsageAdmissionSchema.optional(),
   businessOutputContract: BusinessOutputMaterialSchema.optional(),
   businessSkills: BusinessMaterialRequestSchema.shape.skills.optional(),
   businessSecretEnvNames: z.array(z.string()).max(1024).optional(),
@@ -105,6 +108,7 @@ export const StartBusinessAgentCommandSchema = z.object({
   digestNonce: z.string().regex(/^[a-f0-9]{64}$/),
   agent: StartAgentCommandSchema.strict(),
 }).strict().superRefine((value, ctx) => {
+  if (value.agent.developmentUsage !== undefined) ctx.addIssue({ code: 'custom', message: '业务执行不能携带开发数值受理', path: ['agent', 'developmentUsage'] });
   if ((value.nativeUsageTreeV1 === 1) !== (value.nativeUsageLineageKey !== undefined) || (value.nativeUsageTreeV1 === 1 && value.usageObservationsV1 !== 1))
     ctx.addIssue({ code: 'custom', message: '原生子树采集需要扩展用量能力和持久会话沿革标识' });
 });
@@ -159,6 +163,7 @@ export const RunnerCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...cmd('runtimeInitializationStatus') }).strict(),
   z.object({ ...cmd('cancelRuntimeInitialization') }).strict(),
   ...BusinessExecutionCommands,
+  ...DevelopmentUsageCommands,
   StartBusinessAgentCommandSchema,
   ...BusinessMessageCommands,
   StartAgentCommandSchema,
@@ -210,6 +215,9 @@ export const PreviewLogLineSchema = z.object({
 });
 
 export const RunnerResultPayloads = {
+  developmentUsageInfo: DevelopmentUsageInfoSchema,
+  developmentUsage: DevelopmentUsageReceiptSchema,
+  developmentUsageEvents: DevelopmentUsagePageSchema,
   runtimeInitialization: RuntimeInitializationStatusSchema,
   businessMessage: BusinessMessageReceiptSchema,
   businessExecutionInfo: BusinessExecutionInfoSchema,

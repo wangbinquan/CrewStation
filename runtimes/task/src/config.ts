@@ -3,6 +3,7 @@ import { NativeTerminalRosterSchema, PLATFORM_ENV, TaskIdSchema } from '@crewsta
 import type { Logger } from '@crewstation/kernel';
 import { loadRuntimeInitialization } from './initialization/config';
 import type { RuntimeInitializationConfig } from './initialization/runtimeInitialization';
+import { loadDevelopmentUsageConfig, type DevelopmentUsageConfig } from './agents/developmentUsageConfig';
 
 export interface PreviewConfig {
   command: string[];
@@ -14,6 +15,7 @@ export type TerminalBackendChoice = 'auto' | 'native' | 'script';
 
 export interface RunnerConfig {
   businessProbe?: boolean;
+  developmentUsage?: DevelopmentUsageConfig;
   runtimeInitialization?: RuntimeInitializationConfig;
   taskId: TaskId;
   nativeRunnerId?: string;
@@ -54,6 +56,7 @@ export function loadConfigFromEnv(env: Env = process.env): RunnerConfig {
   if (!taskId.success) throw new RunnerConfigError('CS_TASK_ID 不是合法的任务 ID（36 字符 UUIDv7）');
   return {
     businessProbe: env.CS_RUNNER_BUSINESS_PROBE === '1',
+    developmentUsage: loadDevelopmentUsageConfig(env),
     runtimeInitialization: loadRuntimeInitialization(env),
     taskId: taskId.data,
     ...(env.CS_RUNNER_NATIVE_ID ? { nativeRunnerId: NativeTerminalRosterSchema.shape.runnerId.parse(env.CS_RUNNER_NATIVE_ID) } : {}),

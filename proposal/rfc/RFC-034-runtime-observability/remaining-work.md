@@ -15,7 +15,7 @@
 | 正式页与 CSV 移除 | `84ae1bbbbed1a0f7b9f5de4550e78e4c7e12aa14`；[CI 36508083945](https://github.com/wangbinquan/CrewStation/actions/runs/36508083945) 六项 success；2026-09-29 01:31:46Z 本机八 Deployment Ready | 正式构建加只读夹具的浏览器证据不是实际身份/模型验收 |
 | 开发身份/账本基础 | `ca2ff256317b8ebc5cb914c1310865f916996345`；完整 4191 pass/142 skip/0 fail；[CI 36512613256](https://github.com/wangbinquan/CrewStation/actions/runs/36512613256) success | 已随 v2 本机部署；生产开发来源仍关闭，实际开发采集待完成，不能显示开发已知零 |
 | 采集证明 v2 服务端 | 独立功能门 PASS；冻结 15 路径指纹一致；2026-09-29 03:00:12Z 完整门禁结束：4197 pass/142 skip/0 fail、26633 断言、838 文件 | 已随 `94aabd6dfe641e46bbfc2e736f0632c7fdf6fc12` 推送；[CI 36619175682](https://github.com/wangbinquan/CrewStation/actions/runs/36619175682) 六项 success；本机八组件已升级；与 AW 实际联动/托管验收待完成 |
-| 下一批开发 Agent | [内部身份与总体接入](./development-usage.md)；[headless 实施细化草案](./development-headless.md) | 稳定重发、末尾排空/缺口和日志失败清理合同已复审 PASS；仍需实现、门禁、部署及真实采集验收 |
+| 开发 Agent Stage 1（本地门禁通过，待精确发布） | [内部身份与总体接入](./development-usage.md)；[headless 实施细化](./development-headless.md#9-stage-1-实现检查点2026-09-30在制)；协议/Runner/双卷绑定/驱动底座，79 定向回归通过 | 独立实现功能门PASS，完整4226/142/0通过、41路径指纹一致；精确发布/CI待回执。生产关闭。Session PG/outbox、owner 固定原键/价格/排空、查询与正式两级界面仍须接通及验收 |
 
 源码锚点：[统计合同](../../../packages/contracts/api/observability/runtimeStatistics.ts) 的 `sourceScope` 仍为业务任务、cohort 仍为 started；[platform 装配](../../../modules/platform/wiring.ts) 仅注入业务事实/业务数值来源；[开发生命周期](../../../modules/dev-session/application/agentExecution.ts) 仍由普通事件结束并回收；[平台健康说明](../../../apps/console/src/features/observability/i18n/zh-CN.ts) 明确应用级指标尚未采集。
 
@@ -38,9 +38,11 @@ CS-R01 的失败若不影响开发设计，可以并行推进文档与其他非�
 - 与 AW-R02 联合验证纯空树为零、没有证明为未知、迟到量与历史修订、跨页恢复、v1/v2 升降、费用开放/撤回；证明整条链只有一笔用量/估值。
 - 退出证据：两仓 SHA、CI 终态、服务 API/Runner 版本、实际部署及原始合同/真实同步对拍。RFC-370 托管准入仍由其 owner 关闭。
 
-### CS-R02 开发 Agent 持久数字链路〔只有身份/计价底座；T1～3/T9、PO-02/04/06〕
+### CS-R02 开发 Agent 持久数字链路〔Runner Stage 1 在制，生产未开启；T1～3/T9、PO-02/04/06〕
 
 - [headless 细化设计](./development-headless.md) 已通过独立功能设计门：存储跨进程/容器/Pod、旧 Runner、日志故障、稳定重发、可读末尾排空及不可取回缺口已明确；实现仍须逐条符合该合同。
+- Stage 1 已有可选协议、稳定摘要、Runner 数字日志、双卷归属、同步采集 sink、读/ACK/重放；独立实现功能门 PASS，首轮完整门禁4225/142/1因旧导航异步断言失败，已补测试等待并通过23项回归及独立复核，修正候选完整4226/142/0通过，41路径指纹一致；精确发布/CI尚待回执。新 render 仍未被生产准入选择，现有 Pod 不迁移/重建。
+- 下一阶段 owner 在首次发送前固定原 journal 键，Session PG 逐页复制及公平 outbox；接通价格受理、可读末尾/不可取回缺口屏障和两级明细后才启用真实来源。
 - 实现受理时冻结项目/工作区/Agent/实际环境/算力修订/CNY 目录；Runner 独立数字 journal 与能力协商；Session 连续持久副本和公平 outbox；账本/估值成功后确认消费。
 - 普通终态事件不能直接当数值完成；正常数值出口需数字复制到 finalThrough，中断出口需先排空可读末尾，或持久实际已复制水位及明确不可取回缺口；取消、父工作区释放、强制清理及 Pod 丢失都有完整或中断证据。不得因补采自动重复模型调用。
 - 退出证据：真实 PG 与实际驱动链的重复、乱序、同版冲突、丢 ACK、容器重启、日志/Pod 丢失、多页末尾、排空屏障、旧 Runner；未采集保持未知，不拿 DTO 测试替代。

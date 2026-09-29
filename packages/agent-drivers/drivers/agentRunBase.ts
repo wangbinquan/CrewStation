@@ -35,7 +35,7 @@ export abstract class AgentRunBase implements DriverAgentProcess {
   ) {
     this.events = createEventStream<AgentEvent>(spec.businessEvents ? 4 * 1024 * 1024 : undefined);
     this.event = createAgentEventFactory(spec.agentId);
-    this.usageObserver = spec.businessEvents && spec.usageObservationsV1 === 1 && prepared.normalizeUsage
+    this.usageObserver = (spec.businessEvents || context.usageSink !== undefined) && spec.usageObservationsV1 === 1 && prepared.normalizeUsage
       ? createUsageObserver(prepared.normalizeUsage, spec.agentId, spec.resumeSessionId) : undefined;
   }
 
@@ -64,7 +64,8 @@ export abstract class AgentRunBase implements DriverAgentProcess {
     const input = { lineageKey: this.spec.nativeUsageLineageKey, turn: turn.turnId, turnIndex: turn.turnIndex,
       resumeSessionId, nextRevision: () => this.usageObserver!.nextRevision() };
     const capture = !resident && this.prepared.nativeUsageCapture ? this.prepared.nativeUsageCapture(input, env) : unsupportedNativeUsageCapture(input);
-    await this.events.writeProcessed(this.emit('usage', { usageCapture: capture.begin(Date.now()) }));
+    const event = this.emit('usage', { usageCapture: capture.begin(Date.now()) });
+    if (!this.persistUsage(event)) await this.events.writeProcessed(event);
     return capture;
   }
 
@@ -72,13 +73,21 @@ export abstract class AgentRunBase implements DriverAgentProcess {
     for (const usageCapture of capture?.finish(this.sessionId ?? this.spec.resumeSessionId, Date.now(), issues) ?? []) {
       const event = this.emit('usage', { usageCapture });
       // The final receipt also leaves room for the following business terminal event.
+      if (this.persistUsage(event)) continue;
       if (usageCapture.nativeProof) await this.events.writeProcessed(event);
       else await this.events.write(event);
     }
   }
 
   protected push(event: AgentEvent): void {
-    this.events.push(event);
+    if (!this.persistUsage(event)) this.events.push(event);
+  }
+
+  private persistUsage(event: AgentEvent): boolean {
+    if (event.type !== 'usage' || !event.usageCapture || !this.context.usageSink) return false;
+    try { this.context.usageSink(event.usageCapture, event.at); }
+    catch { this.context.logger.warn('numeric usage sink unavailable'); }
+    return true;
   }
 
   protected emit(type: AgentEventType, fields?: AgentEventFields, at?: number): AgentEvent {

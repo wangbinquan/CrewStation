@@ -1,3 +1,15 @@
+## 2026-09-30 RFC-034 开发采集 Stage 1 完整门禁通过
+
+修正候选结构/lint/两侧类型通过，4226 pass/142 skip/0 fail（26,792断言、845文件、830.04秒）；37源码/测试+4文档共41路径指纹未变。独立Stage 1功能门和旧导航等待修复复核均PASS。首次门禁失败及修复历史保留；只补回执后精确提交/推送，hosted CI继续。生产未选择新render，当前平台部署仍94aabd6d；Session PG/outbox、owner原键/CNY价格/排空与正式两级明细待完成，不关闭CS-R02或两RFC。
+
+## 2026-09-30 RFC-034 Stage 1 候选门禁修复
+
+首轮完整门禁4225 pass/142 skip/1 fail（26,792断言、845文件、635.93秒），40路径指纹未变；开发采集相关全部通过。唯一旧导航测试在能力目录“读取中”时过早断言，现只补有界条件等待，保留原路径/主题/内容断言；23项/107断言及lint通过，独立只读复核PASS。冻结37源码/测试+4文档重跑完整门禁，尚未提交或部署本批；生产开发采集仍关闭。下方历史完整保留。
+
+## 2026-09-30 RFC-034 开发采集 Stage 1（在制）
+
+新增协议/Runner 的独立数字底座及新 Pod 双 emptyDir 归属验证，稳定摘要先 reserve 再 Hook，原键重放不重复模型。恢复反例已补：整个数字目录丢失拒绝新空库，终态写入失败保留当前进程结果而重启未知，普通驱动流异常保留 missing-terminal。79定向/412断言、结构3338文件、本批36源文件lint通过；独立 Stage 1 静态实现功能门 PASS（未运行测试），单次完整候选门禁尚待回执。生产未选择新 render、现有 Pod 不变；Session PG/outbox、owner原键/CNY受理/排空和正式明细继续按 [CS-R02](proposal/rfc/RFC-034-runtime-observability/remaining-work.md#cs-r02-开发-agent-持久数字链路runner-stage-1-在制生产未开启t13t9po-020406) 完成，不关闭两RFC。
+
 ## 2026-09-30 RFC-034 剩余工作索引入口
 
 RFC总索引的034条目从过期Draft改为In Progress，并直接链接[13项剩余清单](proposal/rfc/RFC-034-runtime-observability/remaining-work.md)。本次只更新自有观测登记，其他RFC记录保持。代码和部署仍为94aabd6d；已验证文档检查点693ef50c六项CI成功，后续回执c1b0970c已推送，最终文档CI继续记录，未将开发采集或整个RFC写为完成。
