@@ -1,3 +1,4 @@
+import { ExecutionObservationV2PageSchema, NativeUsageProofSchema, EXECUTION_OBSERVATIONS_V2_MEDIA_TYPE } from '@crewstation/contracts';
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { DevelopmentUsageIdentitySchema, ExecutionObservationIdentitySchema, ExecutionObservationPageSchema, IDENTITY_HEADERS, type Actor, type UserId } from '@crewstation/contracts';
 import { createApp } from '@crewstation/http';
@@ -8,6 +9,8 @@ import { createObservabilityModule, observabilityMigrations } from '../wiring';
 import { drizzleCostVisibility } from '../adapters/persistence/drizzleTokenPricing';
 import { drizzleUsageLedger } from '../adapters/persistence/drizzleUsageLedger';
 import { executionObservationUseCases } from '../application/executionObservations';
+import { usageIngestion } from '../application/usageIngestion';
+import nativeFixture from '../../../packages/contracts/tests/fixtures/crewstation-native-capture-v2.json';
 import type { UsageEvidence } from '../domain/usageProjection';
 
 const available = await testDatabaseAvailable();
@@ -137,7 +140,115 @@ describe.skipIf(!available)('RFC-034 business observation ownership boundary', (
     const identity = DevelopmentUsageIdentitySchema.parse({ ...f.scope, sourceKind: 'development-agent', agentId: Bun.randomUUIDv7(), executionId: Bun.randomUUIDv7(), executionGeneration: 1 });
     await f.module.api.ingestExecutionUsage({ ...f.scope, sourceId: 'development', expectedCursor: null, nextCursor: 'first',
       events: [{ eventId: 'first', measurement: { ...f.measurement, sourceId: 'development', identity } }] });
-    for (const query of [{ limit: 200 }, { snapshot: 'true' as const, limit: 200 }])
+    for (const query of [{ limit: 200 }, { snapshot: 'true' as const, limit: 200 }]) {
       await expect(f.module.api.executionObservations({ identity: 'fixture/fixture' }, f.scope.taskId, query)).rejects.toThrow();
+      await expect(f.module.api.executionObservationsV2({ identity: 'fixture/fixture' }, f.scope.taskId, query)).rejects.toThrow();
+    }
   });
+});
+
+
+function native(f: ReturnType<typeof fixture>) {
+  const store = drizzleUsageLedger(tdb.db), ingest = usageIngestion(store);
+  let revision = 0;
+  return async (state: 'pending' | 'complete') => ingest({ ...f.scope, sourceId: 'runner',
+    expectedCursor: await store.cursor(f.scope, 'runner'), nextCursor: 'proof:' + ++revision, events: [],
+    native: [{ identity: f.measurement.identity, capture: { version: 1, measurements: [], diagnostics: [],
+      nativeProof: NativeUsageProofSchema.parse({ ...nativeFixture.capture.proof, state, fingerprint: state === 'complete' ? 'empty-tree' : null }) } }] });
+}
+const proofHeaders = (f: ReturnType<typeof fixture>) => ({ ...f.service, Accept: EXECUTION_OBSERVATIONS_V2_MEDIA_TYPE });
+describe.skipIf(!available)('RFC-034 explicitly negotiated proof sync', () => {
+  test('proof-only pending and complete share v1 watermarks while v1 retains its original shape', async () => {
+    const f = fixture(), send = native(f);
+    await send('pending');
+    const old = ExecutionObservationPageSchema.parse(await (await f.app.request(f.root, { headers: f.service })).json());
+    expect(old.items).toEqual([]);
+    const first = await f.app.request(f.root, { headers: proofHeaders(f) });
+    expect(first.headers.get('Vary')).toBe('Accept');
+    const pending = ExecutionObservationV2PageSchema.parse(await first.json());
+    expect(pending.persistedThrough).toBe(old.persistedThrough);
+    expect(pending.items).toHaveLength(1); expect(pending.items[0]).toMatchObject({ kind: 'capture', revision: 1, capture: { state: 'pending' } });
+    await send('complete');
+    const complete = ExecutionObservationV2PageSchema.parse(await (await f.app.request(f.root + '?after=' + encodeURIComponent(pending.persistedThrough), { headers: proofHeaders(f) })).json());
+    expect(complete.items).toHaveLength(1); expect(complete.gaps).toEqual([]);
+    expect(complete.items[0]).toMatchObject({ kind: 'capture', revision: 2, capture: { state: 'complete', receivedSteps: 0 } });
+    for (const Accept of ['application/json', '*/*', EXECUTION_OBSERVATIONS_V2_MEDIA_TYPE + ';q=0']) {
+      const page = ExecutionObservationPageSchema.parse(await (await f.app.request(f.root, { headers: { ...f.service, Accept } })).json());
+      expect(page.items).toEqual([]); expect(page.persistedThrough).toBe(complete.persistedThrough);
+    }
+    expect((await f.app.request(f.root, { headers: { ...f.admin, Accept: EXECUTION_OBSERVATIONS_V2_MEDIA_TYPE } })).status).toBe(403);
+  });
+  test('frozen mixed snapshots retain their proof revision and reject cross-version continuations', async () => {
+    const f = fixture(); await f.seed(); const send = native(f); await send('pending');
+    const read = async (query: string) => ExecutionObservationV2PageSchema.parse(await (await f.app.request(f.root + query, { headers: proofHeaders(f) })).json());
+    const first = await read('?snapshot=true&limit=1');
+    if (first.mode !== 'snapshot') throw new Error('Expected snapshot');
+    expect(first.items[0]).toMatchObject({ kind: 'capture', capture: { state: 'pending' } });
+    expect(first.snapshotId).toStartWith('v2:'); expect(first.nextCursor).toStartWith('v2:capture:');
+    await send('complete');
+    const continuation = '?snapshot=true&limit=1&snapshotId=' + encodeURIComponent(first.snapshotId) + '&cursor=' + encodeURIComponent(first.nextCursor!);
+    const second = await read(continuation);
+    expect(second).toMatchObject({ mode: 'snapshot', snapshotThrough: first.snapshotThrough, persistedThrough: first.persistedThrough });
+    expect(second.items[0]?.kind).toBe('usage'); expect(second.gaps.length).toBeGreaterThan(0);
+    expect((await f.app.request(f.root + continuation, { headers: f.service })).status).toBe(400);
+    const old = ExecutionObservationPageSchema.parse(await (await f.app.request(f.root + '?snapshot=true&limit=1', { headers: f.service })).json());
+    if (old.mode !== 'snapshot') throw new Error('Expected v1 snapshot');
+    expect((await f.app.request(f.root + '?snapshot=true&snapshotId=' + old.snapshotId + '&cursor=' + old.nextCursor, { headers: proofHeaders(f) })).status).toBe(400);
+    const latest = await read('?snapshot=true');
+    expect(latest.items.find((row) => row.kind === 'capture')).toMatchObject({ capture: { state: 'complete' } });
+  });
+  test('v2 applies current CNY visibility and rejects visibility races or expired snapshots', async () => {
+    const f = fixture(), model = { provider: 'provider', model: 'actual-model', condition: null };
+    await f.module.api.savePrice(actor, f.profileId, { expectedRevision: 0, requestKey: 'v2-frozen-price', profileRevision: 1, protocol: 'opencode', ...model,
+      currency: 'CNY', rates: { input: '1', output: '3', cacheRead: '0', cacheWrite: null }, effectiveFrom: clock.now().toISOString(), sourceNote: 'fixture' });
+    await f.module.api.acceptExecutionPrice({ identity: f.measurement.identity, profile: { id: f.profileId, revision: 1, protocol: 'opencode' } });
+    await f.seed();
+    await f.module.api.valueExecutionUsage({ measurement: { identity: f.measurement.identity, sourceId: 'runner', recordId: 'first' }, usageRevision: 1, model, requestKey: 'v2-frozen-value' });
+    const read = () => f.module.api.executionObservationsV2({ identity: 'fixture/fixture' }, f.scope.taskId, { snapshot: 'true', limit: 200 });
+    expect((await read()).items.find((row) => row.kind === 'valuation')).toMatchObject({ availability: 'not-authorized', amountDecimal: null });
+    await f.module.api.setExecutionCostVisibility(actor, f.scope.projectId, { expectedRevision: 0, requestKey: 'v2-open-cost', visibility: 'project-members-and-services' });
+    expect((await read()).items.find((row) => row.kind === 'valuation')).toMatchObject({ availability: 'priced', currency: 'CNY', amountDecimal: '0.0001' });
+    const ledger = drizzleUsageLedger(tdb.db), visibility = drizzleCostVisibility(tdb.db);
+    const first = await ledger.snapshotWithCaptures(f.scope, { limit: 1 }, clock.now().getTime(), 1);
+    await expect(ledger.snapshotWithCaptures(f.scope, { limit: 1, snapshotId: first.snapshotId, cursor: first.nextCursor! }, first.expiresAt, 1)).rejects.toMatchObject({ kind: 'gone' });
+    await expect(ledger.changesWithCaptures(f.scope, 9999, 200)).rejects.toMatchObject({ kind: 'validation' });
+    const api = executionObservationUseCases({ clock, visibility, access: { task: async () => f.scope }, authorizer: { authorize: async () => undefined },
+      ledger: { ...ledger, snapshotWithCaptures: async (...args) => {
+        const page = await ledger.snapshotWithCaptures(...args);
+        await visibility.save(f.scope.projectId, { expectedRevision: 1, requestKey: 'v2-during-snapshot', visibility: 'hidden' }, clock.now());
+        return page;
+      } },
+    });
+    await expect(api.executionObservationsV2({ identity: 'fixture/fixture' }, f.scope.taskId, { snapshot: 'true', limit: 1 })).rejects.toMatchObject({ kind: 'conflict' });
+  });
+  test('more than one page of interleaved numeric, proof and CNY history loses no records', async () => {
+    const f = fixture(), send = native(f), store = drizzleUsageLedger(tdb.db);
+    await send('pending');
+    for (let batch = 0; batch < 3; batch++) {
+      await f.module.api.ingestExecutionUsage({ ...f.scope, sourceId: 'runner', expectedCursor: await store.cursor(f.scope, 'runner'), nextCursor: 'values:' + batch,
+        events: Array.from({ length: 200 }, (_, i) => ({ eventId: 'event:' + (batch * 200 + i), measurement: { ...f.measurement, recordId: 'meter:' + (batch * 200 + i) } })) });
+      if (batch === 0) await send('complete');
+    }
+    await f.module.api.valueExecutionUsage({ measurement: { identity: f.measurement.identity, sourceId: 'runner', recordId: 'meter:0' }, usageRevision: 1, model: null, requestKey: 'unpriced-mixed-page' });
+    let after: string | undefined;
+    const items: unknown[] = [];
+    do {
+      const query = '?limit=127' + (after ? '&after=' + encodeURIComponent(after) : '');
+      const page = ExecutionObservationV2PageSchema.parse(await (await f.app.request(f.root + query, { headers: proofHeaders(f) })).json());
+      expect(page.items.length).toBeLessThanOrEqual(127); items.push(...page.items); after = page.nextCursor ?? undefined;
+    } while (after);
+    expect(items).toHaveLength(603);
+    const kinds = items.map((row) => (row as { kind: string }).kind);
+    expect(kinds.filter((kind) => kind === 'capture')).toHaveLength(2);
+    expect(kinds.filter((kind) => kind === 'usage')).toHaveLength(600);
+    expect(kinds.filter((kind) => kind === 'valuation')).toHaveLength(1);
+    const selected = new Set<string>(); let query = '?snapshot=true&limit=127';
+    do {
+      const page = ExecutionObservationV2PageSchema.parse(await (await f.app.request(f.root + query, { headers: proofHeaders(f) })).json());
+      if (page.mode !== 'snapshot') throw new Error('Expected snapshot');
+      for (const item of page.items) selected.add(item.kind + ':' + item.recordId);
+      query = page.nextCursor ? '?snapshot=true&limit=127&snapshotId=' + encodeURIComponent(page.snapshotId) + '&cursor=' + encodeURIComponent(page.nextCursor) : '';
+    } while (query);
+    expect(selected.size).toBe(602);
+  }, 30000);
 });

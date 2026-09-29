@@ -93,7 +93,7 @@ export const ExecutionObservationQuerySchema = z.union([
   z.strictObject({ snapshot: z.literal('true'), snapshotId: key.optional(), cursor: key.optional(), limit })
     .refine((value) => (value.snapshotId === undefined) === (value.cursor === undefined), '快照续页必须同时指定 snapshotId 和 cursor'),
 ]);
-const page = {
+export const ExecutionObservationPageFields = {
   schemaVersion: z.literal(1), capability: z.literal('executionObservationsV1'),
   projectId: ProjectIdSchema, taskId: TaskIdSchema,
   items: z.array(ExecutionObservationSchema).max(500), nextCursor: key.nullable(),
@@ -102,8 +102,8 @@ const page = {
   gaps: z.array(z.strictObject({ after: key.nullable(), through: key, reason: z.enum(['expired', 'source-reset', 'capture-incomplete']) })).max(100),
 };
 export const ExecutionObservationPageSchema = z.discriminatedUnion('mode', [
-  z.strictObject({ ...page, mode: z.literal('incremental') }),
-  z.strictObject({ ...page, mode: z.literal('snapshot'), snapshotId: key, snapshotThrough: key, expiresAt: z.iso.datetime() }),
+  z.strictObject({ ...ExecutionObservationPageFields, mode: z.literal('incremental') }),
+  z.strictObject({ ...ExecutionObservationPageFields, mode: z.literal('snapshot'), snapshotId: key, snapshotThrough: key, expiresAt: z.iso.datetime() }),
 ]).superRefine((value, ctx) => {
   for (const [index, item] of value.items.entries()) {
     if (item.identity.taskId !== value.taskId || item.identity.projectId !== value.projectId)

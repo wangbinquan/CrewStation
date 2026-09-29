@@ -7,7 +7,7 @@ import { qualifyNativeMetrics } from '../domain/usageProjection';
 import { intervalDurations } from '../domain/executionIntervals';
 import type { RuntimeStatisticsSource, RuntimeStatisticsSnapshot } from '../ports/usageLedger';
 import type { Actor, ProjectId, ExecutionObservationPage, ExecutionObservationQuery, SetExecutionCostVisibility, TaskId } from '@crewstation/contracts';
-import { ExecutionObservationSchema, ExecutionObservationPageSchema, ExecutionObservationQuerySchema } from '@crewstation/contracts';
+import { ExecutionObservationV2PageSchema, type ExecutionObservationV2Page, ExecutionObservationSchema, ExecutionObservationPageSchema, ExecutionObservationQuerySchema } from '@crewstation/contracts';
 import { conflict, forbidden, jsonHash, validation, type Clock } from '@crewstation/kernel';
 import type { ExecutionCostVisibilityStore, ExecutionObservationAccess, ExecutionObservationCaller, UsageLedgerStore, UsageTaskScope } from '../ports/usageLedger';
 import type { ProjectAuthorizer } from '../ports/sources';
@@ -46,12 +46,37 @@ async function read(deps: ObservationReadDeps, caller: ExecutionObservationCalle
   return ExecutionObservationPageSchema.parse(page);
 }
 
+async function readWithCaptures(deps: ObservationReadDeps, caller: ExecutionObservationCaller, taskId: TaskId, raw: ExecutionObservationQuery): Promise<ExecutionObservationV2Page> {
+  const query = ExecutionObservationQuerySchema.parse(raw), scope = await deps.access.task(caller, taskId);
+  const visibility = await deps.visibility.read(scope.projectId), now = deps.clock.now(), prefix = cursorPrefix(scope);
+  const base = { schemaVersion: 2 as const, capability: 'executionObservationsV2' as const, ...scope,
+    firstAvailableCursor: prefix + '0', visibilityRevision: visibility.revision, costVisibility: visibility.visibility };
+  let page: ExecutionObservationV2Page;
+  if ('snapshot' in query) {
+    const snapshot = await deps.ledger.snapshotWithCaptures(scope, query, now.getTime(), visibility.revision);
+    page = { ...base, gaps: snapshot.captureIncomplete ? [{ after: null, through: prefix + snapshot.snapshotThrough, reason: 'capture-incomplete' }] : [],
+      mode: 'snapshot', items: snapshot.items, nextCursor: snapshot.nextCursor, snapshotId: snapshot.snapshotId,
+      snapshotThrough: prefix + snapshot.snapshotThrough, persistedThrough: prefix + snapshot.snapshotThrough,
+      asOf: new Date(snapshot.createdAt).toISOString(), expiresAt: new Date(snapshot.expiresAt).toISOString() };
+  } else {
+    const changes = await deps.ledger.changesWithCaptures(scope, readCursor(query.after, scope), query.limit);
+    page = { ...base, gaps: changes.captureIncomplete ? [{ after: null, through: prefix + changes.persistedThrough, reason: 'capture-incomplete' }] : [],
+      mode: 'incremental', items: changes.items, nextCursor: changes.hasMore ? prefix + changes.nextCursor : null,
+      persistedThrough: prefix + changes.persistedThrough, asOf: now.toISOString() };
+  }
+  if ((await deps.visibility.read(scope.projectId)).revision !== visibility.revision) throw conflict('金额可见性已变更，请重新读取观测');
+  if (visibility.visibility === 'hidden') page.items = page.items.map((item) => item.kind === 'valuation'
+    ? { ...item, availability: 'not-authorized', priceVersionRef: null, amountDecimal: null, completeness: 'unknown' } : item);
+  return ExecutionObservationV2PageSchema.parse(page);
+}
+
 export function executionObservationUseCases(deps: ObservationReadDeps) {
   const adminProject = async (actor: Actor, projectId: ProjectId) => {
     if (!actor.isAdmin) throw forbidden('只有系统管理员可以设置项目金额可见性');
     await deps.authorizer.authorize(actor, projectId, 'view');
   };
   return {
+    executionObservationsV2: (caller: ExecutionObservationCaller, taskId: TaskId, query: ExecutionObservationQuery) => readWithCaptures(deps, caller, taskId, query),
     executionObservations: (caller: ExecutionObservationCaller, taskId: TaskId, query: ExecutionObservationQuery) => read(deps, caller, taskId, query),
     executionCostVisibility: async (actor: Actor, projectId: ProjectId) => {
       await adminProject(actor, projectId); return deps.visibility.read(projectId);

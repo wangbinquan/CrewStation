@@ -6,7 +6,7 @@ import type { Database, Executor } from '@crewstation/persistence';
 import type { ExecutionValuationRequest, ExecutionValuationStore, UsageMeasurementRef, UsageLedgerStore, UsageLedgerTransaction, UsageTaskScope } from '../../ports/usageLedger';
 import { costVisibility } from './tokenPriceTables';
 import type { RuntimeStatisticsSnapshot } from '../../ports/usageLedger';
-import { usageSnapshot, captureIncompleteAt } from './usageSnapshot';
+import { usageChangesWithCaptures, usageSnapshotWithCaptures, usageSnapshot, captureIncompleteAt } from './usageSnapshot';
 import { nativeCaptureId, nativeRecordId, nativeStepKey, nativeMeasurementFingerprint, compareNativeBaseline, nativeCaptureSummary, nativeRepairCandidate, nativeStepFingerprint, reconcileNativeRepairModel, projectNativeRepair, rebuildUsageProjection, type UsageEvidence, type NativeCaptureDocument } from '../../domain/usageProjection';
 import { nativeCaptures, nativeCaptureHistory, nativeSteps, nativeBaselines, nativeRepairs, executionValuations, executionValuationReceipts, usageChanges, usageEvents, usageEvidence, usageHeads, usagePages, usageProjections, usageSources } from './usageLedgerTables';
 
@@ -86,6 +86,8 @@ async function reprojectNativeMeter(db: Executor, taskKey: string, key: string, 
 
 export function drizzleUsageLedger(db: Database): UsageLedgerStore {
   return {
+    changesWithCaptures: (scope, after, limit) => usageChangesWithCaptures(db, taskKeyOf(scope), after, limit),
+    snapshotWithCaptures: (scope, query, now, visibilityRevision) => usageSnapshotWithCaptures(db, taskKeyOf(scope), query, now, visibilityRevision),
     snapshot: (scope, query, now, visibilityRevision) => usageSnapshot(db, taskKeyOf(scope), query, now, visibilityRevision),
     cursor: (scope, sourceId) => sourceCursor(db, taskKeyOf(scope), sourceId),
     change: (scope, sourceId, work) => db.transaction(async (tx) => {

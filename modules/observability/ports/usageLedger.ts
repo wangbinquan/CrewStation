@@ -1,4 +1,4 @@
-import type { ExecutionObservation, RuntimeNativeCapture } from '@crewstation/contracts';
+import type { ExecutionObservationV2, ExecutionObservation, RuntimeNativeCapture } from '@crewstation/contracts';
 import type { RuntimeFactQuery, RuntimeTaskFact, RunnerUsageCapture } from '@crewstation/contracts';
 import type { UsageExecutionIdentity, RunnerUsageMeasurement, RunnerUsageSourceIdentity, RunnerUsageSourcePage } from '@crewstation/contracts';
 import type { UsageRecord, UsageObservation, UsageValuation, ProjectId, TaskId, ExecutionCostVisibilityDto, SetExecutionCostVisibility } from '@crewstation/contracts';
@@ -31,7 +31,11 @@ export interface UsageSnapshot {
   snapshotId: string; snapshotThrough: number; expiresAt: number; createdAt: number; visibilityRevision: number;
   items: UsageObservation[]; captureIncomplete: boolean; nextCursor: string | null;
 }
+export interface UsageSyncChanges extends Omit<UsageChanges, 'items'> { items: ExecutionObservationV2[] }
+export interface UsageSyncSnapshot extends Omit<UsageSnapshot, 'items'> { items: ExecutionObservationV2[] }
 export interface UsageLedgerStore {
+  changesWithCaptures(scope: UsageTaskScope, after: number, limit: number): Promise<UsageSyncChanges>;
+  snapshotWithCaptures(scope: UsageTaskScope, query: UsageSnapshotQuery, now: number, visibilityRevision: number): Promise<UsageSyncSnapshot>;
   snapshot(scope: UsageTaskScope, query: UsageSnapshotQuery, now: number, visibilityRevision: number): Promise<UsageSnapshot>;
   change<T>(scope: UsageTaskScope, sourceId: string, work: (tx: UsageLedgerTransaction) => Promise<T>): Promise<T>;
   cursor(scope: UsageTaskScope, sourceId: string): Promise<string | null>;

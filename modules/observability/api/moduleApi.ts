@@ -1,5 +1,5 @@
 import type { ProjectRuntimeStatistics, RuntimeStatisticsQuery, RuntimeTaskObservation, SystemRuntimeStatistics } from '@crewstation/contracts';
-import type { ExecutionCostVisibilityDto, ExecutionObservationPage, ExecutionObservationQuery, SetExecutionCostVisibility, UsageValuation, UsageExecutionIdentity, UsageRecord } from '@crewstation/contracts';
+import type { ExecutionCostVisibilityDto, ExecutionObservationV2Page, ExecutionObservationPage, ExecutionObservationQuery, SetExecutionCostVisibility, UsageValuation, UsageExecutionIdentity, UsageRecord } from '@crewstation/contracts';
 import type { Actor, AlertDto, HealthDto, LogEntryDto, LogQuery, ProjectId, TaskId, TraceChainDto, TraceEventDto, TraceEventsQuery, TraceId, TraceListQuery, TraceSummaryDto } from '@crewstation/contracts';
 
 import type { TokenPricingApi } from './tokenPricingApi';
@@ -33,6 +33,7 @@ export interface ObservabilityModuleApi extends TokenPricingApi {
   ingestExecutionUsage(input: UsageSourcePage): Promise<{ cursor: string | null; applied: number; duplicate: number }>;
   /** Separate durable valuation; references one committed usage projection revision. */
   valueExecutionUsage(input: ExecutionValuationRequest): Promise<UsageValuation>;
+  executionObservationsV2(caller: ExecutionObservationCaller, taskId: TaskId, query: ExecutionObservationQuery): Promise<ExecutionObservationV2Page>;
   executionObservations(caller: ExecutionObservationCaller, taskId: TaskId, query: ExecutionObservationQuery): Promise<ExecutionObservationPage>;
   executionCostVisibility(actor: Actor, projectId: ProjectId): Promise<ExecutionCostVisibilityDto>;
   setExecutionCostVisibility(actor: Actor, projectId: ProjectId, input: SetExecutionCostVisibility): Promise<ExecutionCostVisibilityDto>;
