@@ -302,3 +302,6 @@ Bun静态bundle构建通过；最初品牌SVG解析与macOS大小写文件名冲
 
 
 批次17精确 CI 与部署回执：`94aabd6dfe641e46bbfc2e736f0632c7fdf6fc12` 的 [CI 36619175682](https://github.com/wangbinquan/CrewStation/actions/runs/36619175682) 六项全成功；本机于2026-09-29T19:46:51.122Z完成八组件滚动升级，Ready=1、generation=observedGeneration，默认 Runner 配置按精确 digest 更新，storage-contract=1、无新迁移。完整镜像摘要与组件代次见 [CS-R01 回执](./remaining-work.md#cs-r01-本批发布部署回执2026-09-30)。本机登录与业务/开发真实身份模型验收分别记录；联合实际对拍、开发采集及其他 RFC 余项继续。
+
+
+剩余文档验证回执（2026-09-30）：`693ef50c9ff0fa4d4e60409e7d3b876e02945795` 的 [CI 36622441175](https://github.com/wangbinquan/CrewStation/actions/runs/36622441175) 终态 success，static/unit/module/console/gate/e2e 六项成功。本次仅补齐该回执及开发细化的复核历史表述，代码与已部署的 `94aabd6d` 相同，不重复全量本地门禁或重建运行资源；真实开发采集与两级运行验收仍按剩余清单推进。

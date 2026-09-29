@@ -1,3 +1,7 @@
+## 2026-09-30 RFC-034 剩余工作文档精确 CI 回执
+
+693ef50c9ff0fa4d4e60409e7d3b876e02945795 的 CI36622441175 已终态六项 success。补入剩余清单和实施计划，并将开发设计的前两轮 FAIL 明确为历史，当前最终设计门仍为 PASS。只有文档变化，代码和本机部署保持94aabd6d；开发实际采集、CLI/算力测试及真实联动等13项仍按[remaining-work](proposal/rfc/RFC-034-runtime-observability/remaining-work.md)推进，不宣告RFC完成。
+
 ## 2026-09-30 RFC-034 文档与开发采集合同复核
 
 `94aabd6dfe641e46bbfc2e736f0632c7fdf6fc12` 的 v2 服务端与剩余工作清单已精确推送，CI36619175682六项全成功，本机于19:46:51Z完成八组件升级且全部Ready=1，storage-contract=1。开发细化首轮复核指出重发摘要与日志故障清理缺口：现固定稳定 StartIntent/receipt 恢复，独立 PG 中断出口区分 Runner reportedThrough 和已复制数字水位，可读先排空、确实不可读才记录缺口。最终独立只读功能设计门 PASS，生产开发采集仍关闭；两仓清单范围、取消项与发布状态回填已复核。下方原历史记录保留。
