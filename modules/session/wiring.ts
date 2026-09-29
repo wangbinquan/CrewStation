@@ -1,3 +1,6 @@
+import { drizzleDevelopmentUsageStore } from './adapters/persistence/developmentUsage';
+import { drizzleDevelopmentUsageSourceStore } from './adapters/persistence/developmentUsageSources';
+import { developmentUsageWorker } from './workers/developmentUsageWorker';
 import { drizzleBusinessUsageSourceStore } from './adapters/persistence/businessUsageSources';
 import { legacyRunnerIdentity } from './adapters/persistence/legacyRunnerIdentity';
 import type { ResourceIdentityDirectory } from '@crewstation/persistence';
@@ -55,6 +58,7 @@ export const sessionMigrations: MigrationSet = {
 
 export function createSessionModule(deps: SessionModuleDeps): SessionModule {
   const useCaseDeps: SessionUseCaseDeps = {
+    developmentUsage: drizzleDevelopmentUsageStore(deps.db),
     businessExecutions: drizzleBusinessExecutionStore(deps.db),
     events: drizzleRunnerEventStore(deps.db),
     legacyRunners: deps.identities ? legacyRunnerIdentity(deps.identities) : undefined,
@@ -67,14 +71,20 @@ export function createSessionModule(deps: SessionModuleDeps): SessionModule {
     logger: deps.logger ?? noopLogger,
   };
   const usageSources = drizzleBusinessUsageSourceStore(deps.db);
+  const developmentSources = drizzleDevelopmentUsageSourceStore(deps.db);
   const hub = runnerHub(useCaseDeps);
   const dispatch = commandDispatch(useCaseDeps, hub);
   const streams = browserStreams(useCaseDeps, hub, dispatch);
   const ingestion = businessIngestionWorker({ store: useCaseDeps.businessExecutions!, send: dispatch.sendLocalOnly, logger: useCaseDeps.logger,
     connectedTasks: () => [...hub.connections].filter(([, connection]) => connection.hello.capabilities.businessExecutionV3 === 1).map(([taskId]) => taskId) });
+  const developmentIngestion = developmentUsageWorker({ store: useCaseDeps.developmentUsage!, send: dispatch.sendLocalOnly, logger: useCaseDeps.logger,
+    connectedTasks: () => [...hub.connections].filter(([, connection]) => connection.hello.capabilities.developmentUsageV1 === 1 && connection.hello.capabilities.usageObservationsV1 === 1).map(([taskId]) => taskId) });
   const { upgradeWebSocket, websocket } = createBunWebSocket<ServerWebSocket>();
   const api: SessionModuleApi = {
     name: 'session',
+    registerDevelopmentUsage: useCaseDeps.developmentUsage!.register, getDevelopmentUsage: useCaseDeps.developmentUsage!.get,
+    requestDevelopmentUsageDrain: useCaseDeps.developmentUsage!.requestDrain, markDevelopmentUsageUnavailable: useCaseDeps.developmentUsage!.unavailable,
+    nextDevelopmentUsageSource: developmentSources.next, readDevelopmentUsageMeasurement: developmentSources.measurement, acknowledgeDevelopmentUsageSource: developmentSources.acknowledge,
     readBusinessUsageMeasurement: usageSources.measurement, nextBusinessUsageSource: usageSources.next, acknowledgeBusinessUsageSource: usageSources.acknowledge,
     getExecutionCompletionProof: (taskId, executionId) => useCaseDeps.businessExecutions!.completionProof(taskId, executionId),
     consumeBusinessExecution: (taskId, executionId, through, stopped) => useCaseDeps.businessExecutions!.consume(taskId, executionId, through, stopped),
@@ -90,7 +100,7 @@ export function createSessionModule(deps: SessionModuleDeps): SessionModule {
     api,
     http: { runner: runnerSocketRoutes(hub, upgradeWebSocket), stream: browserSocketRoutes(streams, deps.isAdmin, upgradeWebSocket), internal: internalRoutes(dispatch, useCaseDeps) },
     websocket,
-    workers: [{ start: () => { timer ??= setInterval(() => void hub.tick(), 5000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } }, ingestion],
+    workers: [{ start: () => { timer ??= setInterval(() => void hub.tick(), 5000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } }, ingestion, developmentIngestion],
     migrations: sessionMigrations,
   };
 }

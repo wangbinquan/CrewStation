@@ -1,3 +1,11 @@
+## 2026-09-30 RFC-034 Session 候选完整门禁通过
+
+冻结35路径完整结构/lint/两侧类型与4263 pass/142 skip/0 fail全部通过（27,020断言、852文件）；31源码/测试/迁移/锁及4文档指纹未变。独立Session功能门和文档门PASS，只补回执后精确发布/CI。本批尚未部署，生产仍关闭、本机94aabd6d；owner稳定原键/CNY/实际生命周期排空、platform消费、正式两级明细继续，不关闭CS-R02或两RFC。此前失败与修正历史完整保留，详见[剩余清单](proposal/rfc/RFC-034-runtime-observability/remaining-work.md)。
+
+## 2026-09-30 RFC-034 Session 数字副本/outbox 候选
+
+本批Stage 2仅Session PG原键副本、复制后ACK、公平固定页outbox、持久排空回执及owner内部接口。首轮迟到null和PG尾部漏推进两项P2已补真实PG回归修正，独立Session范围实现门PASS；54相关/335断言、结构3358、29TS lint/后端类型/旧金样通过。冻结单次完整门禁待回执，未提交或部署本批；生产开发采集仍关闭，本机94aabd6d。owner稳定意图/原键/CNY受理/实际释放屏障、platform消费及两级明细继续，详见[RFC034剩余工作](proposal/rfc/RFC-034-runtime-observability/remaining-work.md)。所有下方历史原样保留。
+
 ## 2026-09-30 RFC-034 开发数字底座精确发布回执
 
 `fc491a4d6b31c6476d3222209ced880810936c3e` 已推送并与 origin/main 同步；CI36640100860终态六项success，独立功能门PASS、完整4226/142skip/0及41路径指纹一致。仅Stage 1协议/Runner/双卷绑定/驱动底座：生产开发采集仍关闭，本批未本机部署，当前平台仍94aabd6d。Session PG/outbox、owner原键/价格/排空及两级明细继续。RFC与CS-R02保持In Progress，详见[剩余工作](proposal/rfc/RFC-034-runtime-observability/remaining-work.md)。

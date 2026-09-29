@@ -1,3 +1,4 @@
+import { persistDevelopmentReply, prepareDevelopmentCommand } from './developmentCommandReceipt';
 import type { RunnerCommand, RunnerHello, TaskId } from '@crewstation/contracts';
 import { PlatformError } from '@crewstation/kernel';
 import type { SessionUseCaseDeps } from './dependencies';
@@ -10,7 +11,7 @@ import { persistBusinessReply, prepareBusinessCommand } from './businessCommandR
 const PREVIEW_CONTROL_COMMANDS: ReadonlySet<RunnerCommand['type']> = new Set(['startPreview', 'stopPreview', 'previewLogs']);
 
 /** 命令派发：本副本持有连接就直接发，否则按注册表转发到持有副本；无人持有即 TaskRunner 离线。 */
-export function commandDispatch(deps: Pick<SessionUseCaseDeps, 'registry' | 'forwarder' | 'settings' | 'clock' | 'businessExecutions'>, hub: Pick<RunnerHub, 'connections'>) {
+export function commandDispatch(deps: Pick<SessionUseCaseDeps, 'registry' | 'forwarder' | 'settings' | 'clock' | 'businessExecutions' | 'developmentUsage'>, hub: Pick<RunnerHub, 'connections'>) {
   const sendLocal = (taskId: TaskId, command: RunnerCommand): Promise<unknown> | undefined => {
     const connection = hub.connections.get(taskId);
     if (!connection) return undefined;
@@ -24,6 +25,7 @@ export function commandDispatch(deps: Pick<SessionUseCaseDeps, 'registry' | 'for
     return (async () => {
       // 普通命令保持同步入 pending 的旧行为；可靠命令先提交持久接收意图。
       if ((command.type === 'startBusinessCommand' || command.type === 'startBusinessAgent') || command.type === 'ackBusinessExecutionEvents' || command.type === 'cancelBusinessExecution') await prepareBusinessCommand(deps.businessExecutions, taskId, command);
+      if ((command.type === 'startAgent' && command.developmentUsage) || command.type === 'ackDevelopmentUsageEvents') await prepareDevelopmentCommand(deps.developmentUsage, taskId, command);
       const wire = connection.legacy ? await connection.legacy.outgoing(command) : command;
       const payload = await new Promise<unknown>((resolve, reject) => {
       connection.pending.add({
@@ -34,6 +36,7 @@ export function commandDispatch(deps: Pick<SessionUseCaseDeps, 'registry' | 'for
       try { connection.socket.send(JSON.stringify(wire)); } catch (error) { connection.pending.settle(command.id, { ok: false, code: 'send_failed', message: String(error) }); }
       });
       await persistBusinessReply(deps.businessExecutions, taskId, command, payload);
+      await persistDevelopmentReply(deps.developmentUsage, taskId, command, payload);
       return payload;
     })();
   };

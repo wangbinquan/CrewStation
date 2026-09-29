@@ -320,3 +320,15 @@ Stage 1 首次完整候选门禁回执：2026-09-29T22:12:32Z，4225 pass／142 
 Stage 1 修正候选完整门禁回执：2026-09-29T22:29:20Z，结构/lint/两侧类型全部通过；4226 pass／142 skip／0 fail、26,792断言、845文件，830.04秒。37源码/测试+4文档共41路径指纹全部一致。独立Stage 1实现功能门及旧导航有界等待修复复核均PASS（复核未运行测试）。只补回执后精确发布；同源代码不再重跑完整本地门禁。数字协议/Runner底座通过不代表生产来源已接通；Session PG/outbox、owner原键/CNY受理/排空与两级正式明细仍继续。该本机门禁未运行真实登录/模型/平台资源E2E，hosted精确CI及实机验收单独记录。
 
 Stage 1 底座发布回执（2026-09-30）：`fc491a4d6b31c6476d3222209ced880810936c3e` 已精确推送；[CI 36640100860](https://github.com/wangbinquan/CrewStation/actions/runs/36640100860) 六项 success。候选完整4226/142 skip/0与独立功能门 PASS 已记录。生产开发采集仍关闭，本机平台仍94aabd6d，Session PG/outbox、owner原键/CNY受理/排空及两级明细尚未完成；CS-R02继续，见[剩余清单](./remaining-work.md)。
+
+
+## 实施批次 19：开发 Session PG 副本/outbox（Stage 2 的 Session 部分，在制）
+
+按 [development-headless](./development-headless.md) §10 落地不可变原来源登记、PG连续数字副本、提交后Runner ACK、公平固定页outbox和内部owner读/排空/丢失接口。reported N与copied M分开；只有真实生命周期请求及完整持久末尾，或绑定中断/确实不可取回证明，才产生清理出口。已知缺口和未知尾部不会计成完整零。
+
+首轮独立实现功能门FAIL的迟到null误判和PG连续尾部漏推进两项P2已修并补真实PG回归；最终Session范围静态实现功能门PASS（复核未运行测试）。54相关用例/335断言、3358源文件结构、29本批TS lint、后端类型和7项契约金样通过；实际Runner SQLite+PG的6项回归仅用传输桩，模块层另外保留真实PG回归，不冒充实机模型/身份验收。冻结单次完整门禁及精确发布/CI待回执。
+
+尚未启用生产render、owner稳定原键/意图/CNY受理/释放屏障、platform新来源消费或正式两级明细；本机仍94aabd6d，本批不部署或重建既有执行。CS-R02与所有未满足退出证据的剩余任务继续。此前文档检查点e75939bad6fc29d1d850f6dc78afffd3aa4ea30d的两个push CI36641646598/36641645285均终态success，仅证明文档后继，不代替本批源码门禁。
+
+
+Stage 2 Session 冻结候选完整门禁回执：2026-09-29T23:43:16Z，结构、全仓lint、后端/console类型全部通过；4263 pass／142 skip／0 fail、27,020断言、852文件，测试591.90秒（完整命令637.67秒）。31源码/测试/迁移/锁+4文档共35路径指纹全部未变；独立Session实现功能门及文档复核PASS。只追加本回执后精确发布，同源代码不重跑完整本地门禁。142跳过项与真实身份/模型/集群验收不计为通过；本机仍94aabd6d、生产开发来源关闭，owner/CNY/实际释放屏障、platform消费及两级明细继续。

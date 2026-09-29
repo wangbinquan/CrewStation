@@ -87,3 +87,16 @@ Stage 1 首次完整候选门禁回执：2026-09-29T22:12:32Z，4225 pass／142 
 Stage 1 修正候选完整门禁回执：2026-09-29T22:29:20Z，结构/lint/两侧类型全部通过；4226 pass／142 skip／0 fail、26,792断言、845文件，830.04秒。37源码/测试+4文档共41路径指纹全部一致。独立Stage 1实现功能门及旧导航有界等待修复复核均PASS（复核未运行测试）。只补回执后精确发布；同源代码不再重跑完整本地门禁。数字协议/Runner底座通过不代表生产来源已接通；Session PG/outbox、owner原键/CNY受理/排空与两级正式明细仍继续。该本机门禁未运行真实登录/模型/平台资源E2E，hosted精确CI及实机验收单独记录。
 
 Stage 1 精确发布与 hosted 回执：`fc491a4d6b31c6476d3222209ced880810936c3e` 已推送；[CI 36640100860](https://github.com/wangbinquan/CrewStation/actions/runs/36640100860) 终态 success，static/unit/module/console/gate/e2e 六项全部成功。没有将新 render 选入生产准入，也没有部署本批或创建真实开发验证资源。本机仍94aabd6d；Session/owner/价格/排空及两级正式明细继续，不以本回执关闭CS-R02。
+
+## 10. Stage 2 Session 数字副本检查点（2026-09-30，在制）
+
+本批仅落地 Session 独立 PostgreSQL 数字副本、原来源登记、复制后 ACK、固定 offeredThrough 的公平 outbox、完整/中断排空回执，以及 owner 内部 API/严格客户端。实际执行 UUID、journal/incarnation/摘要、Pod UID、项目/工作区/Agent、算力修订不可替换；未登记原来源不得发送带数字受理的 startAgent。Runner reportedThrough=N、PG 连续 persistedThrough=M 与两种 ACK 分开，网络超时或 PG 临时失败不构成永久丢失证明。0010 只追加 Session 迁移并登记精确锁路径，既有业务契约金样未变化。
+
+首轮独立静态实现门 FAIL 的两个 P2 已修：迟到的同来源 receipt:null 不再把后提交的正常受理标为丢失；PG 已存 6～10 后补 1～5，连续水位会推进到真实 M=10，不在 Pod 丢失后把已存数字写成缺口。真实 PG 回归覆盖迟到响应顺序及两页全部消费。最终独立只读 Session 范围实现门 PASS（未运行测试）；54 相关用例/335断言、结构3358源文件、29 TS路径lint、后端类型及7项业务金样回归通过，新数字实现可执行行均在相关覆盖中实际执行。
+
+六项跨单元回归使用实际 Runner SQLite 和实际 PG、传输桩；模块层另保留真实 PG 与假 numeric peer。覆盖 ACK 回执丢失后重启副本、M=8/N=10可读尾部排空、PG失败、日志/Pod替换和未知受理；这些是存储/协议证据，不能代替真实登录、集群模型或部署验收。单次冻结完整候选门禁、精确提交及 hosted CI 尚待回执。
+
+生产开发采集继续关闭。本批尚未部署，当前平台仍94aabd6d；dev-session owner 尚未固定原键/稳定意图/nonce并接入 CNY 受理和实际生命周期清理屏障，platform 尚未消费新 outbox，事实查询及正式两级界面未接通。后续按 §8.2～4 与 CS-R02～05推进；Session 基础能力通过不关闭整个 Stage 2、CS-R02或两RFC。
+
+
+Stage 2 Session 冻结候选完整门禁回执：2026-09-29T23:43:16Z，结构、全仓lint、后端/console类型全部通过；4263 pass／142 skip／0 fail、27,020断言、852文件，测试591.90秒（完整命令637.67秒）。31源码/测试/迁移/锁+4文档共35路径指纹全部未变；独立Session实现功能门及文档复核PASS。只追加本回执后精确发布，同源代码不重跑完整本地门禁。142跳过项与真实身份/模型/集群验收不计为通过；本机仍94aabd6d、生产开发来源关闭，owner/CNY/实际释放屏障、platform消费及两级明细继续。

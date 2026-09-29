@@ -1,3 +1,4 @@
+import { developmentUsageRoutes } from './developmentUsageRoutes';
 import type { RunnerEvent, TaskId } from '@crewstation/contracts';
 import { RunnerCommandSchema } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
@@ -14,8 +15,9 @@ const eventsQuery = z.object({ sinceSeq: z.coerce.number().int().min(0).default(
 const reliableQuery = z.object({ after: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0), limit: z.coerce.number().int().min(1).max(1000).default(200) }).strict();
 
 /** 进程间接口（只在系统命名空间内可达）：业务任务与开发会话模块经它向 TaskRunner 下发命令、读取持久事件。 */
-export function internalRoutes(dispatch: ReturnType<typeof commandDispatch>, deps: Pick<SessionUseCaseDeps, 'events' | 'businessExecutions'>): Hono<AppEnv> {
+export function internalRoutes(dispatch: ReturnType<typeof commandDispatch>, deps: Pick<SessionUseCaseDeps, 'events' | 'businessExecutions' | 'developmentUsage'>): Hono<AppEnv> {
   const r = new Hono<AppEnv>();
+  r.route('/', developmentUsageRoutes(deps));
   r.get('/internal/tasks/:taskId/executions/:executionId/completion-proof', async (c) => {
     if (!deps.businessExecutions) throw precondition('可靠执行存储未启用');
     const found = await deps.businessExecutions.completionProof(TaskIdSchema.parse(c.req.param('taskId')), c.req.param('executionId'));

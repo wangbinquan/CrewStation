@@ -1,3 +1,4 @@
+import type { DevelopmentUsageDrainReason, DevelopmentUsageKey, DevelopmentUsageLoss, DevelopmentUsagePage, DevelopmentUsageRegistration, StoredDevelopmentUsage } from '@crewstation/contracts';
 import type { ExecutionCompletionProof, RunnerUsageMeasurement, RunnerUsageSourceIdentity, RunnerUsageSourcePage, RunnerBusinessEvent, StoredBusinessExecutionDto, RunnerCommand, RunnerEvent, RunnerHello, TaskId } from '@crewstation/contracts';
 
 export interface StoredEventDto { seq: number; at: string; event: RunnerEvent }
@@ -5,6 +6,13 @@ export interface StoredEventDto { seq: number; at: string; event: RunnerEvent }
 /** session 模块对外能力（本进程内）；跨进程调用走 internal HTTP，客户端在 packages/session-client。 */
 export interface SessionModuleApi {
   readonly name: 'session';
+  registerDevelopmentUsage(registration: DevelopmentUsageRegistration): Promise<StoredDevelopmentUsage>;
+  getDevelopmentUsage(taskId: TaskId, key: DevelopmentUsageKey): Promise<StoredDevelopmentUsage | undefined>;
+  requestDevelopmentUsageDrain(taskId: TaskId, key: DevelopmentUsageKey, reason: DevelopmentUsageDrainReason): Promise<StoredDevelopmentUsage>;
+  markDevelopmentUsageUnavailable(taskId: TaskId, loss: DevelopmentUsageLoss): Promise<StoredDevelopmentUsage>;
+  nextDevelopmentUsageSource(): Promise<DevelopmentUsagePage | undefined>;
+  readDevelopmentUsageMeasurement(key: DevelopmentUsageKey, recordId: string, revision: number): Promise<RunnerUsageMeasurement | undefined>;
+  acknowledgeDevelopmentUsageSource(key: DevelopmentUsageKey, through: number): Promise<void>;
   nextBusinessUsageSource(): Promise<RunnerUsageSourcePage | undefined>;
   readBusinessUsageMeasurement(source: RunnerUsageSourceIdentity, recordId: string, revision: number): Promise<RunnerUsageMeasurement | undefined>;
   acknowledgeBusinessUsageSource(taskId: TaskId, executionId: string, through: number): Promise<void>;

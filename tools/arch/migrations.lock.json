@@ -151,6 +151,7 @@
     "modules/session/adapters/persistence/migrations/0007_stopped_executions.sql": "dc1d855985888378c35d549290aa3ca9d27c40d866c7d2c3d4cae547951b7883",
     "modules/session/adapters/persistence/migrations/0008_execution_completion_proofs.sql": "881fbf02bfd7f872857b76e83b39d4f7c724c83a761e506537d2eaa3917cabea",
     "modules/session/adapters/persistence/migrations/0009_business_usage_sources.sql": "54b66365e0e26eb048c7b202e5808e65e07289bfff8aab9d253be0abedbb2726",
+    "modules/session/adapters/persistence/migrations/0010_development_usage.sql": "2fae5cd49c897f573f7cf8fc805e4605ba14d34bf9ef3c26955ada0b8c5d14ec",
     "modules/task-runtime/adapters/persistence/migrations/0001_create_schema.sql": "4a80f51b12dccdfe01cb532a29d83f3a74c123d9900d58dfe8d51bbc33a50e7f",
     "modules/task-runtime/adapters/persistence/migrations/0002_environments.sql": "a5eaf7f3ad93215ffa58a23498fd5bffc20c7b1e1c1e7dee1adbb08b894fe631",
     "modules/task-runtime/adapters/persistence/migrations/0003_environment_rebuilds.sql": "10fb1dc714c666bade987de60123e23ab3647087f7a3ec80977ba976d2d76eab",

@@ -137,3 +137,4 @@ export * from './api/object-storage/taskInputs';
 export * from './api/observability/runtimeStatistics';
 
 export * from './taskrunner/developmentUsage';
+export * from './taskrunner/developmentUsageStorage';
