@@ -3,7 +3,7 @@ import { AdminOverviewPage } from '../../features/admin';
 import { ClusterOverviewStrip } from '../../features/cluster';
 import { ObjectStorageOverview } from '../../features/object-storage';
 
-/** /admin 管理总览：集群状态、待处理事项与管理入口；对象存储摘要替换同一网格中的入口卡片。 */
+/** /admin 管理总览：对象存储作为顶部集群状态中的容量指标小卡片，由 app 组合 feature。 */
 export function AdminOverview(): ReactElement {
-  return <AdminOverviewPage status={<ClusterOverviewStrip />} entryCards={{ '/admin/object-storage': <ObjectStorageOverview /> }} />;
+  return <AdminOverviewPage status={<ClusterOverviewStrip capacityTile={<ObjectStorageOverview />} />} />;
 }

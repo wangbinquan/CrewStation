@@ -1,7 +1,8 @@
 import type { MessagesShapedLike } from '../../../shared/lib/i18n';
 import type { messages as zh } from './zh-CN';
 export const messages: MessagesShapedLike<typeof zh> = {
-  'objects.overview.open': 'Open object storage',
+  'objects.overview.logicalQuota': 'Logical quota {quota}', 'objects.overview.spaceCount': 'Spaces {count}',
+  'objects.overview.fact': '{label}: {value}',
   'objects.overview.hint': 'Platform-wide logical capacity across development and production spaces; space quotas are not disk capacity. Updates every 30 seconds.',
   'objects.overview.backends': 'Storage backends', 'objects.overview.readyCount': 'Ready {ready} / {total}',
   'objects.overview.used': 'Logical usage', 'objects.overview.quota': 'Total space quota',

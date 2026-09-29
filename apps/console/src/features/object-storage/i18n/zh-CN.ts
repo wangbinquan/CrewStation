@@ -1,6 +1,7 @@
 import type { Messages } from '../../../shared/lib/i18n';
 export const messages = {
-  'objects.overview.open': '打开对象存储',
+  'objects.overview.logicalQuota': '逻辑配额 {quota}', 'objects.overview.spaceCount': '{count} 个空间',
+  'objects.overview.fact': '{label}：{value}',
   'objects.overview.hint': '全平台逻辑容量，包含开发与生产空间；空间配额不代表磁盘容量。每 30 秒自动更新。',
   'objects.overview.backends': '存储后端', 'objects.overview.readyCount': '就绪 {ready} / {total}',
   'objects.overview.used': '逻辑已用', 'objects.overview.quota': '空间配额合计',

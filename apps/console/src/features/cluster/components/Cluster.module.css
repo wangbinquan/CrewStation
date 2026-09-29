@@ -16,27 +16,17 @@
   .listCard { height: 100%; }
   .listCard > :last-child { min-height: 0; }
 }
-/* 集群状态条（2026-09-23 作者裁定从集群管理挪到管理总览最上面）：集群容量五格＋受管资源计数五格一行；容器不够宽时两组各占一行，640px 以下每组两列。 */
+/* 顶部集群状态：容量指标可附加一张对象存储小卡片；容器不够宽时两组各占一行，640px 以下每组两列。 */
 .overview { display: grid; gap: 10px; min-width: 0; }
 .overviewTitle { margin: 0; font-size: var(--cs-font-size); }
 .strip { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: stretch; }
 .group { min-width: 0; display: grid; grid-template-rows: auto 1fr; gap: 6px; }
-/* 容量格文字多、计数格只有一个数：宽度 3:2 分配，1280 宽仍能并排；再窄两组各占一行。 */
-.capacityGroup { flex: 3 1 480px; }
+/* 容量格文字多并增加对象存储：宽度 4:2 分配，1280 宽仍能并排；再窄两组各占一行。 */
+.capacityGroup { flex: 4 1 580px; }
 .countGroup { flex: 2 1 320px; }
 .groupTitle { margin: 0; font: 700 10.5px var(--cs-font-mono); letter-spacing: 0.1em; color: var(--cs-color-text-muted); }
 .tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; align-items: stretch; }
-.tile { display: grid; align-content: start; gap: 2px; min-width: 0; margin: 0; padding: 8px 10px; border: 1px solid var(--cs-color-border); border-radius: 8px; background: var(--cs-color-surface); color: var(--cs-color-text); font: inherit; text-align: left; }
-a.tile { cursor: pointer; text-decoration: none; }
-a.tile:hover { background: var(--cs-color-surface-muted); }
-a.tile:focus-visible { outline: 2px solid var(--cs-color-focus); outline-offset: 2px; }
-.tileTitle { font-size: 12px; color: var(--cs-color-text-muted); }
-.hero { display: block; font-size: 19px; line-height: 1.25; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.hero strong { font-size: inherit; font-weight: inherit; }
-.rate { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.rate strong { font-size: inherit; }
-.tile small { display: block; font-size: 11px; line-height: 1.35; color: var(--cs-color-text-muted); overflow-wrap: anywhere; }
-.tileDanger .hero { color: var(--cs-tone-danger-fg); }
+.extendedCapacity { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .status { display: grid; gap: 4px; font-size: 12px; }
 .status p { margin: 0; }
 .status h3 { margin: 10px 0 4px; font-size: 12px; }

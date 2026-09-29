@@ -3,12 +3,14 @@ import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
 import { ObjectBackendDtoSchema, ObjectSpaceDtoSchema } from '@crewstation/contracts';
 import { adminDirectoryFixture } from './adminDirectoryFixture';
+import { clusterMetricsFixture } from './clusterMetricsFixture';
 import { renderApp } from './renderApp';
 
 const originalFetch = globalThis.fetch;
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; sessionStorage.clear(); });
 function fixture() {
+  clusterMetricsFixture(); const clusterFetch = globalThis.fetch;
   adminDirectoryFixture({ count: 0 });
   const fallback = globalThis.fetch, id = Bun.randomUUIDv7(), at = new Date().toISOString();
   const backend = ObjectBackendDtoSchema.parse({ id, name: 'Local Garage', endpoint: 'http://garage:3900', region: 'garage', bucket: 'crewstation',
@@ -17,10 +19,11 @@ function fixture() {
   const spaces = ['production', 'development'].map((env, i) => ObjectSpaceDtoSchema.parse({ id: Bun.randomUUIDv7(), projectId: Bun.randomUUIDv7(), serviceId: Bun.randomUUIDv7(),
     env, backendId: id, backendPlacementRevision: 1, planId: Bun.randomUUIDv7(), planRevision: 1, revision: 1, health: 'ready', quotaBytes: (i + 1) * 1024 ** 3,
     usedBytes: (i + 1) * 1024, reservedBytes: 512, deletingBytes: (i + 1) * 10, objectCount: 1, createdAt: at }));
-  const state = { backends: [backend], spaces, backendError: false, spacesError: false, invalid: false, hold: undefined as Promise<void> | undefined };
+  const state = { backends: [backend], spaces, backendError: false, spacesError: false, clusterError: false, invalid: false, hold: undefined as Promise<void> | undefined };
   const calls: { url: URL; method: string }[] = [];
   globalThis.fetch = (async (raw, init) => {
     const url = new URL(String(raw), 'http://localhost');
+    if (url.pathname.startsWith('/v1/admin/cluster')) return state.clusterError ? Response.json({ message: 'cluster unavailable' }, { status: 503 }) : clusterFetch(raw, init);
     if (!url.pathname.startsWith('/v3/admin/object-storage/')) return fallback(raw, init);
     calls.push({ url, method: init?.method ?? 'GET' });
     const backends = url.pathname.endsWith('/backends');
@@ -31,24 +34,36 @@ function fixture() {
   }) as typeof fetch;
   return { state, backend, calls };
 }
-function card() { return [...document.querySelectorAll('main h2')].find((h) => h.textContent === '对象存储')!.closest('section')!; }
-function values() { return Object.fromEntries([...card().querySelectorAll('dl > div')].map((row) => [row.querySelector('dt')!.textContent, row.querySelector('dd')!.textContent])); }
+function card() { return document.querySelector('main article[aria-label="对象存储"]')!; }
+function values() { return Object.fromEntries(card().getAttribute('title')!.split('\n').slice(1).map((row) => row.split('：'))); }
 
-test('overview storage summary shares the entry grid, aggregates both environments and opens the management route once', async () => {
+test('storage is a top cluster capacity tile beside CPU and memory while its management entry stays a plain card', async () => {
   const f = fixture(); page = await renderApp('/admin');
-  // 摘要曾独占总览一整行，原入口仍在下方；锁定单一卡片与其他入口并列，避免再次画成独立宽面板。
+  // 两次误放：独立宽面板和下方管理入口。用户要的是顶部集群状态里与 CPU、内存并排的小指标卡片。
+  const strip = [...document.querySelectorAll('main h2')].find((h) => h.textContent === '集群状态')!.closest('section')!;
+  expect(strip.querySelectorAll('article[aria-label="对象存储"]')).toHaveLength(1);
+  expect([...card().parentElement!.children].map((entry) => entry.getAttribute('aria-label'))).toEqual(['节点总数', 'CPU', '内存', '节点文件系统', '网络吞吐', '对象存储']);
+  expect(document.querySelectorAll('main article[aria-label="对象存储"]')).toHaveLength(1);
   expect(document.querySelectorAll('main a[href="/admin/object-storage"]')).toHaveLength(1);
   const grid = document.querySelector('#admin-entries-observability + div')!;
-  expect([...grid.children].includes(card())).toBe(true);
+  expect(grid.contains(card())).toBe(false);
   expect([...grid.children].map((entry) => entry.querySelector('h2')?.textContent)).toEqual(['运行观测与统计', '集群管理', '业务执行恢复', '对象存储', '网关']);
   const todo = document.querySelector('#admin-todo-title')!.closest('section')!;
-  expect(todo.compareDocumentPosition(card()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(card().compareDocumentPosition(todo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(values()).toEqual({ 存储后端: '就绪 1 / 1', 对象空间: '2', 逻辑已用: '3 KiB', 空间配额合计: '3 GiB', 上传预留: '1 KiB', 待删除: '30 B' });
-  expect(card().textContent).toContain('空间配额不代表磁盘容量');
+  expect(card().getAttribute('title')).toContain('空间配额不代表磁盘容量');
+  for (const text of ['3 KiB', '逻辑配额 3 GiB', '就绪 · 2 个空间']) expect(card().textContent).toContain(text);
+  expect(grid.querySelector('a[href="/admin/object-storage"]')!.closest('section')!.textContent).toContain('空间配额、真实传输指标与归档回收状态');
   expect(f.calls.map((c) => c.url.pathname).sort()).toEqual(['/v3/admin/object-storage/backends', '/v3/admin/object-storage/spaces']);
   expect(f.calls.every((c) => c.method === 'GET' && c.url.search === '')).toBe(true);
   expect(document.querySelectorAll('#admin-entries-observability + div a[href="/admin/object-storage"]')).toHaveLength(1);
   await page.click('打开对象存储'); expect(page.path()).toBe('/admin/object-storage');
+});
+
+test('cluster reads failing do not hide the independently observed object storage tile', async () => {
+  const f = fixture(); f.state.clusterError = true; page = await renderApp('/admin');
+  expect(card().textContent).toContain('3 KiB'); expect(card().textContent).toContain('就绪 · 2 个空间');
+  expect(values().存储后端).toBe('就绪 1 / 1');
 });
 
 test('loading is unknown; only successfully observed empty storage renders zero and not configured', async () => {

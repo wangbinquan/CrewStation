@@ -1,8 +1,9 @@
 import type { ClusterCapacity as Capacity, ClusterCoverage, ClusterMetric, ClusterUsageSummary } from '@crewstation/contracts';
 import { useT } from '../../../shared/lib/useT';
+import { MetricTile } from '../../../shared/ui/metrics/MetricTile';
 import { MetricValue, amount, percent } from './MetricValue';
 import { ResourceBudgetTable } from './ResourceBudgetTable';
-import styles from './Cluster.module.css';
+import tileStyles from '../../../shared/ui/metrics/MetricTile.module.css';
 import metricStyles from './Metrics.module.css';
 
 /** 只有覆盖完整且实时的值才拿去算占比；部分合计或过期值算出的百分比会误导。 */
@@ -12,11 +13,11 @@ const fresh = (metric?: ClusterMetric, coverage?: ClusterCoverage) => coverage?.
 export function CapacityTiles({ data: d }: { data: Capacity }) {
   const t = useT();
   return <>
-    <article className={styles.tile}><span className={styles.tileTitle}>{t('cluster.metrics.nodes')}</span><strong className={styles.hero}>{d.nodes}</strong><small>{t('cluster.metrics.nodeCounts', { ready: d.readyNodes, schedulable: d.schedulableNodes })}</small><small>{t('cluster.metrics.podCounts', { pods: d.podCount, pending: d.pendingPods })}</small></article>
-    <article className={styles.tile}><span className={styles.tileTitle}>CPU</span><span className={styles.hero}><MetricValue metric={d.metrics.cpu} coverage={d.coverage.cpu} compact /></span><small>{t('cluster.metrics.usedRatio')} {percent(fresh(d.metrics.cpu, d.coverage.cpu), d.capacity.cpu)}</small><small>{t('cluster.metrics.requests')} {amount(d.demand.requests.cpu ?? '0', 'cores')} / {amount(d.allocatable.cpu, 'cores')}</small></article>
-    <article className={styles.tile}><span className={styles.tileTitle}>{t('cluster.metrics.memory')}</span><span className={styles.hero}><MetricValue metric={d.metrics.memory} coverage={d.coverage.memory} compact /></span><small>{t('cluster.metrics.workingSet')} · {percent(fresh(d.metrics.memory, d.coverage.memory), d.capacity.memory)}</small><small>{t('cluster.metrics.requests')} {amount(d.demand.requests.memory ?? '0')} / {amount(d.allocatable.memory)}</small></article>
-    <article className={styles.tile}><span className={styles.tileTitle}>{t('cluster.metrics.disk')}</span><span className={styles.hero}><MetricValue metric={d.metrics.fsUsed} coverage={d.coverage.fsUsed} compact /></span><small>{t('cluster.metrics.capacity')} <MetricValue metric={d.metrics.fsCapacity} compact /></small><small>{t('cluster.metrics.available')} <MetricValue metric={d.metrics.fsAvailable} compact /></small></article>
-    <article className={styles.tile} title={t('cluster.metrics.defaultInterface')}><span className={styles.tileTitle}>{t('cluster.metrics.network')}</span><span className={styles.rate}>↓ <MetricValue metric={d.metrics.networkRx} coverage={d.coverage.networkRx} compact /></span><span className={styles.rate}>↑ <MetricValue metric={d.metrics.networkTx} coverage={d.coverage.networkTx} compact /></span></article>
+    <MetricTile title={t('cluster.metrics.nodes')} value={<strong>{d.nodes}</strong>}><small>{t('cluster.metrics.nodeCounts', { ready: d.readyNodes, schedulable: d.schedulableNodes })}</small><small>{t('cluster.metrics.podCounts', { pods: d.podCount, pending: d.pendingPods })}</small></MetricTile>
+    <MetricTile title="CPU" value={<MetricValue metric={d.metrics.cpu} coverage={d.coverage.cpu} compact />}><small>{t('cluster.metrics.usedRatio')} {percent(fresh(d.metrics.cpu, d.coverage.cpu), d.capacity.cpu)}</small><small>{t('cluster.metrics.requests')} {amount(d.demand.requests.cpu ?? '0', 'cores')} / {amount(d.allocatable.cpu, 'cores')}</small></MetricTile>
+    <MetricTile title={t('cluster.metrics.memory')} value={<MetricValue metric={d.metrics.memory} coverage={d.coverage.memory} compact />}><small>{t('cluster.metrics.workingSet')} · {percent(fresh(d.metrics.memory, d.coverage.memory), d.capacity.memory)}</small><small>{t('cluster.metrics.requests')} {amount(d.demand.requests.memory ?? '0')} / {amount(d.allocatable.memory)}</small></MetricTile>
+    <MetricTile title={t('cluster.metrics.disk')} value={<MetricValue metric={d.metrics.fsUsed} coverage={d.coverage.fsUsed} compact />}><small>{t('cluster.metrics.capacity')} <MetricValue metric={d.metrics.fsCapacity} compact /></small><small>{t('cluster.metrics.available')} <MetricValue metric={d.metrics.fsAvailable} compact /></small></MetricTile>
+    <MetricTile title={t('cluster.metrics.network')} hint={t('cluster.metrics.defaultInterface')}><span className={tileStyles.rate}>↓ <MetricValue metric={d.metrics.networkRx} coverage={d.coverage.networkRx} compact /></span><span className={tileStyles.rate}>↑ <MetricValue metric={d.metrics.networkTx} coverage={d.coverage.networkTx} compact /></span></MetricTile>
   </>;
 }
 
