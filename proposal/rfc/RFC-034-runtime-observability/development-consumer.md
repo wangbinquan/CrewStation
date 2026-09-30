@@ -92,3 +92,9 @@ v3独立只读设计门PASS，首尾冻结hash一致，原四项P2全部关闭�
 该候选仅启动一次本机完整check，arch阶段被并行工作阻断：data/application和data/ports各超目录上限，console拓扑两文件环，以及project/api-catalog/resource-access/agent-runtime/data/gateway/runtime-environment七份未入锁迁移，共10项；没有进入lint/type/test阶段，不能写作完整本机通过。均不在这四个源码文件内，按development-rules §3保留并行内容，限定文件检查有效，最终整仓判断交精确提交的clean hosted CI。未重跑全量、未补锁/修正他人资源或拓扑文件。
 
 下一批仍须Session独立registration对拍、固定页/完整meter归属、实际文件分区、所有数字的持久所选模型证据及原子cursor/估值/ACK；原owner派发/清理屏障、两级事实/UI及真实运行验收继续。生产采集OFF、sourceScope business-tasks；本机仍为已验证d01ba8223，源码候选发布/CI与后续部署单独回执。
+
+## 2026-09-30 原选择接口测试字面量类型补正
+
+接口提交`54243196a23f8a5f65a5ca2ea5e6820e615dbc09`的[CI36692696016](https://github.com/wangbinquan/CrewStation/actions/runs/36692696016)终态failure：unit/module/console/e2e四项success；干净树arch/lint成功，static类型和gate失败。两个TS2769都在新回归的同一预期对象：nativeSelection.version被推断成number，严格接口要求字面量1。本批只给测试预期version加as const，保持全部原key/关闭后重读/原价/选择/隐私断言；三份生产文件字节未变、此前限定实现门仍适用，不把接口或合同放宽为number。
+
+修正后真实PG同一11项/96断言全部成功，改单文件eslint成功。单独类型检查核对自有错误，精确新提交/六项托管CI另记；没有重复启动已被并行架构在制品阻断的全量check。失败版本未部署，本机仍为d01ba8223；只有新精确提交六项CI全部成功后才能部署。完整消费者/原owner清理/两级事实与真实运行尚未关闭，生产开发仍OFF。AW最新7886ac97b的CI36691067775也已50项全部成功，源码edd56ebe3的主CI与九种原默认定时配置10运行/75作业完整成功回执继续有效。

@@ -107,7 +107,7 @@ describe.skipIf(!available)('开发 owner 稳定意图与人民币原受理', ()
     const preparation = { ...f.preparation, intent: { ...f.preparation.intent, nativeSource: { version: 1 as const } } };
     const prepared = await f.owner.prepare(preparation), bound = await f.owner.bind(f.child.id, f.info);
     const expected = { registration: bound.binding!, price: prepared.price,
-      nativeSelection: { version: 1, expectedNamespace: preparation.intent.nativeUsageLineageKey } };
+      nativeSelection: { version: 1 as const, expectedNamespace: preparation.intent.nativeUsageLineageKey } };
     // A consumer must verify the frozen choice before trusting any Runner source frame.
     expect(await f.owner.resolve(bound.binding!.key)).toEqual(expected);
     f.controls.priceRevision = 99;
