@@ -1,10 +1,11 @@
 import { afterEach, expect, test } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, renameSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createUsageObserver } from './capture';
-import { createOpencodeUsageNormalizer, opencodeUsageDatabasePath, readOpencodeUsageModel } from './opencodeModel';
+import { createDevelopmentOpencodeUsageNormalizer, createOpencodeUsageNormalizer, opencodeUsageDatabasePath, readOpencodeUsageModel } from './opencodeModel';
+import { DevelopmentNativeObserver } from './developmentNativeObserver';
 import { parseEvent } from '../opencode/events';
 
 const roots: string[] = [];
@@ -79,4 +80,30 @@ test('retry queue and elapsed budget produce explicit gaps while preserving orig
   expect(last!.diagnostics).toContain('native-model-retry-capacity');
   expect(last!.measurements[0]!.usage.input).toBe('10');
   expect(observer.retryModels(1200, 0)).toEqual([{ version: 1, measurements: [], diagnostics: ['native-model-retry-budget'] }]);
+});
+
+test('development model evidence never survives native file loss or replacement while stdout Tokens remain known', () => {
+  const file = path(); seed(file, 'original-model');
+  const source = new DevelopmentNativeObserver(file), observer = createUsageObserver(createDevelopmentOpencodeUsageNormalizer(source), 'agent'), capture = observer.beginTurn();
+  expect(capture(event(), 1000)?.measurements[0]?.actualModel?.model).toBe('original-model');
+  rmSync(file); const unavailable = capture(event(15), 1100)!;
+  expect(unavailable.measurements[0]).toMatchObject({ actualModel: null, usage: { input: '15' } }); expect(unavailable.diagnostics).toContain('native-model-unavailable');
+  seed(file, 'replacement-model'); const changed = capture(event(16), 1200)!;
+  expect(changed.measurements[0]).toMatchObject({ actualModel: null, usage: { input: '16' } }); expect(source.issues()).toContain('native-source-changed');
+});
+test('development cache can retain a proven assistant only in the same currently observed native store', () => {
+  const file = path(); seed(file); const observer = createUsageObserver(createDevelopmentOpencodeUsageNormalizer(new DevelopmentNativeObserver(file)), 'agent'), capture = observer.beginTurn();
+  const first = capture(event(), 1000)!; const db = new Database(file); db.exec('DELETE FROM message'); db.close();
+  expect(capture(event(15), 1100)?.measurements[0]?.actualModel).toEqual(first.measurements[0]?.actualModel);
+  const replacement = path(); seed(replacement, 'different-model'); renameSync(replacement, file);
+  expect(capture(event(16), 1200)?.measurements[0]?.actualModel).toBeNull();
+});
+test('pending corrections keep their original turn and source when a later turn selects a different DB', () => {
+  const original = path(), next = path(); seed(next, 'next-model');
+  const observer = createUsageObserver(createDevelopmentOpencodeUsageNormalizer(new DevelopmentNativeObserver(original)), 'agent'), first = observer.beginTurn()(event(), 1000)!;
+  observer.setNormalizer(createDevelopmentOpencodeUsageNormalizer(new DevelopmentNativeObserver(next))); observer.beginTurn();
+  expect(observer.retryModels(1100)).toEqual([]); seed(original, 'original-model');
+  const correction = observer.retryModels(1200)[0]?.measurements[0];
+  expect(correction?.actualModel?.model).toBe('original-model'); expect(correction?.scope).toEqual(first.measurements[0]?.scope); expect(correction?.recordId).toBe(first.measurements[0]?.recordId);
+  expect(correction?.usage.input).toBe('10');
 });

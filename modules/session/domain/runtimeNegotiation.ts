@@ -10,6 +10,7 @@ const BUSINESS_EXECUTION_COMMANDS: ReadonlySet<RunnerCommand['type']> = new Set(
  * 让原因以管理员能处理的话回到调用方，而不是让 Runner 半途失败。
  */
 export function assertLaunchSupported(command: RunnerCommand, capabilities: RunnerHello['capabilities']): void {
+  if (command.type === 'startAgent' && command.developmentUsage?.intent.nativeSource?.version === 1 && capabilities.developmentNativeSourceV1 !== 1) throw new PlatformError('precondition', '当前任务容器未声明开发实际原生来源能力', { code: 'unsupported_capability', capability: 'developmentNativeSourceV1' });
   if (command.type === 'stopDevelopmentAgent' && (capabilities.developmentUsageV1 !== 1 || capabilities.developmentUsageStopV1 !== 1)) throw new PlatformError('precondition', '当前任务容器未声明开发数字持久停止能力', { code: 'unsupported_capability', capability: 'developmentUsageStopV1' });
   if ((command.type === 'developmentUsageInfo' || command.type === 'readDevelopmentUsageEvents' || command.type === 'ackDevelopmentUsageEvents' || (command.type === 'startAgent' && command.developmentUsage !== undefined)) && capabilities.developmentUsageV1 !== 1) throw new PlatformError('precondition', '当前任务容器未声明开发数值日志能力', { code: 'unsupported_capability', capability: 'developmentUsageV1' });
   if ((command.type === 'runtimeInitializationStatus' || command.type === 'cancelRuntimeInitialization') && capabilities.runtimeInitialization !== 1) throw new PlatformError('precondition', '当前任务容器未声明运行镜像初始化能力', { code: 'unsupported_capability', capability: 'runtimeInitialization' });

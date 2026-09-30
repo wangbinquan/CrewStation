@@ -103,7 +103,7 @@ class PendingAgentSupervisor implements AgentSupervisor {
 
 function toSpec(command: StartAgentCommand): AgentSpec {
   return {
-    ...(command.developmentUsage ? { usageObservationsV1: 1 as const, nativeUsageTreeV1: 1 as const, nativeUsageLineageKey: command.developmentUsage.intent.nativeUsageLineageKey } : {}),
+    ...(command.developmentUsage ? { usageObservationsV1: 1 as const, nativeUsageTreeV1: 1 as const, nativeUsageLineageKey: command.developmentUsage.intent.nativeUsageLineageKey, ...(command.developmentUsage.intent.nativeSource?.version === 1 ? { developmentNativeSourceV1: 1 as const } : {}) } : {}),
     agentId: command.agentId,
     compute: command.compute,
     profileRevision: command.profileRevision,

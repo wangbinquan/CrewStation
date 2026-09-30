@@ -30,7 +30,7 @@ export function scope(context: UsageContext, level: NonNullable<RunnerUsageMeasu
     turn: level === 'tree-total' ? 'session-origin' : context.turnId, turnIndex: level === 'tree-total' ? 0 : context.turnIndex, level };
 }
 
-interface SeenUsage { turnIndex: number; turnId: string; fingerprint: string; nativeFingerprint: string; pending: boolean }
+interface SeenUsage { normalize: UsageNormalizer; turnIndex: number; turnId: string; fingerprint: string; nativeFingerprint: string; pending: boolean }
 interface PendingUsage { event: NormalizedEvent; seen: SeenUsage }
 const MODEL_RETRY_LIMIT = 200;
 function contentFingerprint(capture: RunnerUsageCapture): string {
@@ -39,7 +39,7 @@ function contentFingerprint(capture: RunnerUsageCapture): string {
 
 /** One observer per accepted Agent; revisions and native turn attribution survive process restarts. */
 export function createUsageObserver(normalize: UsageNormalizer, agentId: string, resumeSessionId?: string) {
-  let turn = 0, revision = 0;
+  let turn = 0, revision = 0, activeNormalizer = normalize;
   let current: { turnIndex: number; turnId: string } | undefined;
   const contexts = new Map<string, SeenUsage>(), pending = new Map<string, PendingUsage>();
   const capture = (event: NormalizedEvent, at: number, turnContext: { turnIndex: number; turnId: string }, retry = false): RunnerUsageCapture | undefined => {
@@ -52,11 +52,12 @@ export function createUsageObserver(normalize: UsageNormalizer, agentId: string,
     const context = { turnIndex: before?.turnIndex ?? turnContext.turnIndex, turnId: before?.turnId ?? turnContext.turnId };
     const diagnostics: string[] = [];
     try {
-      const measurements = normalize(raw, { ...context, sessionId, revision: ++revision, observedAt: new Date(at).toISOString(), resumeSessionId }, diagnostics);
+      const normalizeAtSource = before?.normalize ?? activeNormalizer;
+      const measurements = normalizeAtSource(raw, { ...context, sessionId, revision: ++revision, observedAt: new Date(at).toISOString(), resumeSessionId }, diagnostics);
       const needsModel = diagnostics.includes('native-model-unavailable');
       if (needsModel && !pending.has(key) && pending.size >= MODEL_RETRY_LIMIT) diagnostics.push('native-model-retry-capacity');
       const result = RunnerUsageCaptureSchema.parse({ version: 1, measurements, diagnostics: [...new Set(diagnostics)] });
-      const fingerprint = contentFingerprint(result), seen = { ...context, nativeFingerprint, fingerprint, pending: needsModel };
+      const fingerprint = contentFingerprint(result), seen = { ...context, normalize: normalizeAtSource, nativeFingerprint, fingerprint, pending: needsModel };
       contexts.set(key, seen);
       if (!needsModel) pending.delete(key);
       else if (pending.has(key) || pending.size < MODEL_RETRY_LIMIT) pending.set(key, { event, seen });
@@ -64,6 +65,8 @@ export function createUsageObserver(normalize: UsageNormalizer, agentId: string,
     } catch { return { version: 1, measurements: [], diagnostics: ['usage-normalization-failed'] }; }
   };
   return {
+    /** Pending numeric corrections retain their original turn/source normalizer. */
+    setNormalizer(next: UsageNormalizer): void { activeNormalizer = next; },
     beginTurn(includesRecord?: (sessionId: string, nativeId: string) => boolean): UsageCapture {
       const turnIndex = turn++, turnId = jsonHash({ agentId, turnIndex });
       current = { turnIndex, turnId };

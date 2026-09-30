@@ -1,4 +1,4 @@
-import type { AgentEvent, RunnerUsageCapture, StartAgentCommand } from '@crewstation/contracts';
+import type { AgentEvent, DevelopmentRunnerUsageCapture, StartAgentCommand } from '@crewstation/contracts';
 import { RunnerCommandError } from '../commandError';
 import { validateDevelopmentStart } from './developmentStartIntent';
 import type { DevelopmentUsageJournal } from './developmentUsageJournal';
@@ -24,7 +24,7 @@ export class DevelopmentAgentUsage {
     catch (error) { this.journal.interrupt(this.key.executionId, 'journal-unavailable'); throw error; }
   };
 
-  readonly capture = (capture: RunnerUsageCapture, occurredAt: string): void => {
+  readonly capture = (capture: DevelopmentRunnerUsageCapture, occurredAt: string): void => {
     try { this.journal.capture(this.key, capture, occurredAt); }
     catch { this.journal.interrupt(this.key.executionId, 'journal-unavailable'); }
   };

@@ -3,6 +3,7 @@ import { isAbsolute, join } from 'node:path';
 import { identifier, object, type UsageNormalizer, type UsageObject } from './capture';
 import { normalizeOpencodeUsage } from './opencode';
 import type { RunnerUsageMeasurement } from '@crewstation/contracts';
+import type { DevelopmentNativeObserver } from './developmentNativeObserver';
 
 type ActualModel = NonNullable<RunnerUsageMeasurement['actualModel']>;
 /** v1.18.29 core/database/database.ts: explicit DB overrides the standard release channel path. */
@@ -43,6 +44,23 @@ export function createOpencodeUsageNormalizer(env: Readonly<Record<string, strin
     const key = JSON.stringify([context.sessionId, object(raw.part)?.id, object(raw.part)?.messageID]);
     const actual = readOpencodeUsageModel(path, raw, context.sessionId) ?? proven.get(key) ?? null;
     if (actual) { if (!proven.has(key)) proven.set(key, actual); }
+    else diagnostics.push('native-model-unavailable');
+    return rows.map((row) => ({ ...row, actualModel: actual }));
+  };
+}
+
+/** Development never borrows metadata from a replaced or currently unverified store. */
+export function createDevelopmentOpencodeUsageNormalizer(observer: DevelopmentNativeObserver): UsageNormalizer {
+  const proven = new Map<string, ActualModel>();
+  return (raw, context, diagnostics) => {
+    const rows = normalizeOpencodeUsage(raw, context, diagnostics);
+    if (!rows.length) return rows;
+    const observed = observer.read((path) => readOpencodeUsageModel(path, raw, context.sessionId));
+    const bound = observed.store.state === 'observed' && !observer.changed();
+    const key = bound ? JSON.stringify([observed.store, context.sessionId, object(raw.part)?.id, object(raw.part)?.messageID]) : null;
+    if (!bound) proven.clear();
+    const actual = key ? observed.value ?? proven.get(key) ?? null : null;
+    if (actual && key) proven.set(key, actual);
     else diagnostics.push('native-model-unavailable');
     return rows.map((row) => ({ ...row, actualModel: actual }));
   };

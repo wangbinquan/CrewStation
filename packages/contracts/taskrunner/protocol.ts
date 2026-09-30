@@ -53,6 +53,7 @@ export const RunnerHelloSchema = z.object({
     businessExecutionV3: z.literal(1).optional(),
     developmentUsageV1: z.literal(1).optional(),
     developmentUsageStopV1: z.literal(1).optional(),
+    developmentNativeSourceV1: z.literal(1).optional(),
     usageObservationsV1: z.literal(1).optional(),
     nativeUsageTreeV1: z.literal(1).optional(),
     /** RFC-028：逐容器初始化、工具检查、持久去重和命令门控。 */
@@ -61,7 +62,7 @@ export const RunnerHelloSchema = z.object({
     terminalControl: z.literal(1).optional(),
     /** 容器内实际可用的脚本解释器清单；缺少所需语言的启动在执行前被拒。 */
     interpreters: z.array(RunnerInterpreterSchema).optional(),
-  }).refine((value) => (value.nativeUsageTreeV1 !== 1 && value.developmentUsageV1 !== 1) || value.usageObservationsV1 === 1, '原生子树或开发日志能力依赖扩展用量能力').refine((value) => value.developmentUsageStopV1 !== 1 || value.developmentUsageV1 === 1, '持久停止能力依赖开发日志能力'),
+  }).refine((value) => (value.nativeUsageTreeV1 !== 1 && value.developmentUsageV1 !== 1) || value.usageObservationsV1 === 1, '原生子树或开发日志能力依赖扩展用量能力').refine((value) => value.developmentUsageStopV1 !== 1 || value.developmentUsageV1 === 1, '持久停止能力依赖开发日志能力').refine((value) => value.developmentNativeSourceV1 !== 1 || (value.developmentUsageV1 === 1 && value.usageObservationsV1 === 1), '开发原生来源能力依赖开发日志与扩展用量能力'),
 });
 
 const cmd = <T extends string>(type: T) => ({ id: z.string().min(1), type: z.literal(type) });

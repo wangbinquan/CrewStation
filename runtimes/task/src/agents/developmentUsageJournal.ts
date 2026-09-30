@@ -2,7 +2,7 @@ import type { Database } from 'bun:sqlite';
 import { DevelopmentStartControls } from './developmentStartControls';
 import { developmentIntentDigest } from './developmentStartIntent';
 import { DevelopmentUsageStopReceiptSchema, type DevelopmentUsageStopReceipt } from '@crewstation/contracts';
-import type { DevelopmentUsageAdmission, DevelopmentUsageEvent, DevelopmentUsageInfo, DevelopmentUsageInterruption, DevelopmentUsageKey, DevelopmentUsagePage, DevelopmentUsageReceipt, ProjectId, TaskId, RunnerUsageCapture } from '@crewstation/contracts';
+import type { DevelopmentUsageAdmission, DevelopmentUsageEvent, DevelopmentUsageInfo, DevelopmentUsageInterruption, DevelopmentUsageKey, DevelopmentUsagePage, DevelopmentUsageReceipt, ProjectId, TaskId, DevelopmentRunnerUsageCapture } from '@crewstation/contracts';
 import { DEVELOPMENT_USAGE_LIMITS, DevelopmentUsageAdmissionSchema, DevelopmentUsageEventSchema, DevelopmentUsageKeySchema, DevelopmentUsagePageSchema, DevelopmentUsageReceiptSchema, ProjectIdSchema, TaskIdSchema } from '@crewstation/contracts';
 import { RunnerCommandError } from '../commandError';
 import { openJournalStorage } from '../exec/journalStorage';
@@ -85,7 +85,7 @@ export class DevelopmentUsageJournal {
     const identity = admission.intent.identity, prior = this.row(identity.executionId);
     if (prior) { this.match(prior, admission.key); return { created: false, receipt: this.receipt(prior) }; }
     if (admission.key.incarnation !== this.incarnation) invalid('新受理必须绑定当前 Runner 实例');
-    const header = JSON.stringify({ identity, profileId: admission.intent.profileId, profileRevision: admission.intent.profileRevision });
+    const header = JSON.stringify({ identity, profileId: admission.intent.profileId, profileRevision: admission.intent.profileRevision, ...(admission.intent.nativeSource ? { nativeSource: admission.intent.nativeSource } : {}) });
     this.db.query('INSERT INTO executions(execution_id,attempt,payload_digest,incarnation,phase) VALUES(?,?,?,?,?)').run(identity.executionId, 1, admission.key.payloadDigest, this.incarnation, 'registered');
     this.db.query('INSERT INTO development_admissions(execution_id,header) VALUES(?,?)').run(identity.executionId, header);
     this.starts.register(identity.executionId);
@@ -112,7 +112,7 @@ export class DevelopmentUsageJournal {
     this.remember(this.receipt(this.row(key.executionId)!));
   }
 
-  capture(key: DevelopmentUsageKey, capture: RunnerUsageCapture, occurredAt: string): void {
+  capture(key: DevelopmentUsageKey, capture: DevelopmentRunnerUsageCapture, occurredAt: string): void {
     this.key(key);
     const receipt = this.trusted.get(key.executionId);
     if (!receipt || receipt.key.incarnation !== key.incarnation || receipt.key.payloadDigest !== key.payloadDigest || key.incarnation !== this.incarnation) invalid('数值追加键与当前受理不同');
@@ -124,12 +124,16 @@ export class DevelopmentUsageJournal {
       this.db.transaction(() => {
         const row = this.require(key);
         if (row.incarnation !== this.incarnation || !['registered', 'running'].includes(row.phase)) invalid('不能向旧实例或已结束执行追加数值');
+        if (parsed.data.capture.nativeSource && JSON.parse(row.header).nativeSource?.version !== 1) throw new RunnerCommandError('development_usage_invalid_capture', '原意图未选择开发实际来源');
         if (bytes > this.limits.eventBytes || row.spool_bytes + bytes > this.limits.spoolBytes || Buffer.byteLength(JSON.stringify({ key, after: row.last_sequence, through: row.last_sequence + 1, events: [parsed.data] })) > this.limits.pageBytes) throw new RunnerCommandError('development_usage_limit', '开发数值日志达到上限');
         this.db.query('INSERT INTO events(execution_id,sequence,occurred_at,body,bytes) VALUES(?,?,?,?,?)').run(key.executionId, row.last_sequence + 1, occurredAt, body, bytes);
         this.db.query('UPDATE executions SET last_sequence=last_sequence+1,spool_bytes=spool_bytes+? WHERE execution_id=?').run(bytes, key.executionId);
       }).immediate();
       this.remember(this.receipt(this.row(key.executionId)!));
-    } catch (error) { this.interrupt(key.executionId, error instanceof RunnerCommandError && error.code === 'development_usage_limit' ? 'journal-limit' : 'journal-unavailable'); }
+    } catch (error) {
+      const code = error instanceof RunnerCommandError ? error.code : '';
+      this.interrupt(key.executionId, code === 'development_usage_limit' ? 'journal-limit' : code === 'development_usage_invalid_capture' ? 'invalid-capture' : 'journal-unavailable');
+    }
   }
 
   finish(key: DevelopmentUsageKey, result: DevelopmentUsageReceipt['result']): void {
@@ -210,7 +214,7 @@ export class DevelopmentUsageJournal {
   private receipt(row: Row): DevelopmentUsageReceipt {
     const result = row.result ? JSON.parse(row.result) as { result: DevelopmentUsageReceipt['result']; interruption: DevelopmentUsageInterruption | null } : { result: null, interruption: null };
     const interrupted = result.interruption ?? (row.phase !== 'finished' && row.incarnation !== this.incarnation ? 'runner-restarted' : null);
-    const header = JSON.parse(row.header) as Pick<DevelopmentUsageReceipt, 'identity' | 'profileId' | 'profileRevision'>;
+    const { nativeSource: _nativeSource, ...header } = JSON.parse(row.header) as Pick<DevelopmentUsageReceipt, 'identity' | 'profileId' | 'profileRevision'> & { nativeSource?: { version: 1 } };
     if (header.identity.projectId !== this.context.projectId || header.identity.taskId !== this.context.workspaceTaskId || header.identity.executionId !== this.context.runtimeTaskId) throw new RunnerCommandError('development_journal_lost', '开发日志已绑定不同环境归属');
     return DevelopmentUsageReceiptSchema.parse({ ...header, key: { executionId: row.execution_id, journalId: this.journalId, incarnation: row.incarnation, payloadDigest: row.payload_digest }, podUid: this.context.podUid,
       phase: row.phase !== 'finished' && row.incarnation !== this.incarnation ? 'unknown' : row.phase,

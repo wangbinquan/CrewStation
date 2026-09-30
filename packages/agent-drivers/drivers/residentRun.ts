@@ -7,6 +7,7 @@ import type { AgentEvent, KnownAgentProtocol } from '@crewstation/contracts';
 import { DriverStateError } from '../contract/agentDriver';
 import type { DriverAgentSpec, DriverLaunchContext } from '../contract/agentDriver';
 import type { DriverChildProcessWithStdin } from '../contract/processHost';
+import type { NativeUsageCapture } from './usage/nativeCapture';
 import type { PreparedRuntime } from './cliRuntimeAdapter';
 import { AgentRunBase, failureMessage } from './agentRunBase';
 import { pumpTurn } from './turnPump';
@@ -14,6 +15,7 @@ import { pumpTurn } from './turnPump';
 export class ResidentAgentRun extends AgentRunBase {
   private stream: DriverChildProcessWithStdin | undefined;
   private lifetime: Promise<void>;
+  private nativeCapture: NativeUsageCapture | undefined;
   private turnError: string | null = null;
 
   constructor(spec: DriverAgentSpec, context: DriverLaunchContext, prepared: PreparedRuntime, protocol: KnownAgentProtocol) {
@@ -48,12 +50,13 @@ export class ResidentAgentRun extends AgentRunBase {
       resident: true,
     });
     const captureUsage = this.usageObserver?.beginTurn();
-    if (this.spec.nativeUsageTreeV1 === 1) await this.beginNativeCapture(plan.env, this.sessionId ?? this.spec.resumeSessionId, true);
-    if (this.cancelled || this.events.closed) return;
+    if (this.spec.nativeUsageTreeV1 === 1) this.nativeCapture = await this.beginNativeCapture(plan.env, this.sessionId ?? this.spec.resumeSessionId, true);
+    if (this.cancelled || this.events.closed) { await this.finishNativeCapture(this.nativeCapture, ['native-process-not-started']); return; }
     let stream: DriverChildProcessWithStdin;
     try {
       stream = this.context.host.spawnWithStdin({ cmd: plan.cmd, cwd: this.context.cwd, env: plan.env });
     } catch (error) {
+      await this.finishNativeCapture(this.nativeCapture, ['native-process-not-started']);
       this.finishFailed('spawn_failed', error instanceof Error ? error.message : String(error), null);
       return;
     }
@@ -82,6 +85,7 @@ export class ResidentAgentRun extends AgentRunBase {
     });
     } finally {
       this.retryUsageModels();
+      await this.finishNativeCapture(this.nativeCapture);
       this.stream = undefined;
       this.child = undefined;
     }

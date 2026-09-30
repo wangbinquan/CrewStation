@@ -3,7 +3,7 @@ import { afterEach, expect, test } from 'bun:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { RunnerUsageCaptureSchema, type AgentEvent, type RunnerUsageCapture } from '@crewstation/contracts';
+import { DevelopmentRunnerUsageCaptureSchema, RunnerUsageCaptureSchema, type DevelopmentRunnerUsageCapture, type AgentEvent, type RunnerUsageCapture } from '@crewstation/contracts';
 import { noopLogger } from '@crewstation/kernel';
 import { createClaudeCodeDriver } from '../drivers/claudeCode/driver';
 import { createOpencodeDriver } from '../drivers/opencode/driver';
@@ -48,4 +48,38 @@ test('OpenCode numeric channel retains explicit unavailable native-store evidenc
   expect(captured.at(-1)?.nativeProof?.state).toBe('partial');
   expect(captured.at(-1)?.nativeProof?.issues).toContain('native-store-unavailable');
   resetOpencodeBinaryVersions(); resetOpencodeProbes();
+});
+
+test('selected unsupported Claude source is private and emits both begin and finish before terminal', async () => {
+  const host = createFakeProcessHost([{ stdout: lines }]), frames: DevelopmentRunnerUsageCapture[] = [];
+  const events = await collect(createClaudeCodeDriver(() => '/bin/claude').start({ ...spec, developmentNativeSourceV1: 1 }, context(host, (frame) => frames.push(DevelopmentRunnerUsageCaptureSchema.parse(frame)))).events);
+  expect(frames.filter((f) => f.nativeSource).map((f) => f.nativeSource?.stage)).toEqual(['begin', 'finish']);
+  expect(frames.at(-1)).toMatchObject({ nativeProof: { state: 'unsupported' }, nativeSource: { finalStore: { state: 'unavailable' }, issues: ['native-source-unsupported'] } });
+  expect(frames.flatMap((f) => f.measurements).some((m) => m.usage.input === '10')).toBe(true); expect(events.map((e) => e.type)).toEqual(['started', 'session', 'completed']);
+});
+test('resident unsupported source finalization precedes process terminal without entering ordinary events', async () => {
+  const host = createFakeProcessHost([{ stdout: [], onFrame: () => lines }]), frames: DevelopmentRunnerUsageCapture[] = [];
+  const process = createClaudeCodeDriver(() => '/bin/claude').start({ ...spec, mode: 'interactive', developmentNativeSourceV1: 1 }, context(host, (frame) => frames.push(frame)));
+  const events: AgentEvent[] = [];
+  for await (const event of process.events) { events.push(event); if (event.type === 'status' && event.status === 'waiting') host.finishResident(); }
+  expect(frames.filter((f) => f.nativeSource).map((f) => f.nativeSource?.stage)).toEqual(['begin', 'finish']);
+  expect(frames.at(-1)?.nativeProof?.state).toBe('unsupported'); expect(events.some((e) => e.type === 'usage')).toBe(false); expect(events.at(-1)?.type).toBe('completed');
+});
+test('spawn failures retain a selected final source gap and numeric sink failures leave the original model result intact', async () => {
+  for (const mode of ['oneshot', 'interactive'] as const) {
+    const host = createFakeProcessHost([{ stdout: lines }]), frames: DevelopmentRunnerUsageCapture[] = [];
+    host.spawnPiped = host.spawnWithStdin = () => { throw new Error('spawn failed'); };
+    const events = await collect(createClaudeCodeDriver(() => '/bin/claude').start({ ...spec, mode, developmentNativeSourceV1: 1 }, context(host, (frame) => frames.push(frame))).events);
+    expect(events.at(-1)?.type).toBe('error'); expect(host.spawns).toHaveLength(0); expect(frames.at(-1)?.nativeSource?.stage).toBe('finish');
+  }
+  let sourceWrites = 0;
+  const events = await collect(createClaudeCodeDriver(() => '/bin/claude').start({ ...spec, developmentNativeSourceV1: 1 }, context(createFakeProcessHost([{ stdout: lines }]), (frame) => { if (frame.nativeSource) sourceWrites++; throw new Error('private sink failed'); })).events);
+  expect(sourceWrites).toBe(2); expect(events.at(-1)?.type).toBe('completed'); expect(events.some((e) => e.type === 'usage')).toBe(false);
+});
+test('selected sources cannot leak through ordinary or business event paths without a development sink', async () => {
+  for (const businessEvents of [false, true]) {
+    const host = createFakeProcessHost([{ stdout: lines }]);
+    const events = await collect(createClaudeCodeDriver(() => '/bin/claude').start({ ...spec, businessEvents, developmentNativeSourceV1: 1 }, context(host)).events);
+    expect(host.spawns).toHaveLength(0); expect(events.at(-1)?.type).toBe('error'); expect(events.some((e) => e.type === 'usage')).toBe(false);
+  }
 });

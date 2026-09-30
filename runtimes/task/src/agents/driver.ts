@@ -1,4 +1,4 @@
-import type { RunnerUsageCapture, BusinessMaterialRequest } from '@crewstation/contracts';
+import type { DevelopmentRunnerUsageCapture, BusinessMaterialRequest } from '@crewstation/contracts';
 import type { AgentEvent, AgentEventType, AgentPermission, KnownAgentProtocol, LaunchSpec, McpConnection } from '@crewstation/contracts';
 import type { ManagedRuntimeContext } from '@crewstation/agent-drivers';
 import type { Logger } from '@crewstation/kernel';
@@ -11,6 +11,7 @@ export interface AgentSpec {
   businessEvents?: boolean;
   usageObservationsV1?: 1;
   nativeUsageTreeV1?: 1;
+  developmentNativeSourceV1?: 1;
   nativeUsageLineageKey?: string;
   agentId: string;
   /** 算力档位名（RFC-001）：平台透传，运行时不解释，只在 started 事件里回显。 */
@@ -30,7 +31,7 @@ export interface AgentSpec {
 /** 由 TaskRunner 提供给驱动的宿主能力：已解析的 cwd、含凭据的完整环境（绝不记录）、降权拉起器与托管上下文。 */
 export interface AgentLaunchContext {
   /** Direct durable numeric sink; ordinary text and business event mapping remain separate. */
-  usageSink?: (capture: RunnerUsageCapture, occurredAt: string) => void;
+  usageSink?: (capture: DevelopmentRunnerUsageCapture, occurredAt: string) => void;
   cwd: string;
   env: Record<string, string>;
   launcher: ProcessLauncher;

@@ -1,4 +1,5 @@
 import { createOpencodeUsageNormalizer, opencodeUsageDatabasePath } from '../usage/opencodeModel';
+import { createDevelopmentNativeUsageCapture } from '../usage/developmentNativeCapture';
 import { createNativeUsageCapture } from '../usage/nativeCapture';
 import { readOrderedNativeUsageSnapshot } from '../usage/orderedNativeSnapshot';
 import { stageBusinessSkills, nativeSkillRoots } from '../../injection/businessSkills';
@@ -84,7 +85,7 @@ async function prepareOpencode(spec: DriverAgentSpec, context: DriverLaunchConte
     }),
     parseEvent,
     normalizeUsage: createOpencodeUsageNormalizer(env),
-    nativeUsageCapture: (input, finalEnv) => createNativeUsageCapture(input, (root) => readOrderedNativeUsageSnapshot(opencodeUsageDatabasePath(finalEnv), root)),
+    nativeUsageCapture: (input, finalEnv) => input.developmentNativeSourceV1 === 1 ? createDevelopmentNativeUsageCapture(input, finalEnv) : createNativeUsageCapture(input, (root) => readOrderedNativeUsageSnapshot(opencodeUsageDatabasePath(finalEnv), root)),
     detectSessionNotFound: detectOpencodeSessionNotFound,
     dispose: () => { skills?.dispose(); runDir.dispose(); },
   };

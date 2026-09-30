@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { chmod, mkdtemp, readFile, rm, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { DevelopmentUsageAdmissionSchema, ProjectIdSchema, TaskIdSchema, type DevelopmentUsageAdmission, type RunnerUsageCapture } from '@crewstation/contracts';
+import { DevelopmentRunnerUsageCaptureSchema, DevelopmentUsageAdmissionSchema, ProjectIdSchema, TaskIdSchema, type DevelopmentUsageAdmission, type RunnerUsageCapture } from '@crewstation/contracts';
 import { DevelopmentUsageJournal, type DevelopmentJournalLimits } from './developmentUsageJournal';
 import { developmentIntentDigest } from './developmentStartIntent';
 
@@ -161,4 +161,28 @@ describe('RFC-034 development numeric journal', () => {
     expect(restarted.reserve(original).created).toBe(false);
   });
 
+});
+
+function sourceFrame(original: DevelopmentUsageAdmission, stage: 'begin' | 'finish') {
+  return DevelopmentRunnerUsageCaptureSchema.parse({ version: 1, measurements: [], diagnostics: [], nativeProof: { contract: 'opencode-child-steps-v1', lineageKey: original.intent.nativeUsageLineageKey, turn: 'turn', turnIndex: 0,
+    state: 'unsupported', root: null, observedAt: at, baseline: { kind: 'fresh', fingerprint: null }, fingerprint: null, sessions: 0, steps: 0, emitted: 0, baselineSteps: 0, priorRevisionGap: false, issues: ['native-tree-unsupported'] },
+    nativeSource: { version: 1, stage, lineageKey: original.intent.nativeUsageLineageKey, turn: 'turn', turnIndex: 0, observedAt: at, plannedPathDigest: null, scope: 'unverified', beginStore: { state: 'unavailable' }, finalStore: stage === 'begin' ? null : { state: 'unavailable' }, continuity: 'unverified', issues: ['native-source-unsupported'] } });
+}
+test('a selected source survives FULL/WAL reopen, bounded reads and ACK without extending strict receipt fields', async () => {
+  const path = await directory(), journal = open(path), old = admission(journal), intent = { ...old.intent, nativeSource: { version: 1 as const } };
+  const original = { ...old, intent, key: { ...old.key, payloadDigest: developmentIntentDigest({ intent, digestNonce: old.digestNonce }) } };
+  journal.reserve(original); journal.capture(original.key, sourceFrame(original, 'begin'), at); journal.capture(original.key, sourceFrame(original, 'finish'), at); journal.finish(original.key, 'completed');
+  expect(journal.read(original.key, 0).events.map((e) => e.capture.nativeSource?.stage)).toEqual(['begin', 'finish']);
+  expect(journal.info(original.key).receipt).not.toHaveProperty('nativeSource'); journal.acknowledge(original.key, 1);
+  const restarted = open(path); expect(restarted.reserve(original).created).toBe(false);
+  expect(restarted.read(original.key, 1).events[0]?.capture.nativeSource?.stage).toBe('finish'); expect(restarted.acknowledge(original.key, 2).finalThrough).toBe(2);
+  expect(() => restarted.reserve(old)).toThrow('原启动意图不同');
+});
+test('an old accepted intent cannot acquire source capability through new hello or a replayed flag', async () => {
+  const journal = open(await directory()), original = admission(journal); journal.reserve(original);
+  journal.capture(original.key, sourceFrame(original, 'begin'), at);
+  expect(journal.info(original.key).receipt).toMatchObject({ interruption: 'invalid-capture', lastSequence: 0, finalThrough: null });
+  const intent = { ...original.intent, nativeSource: { version: 1 as const } }, payloadDigest = developmentIntentDigest({ intent, digestNonce: original.digestNonce });
+  expect(payloadDigest).not.toBe(original.key.payloadDigest);
+  expect(() => journal.reserve({ ...original, intent, key: { ...original.key, payloadDigest } })).toThrow('原启动意图不同');
 });

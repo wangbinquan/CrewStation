@@ -20,13 +20,13 @@ const cleanups: Array<() => Promise<void> | void> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 const deferred = () => { let resolve!: () => void; const promise = new Promise<void>((done) => { resolve = done; }); return { resolve, promise }; };
 
-async function boot(options: { numeric?: boolean; hold?: boolean; breakStream?: boolean } = {}) {
+async function boot(options: { numeric?: boolean; hold?: boolean; breakStream?: boolean; source?: boolean } = {}) {
   const path = await mkdtemp(join(tmpdir(), 'cs-development-runner-')); cleanups.push(() => rm(path, { recursive: true, force: true }));
   const journal = new DevelopmentUsageJournal(path, { projectId: project, workspaceTaskId: workspace, runtimeTaskId: TEST_TASK_ID, podUid: 'pod-a' }, crypto.randomUUID());
   const session: FakeSession = startFakeSession(); cleanups.push(() => session.stop());
-  const cancelled = deferred(), release = deferred(); let spawns = 0, home = '';
+  const cancelled = deferred(), release = deferred(); let spawns = 0, home = '', sourceFlag: 1 | undefined;
   const drivers: AgentDriverFactory = { forProtocol: (protocol) => ({ protocol, start: (spec, context) => {
-    spawns++; home = context.env.HOME ?? '';  const event = createAgentEventFactory(spec.agentId), events = createEventQueue<ReturnType<typeof event>>();
+    spawns++; home = context.env.HOME ?? ''; sourceFlag = spec.developmentNativeSourceV1;  const event = createAgentEventFactory(spec.agentId), events = createEventQueue<ReturnType<typeof event>>();
     events.push(event('started')); context.usageSink?.(capture, new Date().toISOString()); events.push(event('text', { text: 'ordinary-output' }));
     if (options.breakStream) events.fail(new Error('unexpected driver stream failure'));
     else if (!options.hold) { events.push(event('completed')); events.close(); }
@@ -36,10 +36,10 @@ async function boot(options: { numeric?: boolean; hold?: boolean; breakStream?: 
   const tr: TestRunner = await startTestRunner(session.url, {}, { drivers, ...(options.numeric ? { developmentUsageJournal: journal } : {}) }); cleanups.push(() => tr.dispose());
   await tr.runner.whenConnected();
   const command = StartAgentCommandSchema.parse({ id: 'start', type: 'startAgent', agentId, compute: 'Named compute', profileRevision: 3, launch: launchSpec(), permission: 'full', mode: 'oneshot', initialPrompt: 'private-prompt', mcp: [], env: {}, beforeStart: material(), processAttemptId: 'fixed-process-attempt' });
-  const intent = { version: 1 as const, identity: { sourceKind: 'development-agent' as const, projectId: project, taskId: workspace, executionId: TEST_TASK_ID, executionGeneration: 1 as const, agentId }, profileId: command.beforeStart.profile, profileRevision: command.profileRevision, launch: command.launch, permission: command.permission, mode: command.mode, initialPrompt: command.initialPrompt ?? null, cwd: null, resumeSessionId: null, systemPrompt: null, mcp: [], nativeUsageLineageKey: 'actual-store-lineage' };
+  const intent = { version: 1 as const, identity: { sourceKind: 'development-agent' as const, projectId: project, taskId: workspace, executionId: TEST_TASK_ID, executionGeneration: 1 as const, agentId }, profileId: command.beforeStart.profile, profileRevision: command.profileRevision, launch: command.launch, permission: command.permission, mode: command.mode, initialPrompt: command.initialPrompt ?? null, cwd: null, resumeSessionId: null, systemPrompt: null, mcp: [], nativeUsageLineageKey: 'actual-store-lineage', ...(options.source ? { nativeSource: { version: 1 as const } } : {}) };
   const base = { intent, digestNonce: 'a'.repeat(64) };
   const admission: DevelopmentUsageAdmission = { ...base, key: { executionId: TEST_TASK_ID, journalId: journal.journalId, incarnation: journal.incarnation, payloadDigest: developmentIntentDigest(base) } };
-  return { path, session, tr, journal, command, admission, cancelled, release, spawns: () => spawns, home: () => home };
+  return { path, session, tr, journal, command, admission, cancelled, release, spawns: () => spawns, home: () => home, sourceFlag: () => sourceFlag };
 }
 
 test('numeric commands and starts are explicit capabilities; legacy agent commands preserve ordinary events', async () => {
@@ -96,4 +96,16 @@ test('invalid CWD cannot run Hook/model or leave a resumable registered admissio
   expect(f.journal.info(admission.key).receipt).toMatchObject({ phase: 'finished', result: 'error', lastSequence: 0 });
   await f.session.call({ ...f.command, id: 'same-invalid-replay', cwd, developmentUsage: admission });
   expect(f.spawns()).toBe(0);
+});
+
+test('source selection comes only from the Hook-frozen intent while a newer hello leaves legacy admissions unchanged', async () => {
+  const legacy = await boot({ numeric: true }); expect(legacy.session.hellos[0]?.capabilities.developmentNativeSourceV1).toBe(1);
+  await legacy.session.call({ ...legacy.command, developmentUsage: legacy.admission }); await legacy.session.waitForEvent('agent', (e) => e.event.type === 'completed');
+  expect(legacy.sourceFlag()).toBeUndefined();
+  const intent = { ...legacy.admission.intent, nativeSource: { version: 1 as const } };
+  const changed = { ...legacy.admission, intent, key: { ...legacy.admission.key, payloadDigest: developmentIntentDigest({ intent, digestNonce: legacy.admission.digestNonce }) } };
+  await expect(legacy.session.call({ ...legacy.command, id: 'upgraded-replay', developmentUsage: changed })).rejects.toThrow(); expect(legacy.spawns()).toBe(1);
+  const selected = await boot({ numeric: true, source: true });
+  await selected.session.call({ ...selected.command, developmentUsage: selected.admission }); await selected.session.waitForEvent('agent', (e) => e.event.type === 'completed');
+  expect(selected.sourceFlag()).toBe(1); expect(selected.spawns()).toBe(1);
 });

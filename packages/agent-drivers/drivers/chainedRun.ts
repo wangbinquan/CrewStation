@@ -53,7 +53,7 @@ export class ChainedAgentRun extends AgentRunBase {
     try {
       const plan = this.prepared.plan({ prompt, resumeSessionId: this.resumeIdFor(), resident: false });
       if (this.spec.nativeUsageTreeV1 === 1) native = await this.beginNativeCapture(plan.env, this.resumeIdFor());
-      if (this.cancelled || this.events.closed) return;
+      if (this.cancelled || this.events.closed) { await this.finishNativeCapture(native, ['native-process-not-started']); return; }
       child = this.spawn(plan);
     } catch (error) {
       await this.finishNativeCapture(native, ['native-process-not-started']);

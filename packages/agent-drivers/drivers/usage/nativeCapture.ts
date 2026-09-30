@@ -1,13 +1,16 @@
 import { jsonHash } from '@crewstation/kernel';
 import { RunnerUsageCaptureSchema, type NativeUsageProof, type NativeUsageStep, type RunnerUsageCapture, type RunnerUsageMeasurement } from '@crewstation/contracts';
 import type { NativeUsageSnapshot } from './nativeSnapshot';
+import type { UsageNormalizer } from './capture';
+import type { DevelopmentRunnerUsageCapture } from '@crewstation/contracts';
 
-export interface NativeCaptureInput { lineageKey: string; turn: string; turnIndex: number; resumeSessionId?: string; nextRevision: () => number }
+export interface NativeCaptureInput { lineageKey: string; turn: string; turnIndex: number; resumeSessionId?: string; developmentNativeSourceV1?: 1; nextRevision: () => number }
 export interface NativeUsageCapture {
-  begin(at: number): RunnerUsageCapture;
+  normalizeUsage?: UsageNormalizer;
+  begin(at: number): DevelopmentRunnerUsageCapture;
   includesRecord(sessionId: string, partId: string): boolean;
   observeSession(sessionId: string): void;
-  finish(root: string | undefined, at: number, issues?: string[]): RunnerUsageCapture[];
+  finish(root: string | undefined, at: number, issues?: string[]): DevelopmentRunnerUsageCapture[];
 }
 const equivalent = (before: NativeUsageStep, after: NativeUsageStep) => jsonHash(before) === jsonHash(after);
 function measurement(input: NativeCaptureInput, step: NativeUsageStep, root: string, at: number): RunnerUsageMeasurement {

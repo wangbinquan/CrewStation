@@ -2,6 +2,8 @@
 // ← agent-workflow `execution/agentProcess.ts` 的 outcome 映射思路，但那里的产物是一条汇总记录，
 // 这里的产物是一条 AgentEvent 流。
 
+import { unsupportedDevelopmentNativeUsageCapture } from './usage/developmentNativeCapture';
+import type { DevelopmentRunnerUsageCapture } from '@crewstation/contracts';
 import { unsupportedNativeUsageCapture, type NativeUsageCapture } from './usage/nativeCapture';
 import { createUsageObserver } from './usage/capture';
 import type { AgentEvent, AgentEventType, KnownAgentProtocol } from '@crewstation/contracts';
@@ -59,24 +61,36 @@ export abstract class AgentRunBase implements DriverAgentProcess {
   }
 
   protected async beginNativeCapture(env: Readonly<Record<string, string | undefined>>, resumeSessionId?: string, resident = false): Promise<NativeUsageCapture | undefined> {
+    if (this.spec.developmentNativeSourceV1 === 1 && (!this.context.usageSink || this.spec.businessEvents)) throw new DriverStateError('development_source_requires_sink', '开发实际来源需要独立数字通道');
     if (this.spec.nativeUsageTreeV1 !== 1 || !this.usageObserver || !this.spec.nativeUsageLineageKey) return undefined;
     const turn = this.usageObserver.currentTurn();
     const input = { lineageKey: this.spec.nativeUsageLineageKey, turn: turn.turnId, turnIndex: turn.turnIndex,
-      resumeSessionId, nextRevision: () => this.usageObserver!.nextRevision() };
-    const capture = !resident && this.prepared.nativeUsageCapture ? this.prepared.nativeUsageCapture(input, env) : unsupportedNativeUsageCapture(input);
-    const event = this.emit('usage', { usageCapture: capture.begin(Date.now()) });
+      resumeSessionId, ...(this.spec.developmentNativeSourceV1 === 1 ? { developmentNativeSourceV1: 1 as const } : {}), nextRevision: () => this.usageObserver!.nextRevision() };
+    const capture = !resident && this.prepared.nativeUsageCapture ? this.prepared.nativeUsageCapture(input, env) : this.spec.developmentNativeSourceV1 === 1 ? unsupportedDevelopmentNativeUsageCapture(input) : unsupportedNativeUsageCapture(input);
+    if (capture.normalizeUsage) this.usageObserver.setNormalizer(capture.normalizeUsage);
+    const begin = capture.begin(Date.now());
+    if (this.persistSource(begin)) return capture;
+    const event = this.emit('usage', { usageCapture: begin });
     if (!this.persistUsage(event)) await this.events.writeProcessed(event);
     return capture;
   }
 
   protected async finishNativeCapture(capture: NativeUsageCapture | undefined, issues: string[] = []): Promise<void> {
     for (const usageCapture of capture?.finish(this.sessionId ?? this.spec.resumeSessionId, Date.now(), issues) ?? []) {
+      if (this.persistSource(usageCapture)) continue;
       const event = this.emit('usage', { usageCapture });
       // The final receipt also leaves room for the following business terminal event.
       if (this.persistUsage(event)) continue;
       if (usageCapture.nativeProof) await this.events.writeProcessed(event);
       else await this.events.write(event);
     }
+  }
+
+  private persistSource(capture: DevelopmentRunnerUsageCapture): boolean {
+    if (!capture.nativeSource) return false;
+    try { this.context.usageSink?.(capture, capture.nativeSource.observedAt); }
+    catch { this.context.logger.warn('numeric usage sink unavailable'); }
+    return true;
   }
 
   protected push(event: AgentEvent): void {
