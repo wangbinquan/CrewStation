@@ -414,3 +414,10 @@ development-native-source v2设计门PASS；共享业务严格面及旧receipt�
 限定30源码/测试独立门PASS、77项相关与34项合同族通过及精确lint后，按共享在制品规则只发布36自有路径为 `d01ba8223fc08c8b2b70ee4db859e560c2151668`。[CI 36682129650](https://github.com/wangbinquan/CrewStation/actions/runs/36682129650) 六项全部success；本机全量被并行迁移阻断的记录保留，不宣称本机完整通过。2026-09-30T07:30:51.933Z八组件固定摘要升级完成、generation=observedGeneration且Ready=1、storage-contract=1、迁移Job Complete、公开登录HTTP200/匿名受保护根路由401。完整源码/镜像及默认Runner回执见[实际来源底座](./development-native-source.md#精确发布hosted-ci-与本机部署回执2026-09-30)。
 
 本批只关闭实际来源第一批发布/CI/部署依赖。生产开发采集仍OFF，sourceScope仍business-tasks；owner固定挂载/派发/删除屏障、consumer原价归属及两级事实/UI继续，真实身份/模型未验收，CS-R02和两个RFC不关闭。并行资源及共享登记原样留给其后续提交；AW新候选edd56ebe3的主CI与九个默认定时配置继续验收。
+
+
+## 2026-09-30 开发实际来源消费者限定设计 v3
+
+[development-consumer.md](./development-consumer.md)限定v3独立设计门PASS，保留v1三项/v2一项P2失败历史并逐项修正。明确Session独立registration与owner原绑定对拍、实际sourceVerified先于数字完整性、stream游标与每turn完整meter分离、所有普通数字的所选模型证据同页持久化及已ACK旧模型恢复；原价/未知/超预算语义与复制库隔离均有反例。当前仅设计通过，没有消费代码、生产派发、删除屏障或两级事实/UI验收。
+
+此前三份发布/部署回执文档b643e53196e2eea0d61a6160df7f543263c5a561的[CI 36685062165](https://github.com/wangbinquan/CrewStation/actions/runs/36685062165) 已success；本机源码仍为已验证d01ba8223、八组件Ready，生产开发采集OFF/sourceScope business-tasks。AW edd56ebe3主CI和完整E2E已success，WebKit最终终态仍待验收。继续内部消费者及原owner/CNY/排空/正式明细，CS-R02和两RFC不关闭；共享STATE/RFC索引与并行资源工作原样保留。

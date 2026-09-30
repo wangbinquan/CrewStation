@@ -4,7 +4,7 @@
 
 ## 当前已实现与实际部署
 
-当前本机平台版本：bebb3d9b3b2a879a8e8ecf9b56b818fc912b15b7，2026-09-30T04:11:33.945Z部署完成；[精确CI36665601664](https://github.com/wangbinquan/CrewStation/actions/runs/36665601664)六项成功，八组件Ready=1、storage-contract=1、迁移Complete、公开登录HTTP200。双路径布局/固定元数据及原键持久停止底座已部署；生产开发采集仍关闭，实际来源、owner派发/完整清理/consumer/两级明细未接通。
+当前本机源码版本：`d01ba8223fc08c8b2b70ee4db859e560c2151668`，2026-09-30T07:30:51.933Z部署完成；[精确CI36682129650](https://github.com/wangbinquan/CrewStation/actions/runs/36682129650)六项成功，八组件Ready=1、storage-contract=1、迁移Complete，公开登录HTTP200、未登录根路由HTTP401符合现有认证合同。双路径布局/固定元数据、原键持久停止及实际原生来源第一批底座已部署；生产开发采集仍关闭，owner派发/完整清理/consumer/两级明细未接通。其后`b643e53196e2eea0d61a6160df7f543263c5a561`只提交发布/部署回执文档，[精确CI36685062165](https://github.com/wangbinquan/CrewStation/actions/runs/36685062165)六项成功，不改变本机源码镜像。
 
 正式项目/系统统计已有业务任务、Agent/尝试、四桶 Token、人民币估值、基础泳道、算力贡献下钻和采集质量；项目与算力显示名称，保留稳定 ID/受理修订。已有价格配置与冻结目录、OpenCode 根/子树采集、原归属修订和原价补算；资源/容量和当前服务槽/平台 Pod 健康已有入口。
 
@@ -233,3 +233,10 @@ Stage 2 Session 冻结候选完整门禁回执：2026-09-29T23:43:16Z，结构�
 源码 `d01ba8223fc08c8b2b70ee4db859e560c2151668` 已精确推送，[CI 36682129650](https://github.com/wangbinquan/CrewStation/actions/runs/36682129650) 六项全部success。2026-09-30T07:30:51.933Z完成本机升级：storage-contract=1、迁移Job `rfc034-native-source-migrate-d01ba822` Complete、八组件generation=observedGeneration且Ready=1；console204、API198、auth96、controller163、events66、Session115、两MCP各62。登录页HTTP200，匿名根路由按现有ForwardAuth返回401；三镜像OCI revision核对源码SHA，固定摘要见[完整回执](./development-native-source.md#精确发布hosted-ci-与本机部署回执2026-09-30)。默认Runner摘要52db50f761af211ce4b766e6a2244c6e1c61af4d8c019fd408f725c44f9b4413。
 
 生产采集仍OFF、sourceScope仍business-tasks。第一批来源证明不等同项目开发消耗已接通；CS-R02后续实际owner派发/挂载约束、停止与数字排空/删除屏障、consumer固定原执行与原CNY价格历史修订、同快照事实及两级UI尚未完成，其他CS-R待办继续。真实身份/模型验收未执行；共享STATE/RFC索引及并行资源工作完整保留，未提交。AW edd56ebe3的主CI与九种默认定时配置正在验证，不将旧候选八绿当新候选全绿；两RFC不关闭。
+
+
+## 2026-09-30 开发实际来源消费者限定设计 v3
+
+[development-consumer.md](./development-consumer.md)限定v3独立设计门PASS，保留v1三项/v2一项P2失败历史并逐项修正。明确Session独立registration与owner原绑定对拍、实际sourceVerified先于数字完整性、stream游标与每turn完整meter分离、所有普通数字的所选模型证据同页持久化及已ACK旧模型恢复；原价/未知/超预算语义与复制库隔离均有反例。当前仅设计通过，没有消费代码、生产派发、删除屏障或两级事实/UI验收。
+
+此前三份发布/部署回执文档b643e53196e2eea0d61a6160df7f543263c5a561的[CI 36685062165](https://github.com/wangbinquan/CrewStation/actions/runs/36685062165) 已success；本机源码仍为已验证d01ba8223、八组件Ready，生产开发采集OFF/sourceScope business-tasks。AW edd56ebe3主CI和完整E2E已success，WebKit最终终态仍待验收。继续内部消费者及原owner/CNY/排空/正式明细，CS-R02和两RFC不关闭；共享STATE/RFC索引与并行资源工作原样保留。
