@@ -636,3 +636,14 @@ v1独立18前身17路径功能门FAIL一项P2：I/O后虽读过时钟，但commi
 [准入设计与验证](./development-workload-admission.md) v5限定设计门PASS；30条源码/测试中的实际准入、原卷owner和作业事务fence已接通，64项相关真实PG/公开模块回归、架构和精确lint通过。原故障及夹具/类型失败保留。整个候选独立实现门、唯一完整门禁、发布CI与部署尚待完成；现行d3部署和生产开发采集OFF边界不变。完整数字清理/消费/两级事实UI仍为后续依赖。
 
 开发准入v2整体独立实现门PASS（51文件/6证据稳定），补公开controller清理保留组合1项/14断言通过。唯一完整门禁4659/143skip/18fail，30源码稳定、同轮相关64/0；18失败及后续7项类型错误均属并行events/来源改造。自有精确lint通过，参考兼容PASS；按开发规则§3只精确提交自有路径，保留外部结果，不重复全量，以本提交hosted CI为最终结论。发布与本机部署回执继续。
+
+
+## 2026-10-01 实际开发工作卷准入的精确发布与部署
+
+- 精确源码：`b9508486d94fb3bbcaa460dc03dcc697d877b37d`，33条自有路径提交并推送；推前后main/origin均0/0、共享索引为空，未提交并行events/identity/gateway/platform/迁移/共享登记。独立最终实现与发布复核PASS，原绑定恢复和pinnedVolume owner反例失败历史保留。
+- [精确CI36790207172](https://github.com/wangbinquan/CrewStation/actions/runs/36790207172)终态success：static、unit、module、console、gate、e2e六项全部成功。原单次本机全量4659pass/143skip/18外部fail、aggregate=1仍保留；同次10个相关文件64pass/0fail/0skip，30源码指纹一致。提交前精确lint通过，后续7条外部类型错误未收编或篡改，不将本机全量改写成绿色。
+- 部署前逐个读取当前OCI实际源码：console/control-plane为333e631d、默认Runner为d3acac1f，均证实为本次源码祖先；升级保留另一会话已部署输出。完成时间`2026-09-30T23:33:28.986Z`（北京时间10-01 07:33:28.986）。八组件generation=observedGeneration且Ready=1：console 213、cs-api 207、cs-auth 105、cs-controller 172、cs-events 75、cs-session 124、mcp-capabilities 71、mcp-operations 71。storage-contract=1；原owner/Session数字表存在。
+- 迁移Job `rfc034-development-workload-admission-migrate-b9508486`，UID `02d761f6-6102-40aa-902c-1014584cfe19`，Complete，实际日志applied=0、roles.initialized=0。部署前私有数据库备份42873542字节、SHA256 `fa8dfd53ce7a956d9c2f69187a6dcd1df3c1dc45a036e201be4b2651e5a7122c`；不将备份或启动材料提交入库。
+- 实际镜像：console `90b63ef20114c9748b84a07eab168b776c1d1390c867b3082a2157497b1f2eb1`；control-plane `159a1469fedb96d92d22912833078a7c928f5fb1226733cfcdba9b6be07664fe`；默认Runner `e7b0153ee23280606b90f88f6cf198543f1fb8d467e13f904c089d0f2cdd6da4`。三镜像OCI revision及默认Runner内容源码均核对为完整b9508486提交，部署固定到摘要。
+- 公开只读验收`2026-09-30T23:34:31.149611+00:00`：console.cs.localhost/auth/login HTTP200、未登录根HTTP401，八组件与三个摘要全部对拍。没有身份切换、真实模型/开发验证资源创建或结束、旧会话/固定算力Runner重建。
+- 边界：实际ledger/native开发消费者注册、原Pod绑定与持久许可接续已部署；生产开发数字producer仍OFF。完整数字清理、全部物理入口、观测消费和项目/系统两级开发明细、真实身份/模型及AW联合验收继续，CS-R02和两RFC不关闭。下一批[数字清理实施细化](./development-cleanup.md#2026-10-01-实际数字清理候选的实施细化设计候选尚未实现)仅原bound出口设计PASS，不能当成源码实现或producer开启许可。

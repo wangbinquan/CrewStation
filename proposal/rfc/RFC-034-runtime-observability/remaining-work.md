@@ -4,7 +4,7 @@
 
 ## 当前已实现与实际部署
 
-当前本机源码版本：`d3acac1fe0daab77e1ce741604f9e77131f943a4`，2026-09-30T20:33:55.504Z（北京时间10-01 04:33:55.504）部署完成；[精确CI36771444783](https://github.com/wangbinquan/CrewStation/actions/runs/36771444783)六项成功，八组件Ready=1、代次一致、storage-contract=1、迁移Complete/applied=0，三镜像源码与默认Runner摘要已对拍。2026-09-30T20:37:32.936952Z公开console.cs.localhost登录HTTP200、未登录根HTTP401。原生来源、内部consumer/派发/结束/独立查询/普通屏障/派发恢复和本批严格保护渲染已部署；resources实际开发消费者准入尚待本候选接通，生产开发采集仍OFF，完整数字清理/消费和两级开发明细未完成。历史门禁失败与各部署批次保留在下方。
+当前本机源码版本：`b9508486d94fb3bbcaa460dc03dcc697d877b37d`，2026-09-30T23:33:28.986Z（北京时间10-01 07:33:28.986）部署完成；[精确CI36790207172](https://github.com/wangbinquan/CrewStation/actions/runs/36790207172)六项成功，八组件Ready=1、代次一致、storage-contract=1、迁移Complete/applied=0，三镜像源码与默认Runner摘要已对拍。2026-09-30T23:34:31.149611+00:00公开console.cs.localhost登录HTTP200、未登录根HTTP401。原生来源、内部consumer/派发/结束/独立查询/普通屏障/派发恢复、严格保护渲染与实际开发工作卷消费者准入已部署；生产开发采集仍OFF，完整数字清理/消费和两级开发明细未完成。历史门禁失败与各部署批次保留在下方。
 
 正式项目/系统统计已有业务任务、Agent/尝试、四桶 Token、人民币估值、基础泳道、算力贡献下钻和采集质量；项目与算力显示名称，保留稳定 ID/受理修订。已有价格配置与冻结目录、OpenCode 根/子树采集、原归属修订和原价补算；资源/容量和当前服务槽/平台 Pod 健康已有入口。
 
@@ -440,3 +440,14 @@ v1独立18前身17路径功能门FAIL一项P2：I/O后虽读过时钟，但commi
 实际开发消费者准入已在本地候选中实现，64项相关真实PG/公开Task-Resources-Controller组合回归通过，详见[准入实现检查点](./development-workload-admission.md#2026-10-01-实现候选与相关回归)。独立整体实现审查、唯一完整门禁、精确CI和本机升级待完成；顶部所列d3仍是实际部署。生产开发采集继续OFF，CS-R02及完整清理/消费/两级开发明细仍未关闭。
 
 开发准入v2整体限定实现门PASS，唯一完整门禁的自有64项全部通过、30源码稳定；全量4659pass/143skip/18fail及后续并行7项类型错误保留在[准入门禁检查点](./development-workload-admission.md#2026-10-01-唯一完整门禁与共享在制边界)。参考兼容PASS、自有精确lint通过，按开发规则§3精确发布并核该SHA hosted CI；发布/部署仍未记完成，现行d3与生产OFF保持。
+
+
+## 2026-10-01 实际开发工作卷准入的精确发布与部署
+
+- 精确源码：`b9508486d94fb3bbcaa460dc03dcc697d877b37d`，33条自有路径提交并推送；推前后main/origin均0/0、共享索引为空，未提交并行events/identity/gateway/platform/迁移/共享登记。独立最终实现与发布复核PASS，原绑定恢复和pinnedVolume owner反例失败历史保留。
+- [精确CI36790207172](https://github.com/wangbinquan/CrewStation/actions/runs/36790207172)终态success：static、unit、module、console、gate、e2e六项全部成功。原单次本机全量4659pass/143skip/18外部fail、aggregate=1仍保留；同次10个相关文件64pass/0fail/0skip，30源码指纹一致。提交前精确lint通过，后续7条外部类型错误未收编或篡改，不将本机全量改写成绿色。
+- 部署前逐个读取当前OCI实际源码：console/control-plane为333e631d、默认Runner为d3acac1f，均证实为本次源码祖先；升级保留另一会话已部署输出。完成时间`2026-09-30T23:33:28.986Z`（北京时间10-01 07:33:28.986）。八组件generation=observedGeneration且Ready=1：console 213、cs-api 207、cs-auth 105、cs-controller 172、cs-events 75、cs-session 124、mcp-capabilities 71、mcp-operations 71。storage-contract=1；原owner/Session数字表存在。
+- 迁移Job `rfc034-development-workload-admission-migrate-b9508486`，UID `02d761f6-6102-40aa-902c-1014584cfe19`，Complete，实际日志applied=0、roles.initialized=0。部署前私有数据库备份42873542字节、SHA256 `fa8dfd53ce7a956d9c2f69187a6dcd1df3c1dc45a036e201be4b2651e5a7122c`；不将备份或启动材料提交入库。
+- 实际镜像：console `90b63ef20114c9748b84a07eab168b776c1d1390c867b3082a2157497b1f2eb1`；control-plane `159a1469fedb96d92d22912833078a7c928f5fb1226733cfcdba9b6be07664fe`；默认Runner `e7b0153ee23280606b90f88f6cf198543f1fb8d467e13f904c089d0f2cdd6da4`。三镜像OCI revision及默认Runner内容源码均核对为完整b9508486提交，部署固定到摘要。
+- 公开只读验收`2026-09-30T23:34:31.149611+00:00`：console.cs.localhost/auth/login HTTP200、未登录根HTTP401，八组件与三个摘要全部对拍。没有身份切换、真实模型/开发验证资源创建或结束、旧会话/固定算力Runner重建。
+- 边界：实际ledger/native开发消费者注册、原Pod绑定与持久许可接续已部署；生产开发数字producer仍OFF。完整数字清理、全部物理入口、观测消费和项目/系统两级开发明细、真实身份/模型及AW联合验收继续，CS-R02和两RFC不关闭。下一批[数字清理实施细化](./development-cleanup.md#2026-10-01-实际数字清理候选的实施细化设计候选尚未实现)仅原bound出口设计PASS，不能当成源码实现或producer开启许可。

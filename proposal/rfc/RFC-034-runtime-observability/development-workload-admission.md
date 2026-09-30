@@ -1,10 +1,10 @@
 # RFC-034 开发 Agent 的实际工作卷准入与持久创建接续
 
-状态：设计v2独立PASS，v3发现绑定恢复P2，v4补充精确等待与继续绑定；首轮及v3失败回执保留；承接 [保护渲染](./development-protection.md) 与 [完整清理规划](./development-cleanup.md)。基线 d3acac1f 已推送、六项 CI 全绿并实际本机部署。这个候选把实际消费者注册和原 Pod 许可链接通；不装配生产数字 producer，不宣称数字排空、全入口清理、零证明或两级事实完成。已批准的 RFC 总范围继续 In Progress。
+状态：设计v2独立PASS，v3发现绑定恢复P2，v4补充精确等待与继续绑定；首轮及v3失败回执保留；承接 [保护渲染](./development-protection.md) 与 [完整清理规划](./development-cleanup.md)。原基线 d3acac1f 已发布；本候选现以完整b9508486提交发布、六项CI成功并实际本机部署，见页末回执。这个候选把实际消费者注册和原 Pod 许可链接通；不装配生产数字 producer，不宣称数字排空、全入口清理、零证明或两级事实完成。已批准的 RFC 总范围继续 In Progress。
 
-## 当前源码缺口与组合边界
+## 设计基线的源码缺口与组合边界
 
-resources/safety/guards.ts:19 的 assertConsumerOwner 只接受 business-workspace 和带 taskStorage 的原工作卷，开发 Agent 即使纯对象合法仍不能登记。原 direct writer 先拒绝显式新选择；其旧 prepare 在整个项目事务里调用集群和材料。direct 投影没有完整 pod/consumer 规格，现有持久 controller 无法接续授予许可。ledger writer 已有 register → Secret/Pod → bind → inspect → PG grant → UID Secret；这些既有端口保持。
+设计基线d3acac1f中的resources/safety/guards.ts:19 的 assertConsumerOwner 只接受 business-workspace 和带 taskStorage 的原工作卷，开发 Agent 即使纯对象合法仍不能登记。原 direct writer 先拒绝显式新选择；其旧 prepare 在整个项目事务里调用集群和材料。direct 投影没有完整 pod/consumer 规格，现有持久 controller 无法接续授予许可。ledger writer 已有 register → Secret/Pod → bind → inspect → PG grant → UID Secret；这些既有端口保持。
 
 L4 task-runtime application 编排，L5 adapters 读写本模块 PG、K8s 或经已有端口调用 resources。resources 在自身原 parent/storageTask 锁下核本模块台账，不查询 task-runtime schema、不 import 私有代码。L6 task-runtime wiring 使用已经注入的 resources WorkloadSafety 注册方法；不改并行 platform/wiring 或业务删除实现。节点探测和许可激活仍在 cluster-control；不能用进程内临时状态或在 task-runtime 假发 grant。
 
@@ -81,3 +81,14 @@ v5限定设计门51/51指纹一致、PASS；原卷owner修正及全部准入候�
 完整五组件于2026-09-30T22:56:40.256882Z结束，1033.04秒：架构/lint/后端类型/控制台类型均0，测试4659pass/143skip/18fail、30488断言、933文件；aggregate=1原日志保留。30自有源码首尾一致，10相关文件的64项在同一全量中全部通过、无失败/跳过。18失败来自并行events来源改造及其结构/平台迁移/升级回归，未修改或收编该在制工作。
 
 参考兼容独立门PASS：仅并行platform/wiring新增身份来源和events入口，不替换本批台账/WorkloadSafety/native worker/controller接线，生产OFF保持；当前已提交HEAD的17参考字节与原实现审阅完全一致。依开发规则§3，完成自有精确lint（0）和后续装配比例类型核验；后者7项错误均为并行ProjectServiceActor未导出或其测试类型，原失败也保留。没有重复完整门禁、清掉外部WIP或用替代checkout验证。最终只提交自有源码/文档，并由该精确提交的六项hosted CI裁定；CI/本机部署未完成前不写成功。
+
+
+## 2026-10-01 实际开发工作卷准入的精确发布与部署
+
+- 精确源码：`b9508486d94fb3bbcaa460dc03dcc697d877b37d`，33条自有路径提交并推送；推前后main/origin均0/0、共享索引为空，未提交并行events/identity/gateway/platform/迁移/共享登记。独立最终实现与发布复核PASS，原绑定恢复和pinnedVolume owner反例失败历史保留。
+- [精确CI36790207172](https://github.com/wangbinquan/CrewStation/actions/runs/36790207172)终态success：static、unit、module、console、gate、e2e六项全部成功。原单次本机全量4659pass/143skip/18外部fail、aggregate=1仍保留；同次10个相关文件64pass/0fail/0skip，30源码指纹一致。提交前精确lint通过，后续7条外部类型错误未收编或篡改，不将本机全量改写成绿色。
+- 部署前逐个读取当前OCI实际源码：console/control-plane为333e631d、默认Runner为d3acac1f，均证实为本次源码祖先；升级保留另一会话已部署输出。完成时间`2026-09-30T23:33:28.986Z`（北京时间10-01 07:33:28.986）。八组件generation=observedGeneration且Ready=1：console 213、cs-api 207、cs-auth 105、cs-controller 172、cs-events 75、cs-session 124、mcp-capabilities 71、mcp-operations 71。storage-contract=1；原owner/Session数字表存在。
+- 迁移Job `rfc034-development-workload-admission-migrate-b9508486`，UID `02d761f6-6102-40aa-902c-1014584cfe19`，Complete，实际日志applied=0、roles.initialized=0。部署前私有数据库备份42873542字节、SHA256 `fa8dfd53ce7a956d9c2f69187a6dcd1df3c1dc45a036e201be4b2651e5a7122c`；不将备份或启动材料提交入库。
+- 实际镜像：console `90b63ef20114c9748b84a07eab168b776c1d1390c867b3082a2157497b1f2eb1`；control-plane `159a1469fedb96d92d22912833078a7c928f5fb1226733cfcdba9b6be07664fe`；默认Runner `e7b0153ee23280606b90f88f6cf198543f1fb8d467e13f904c089d0f2cdd6da4`。三镜像OCI revision及默认Runner内容源码均核对为完整b9508486提交，部署固定到摘要。
+- 公开只读验收`2026-09-30T23:34:31.149611+00:00`：console.cs.localhost/auth/login HTTP200、未登录根HTTP401，八组件与三个摘要全部对拍。没有身份切换、真实模型/开发验证资源创建或结束、旧会话/固定算力Runner重建。
+- 边界：实际ledger/native开发消费者注册、原Pod绑定与持久许可接续已部署；生产开发数字producer仍OFF。完整数字清理、全部物理入口、观测消费和项目/系统两级开发明细、真实身份/模型及AW联合验收继续，CS-R02和两RFC不关闭。下一批[数字清理实施细化](./development-cleanup.md#2026-10-01-实际数字清理候选的实施细化设计候选尚未实现)仅原bound出口设计PASS，不能当成源码实现或producer开启许可。
