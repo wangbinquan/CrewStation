@@ -2,6 +2,7 @@ import { useId, useLayoutEffect, useRef } from 'react';
 import type { FormEvent, KeyboardEvent, MouseEvent, ReactElement, ReactNode, RefObject, SyntheticEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { currentOpener, returnFocus } from '../../lib/focusReturn';
+import type { FocusTarget } from '../../lib/focusReturn';
 import { useT } from '../../lib/useT';
 import { Button, ButtonSizeContext } from '../Button';
 import { useDialogHost, useDialogsHidden } from './DialogHost';
@@ -68,7 +69,7 @@ export function Dialog(props: DialogProps): ReactElement | null {
 function DialogFrame({ title, children, footer, onClose, busy = false, size = 'medium', role = 'dialog', describedBy, onSubmit, initialFocus, returnFocusTo, open = true }: DialogProps): ReactElement {
   const t = useT(), titleId = useId(), host = useDialogHost();
   const dialog = useRef<HTMLDialogElement>(null), body = useRef<HTMLDivElement>(null);
-  const opener = useRef<HTMLElement | null | undefined>(undefined);
+  const opener = useRef<FocusTarget | null | undefined>(undefined);
   useLayoutEffect(() => {
     const node = dialog.current;
     if (!open) {

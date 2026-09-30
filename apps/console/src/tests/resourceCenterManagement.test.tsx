@@ -12,6 +12,30 @@ async function input(label: string, value: string) {
 }
 async function escape() { await act(async () => dialog().dispatchEvent(new Event('cancel', { cancelable: true }))); await page!.settle(); }
 
+test('已生效变更显示可读指标，并明确区分申请时配置和批准值', async () => {
+  const f = resourceCenterFixture('admin');
+  f.state.snapshot.requests = [{ ...f.request(), state: 'applied', approvedValues: { maxConcurrentTasks: 6 } }];
+  page = await renderApp(`/admin/projects/${centerProject}/resources?view=requests&request=${centerRequest}`);
+  const comparison = dialog().querySelector('table')!;
+  expect(comparison.textContent).toContain('执行并发上限');
+  expect(comparison.textContent).toContain('申请时配置值');
+  expect(comparison.textContent).not.toContain('maxConcurrentTasks');
+  expect([...comparison.querySelectorAll('tbody td')].map((cell) => cell.textContent)).toEqual(['执行并发上限', '8', '3', '6']);
+  expect(f.writes).toHaveLength(0);
+});
+
+test('审批后保留原申请配置，不把旧检查缓存当作当前生效值', async () => {
+  const f = resourceCenterFixture('admin'), initial = f.request();
+  f.state.current = 5; f.state.snapshot.requests = [{ ...initial, state: 'pending' }];
+  page = await renderApp(`/admin/projects/${centerProject}/resources?view=requests&request=${centerRequest}`);
+  expect(dialog().querySelector('table')!.textContent).toContain('当前配置值');
+  f.state.snapshot.requests = [{ ...initial, state: 'applied', approvedValues: { maxConcurrentTasks: 6 } }];
+  await page.reread();
+  expect(dialog().querySelector('table')!.textContent).toContain('申请时配置值');
+  expect([...dialog().querySelectorAll('tbody td')].map((cell) => cell.textContent)).toEqual(['执行并发上限', '8', '3', '6']);
+  expect(f.writes).toHaveLength(0);
+});
+
 test('管理员同页修改批准值，确认前没有写入；申请原值和版本分别保留', async () => {
   const f = resourceCenterFixture('admin'); f.state.snapshot.requests = [{ ...f.request(), state: 'pending', origin: 'owner-request' }];
   page = await renderApp(`/admin/projects/${centerProject}/resources?view=requests&request=${centerRequest}`);

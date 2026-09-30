@@ -21,7 +21,8 @@ export function ResourceRequestDialog({ projectId, initial, role, viewerId, arch
   const query = useApiQuery(['resource-request', projectId, initial.id], () => api.resourceCenter.request(projectId, initial.id), { staleTimeMs: 0, refetchIntervalMs: (data) => data && isInFlight(data.state) ? 5000 : undefined });
   const request = query.data ?? initial, editable = ['pending', 'needs-review'].includes(request.state), admin = role === 'admin', enabled = !!query.data && !query.error && !archived && (!conflict || rechecked);
   const inspection = useApiQuery(['request-inspect', projectId, initial.id], () => api.resourceCenter.inspect(projectId, initial.target), { enabled: admin && editable, staleTimeMs: 0 });
-  const fields = inspection.data?.view.fields ?? [], current = inspection.data?.view.current ?? request.baseValues;
+  const fields = inspection.data?.view.fields ?? [], current = editable ? inspection.data?.view.current ?? request.baseValues : request.baseValues;
+  const currentTitle = editable && inspection.data ? undefined : t('resourceCenter.baseConfig');
   const mutation = useApiMutation(async (input: NonNullable<typeof confirm>) => {
     if (input.operation === 'cancel') return api.resourceCenter.cancel(projectId, request.id, request.version);
     if (input.operation === 'retry') return api.resourceCenter.retry(projectId, request.id, request.version);
@@ -39,12 +40,12 @@ export function ResourceRequestDialog({ projectId, initial, role, viewerId, arch
     <QueryStatus isPending={query.isPending} error={query.error} />
     <div className={styles.inline}><Badge tone={isInFlight(request.state) ? 'warning' : request.state === 'applied' ? 'success' : 'neutral'}>{t(`resourceCenter.requestState.${request.state}`)}</Badge><code>{request.id}</code></div>
     <dl className={styles.facts}><dt>{t('resourceCenter.requester')}</dt><dd>{request.requesterName ?? request.requestedBy}</dd><dt>{t('resourceCenter.created')}</dt><dd>{new Date(request.createdAt).toLocaleString()}</dd><dt>{t('resourceCenter.reason')}</dt><dd>{request.reason}</dd><dt>{t('resourceCenter.origin')}</dt><dd>{t(`resourceCenter.origin.${request.origin}`)}</dd></dl>
-    <ValueComparison fields={fields} original={request.requestedValues} current={current} proposed={admin && editable ? draft.values : request.approvedValues ?? request.requestedValues} />
+    <ValueComparison fields={fields} original={request.requestedValues} current={current} currentTitle={currentTitle} proposed={admin && editable ? draft.values : request.approvedValues ?? request.requestedValues} />
     {admin && editable ? <><QueryStatus isPending={inspection.isPending} error={inspection.error} /><ResourceFields fields={fields} values={draft.values} onChange={(key, value) => onDraft({ ...draft, values: { ...draft.values, [key]: value } })} /><FormField label={t('resourceCenter.decisionReason')} hint={t('resourceCenter.overrideHint')}><textarea rows={3} maxLength={2000} value={draft.reason} onChange={(event) => onDraft({ ...draft, reason: event.target.value })} /></FormField><ul className={styles.impact}>{inspection.data?.view.impact.map((v) => <li key={v}>{v}</li>)}</ul></> : null}
     {request.decidedBy ? <dl className={styles.facts}><dt>{t('resourceCenter.decider')}</dt><dd>{request.deciderName ?? request.decidedBy}</dd><dt>{t('resourceCenter.decisionReason')}</dt><dd>{request.decisionReason}</dd></dl> : null}
     {request.effect ? <p className={styles.muted}>{request.effect}</p> : null}{request.failure ? <p role="alert" className={styles.warning}>{request.failure}</p> : null}{error ? <p role="alert">{error}</p> : null}
     {conflict ? <FormField label={t('resourceCenter.conflictReview')} hint={t('resourceCenter.conflictHint')}><input type="checkbox" checked={rechecked} onChange={(event) => setRechecked(event.target.checked)} /></FormField> : null}
   </Dialog>{confirm ? <ConfirmationDialog title={t(`resourceCenter.${confirm.operation === 'cancel' ? 'withdraw' : confirm.operation}`)} question={t('resourceCenter.confirmChange', { name: request.targetName })} hint={t('resourceCenter.syncHint')} size="large" busy={mutation.isPending} confirmLabel={t('resourceCenter.submit')} onConfirm={() => { void submit(); }} onCancel={() => setConfirm(undefined)} confirmDisabled={!enabled} danger={confirm.operation === 'reject'}>
-    <ValueComparison fields={fields} original={request.requestedValues} current={current} proposed={confirm.values ?? request.requestedValues} />{error ? <p role="alert">{error}</p> : null}
+    <ValueComparison fields={fields} original={request.requestedValues} current={current} currentTitle={currentTitle} proposed={confirm.values ?? request.requestedValues} />{error ? <p role="alert">{error}</p> : null}
   </ConfirmationDialog> : null}</>;
 }

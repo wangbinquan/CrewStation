@@ -2,6 +2,8 @@ import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
 import { act, useState } from 'react';
 import { FULL_METRICS } from '../shared/ui/topology/topologyLayout';
+import { Dialog } from '../shared/ui/dialog/Dialog';
+import { TopologyDiagram } from '../shared/ui/topology/TopologyDiagram';
 import { TopologyList } from '../shared/ui/topology/TopologyList';
 import { TopologyWorkspace } from '../shared/ui/topology/TopologyWorkspace';
 import { renderElement } from './renderElement';
@@ -18,6 +20,24 @@ function Harness({ laneGap }: { laneGap?: number }) {
   return <><TopologyWorkspace topology={layoutFixture} label="夹具形态图" selectedId={selected} onSelect={setSelected} metrics={laneGap ? { ...FULL_METRICS, laneGap } : undefined}
     detail={selected ? <aside aria-label="详情">{selected}</aside> : undefined} /><output aria-label="选中">{selected ?? ''}</output></>;
 }
+
+function DiagramDialogHarness() {
+  const [selected, setSelected] = useState<string>();
+  return <><TopologyDiagram topology={layoutFixture} label="资源图" selectedId={selected} onSelect={setSelected} />
+    {selected ? <Dialog title={selected} onClose={() => setSelected(undefined)}>资源详情</Dialog> : null}</>;
+}
+
+test('shared dialog restores an SVG topology trigger after keyboard selection and Escape', async () => {
+  rendered = await renderElement(<DiagramDialogHarness />, {});
+  const trigger = nodeEl('cli');
+  await act(async () => { trigger.focus(); trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); });
+  await rendered.settle();
+  expect(document.querySelectorAll('dialog[open]')).toHaveLength(1);
+  await act(async () => { document.querySelector('dialog')!.dispatchEvent(new Event('cancel', { cancelable: true })); });
+  await rendered.settle();
+  expect(document.querySelectorAll('dialog[open]')).toHaveLength(0);
+  expect(document.activeElement === trigger).toBe(true);
+});
 
 test('nodes render as focusable buttons; click and Enter select; selection dims non-neighbours and Esc clears it', async () => {
   rendered = await renderElement(<Harness />, {});
@@ -52,18 +72,22 @@ test('filters dim without removing, the attention chip counts abnormal nodes, an
   expect(rendered.text()).not.toContain('快照完整');
 });
 
-test('node details open in a shared dialog and keep the graph scroll and filters intact', async () => {
+test('node details open in a shared dialog and return focus to the SVG trigger while keeping graph context', async () => {
   rendered = await renderElement(<Harness />, {});
   const stage = document.querySelector('svg[role="group"]')!.parentElement!;
   stage.scrollTop = 300;
   await rendered.click('开发会话');
-  await act(async () => { nodeEl('cli').dispatchEvent(new MouseEvent('click', { bubbles: true })); }); await rendered.settle();
+  const trigger = nodeEl('cli');
+  await act(async () => { trigger.focus(); });
+  expect(document.activeElement === trigger).toBe(true);
+  await act(async () => { trigger.dispatchEvent(new MouseEvent('click', { bubbles: true })); }); await rendered.settle();
   expect(document.querySelectorAll('dialog[open]')).toHaveLength(1);
   expect(document.querySelector('dialog [aria-label="详情"]')?.textContent).toBe('cli');
   expect(document.querySelectorAll('.workspace > .detail')).toHaveLength(0);
   await act(async () => { document.querySelector('dialog')!.dispatchEvent(new Event('cancel', { cancelable: true })); }); await rendered.settle();
   expect(document.querySelectorAll('dialog[open]')).toHaveLength(0);
   expect(stage.scrollTop).toBe(300); expect(dimmed('route')).toBe(true);
+  expect(document.activeElement === trigger).toBe(true);
 });
 
 test('a partial snapshot still gets a warning line naming the failed sources', async () => {
