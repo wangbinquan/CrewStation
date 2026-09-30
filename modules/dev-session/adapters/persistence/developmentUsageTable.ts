@@ -12,5 +12,7 @@ export const developmentAgentUsage = devSessionSchema.table('development_agent_u
   binding: jsonDocument('binding').$type<DevelopmentUsageRegistration>(),
   unsupported: boolean('unsupported').notNull().default(false),
   capabilityPodUid: text('capability_pod_uid'),
+  /** Durable fair recovery bookkeeping, not part of the original owner payload. */
+  endingCheckedAt: text('ending_checked_at'),
   closeReason: text('close_reason').$type<DevelopmentUsageDrainReason>(),
 }, (t) => [index('development_agent_usage_cohort').on(t.projectId, t.acceptedAt, t.executionTaskId)]);

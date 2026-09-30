@@ -20,6 +20,8 @@ export const agentStarts = devSessionSchema.table('agent_starts', {
   execution: jsonDocument('execution').$type<AgentStart['execution']>().notNull(),
   executionTaskId: text('execution_task_id').notNull(),
   state: text('state').notNull(),
+  /** Owner-private sticky logical ending; omitted from all public AgentStart values. */
+  logicalEnding: boolean('logical_ending').notNull().default(false),
   failure: text('failure'),
   cancelled: boolean('cancelled').notNull().default(false),
   cursor: integer('cursor').notNull().default(0),

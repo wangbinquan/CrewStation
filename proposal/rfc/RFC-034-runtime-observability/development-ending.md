@@ -1,6 +1,6 @@
 # RFC-034 持久结束作业限定实施设计
 
-状态：限定设计 v2 独立功能门 PASS，未实现；承接原键派发设计 v2 和已通过限定功能门的 participant。此批先落地 owner 的持久结束状态与恢复入口，生产仍 OFF。原选择/人民币受理/数字副本/私有消费已经具备部分底座，完整项目与系统事实、删除许可和生产接线仍未完成。
+状态：限定设计 v2/v3 独立功能门 PASS，第一批内部候选在制；承接原键派发设计 v2 和已通过限定功能门的 participant。此批先落地 owner 的持久结束状态与恢复入口，生产仍 OFF。原选择/人民币受理/数字副本/私有消费已经具备部分底座，完整项目与系统事实、删除许可和生产接线仍未完成。
 
 ## 已核实的断点与范围
 
@@ -54,3 +54,49 @@ v1独立只读设计门FAIL一项P2：bind已提交但Session登记失败，owne
 ## 限定设计 v2 回执
 
 v2独立只读设计门PASS，冻结SHA-256为7433f4ea360a80d063a3563035a1b324a48caad5bf4cb42455a999577457fdd9，首尾一致。原登记恢复P2关闭；目标行原子标志可阻止迟到整行写回且不反向取owner锁，没有新增功能阻断。复核未写文件或运行测试。此为设计PASS，持久作业、Session按执行查询/恢复、状态原子保护、停止/排空、删除许可与production wiring仍须逐批实现和验证；生产OFF，CS-R02/两RFC不关闭。
+
+
+## 本批实施拆分与恢复约束
+
+第一批实现持久作业、目标行保护和可单步调用的内部恢复 participant，不接 production lifecycle/定时器，不提供删除许可。字段 actualEndedAt 固定未知 null；当前 Runner/Session receipt 没有实际事件时刻，不从 AgentStart.endedAt 或 worker 时钟补造。已存在 AgentStart.endedAt 保留旧兼容显示，不能充当新执行事实。
+
+结束作业以原 owner 为 FK，首次 reason/observedAt 稳定，逻辑 result 与停止请求独立；保存原键核验后的 StopReceipt.prevented/finished 证据和 Session closure，分别形成 awaiting-stop、awaiting-closure、evidence-complete。evidence-complete 仍只是收集到两类证据，task-runtime/resources/项目删除未消费完整守卫前不返回清理许可。unbound 作业允许封闭准入但永远等待，独立 Session 按执行查验及从未发送证明另批实现；forced-release/environment-lost 也不由本批凭字符串创建永久 loss。
+
+每个作业有递增 fence、租约截止时刻、version 和 lastAttemptAt；有界查询最多32个，按最近尝试最久者与执行ID公平取候选。事务内只依 owner→AgentStart→ending 顺序取锁，重核完整原绑定；claim 用同一顺序且核当前租约，提交证据核 fence/version/租约未过期。过期工作者只能等待，不能覆盖新证据。外部停止命令原键幂等，租约超时不制造永久丢失。
+
+漏掉 ordinary terminal 的恢复不依赖 finalized：owner 新增私有 ending_checked_at，按 coalesce(checkedAt,acceptedAt)/executionId 取绑定且没有结束作业的原记录，FOR UPDATE OF owner SKIP LOCKED，最多32行。先持久推进 checkedAt 再在事务外查 Session；暂时失败或进程崩溃在后续公平轮转中重试，同批不会因低ID运行中任务永远挡住后面的 finished。该标志不进入旧 owner/public JSON。独立恢复登记、finished 匹配后才 requestEnding；不读取当前档位/价格/秘密。
+
+普通 AgentStart.update 的全行 UPDATE 在目标行以私有 logicalEnding=false 为原子条件；如果未更新，则只在 logicalEnding=true 的同一目标行推进 max(cursor) 和非空诊断。并发结束持有行锁时，PostgreSQL 条件重新检查阻止旧快照覆盖；普通更新不读取或反向获取 owner。ending 写入逻辑标志/state 与 owner.closeReason 和作业保持同一事务；原 identity/profile/请求和既有 finalized 保留，后续实际清理需独立许可路径推进。
+
+单步 ending participant 先 claim，取完整原 binding 幂等 register 并严格核 registration/receipt；即使 owner 已关闭，也先恢复 Session 登记，然后原 admission stop 和 requestDrain。已有 Session drainReason 始终复用；stopping/unknown/普通 finished/网络错误不当物理停止证明，Session 的闭合水位独立校验。所有 Session/Runner I/O 都在本模块事务外。状态重放、请求取消但实际完成、M8/N10 尚未闭合、丢登记＋关闭＋重启、并发迟到全行更新、租约过期/抢占、32条公平补队列、旧迁移升级各自有真实 PG 或纯状态反例。
+
+完整删除守卫、原 UID 丢失/force 的实际证明、unbound 独立 Session 查询、真实实际终态时刻、生产接线和两级事实/UI继续留待后续；不因本批内部队列或证据完整状态关闭 CS-R02。
+
+
+## 持久结束第一批候选检查点（2026-09-30）
+
+本批17自有源码/测试/迁移路径完成内部候选：dev-session私表原执行唯一作业、首次reason/observedAt、逻辑结果与未知actualEndedAt、原目标行私有不可回退保护、有界公平owner补漏和job租约/fence/version、关闭后的Session登记恢复与原admission停止/排空participant。没有生产定时器/lifecycle装配，也没有删除许可；evidence-complete仅内部证据状态。原价格/nonce/固定算力不重新获取，旧AgentStart/ownerJSON没有新字段。forced-release/environment-lost请求没有本批证明而拒绝；unbound只能封闭准入并等待。实际时间合同仍未提供，0014保留actualEndedAt=NULL。
+
+真实隔离PG先确认旧全行更新可把ended写回pending：1pass/1fail；目标行logicalEnding条件修复后2pass/0fail。第一批其他回归11pass/7fail：Drizzle的FOR UPDATE OF带schema限定名被PG拒绝，以及严格回执夹具误含runtimeTaskId；改为唯一外层owner关系的FOR UPDATE SKIP LOCKED，显式原回执字段。次轮17pass/1fail是旧未选择夹具仍尝试bind，修正为旧选择无数字绑定；另修测试数组类型，未调整行为断言。首次失败记录保留。
+
+修正候选最终47pass/0fail/0skip、327断言、7文件，包括纯状态/原登记反例、真实owner/jobPG并发、0014旧库实际升级、32条公平轮转、原键派发/冻结人民币原价既有回归。精确16个TS文件eslint和后端typecheck通过；相关lcov中ending应用/领域/持久request/store/transaction可执行行全部被覆盖，这仅为本地候选证据。结构检查当前只报外部packages/persistence的connection↔transactionContext文件环，本批没有结构违规；不改其并行内容，单次稳定候选完整门禁和clean exact-SHA CI另记。
+
+当前限定实现独立功能复核待回执。所有Session/Runner入口在本批回归仍是传输替身，实际数据库仅验证本模块owner/job；不写作真实模型、完整Session排空或实际Pod删除验收。unbound独立Session按执行查验、force/实际UID丢失、全部删除旁路、task-runtime/resources及RFC037项目删除消费、真实终态时间、生产源与两级事实/UI继续；生产OFF、sourceScope=business-tasks、CS-R02/两个RFC保持In Progress。
+
+迁移0014追加到共享锁时保留所有并行引用，仍未提交整份锁或推送main。已本地精确提交的消费者965b45e8和原键派发646da1e9继续保留；最新锁引用和其他会话的发布状态必须在短时Git临界区再次核对，不能扫入其未提交源码或从锁剥离条目。
+
+
+## ending 限定实现 v1 失败与 v2 回执
+
+v1独立18前身17路径功能门FAIL一项P2：I/O后虽读过时钟，但commit/retry/claim在数据库取锁前固定时间，等待owner行锁期间跨越30秒截止仍可能接受过期操作。新真实PG行锁反例0pass/3fail准确复现；v2给store注入Clock，在owner→AgentStart→job全部行锁取得后再读当前时钟，evidence.observedAt只保留来源观察含义。修复后3pass/0fail；并未用超时重试或增加租约时长绕过。首次FAIL与红回归保留。
+
+最终18路径v2限定独立静态功能门PASS，首尾指纹一致，自有0014与共享锁SHA-256一致；未发现新限定功能阻断。实际最终相关50pass/0fail/0skip、335断言、8文件，精确17TS lint通过。首次后端typecheck通过；最终全仓typecheck现在被并行packages/persistence/transactionContext.test.ts的4项缺失导出/隐式类型错误阻断，没有本批自有路径报错，不能把最终类型检查写成全绿。上段结构文件环属于当时并行检查点，单次稳定候选完整check以其实际结果另记。
+
+该PASS只覆盖内部作业、原目标行状态保护和可单步接续的participant；实际Session/Runner仍是传输替身，未生产装配、运行模型或回收Pod。evidence-complete没有清理许可；全部删除守卫、unbound独立登记查询、实际UID丢失/force证明、实际终态时间、生产来源和两级事实/UI继续。生产OFF、sourceScope=business-tasks、完整RFC不关闭。
+
+
+## ending 稳定候选单次完整门禁回执
+
+21路径（18源码/测试/迁移＋3自有RFC文档）冻结后仅跑一次完整bun run check，候选首尾全部未变。该命令在arch阶段退出1：外部packages/persistence的connection↔transactionContext文件环，以及并行resources/0007_project_admission_lock_holder新迁移未入锁；没有进入全仓lint、类型或测试。不能把此前定向50pass/0fail或首轮类型通过写成本次完整门禁全绿，也不因其后续改动重复完整检查。精确17TS lint、50项定向回归和限定实现v2 PASS保持；最终类型四项外部错误仍以记录为准。clean提交树exact-SHA CI须待共享迁移及对应依赖齐備后再验证。
+
+下一步只精确本地提交自有21路径，整个共享锁和外部在制源码留工作树。不得提前push缺失依赖的累计main，不将本地提交写成远端或部署完成。生产OFF、evidence-complete无清理许可，完整开发删除守卫和两级事实/UI继续。

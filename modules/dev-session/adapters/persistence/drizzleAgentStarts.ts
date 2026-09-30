@@ -31,7 +31,13 @@ export function drizzleAgentStarts(db: Database): AgentStartRepository {
     findByExecution: async (id) => { const row = (await db.select().from(table).where(eq(table.executionTaskId, id)))[0]; return row ? toStart(row) : undefined; },
     listByTask: async (taskId) => (await db.select().from(table).where(eq(table.taskId, taskId)).orderBy(asc(table.createdAt))).map(toStart),
     listUnfinalized: async (after, limit) => (await db.select().from(table).where(and(eq(table.finalized, false), after ? gt(table.agentId, after) : undefined)).orderBy(asc(table.agentId)).limit(limit)).map(toStart),
-    update: async (start) => { await db.update(table).set(toRow(start)).where(eq(table.agentId, start.agentId)); },
+    update: async (start) => {
+      // PostgreSQL rechecks the target predicate after an ending transaction releases this row.
+      const changed = await db.update(table).set(toRow(start)).where(and(eq(table.agentId, start.agentId), eq(table.logicalEnding, false))).returning({ id: table.agentId });
+      if (changed.length) return;
+      await db.update(table).set({ cursor: sql`greatest(${table.cursor}, ${start.cursor})`, failure: sql`coalesce(${start.failure ?? null}, ${table.failure})` })
+        .where(and(eq(table.agentId, start.agentId), eq(table.logicalEnding, true)));
+    },
     withLock: (agentId, operation) => db.transaction(async (tx) => { await tx.execute(sql`select pg_advisory_xact_lock(hashtext('dev_session.agent_start'), hashtext(${agentId}))`); await operation(); }),
   };
 }
