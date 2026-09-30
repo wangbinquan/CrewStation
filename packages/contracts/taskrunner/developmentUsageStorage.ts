@@ -40,6 +40,15 @@ export const StoredDevelopmentUsageSchema = z.strictObject({
     if (value.complete ? closure.reason !== null : (!value.loss && (!receipt?.interruption || value.persistedThrough < receipt.lastSequence)) || (closure.reason !== value.loss?.reason && closure.reason !== receipt?.interruption)) invalid('中断排空需要原来源不可取回或可读末尾已复制的证明');
   }
 });
+/** Independent actual-execution lookup; absence is not a usage/stop/cleanup proof. */
+export const DevelopmentUsageLookupSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ version: z.literal(1), runtimeTaskId: TaskIdSchema, kind: z.literal('absent') }),
+  z.strictObject({ version: z.literal(1), runtimeTaskId: TaskIdSchema, kind: z.literal('registered'), stored: StoredDevelopmentUsageSchema }),
+]).superRefine((value, ctx) => {
+  if (value.kind === 'registered' && value.stored.registration.runtimeTaskId !== value.runtimeTaskId)
+    ctx.addIssue({ code: 'custom', message: '登记查询必须属于同一实际执行环境' });
+});
+export type DevelopmentUsageLookup = z.infer<typeof DevelopmentUsageLookupSchema>;
 export type DevelopmentUsageRegistration = z.infer<typeof DevelopmentUsageRegistrationSchema>;
 export type DevelopmentUsageDrainReason = z.infer<typeof DevelopmentUsageDrainReasonSchema>;
 export type DevelopmentUsageLoss = z.infer<typeof DevelopmentUsageLossSchema>;

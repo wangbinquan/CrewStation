@@ -9,7 +9,7 @@ function developmentRegistration(): DevelopmentUsageRegistration {
 }
 
 const unexpected = async (): Promise<never> => { throw new Error('unexpected'); };
-const storeWith = (pending: DevelopmentUsageStore['pending']): DevelopmentUsageStore => ({ register: unexpected, get: unexpected, ingest: unexpected, acknowledgeRunner: unexpected, requestDrain: unexpected, unavailable: unexpected, pending });
+const storeWith = (pending: DevelopmentUsageStore['pending']): DevelopmentUsageStore => ({ lookup: unexpected, register: unexpected, get: unexpected, ingest: unexpected, acknowledgeRunner: unexpected, requestDrain: unexpected, unavailable: unexpected, pending });
 
 test('development worker does not overlap and stop waits for its active PG copy', async () => {
   let release!: () => void, reads = 0; const blocked = new Promise<void>((done) => { release = done; });

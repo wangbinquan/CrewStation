@@ -82,6 +82,7 @@ export function createSessionModule(deps: SessionModuleDeps): SessionModule {
   const { upgradeWebSocket, websocket } = createBunWebSocket<ServerWebSocket>();
   const api: SessionModuleApi = {
     name: 'session',
+    lookupDevelopmentUsage: useCaseDeps.developmentUsage!.lookup,
     registerDevelopmentUsage: useCaseDeps.developmentUsage!.register, getDevelopmentUsage: useCaseDeps.developmentUsage!.get,
     requestDevelopmentUsageDrain: useCaseDeps.developmentUsage!.requestDrain, markDevelopmentUsageUnavailable: useCaseDeps.developmentUsage!.unavailable,
     nextDevelopmentUsageSource: developmentSources.next, readDevelopmentUsageMeasurement: developmentSources.measurement, acknowledgeDevelopmentUsageSource: developmentSources.acknowledge,

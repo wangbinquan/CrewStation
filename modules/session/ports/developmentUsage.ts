@@ -1,6 +1,7 @@
-import type { DevelopmentUsageDrainReason, DevelopmentUsageKey, DevelopmentUsageLoss, DevelopmentUsagePage, DevelopmentUsageReceipt, DevelopmentUsageRegistration, RunnerUsageMeasurement, StoredDevelopmentUsage, TaskId } from '@crewstation/contracts';
+import type { DevelopmentUsageDrainReason, DevelopmentUsageLookup, DevelopmentUsageKey, DevelopmentUsageLoss, DevelopmentUsagePage, DevelopmentUsageReceipt, DevelopmentUsageRegistration, RunnerUsageMeasurement, StoredDevelopmentUsage, TaskId } from '@crewstation/contracts';
 
 export interface DevelopmentUsageStore {
+  lookup(taskId: TaskId): Promise<DevelopmentUsageLookup>;
   register(registration: DevelopmentUsageRegistration): Promise<StoredDevelopmentUsage>;
   get(taskId: TaskId, key: DevelopmentUsageKey): Promise<StoredDevelopmentUsage | undefined>;
   ingest(taskId: TaskId, receipt: DevelopmentUsageReceipt, page?: DevelopmentUsagePage): Promise<StoredDevelopmentUsage>;

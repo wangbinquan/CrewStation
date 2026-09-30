@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, lt, or, sql } from 'drizzle-orm';
-import { DevelopmentUsageDrainReasonSchema, DevelopmentUsageKeySchema, DevelopmentUsageLossSchema, DevelopmentUsagePageSchema, DevelopmentUsageReceiptSchema, DevelopmentUsageRegistrationSchema } from '@crewstation/contracts';
+import { DevelopmentUsageLookupSchema, TaskIdSchema, DevelopmentUsageDrainReasonSchema, DevelopmentUsageKeySchema, DevelopmentUsageLossSchema, DevelopmentUsagePageSchema, DevelopmentUsageReceiptSchema, DevelopmentUsageRegistrationSchema } from '@crewstation/contracts';
 import type { DevelopmentUsagePage, TaskId } from '@crewstation/contracts';
 import { conflict, jsonHash, validation } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
@@ -9,6 +9,13 @@ import { developmentUsageEvents as events, developmentUsageStreams as streams } 
 
 export function drizzleDevelopmentUsageStore(db: Database): DevelopmentUsageStore {
   return {
+    lookup: async (rawTaskId) => {
+      const taskId = TaskIdSchema.parse(rawTaskId);
+      const [row] = await db.select().from(streams).where(eq(streams.taskId, taskId));
+      // Only an actual successful SQL query with no row can produce explicit absence.
+      return DevelopmentUsageLookupSchema.parse(row ? { version: 1, runtimeTaskId: taskId, kind: 'registered', stored: snapshot(row) }
+        : { version: 1, runtimeTaskId: taskId, kind: 'absent' });
+    },
     register: (raw) => db.transaction(async (tx) => {
       const registration = DevelopmentUsageRegistrationSchema.parse(raw);
       await tx.insert(streams).values({ taskId: registration.runtimeTaskId, registration }).onConflictDoNothing();
