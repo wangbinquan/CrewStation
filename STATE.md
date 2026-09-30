@@ -4,7 +4,7 @@
 
 ## 2026-09-30 RFC-037 项目创建弹窗与彻底删除（实施中）
 
-作者已批准完整 RFC 实施、提交上库、本机部署和自主验证。[创建／底座批](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/creation-deployment.md)已精确发布 `cc56ee8818bdb87d76932a5fe3affd947d7e39ef`，CI 36735324944 六项终态 success，本机真实平台库先备份再迁移、八组件 Ready=1，原业务 Pod／卷／Namespace UID 保持。共享 FormDialog 的实际域名／模板说明、旧书签、草稿、筛选与焦点通过部署后浏览器验证，1280／390／320px 均无横向溢出。专用验收项目 `01a0f30b-c652-7000-8d6f-553e3b5f6135` 已实际开通且首个待验证版本可访问，尚未删除。稳定本地完整门禁 4561 pass／143 skip／0 fail，189 路径指纹一致；早期失败和修复过程保留在 plan。后续 API 目录清理候选在制；其余物理 owner／消费者数字排空、正式 22 owner 组合和删除 UI 仍缺，产品永久删除保持关闭，目标继续。保留 RFC-036／034 完整并行内容。
+作者已批准完整 RFC 实施、提交上库、本机部署和自主验证。[创建／底座批](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/creation-deployment.md)已精确发布 `cc56ee8818bdb87d76932a5fe3affd947d7e39ef`，CI 36735324944 六项终态 success，本机真实平台库先备份再迁移、八组件 Ready=1，原业务 Pod／卷／Namespace UID 保持。共享 FormDialog 的实际域名／模板说明、旧书签、草稿、筛选与焦点通过部署后浏览器验证，1280／390／320px 均无横向溢出。专用验收项目 `01a0f30b-c652-7000-8d6f-553e3b5f6135` 已实际开通且首个待验证版本可访问，尚未删除；创建验收文档 `020dc2f8` 的六项 CI 也通过。下一批 API 目录／资源申请完整内容清理、持久在途工作、真实断线修正及[封闭期间重新确认](proposal/rfc/RFC-037-project-creation-and-deletion/reconfirmation.md)已实现，稳定完整门禁 4612 pass／143 skip／0 fail、30036 断言，69 路径指纹一致；精确发布与 CI 接续。早期失败与修复仍保留在 plan。其余物理 owner／消费者数字排空、正式 22 owner 组合和删除 UI 仍缺，产品永久删除保持关闭，目标继续。保留 RFC-036／034 完整并行内容。
 
 ## 2026-09-30 平台管理导航：项目与能力供给前移
 

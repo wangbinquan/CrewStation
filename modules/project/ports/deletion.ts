@@ -9,6 +9,7 @@ export interface ProjectDeletions {
   getOperation(id: string, lock?: boolean): Promise<DeletionOperationRecord | undefined>;
   findOperation(projectId: ProjectId): Promise<DeletionOperationRecord | undefined>;
   findRequest(requestKey: string): Promise<DeletionOperationRecord | undefined>;
+  lockRequest(requestKey: string): Promise<void>;
   insertOperation(operation: DeletionOperationRecord): Promise<void>;
   saveOperation(operation: DeletionOperationRecord): Promise<void>;
   markDeleting(id: ProjectId, at: Date): Promise<void>;

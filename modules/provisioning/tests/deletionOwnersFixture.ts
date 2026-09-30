@@ -12,7 +12,8 @@ export function statefulDeletionOwners(project: ProjectDeletionApi) {
   const inspect = (participant: ProjectDeletionParticipant, id: ProjectId): ProjectDeletionInventory => {
     if (unavailable.has(participant)) throw new Error('source unavailable');
     const object = objects.get(key(participant, id));
-    const resources = object ? [{ kind: 'test-owned-object', id: key(participant, id), identity: object.uid, count: 1 }] : [];
+    const resources = object ? [{ kind: 'test-owned-object', id: key(participant, id), identity: object.uid, count: 1,
+      scope: participant === 'api-catalog' ? 'metadata' as const : 'physical' as const, ...(participant === 'api-catalog' ? {} : { sourceIdentity: object.uid }) }] : [];
     return { participant, revision: jsonHash(resources), complete: true, resources, references: [], blockers: [] };
   };
   const run = async (participant: ProjectDeletionParticipant, context: ProjectDeletionContext): Promise<ProjectDeletionStepResult> => {

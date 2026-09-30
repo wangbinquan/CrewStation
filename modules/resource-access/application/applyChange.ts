@@ -6,8 +6,13 @@ import { activeProject, adapterOf, requireAdmin, requestable, validateValues } f
 
 /** Queue lease + version CAS fence each persisted transition. A receipt resumes observation without writing again. */
 export async function applyResourceChange(deps: ResourceAccessDeps, id: string, heartbeat: () => Promise<boolean>): Promise<boolean> {
-  let change = await deps.repository.get(id);
+  const change = await deps.repository.get(id);
   if (!change || !['approved', 'applying'].includes(change.state)) return true;
+  return deps.repository.withAdmission(change.projectId, () => applyAcceptedChange(deps, change, heartbeat), id);
+}
+
+async function applyAcceptedChange(deps: ResourceAccessDeps, change: ResourceChange, heartbeat: () => Promise<boolean>): Promise<boolean> {
+  const id = change.id;
   const adapter = adapterOf(deps, change.target);
   const save = async (patch: Partial<ResourceChange>) => {
     if (!await heartbeat()) throw precondition('申请应用租约已转移');

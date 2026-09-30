@@ -14,7 +14,7 @@ async function inspect(db: Executor, id: ProjectId): Promise<ProjectDeletionInve
     md5(coalesce(string_agg(md5(content::text), ',' ORDER BY md5(content::text)), '')) AS fingerprint FROM identity.identity_forwarding content WHERE project_id = ${id}`);
   const count = Number(rows[0]?.count), fingerprint = rows[0]?.fingerprint;
   if (!Number.isSafeInteger(count) || count < 0 || !fingerprint) throw precondition('项目身份转发盘点不完整');
-  const resources = [{ kind: 'identity-forwarding', id, identity: jsonHash({ count, fingerprint }), count }];
+  const resources = [{ kind: 'identity-forwarding', id, identity: jsonHash({ count, fingerprint }), count, scope: 'metadata' as const }];
   return { participant: 'identity', revision: jsonHash(resources), complete: true, resources, references: [], blockers: [] };
 }
 async function lock(db: Executor, context: ProjectDeletionContext) {
@@ -43,7 +43,7 @@ export function identityDeletionRepository(db: Database, assertGrant: (context: 
   return { inspect: (id) => inspect(db, id), assertSealed: (context) => sealedWork(context), purge: (context) => sealedWork(context, true),
     seal: (context) => db.transaction(async (tx) => {
       const row = await lock(tx, context); await assertGrant(context); const current = await inspect(tx, context.target.id);
-      if (row.operation_id && row.confirmed_revision !== context.confirmed.revision) throw precondition('身份确认摘要不能被替换');
+      if (row.operation_id && row.confirmed_revision !== context.confirmed.revision && row.generation >= context.generation) throw precondition('身份确认摘要不能被替换');
       await tx.execute(sql`UPDATE identity.deletion_fences SET project_slug = ${context.target.slug}, operation_id = ${context.operationId}, generation = ${context.generation}, confirmed_revision = ${context.confirmed.revision} WHERE project_id = ${context.target.id}`);
       return current.revision === context.confirmed.revision;
     }),

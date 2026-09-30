@@ -7,7 +7,7 @@ import type { ApiCatalogUseCaseDeps } from './dependencies';
 import { requestToDto } from './toDto';
 
 /** 管理员审批与撤销：授权变化在同一事务内发布 api-catalog.grant-changed，gateway 据此重新生成放行表。 */
-export function grantUseCases({ uow, clock, projects }: ApiCatalogUseCaseDeps) {
+export function grantUseCases({ uow, clock, projects, services }: ApiCatalogUseCaseDeps) {
   return {
     decideRequest: async (actor: Actor, requestId: string, input: DecideApiRequest): Promise<ApiRequestDto> => {
       if (!await projects.isAdmin(actor.userId)) throw forbidden('只有管理员可以审批 API 申请');
@@ -19,6 +19,7 @@ export function grantUseCases({ uow, clock, projects }: ApiCatalogUseCaseDeps) {
       return uow.run(async (scope) => {
         const initial = await scope.requests.getById(requestId);
         if (!initial) throw notFound('申请', requestId);
+        await scope.allocations.bindService(initial.serviceId, initial.projectId);
         await scope.allocations.lock(initial.serviceId);
         const request = await scope.requests.getById(requestId);
         if (!request) throw notFound('申请', requestId);
@@ -33,8 +34,10 @@ export function grantUseCases({ uow, clock, projects }: ApiCatalogUseCaseDeps) {
     },
     revokeGrant: async (actor: Actor, serviceId: ServiceId, operationId: string): Promise<void> => {
       if (!await projects.isAdmin(actor.userId)) throw forbidden('只有管理员可以撤销授权');
+      const service = await services.resolveService(serviceId); if (!service) throw notFound('服务', serviceId);
       const now = clock.now();
       await uow.run(async (scope) => {
+        await scope.allocations.bindService(serviceId, service.projectId);
         await scope.allocations.lock(serviceId);
         const existing = await scope.grants.get(serviceId, operationId);
         if (!existing || existing.state !== 'granted') throw notFound('授权', operationId);

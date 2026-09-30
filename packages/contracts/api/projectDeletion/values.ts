@@ -25,6 +25,10 @@ export const ProjectDeletionResourceSchema = z.object({
   kind: z.string().min(1).max(100), id: z.string().min(1).max(512),
   /** UID、OID、remoteProjectId、placementRevision 等来源身份；禁止携带配置或凭据原文。 */
   identity: z.string().min(1).max(1024), count: z.number().int().nonnegative().default(1),
+  /** 未分类的旧材料按物理身份保护；只有 owner 明确的内容摘要允许重新确认。 */
+  scope: z.enum(['metadata', 'physical']).optional(),
+  /** 稳定 UID/OID/远端来源身份与当前内容修订分开；缺失时保守地沿用完整 identity。 */
+  sourceIdentity: z.string().min(1).max(1024).optional(),
 }).strict();
 export const ProjectDeletionBlockerSchema = z.object({
   participant: ProjectDeletionParticipantSchema, code: z.string().min(1).max(100), message: z.string().min(1).max(1000), resourceId: z.string().max(512).optional(),

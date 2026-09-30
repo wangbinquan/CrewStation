@@ -23,7 +23,7 @@ export function resourceDeletionRepository(db: Database, assertGrant: (context: 
       await tx.execute(sql`INSERT INTO resources.deletion_fences(project_id) VALUES (${context.target.id}) ON CONFLICT DO NOTHING`);
       const previous = await tx.execute<{ operation_id: string | null; generation: number; confirmed_revision: string | null }>(sql`SELECT operation_id,generation,confirmed_revision FROM resources.deletion_fences WHERE project_id = ${context.target.id} FOR UPDATE`);
       const row = previous[0]!;
-      if (row.operation_id && (row.operation_id !== context.operationId || row.generation > context.generation || row.confirmed_revision && row.confirmed_revision !== context.confirmed.revision)) throw precondition('资源清理确认材料不能替换');
+      if (row.operation_id && (row.operation_id !== context.operationId || row.generation > context.generation || row.confirmed_revision && row.confirmed_revision !== context.confirmed.revision && row.generation >= context.generation)) throw precondition('资源清理确认材料不能替换');
       const report = await inspectLedgerDeletion(tx, context.target.id, context.target.namespace);
       await rememberIdentities(tx, context.target.id, context.target.namespace);
       await tx.execute(sql`UPDATE resources.deletion_fences SET operation_id = ${context.operationId},generation = ${context.generation},confirmed_revision = ${context.confirmed.revision} WHERE project_id = ${context.target.id}`);

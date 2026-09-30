@@ -1,5 +1,5 @@
 import type {
-  Actor, ApiOperationDto, ApiProxyDto, ApiRequestDto, ApiRequestPage, CreateApiRequest, DecideApiRequest, OpenPolicy, OperationRoute, ProjectId, RequestPageQuery, ServiceId, UserId,
+  Actor, ApiOperationDto, ApiProxyDto, ApiRequestDto, ApiRequestPage, CreateApiRequest, DecideApiRequest, OpenPolicy, OperationRoute, ProjectDeletionOwner, ProjectId, RequestPageQuery, ServiceId, UserId,
 } from '@crewstation/contracts';
 import type { ResourceTarget, ResourceValues } from '@crewstation/contracts';
 
@@ -13,6 +13,7 @@ export interface GrantedOperations {
 /** api-catalog 模块对外能力；其他模块经 ports 注入其中的子集。 */
 export interface ApiCatalogModuleApi {
   readonly name: 'api-catalog';
+  readonly deletionOwner?: ProjectDeletionOwner;
   applyResourceChange(actor: Actor, serviceId: ServiceId, input: { operationId: string; target: ResourceTarget; expectedRevision: string; values: ResourceValues }): Promise<{ revision: string; effect: string; applied: boolean }>;
   resourceChangeReceipt(serviceId: ServiceId, operationId: string): Promise<{ revision: string; effect: string; applied: boolean } | undefined>;
   isAdmin(userId: UserId): Promise<boolean>;

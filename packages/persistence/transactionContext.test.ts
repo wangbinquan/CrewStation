@@ -49,4 +49,22 @@ describe.skipIf(!available)('持久准入独立连接池（真实 PG）', () => 
     } finally { write(); }
     await inFlight; expect(await sealing).toBe('sealed');
   }, 10_000);
+  for (const mode of ['shared', 'exclusive'] as const) test(`${mode} 准入断线后拒绝原调用，仍在退出的外部回调不能使驱动提交已关闭的连接`, async () => {
+    database = await createTestDatabase(); single = connectDatabase(database.url, { max: 1 });
+    let entered!: (pid: number) => void, release!: () => void, exited!: (key?: string) => void;
+    const ready = new Promise<number>((resolve) => { entered = resolve; }), held = new Promise<void>((resolve) => { release = resolve; }), late = new Promise<string | undefined>((resolve) => { exited = resolve; });
+    const admission = mode === 'shared' ? withSharedDatabaseAdmission : withExclusiveDatabaseAdmission;
+    const pending = admission(single.db, KEY, async (guard) => {
+      entered(Number((await guard.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`))[0]!.pid)); await held;
+      const key = await single.db.transaction(async (tx) => (await tx.execute<{ key?: string }>(sql`SELECT current_setting('crewstation.shared_admission_key',true) AS key`))[0]?.key);
+      exited(key || undefined);
+    }).then(() => 'unexpected-success', () => 'disconnected');
+    try {
+      await database.db.execute(sql`SELECT pg_terminate_backend(${await ready})`);
+      expect(await pending).toBe('disconnected');
+    } finally { release(); }
+    // 2026-10-01：驱动提前拒绝事务后，迟到回调原先会触发 null socket.write 和清理超时。
+    expect(await late).toBeUndefined();
+    expect(Number((await single.db.execute<{ value: number }>(sql`SELECT 1 AS value`))[0]?.value)).toBe(1);
+  }, 10_000);
 });

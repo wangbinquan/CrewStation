@@ -14,6 +14,7 @@ export function apiResourceAllocationUseCases(deps: ApiCatalogUseCaseDeps) {
       if (input.target.resourceType !== 'api-operation' || !['grant', 'revoke'].includes(input.target.action) || Object.keys(input.values).length) throw validation('接口分配参数不适用');
       const hash = jsonHash({ serviceId, input });
       return deps.uow.run(async (scope) => {
+        await scope.allocations.bindService(serviceId, service.projectId);
         await scope.allocations.lock(serviceId);
         const old = await scope.allocations.get(serviceId, input.operationId);
         if (old) { if (old.hash !== hash) throw conflict('同一资源操作不能改变内容'); return { revision: old.revision, effect: old.effect, applied: old.applied }; }

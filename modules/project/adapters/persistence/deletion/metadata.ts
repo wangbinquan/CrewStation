@@ -30,7 +30,7 @@ export async function inspectProjectMetadata(db: Executor, projectId: ProjectId)
       FROM ${sql.identifier('project')}.${sql.identifier(table)} content WHERE project_id = ${projectId}`);
     const count = Number(rows[0]?.count), fingerprint = rows[0]?.fingerprint;
     if (!Number.isSafeInteger(count) || count < 0 || !fingerprint) throw precondition('项目内容盘点不完整');
-    resources.push({ kind: table, id: projectId, identity: jsonHash({ table, count, fingerprint }), count });
+    resources.push({ kind: table, id: projectId, identity: jsonHash({ table, count, fingerprint }), count, scope: 'metadata' as const });
   }
   return { participant: 'project', revision: jsonHash(resources), complete: true, resources, references: [], blockers: [] };
 }

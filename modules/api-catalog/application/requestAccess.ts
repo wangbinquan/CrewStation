@@ -13,6 +13,7 @@ export function requestAccessUseCase({ uow, services, projects, clock }: ApiCata
     if (!await projects.resourceRequestable?.(actor, resolved.projectId, { resourceType: 'api-operation', resourceId: input.operationId, action: 'grant' })) throw forbidden('该接口未明确开放资源申请');
     const now = clock.now();
     return uow.run(async (scope) => {
+      await scope.allocations.bindService(serviceId, resolved.projectId);
       await scope.allocations.lock(serviceId);
       const operation = await scope.operations.getById(input.operationId);
       if (!operation || operation.state !== 'active') throw notFound('操作', input.operationId);

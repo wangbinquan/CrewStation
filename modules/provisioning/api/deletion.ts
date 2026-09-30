@@ -5,6 +5,8 @@ export interface ProjectDeletionController {
   accept(actor: Actor, projectId: ProjectId, input: AcceptProjectDeletion): Promise<ProjectDeletionOperation>;
   read(actor: Actor, operationId: string): Promise<ProjectDeletionOperation>;
   retry(actor: Actor, operationId: string): Promise<ProjectDeletionOperation>;
+  prepareReconfirmation(actor: Actor, operationId: string): Promise<ProjectDeletionPlan>;
+  reconfirm(actor: Actor, operationId: string, input: AcceptProjectDeletion): Promise<ProjectDeletionOperation>;
   enqueue(operationId: string): Promise<void>;
   advance(operationId: string, heartbeat?: () => Promise<boolean>): Promise<void>;
   recover(): Promise<void>;

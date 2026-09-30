@@ -11,7 +11,8 @@ export function clusterObjectResource(object: DeletionClusterObject): ProjectDel
   if (!object.metadata.uid) throw precondition('集群对象缺少原实例 UID，不能确认清理');
   const claim = object.kind === 'PersistentVolume' ? (object['spec'] as { claimRef?: { uid?: string; namespace?: string } } | undefined)?.claimRef : undefined;
   return { kind: object.kind, id: JSON.stringify({ apiVersion: object.apiVersion, kind: object.kind, namespace: object.metadata.namespace, name: object.metadata.name }),
-    identity: JSON.stringify({ uid: object.metadata.uid, digest: jsonHash({ spec: object['spec'], data: object['data'], binaryData: object['binaryData'], owners: object.metadata.ownerReferences }), ...(claim ? { claimUid: claim.uid, claimNamespace: claim.namespace } : {}) }), count: 1 };
+    identity: JSON.stringify({ uid: object.metadata.uid, digest: jsonHash({ spec: object['spec'], data: object['data'], binaryData: object['binaryData'], owners: object.metadata.ownerReferences }), ...(claim ? { claimUid: claim.uid, claimNamespace: claim.namespace } : {}) }),
+    count: 1, scope: 'physical', sourceIdentity: object.metadata.uid };
 }
 export function originalUid(resource: ProjectDeletionResource): string {
   const value = JSON.parse(resource.identity) as { uid?: unknown };

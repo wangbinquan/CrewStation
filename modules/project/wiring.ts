@@ -37,6 +37,7 @@ import type { HostNaming } from './ports/hostNaming';
 import type { ProjectSettings } from './ports/projectSettings';
 import type { TaskUsage } from './ports/taskUsage';
 import { deletionIntentUseCases } from './application/deletion/intent';
+import { deletionReconfirmationUseCases } from './application/deletion/reconfirmation';
 import { deletionProgressUseCases } from './application/deletion/progress';
 import { projectDeletionOwnerUseCases } from './application/deletion/owner';
 
@@ -96,6 +97,7 @@ export function createProjectModule(deps: ProjectModuleDeps): ProjectModule {
     ...marketListingUseCases(useCaseDeps),
     ...projectPageUseCases(useCaseDeps),
     ...deletionIntentUseCases(useCaseDeps),
+    ...deletionReconfirmationUseCases(useCaseDeps),
     ...deletionProgressUseCases(useCaseDeps),
     ...projectDeletionOwnerUseCases(useCaseDeps),
   };

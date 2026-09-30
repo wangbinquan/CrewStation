@@ -18,7 +18,7 @@ async function inspect(db: Executor, projectId: ProjectId): Promise<ProjectDelet
       FROM ${sql.identifier('config')}.${sql.identifier(table)} content WHERE project_id = ${projectId}`);
     const count = Number(rows[0]?.count), fingerprint = rows[0]?.fingerprint;
     if (!Number.isSafeInteger(count) || count < 0 || !fingerprint) throw precondition('配置内容盘点不完整');
-    resources.push({ kind: table, id: projectId, identity: jsonHash({ table, count, fingerprint }), count });
+    resources.push({ kind: table, id: projectId, identity: jsonHash({ table, count, fingerprint }), count, scope: 'metadata' as const });
   }
   return { participant: 'config', revision: jsonHash(resources), complete: true, resources, references: [], blockers: [] };
 }
@@ -45,7 +45,7 @@ export function configDeletionRepository(db: Database, assertGrant: (context: Pr
     seal: (context) => db.transaction(async (tx) => {
       const row = await lock(tx, context); await assertGrant(context);
       const current = await inspect(tx, context.target.id);
-      if (row.operation_id && row.confirmed_revision !== context.confirmed.revision) throw precondition('配置确认摘要不能被替换');
+      if (row.operation_id && row.confirmed_revision !== context.confirmed.revision && row.generation >= context.generation) throw precondition('配置确认摘要不能被替换');
       await tx.execute(sql`UPDATE config.deletion_fences SET operation_id = ${context.operationId}, generation = ${context.generation}, confirmed_revision = ${context.confirmed.revision} WHERE project_id = ${context.target.id}`);
       return current.revision === context.confirmed.revision;
     }),

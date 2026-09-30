@@ -70,3 +70,12 @@
 - 台账 seal 比较原记录归属和期望；其他 owner 关闭消费者或追加停止扫描仍在这些原记录范围内，不能把运行状态／时钟当作新资源。新增原记录、改变物理目标、外部项目引用和未登记表仍阻断。资源物理端口须另行确认原实例保护、停止、实际回收与复盘，当前尚未完成原 Pod／工作盘的实际组合。
 - cluster-control 的命名空间 owner 已按 discovery 的真实复数名读取所有分页，追踪原 UID 认领链，同时盘点关联全量 PV；Namespace 只在前序证明和子对象清理完后带原 UID 正常删除，等待 API Server 原实例消失，不清未知 finalizer。当前全链路仍未开放，假 API Server 的用例不能替代实际供应器证明。
 - 编排 HTTP／工作器底座已接入可选的完整参与者装配；平台尚未提供全部 owner，因此产品仍不暴露永久删除入口。其余 owner 的物理回收、全链路组合、删除 UI 和真实资源对账继续；不能以本清单或底座成功代替完整删除验收。
+
+## 5. 后续 owner 候选（2026-10-01）
+
+- api-catalog 的五个内容表全部由直接及代理／操作／服务间接归属盘点与清除。新 `deletion_entities` 保存最小原 ID 映射，`deletion_fences` 保存操作／世代／确认修订及是否验证完成。其他项目对本接口的授权失效、待审申请失效，但原理由、申请者与裁决历史仍归调用方。
+- resource-access 清理 changes 的全部申请、审批、快照和领域回执；catalog_policies 保留。`deletion_identities` 固定旧申请所属项目；`deletion_work` 仅存原 changeId、projectId、backend PID、世代、退出状态及恢复摘要，防止实际回调仍在运行时误判排空。退出字段和清理受 SQL 触发器保护，不能凭 raw UPDATE／DELETE 清掉在途事实。
+- 两个新 owner 的失败 seal 均持久化 scope_verified=false，重复调用或普通 retry 不会冒充成功。只有 project 验证的新确认材料和新世代可以重新比较尚未完成的范围。
+- 明确标记本批内容盘点为 metadata。集群对象以 UID 为 sourceIdentity，当前 spec／内容摘要另保留于 identity。未分类旧项按物理来源保护，不允许把消失或替换的原来源重新认领；实际供给的物理清理仍由所属 owner 证明。
+
+以上尚属后续发布候选，不表示剩余 22 方清理、平台装配或实机回收完成。

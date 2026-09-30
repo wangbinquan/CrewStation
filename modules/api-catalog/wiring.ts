@@ -11,8 +11,10 @@ import type { Database, MigrationSet } from '@crewstation/persistence';
 import { readMigrationDir } from '@crewstation/persistence';
 import type { Hono } from 'hono';
 import { drizzleUnitOfWork } from './adapters/persistence/drizzleUnitOfWork';
+import { apiCatalogDeletionRepository } from './adapters/persistence/deletion/repository';
 import type { ApiCatalogModuleApi } from './api/moduleApi';
 import { grantUseCases } from './application/decideRequest';
+import { apiCatalogDeletionOwner } from './application/projectDeletion';
 import { apiResourceAllocationUseCases } from './application/resourceAllocation';
 import type { ApiCatalogUseCaseDeps } from './application/dependencies';
 import { grantedOperationsUseCase } from './application/grantedOperations';
@@ -34,7 +36,7 @@ import type { ProjectAuthorizer } from './ports/projectAuthorizer';
 export interface ApiCatalogModuleDeps {
   db: Database;
   /** project 模块：管理员标记与项目内授权。 */
-  projects: Pick<ProjectModuleApi, 'isAdmin' | 'authorize' | 'readProjectBasics'> & Pick<ProjectAuthorizer, 'resourceRequestable'>;
+  projects: Pick<ProjectModuleApi, 'isAdmin' | 'authorize' | 'readProjectBasics'> & Pick<ProjectAuthorizer, 'resourceRequestable'> & Partial<Pick<ProjectModuleApi, 'assertProjectDeletionGrant'>>;
   /** 服务 ID／服务身份 → 归属；由应用基于 project 模块装配。 */
   services: ServiceResolver;
   hosts: HostNaming;
@@ -71,6 +73,7 @@ export function createApiCatalogModule(deps: ApiCatalogModuleDeps): ApiCatalogMo
   };
   const api: ApiCatalogModuleApi = {
     name: 'api-catalog',
+    ...(deps.projects.assertProjectDeletionGrant ? { deletionOwner: apiCatalogDeletionOwner(apiCatalogDeletionRepository(deps.db, deps.projects.assertProjectDeletionGrant), deps.projects.assertProjectDeletionGrant) } : {}),
     isAdmin: (userId) => deps.projects.isAdmin(userId),
     ...catalogQueryUseCases(useCaseDeps),
     setOpenPolicy: setOpenPolicyUseCase(useCaseDeps),

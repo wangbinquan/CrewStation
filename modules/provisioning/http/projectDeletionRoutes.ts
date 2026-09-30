@@ -31,5 +31,14 @@ export function projectDeletionRoutes(api: ProjectDeletionController, isAdmin: (
     const operation = await api.retry(user, parseParams(c, operationParams).operationId);
     c.header('location', `/v1/project-deletions/${operation.id}`); return c.json(operation, 202);
   });
+  r.post('/v1/project-deletions/:operationId/reconfirmation-plans', async (c) => {
+    const user = await actor(c); await parseBody(c, z.object({}).strict());
+    return c.json(await api.prepareReconfirmation(user, parseParams(c, operationParams).operationId));
+  });
+  r.post('/v1/project-deletions/:operationId/reconfirm', async (c) => {
+    const user = await actor(c), input = await parseBody(c, AcceptProjectDeletionSchema);
+    const operation = await api.reconfirm(user, parseParams(c, operationParams).operationId, input);
+    c.header('location', `/v1/project-deletions/${operation.id}`); return c.json(operation, 202);
+  });
   return r;
 }

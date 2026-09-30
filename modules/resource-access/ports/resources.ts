@@ -8,6 +8,7 @@ export interface ResourceAdapter {
   read(projectId: ProjectId, target: ResourceTarget): Promise<ResourceTargetView>;
   /** 相同 operationId 必须幂等；不得启动、重建或终止已有工作负载。 */
   apply(command: { operationId: string; actor: Actor; projectId: ProjectId; target: ResourceTarget; expectedRevision: string; values: ResourceValues; requestedBy: UserId; reason: string }): Promise<{ revision: string; effect: string; applied: boolean }>;
+  /** 原 operationId 的领域写入已提交的稳定回执；不能只返回受理 ACK。applied 另描述实际资源生效，由其 owner 负责物理清理证明。 */
   recover?(projectId: ProjectId, operationId: string): Promise<{ revision: string; effect: string; applied: boolean } | undefined>;
   observe?(projectId: ProjectId, target: ResourceTarget, receipt: { revision: string; effect: string }, operationId: string): Promise<{ applied: boolean; effect: string }>;
 }

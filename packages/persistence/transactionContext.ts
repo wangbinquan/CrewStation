@@ -29,13 +29,32 @@ export function withSharedDatabaseAdmission<T>(db: Database, key: string, work: 
   const current = scopes.getStore();
   if (current?.active && current.database === db && current.key === key) return work(current.transaction);
   const guard = guards.get(db); if (!guard) throw new Error('Database admission requires connectDatabase');
-  return guard().transaction(async (transaction) => {
+  let admitted: Scope | undefined;
+  return admissionTransaction(guard(), async (transaction) => {
     await transaction.execute(sql`SELECT pg_advisory_xact_lock_shared(hashtextextended(${key},0))`);
     const backend = Number((await transaction.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`))[0]!.pid);
-    const scope: Scope = { database: db, key, backend, transaction, active: true };
+    const scope: Scope = { database: db, key, backend, transaction, active: true }; admitted = scope;
     try { return await scopes.run(scope, () => work(transaction)); }
     finally { scope.active = false; }
+  }, () => { if (admitted) admitted.active = false; });
+}
+
+function admissionTransaction<T>(database: Database, work: (transaction: Transaction) => Promise<T>, unavailableCallback?: () => void): Promise<T> {
+  let unavailable = false;
+  const pending = database.transaction(async (transaction) => {
+    try { const result = await work(transaction); return unavailable ? abandonedAdmission<T>() : result; }
+    catch (error) { if (unavailable) return abandonedAdmission<T>(); throw error; }
   });
+  return pending.catch((error) => { unavailable = true; unavailableCallback?.(); throw error; });
+}
+
+/**
+ * postgres.js 在连接关闭时已经拒绝外层事务，但外部回调仍可能继续。
+ * 废弃它的内部 scope，避免随后向已关闭的 socket 发送 COMMIT／ROLLBACK。
+ * 调用方收到原断线错误；持久在途 owner 仍需证明外部回调退出。
+ */
+function abandonedAdmission<T>(): Promise<T> {
+  return new Promise<T>(() => { /* 外层已拒绝，断开的驱动 scope 不再执行终结查询。 */ });
 }
 
 /** 排他封闭也使用准入池，避免等待 shared 回调时占满它完成 UOW 所需的普通连接。 */
@@ -43,7 +62,7 @@ export function withExclusiveDatabaseAdmission<T>(db: Database, key: string, wor
   const current = scopes.getStore();
   if (current?.active && current.database === db && current.key === key) throw new Error('Cannot seal an active shared admission');
   const guard = guards.get(db); if (!guard) throw new Error('Database admission requires connectDatabase');
-  return guard().transaction(async (transaction) => {
+  return admissionTransaction(guard(), async (transaction) => {
     await transaction.execute(sql`SET LOCAL lock_timeout = '30s'`);
     await transaction.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${key},0))`);
     return work(transaction);

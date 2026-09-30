@@ -7,6 +7,7 @@ import { IN_FLIGHT, targetKey } from '../../domain/change';
 import type { ResourceChange } from '../../domain/change';
 import type { ResourceAccessRepository } from '../../ports/repository';
 import { resourceAccessTransaction } from './coordination';
+import { withResourceAccessAdmission } from './projectAdmission';
 import { catalogPolicies, changes } from './tables';
 
 export const RESOURCE_CHANGE_JOB = 'resource-access.apply';
@@ -16,6 +17,7 @@ const schedule = (tx: Transaction, change: ResourceChange) => enqueueJob(tx, RES
 
 export function resourceAccessRepository(db: Database): ResourceAccessRepository {
   return {
+    withAdmission: (projectId, work, changeId) => withResourceAccessAdmission(db, projectId, work, changeId),
     get: async (id) => (await db.select().from(changes).where(eq(changes.id, id)).limit(1))[0]?.body,
     byKey: async (projectId, actorId, key) => (await db.select().from(changes).where(and(eq(changes.projectId, projectId), eq(changes.actorId, actorId), eq(changes.key, key))).limit(1))[0]?.body,
     accept: (change) => resourceAccessTransaction(db, `${change.projectId}:${targetKey(change.target)}`, async (tx) => {

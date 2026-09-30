@@ -2,6 +2,7 @@ import type { ProjectId, ResourceCatalogPolicy, ResourceRequestQuery, ResourceTy
 import type { ResourceChange } from '../domain/change';
 
 export interface ResourceAccessRepository {
+  withAdmission<T>(projectId: ProjectId, work: () => Promise<T>, changeId?: string): Promise<T>;
   get(id: string): Promise<ResourceChange | undefined>;
   byKey(projectId: ProjectId, actorId: string, key: string): Promise<ResourceChange | undefined>;
   accept(change: ResourceChange): Promise<ResourceChange>;
