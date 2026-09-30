@@ -43,6 +43,11 @@ export function buildCommandHandlers(targets: CommandTargets): CommandHandlers {
     return targets.developmentUsage;
   };
   return {
+    stopDevelopmentAgent: async (c) => {
+      development();
+      if (!targets.agents.stopDevelopmentAgent) throw new RunnerCommandError('development_usage_stop_unsupported', '当前监督器不支持原键停止');
+      return targets.agents.stopDevelopmentAgent(c.admission, c.podUid);
+    },
     developmentUsageInfo: async (c) => development().info(c.key),
     readDevelopmentUsageEvents: async (c) => development().read(c.key, c.after, c.limit),
     ackDevelopmentUsageEvents: async (c) => development().acknowledge(c.key, c.through),

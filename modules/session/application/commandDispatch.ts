@@ -25,7 +25,7 @@ export function commandDispatch(deps: Pick<SessionUseCaseDeps, 'registry' | 'for
     return (async () => {
       // 普通命令保持同步入 pending 的旧行为；可靠命令先提交持久接收意图。
       if ((command.type === 'startBusinessCommand' || command.type === 'startBusinessAgent') || command.type === 'ackBusinessExecutionEvents' || command.type === 'cancelBusinessExecution') await prepareBusinessCommand(deps.businessExecutions, taskId, command);
-      if ((command.type === 'startAgent' && command.developmentUsage) || command.type === 'ackDevelopmentUsageEvents') await prepareDevelopmentCommand(deps.developmentUsage, taskId, command);
+      if (command.type === 'stopDevelopmentAgent' || (command.type === 'startAgent' && command.developmentUsage) || command.type === 'ackDevelopmentUsageEvents') await prepareDevelopmentCommand(deps.developmentUsage, taskId, command);
       const wire = connection.legacy ? await connection.legacy.outgoing(command) : command;
       const payload = await new Promise<unknown>((resolve, reject) => {
       connection.pending.add({

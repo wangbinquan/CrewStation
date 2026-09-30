@@ -1,3 +1,15 @@
+## 2026-09-30 RFC-034 原键持久停止完整候选通过
+
+23路径冻结完整门禁4307 pass/142 skip/0 fail、27307断言、860文件通过且指纹未变；独立限定实现门PASS。仅修正文档状态和prevented例外后精确发布，同源代码不重跑完整门禁；精确CI/本机部署待回执。生产开发采集仍OFF，完整owner、实际来源证明、清理屏障、consumer及两级事实/UI继续；CS-R02和两RFC不关闭。下方历史保留。
+
+## 2026-09-30 RFC-034 原键持久停止限定候选
+
+原键 SQLite 持久停止、Hook 后同步许可、pending Supervisor 和 Session drain/原 key+Pod 派发守卫已实现；独立 17 路径静态实现门 PASS，真实 SQLite/PG+假驱动相关 47 pass/0 fail、224 断言，类型/lint/结构通过。缓存终态覆盖及原 interruption 丢失已修复并回归；一次冻结完整门禁、精确发布/CI/本机部署待回执。生产开发采集仍 OFF，完整 owner/实际来源/删除屏障/消费/两级事实 UI 继续，CS-R02 和两 RFC 不关闭。详见 [限定停止设计与检查点](proposal/rfc/RFC-034-runtime-observability/development-stop.md)。下方历史回执保留。
+
+## 2026-09-30 RFC-034 render/元数据精确部署，原键停止设计继续
+
+BC源码bc8522cb7c98a6ef308065a5b5821ce181775ad9六项精确CI成功，2026-09-30T02:18:01Z本机八组件Ready=1、storage-contract=1，公开/auth/login只读HTTP200；详见RFC034回执。原键持久停止限定设计修正后独立PASS，interrupted finished缺实际退出证明必须unknown，尚未实现/测试。生产开发采集仍OFF，来源沿革/临时HOME规则及完整owner派发/清理/消费/两级明细继续；两RFC不关闭。
+
 ## 2026-09-30 RFC-034 render/元数据候选完整检查通过，剩余合同已落档
 
 23路径候选4288 pass/142 skip/0 fail、27227断言、857文件，2026-09-30T01:55:33Z结束且内容指纹未变；独立限定实现门PASS。仅补回执与待办后精确发布/CI/本机部署，同源码不重跑完整门禁。实际原生来源（最终环境/临时HOME/沿革）和原key+Pod持久停止是下一阶段基础；详见RFC034 development-owner末节与remaining-work CS-R02。生产开发采集仍关闭，owner全派发/清理/消费/两级事实UI及实机身份/模型验收尚未完成，两RFC保持In Progress。

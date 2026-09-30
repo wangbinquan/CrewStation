@@ -9,12 +9,20 @@ export function reserveDevelopmentUsage(command: StartAgentCommand, journal?: De
   if (!journal) throw new RunnerCommandError('development_usage_unsupported', '当前 Runner 未提供开发数值日志');
   const admission = validateDevelopmentStart(command, command.developmentUsage);
   const reservation = journal.reserve(admission);
-  return new DevelopmentAgentUsage(journal, admission.key, !reservation.created);
+  return new DevelopmentAgentUsage(journal, admission, !reservation.created);
 }
 
 export class DevelopmentAgentUsage {
   private terminal = false;
-  constructor(private readonly journal: DevelopmentUsageJournal, private readonly key: NonNullable<StartAgentCommand['developmentUsage']>['key'], readonly replayed: boolean) {}
+  constructor(private readonly journal: DevelopmentUsageJournal, private readonly admission: NonNullable<StartAgentCommand['developmentUsage']>, readonly replayed: boolean) {}
+  private get key() { return this.admission.key; }
+  matches(key: typeof this.key): boolean { const own = this.key; return key.executionId === own.executionId && key.journalId === own.journalId && key.incarnation === own.incarnation && key.payloadDigest === own.payloadDigest; }
+  stop() { return this.journal.requestStop(this.admission, this.journal.context.podUid); }
+  unprovenExit(): boolean { try { return this.journal.info(this.key).receipt?.interruption !== null; } catch { return true; } }
+  readonly permitLaunch = (): boolean => {
+    try { return this.journal.permitLaunch(this.key); }
+    catch (error) { this.journal.interrupt(this.key.executionId, 'journal-unavailable'); throw error; }
+  };
 
   readonly capture = (capture: RunnerUsageCapture, occurredAt: string): void => {
     try { this.journal.capture(this.key, capture, occurredAt); }

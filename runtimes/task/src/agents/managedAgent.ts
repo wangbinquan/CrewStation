@@ -20,6 +20,8 @@ export interface ManagedAgentDeps {
   processAttemptId: string;
   usageSink?: AgentLaunchContext['usageSink'];
   usageInterrupted?: () => void;
+  /** Synchronous durable permission immediately before the first driver.start. */
+  usageCanLaunch?: () => boolean;
   persistentHome?: string;
   logger: Logger;
 }
@@ -73,7 +75,12 @@ export class ManagedAgentProcess implements AgentProcess {
     if (this.cancelled) return;
     const env = this.deps.launcher.baseEnv({ ...this.deps.commandEnv, ...outcome.env, ...(this.spec.businessEvents ? { HOME: outcome.home, XDG_DATA_HOME: join(outcome.home, '.local/share'), XDG_CONFIG_HOME: join(outcome.home, '.config'), XDG_STATE_HOME: join(outcome.home, '.local/state') } : {}) });
     const context: AgentLaunchContext = { usageSink: this.deps.usageSink, cwd: this.deps.cwd, env, launcher: this.deps.launcher, logger: this.deps.logger, managed: { home: outcome.home, runDir: outcome.runDir, ...(outcome.configFile ? { configFile: outcome.configFile } : {}) } };
-    try { this.inner = this.deps.driver.start(this.spec, context); }
+    try {
+      if (this.deps.usageCanLaunch && !this.deps.usageCanLaunch()) {
+        this.events.push(this.event('cancelled', { result: { durationMs: 0 } })); this.events.close(); return;
+      }
+      this.inner = this.deps.driver.start(this.spec, context);
+    }
     catch { this.events.push(this.event('error', { error: { code: 'spawn_failed', message: 'Agent 进程未能创建' } })); this.events.close(); return; }
     void this.forward(this.inner);
   }

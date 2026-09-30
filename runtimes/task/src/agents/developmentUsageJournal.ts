@@ -1,4 +1,7 @@
 import type { Database } from 'bun:sqlite';
+import { DevelopmentStartControls } from './developmentStartControls';
+import { developmentIntentDigest } from './developmentStartIntent';
+import { DevelopmentUsageStopReceiptSchema, type DevelopmentUsageStopReceipt } from '@crewstation/contracts';
 import type { DevelopmentUsageAdmission, DevelopmentUsageEvent, DevelopmentUsageInfo, DevelopmentUsageInterruption, DevelopmentUsageKey, DevelopmentUsagePage, DevelopmentUsageReceipt, ProjectId, TaskId, RunnerUsageCapture } from '@crewstation/contracts';
 import { DEVELOPMENT_USAGE_LIMITS, DevelopmentUsageAdmissionSchema, DevelopmentUsageEventSchema, DevelopmentUsageKeySchema, DevelopmentUsagePageSchema, DevelopmentUsageReceiptSchema, ProjectIdSchema, TaskIdSchema } from '@crewstation/contracts';
 import { RunnerCommandError } from '../commandError';
@@ -16,6 +19,7 @@ const defaultLimits: DevelopmentJournalLimits = { eventBytes: DEVELOPMENT_USAGE_
 export class DevelopmentUsageJournal {
   private readonly db: Database;
   private readonly trusted = new Map<string, DevelopmentUsageReceipt>();
+  private readonly starts: DevelopmentStartControls;
   readonly journalId: string;
   constructor(directory: string, readonly context: DevelopmentJournalContext, readonly incarnation: string, private readonly limits = defaultLimits) {
     if (!context.podUid || context.podUid.length > 128 || Object.values(limits).some((n) => !Number.isSafeInteger(n) || n < 1) || limits.eventBytes > limits.pageBytes || limits.pageBytes > DEVELOPMENT_USAGE_LIMITS.pageBytes || limits.spoolBytes > DEVELOPMENT_USAGE_LIMITS.spoolBytes) invalid('开发日志配置无效');
@@ -24,6 +28,7 @@ export class DevelopmentUsageJournal {
     try {
       this.journalId = bindDevelopmentJournal(this.db, directory, context.podUid);
       this.db.exec('CREATE TABLE IF NOT EXISTS development_admissions (execution_id TEXT PRIMARY KEY, header TEXT NOT NULL);');
+      this.starts = new DevelopmentStartControls(this.db);
       const row = this.row(context.runtimeTaskId);
       const admitted = this.db.query<{ count: number }, []>('SELECT count(*) AS count FROM executions').get()!.count;
       if (admitted > 1 || (admitted === 1 && !row)) throw new RunnerCommandError('development_journal_lost', '已受理开发日志的身份头或执行归属丢失');
@@ -32,19 +37,59 @@ export class DevelopmentUsageJournal {
   }
 
   reserve(raw: DevelopmentUsageAdmission): { created: boolean; receipt: DevelopmentUsageReceipt } {
-    const admission = DevelopmentUsageAdmissionSchema.parse(raw), identity = admission.intent.identity;
-    this.key(admission.key);
-    if (identity.projectId !== this.context.projectId || identity.taskId !== this.context.workspaceTaskId) invalid('开发受理不属于当前项目和父工作区');
-    const reserved = this.db.transaction(() => {
-      const prior = this.row(identity.executionId);
-      if (prior) { this.match(prior, admission.key); return { created: false, receipt: this.receipt(prior) }; }
-      if (admission.key.incarnation !== this.incarnation) invalid('新受理必须绑定当前 Runner 实例');
-      const header = JSON.stringify({ identity, profileId: admission.intent.profileId, profileRevision: admission.intent.profileRevision });
-      this.db.query('INSERT INTO executions(execution_id,attempt,payload_digest,incarnation,phase) VALUES(?,?,?,?,?)').run(identity.executionId, 1, admission.key.payloadDigest, this.incarnation, 'registered');
-      this.db.query('INSERT INTO development_admissions(execution_id,header) VALUES(?,?)').run(identity.executionId, header);
-      return { created: true, receipt: this.receipt(this.row(identity.executionId)!) };
-    }).immediate();
+    const admission = this.admission(raw);
+    const reserved = this.db.transaction(() => this.reserveWithin(admission)).immediate();
     return { created: reserved.created, receipt: this.remember(reserved.receipt) };
+  }
+
+  requestStop(raw: DevelopmentUsageAdmission, podUid: string): DevelopmentUsageStopReceipt {
+    const admission = this.admission(raw);
+    if (podUid !== this.context.podUid || developmentIntentDigest(admission) !== admission.key.payloadDigest) invalid('停止命令与原意图或Pod不同');
+    const receipt = this.db.transaction(() => {
+      this.reserveWithin(admission);
+      const row = this.require(admission.key), known = this.trusted.get(row.execution_id) ?? this.receipt(row);
+      const prevented = this.starts.stop(row.execution_id, row.phase === 'registered' && row.incarnation === this.incarnation && known.phase !== 'finished');
+      if (prevented && row.phase === 'registered' && known.phase !== 'finished') this.db.query('UPDATE executions SET phase=?,result=? WHERE execution_id=?').run('finished', JSON.stringify({ result: 'cancelled', interruption: known.interruption }), row.execution_id);
+      return this.receipt(this.require(admission.key));
+    }).immediate();
+    this.remember(receipt);
+    return this.stopStatus(admission.key, false);
+  }
+
+  permitLaunch(key: DevelopmentUsageKey): boolean {
+    return this.db.transaction(() => {
+      const row = this.require(key);
+      if (row.incarnation !== this.incarnation) invalid('旧Runner实例不能获得新的启动许可');
+      if (this.starts.get(key.executionId)?.stopRequested) return false;
+      if (row.phase !== 'registered') invalid('只有未启动的原受理可获得启动许可');
+      return this.starts.permit(key.executionId);
+    }).immediate();
+  }
+
+  stopStatus(key: DevelopmentUsageKey, tracked: boolean): DevelopmentUsageStopReceipt {
+    const receipt = this.remember(this.receipt(this.require(key))), control = this.starts.get(key.executionId);
+    const state = control?.prevented && !control.launchPermitted && receipt.phase === 'finished' && receipt.result === 'cancelled' ? 'prevented'
+      : receipt.phase === 'finished' && receipt.interruption === null ? 'finished'
+      : tracked && control?.stopRequested && key.incarnation === this.incarnation && receipt.phase !== 'finished' ? 'stopping' : 'unknown';
+    return DevelopmentUsageStopReceiptSchema.parse({ version: 1, state, receipt });
+  }
+
+  private admission(raw: DevelopmentUsageAdmission): DevelopmentUsageAdmission {
+    const admission = DevelopmentUsageAdmissionSchema.parse(raw);
+    this.key(admission.key);
+    if (admission.intent.identity.projectId !== this.context.projectId || admission.intent.identity.taskId !== this.context.workspaceTaskId) invalid('开发受理不属于当前项目和父工作区');
+    return admission;
+  }
+
+  private reserveWithin(admission: DevelopmentUsageAdmission): { created: boolean; receipt: DevelopmentUsageReceipt } {
+    const identity = admission.intent.identity, prior = this.row(identity.executionId);
+    if (prior) { this.match(prior, admission.key); return { created: false, receipt: this.receipt(prior) }; }
+    if (admission.key.incarnation !== this.incarnation) invalid('新受理必须绑定当前 Runner 实例');
+    const header = JSON.stringify({ identity, profileId: admission.intent.profileId, profileRevision: admission.intent.profileRevision });
+    this.db.query('INSERT INTO executions(execution_id,attempt,payload_digest,incarnation,phase) VALUES(?,?,?,?,?)').run(identity.executionId, 1, admission.key.payloadDigest, this.incarnation, 'registered');
+    this.db.query('INSERT INTO development_admissions(execution_id,header) VALUES(?,?)').run(identity.executionId, header);
+    this.starts.register(identity.executionId);
+    return { created: true, receipt: this.receipt(this.require(admission.key)) };
   }
 
   info(key?: DevelopmentUsageKey): DevelopmentUsageInfo {

@@ -44,6 +44,13 @@ export const DevelopmentUsageReceiptSchema = z.strictObject({
   if (value.acknowledgedSequence > value.lastSequence) ctx.addIssue({ code: 'custom', message: '确认水位不能超过持久数字水位' });
   if (value.finalThrough !== null && (value.phase !== 'finished' || value.interruption !== null || value.finalThrough !== value.lastSequence)) ctx.addIssue({ code: 'custom', message: '完整结束只能指向已持久的连续数字末尾' });
 });
+export const DevelopmentUsageStopReceiptSchema = z.strictObject({
+  version: z.literal(1), state: z.enum(['prevented', 'stopping', 'finished', 'unknown']), receipt: DevelopmentUsageReceiptSchema,
+}).superRefine((value, ctx) => {
+  if (value.state === 'prevented' && (value.receipt.phase !== 'finished' || value.receipt.result !== 'cancelled')) ctx.addIssue({ code: 'custom', message: '未启动停止必须有持久取消回执' });
+  if (value.state === 'stopping' && value.receipt.phase === 'finished') ctx.addIssue({ code: 'custom', message: '终态不能冒充当前正在停止' });
+  if (value.state === 'finished' && (value.receipt.phase !== 'finished' || value.receipt.interruption !== null)) ctx.addIssue({ code: 'custom', message: '中断终态不能单独证明进程退出' });
+});
 export const DevelopmentUsageInfoSchema = z.strictObject({
   version: z.literal(1), runtimeTaskId: TaskIdSchema, podUid: z.string().min(1).max(128), journalId: z.uuid(), incarnation: z.uuid(), receipt: DevelopmentUsageReceiptSchema.nullable(),
 });
@@ -54,10 +61,12 @@ export const DevelopmentUsagePageSchema = z.strictObject({ key: DevelopmentUsage
 });
 const command = <T extends string>(type: T) => ({ id: z.string().min(1), type: z.literal(type) });
 export const DevelopmentUsageCommands = [
+  z.strictObject({ ...command('stopDevelopmentAgent'), admission: DevelopmentUsageAdmissionSchema, podUid: z.string().min(1).max(128) }),
   z.strictObject({ ...command('developmentUsageInfo'), key: DevelopmentUsageKeySchema.optional() }),
   z.strictObject({ ...command('readDevelopmentUsageEvents'), key: DevelopmentUsageKeySchema, after: sequence, limit: z.number().int().min(1).max(DEVELOPMENT_USAGE_LIMITS.capturesPerPage).default(DEVELOPMENT_USAGE_LIMITS.capturesPerPage) }),
   z.strictObject({ ...command('ackDevelopmentUsageEvents'), key: DevelopmentUsageKeySchema, through: sequence }),
 ] as const;
+export type DevelopmentUsageStopReceipt = z.infer<typeof DevelopmentUsageStopReceiptSchema>;
 export type DevelopmentStartIntent = z.infer<typeof DevelopmentStartIntentSchema>;
 export type DevelopmentUsageAdmission = z.infer<typeof DevelopmentUsageAdmissionSchema>;
 export type DevelopmentUsageKey = z.infer<typeof DevelopmentUsageKeySchema>;
