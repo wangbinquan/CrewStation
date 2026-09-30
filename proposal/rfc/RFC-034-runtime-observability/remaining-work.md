@@ -4,7 +4,7 @@
 
 ## 当前已实现与实际部署
 
-当前本机源码版本：`d01ba8223fc08c8b2b70ee4db859e560c2151668`，2026-09-30T07:30:51.933Z部署完成；[精确CI36682129650](https://github.com/wangbinquan/CrewStation/actions/runs/36682129650)六项成功，八组件Ready=1、storage-contract=1、迁移Complete，公开登录HTTP200、未登录根路由HTTP401符合现有认证合同。双路径布局/固定元数据、原键持久停止及实际原生来源第一批底座已部署；生产开发采集仍关闭，owner派发/完整清理/consumer/两级明细未接通。其后`b643e53196e2eea0d61a6160df7f543263c5a561`只提交发布/部署回执文档，[精确CI36685062165](https://github.com/wangbinquan/CrewStation/actions/runs/36685062165)六项成功，不改变本机源码镜像。
+当前本机源码版本：`1d48fb1703744acfc06841e3a34e8f742e8c98bd`，2026-09-30T09:29:13.385Z部署完成；[精确CI36694912441](https://github.com/wangbinquan/CrewStation/actions/runs/36694912441)六项成功，八组件Ready=1、storage-contract=1、迁移Complete/applied=0，公开登录HTTP200、未登录根HTTP401符合现有认证合同。实际原生来源、原键持久停止和原选择接口底座已部署；生产开发采集仍OFF，完整consumer、owner派发/清理屏障和两级开发明细尚未接通。源码与后继回执文档分别记录，历史d01/bebb批次保留在下方。
 
 正式项目/系统统计已有业务任务、Agent/尝试、四桶 Token、人民币估值、基础泳道、算力贡献下钻和采集质量；项目与算力显示名称，保留稳定 ID/受理修订。已有价格配置与冻结目录、OpenCode 根/子树采集、原归属修订和原价补算；资源/容量和当前服务槽/平台 Pod 健康已有入口。
 
@@ -252,3 +252,30 @@ Stage 2 Session 冻结候选完整门禁回执：2026-09-29T23:43:16Z，结构�
 接口提交`54243196a23f8a5f65a5ca2ea5e6820e615dbc09`的[CI36692696016](https://github.com/wangbinquan/CrewStation/actions/runs/36692696016)终态failure：unit/module/console/e2e四项success；干净树arch/lint成功，static类型和gate失败。两个TS2769都在新回归的同一预期对象：nativeSelection.version被推断成number，严格接口要求字面量1。本批只给测试预期version加as const，保持全部原key/关闭后重读/原价/选择/隐私断言；三份生产文件字节未变、此前限定实现门仍适用，不把接口或合同放宽为number。
 
 修正后真实PG同一11项/96断言全部成功，改单文件eslint成功。单独类型检查核对自有错误，精确新提交/六项托管CI另记；没有重复启动已被并行架构在制品阻断的全量check。失败版本未部署，本机仍为d01ba8223；只有新精确提交六项CI全部成功后才能部署。完整消费者/原owner清理/两级事实与真实运行尚未关闭，生产开发仍OFF。AW最新7886ac97b的CI36691067775也已50项全部成功，源码edd56ebe3的主CI与九种原默认定时配置10运行/75作业完整成功回执继续有效。
+
+## 原选择接口精确发布、CI与本机部署回执（2026-09-30）
+
+限定原选择接口/测试类型补正源码 `1d48fb1703744acfc06841e3a34e8f742e8c98bd` 已推送；[精确CI36694912441](https://github.com/wangbinquan/CrewStation/actions/runs/36694912441)已六项全部success：static、unit、module、console、e2e、gate。此前54243196的类型失败、单行as const修正与11项真实PG/96断言、文件lint及单独完整typecheck成功记录保留；三份生产文件内容未因测试类型补正改变。限定原选择接口实现门PASS不扩大为完整consumer PASS。
+
+本机于2026-09-30T09:29:13.385Z完成该源码部署。迁移job `rfc034-consumer-owner-selection-types-migrate-1d48fb17` Complete=True，日志applied=0；原owner与Session数字表存在。八Deployment均generation=observedGeneration、Ready=1，storage-contract=1；默认Runner和三幅镜像OCI revision均严格指向同一完整源码SHA：
+
+| 组件 | generation / observed | Ready |
+| --- | --- | --- |
+| console | 205 / 205 | 1 |
+| cs-api | 199 / 199 | 1 |
+| cs-auth | 97 / 97 | 1 |
+| cs-controller | 164 / 164 | 1 |
+| cs-events | 67 / 67 | 1 |
+| cs-session | 116 / 116 | 1 |
+| mcp-capabilities | 63 / 63 | 1 |
+| mcp-operations | 63 / 63 | 1 |
+
+| 镜像 | 不可变摘要 |
+| --- | --- |
+| cs-console:dev | `sha256:003194963bc8d1dab45df2384cdcadb03110a1385f034b33f59e52017551dbc3` |
+| cs-control-plane:dev | `sha256:5fb9f79845e7b47bfea4e57ae1a817a21b87a00a664021bc867e36236641d026` |
+| cs-task-runtime:dev | `sha256:91b61a26f0e573afa78dbdbccbea62d40c4eac3135e85a5d9cc93d31c4f2391f` |
+
+默认Runner：`registry.crewstation-system.svc.cluster.local:5000/crewstation/task-runtime@sha256:91b61a26f0e573afa78dbdbccbea62d40c4eac3135e85a5d9cc93d31c4f2391f`。公开匿名路由核对：`/auth/login` HTTP200、`/` HTTP401符合现有forward-auth合同；没有切换真实身份、调用模型或创建/停止业务验证会话。构建使用git archive的该精确提交，未混入并行资源/拓扑工作；部署前验证原d01组件和默认镜像未变、更新时使用resourceVersion CAS。
+
+生产开发采集仍OFF，sourceScope仍business-tasks；仅原选择接口底座已部署，Session独立registration对拍、按turn固定页/真实文件分区、全部数字所选模型证据的同事务持久、原价修订/ACK、owner派发/完整清理屏障与两级事实/UI继续。CS-R02与两个RFC不关闭。该回执后继只写三份观测文档，不改变已部署源码；后继文档精确CI另外验证，共享STATE/RFC索引与并行输出完整保留。
