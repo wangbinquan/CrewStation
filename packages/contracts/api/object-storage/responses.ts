@@ -26,6 +26,8 @@ export const ObjectSpaceDtoSchema = z.strictObject({
   backendId: ResourceIdSchema, backendPlacementRevision: StorageRevisionSchema, planId: ResourceIdSchema, planRevision: StorageRevisionSchema,
   revision: StorageRevisionSchema, health: StorageHealthSchema, quotaBytes: StorageBytesSchema, usedBytes: StorageBytesSchema,
   reservedBytes: StorageBytesSchema, deletingBytes: StorageBytesSchema, objectCount: StorageBytesSchema, createdAt: z.iso.datetime(),
+  maxObjectBytes: StorageBytesSchema.optional(), maxConcurrentTransfers: z.number().int().positive().optional(),
+  quotaRevision: z.number().int().min(0).optional(), quotaSource: z.enum(['plan', 'project']).optional(),
 });
 export const StoredObjectDtoSchema = z.strictObject({
   id: ResourceIdSchema, spaceId: ResourceIdSchema, revision: StorageRevisionSchema, name: ObjectNameSchema,

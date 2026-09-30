@@ -9,7 +9,7 @@ export function projectComputePolicyUseCases(deps: AgentRuntimeUseCaseDeps) {
   const getProjectComputePolicy = async (actor: Actor, projectId: ProjectId): Promise<ProjectComputePolicyDto> => {
     await deps.projects.authorize(actor, projectId, 'view');
     const record = await deps.uow.read.projectPolicies.get(projectId), policy = record?.policy ?? INHERITED_COMPUTE_POLICY;
-    const effectiveDefaultProfile = policy.mode === 'inherit' ? (await deps.uow.read.profiles.getDefault())?.id ?? null : policy.defaultProfile;
+    const effectiveDefaultProfile = policy.mode === 'inherit' ? policy.defaultOverrideProfile ?? (await deps.uow.read.profiles.getDefault())?.id ?? null : policy.defaultProfile;
     return { projectId, revision: record?.revision ?? 0, policy, effectiveDefaultProfile,
       effectiveDevTaskProfile: policy.devTaskProfile ?? deps.defaultTaskProfile, updatedAt: record?.updatedAt.toISOString() ?? null };
   };
@@ -19,10 +19,11 @@ export function projectComputePolicyUseCases(deps: AgentRuntimeUseCaseDeps) {
       adminOnly(actor);
       await deps.projects.authorize(actor, projectId, 'view');
       const input = SaveProjectComputePolicySchema.parse(raw), { policy } = input;
-      for (const name of policy.allowedProfiles) {
+      for (const name of [...new Set([...policy.allowedProfiles, ...policy.additionalProfiles ?? [], ...policy.excludedProfiles ?? [], ...policy.defaultOverrideProfile ? [policy.defaultOverrideProfile] : []])]) {
         const profile = await deps.uow.read.profiles.get(name);
         if (!profile) throw validation(`算力档位 ${name} 不存在，请刷新目录`, { field: 'allowedProfiles' });
-        if (name === policy.defaultProfile && profile.protocol === 'terminal') throw validation('项目默认档位必须支持业务 Agent，不能使用通用终端档位', { field: 'defaultProfile' });
+        if ([policy.defaultProfile, policy.defaultOverrideProfile].includes(name) && profile.protocol === 'terminal') throw validation('项目默认档位必须支持业务 Agent，不能使用通用终端档位', { field: 'defaultProfile' });
+        if (name === policy.defaultOverrideProfile && ((!profile.defaultVisible && !policy.additionalProfiles?.includes(name)) || !profile.enabled)) throw validation('项目默认档位必须已授权并启用', { field: 'defaultOverrideProfile' });
       }
       if (policy.devTaskProfile && !await deps.taskProfiles.exists(policy.devTaskProfile)) throw validation(`开发容器套餐 ${policy.devTaskProfile} 不存在`, { field: 'devTaskProfile' });
       const saved = await deps.uow.run((scope) => scope.projectPolicies.save({ projectId, policy, revision: input.expectedRevision + 1, updatedBy: actor.userId, updatedAt: deps.clock.now() }, input.expectedRevision));

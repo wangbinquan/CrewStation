@@ -1,18 +1,20 @@
 import type {
-  ProjectServicePolicyDto, SaveProjectServicePolicy,
+  ProjectServicePolicyDto, SaveProjectServicePolicy, ProjectDomainPreview,
   CreateServicePlan, CreateTaskProfile,  ProjectCreationCatalog, ProjectPage, ProjectPageEntry, ProjectPageQuery,
   Actor, CreateProjectRequest, ListProjectsQuery, ManifestKind, MemberDto, ProjectDto, ProjectId, ProjectState, QuotaDto, ServiceDto,
   ServiceId, ServicePlanDto, ServicePlanWrite, TaskProfileWrite, SetMemberRequest, SetQuotaRequest, TaskProfileDto, UserId,
   AppVisibilityDto, SetAppVisibilityRequest, AppPresentationDto, SetAppPresentationRequest, MemberCandidateDto, MarketAppsQuery, MarketAppDto,
   AppAccessRequestDto, AppAccessRequestPage, AppAccessStatusDto, CreateAppAccessRequest, DecideAppAccessRequest, RequestPageQuery,
 } from '@crewstation/contracts';
+import type { NamespaceQuota, ProjectNamespaceQuotaDto, ResourceTarget, ResourceValues } from '@crewstation/contracts';
+import type { ProjectDeletionApi } from './deletion';
 
 export type ProjectAction =
   | 'view' | 'develop' | 'publish' | 'switch-traffic' | 'manage-members' | 'manage-testers'
   | 'approve-data-access' | 'manage-production-config' | 'manage-development-config'
   | 'force-release-session' | 'view-preview' | 'manage-quota' | 'archive'
   // RFC-021：下线／推迟／重新部署待验证版本、开关正式版本维护（负责人与管理员）。
-  | 'manage-slots' | 'manage-maintenance' | 'manage-task-storage';
+  | 'manage-slots' | 'manage-maintenance' | 'manage-task-storage' | 'request-resources';
 
 export type EffectiveRole = 'admin' | 'owner' | 'developer' | 'tester' | 'user';
 
@@ -54,13 +56,14 @@ export type AppAccessVerdict =
 export type MarketListing = Omit<MarketAppDto, 'production' | 'entry'> & { serviceId?: ServiceId };
 
 /** project 模块对外能力；其他模块经 ports 注入其中的子集。 */
-export interface ProjectModuleApi {
+export interface ProjectModuleApi extends ProjectDeletionApi {
   readonly name: 'project';
   isAdmin(userId: UserId): Promise<boolean>;
   roleOf(actor: Actor, projectId: ProjectId): Promise<EffectiveRole | undefined>;
   /** 无权限时抛 forbidden；非成员抛 not_found。 */
   authorize(actor: Actor, projectId: ProjectId, action: ProjectAction): Promise<EffectiveRole>;
   creationCatalog(actor: Actor): Promise<ProjectCreationCatalog>;
+  projectDomainPreview(actor: Actor, slug: string): Promise<ProjectDomainPreview>;
   createProject(actor: Actor, input: CreateProjectRequest): Promise<ProjectDto>;
   getProject(actor: Actor, projectId: ProjectId): Promise<ProjectDto>;
   listProjects(actor: Actor, query?: ListProjectsQuery): Promise<ProjectDto[]>;
@@ -107,6 +110,10 @@ export interface ProjectModuleApi {
   getQuota(actor: Actor, projectId: ProjectId): Promise<QuotaDto>;
   setQuota(actor: Actor, projectId: ProjectId, input: SetQuotaRequest): Promise<QuotaDto>;
   quotaLimit(projectId: ProjectId): Promise<number | undefined>;
+  getNamespaceQuota(actor: Actor, projectId: ProjectId): Promise<ProjectNamespaceQuotaDto>;
+  namespaceQuota(projectId: ProjectId): Promise<NamespaceQuota>;
+  applyResourceChange(actor: Actor, projectId: ProjectId, command: { operationId: string; target: ResourceTarget; expectedRevision: string; values: ResourceValues }): Promise<{ revision: string; effect: string; applied: boolean }>;
+  resourceChangeReceipt(projectId: ProjectId, operationId: string): Promise<{ revision: string; effect: string; applied: boolean } | undefined>;
   getServicePolicy(actor: Actor, projectId: ProjectId): Promise<ProjectServicePolicyDto>;
   listProjectServicePlans(actor: Actor, projectId: ProjectId): Promise<ServicePlanDto[]>;
   saveServicePolicy(actor: Actor, projectId: ProjectId, input: SaveProjectServicePolicy): Promise<ProjectServicePolicyDto>;

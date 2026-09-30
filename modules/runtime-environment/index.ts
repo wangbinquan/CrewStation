@@ -3,3 +3,4 @@ export { createRuntimeEnvironmentModule, runtimeEnvironmentMigrations } from './
 export type { RuntimeEnvironmentModule, RuntimeEnvironmentModuleDeps } from './wiring';
 export { createManagedRuntimeEnvironmentModule } from './wiring';
 export type { ManagedRuntimeEnvironmentDeps } from './wiring';
+export { imageAllocationRevision } from './api/allocationRevision';

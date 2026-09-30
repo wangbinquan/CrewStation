@@ -7,7 +7,7 @@ export interface EnvironmentRepository {
   getById(id: TaskId): Promise<TaskEnvironment | undefined>;
   /** 事务里锁住这一行再读：与并发的环境更新串行（台账补投影用，RFC-025）。 */
   getForUpdate(id: TaskId): Promise<TaskEnvironment | undefined>;
-  listByProject(projectId: ProjectId, states?: EnvironmentState[]): Promise<TaskEnvironment[]>;
+  listByProject(projectId: ProjectId, states?: EnvironmentState[], page?: { after?: string; limit: number }): Promise<TaskEnvironment[]>;
   listByStates(states: EnvironmentState[], page?: { after?: string; limit: number }): Promise<TaskEnvironment[]>;
   /** 调用链列表（Design §14）：本项目开发会话与业务任务按 traceId 分组的时间键，按开始时间倒序翻页。 */
   traceKeys(projectId: ProjectId, page: EnvironmentTracePage): Promise<EnvironmentTraceKey[]>;

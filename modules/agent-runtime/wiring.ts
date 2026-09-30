@@ -1,6 +1,7 @@
 import { launchVersionUseCases } from './application/launchVersions';
 import { precondition } from '@crewstation/kernel';
 import { projectComputePolicyUseCases } from './application/projectComputePolicy';
+import { computeResourceAllocationUseCases } from './application/resourceAllocation';
 import { projectProfileUseCases } from './application/projectProfiles';
 import { projectComputeRoutes } from './http/projectComputeRoutes';
 import type { ComputeProjects } from './ports/projects';
@@ -83,6 +84,7 @@ export function createAgentRuntimeModule(deps: AgentRuntimeModuleDeps): AgentRun
   const api: AgentRuntimeModuleApi = {
     name: 'agent-runtime',
     ...projectComputePolicyUseCases(useCaseDeps), ...projectProfileUseCases(useCaseDeps),
+    ...computeResourceAllocationUseCases(useCaseDeps, deps.isAdmin),
     listProfiles: queries.listProfiles, getProfile: queries.getProfile, listSummaries: queries.listSummaries, listDisplayNames: queries.listDisplayNames,
     ...profileWriteUseCases(useCaseDeps),
     ...profileSettingUseCases(useCaseDeps),

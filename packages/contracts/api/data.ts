@@ -21,7 +21,7 @@ export const DataResourceDtoSchema = z.object({
 export const TaskDataModeSchema = z.enum(['development', 'diagnostic-readonly', 'production-change']);
 export const TaskDataBindingStateSchema = z.enum(['requested', 'approved', 'rejected', 'active', 'expired', 'revoked']);
 
-/** 开发会话内申请数据访问模式；后两种需负责人批准（R34）。 */
+/** 开发会话内申请数据访问模式；后两种由负责人申请、管理员批准（R34）。 */
 export const RequestTaskDataBindingSchema = z.object({
   mode: TaskDataModeSchema,
   reason: z.string().max(500).optional(),

@@ -18,7 +18,9 @@ export function reapplyNamespacesUseCase(steps: ProvisioningSteps, logger: Logge
     let applied = 0, failed = 0;
     for (const facts of projects) {
       try {
-        await steps.ensureNamespace(facts);
+        const current = await steps.loadProject(facts.projectId);
+        if (!current || current.state === 'archived' || current.state === 'deleting') continue;
+        await steps.ensureNamespace(current);
         applied += 1;
       } catch (error) {
         failed += 1;

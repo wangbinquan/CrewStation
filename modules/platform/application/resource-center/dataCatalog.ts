@@ -1,0 +1,19 @@
+import { notFound } from '@crewstation/kernel';
+import type { ResourceCatalogPorts } from '../../ports/resourceCatalogs';
+import { actions, catalogAdapter, quotaMetric, resourceCommand } from './catalog';
+
+const GIB = 1024 ** 3;
+export function dataResourceCatalogs(p: ResourceCatalogPorts) {
+  const objects = p.objects;
+  const plans = catalogAdapter('object-plan', async (id) => {
+    if (!objects) return [];
+    const [catalog, policy] = await Promise.all([objects.plans(p.actor), objects.projectPolicy(p.actor, id)]);
+    return catalog.flatMap((plan) => actions({ target: { resourceType: 'object-plan', resourceId: plan.id, action: 'grant' }, name: plan.name, revision: p.revisions.objectPlan(policy.revision, plan), current: {}, fields: [], impact: ['扩大项目可选对象存储套餐范围，后续发布按 Manifest 创建空间', '不会移动现有数据或创建新的后端'], owned: policy.planIds.includes(plan.id), available: plan.enabled, ...(!plan.enabled ? { reason: '套餐已停用' } : {}), source: 'granted', metrics: [quotaMetric(`object-template:${plan.id}`, 'bytes', '空间容量', 'GiB', plan.quotaBytes / GIB), quotaMetric(`object-template:${plan.id}`, 'maxObjectGiB', '单对象上限', 'GiB', plan.maxObjectBytes / GIB), quotaMetric(`object-template:${plan.id}`, 'maxConcurrentTransfers', '并发传输', '个', plan.maxConcurrentTransfers)] }));
+  }, (c) => { if (!objects) throw notFound('对象存储'); return objects.applyResourceChange(c.actor, c.projectId, resourceCommand(c)); }, objects?.resourceChangeReceipt);
+  const spaces = catalogAdapter('object-space', async (id) => {
+    if (!objects) return [];
+    return (await objects.spaces(p.actor, id)).map((space) => ({ target: { resourceType: 'object-space' as const, resourceId: space.id, action: 'set-quota' as const }, name: `${space.env === 'production' ? '生产' : '开发'}对象空间`, revision: p.revisions.objectSpace(space), current: { quotaGiB: space.quotaBytes / GIB, maxObjectGiB: (space.maxObjectBytes ?? 0) / GIB, maxConcurrentTransfers: space.maxConcurrentTransfers ?? 1 }, fields: [{ key: 'quotaGiB', label: '空间容量', type: 'number' as const, min: 1, unit: 'GiB', required: true }, { key: 'maxObjectGiB', label: '单对象上限', type: 'number' as const, min: 1, unit: 'GiB', required: true }, { key: 'maxConcurrentTransfers', label: '并发传输上限', type: 'number' as const, min: 1, max: 1000, integer: true, unit: '个', required: true }], impact: ['缩容必须覆盖已用、预留与待删除容量', '同时受后端总预算约束；只调整准入额度，不搬迁或删除数据'], owned: true, available: true, source: space.quotaSource === 'project' ? 'configuration' as const : 'granted' as const, facts: [{ label: '环境', value: space.env }, { label: '健康', value: space.health }, { label: '对象数', value: String(space.objectCount) }], metrics: [quotaMetric(`object-space:${space.id}`, 'quotaGiB', '容量', 'GiB', space.quotaBytes / GIB, space.usedBytes / GIB, (space.reservedBytes + space.deletingBytes) / GIB), quotaMetric(`object-space:${space.id}`, 'maxObjectGiB', '单对象上限', 'GiB', space.maxObjectBytes === undefined ? null : space.maxObjectBytes / GIB), quotaMetric(`object-space:${space.id}`, 'maxConcurrentTransfers', '并发传输', '个', space.maxConcurrentTransfers ?? null)] }));
+  }, (c) => { if (!objects) throw notFound('对象存储'); return objects.applyResourceChange(c.actor, c.projectId, resourceCommand(c)); }, objects?.resourceChangeReceipt);
+  const production = catalogAdapter('production-data', (id) => p.production.listProductionAccessTargets(p.actor, id), (c) => p.production.applyProductionAccess(c.actor, c.projectId, { operationId: c.operationId, taskId: c.target.resourceId as Parameters<typeof p.production.applyProductionAccess>[2]['taskId'], expectedRevision: c.expectedRevision, values: c.values, requestedBy: c.requestedBy, reason: c.reason }), p.production.productionAccessReceipt, (id, _target, _receipt, operationId) => p.production.observeProductionAccess(id, operationId));
+  return [plans, spaces, production];
+}

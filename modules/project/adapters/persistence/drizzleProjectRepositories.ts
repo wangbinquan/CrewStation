@@ -1,6 +1,7 @@
 import type { ManifestKind, MemberRole, ProjectId, ProjectState, ServiceId, UserId } from '@crewstation/contracts';
 import type { Executor } from '@crewstation/persistence';
-import { and, eq, gt, inArray } from 'drizzle-orm';
+import { and, eq, gt, inArray, ne } from 'drizzle-orm';
+import { precondition } from '@crewstation/kernel';
 import type { Project } from '../../domain/project';
 import type { Service } from '../../domain/service';
 import type { MembershipRepository, ProjectRepository, ServiceRepository } from '../../ports/repositories';
@@ -10,7 +11,10 @@ export function drizzleProjectRepository(db: Executor): ProjectRepository {
   const first = (rows: Array<typeof projects.$inferSelect>): Project | undefined => (rows[0] ? toProject(rows[0]) : undefined);
   return {
     insert: async (project) => { await db.insert(projects).values(toProjectRow(project)); },
-    update: async (project) => { await db.update(projects).set(toProjectRow(project)).where(eq(projects.id, project.id)); },
+    update: async (project) => {
+      const rows = await db.update(projects).set(toProjectRow(project)).where(and(eq(projects.id, project.id), ne(projects.state, 'deleting'))).returning({ id: projects.id });
+      if (rows.length !== 1) throw precondition('项目正在删除或已不存在，不能恢复原状态');
+    },
     getById: (id) => db.select().from(projects).where(eq(projects.id, id)).then(first),
     getBySlug: (slug) => db.select().from(projects).where(eq(projects.slug, slug)).then(first),
     list: async (page) => (await db.select().from(projects).where(page?.after ? gt(projects.id, page.after) : undefined).orderBy(page ? projects.id : projects.createdAt).limit(page ? Math.min(500, Math.max(1, page.limit)) : 2_147_483_647)).map(toProject),

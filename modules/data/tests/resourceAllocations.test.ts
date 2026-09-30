@@ -1,0 +1,34 @@
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { createTestDatabase, testDatabaseAvailable, type TestDatabase } from '@crewstation/testkit';
+import { eq } from 'drizzle-orm';
+import { objectCatalogRepository } from '../adapters/persistence/objectCatalog';
+import { objectSpaces } from '../adapters/persistence/objectTables';
+import { objectPlanAllocationRevision, objectSpaceAllocationRevision } from '../api/allocationRevision';
+import { dataMigrations } from '../wiring';
+import { backendFixture, objectId, sourceFixture } from './objectFixtures';
+const available = await testDatabaseAvailable(), GIB = 1024 ** 3; let db: TestDatabase;
+beforeAll(async () => { if (available) db = await createTestDatabase([dataMigrations]); }); afterAll(async () => { await db?.drop(); });
+describe.skipIf(!available)('resource center object allocations', () => {
+  test('scoped plans, independent quota override, replay and authoritative used/reserved/deleting budget constraints', async () => {
+    const catalog = objectCatalogRepository(db.db), source = sourceFixture(), backend = await catalog.registerBackend(backendFixture({ budgetBytes: GIB * 10, health: 'ready' }));
+    const plan = await catalog.savePlan(objectId(), { name: 'Objects', backendId: backend.id, quotaBytes: GIB * 2, maxObjectBytes: GIB, maxConcurrentTransfers: 4, enabled: true });
+    const grant = { operationId: objectId(), projectId: source.projectId, target: { resourceType: 'object-plan' as const, resourceId: plan.id, action: 'grant' as const }, expectedRevision: objectPlanAllocationRevision(1, plan), values: {} };
+    const receipt = await catalog.applyResourceChange(grant); expect(receipt.applied).toBe(true);
+    expect(await catalog.applyResourceChange(grant)).toEqual(receipt); expect((await catalog.policy(source.projectId)).planIds).toEqual([plan.id]);
+    const space = await catalog.ensureSpace({ ...source, id: objectId(), planId: plan.id, deploymentMode: 'local' });
+    const quota = { operationId: objectId(), projectId: source.projectId, target: { resourceType: 'object-space' as const, resourceId: space.id, action: 'set-quota' as const }, expectedRevision: objectSpaceAllocationRevision(space), values: { quotaGiB: 3, maxObjectGiB: 2, maxConcurrentTransfers: 7 } };
+    expect((await catalog.applyResourceChange(quota)).applied).toBe(true);
+    const next = (await catalog.space(space.id))!; expect(next).toMatchObject({ quotaBytes: GIB * 3, maxObjectBytes: GIB * 2, maxConcurrentTransfers: 7, quotaSource: 'project' });
+    await catalog.ensureSpace({ ...source, id: space.id, planId: plan.id, deploymentMode: 'local' }); expect((await catalog.space(space.id))!.quotaBytes).toBe(GIB * 3);
+    expect(await catalog.applyResourceChange(quota)).toEqual((await catalog.resourceChangeReceipt(source.projectId, quota.operationId))!);
+    await expect(catalog.applyResourceChange({ ...quota, operationId: objectId(), projectId: sourceFixture().projectId })).rejects.toMatchObject({ kind: 'not_found' });
+    const used = { ...next, usedBytes: GIB, reservedBytes: GIB / 4, deletingBytes: GIB / 4 }; await db.db.update(objectSpaces).set({ body: used }).where(eq(objectSpaces.id, next.id));
+    const change = (values: typeof quota.values) => catalog.applyResourceChange({ ...quota, operationId: objectId(), expectedRevision: objectSpaceAllocationRevision(used), values });
+    await expect(change({ quotaGiB: 1, maxObjectGiB: 1, maxConcurrentTransfers: 2 })).rejects.toMatchObject({ kind: 'precondition' });
+    await expect(change({ quotaGiB: 11, maxObjectGiB: 1, maxConcurrentTransfers: 2 })).rejects.toMatchObject({ kind: 'quota_exceeded' });
+    await expect(change({ quotaGiB: 2, maxObjectGiB: 3, maxConcurrentTransfers: 2 })).rejects.toMatchObject({ kind: 'validation' });
+    await expect(change({ quotaGiB: 2, maxObjectGiB: 1, maxConcurrentTransfers: 1.5 })).rejects.toMatchObject({ kind: 'validation' });
+    expect((await catalog.space(space.id))!.quotaBytes).toBe(GIB * 3);
+    expect(await catalog.resourceChangeReceipt(sourceFixture().projectId, quota.operationId)).toBeUndefined();
+  });
+});

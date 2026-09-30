@@ -11,6 +11,7 @@ import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import type { ApiCatalogModule } from '../wiring';
 import { apiCatalogMigrations, createApiCatalogModule } from '../wiring';
+import { apiAllocationRevision } from '../api/allocationRevision';
 
 const available = await testDatabaseAvailable();
 let tdb: TestDatabase;
@@ -22,6 +23,7 @@ let dev: Actor;
 let issuesProject: { projectId: ProjectId; serviceId: ServiceId };
 let demo: { projectId: ProjectId; serviceId: ServiceId };
 let workerB: { projectId: ProjectId; serviceId: ServiceId };
+let eligible = true;
 
 const hosts = { prodHost: (s: string) => `${s}.cs.localhost`, previewHost: (s: string) => `preview.${s}.cs.localhost`, serviceHost: (s: string) => `${s}.svc.cs.internal` };
 const service = { command: ['bun', 'run', 'src/main.ts'], port: 3000, servicePlanId: BUILTIN_RESOURCES.servicePlanSmall };
@@ -80,8 +82,8 @@ beforeAll(async () => {
   await project.api.setMember(owner, demo.projectId, { userId: dev.userId, role: 'developer' });
   catalog = createApiCatalogModule({
     db: tdb.db,
-    projects: project.api,
-    users: { displayName: async (id) => id === dev.userId ? '开发者小李' : id === admin.userId ? '管理员老王' : undefined },
+    projects: { ...project.api, resourceRequestable: async () => eligible },
+    users: { displayName: async (id) => id === dev.userId ? '开发者小李' : id === admin.userId ? '管理员老王' : id === owner.userId ? '负责人小周' : undefined },
     services: {
       resolveService: async (serviceId) => {
         const s = await project.api.getService(admin, serviceId).catch(() => undefined);
@@ -141,28 +143,28 @@ describe.skipIf(!available)('api-catalog module', () => {
   test('申请 → 审批 → Grant 与 grant-changed 事件；重复申请、默认开放、非成员被拒', async () => {
     const stranger: Actor = { userId: '01a0bf5d-8f4b-7622-8c1a-d607ceefa8df' as UserId, isAdmin: false };
     await expect(catalog.api.requestAccess(stranger, demo.serviceId, { operationId: detailKey })).rejects.toMatchObject({ kind: 'not_found' });
-    await expect(catalog.api.requestAccess(dev, demo.serviceId, { operationId: listKey })).rejects.toMatchObject({ kind: 'precondition' });
-    const request = await catalog.api.requestAccess(dev, demo.serviceId, { operationId: detailKey, reason: '同步工单' });
+    await expect(catalog.api.requestAccess(owner, demo.serviceId, { operationId: listKey })).rejects.toMatchObject({ kind: 'precondition' });
+    const request = await catalog.api.requestAccess(owner, demo.serviceId, { operationId: detailKey, reason: '同步工单' });
     requestId = request.id;
-    expect(request).toMatchObject({ state: 'pending', serviceId: demo.serviceId, operationId: detailKey, reason: '同步工单', requestedBy: dev.userId });
-    await expect(catalog.api.requestAccess(dev, demo.serviceId, { operationId: detailKey })).rejects.toMatchObject({ kind: 'conflict' });
+    expect(request).toMatchObject({ state: 'pending', serviceId: demo.serviceId, operationId: detailKey, reason: '同步工单', requestedBy: owner.userId });
+    await expect(catalog.api.requestAccess(owner, demo.serviceId, { operationId: detailKey })).rejects.toMatchObject({ kind: 'conflict' });
     const listed = await catalog.api.listRequests(owner, demo.projectId);
     expect(listed.map((r) => r.id)).toEqual([requestId]);
-    expect(listed[0]).toMatchObject({ requestedByName: '开发者小李' }); expect(listed[0]?.decidedByName).toBeUndefined();
+    expect(listed[0]).toMatchObject({ requestedByName: '负责人小周' }); expect(listed[0]?.decidedByName).toBeUndefined();
     await expect(catalog.api.listRequests(dev)).rejects.toMatchObject({ kind: 'forbidden' });
     expect((await catalog.api.listRequests(admin)).length).toBe(1);
     await expect(catalog.api.decideRequest(dev, requestId, { approve: true })).rejects.toMatchObject({ kind: 'forbidden' });
     const decided = await catalog.api.decideRequest(admin, requestId, { approve: true, decision: '同意' });
     expect(decided).toMatchObject({ state: 'approved', decidedBy: admin.userId, decision: '同意' });
     expect(decided.decidedAt).toBeDefined();
-    expect((await catalog.api.listRequests(admin))[0]).toMatchObject({ requestedByName: '开发者小李', decidedByName: '管理员老王' });
+    expect((await catalog.api.listRequests(admin))[0]).toMatchObject({ requestedByName: '负责人小周', decidedByName: '管理员老王' });
     await expect(catalog.api.decideRequest(admin, requestId, { approve: false })).rejects.toMatchObject({ kind: 'precondition' });
-    await expect(catalog.api.requestAccess(dev, demo.serviceId, { operationId: detailKey })).rejects.toMatchObject({ kind: 'conflict' });
+    await expect(catalog.api.requestAccess(owner, demo.serviceId, { operationId: detailKey })).rejects.toMatchObject({ kind: 'conflict' });
     expect(await catalog.api.grantedOperations('demo/demo')).toMatchObject({ operations: [detailKey], defaultOpen: [listKey] });
     expect(await catalog.api.grantedOperations('nobody/nobody')).toMatchObject({ operations: [], defaultOpen: [listKey] });
     expect((await catalog.api.listOperations(dev, demo.serviceId)).find((o) => o.id === detailKey)?.granted).toBe(true);
     // 拒绝不产生 Grant
-    const second = await catalog.api.requestAccess(dev, demo.serviceId, { operationId: createKey });
+    const second = await catalog.api.requestAccess(owner, demo.serviceId, { operationId: createKey });
     expect((await catalog.api.decideRequest(admin, second.id, { approve: false, decision: '写操作暂不开放' })).state).toBe('rejected');
     expect((await catalog.api.grantedOperations('demo/demo')).operations).toEqual([detailKey]);
     expect(await grantChangedEvents()).toEqual([[detailKey, 'granted']]);
@@ -186,7 +188,7 @@ describe.skipIf(!available)('api-catalog module', () => {
     await expect(catalog.api.revokeGrant(admin, demo.serviceId, detailKey)).rejects.toMatchObject({ kind: 'not_found' });
     expect((await grantChangedEvents()).map(([, state]) => state)).toEqual(['granted', 'revoked']);
     // 撤销后可以再次申请并批准
-    const again = await catalog.api.requestAccess(dev, demo.serviceId, { operationId: detailKey });
+    const again = await catalog.api.requestAccess(owner, demo.serviceId, { operationId: detailKey });
     await catalog.api.decideRequest(admin, again.id, { approve: true });
     expect((await catalog.api.grantedOperations('demo/demo')).operations).toEqual([detailKey]);
   });
@@ -243,7 +245,7 @@ describe.skipIf(!available)('api-catalog module', () => {
     expect((await app.request(`/v1/catalog/proxies/${issuesProxyId}/openapi`, { headers: as(dev) })).status).toBe(400);
     // 申请（先把 createKey 改回 targeted 以便申请）
     await catalog.api.setOpenPolicy(admin, createKey, 'targeted');
-    const created = await app.request(`/v1/services/${demo.serviceId}/api-requests`, { method: 'POST', headers: as(dev, json), body: JSON.stringify({ operationId: createKey, reason: '需要建单' }) });
+    const created = await app.request(`/v1/services/${demo.serviceId}/api-requests`, { method: 'POST', headers: as(owner, json), body: JSON.stringify({ operationId: createKey, reason: '需要建单' }) });
     expect(created.status).toBe(201);
     const createdBody = (await created.json()) as { id: string; state: string };
     expect(createdBody.state).toBe('pending');
@@ -256,5 +258,26 @@ describe.skipIf(!available)('api-catalog module', () => {
     expect((await app.request(`/v1/services/${demo.serviceId}/grants/${encoded}`, { method: 'DELETE', headers: as(admin) })).status).toBe(204);
     expect((await app.request(`/v1/services/${demo.serviceId}/grants/${encoded}`, { method: 'DELETE', headers: as(admin) })).status).toBe(404);
     expect((await catalog.api.grantedOperations('demo/demo')).operations).toEqual([detailKey]);
+  });
+  test('资源命令重新鉴权、版本比较、原操作幂等；默认开放不能从项目撤销', async () => {
+    const operations = await catalog.api.listOperations(admin, demo.serviceId), op = operations.find((o) => o.id === detailKey)!;
+    const input = { operationId: Bun.randomUUIDv7(), target: { resourceType: 'api-operation' as const, resourceId: detailKey, action: 'revoke' as const }, expectedRevision: apiAllocationRevision(op, true), values: {} };
+    await expect(catalog.api.applyResourceChange({ ...owner, isAdmin: true }, demo.serviceId, input)).rejects.toMatchObject({ kind: 'forbidden' });
+    await expect(catalog.api.requestAccess(dev, demo.serviceId, { operationId: createKey })).rejects.toMatchObject({ kind: 'forbidden' });
+    const receipt = await catalog.api.applyResourceChange(admin, demo.serviceId, input); expect(receipt.applied).toBe(false); expect(await catalog.api.applyResourceChange(admin, demo.serviceId, input)).toEqual(receipt); expect(await catalog.api.resourceChangeReceipt(demo.serviceId, input.operationId)).toEqual(receipt);
+    await expect(catalog.api.applyResourceChange(admin, demo.serviceId, { ...input, values: { extra: true } })).rejects.toMatchObject({ kind: 'validation' });
+    await expect(catalog.api.applyResourceChange(admin, demo.serviceId, { ...input, operationId: Bun.randomUUIDv7() })).rejects.toMatchObject({ kind: 'conflict' });
+    const defaultOp = operations.find((o) => o.id === listKey)!; await expect(catalog.api.applyResourceChange(admin, demo.serviceId, { ...input, operationId: Bun.randomUUIDv7(), target: { ...input.target, resourceId: listKey }, expectedRevision: apiAllocationRevision(defaultOp, true) })).rejects.toMatchObject({ kind: 'precondition' });
+    const grant = { ...input, target: { ...input.target, action: 'grant' as const }, expectedRevision: apiAllocationRevision(op, false) }; const results = await Promise.allSettled([Bun.randomUUIDv7(), Bun.randomUUIDv7()].map((operationId) => catalog.api.applyResourceChange(admin, demo.serviceId, { ...grant, operationId })));
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1); expect(results.find((r) => r.status === 'rejected')).toMatchObject({ reason: { kind: 'conflict' } });
+  });
+  test('缺少申请目录端口时关闭旧入口；撤回目录后不能申请或批准，原申请保留待审', async () => {
+    const unconfigured = createApiCatalogModule({ db: tdb.db, projects: project.api, hosts: { platformApiHost: () => 'api.svc.cs.internal' }, services: { resolveService: async (serviceId) => ({ projectId: demo.projectId, serviceId, slug: 'demo', identity: 'demo/demo' }), resolveServiceIdentity: async () => undefined } });
+    // 旧实现漏装目录端口时默认允许申请，绕过“明确可申请”的边界。
+    await expect(unconfigured.api.requestAccess(owner, demo.serviceId, { operationId: createKey })).rejects.toMatchObject({ kind: 'forbidden' });
+    eligible = false; await expect(catalog.api.requestAccess(owner, demo.serviceId, { operationId: createKey })).rejects.toMatchObject({ kind: 'forbidden' });
+    eligible = true; const request = await catalog.api.requestAccess(owner, demo.serviceId, { operationId: createKey, reason: '显式目录申请' }); eligible = false;
+    await expect(catalog.api.decideRequest(admin, request.id, { approve: true, decision: '已撤回目录' })).rejects.toMatchObject({ kind: 'forbidden' });
+    expect((await catalog.api.listRequests(owner, demo.projectId)).find((r) => r.id === request.id)?.state).toBe('pending'); eligible = true;
   });
 });

@@ -25,6 +25,7 @@
 
 .small { --dialog-width: 480px; }
 .large { --dialog-width: 880px; }
+.fullscreen { --dialog-width: calc(100vw - 32px); height: calc(100dvh - 32px); }
 
 .dialog::backdrop {
   background: var(--cs-color-backdrop);

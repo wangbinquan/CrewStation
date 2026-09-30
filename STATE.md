@@ -1,3 +1,19 @@
+## 2026-09-30 RFC-036 项目资源中心候选与自查
+
+资源中心双端正式页、11 类资源申请／同页管理员调整、持久审批与实际生效观测、精确拓扑归属和统一弹窗已形成候选。真实隔离 PG／HTTP + 正式路由渲染汇总 171 pass／0 fail、1280 断言、35 文件；旧 API 缺失目录配置的红回归后修正组合接线，追加 11 pass／0 fail、92 断言。筛选紧凑布局及 UI／模型／拓扑专项 30 pass／0 fail、203 断言；正式组件三种演示角色、桌面／窄屏、顶层 Esc 草稿与焦点已浏览器检查。console 构建、双类型检查及候选 lint 通过，定向新增代码覆盖约 98.48%。[验收与实现自查](proposal/rfc/RFC-036-project-resource-workspace/acceptance.md)记录证据与待办，RFC 保持 In Progress。作者最新指示先提交自有清单，消息协调不再作为本地提交前置；保留共享文件的完整并行内容，未新增追踪他人文件。平台 wiring 后续新增的并行准入接线造成归档命名空间回归及 hook 超时，暂留工作树，本轮其余清单精确提交接续；结构门禁当前仅被其他会话 resources/0004 迁移未入锁阻断。尚未推送、部署或真实授权变更，RFC-034 的 965b45e8 已保留；完整依赖与组合回归仍须闭环。
+
+## 2026-09-30 RFC-037 项目创建弹窗与彻底删除（实施中）
+
+作者已批准完整 RFC 实施、提交上库、本机部署和自主验证。[RFC-037 三件套](proposal/rfc/RFC-037-project-creation-and-deletion/proposal.md)及[交互稿](proposal/rfc/RFC-037-project-creation-and-deletion/prototype/README.md)完成；正式创建已改共享 FormDialog，实际 HostNaming 域名预览、模板内容、自建／代建／接入、旧书签和草稿／焦点接线齐全。后端域名 4、console 14 项通过，实际组件隔离浏览器已有桌面／手机截图，尚非部署验收。删除底座／配置／身份／客户端 131 项及实际队列 4 项通过；新增资源台账准入共享／排他锁、12 表全量历史／间接清零和旧键墓碑，相关 78 项通过；cluster-control 原 UID、完整 discovery、PV 与正常 Namespace 终结全模块 166 项通过。原 Pod 保护、实际工作盘／仓库／数据库／对象／镜像回收及其余 owner 继续；22 owner 全部装配前产品删除仍关闭。自有资源 0004 迁移入锁；后端类型／精确 lint 通过，当前全库结构仅被并行 dev-session 在制依赖阻断。尚未完整门禁、提交、部署或真实验证资源；保留 RFC-036／034 并行工作及下方历史，详见 plan 回执。
+
+## 2026-09-30 平台管理导航：项目与能力供给前移
+
+按作者要求将「供给与接入」改为「项目与能力供给」，包含项目管理／能力接入，整组排在「运行与观测」上方；左栏与总览卡片共用定义同步调整，中英文文案和 RFC-003 §4 修订已回填。导航／空间边界／文案／存储总览相关 35 pass／0 fail，精确 ESLint、console 类型与生产构建通过；回归先在旧实现上确认三项失败后修正。一次完整 `bun run check` 被并行项目资源任务三份新迁移未入锁阻断（project/0014_project_resource_policies、resource-access/0001_create_schema、agent-runtime/0008_resource_allocations），日志 `/private/tmp/cs-admin-supply-nav-check-20260930.log`。作者随后明确要求只提交上库，五个导航／文案／测试／RFC 路径已精确提交并推送为 `0a207acf9389cc6a5ee0b64a0f389c8a14f075b2`；[精确 CI 36681744659](https://github.com/wangbinquan/CrewStation/actions/runs/36681744659) 已终态六项 success（含新增代码防护与实机端到端）。最终 fetch 确认本地与 origin/main 同为并行后继 `d01ba8223fc08c8b2b70ee4db859e560c2151668`，保留本提交及其五个路径内容，暂存区为空。未部署，未改动并行迁移或锁文件；本共享 STATE 记录保留在工作树，未随代码提交。
+
+## 2026-09-30 RFC-034 原键停止已部署，实际来源设计接续
+
+bebb3d9b3b2a879a8e8ecf9b56b818fc912b15b7已精确推送，CI36665601664六项success；2026-09-30T04:11:33.945Z八组件Ready=1、storage-contract=1、迁移Complete、公开登录HTTP200，Runner默认摘要已更新。4307/142skip/0和独立限定实现门PASS的源码已本机部署；生产开发采集仍OFF，旧会话/固定档位不替换。实际原生来源/临时HOME沿革限定v2设计与30路径最终静态实现门PASS，相关73/0与真实适配3/0及精确ESLint通过，完整check/精确CI/部署待回执；owner全派发/清理/consumer/同快照事实/两级UI及真实身份模型验收仍未关闭。详见RFC034 development-stop与development-native-source，下方保留历史。
+
 ## 2026-09-30 RFC-034 原键持久停止完整候选通过
 
 23路径冻结完整门禁4307 pass/142 skip/0 fail、27307断言、860文件通过且指纹未变；独立限定实现门PASS。仅修正文档状态和prevented例外后精确发布，同源代码不重跑完整门禁；精确CI/本机部署待回执。生产开发采集仍OFF，完整owner、实际来源证明、清理屏障、consumer及两级事实/UI继续；CS-R02和两RFC不关闭。下方历史保留。

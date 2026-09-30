@@ -21,6 +21,7 @@ import { maintenanceUseCases } from './application/maintenance';
 import { checkAllowlist } from './application/allowlistCheck';
 import { observedPodOf, podIdentityUseCases } from './application/podIdentities';
 import { rateLimitUseCases } from './application/rateLimits';
+import { resourceRateLimitUseCases } from './application/resourceRateLimits';
 import { routeUseCases } from './application/reconcileRoutes';
 import { gatewayRoutes } from './http/gatewayRoutes';
 import { maintenanceRoutes } from './http/maintenanceRoutes';
@@ -100,7 +101,7 @@ export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
   const allowlist = allowlistUseCases(useCaseDeps, maintenance.serviceCallBlock);
   const pods = podIdentityUseCases(useCaseDeps);
   const api: GatewayModuleApi = {
-    name: 'gateway', ...routes, ...allowlist, evaluate: allowlist.evaluate, lookupByIp: pods.lookupByIp, purgeIdentityTombstones: pods.purgeTombstones, ...maintenance, ...limits,
+    name: 'gateway', ...routes, ...allowlist, evaluate: allowlist.evaluate, lookupByIp: pods.lookupByIp, purgeIdentityTombstones: pods.purgeTombstones, ...maintenance, ...limits, ...resourceRateLimitUseCases(useCaseDeps, deps.isAdmin),
     checkAllowlist: () => checkAllowlist(useCaseDeps, allowlist.verifyAllowlist),
     syncObservedPod: (pod, gone) => pods.syncPod(observedPodOf(pod, gone)),
     relistObservedPods: (list) => pods.relistPods(list.map((pod) => observedPodOf(pod, false))),

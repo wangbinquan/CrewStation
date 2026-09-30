@@ -1,6 +1,7 @@
 import type { ProjectFacts } from '../api/steps';
 import { namespaceDeclaration, networkPolicyDeclaration } from '../domain/namespaceProjection';
 import type { NamespaceLedger, NamespaceRecordView } from '../ports/ledger';
+import type { NamespaceQuota, ProjectId } from '@crewstation/contracts';
 
 export interface NamespaceSettings {
   /** 默认网络策略放行的系统命名空间。 */
@@ -8,6 +9,7 @@ export interface NamespaceSettings {
   /** 开通链等命名空间运行中的最长时间；缺省 60 秒。 */
   readonly readyTimeoutMs?: number;
   readonly pollMs?: number;
+  readonly quota?: (projectId: ProjectId) => Promise<NamespaceQuota>;
 }
 
 const DEFAULT_TIMEOUT_MS = 60_000;
@@ -28,7 +30,7 @@ function pending(label: string, record: NamespaceRecordView | undefined): string
  */
 export function namespaceRecords(ledger: NamespaceLedger, settings: NamespaceSettings) {
   const declare = async (facts: ProjectFacts): Promise<readonly [string, string]> => {
-    const namespace = await ledger.declare(namespaceDeclaration(facts));
+    const namespace = await ledger.declare(namespaceDeclaration(facts, await settings.quota?.(facts.projectId)));
     const policies = await ledger.declare(networkPolicyDeclaration(facts, settings.systemNamespace));
     return [namespace.id, policies.id];
   };

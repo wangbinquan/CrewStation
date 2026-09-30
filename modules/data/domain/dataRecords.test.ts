@@ -44,7 +44,7 @@ describe('数据资源与访问绑定的期望（RFC-025 第四期）', () => {
     const requested = bindingProjection(binding()).declaration;
     expect(requested.parentId).toBe('01a0bf5d-8f4b-7418-8a3f-7cbb4a1fd751');
     expect(requested.spec.children).toEqual([]);
-    expect(requested.conditions).toEqual([{ type: 'Prepared', status: 'false', reason: 'awaiting-approval', message: '等负责人批准' }]);
+    expect(requested.conditions).toEqual([{ type: 'Prepared', status: 'false', reason: 'awaiting-approval', message: '等管理员批准' }]);
     const expiresAt = new Date('2026-09-24T00:30:00Z');
     const active = bindingProjection(binding({ state: 'active', roleName: 'cs_t_abc', secretBox: 'boxed', expiresAt }), { database: 'cs_demo', ownerRole: 'cs_demo' }).declaration;
     expect(active.spec).toEqual({ children: [{ kind: 'PostgresRole', name: 'cs_t_abc' }], mode: 'diagnostic-readonly', ttlMinutes: 30, expiresAt: '2026-09-24T00:30:00.000Z', database: 'cs_demo', ownerRole: 'cs_demo' });

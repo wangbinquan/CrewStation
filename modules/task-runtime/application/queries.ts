@@ -1,6 +1,7 @@
 import type { RuntimeImageExecutionSnapshot, RuntimeInitializationStatus, Actor, ProjectId, TaskId } from '@crewstation/contracts';
 import { TASKRUNNER_PROTOCOL_VERSION } from '@crewstation/contracts';
 import type { DevSessionDto, StartupRecord } from '@crewstation/contracts';
+import type { ResourceWorkload, ResourceWorkloadPage } from '@crewstation/contracts';
 import { notFound, precondition } from '@crewstation/kernel';
 import { tokenMatches } from '../domain/runnerToken';
 import type { EnvironmentState, TaskEnvironment } from '../domain/taskEnvironment';
@@ -51,6 +52,13 @@ export function environmentToDto(env: TaskEnvironment): EnvironmentDto {
 export function environmentQueries(deps: TaskRuntimeUseCaseDeps) {
   const { uow, authorizer } = deps;
   return {
+    resourceWorkload: async (actor: Actor, id: TaskId): Promise<ResourceWorkload> => { const env = await uow.read.environments.getById(id); if (!env) throw notFound('任务环境'); await authorizer.authorize(actor, env.projectId, 'view'); return resourceWorkload(env); },
+    resourceWorkloads: async (actor: Actor, projectId: ProjectId, page: { after?: string; limit: number }): Promise<ResourceWorkloadPage> => {
+      await authorizer.authorize(actor, projectId, 'view');
+      const limit = Math.min(500, Math.max(1, page.limit)), rows = await uow.read.environments.listByProject(projectId, ['creating', 'running', 'paused', 'releasing', 'failed'], { ...page, limit: limit + 1 });
+      const selected = rows.slice(0, limit);
+      return { items: selected.map(resourceWorkload), nextCursor: rows.length > limit ? selected.at(-1)!.id : null };
+    },
     listClusterTasks: async () => {
       const result: ReturnType<typeof clusterTask>[] = []; let after: string | undefined;
       for (let page = 0; page < 1000; page++) {
@@ -89,5 +97,7 @@ export function environmentQueries(deps: TaskRuntimeUseCaseDeps) {
     },
   };
 }
+
+function resourceWorkload(env: TaskEnvironment): ResourceWorkload { return { id: env.id, projectId: env.projectId, kind: env.kind, state: env.state, taskProfileId: env.native?.profile.id ?? env.profile, parentTaskId: env.native?.parentTaskId ?? null, computeProfileId: env.native?.computeProfile?.profileId ?? null, runtimeImageVersionId: env.render?.runtimeImage?.versionId ?? null, runtimeImageId: null, cpu: env.native?.profile.cpu ?? env.render?.resources.cpu ?? null, memory: env.native?.profile.memory ?? env.render?.resources.memory ?? null, storage: env.native?.profile.storage ?? env.render?.resources.storage ?? null, volumeMode: env.volumeMode, podUid: env.podUid ?? env.native?.podUid ?? null, createdAt: env.createdAt.toISOString(), updatedAt: env.updatedAt.toISOString() }; }
 
 function clusterTask(e: TaskEnvironment) { return ({ taskId: e.id, projectId: e.projectId, namespace: e.namespace, podName: e.podName, pvcName: e.pvcName, ...(e.podUid ? { podUid: e.podUid } : {}), kind: e.kind, state: e.state, profile: e.native?.computeProfile?.profileId ?? e.labels['crewstation.io/compute-profile'] ?? e.profile, ...(e.kind === 'profile-test' && e.labels['crewstation.io/profile-revision'] ? { profileRevision: Number(e.labels['crewstation.io/profile-revision']) } : {}), ...(e.kind === 'profile-test' && e.labels['crewstation.io/profile-test'] ? { profileTestId: e.labels['crewstation.io/profile-test'] } : {}), revision: e.updatedAt.toISOString(), volumeMode: e.volumeMode, ...(e.native ? { purpose: e.native.purpose ?? 'cli', parentTaskId: e.native.parentTaskId, agentId: e.native.agentId, ...(e.native.terminalId ? { terminalId: e.native.terminalId } : {}), ...(e.native.podUid ? { podUid: e.native.podUid } : {}), pvcUid: e.native.pvcUid, ...(e.native.computeProfile ? { profileRevision: e.native.computeProfile.revision } : {}) } : {}) }); }

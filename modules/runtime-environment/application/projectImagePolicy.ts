@@ -23,7 +23,7 @@ export function projectImagePolicy(deps: RuntimeImageDeps) {
         await s.lock(`image-policy:${projectId}`);
         const old = await s.projectImagePolicies.get(projectId);
         if ((old?.revision ?? 0) !== parsed.expectedRevision) throw conflict('业务镜像授权已被修改，请重新读取后核对；本次修改未保存', { code: 'project_image_policy_revision_conflict' });
-        for (const id of parsed.policy.allowedImageIds) if (!await s.images.get(id)) throw validation('授权镜像不存在，请刷新目录', { field: 'allowedImageIds', imageId: id });
+        for (const id of [...parsed.policy.allowedImageIds, ...parsed.policy.additionalImageIds ?? [], ...parsed.policy.excludedImageIds ?? []]) if (!await s.images.get(id)) throw validation('授权镜像不存在，请刷新目录', { field: 'allowedImageIds', imageId: id });
         const next = ProjectRuntimeImagePolicyDtoSchema.parse({ projectId, revision: parsed.expectedRevision + 1, policy: parsed.policy, updatedAt: deps.clock.now().toISOString() });
         await s.projectImagePolicies.save(next);
         return next;

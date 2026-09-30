@@ -31,6 +31,7 @@ export interface OperationListProps {
   readonly onSelect?: (operation: ApiOperationDto) => void;
   /** 打开「申请定向开放」弹窗（两种形态共用）。 */
   readonly onRequest: (operation: ApiOperationDto) => void;
+  readonly requestableIds?: ReadonlySet<string>;
   /** 侧栏形态：正在试调的操作，它的试调面板在该行下原地展开。 */
   readonly active?: string;
   readonly activePanel?: ReactNode;
@@ -57,7 +58,7 @@ export function OperationList(props: OperationListProps): ReactElement {
   // 放大形态点「申请」同时选中这一行，详情栏跟着换；申请表单本身在弹窗里。
   const row = (item: ApiOperationDto) => <OperationRow key={item.id} operation={item} pending={pending} full={!!onSelect}
     current={onSelect ? operation === item.id : undefined} expanded={expanded.has(item.id)} onToggle={() => toggle(item.id)}
-    onRequest={() => { onSelect?.(item); props.onRequest(item); }}
+    onRequest={!props.requestableIds || props.requestableIds.has(item.id) ? () => { onSelect?.(item); props.onRequest(item); } : undefined}
     onInvoke={props.onInvoke} onSelect={onSelect} activePanel={props.active === item.id ? props.activePanel : undefined} />;
   return <div className={styles.list}>
     {context ? <p className={styles.context}>{t(context.key)} <code>{context.value}</code> <Button size="small" variant="ghost" onClick={onClearContext}>{t('catalog.clearContext')}</Button></p> : null}

@@ -24,6 +24,8 @@ async function accessibleSpace(deps: ObjectAdministrationDeps, actor: Actor, id:
 
 export function objectAdministration(deps: ObjectAdministrationDeps): ObjectStorageAdminApi {
   return {
+    applyResourceChange: async (actor, projectId, input) => { admin(actor); await deps.authorizer.authorize(actor, projectId, 'approve-data-access'); return deps.catalog.applyResourceChange({ projectId, ...input }); },
+    resourceChangeReceipt: (projectId, operationId) => deps.catalog.resourceChangeReceipt(projectId, operationId),
     rotateCredential: rotateObjectCredential(deps),
     archiveHistory: async (actor, target, query) => {
       const { spaces } = await observationScope(deps, actor, target);

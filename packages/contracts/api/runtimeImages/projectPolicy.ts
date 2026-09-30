@@ -5,8 +5,12 @@ import { ProjectIdSchema, ResourceIdSchema } from '../../ids';
 export const ProjectRuntimeImagePolicySchema = z.object({
   mode: z.enum(['inherit', 'restricted']),
   allowedImageIds: z.array(ResourceIdSchema).max(512),
+  additionalImageIds: z.array(ResourceIdSchema).max(512).optional(),
+  excludedImageIds: z.array(ResourceIdSchema).max(512).optional(),
 }).strict().refine((value) => new Set(value.allowedImageIds).size === value.allowedImageIds.length, '授权镜像重复')
-  .refine((value) => value.mode !== 'inherit' || value.allowedImageIds.length === 0, '继承平台范围不能夹带指定镜像');
+  .refine((value) => value.mode !== 'inherit' || value.allowedImageIds.length === 0, '继承平台范围不能夹带指定镜像')
+  .refine((value) => ['additionalImageIds', 'excludedImageIds'].every((key) => { const ids = value[key as 'additionalImageIds'] ?? []; return new Set(ids).size === ids.length; }), '镜像授权不能重复')
+  .refine((value) => !value.additionalImageIds?.some((id) => value.excludedImageIds?.includes(id)), '明确授权和排除不能重叠');
 export const ProjectRuntimeImagePolicyDtoSchema = z.object({
   projectId: ProjectIdSchema, revision: z.number().int().min(0), policy: ProjectRuntimeImagePolicySchema,
   updatedAt: z.iso.datetime().nullable(),

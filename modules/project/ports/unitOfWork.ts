@@ -5,6 +5,8 @@ import type { AppListingRepository } from './appListings';
 import type { AccessRequestRepository } from './accessRequests';
 import type { ProjectPageRepository } from './projectPages';
 import type { ServicePolicyRepository } from './servicePolicies';
+import type { ProjectResourcePolicies } from './resourcePolicies';
+import type { ProjectDeletions } from './deletion';
 
 export interface DomainEventPublisher {
   publish<T extends DomainTopicName>(topic: T, payload: DomainPayload<T>): Promise<void>;
@@ -22,6 +24,8 @@ export interface RepositoryScope {
   readonly accessRequests: AccessRequestRepository;
   readonly projectPages: ProjectPageRepository;
   readonly servicePolicies: ServicePolicyRepository;
+  readonly resourcePolicies: ProjectResourcePolicies;
+  readonly deletions: ProjectDeletions;
   readonly events: DomainEventPublisher;
 }
 

@@ -3,6 +3,8 @@ import { ApiOperationDtoSchema } from '@crewstation/contracts';
 import { useState } from 'react';
 import type { ReactElement } from 'react';
 import { errorMessage } from '../../../shared/api/useApi';
+import { useApiQuery } from '../../../shared/api/useApi';
+import { api } from '../../../shared/api/client';
 import { useT } from '../../../shared/lib/useT';
 import { useAccessRequestDialog } from '../hooks/useAccessRequestDialog';
 import { useCatalogActions } from '../hooks/useCatalogActions';
@@ -21,6 +23,7 @@ export interface CatalogContentProps {
   /** 已确定的服务 ID：目录的 granted 与裁剪都以它为准，页面在拿到之前不渲染本组件。 */
   readonly serviceId: string;
   readonly canDevelop?: boolean;
+  readonly canRequest?: boolean;
   /** 紧凑形态：只列已授权操作与试调，不含申请记录与 Swagger。 */
   readonly compact?: boolean;
   /** 紧凑形态在工具面板里：内容短时把最后一张卡（操作表）拉到面板底边。 */
@@ -39,10 +42,12 @@ export interface CatalogContentProps {
  * 目录页正文：放大形态「列表在前、详情在旁」（RFC-020 design §7）；侧栏形态只有列表，试调在该行下原地展开。
  * 「申请定向开放」两种形态都是弹窗（2026-09-23），理由按操作各留一份草稿。
  */
-export function CatalogContent({ projectId, serviceId, canDevelop = false, compact = false, fill = false, proxy, operation, onClearContext, onSelect, platform }: CatalogContentProps): ReactElement {
+export function CatalogContent({ projectId, serviceId, canDevelop = false, canRequest = false, compact = false, fill = false, proxy, operation, onClearContext, onSelect, platform }: CatalogContentProps): ReactElement {
   const t = useT();
   const { operations, requests, proxies } = useCatalogData(projectId, serviceId);
   const actions = useCatalogActions(serviceId), request = useAccessRequestDialog(actions);
+  const targets = useApiQuery(['catalog-requestable', projectId], () => api.resourceCenter.targets(projectId, 'api-operation'), { enabled: canRequest });
+  const requestableIds = new Set(canRequest && !targets.error && Array.isArray(targets.data) ? targets.data.filter((target) => target.actions.some((action) => action.kind === 'request' && action.enabled)).map((target) => target.view.target.resourceId) : []);
   const parsed = ApiOperationDtoSchema.array().safeParse(operations.data?.items);
   const context = { projectId, canDevelop, operations: parsed.success ? parsed.data : [], catalogReady: !operations.error && parsed.success };
   const [localId, setLocalId] = useState<string>();
@@ -52,9 +57,9 @@ export function CatalogContent({ projectId, serviceId, canDevelop = false, compa
   const missingId = selectedId && operations.data && !operations.data.items.some((item) => item.id === selectedId) ? selectedId : undefined;
   const selected = (operations.data?.items ?? []).find((item) => item.id === selectedId);
   const pending = (requests.data?.items ?? []).find((item) => item.state === 'pending' && item.operationId === selectedId);
-  const list = { operations: operations.data?.items ?? [], requests: requests.data?.items ?? [], loading: operations.isPending, loadError: operations.error, actions, platform, onRequest: request.open };
+  const list = { operations: operations.data?.items ?? [], requests: requests.data?.items ?? [], loading: operations.isPending, loadError: operations.error, actions, platform, onRequest: request.open, requestableIds };
   const requestError = request.target && actions.requestAccess.variables?.operationId === request.target.id && actions.requestAccess.error ? errorMessage(actions.requestAccess.error) : undefined;
-  const requestDialog = request.target ? <AccessRequestDialog operation={request.target} reason={request.reason} pending={actions.requestAccess.isPending} {...(requestError ? { error: requestError } : {})}
+  const requestDialog = request.target && requestableIds.has(request.target.id) ? <AccessRequestDialog operation={request.target} reason={request.reason} pending={actions.requestAccess.isPending} {...(requestError ? { error: requestError } : {})}
     onChange={request.change} onSubmit={request.submit} onClose={request.close} /> : null;
   if (compact) return (
     <div className={fill ? `${styles.stack} ${styles.fill}` : styles.stack}>
@@ -73,7 +78,7 @@ export function CatalogContent({ projectId, serviceId, canDevelop = false, compa
       </div>
       {/* 详情栏：选中操作的文档与申请在上，试调面板（会话绑定、表单、结果）在下——没选中时会话绑定也要能看、能重绑。 */}
       <aside className={styles.aside} aria-label={t('catalog.detail.title')}>
-        <OperationDetail operation={selected} missingId={missingId} onClear={clear} pendingRequest={pending} onRequest={request.open} onInvoke={canDevelop ? open : undefined} />
+        <OperationDetail operation={selected} missingId={missingId} onClear={clear} pendingRequest={pending} onRequest={selected && requestableIds.has(selected.id) ? request.open : undefined} onInvoke={canDevelop ? open : undefined} />
         {panel}
       </aside>
       {requestDialog}

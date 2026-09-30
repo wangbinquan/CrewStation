@@ -1,5 +1,5 @@
 import type { Actor, ProjectId } from '@crewstation/contracts';
-import { forbidden, notFound } from '@crewstation/kernel';
+import { forbidden, notFound, precondition } from '@crewstation/kernel';
 import type { EffectiveRole, ProjectAction } from '../domain/authorization';
 import { currentActor } from './creation/eligibility';
 import { isAllowed } from '../domain/authorization';
@@ -22,6 +22,7 @@ export function authorizationUseCases(deps: ProjectUseCaseDeps) {
     if (role === undefined) throw notFound('项目', projectId);
     if (role !== 'admin' && action !== 'view-preview' && (await uow.read.projects.getById(projectId))?.kind !== 'DigitalWorker') throw forbidden('接入容器仅管理员可管理');
     if (!isAllowed(role, action)) throw forbidden(`角色 ${role} 不能执行 ${action}`);
+    if (action !== 'view' && (await uow.read.projects.getById(projectId))?.state === 'deleting') throw precondition('项目正在永久删除，不能继续操作');
     return role;
   };
   return { roleOf, authorize };

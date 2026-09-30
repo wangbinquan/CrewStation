@@ -28,7 +28,7 @@ export function drizzleEnvironmentRepository(db: Executor): EnvironmentRepositor
     update: async (e) => { await db.update(environments).set(toRow(e)).where(eq(environments.id, e.id)); },
     getById: async (id) => { const row = (await db.select().from(environments).where(eq(environments.id, id)))[0]; return row ? toEnv(row) : undefined; },
     getForUpdate: async (id) => { const row = (await db.select().from(environments).where(eq(environments.id, id)).for('update'))[0]; return row ? toEnv(row) : undefined; },
-    listByProject: async (projectId, states) => (await db.select().from(environments).where(states?.length ? and(eq(environments.projectId, projectId), inArray(environments.state, states)) : eq(environments.projectId, projectId)).orderBy(environments.createdAt)).map(toEnv),
+    listByProject: async (projectId, states, page) => (await db.select().from(environments).where(and(eq(environments.projectId, projectId), states?.length ? inArray(environments.state, states) : undefined, page?.after ? gt(environments.id, page.after) : undefined)).orderBy(page ? environments.id : environments.createdAt).limit(page ? Math.min(501, Math.max(1, page.limit)) : 2_147_483_647)).map(toEnv),
     listByStates: async (states, page) => (await db.select().from(environments).where(and(inArray(environments.state, states), page?.after ? gt(environments.id, page.after) : undefined)).orderBy(environments.id).limit(page ? Math.min(500, Math.max(1, page.limit)) : 2_147_483_647)).map(toEnv),
     ...environmentTraceQueries(db, toEnv),
     listChildren: async (parentTaskId) => (await db.select().from(environments).where(sql`${environments.native}->>'parentTaskId' = ${parentTaskId}`).orderBy(environments.createdAt)).map(toEnv),

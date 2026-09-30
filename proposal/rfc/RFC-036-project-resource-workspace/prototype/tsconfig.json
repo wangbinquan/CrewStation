@@ -1,0 +1,5 @@
+{
+  "extends": "../../../../apps/console/tsconfig.json",
+  "compilerOptions": { "baseUrl": "../../../..", "ignoreDeprecations": "6.0", "paths": { "react": ["apps/console/node_modules/@types/react"], "react/*": ["apps/console/node_modules/@types/react/*"], "react-dom/*": ["apps/console/node_modules/@types/react-dom/*"] }, "types": ["bun"] },
+  "include": ["*.ts", "*.tsx", "../../../../apps/console/src/vite-env.d.ts"]
+}

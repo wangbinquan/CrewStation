@@ -19,6 +19,7 @@ const serviceId = '01a0bf5d-8f4b-76c5-866c-f1feda3d63bb' as ServiceId;
 const projectId = '01a0bf5d-8f4b-7178-82e1-9a99060b1192' as ProjectId;
 const taskId = '01a0bf5d-8f4b-7418-8a3f-7cbb4a1fd751' as TaskId;
 const owner: Actor = { userId: '01a0bf5d-8f4b-7793-867c-efd7527b386b' as UserId, isAdmin: false };
+const platformAdmin: Actor = { userId: '01a0bf5d-8f4b-7210-8353-be66da3bbb41' as UserId, isAdmin: true };
 const dev: Actor = { userId: '01a0bf5d-8f4b-7a4e-8eb2-04fca5c047bf' as UserId, isAdmin: false };
 
 type DataDeps = Parameters<typeof createDataModule>[0];
@@ -29,7 +30,7 @@ beforeAll(async () => {
   const url = new URL(adminUrl);
   deps = {
     users: { displayName: async (id) => id === dev.userId ? '开发者小李' : id === owner.userId ? '负责人小周' : undefined },
-    authorizer: { authorize: async (actor, _p, action) => { if (action === 'approve-data-access' && actor.userId !== owner.userId) throw new Error('forbidden'); } },
+    authorizer: { authorize: async (actor, _p, action) => { if (action === 'approve-data-access' && actor.userId !== platformAdmin.userId) throw new Error('forbidden'); return actor.userId === owner.userId ? 'owner' : actor.userId === platformAdmin.userId ? 'admin' : 'developer'; } },
     services: { resolveServiceById: async () => ({ projectId, slug }) },
     isAdmin: async () => false,
     settings: { defaultPlan: 'db-small', secretKeyBase64: generateSecretKey(), postgres: { adminUrl, visibleHost: url.hostname, visiblePort: Number(url.port) } },
@@ -67,32 +68,32 @@ describe.skipIf(!available)('data module', () => {
     expect(stored.every((r) => r.secret_box.startsWith('v1:'))).toBe(true);
   });
 
-  test('开发模式直接生效；只读诊断需负责人批准且不能写；生产变更可写；撤权后不可用', async () => {
+  test('开发模式直接生效；只读诊断需管理员批准且不能写；生产变更可写；撤权后不可用', async () => {
     const devBinding = await data.api.requestTaskBinding(dev, { taskId, serviceId }, { mode: 'development', ttlMinutes: 120 });
     expect(devBinding.state).toBe('active');
     expect((await data.api.envForTask(taskId)).CS_DATABASE_URL).toContain('_dev');
 
-    const ro = await data.api.requestTaskBinding(dev, { taskId, serviceId }, { mode: 'diagnostic-readonly', reason: '看日志表', ttlMinutes: 30 });
+    const ro = await data.api.requestTaskBinding(owner, { taskId, serviceId }, { mode: 'diagnostic-readonly', reason: '看日志表', ttlMinutes: 30 });
     expect(ro.state).toBe('requested');
     expect(ro.ttlMinutes).toBe(30);
     const requestedList = await data.api.listProjectBindings(owner, projectId, ['requested']);
-    expect(requestedList).toHaveLength(1); expect(requestedList[0]).toMatchObject({ requestedByName: '开发者小李' });
+    expect(requestedList).toHaveLength(1); expect(requestedList[0]).toMatchObject({ requestedByName: '负责人小周' });
     await expect(data.api.decideTaskBinding(dev, ro.id, { approve: true })).rejects.toThrow('forbidden');
-    const approved = await data.api.decideTaskBinding(owner, ro.id, { approve: true, decision: '同意 30 分钟' });
+    const approved = await data.api.decideTaskBinding(platformAdmin, ro.id, { approve: true, decision: '同意 30 分钟' });
     expect(approved.state).toBe('active');
     expect(approved.ttlMinutes).toBe(30);
     const env = await data.api.envForTask(taskId);
     expect(await canQuery(env.CS_PROD_READONLY_DATABASE_URL!, 'SELECT count(*) FROM t')).toBe(true);
     expect(await canQuery(env.CS_PROD_READONLY_DATABASE_URL!, 'INSERT INTO t VALUES (1)')).toBe(false);
 
-    const rw = await data.api.requestTaskBinding(dev, { taskId, serviceId }, { mode: 'production-change', ttlMinutes: 10 });
-    const rejected = await data.api.decideTaskBinding(owner, rw.id, { approve: false, decision: '先走只读' });
+    const rw = await data.api.requestTaskBinding(owner, { taskId, serviceId }, { mode: 'production-change', ttlMinutes: 10 });
+    const rejected = await data.api.decideTaskBinding(platformAdmin, rw.id, { approve: false, decision: '先走只读' });
     expect(rejected.state).toBe('rejected');
-    const rw2 = await data.api.requestTaskBinding(dev, { taskId, serviceId }, { mode: 'production-change', ttlMinutes: 10 });
-    await data.api.decideTaskBinding(owner, rw2.id, { approve: true });
+    const rw2 = await data.api.requestTaskBinding(owner, { taskId, serviceId }, { mode: 'production-change', ttlMinutes: 10 });
+    await data.api.decideTaskBinding(platformAdmin, rw2.id, { approve: true });
     const env2 = await data.api.envForTask(taskId);
     expect(await canQuery(env2.CS_PROD_DATABASE_URL!, 'INSERT INTO t VALUES (2)')).toBe(true);
-    await data.api.revokeTaskBinding(owner, rw2.id);
+    await data.api.revokeTaskBinding(platformAdmin, rw2.id);
     expect((await data.api.envForTask(taskId)).CS_PROD_DATABASE_URL).toBeUndefined();
     expect(await canQuery(env2.CS_PROD_DATABASE_URL!, 'SELECT 1')).toBe(false);
   });
@@ -100,8 +101,8 @@ describe.skipIf(!available)('data module', () => {
     let now = Date.now();
     const expiring = createDataModule({ ...deps, db: tdb.db, clock: { now: () => new Date(now) }, expiryIntervalMs: 20 });
     expect(expiring.workers).toHaveLength(1);
-    const requested = await expiring.api.requestTaskBinding(dev, { taskId, serviceId }, { mode: 'diagnostic-readonly', reason: '到期回收', ttlMinutes: 5 });
-    await expiring.api.decideTaskBinding(owner, requested.id, { approve: true });
+    const requested = await expiring.api.requestTaskBinding(owner, { taskId, serviceId }, { mode: 'diagnostic-readonly', reason: '到期回收', ttlMinutes: 5 });
+    await expiring.api.decideTaskBinding(platformAdmin, requested.id, { approve: true });
     const role = `cs_t_${requested.id.replaceAll('-', '')}`;
     const admin = postgres(adminUrl, { max: 1, onnotice: () => undefined });
     const roles = async () => Number((await admin`SELECT count(*)::int AS n FROM pg_roles WHERE rolname = ${role}`)[0]?.n);
@@ -119,9 +120,9 @@ describe.skipIf(!available)('data module', () => {
   });
   test('开发会话释放（任务已释放事件）时收回它名下还没结束的绑定：生效中的删掉临时角色，申请中的一并收回，别的任务不受影响；重复投递无副作用（2026-09-23 作者裁定）', async () => {
     const released = '01a0bf5d-8f4b-7418-8a3f-7cbb4a1fd760' as TaskId;
-    const active = await data.api.requestTaskBinding(dev, { taskId: released, serviceId }, { mode: 'diagnostic-readonly', reason: '释放即收回', ttlMinutes: 30 });
-    await data.api.decideTaskBinding(owner, active.id, { approve: true });
-    const pending = await data.api.requestTaskBinding(dev, { taskId: released, serviceId }, { mode: 'production-change', ttlMinutes: 10 });
+    const active = await data.api.requestTaskBinding(owner, { taskId: released, serviceId }, { mode: 'diagnostic-readonly', reason: '释放即收回', ttlMinutes: 30 });
+    await data.api.decideTaskBinding(platformAdmin, active.id, { approve: true });
+    const pending = await data.api.requestTaskBinding(owner, { taskId: released, serviceId }, { mode: 'production-change', ttlMinutes: 10 });
     const other = await data.api.requestTaskBinding(dev, { taskId, serviceId }, { mode: 'development', ttlMinutes: 120 });
     const role = `cs_t_${active.id.replaceAll('-', '')}`;
     const admin = postgres(adminUrl, { max: 1, onnotice: () => undefined });

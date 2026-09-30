@@ -1,0 +1,31 @@
+import type { ProjectResourceNode, ProjectResourceSnapshot, ResourceActionDescriptor, ResourceRequestDto, ResourceTargetInspection } from '@crewstation/contracts';
+import { ProjectDtoSchema } from '@crewstation/contracts';
+
+export const centerProject = '01a0bf5d-8f4b-7148-804c-6bd655d243f6', centerUser = '01a0bf5d-8f4b-7000-8000-111111111111', centerRequest = '01a0bf5d-8f4b-7000-8000-222222222222';
+export const centerRoot = `/v1/projects/${centerProject}/resource-center`, centerPath = `/projects/${centerProject}/resource-center`;
+const at = '2026-09-30T02:00:00.000Z';
+export const resourceNodeFixture = (id: string, overrides: Partial<ProjectResourceNode> = {}): ProjectResourceNode => ({ id, resourceId: id, name: id, description: 'resource purpose', resourceType: 'compute-profile', kind: 'allocation', category: 'execution', environment: 'project', access: 'owned', source: 'granted', state: 'available', stateText: '已授权', observedAt: at, stale: false, facts: [], metrics: [], ownerId: null, memberIds: [], actions: [], pendingRequestIds: [], ...overrides });
+export function centerSnapshot(role: ProjectResourceSnapshot['role'] = 'owner'): ProjectResourceSnapshot {
+  const descriptor: ResourceActionDescriptor = { id: 'quota:change', kind: role === 'admin' ? 'direct' : 'request', target: { resourceType: 'execution-quota', resourceId: centerProject, action: 'set-quota' }, revision: 'revision-1', current: { maxConcurrentTasks: 3 }, label: 'Quota change', fields: [{ key: 'maxConcurrentTasks', label: '最大并发执行', type: 'number', integer: true, min: 1, max: 100, required: true }], impact: ['已有运行任务保持运行'], enabled: true };
+  const quota = resourceNodeFixture('execution-limit', { name: '执行并发额度', resourceId: centerProject, resourceType: 'execution-quota', actions: role === 'developer' ? [] : [descriptor], metrics: [{ key: 'maxConcurrentTasks', label: '执行并发', unit: '个', scopeId: 'execution:project', used: 2, reserved: 1, limit: 3, requestedLimit: null, limitKind: 'value', observedAt: at }] });
+  return { projectId: centerProject as ProjectResourceSnapshot['projectId'], projectName: '资源中心验收', namespace: 'cs-resource-center', role, archived: false, complete: true, observedAt: at, nodes: [quota, ...Array.from({ length: 79 }, (_, i) => resourceNodeFixture(`node-${String(i).padStart(3, '0')}`))], edges: [{ id: 'usage:edge', sourceId: 'node-000', targetId: quota.id, relation: 'consumes-quota', state: 'observed', label: '占用执行额度' }], sources: [{ id: 'ledger', name: '资源台账', complete: true, observedAt: at, error: null }], requests: [], requestsNextCursor: null, legacyRequests: [] };
+}
+export function resourceCenterFixture(role: ProjectResourceSnapshot['role'] = 'owner') {
+  const snapshot = centerSnapshot(role), state = { snapshot, conflict: false, revision: 'revision-1', current: 3 }, writes: { path: string; body: Record<string, unknown> }[] = [], reads: string[] = [];
+  const project = ProjectDtoSchema.parse({ id: centerProject, serviceId: '01a0bf5d-8f4b-7000-8000-333333333333', ownerUserId: centerUser, kind: 'DigitalWorker', name: snapshot.projectName, slug: 'resource-center', namespace: snapshot.namespace, state: 'active', createdAt: at });
+  const request = (): ResourceRequestDto => ({ id: centerRequest as ResourceRequestDto['id'], projectId: snapshot.projectId, target: snapshot.nodes[0]!.actions[0]?.target ?? { resourceType: 'execution-quota', resourceId: centerProject, action: 'set-quota' }, targetName: '执行并发额度', state: role === 'admin' ? 'approved' : 'pending', version: 1, origin: role === 'admin' ? 'direct-admin' : 'owner-request', baseRevision: state.revision, baseValues: { maxConcurrentTasks: state.current }, requestedValues: { maxConcurrentTasks: 8 }, approvedValues: null, reason: '更多开发并发任务', requestedBy: centerUser as ResourceRequestDto['requestedBy'], requesterName: '项目负责人', decidedBy: null, deciderName: null, decisionReason: null, createdAt: at, updatedAt: at, appliedAt: null, effect: null, failure: null, requestKey: 'fixture-key' });
+  globalThis.fetch = (async (input, init) => {
+    const url = new URL(String(input), 'http://localhost'), path = url.pathname, method = init?.method ?? 'GET';
+    if (path === '/v1/me') return Response.json({ id: centerUser, isAdmin: role === 'admin', platformRole: role === 'admin' ? 'admin' : 'developer', name: '验收用户', email: 'test@test.cn', memberships: [{ projectId: centerProject, role: role === 'admin' ? 'owner' : role }] });
+    if (path === `/v1/projects/${centerProject}`) return Response.json(project);
+    if (path === centerRoot) { reads.push(path); return Response.json(state.snapshot); }
+    if (path === `${centerRoot}/inspect`) { reads.push(path); const descriptor = snapshot.nodes[0]!.actions[0]; const result: ResourceTargetInspection = { view: { target: descriptor?.target ?? request().target, name: '执行并发额度', revision: state.revision, current: { maxConcurrentTasks: state.current }, fields: descriptor?.fields ?? [], impact: ['不结束已有任务'], owned: true, available: true }, actions: descriptor ? [descriptor] : [], policy: null, requestable: true }; return Response.json(result); }
+    if ((path === `${centerRoot}/requests` || path === `${centerRoot}/direct`) && method === 'POST') { const body = JSON.parse(String(init?.body)); writes.push({ path, body }); if (state.conflict) { state.revision = 'revision-2'; state.current = 4; return Response.json({ error: 'conflict', message: '资源修订变化，请核对最新值' }, { status: 409 }); } snapshot.requests = [request()]; return Response.json(request(), { status: 202 }); }
+    if (path === `${centerRoot}/requests/${centerRequest}`) return Response.json(snapshot.requests[0] ?? request());
+    if (path.startsWith(`${centerRoot}/requests/`) && method === 'POST') { const body = JSON.parse(String(init?.body)); writes.push({ path, body }); return Response.json({ ...request(), state: path.endsWith('/cancel') ? 'cancelled' : 'approved', version: 2 }); }
+    if (path === `${centerRoot}/requests`) return Response.json({ items: snapshot.requests, nextCursor: null });
+    if (path.endsWith('/resources/view')) return Response.json({ items: [], counts: {}, cursor: 0 });
+    return Response.json({ items: [], quota: { maxConcurrentTasks: 3, running: 2 } });
+  }) as typeof fetch;
+  return { state, writes, reads, project, request };
+}

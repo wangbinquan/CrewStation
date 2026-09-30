@@ -59,16 +59,16 @@ export interface TasksResource {
   /** GET /v1/projects/:projectId/data/resources */
   listDataResources(projectId: string): Promise<ItemsPage<DataResourceDto>>;
   rotateDataCredential(resourceId: string): Promise<DataResourceDto>;
-  /** POST /v1/services/:serviceId/tasks/:taskId/data-bindings（201）：申请数据访问模式；后两种需负责人批准。 */
+  /** POST /v1/services/:serviceId/tasks/:taskId/data-bindings（201）：生产访问由负责人申请、管理员批准。 */
   requestDataBinding(serviceId: string, taskId: string, input: RequestTaskDataBindingInput): Promise<TaskDataBindingDto>;
   /** GET /v1/tasks/:taskId/data-bindings */
   listTaskDataBindings(taskId: string): Promise<ItemsPage<TaskDataBindingDto>>;
   /** GET /v1/projects/:projectId/data-bindings?state= */
   listProjectDataBindings(projectId: string, query?: { readonly state?: TaskDataBindingState }): Promise<ItemsPage<TaskDataBindingDto>>;
-  /** POST /v1/data-bindings/:id/decision（负责人） */
+  /** POST /v1/data-bindings/:id/decision（平台管理员） */
   decideDataBinding(bindingId: string, input: DecideTaskDataBinding): Promise<TaskDataBindingDto>;
   /** POST /v1/data-bindings/:id/revoke */
-  revokeDataBinding(bindingId: string): Promise<TaskDataBindingDto>;
+  revokeDataBinding(bindingId: string, input?: Pick<DecideTaskDataBinding, 'decision'>): Promise<TaskDataBindingDto>;
 }
 
 export function tasksResource(transport: Transport): TasksResource {
@@ -94,6 +94,6 @@ export function tasksResource(transport: Transport): TasksResource {
     listTaskDataBindings: (taskId) => transport.request<ItemsPage<TaskDataBindingDto>>('GET', `${task(taskId)}/data-bindings`),
     listProjectDataBindings: (projectId, query) => transport.request<ItemsPage<TaskDataBindingDto>>('GET', `${project(projectId)}/data-bindings`, { query }),
     decideDataBinding: (bindingId, input) => transport.request<TaskDataBindingDto>('POST', `/v1/data-bindings/${segment(bindingId)}/decision`, { body: input }),
-    revokeDataBinding: (bindingId) => transport.request<TaskDataBindingDto>('POST', `/v1/data-bindings/${segment(bindingId)}/revoke`),
+    revokeDataBinding: (bindingId, input) => transport.request<TaskDataBindingDto>('POST', `/v1/data-bindings/${segment(bindingId)}/revoke`, input ? { body: input } : undefined),
   };
 }

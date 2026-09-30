@@ -14,6 +14,8 @@ import { parseReleaseSearch } from '../../shared/project/releaseSearch';
 import { AdminProjectLayout } from '../layout/ProjectLayout';
 import { ProjectOperationsPage } from '../project/ProjectOperationsPage';
 import { ProjectSettingsPage } from '../project/ProjectSettingsPage';
+import { parseCenterSearch } from '../../features/project-resources';
+import { ProjectResourceCenterPage } from '../project/ProjectResourceCenterPage';
 
 export const adminProjectRoute = createRoute({ getParentRoute: () => adminRoute, path: 'integrations/$projectId', component: AdminProjectLayout });
 const observability = createRoute({ getParentRoute: () => adminProjectRoute, path: 'observability', component: ProjectRuntimeStatisticsPage, validateSearch: parseRuntimeSearch });
@@ -43,4 +45,5 @@ const settings = createRoute({ getParentRoute: () => adminProjectRoute, path: 's
 const resources = createRoute({ getParentRoute: () => adminProjectRoute, path: 'resources', validateSearch: parseResourceSearch,
   beforeLoad: ({ params, search }) => { redirectResource(params, search); },
 });
-export const adminProjectRoutes = adminProjectRoute.addChildren([overview, observability, observationTask, development, conversations, release, operations, settings, resources]);
+const resourceCenter = createRoute({ getParentRoute: () => adminProjectRoute, path: 'resource-center', component: ProjectResourceCenterPage, validateSearch: parseCenterSearch });
+export const adminProjectRoutes = adminProjectRoute.addChildren([overview, observability, observationTask, development, conversations, release, operations, settings, resources, resourceCenter]);

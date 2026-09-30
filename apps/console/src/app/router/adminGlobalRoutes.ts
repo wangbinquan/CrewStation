@@ -1,16 +1,19 @@
+import { AdminProjectResourceCenterPage } from '../admin/AdminProjectResourceCenterPage';
+import { parseCenterSearch } from '../../features/project-resources';
 import { createRoute, redirect } from '@tanstack/react-router';
 import { adminRoute } from '../../features/admin';
 import { parseCapabilitySearch, parseRequestSearch } from '../../shared/admin/managementSearch';
 import { AdminCapabilitiesPage } from '../admin/AdminCapabilitiesPage';
 import { AdminRequestsPage } from '../admin/AdminRequestsPage';
-import { AdminProjectCreationPage, AdminProjectProvisioningPage } from '../admin/AdminProjectCreationPage';
+import { AdminProjectProvisioningPage } from '../admin/AdminProjectCreationPage';
 import { AdminOverview } from '../admin/AdminOverview';
 
 /** /admin 管理总览：集群状态条来自集群管理、待办与入口来自 admin，在 app/ 装配（2026-09-23）。 */
 export const adminOverviewRoute = createRoute({ getParentRoute: () => adminRoute, path: '/', component: AdminOverview });
 
-export const adminProjectCreateRoute = createRoute({ getParentRoute: () => adminRoute, path: 'projects/new', component: AdminProjectCreationPage,
+export const adminProjectCreateRoute = createRoute({ getParentRoute: () => adminRoute, path: 'projects/new',
   validateSearch: (search: Record<string, unknown>): { scope: 'integration' | 'digital-worker' } => ({ scope: search.scope === 'integration' ? 'integration' : 'digital-worker' }),
+  beforeLoad: ({ search }) => { throw redirect(search.scope === 'integration' ? { to: '/admin/capabilities', search: { tab: 'integrations', create: true }, replace: true } : { to: '/admin/projects', search: { create: true }, replace: true }); },
 });
 export const adminProjectProvisioningRoute = createRoute({ getParentRoute: () => adminRoute, path: 'projects/$projectId/provisioning', component: AdminProjectProvisioningPage });
 
@@ -28,3 +31,5 @@ export const adminCatalogLegacyRoute = createRoute({ getParentRoute: () => admin
 export const adminEgressLegacyRoute = createRoute({ getParentRoute: () => adminRoute, path: 'egress',
   beforeLoad: () => { throw redirect({ to: '/admin', replace: true }); },
 });
+
+export const adminProjectResourcesRoute = createRoute({ getParentRoute: () => adminRoute, path: 'projects/$projectId/resources', component: AdminProjectResourceCenterPage, validateSearch: parseCenterSearch });

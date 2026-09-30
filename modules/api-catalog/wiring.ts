@@ -13,6 +13,7 @@ import type { Hono } from 'hono';
 import { drizzleUnitOfWork } from './adapters/persistence/drizzleUnitOfWork';
 import type { ApiCatalogModuleApi } from './api/moduleApi';
 import { grantUseCases } from './application/decideRequest';
+import { apiResourceAllocationUseCases } from './application/resourceAllocation';
 import type { ApiCatalogUseCaseDeps } from './application/dependencies';
 import { grantedOperationsUseCase } from './application/grantedOperations';
 import { listRequestsUseCase } from './application/listRequests';
@@ -27,12 +28,13 @@ import { requestRoutes } from './http/requestRoutes';
 import type { HostNaming } from './ports/hostNaming';
 import type { UserDirectory } from './ports/userDirectory';
 import type { ServiceResolver } from './ports/serviceResolver';
+import type { ProjectAuthorizer } from './ports/projectAuthorizer';
 
 /** 装配期注入：其他模块的能力以端口形式出现在这里，由应用提供实现。 */
 export interface ApiCatalogModuleDeps {
   db: Database;
   /** project 模块：管理员标记与项目内授权。 */
-  projects: Pick<ProjectModuleApi, 'isAdmin' | 'authorize' | 'readProjectBasics'>;
+  projects: Pick<ProjectModuleApi, 'isAdmin' | 'authorize' | 'readProjectBasics'> & Pick<ProjectAuthorizer, 'resourceRequestable'>;
   /** 服务 ID／服务身份 → 归属；由应用基于 project 模块装配。 */
   services: ServiceResolver;
   hosts: HostNaming;
@@ -62,7 +64,7 @@ export function createApiCatalogModule(deps: ApiCatalogModuleDeps): ApiCatalogMo
   const useCaseDeps: ApiCatalogUseCaseDeps = {
     uow: drizzleUnitOfWork(deps.db),
     services: deps.services,
-    projects: { isAdmin: (id) => deps.projects.isAdmin(id), authorize: (actor, projectId, action) => deps.projects.authorize(actor, projectId, action), readProjectBasics: (actor, ids) => deps.projects.readProjectBasics(actor, ids) },
+    projects: { isAdmin: (id) => deps.projects.isAdmin(id), authorize: (actor, projectId, action) => deps.projects.authorize(actor, projectId, action), readProjectBasics: (actor, ids) => deps.projects.readProjectBasics(actor, ids), ...(deps.projects.resourceRequestable ? { resourceRequestable: deps.projects.resourceRequestable } : {}) },
     hosts: deps.hosts,
     clock: deps.clock ?? systemClock,
     ...(deps.users ? { users: deps.users } : {}),
@@ -76,6 +78,7 @@ export function createApiCatalogModule(deps: ApiCatalogModuleDeps): ApiCatalogMo
     listRequests: listRequestsUseCase(useCaseDeps),
     listRequestPage: requestPageUseCase(useCaseDeps),
     ...grantUseCases(useCaseDeps),
+    ...apiResourceAllocationUseCases(useCaseDeps),
     grantedOperations: grantedOperationsUseCase(useCaseDeps),
     prunedOpenApi: prunedOpenApiUseCase(useCaseDeps),
   };

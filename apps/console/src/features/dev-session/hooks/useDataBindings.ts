@@ -6,7 +6,7 @@ import { queryKeys } from '../../../shared/api/queryKeys';
 import { useApiMutation, useApiQuery } from '../../../shared/api/useApi';
 export type DataBindingsHandle = ReturnType<typeof useDataBindings>;
 
-/** 开发会话的数据访问绑定：三种模式，后两种要负责人批准。 */
+/** 开发会话的数据访问绑定：负责人申请生产访问，平台管理员审批与撤销。 */
 export function useDataBindings(projectId: string, taskId: string, serviceId: string | undefined, permissions: { canDevelop: boolean; canManage: boolean }) {
   const key = [...queryKeys.dataBindings(projectId), taskId], lock = useRef(false);
   const query = useApiQuery(key, () => api.tasks.listTaskDataBindings(taskId), { refetchIntervalMs: 5_000 });

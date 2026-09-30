@@ -8,7 +8,7 @@ import { useDialogHost, useDialogsHidden } from './DialogHost';
 import styles from './Dialog.module.css';
 
 /** 三档宽度：`small` 480（确认）、`medium` 600（一般表单，默认）、`large` 880（多页签、多步骤的大表单）。 */
-export type DialogSize = 'small' | 'medium' | 'large';
+export type DialogSize = 'small' | 'medium' | 'large' | 'fullscreen';
 
 export interface DialogProps {
   /** 动作名，作标题，如「进入维护」「修改 API_KEY」。 */
@@ -40,6 +40,8 @@ export interface DialogProps {
    * 其余弹窗随所在的一片藏起、重新显示时照原样回来。
    */
   readonly persistent?: boolean;
+  /** 关闭时保留正文中的表单草稿；重新打开仍执行统一焦点与模态行为。 */
+  readonly open?: boolean;
 }
 
 /** 正文里可编辑的控件：打开弹窗、清空输入后焦点落在第一个上。 */
@@ -63,25 +65,31 @@ export function Dialog(props: DialogProps): ReactElement | null {
   return hidden && !props.persistent ? null : <DialogFrame {...props} />;
 }
 
-function DialogFrame({ title, children, footer, onClose, busy = false, size = 'medium', role = 'dialog', describedBy, onSubmit, initialFocus, returnFocusTo }: DialogProps): ReactElement {
+function DialogFrame({ title, children, footer, onClose, busy = false, size = 'medium', role = 'dialog', describedBy, onSubmit, initialFocus, returnFocusTo, open = true }: DialogProps): ReactElement {
   const t = useT(), titleId = useId(), host = useDialogHost();
   const dialog = useRef<HTMLDialogElement>(null), body = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | null | undefined>(undefined);
   useLayoutEffect(() => {
+    const node = dialog.current;
+    if (!open) {
+      if (node?.open) node.close();
+      // close() 也会执行浏览器自己的焦点恢复；统一返回焦点必须在它之后。
+      returnFocus(returnFocusTo?.current ?? opener.current ?? null); opener.current = undefined;
+      return;
+    }
     // StrictMode 会重放 effect；第二次的 activeElement 已是模态内部，不能覆盖原触发者。
     if (opener.current === undefined) opener.current = currentOpener();
-    const node = dialog.current;
     if (node && !node.open) node.showModal();
     const target = initialFocus === 'dialog' ? node : initialFocus?.current ?? body.current?.querySelector<HTMLElement>(DIALOG_FIELD_SELECTOR) ?? node;
     target?.focus();
     // 卸载时元素随之移出顶层，不调用 close()，免得卸载后再派发 close 事件。
     // 路由往返会重建触发按钮；关闭时读取最新引用，不能冻结为打开时的旧 DOM。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    return () => returnFocus(returnFocusTo?.current ?? opener.current ?? null);
-  }, [initialFocus, returnFocusTo]);
+    return () => { returnFocus(returnFocusTo?.current ?? opener.current ?? null); };
+  }, [initialFocus, returnFocusTo, open]);
   // Esc：浏览器先派发 cancel，拦下后由调用方决定关闭；进行中不关。
   const cancel = (event: SyntheticEvent): void => { event.stopPropagation(); event.preventDefault(); if (!busy) onClose(); };
-  const close = (event: SyntheticEvent): void => { event.stopPropagation(); onClose(); };
+  const close = (event: SyntheticEvent): void => { event.stopPropagation(); if (open) onClose(); };
   const keyDown = (event: KeyboardEvent): void => { event.stopPropagation(); };
   const submit = (event: FormEvent): void => { event.preventDefault(); event.stopPropagation(); if (!busy) onSubmit?.(); };
   // 区域缺省档位（开发页整片是紧凑档）沿组件树穿过 portal 传进来；弹窗自己的按钮一律标准档，在这里复位。

@@ -22,6 +22,7 @@ export function CatalogPage({ embedded = false, compact = false, fill = false, p
   const serviceId = project.data?.serviceId;
   const identityIncomplete = me.data !== undefined && !Array.isArray(me.data.memberships) && me.data.isAdmin !== true;
   const canDevelop = !me.error && !identityIncomplete && (me.data?.isAdmin === true || me.data?.memberships?.some((item) => item.projectId === projectId && (item.role === 'owner' || item.role === 'developer')) === true);
+  const canRequest = !me.error && !me.data?.isAdmin && me.data?.memberships?.some((item) => item.projectId === projectId && item.role === 'owner') === true;
   return (
     <>
       {!embedded ? <PageHeader title={t('catalog.title')} description={[t('catalog.line1'), t('catalog.line2'), t('catalog.line3')]} /> : null}
@@ -31,7 +32,7 @@ export function CatalogPage({ embedded = false, compact = false, fill = false, p
       {!project.isPending && project.error === null && serviceId === undefined ? (
         <EmptyState title={t('catalog.service.missingTitle')} description={t('catalog.service.missingDescription')} />
       ) : null}
-      {serviceId !== undefined ? <CatalogContent key={`${projectId}:${proxy ?? ''}`} projectId={projectId} serviceId={serviceId} canDevelop={canDevelop && !project.error} compact={compact} fill={fill} proxy={proxy} operation={operation} onClearContext={onClearContext} onSelect={onSelect} platform={platform} /> : null}
+      {serviceId !== undefined ? <CatalogContent key={`${projectId}:${proxy ?? ''}`} projectId={projectId} serviceId={serviceId} canDevelop={canDevelop && !project.error} canRequest={canRequest && !project.error} compact={compact} fill={fill} proxy={proxy} operation={operation} onClearContext={onClearContext} onSelect={onSelect} platform={platform} /> : null}
       {/* 管理员的管理动作留在管理空间（RFC-002）；这里只留一行入口，不再放在页首。 */}
       {!compact && !me.error && me.data?.isAdmin === true ? <ActionRow><ButtonLink to="/admin/capabilities" search={{ tab: 'api', projectId, proxy, operation }}>{t('catalog.admin.openManagement')}</ButtonLink><ButtonLink to="/admin/requests" search={{ projectId, state: 'pending' }}>{t('catalog.admin.openRequests')}</ButtonLink></ActionRow> : null}
     </>

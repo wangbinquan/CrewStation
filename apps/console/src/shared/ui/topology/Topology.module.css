@@ -72,6 +72,8 @@
 .edge_dial .edgePath { stroke: var(--cs-topo-development-stroke); }
 .arrow.edge_dial { fill: var(--cs-topo-development-stroke); }
 .evidence_static .edgePath { stroke-dasharray: 5 4; }
+.evidence_configured .edgePath { stroke-dasharray: 5 4; }
+.evidence_proposed .edgePath { stroke-dasharray: 2 5; stroke-width: 1.5; }
 .edgeLabel { font: 400 10px var(--cs-font-mono); fill: var(--cs-color-text-muted); paint-order: stroke; stroke: var(--cs-color-surface); stroke-width: 4px; stroke-linejoin: round; }
 
 .legend { display: grid; gap: 6px; font-size: 12px; color: var(--cs-color-text-muted); }

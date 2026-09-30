@@ -1,0 +1,27 @@
+{
+  "name": "@crewstation/module-resource-access",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "项目资源申请、审批、直接分配与可申请目录政策",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "crewstation": {
+    "layer": 3
+  },
+  "dependencies": {
+    "@crewstation/contracts": "workspace:*",
+    "@crewstation/http": "workspace:*",
+    "@crewstation/kernel": "workspace:*",
+    "@crewstation/module-project": "workspace:*",
+    "@crewstation/persistence": "workspace:*",
+    "@crewstation/queue": "workspace:*",
+    "drizzle-orm": "0.45.2",
+    "hono": "4.13.7",
+    "zod": "4.6.2"
+  },
+  "devDependencies": {
+    "@crewstation/testkit": "workspace:*"
+  }
+}

@@ -1,56 +1,16 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Database, Executor, Transaction } from '@crewstation/persistence';
-import { conflict, forbidden, jsonHash, notFound, PlatformError, precondition, quotaExceeded } from '@crewstation/kernel';
-import type { ObjectBackendRecord, ObjectPlanRecord, ObjectSource, ObjectSpaceRecord } from '../../domain/objectStorage';
-import { assertSameStorageRequest, assertStorageRevision, assertStorageWrite } from '../../domain/objectStorage';
+import { conflict, forbidden, jsonHash, notFound, precondition, quotaExceeded } from '@crewstation/kernel';
+import type { ObjectBackendRecord, ObjectPlanRecord, ObjectSpaceRecord } from '../../domain/objectStorage';
+import { assertSameStorageRequest, assertStorageRevision } from '../../domain/objectStorage';
 import type { ObjectCatalogRepository, ObjectProjectPolicy } from '../../ports/objectStorage';
 import { objectBackends, objectPlans, objectProjectPolicies, objectSpaces, objectStorageFreezes, objectWriteControls, storedObjects } from './objectTables';
 import { objectFreezeStatus } from './objectFreeze';
 import { assertStorageContractEnabled } from './objects/contractState';
+import { objectResourceAllocations } from './objectResourceAllocations';
 
-/** Only short metadata transactions use this lock; never perform byte-store calls inside it. */
-export async function objectStorageTransaction<T>(db: Database, work: (tx: Transaction, now: Date) => Promise<T>): Promise<T> {
-  const deadline = Date.now() + 2000;
-  do {
-    const result = await db.transaction(async (tx) => {
-      const [lock] = await tx.execute<{ acquired: boolean }>(sql`SELECT pg_try_advisory_xact_lock(hashtextextended('data.object-storage', 0)) AS acquired`);
-      if (!lock?.acquired) return { acquired: false as const };
-      const [time] = await tx.execute<{ now: string }>(sql`SELECT clock_timestamp()::text AS now`);
-      return { acquired: true as const, value: await work(tx, new Date(time!.now)) };
-    });
-    if (result.acquired) return result.value;
-    await Bun.sleep(10);
-  } while (Date.now() < deadline);
-  throw new PlatformError('unavailable', '存储元数据正在变更，请重试', { code: 'object_storage_busy' });
-}
-
-export async function requireObjectBackend(db: Executor, id: string): Promise<ObjectBackendRecord> {
-  const row = (await db.select().from(objectBackends).where(eq(objectBackends.id, id)))[0];
-  if (!row) throw notFound('对象存储后端', id);
-  return row.body;
-}
-export async function requireObjectSpace(db: Executor, id: string): Promise<ObjectSpaceRecord> {
-  const row = (await db.select().from(objectSpaces).where(eq(objectSpaces.id, id)))[0];
-  if (!row) throw notFound('对象空间', id);
-  return row.body;
-}
-export async function assertObjectStorageUnfrozen(db: Executor, backendId: string): Promise<void> {
-  const frozen = (await db.select().from(objectStorageFreezes)).some(({ body }) => body.active && (body.backendId === null || body.backendId === backendId));
-  if (frozen) throw precondition('对象存储正在备份或迁移，写操作暂时冻结', { code: 'object_storage_frozen' });
-}
-export async function authorizeObjectWrite(db: Executor, space: ObjectSpaceRecord, source: ObjectSource, fence: Parameters<typeof assertStorageWrite>[1], now: Date): Promise<void> {
-  if (space.projectId !== source.projectId || space.serviceId !== source.serviceId || space.env !== source.env) throw notFound('对象空间');
-  if (source.writeAllowed === false) throw precondition('来源项目已停止新写入', { code: 'object_project_read_only' });
-  await assertObjectStorageUnfrozen(db, space.backendId);
-  const row = (await db.select().from(objectWriteControls).where(eq(objectWriteControls.serviceId, source.serviceId)))[0];
-  assertStorageWrite(row?.body, fence, source.fenced, now, source.podUid);
-}
-export async function saveObjectSpace(db: Executor, space: ObjectSpaceRecord): Promise<void> {
-  await db.update(objectSpaces).set({ body: space }).where(eq(objectSpaces.id, space.id));
-}
-export async function saveObjectBackend(db: Executor, backend: ObjectBackendRecord): Promise<void> {
-  await db.update(objectBackends).set({ body: backend }).where(eq(objectBackends.id, backend.id));
-}
+import { assertObjectStorageUnfrozen, objectStorageTransaction, requireObjectBackend, saveObjectBackend, saveObjectSpace } from './objectMetadata';
+export { assertObjectStorageUnfrozen, authorizeObjectWrite, objectStorageTransaction, requireObjectBackend, requireObjectSpace, saveObjectBackend, saveObjectSpace } from './objectMetadata';
 
 async function declaredQuota(db: Executor, backendId: string, except?: string): Promise<number> {
   return (await db.select().from(objectSpaces).where(eq(objectSpaces.backendId, backendId)))
@@ -95,6 +55,7 @@ export function objectCatalogRepository(db: Database, options: { requireContract
     }),
     ...planAndSpaceOperations(db, options),
     ...controlOperations(db),
+    ...objectResourceAllocations(db),
   };
 }
 
@@ -141,14 +102,16 @@ async function ensureSpace(tx: Transaction, input: Parameters<ObjectCatalogRepos
   if (input.deploymentMode === 'production' && (backend.durability !== 'replicated' || !backend.durabilityVerifiedAt)) throw precondition('生产环境必须使用经过验证的冗余后端', { code: 'object_durability_unverified' });
   const previous = (await tx.select().from(objectSpaces).where(and(eq(objectSpaces.serviceId, input.serviceId), eq(objectSpaces.env, input.env))))[0]?.body;
   if (previous && (previous.projectId !== input.projectId || previous.backendId !== backend.id || previous.backendPlacementRevision !== backend.placementRevision)) throw precondition('已有对象空间需要显式迁移，不能换后端或归属');
-  if (previous && plan.quotaBytes < previous.usedBytes + previous.reservedBytes + previous.deletingBytes) throw precondition('空间新配额低于已使用和预留量');
-  if (plan.quotaBytes + await declaredQuota(tx, backend.id, previous?.id) > backend.budgetBytes) throw quotaExceeded('后端可分配空间预算不足');
+  const quotaBytes = previous?.quotaOverrides?.quotaBytes ?? plan.quotaBytes;
+  if (previous && quotaBytes < previous.usedBytes + previous.reservedBytes + previous.deletingBytes) throw precondition('空间新配额低于已使用和预留量');
+  if (quotaBytes + await declaredQuota(tx, backend.id, previous?.id) > backend.budgetBytes) throw quotaExceeded('后端可分配空间预算不足');
   if (previous?.planId === plan.id && previous.planRevision === plan.revision) return previous;
   const space: ObjectSpaceRecord = {
     id: previous?.id ?? input.id, projectId: input.projectId, serviceId: input.serviceId, env: input.env,
     backendId: backend.id, backendPlacementRevision: backend.placementRevision, planId: plan.id, planRevision: plan.revision,
-    revision: (previous?.revision ?? 0) + 1, health: backend.health, quotaBytes: plan.quotaBytes,
-    maxObjectBytes: plan.maxObjectBytes, maxConcurrentTransfers: plan.maxConcurrentTransfers, activeTransfers: previous?.activeTransfers ?? 0,
+    revision: (previous?.revision ?? 0) + 1, health: backend.health, quotaBytes,
+    ...(previous?.quotaOverrides ? { quotaOverrides: previous.quotaOverrides, quotaRevision: previous.quotaRevision, quotaSource: 'project' as const } : {}),
+    maxObjectBytes: previous?.quotaOverrides?.maxObjectBytes ?? plan.maxObjectBytes, maxConcurrentTransfers: previous?.quotaOverrides?.maxConcurrentTransfers ?? plan.maxConcurrentTransfers, activeTransfers: previous?.activeTransfers ?? 0,
     usedBytes: previous?.usedBytes ?? 0, reservedBytes: previous?.reservedBytes ?? 0, deletingBytes: previous?.deletingBytes ?? 0,
     objectCount: previous?.objectCount ?? 0, enabled: true, createdAt: previous?.createdAt ?? now.toISOString(),
   };

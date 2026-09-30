@@ -1,4 +1,5 @@
 import type { Actor, ProjectId } from '@crewstation/contracts';
+import type { ProjectDeletionController } from './deletion';
 
 /** 一轮命名空间重下发的结果（RFC-018）：成功与失败的项目数，用于日志与用例断言。 */
 export interface ReapplyOutcome {
@@ -8,6 +9,7 @@ export interface ReapplyOutcome {
 
 export interface ProvisioningModuleApi {
   readonly name: 'provisioning';
+  readonly deletions?: ProjectDeletionController;
   /** 管理员在工作卷等资源处理完后，删除归档项目的命名空间。 */
   deleteNamespace(actor: Actor, id: string): Promise<void>;
   /** 同步执行一次开通链（CLI 与测试用）；正常路径由 project.created 事件入队。 */
@@ -16,4 +18,5 @@ export interface ProvisioningModuleApi {
   retry(projectId: ProjectId): Promise<void>;
   /** 对全部未归档项目重跑 `ensureNamespace`（RFC-018）；控制面启动时调用一次。 */
   reapplyNamespaces(): Promise<ReapplyOutcome>;
+  reapplyProjectNamespace(projectId: ProjectId): Promise<void>;
 }

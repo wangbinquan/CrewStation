@@ -4213,6 +4213,16 @@
               "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "type": "string"
             },
+            "maxConcurrentTransfers": {
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "type": "integer"
+            },
+            "maxObjectBytes": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
             "objectCount": {
               "maximum": 9007199254740991,
               "minimum": 0,
@@ -4235,6 +4245,18 @@
               "maximum": 9007199254740991,
               "minimum": 0,
               "type": "integer"
+            },
+            "quotaRevision": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "quotaSource": {
+              "enum": [
+                "plan",
+                "project"
+              ],
+              "type": "string"
             },
             "reservedBytes": {
               "maximum": 9007199254740991,

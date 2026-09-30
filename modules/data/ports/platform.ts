@@ -1,7 +1,7 @@
 import type { Actor, ProjectId, ServiceId } from '@crewstation/contracts';
 
 export interface ProjectAuthorizer {
-  authorize(actor: Actor, projectId: ProjectId, action: 'view' | 'develop' | 'approve-data-access' | 'manage-task-storage'): Promise<unknown>;
+  authorize(actor: Actor, projectId: ProjectId, action: 'view' | 'develop' | 'approve-data-access' | 'manage-task-storage' | 'request-resources'): Promise<unknown>;
 }
 
 export interface ServiceResolver {

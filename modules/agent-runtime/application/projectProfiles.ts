@@ -14,9 +14,10 @@ export function projectProfileUseCases(deps: AgentRuntimeUseCaseDeps) {
   };
   const authorizedName = async (projectId: ProjectId, wanted?: ComputeProfileSelector): Promise<string> => {
     const policy = await policyOf(projectId);
-    const name = wanted?.kind === 'profile' ? wanted.profileId : policy.mode === 'restricted' ? policy.defaultProfile : (await deps.uow.read.profiles.getDefault())?.id;
+    const name = wanted?.kind === 'profile' ? wanted.profileId : policy.mode === 'restricted' ? policy.defaultProfile : policy.defaultOverrideProfile ?? (await deps.uow.read.profiles.getDefault())?.id;
     if (!name) throw precondition('项目尚未配置可用的默认算力档位，请管理员分配', { code: 'no_project_default_profile' });
-    const allowed = policy.mode === 'restricted' ? policy.allowedProfiles.includes(name) : (await deps.uow.read.profiles.get(name))?.defaultVisible !== false;
+    const inherited = policy.mode === 'restricted' ? policy.allowedProfiles.includes(name) : (await deps.uow.read.profiles.get(name))?.defaultVisible !== false;
+    const allowed = (inherited || policy.additionalProfiles?.includes(name)) && !policy.excludedProfiles?.includes(name);
     if (!allowed) throw new PlatformError('forbidden', `项目未获授权使用算力档位 ${name}，请联系管理员分配`, { code: 'project_compute_forbidden', profile: name });
     return name;
   };
@@ -24,8 +25,8 @@ export function projectProfileUseCases(deps: AgentRuntimeUseCaseDeps) {
     const policy = await policyOf(projectId);
     const profiles = await queries.listSummaries(true);
     const visible = new Set((await deps.uow.read.profiles.list()).filter((p) => p.defaultVisible !== false).map((p) => p.id));
-    return profiles.filter((p) => policy.mode === 'restricted' ? policy.allowedProfiles.includes(p.id) : visible.has(p.id))
-      .map((p) => ({ ...p, isDefault: policy.mode === 'restricted' ? p.id === policy.defaultProfile : p.isDefault }));
+    return profiles.filter((p) => ((policy.mode === 'restricted' ? policy.allowedProfiles.includes(p.id) : visible.has(p.id)) || policy.additionalProfiles?.includes(p.id)) && !policy.excludedProfiles?.includes(p.id))
+      .map((p) => ({ ...p, isDefault: policy.mode === 'restricted' ? p.id === policy.defaultProfile : policy.defaultOverrideProfile ? p.id === policy.defaultOverrideProfile : p.isDefault }));
   };
   return {
     listProjectSummaries: async (actor: Actor, projectId: ProjectId) => { await deps.projects.authorize(actor, projectId, 'view'); return summaries(projectId); },

@@ -29,6 +29,6 @@ export function dataRoutes(api: DataModuleApi, isAdmin: (userId: UserId) => Prom
   });
   r.get('/v1/tasks/:taskId/data-bindings', async (c) => c.json({ items: await api.listTaskBindings(await actor(c), parseParams(c, z.object({ taskId: TaskIdSchema })).taskId as TaskId) }));
   r.post('/v1/data-bindings/:id/decision', async (c) => c.json(await api.decideTaskBinding(await actor(c), c.req.param('id'), await parseBody(c, DecideTaskDataBindingSchema))));
-  r.post('/v1/data-bindings/:id/revoke', async (c) => c.json(await api.revokeTaskBinding(await actor(c), c.req.param('id'))));
+  r.post('/v1/data-bindings/:id/revoke', async (c) => c.json(await api.revokeTaskBinding(await actor(c), c.req.param('id'), c.req.header('content-type') ? await parseBody(c, z.object({ decision: z.string().trim().min(5).max(500).optional() }).strict()) : undefined)));
   return r;
 }

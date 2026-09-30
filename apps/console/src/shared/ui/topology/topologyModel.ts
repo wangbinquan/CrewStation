@@ -8,7 +8,7 @@ export type NodeStatus = typeof STATUS_ORDER[number];
 export type NodeKind = 'route' | 'workload' | 'pod' | 'database' | 'object-space' | 'volume' | 'job' | 'component' | 'external' | 'summary';
 export const EDGE_KINDS = ['routes', 'owns', 'child', 'mounts', 'binds', 'uses', 'traffic', 'control', 'dial', 'push'] as const;
 export type EdgeKind = typeof EDGE_KINDS[number];
-export type Evidence = 'observed' | 'static';
+export type Evidence = 'observed' | 'static' | 'configured' | 'proposed';
 
 export interface TopologyNode {
   readonly id: string;
@@ -70,14 +70,15 @@ export function neighbours(topology: Topology, id: string): ReadonlySet<string> 
   return set;
 }
 
-export interface TopologyFilter { readonly semantics?: ReadonlySet<Semantic>; readonly statuses?: ReadonlySet<NodeStatus>; readonly abnormalOnly?: boolean }
+export interface TopologyFilter { readonly ids?: ReadonlySet<string>; readonly semantics?: ReadonlySet<Semantic>; readonly statuses?: ReadonlySet<NodeStatus>; readonly abnormalOnly?: boolean }
 export function matchesFilter(node: TopologyNode, filter: TopologyFilter): boolean {
+  if (filter.ids && !filter.ids.has(node.id)) return false;
   if (filter.semantics && filter.semantics.size > 0 && !filter.semantics.has(node.semantic)) return false;
   if (filter.statuses && filter.statuses.size > 0 && !filter.statuses.has(node.status)) return false;
   if (filter.abnormalOnly && !node.abnormal) return false;
   return true;
 }
-export function hasFilter(filter: TopologyFilter): boolean { return Boolean(filter.semantics?.size || filter.statuses?.size || filter.abnormalOnly); }
+export function hasFilter(filter: TopologyFilter): boolean { return Boolean(filter.ids || filter.semantics?.size || filter.statuses?.size || filter.abnormalOnly); }
 
 export function semanticCounts(topology: Topology): readonly (readonly [Semantic, number])[] {
   const counts = new Map<Semantic, number>();

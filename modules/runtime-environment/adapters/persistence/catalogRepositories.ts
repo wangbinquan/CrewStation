@@ -1,6 +1,6 @@
 import { readAdminCatalog } from './catalogSummary';
 import type { Executor } from '@crewstation/persistence';
-import { and, desc, eq, lt, max, or, inArray, sql, exists } from 'drizzle-orm';
+import { and, desc, eq, lt, max, or, inArray, notInArray, sql, exists } from 'drizzle-orm';
 import type { ImageRepository, RevisionRepository, VersionRepository } from '../../ports/repositories';
 import { imageRevisions, imageVersions, runtimeImages, imageProjectGrants, projectImagePolicies } from './tables';
 
@@ -9,7 +9,8 @@ export function imageRepository(db: Executor): ImageRepository {
     listAll: (page) => readAdminCatalog(db, page),
     get: async (id, lock) => { const q = db.select().from(runtimeImages).where(eq(runtimeImages.id, id)); return (await (lock ? q.for('update') : q))[0]?.payload; },
     list: async (projectId, page, includeShared = false, policy) => (await db.select().from(runtimeImages).where(and(
-      policy?.mode === 'restricted' ? (policy.allowedImageIds.length ? inArray(runtimeImages.id, policy.allowedImageIds) : sql`false`) : or(includeShared ? eq(runtimeImages.defaultVisible, true) : undefined, exists(db.select().from(imageProjectGrants).where(and(eq(imageProjectGrants.imageId, runtimeImages.id), eq(imageProjectGrants.projectId, projectId))))),
+      or(policy?.mode === 'restricted' ? (policy.allowedImageIds.length ? inArray(runtimeImages.id, policy.allowedImageIds) : sql`false`) : or(includeShared ? eq(runtimeImages.defaultVisible, true) : undefined, exists(db.select().from(imageProjectGrants).where(and(eq(imageProjectGrants.imageId, runtimeImages.id), eq(imageProjectGrants.projectId, projectId))))), policy?.additionalImageIds?.length ? inArray(runtimeImages.id, policy.additionalImageIds) : undefined),
+      policy?.excludedImageIds?.length ? notInArray(runtimeImages.id, policy.excludedImageIds) : undefined,
       page.search ? sql`strpos(lower(${runtimeImages.name} || ' ' || (${runtimeImages.payload}->>'description')), lower(${page.search})) > 0` : undefined,
       page.before ? lt(runtimeImages.id, page.before) : undefined,
     )).orderBy(desc(runtimeImages.id)).limit(page.limit)).map((row) => row.payload),
@@ -19,8 +20,8 @@ export function imageRepository(db: Executor): ImageRepository {
     granted: async (imageId, projectId) => (await db.select().from(imageProjectGrants).where(and(eq(imageProjectGrants.imageId, imageId), eq(imageProjectGrants.projectId, projectId))).limit(1)).length > 0,
     grants: async (imageId) => {
       const retained = await db.select().from(imageProjectGrants).where(eq(imageProjectGrants.imageId, imageId));
-      const policies = await db.select().from(projectImagePolicies).where(sql`${projectImagePolicies.payload}->'policy'->>'mode' = 'restricted'`);
-      return { retainedProjectIds: retained.map((row) => row.projectId as typeof policies[number]['payload']['projectId']), overrides: policies.map(({ payload }) => ({ projectId: payload.projectId, allowed: payload.policy.allowedImageIds.includes(imageId) })) };
+      const policies = (await db.select().from(projectImagePolicies)).filter(({ payload }) => payload.policy.mode === 'restricted' || payload.policy.additionalImageIds?.includes(imageId) || payload.policy.excludedImageIds?.includes(imageId));
+      return { retainedProjectIds: retained.map((row) => row.projectId as typeof policies[number]['payload']['projectId']), overrides: policies.map(({ payload }) => ({ projectId: payload.projectId, allowed: !payload.policy.excludedImageIds?.includes(imageId) && (payload.policy.additionalImageIds?.includes(imageId) === true || payload.policy.allowedImageIds.includes(imageId)) })) };
     },
   };
 }

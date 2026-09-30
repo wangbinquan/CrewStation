@@ -434,6 +434,7 @@
         "@crewstation/module-project": "workspace:*",
         "@crewstation/module-provisioning": "workspace:*",
         "@crewstation/module-release": "workspace:*",
+        "@crewstation/module-resource-access": "workspace:*",
         "@crewstation/module-resources": "workspace:*",
         "@crewstation/module-runtime-environment": "workspace:*",
         "@crewstation/module-scm": "workspace:*",
@@ -484,6 +485,8 @@
         "zod": "4.6.2",
       },
       "devDependencies": {
+        "@crewstation/module-identity": "workspace:*",
+        "@crewstation/module-project": "workspace:*",
         "@crewstation/testkit": "workspace:*",
       },
     },
@@ -509,6 +512,24 @@
       },
       "devDependencies": {
         "@crewstation/module-resources": "workspace:*",
+        "@crewstation/testkit": "workspace:*",
+      },
+    },
+    "modules/resource-access": {
+      "name": "@crewstation/module-resource-access",
+      "version": "0.0.0",
+      "dependencies": {
+        "@crewstation/contracts": "workspace:*",
+        "@crewstation/http": "workspace:*",
+        "@crewstation/kernel": "workspace:*",
+        "@crewstation/module-project": "workspace:*",
+        "@crewstation/persistence": "workspace:*",
+        "@crewstation/queue": "workspace:*",
+        "drizzle-orm": "0.45.2",
+        "hono": "4.13.7",
+        "zod": "4.6.2",
+      },
+      "devDependencies": {
         "@crewstation/testkit": "workspace:*",
       },
     },
@@ -933,6 +954,8 @@
     "@crewstation/module-provisioning": ["@crewstation/module-provisioning@workspace:modules/provisioning"],
 
     "@crewstation/module-release": ["@crewstation/module-release@workspace:modules/release"],
+
+    "@crewstation/module-resource-access": ["@crewstation/module-resource-access@workspace:modules/resource-access"],
 
     "@crewstation/module-resources": ["@crewstation/module-resources@workspace:modules/resources"],
 

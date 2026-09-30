@@ -8,6 +8,10 @@ import { ProjectSettingsPage } from '../project/ProjectSettingsPage';
 import { ProjectOperationsPage } from '../project/ProjectOperationsPage';
 import { ProjectDevelopmentPage } from '../project/ProjectDevelopmentPage';
 import { projectRoute } from './projectRoute';
+import { parseCenterSearch } from '../../features/project-resources';
+import { ProjectResourceCenterPage } from '../project/ProjectResourceCenterPage';
+
+export const projectResourceCenterRoute = createRoute({ getParentRoute: () => projectRoute, path: 'resource-center', component: ProjectResourceCenterPage, validateSearch: parseCenterSearch });
 
 /** 「开发资源」的旧地址各归其家（RFC-020 D2）：API／事件／平台接入 → 开发页参考面板（放大），数据 → 数据面板，项目与仓库 → 设置「项目信息」。 */
 function redirectResource(params: { projectId: string }, search: ResourceSearch): never {

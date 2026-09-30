@@ -1,5 +1,6 @@
 import { ProjectComputePolicyDtoSchema, ProjectDtoSchema } from '@crewstation/contracts';
 import { ADMIN_ID, profileIdOf, profileDetail, terminalProfile } from './computeProfileFixture';
+import { centerSnapshot } from './resourceCenterFixture';
 
 export const computeProjectId = '01a0bf5d-8f4b-7148-804c-6bd655d243f6';
 export const computePolicyPath = `/v1/projects/${computeProjectId}/compute-policy`;
@@ -29,6 +30,7 @@ export function projectComputeFixture() {
     if (path === `/v1/projects/${computeProjectId}/quota`) return Response.json({ maxConcurrentTasks: 3, running: 2 });
     if (path === '/v1/catalog/service-plans') return Response.json({ items: [] });
     if (path === `/v1/projects/${computeProjectId}`) return Response.json(project);
+    if (path === `/v1/projects/${computeProjectId}/resource-center`) return Response.json({ ...centerSnapshot('admin'), projectId: computeProjectId, projectName: project.name, namespace: project.namespace, nodes: [], requests: [], edges: [] });
     if (path === '/v1/admin/compute-profiles') return Response.json({ items: state.profiles });
     if (path === '/v1/catalog/task-profiles') return Response.json({ items: [{ id: profileIdOf('coding-medium'), name: 'coding-medium', cpu: '1', memory: '2Gi', storage: '10Gi', description: '' }, { id: profileIdOf('coding-large'), name: 'coding-large', cpu: '2', memory: '4Gi', storage: '20Gi', description: '' }] });
     return Response.json({ items: [] });

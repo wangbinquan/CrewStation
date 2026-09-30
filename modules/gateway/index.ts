@@ -2,3 +2,4 @@ export type { Evaluation, EvaluationTarget, GatewayModuleApi, NotDeployedEntry }
 export { UNAVAILABLE_PATH } from './api/moduleApi';
 export { createGatewayModule, gatewayMigrations } from './wiring';
 export type { GatewayModule, GatewayModuleDeps } from './wiring';
+export { gatewayAllocationRevision, projectRateLimitValues } from './api/resourceLimits';

@@ -167,6 +167,8 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     stopRuntimeImageProbe: stopImageProbe(useCaseDeps, deps.imageProbeLeases ? imageProbeCleanup(deps.k8s, deps.imageProbeLeases.port, deps.imageProbeLeases.holder) : undefined),
     reconcileRebuild: reconcileRebuildUseCase(recoveryDeps),
     listClusterTasks: queries.listClusterTasks,
+    resourceWorkloads: queries.resourceWorkloads,
+    resourceWorkload: queries.resourceWorkload,
     ...rebuild,
     createEnvironment: async (input) => environmentToDto(await create(input)),
     resolveDevelopmentObjectSource: resolveDevelopmentObjectSource(useCaseDeps),

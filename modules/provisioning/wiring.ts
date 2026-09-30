@@ -22,6 +22,11 @@ import type { NamespaceLedger } from './ports/ledger';
 import { PROVISION_JOB_KIND, provisionJobHandler } from './workers/provisionHandler';
 import type { StartupTask } from './workers/namespaceReapply';
 import { namespaceReapplyTask } from './workers/namespaceReapply';
+import type { ProjectDeletionOwner } from '@crewstation/contracts';
+import type { ProjectDeletionIntents } from './ports/projectDeletions';
+import { projectDeletionController } from './application/deletion/controller';
+import { projectDeletionRoutes } from './http/projectDeletionRoutes';
+import { deletionEnqueue, projectDeletionRuntime } from './workers/projectDeletionRuntime';
 
 export interface ProvisioningModuleDeps {
   db: Database;
@@ -35,6 +40,8 @@ export interface ProvisioningModuleDeps {
   isAdmin: (userId: UserId) => Promise<boolean>;
   logger?: Logger;
   authorizeRetry?: (actor: Actor, projectId: ProjectId) => Promise<void>;
+  /** 仅在全部 owner 接齐后组合；未提供时不开放永久删除 HTTP 或工作器。 */
+  deletion?: { intents: ProjectDeletionIntents; owners: readonly ProjectDeletionOwner[] };
 }
 
 export interface ProvisioningModule {
@@ -52,12 +59,19 @@ export function createProvisioningModule(deps: ProvisioningModuleDeps): Provisio
   const provision = provisionProjectUseCase({ ...deps.steps, ensureNamespace: namespaces.ensure }, logger);
   const reapply = reapplyNamespacesUseCase({ ...deps.steps, ensureNamespace: namespaces.declare }, logger);
   const enqueue = async (projectId: string): Promise<void> => { await enqueueJob(deps.db, PROVISION_JOB_KIND, { projectId }, { dedupKey: projectId, maxAttempts: 5 }); };
-  const api: ProvisioningModuleApi = { name: 'provisioning', deleteNamespace: (actor, id) => deleteNamespace(deps.cleanup, deps.isAdmin, actor, id), provisionProject: provision, retry: enqueue, reapplyNamespaces: reapply };
+  const deletions = deps.deletion ? projectDeletionController({ ...deps.deletion, isAdmin: deps.isAdmin, logger, workerOwner: `${deps.workerOwner}.deletion`, enqueue: deletionEnqueue(deps.db) }) : undefined;
+  const deletionRuntime = deletions ? projectDeletionRuntime(deps.db, deletions, deps.workerOwner, logger) : undefined;
+  const api: ProvisioningModuleApi = { name: 'provisioning', deleteNamespace: (actor, id) => deleteNamespace(deps.cleanup, deps.isAdmin, actor, id), provisionProject: provision, retry: enqueue, reapplyNamespaces: reapply,
+    reapplyProjectNamespace: async (id) => { const facts = await deps.steps.loadProject(id); if (!facts || facts.state === 'archived' || facts.state === 'deleting') return; await namespaces.declare(facts); },
+  };
   return {
-    api,
-    http: [provisioningRoutes(api, deps.isAdmin, deps.authorizeRetry)],
-    workers: [createWorker({ db: deps.db, kinds: [PROVISION_JOB_KIND], owner: deps.workerOwner, concurrency: 2, leaseSeconds: 600, logger, handler: provisionJobHandler(api) })],
-    startupTasks: [namespaceReapplyTask(reapply, logger)],
-    subscriptions: createEventConsumer({ db: deps.db, consumer: deps.consumerName, logger }).on(DomainTopic.projectCreated, async (e) => { await enqueue(e.payload.projectId); }),
+    api: { ...api, ...(deletions ? { deletions } : {}) },
+    http: [provisioningRoutes(api, deps.isAdmin, deps.authorizeRetry), ...(deletions ? [projectDeletionRoutes(deletions, deps.isAdmin)] : [])],
+    workers: [createWorker({ db: deps.db, kinds: [PROVISION_JOB_KIND], owner: deps.workerOwner, concurrency: 2, leaseSeconds: 600, logger, handler: provisionJobHandler(api) }), ...(deletionRuntime ? [deletionRuntime.worker] : [])],
+    startupTasks: [namespaceReapplyTask(reapply, logger), ...(deletionRuntime ? [deletionRuntime.recovery] : [])],
+    subscriptions: (() => {
+      const consumer = createEventConsumer({ db: deps.db, consumer: deps.consumerName, logger }).on(DomainTopic.projectCreated, async (e) => { await enqueue(e.payload.projectId); });
+      if (deletions) consumer.on(DomainTopic.projectDeletionRequested, async (e) => { await deletions.enqueue(e.payload.operationId); }); return consumer;
+    })(),
   };
 }

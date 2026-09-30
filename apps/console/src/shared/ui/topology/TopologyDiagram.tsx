@@ -1,6 +1,6 @@
 // SVG 形态图（RFC-019）：语义色描边＋半透明填充的圆角节点、类型小图标、虚线边界框、正交连线与小字标签、点选／悬停聚焦。
 // 视觉语法借鉴 Archify（颜色只表达语义、状态另有非颜色提示、静态标注与观测关系分开），组件本身无业务含义。
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import type { KeyboardEvent, ReactElement } from 'react';
 import { useT } from '../../lib/useT';
 import type { NodeKind, Topology, TopologyFilter, TopologyNode } from './topologyModel';
@@ -35,6 +35,7 @@ export interface TopologyDiagramProps {
 }
 
 export function TopologyDiagram({ topology, metrics: base = FULL_METRICS, selectedId, onSelect, filter, label }: TopologyDiagramProps): ReactElement {
+  const markerId = useId().replaceAll(':', '');
   const [frame, frameWidth] = useContainerWidth<HTMLDivElement>();
   const metrics = useMemo(() => fitMetrics(base, topology.lanes.length, frameWidth), [base, topology.lanes.length, frameWidth]);
   const layout = useMemo(() => layoutTopology(topology, metrics), [topology, metrics]);
@@ -47,11 +48,11 @@ export function TopologyDiagram({ topology, metrics: base = FULL_METRICS, select
   return <div ref={frame} className={styles.frame}>
     <svg className={styles.svg} viewBox={`0 0 ${layout.width} ${layout.height}`} width={layout.width} role="group" aria-label={label} onMouseLeave={() => setHover(undefined)}>
       <defs>
-        <pattern id="cs-topo-grid" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.9" className={styles.gridDot} /></pattern>
-        {EDGE_KINDS.map((kind) => <marker key={kind} id={`cs-topo-arrow-${kind}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M1 1.5 8.5 5 1 8.5z" className={cls(styles.arrow, styles[`edge_${kind}`])} /></marker>)}
+        <pattern id={`${markerId}-grid`} width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.9" className={styles.gridDot} /></pattern>
+        {EDGE_KINDS.map((kind) => <marker key={kind} id={`${markerId}-arrow-${kind}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M1 1.5 8.5 5 1 8.5z" className={cls(styles.arrow, styles[`edge_${kind}`])} /></marker>)}
       </defs>
       <rect width={layout.width} height={layout.height} className={styles.canvas} />
-      <rect width={layout.width} height={layout.height} fill="url(#cs-topo-grid)" />
+      <rect width={layout.width} height={layout.height} fill={`url(#${markerId}-grid)`} />
       {layout.lanes.map((lane) => lane.title ? <text key={`${lane.title}-${lane.x}`} x={lane.x} y={metrics.margin + 12} className={styles.lane}>{lane.title}</text> : null)}
       {layout.bands.map(({ band, y, boxes, titleOnBox }) => <g key={band.id} className={styles[`sem_${band.semantic}`]}>
         {!titleOnBox && band.title ? <text x={metrics.margin} y={y + 17} className={styles.bandTitle}>{band.title}{band.note ? <tspan className={styles.bandNote}> · {band.note}</tspan> : null}</text> : null}
@@ -60,8 +61,8 @@ export function TopologyDiagram({ topology, metrics: base = FULL_METRICS, select
           {box.title ? <text x={rect.x + 10} y={rect.y + 17} className={styles.bandTitle}><title>{box.note ? `${box.title} · ${box.note}` : box.title}</title>{clipPx(box.title, rect.w - 20, 11)}{box.note && textWidth(`${box.title} · ${box.note}`, 11) <= rect.w - 20 ? <tspan className={styles.bandNote}> · {box.note}</tspan> : null}</text> : null}
         </g>)}
       </g>)}
-      {layout.edges.map(({ edge, d, labelX, labelY, labelSpace }) => <g key={`${edge.from}→${edge.to}`} className={cls(styles.edge, styles[`edge_${edge.kind}`], styles[`evidence_${edge.evidence}`], dimEdge(edge.from, edge.to) && styles.is_dim)} data-evidence={edge.evidence}>
-        <path d={d} className={styles.edgePath} markerEnd={`url(#cs-topo-arrow-${edge.kind})`} />
+      {layout.edges.map(({ edge, d, labelX, labelY, labelSpace }) => <g key={`${edge.from}→${edge.to}:${edge.kind}:${edge.evidence}:${edge.label ?? ''}`} className={cls(styles.edge, styles[`edge_${edge.kind}`], styles[`evidence_${edge.evidence}`], dimEdge(edge.from, edge.to) && styles.is_dim)} data-evidence={edge.evidence}>
+        <path d={d} className={styles.edgePath} markerEnd={`url(#${markerId}-arrow-${edge.kind})`} />
         {edge.label && textWidth(edge.label, 10) <= labelSpace - 10 ? <text x={labelX} y={labelY} textAnchor="middle" className={styles.edgeLabel}>{edge.label}</text> : null}
       </g>)}
       {layout.nodes.map((placed) => <TopologyNodeView key={placed.node.id} placed={placed} selected={placed.node.id === selectedId} dim={dimNode(placed.node)}

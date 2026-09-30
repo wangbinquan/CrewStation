@@ -16,7 +16,8 @@ export async function imageAccess(deps: RuntimeImageDeps, actor: Actor, projectI
   if (!image) throw notFound('运行镜像', imageId);
   if (projectId === undefined || action !== 'view') return image;
   const policy = action === 'view' ? (await scope.projectImagePolicies.get(projectId))?.policy : undefined;
-  const visible = policy?.mode === 'restricted' ? policy.allowedImageIds.includes(imageId) : image.defaultVisible || await scope.images.granted(imageId, projectId);
+  const inherited = policy?.mode === 'restricted' ? policy.allowedImageIds.includes(imageId) : image.defaultVisible || await scope.images.granted(imageId, projectId);
+  const visible = (inherited || policy?.additionalImageIds?.includes(imageId)) && !policy?.excludedImageIds?.includes(imageId);
   if (!visible) throw notFound('运行镜像', imageId);
   return image;
 }

@@ -7,7 +7,7 @@ import { AdminGatewayPage } from './pages/AdminGatewayPage';
 import { AdminServicePlansPage } from './pages/AdminServicePlansPage';
 import { AdminTaskProfilesPage } from './pages/AdminTaskProfilesPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
-import { AdminProjectComputePage, AdminProjectComputeLegacyPage } from './pages/AdminProjectComputePage';
+import { AdminProjectComputeLegacyPage } from './pages/AdminProjectComputePage';
 import { AdminResourceTemplatesPage } from './pages/AdminResourceTemplatesPage';
 import { AdminProjectsPage } from './pages/AdminProjectsPage';
 import { AdminSettingsPage } from './pages/AdminSettingsPage';
@@ -30,7 +30,6 @@ export const adminSettingsRoute = createRoute({ getParentRoute: () => adminRoute
 
 export const adminProjectComputeRoute = createRoute({ getParentRoute: () => adminRoute, path: 'projects/$projectId/compute', component: AdminProjectComputeLegacyPage });
 
-export const adminProjectResourcesRoute = createRoute({ getParentRoute: () => adminRoute, path: 'projects/$projectId/resources', component: AdminProjectComputePage });
 export const adminResourceTemplatesRoute = createRoute({ getParentRoute: () => adminRoute, path: 'projects/resource-templates', component: AdminResourceTemplatesPage,
   validateSearch: (search: Record<string, unknown>): { kind: 'service' | 'task'; q?: string } => ({ kind: search.kind === 'task' ? 'task' : 'service', ...(typeof search.q === 'string' && search.q.trim() ? { q: search.q.trim().slice(0, 120) } : {}) }),
 });

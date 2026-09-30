@@ -1,10 +1,13 @@
 import type { Actor, AuthorizeObjectStoragePlans, ObjectBackendDto, ObjectPageQuery, ObjectSpaceDto, ObjectStorageObservation, ObjectStoragePlanDto, ObjectStoragePlanInput, ProjectId, RegisterObjectBackend, StorageWindow, StoredObjectDto, StoredObjectPage, UpdateObjectBackend } from '@crewstation/contracts';
 import type { ObjectServiceApi } from './objectServiceApi';
+import type { ResourceTarget, ResourceValues } from '@crewstation/contracts';
 import type { ObjectStorageBlockerPage } from '@crewstation/contracts';
 import type { ArchiveReceiptPage, ArchiveReceiptPageQuery, ObjectArchiveHistoryPage } from '@crewstation/contracts';
 import type { RotateObjectBackendCredential } from '@crewstation/contracts';
 
 export interface ObjectStorageAdminApi {
+  applyResourceChange(actor: Actor, projectId: ProjectId, command: { operationId: string; target: ResourceTarget; expectedRevision: string; values: ResourceValues }): Promise<{ revision: string; effect: string; applied: boolean }>;
+  resourceChangeReceipt(projectId: ProjectId, operationId: string): Promise<{ revision: string; effect: string; applied: boolean } | undefined>;
   rotateCredential(actor: Actor, id: string, input: RotateObjectBackendCredential): Promise<ObjectBackendDto>;
   archiveHistory(actor: Actor, target: { backendId: string } | { spaceId: string }, query: ObjectPageQuery): Promise<ObjectArchiveHistoryPage>;
   receiptItems(actor: Actor, id: string, query: ArchiveReceiptPageQuery): Promise<ArchiveReceiptPage>;

@@ -5,7 +5,7 @@ import { ManifestKindSchema } from '../manifest/serviceSpec';
 import { MemberRoleSchema, PlatformRoleSchema } from './identity';
 import { ProjectTemplateDtoSchema } from './scm';
 
-export const ProjectStateSchema = z.enum(['provisioning', 'active', 'archived', 'failed']);
+export const ProjectStateSchema = z.enum(['provisioning', 'active', 'archived', 'failed', 'deleting']);
 
 export const ProjectDtoSchema = z.object({
   id: ProjectIdSchema,
@@ -49,6 +49,10 @@ export const CreateProjectRequestSchema = z.object({
 
 export const ProjectCreationCatalogSchema = z.object({ templates: z.array(ProjectTemplateDtoSchema), defaultServicePlan: ResourceIdSchema, maxConcurrentTasks: z.number().int().min(1) });
 export type ProjectCreationCatalog = z.infer<typeof ProjectCreationCatalogSchema>;
+
+/** 创建前只读预览；所有主机名来自平台安装配置，与创建后的 ServiceDto 使用同一规则。 */
+export const ProjectDomainPreviewSchema = z.object({ slug: SlugSchema, prodHost: z.string().min(1), previewHost: z.string().min(1), serviceHost: z.string().min(1) }).strict();
+export type ProjectDomainPreview = z.infer<typeof ProjectDomainPreviewSchema>;
 
 export const MemberDtoSchema = z.object({ userId: UserIdSchema, role: MemberRoleSchema, platformRole: PlatformRoleSchema.optional(), name: z.string(), email: z.string() });
 export const SetMemberRequestSchema = z.object({ userId: UserIdSchema, role: MemberRoleSchema });

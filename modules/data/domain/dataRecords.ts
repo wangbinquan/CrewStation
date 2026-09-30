@@ -80,7 +80,7 @@ const ENDED: Partial<Record<TaskDataBinding['state'], ReleaseReason>> = {
 
 /** 等批准时 Prepared 为假（排队）；批准后 Prepared 为真，建好临时角色、生效时 Granted 为真。 */
 function bindingConditions(binding: TaskDataBinding): Condition[] {
-  if (binding.state === 'requested') return [{ type: 'Prepared', status: 'false', reason: 'awaiting-approval', message: '等负责人批准' }];
+  if (binding.state === 'requested') return [{ type: 'Prepared', status: 'false', reason: 'awaiting-approval', message: '等管理员批准' }];
   return [{ type: 'Prepared', status: 'true' }, binding.state === 'active' ? { type: 'Granted', status: 'true' } : { type: 'Granted', status: 'false' }];
 }
 

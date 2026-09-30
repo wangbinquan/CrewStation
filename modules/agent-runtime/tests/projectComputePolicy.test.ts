@@ -11,6 +11,7 @@ import type { TestDatabase } from '@crewstation/testkit';
 import { sql } from 'drizzle-orm';
 import { agentRuntimeMigrations, createAgentRuntimeModule } from '../wiring';
 import type { AgentRuntimeModule } from '../wiring';
+import { computeAllocationRevision, taskProfileAllocationRevision } from '../api/allocationRevision';
 
 const profileIds = new Map<string, string>();
 const profileId = (name: string) => { if (!profileIds.has(name)) profileIds.set(name, newResourceId()); return profileIds.get(name)!; };
@@ -136,5 +137,28 @@ describe.skipIf(!available)('项目算力分配与档位可见性（RFC-012）',
       expect([...(await old.db.execute(sql`SELECT default_visible FROM agent_runtime.profiles`))]).toEqual([expect.objectContaining({ default_visible: true })]);
       await expect(Promise.resolve(old.db.execute(sql`UPDATE agent_runtime.profiles SET default_visible = false WHERE name = 'old-default'`))).rejects.toBeDefined();
     } finally { await old.drop(); }
+  });
+
+  test('资源中心逐项授权保留继承、项目默认与开发规格；CAS 和提交后重放均可验证', async () => {
+    const id = project(5), initial = await mod.api.getProjectComputePolicy(admin, id);
+    await mod.api.saveProjectComputePolicy(admin, id, { expectedRevision: initial.revision, policy: inherited });
+    let revision = initial.revision + 1;
+    const profile = (await mod.api.listProfiles(admin)).items.find((p) => p.id === profileId('private'))!;
+    const command = { operationId: newResourceId(), target: { resourceType: 'compute-profile' as const, resourceId: profile.id, action: 'grant' as const }, expectedRevision: computeAllocationRevision(revision, profile), values: {} };
+    await expect(mod.api.applyResourceChange({ ...member, isAdmin: true }, id, command)).rejects.toMatchObject({ kind: 'forbidden' });
+    const receipt = await mod.api.applyResourceChange(admin, id, command); revision++;
+    expect(await mod.api.applyResourceChange(admin, id, command)).toEqual(receipt);
+    expect((await mod.api.getProjectComputePolicy(admin, id)).policy).toMatchObject({ mode: 'inherit', additionalProfiles: [profile.id] });
+    await mod.api.applyResourceChange(admin, id, { ...command, operationId: newResourceId(), target: { ...command.target, action: 'set-default' }, expectedRevision: computeAllocationRevision(revision++, profile), values: { inheritDefault: false } });
+    expect((await mod.api.getProjectComputePolicy(admin, id)).effectiveDefaultProfile).toBe(profile.id);
+    expect(await mod.api.resolveForProject(id, undefined, 'agent')).toMatchObject({ id: profile.id });
+    await mod.api.applyResourceChange(admin, id, { ...command, operationId: newResourceId(), target: { ...command.target, action: 'set-default' }, expectedRevision: computeAllocationRevision(revision++, profile), values: { inheritDefault: true } });
+    expect((await mod.api.getProjectComputePolicy(admin, id)).effectiveDefaultProfile).toBe(profileId('public'));
+    await mod.api.applyResourceChange(admin, id, { operationId: newResourceId(), target: { resourceType: 'task-profile', resourceId: taskProfiles.large, action: 'set-default' }, expectedRevision: taskProfileAllocationRevision(revision++, taskProfiles.large), values: {} });
+    expect(await mod.api.projectDevTaskProfile(id)).toBe(taskProfiles.large);
+    const attempts = await Promise.allSettled([1, 2].map(() => mod.api.applyResourceChange(admin, id, { ...command, operationId: newResourceId(), target: { ...command.target, action: 'revoke' }, expectedRevision: computeAllocationRevision(revision, profile) })));
+    expect(attempts.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect((await mod.api.getProjectComputePolicy(admin, id)).policy).toMatchObject({ mode: 'inherit', excludedProfiles: [profile.id] });
+    await expect(mod.api.resolveForProject(id, selector('private'), 'agent')).rejects.toMatchObject({ kind: 'forbidden' });
   });
 });

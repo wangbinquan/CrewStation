@@ -1,4 +1,5 @@
 import type { Actor, AllowlistDocument, ExitMaintenanceRequest, MaintenanceDto, OfflineReason, ProjectId, ProjectRateLimitsDto, RateLimits, RateLimitSettingsDto, RouteEntry, ServiceId, ServiceMaintenanceView, SetMaintenanceRequest, SetProjectRateLimitsRequest, SetRateLimitSettingsRequest, UserId, WorkloadIdentity } from '@crewstation/contracts';
+import type { ResourceTarget, ResourceValues } from '@crewstation/contracts';
 
 export interface EvaluationTarget { host: string; method: string; path: string }
 /** `unavailable`：目标正式版本维护中（RFC-021），ForwardAuth 回 503 而不是 403。 */
@@ -39,6 +40,8 @@ export interface ObservedPodObject {
 /** gateway 模块对外能力：路由与放行表生成、Pod 身份反查与服务域放行评估（cs-auth 用后两者）。 */
 export interface GatewayModuleApi {
   readonly name: 'gateway';
+  applyResourceChange(actor: Actor, projectId: ProjectId, input: { operationId: string; target: ResourceTarget; expectedRevision: string; values: ResourceValues }): Promise<{ revision: string; effect: string; applied: boolean }>;
+  resourceChangeReceipt(projectId: ProjectId, operationId: string): Promise<{ revision: string; effect: string; applied: boolean } | undefined>;
   productionRouteObserved(serviceId: ServiceId, physical: 'blue' | 'green'): Promise<boolean>;
   reconcileService(serviceId: ServiceId): Promise<RouteEntry[]>;
   reconcileAll(): Promise<number>;

@@ -384,7 +384,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'devSession.data.reasonPlaceholder': 'Reason (optional)',
   'devSession.data.empty': 'No additional bindings. Development data persists across sessions; the application configuration selects the connection.',
   'devSession.data.expires': 'valid until {at}',
-  'devSession.data.approvalWarning': 'Requires the project owner to approve. The binding covers this development session and can coexist with other bindings. Approval does not confirm that existing CLIs loaded it or the application selected it.',
+  'devSession.data.approvalWarning': 'The project owner requests access and a platform administrator approves. The binding covers this development session and can coexist with other bindings. Approval does not confirm that existing CLIs loaded it or the application selected it.',
   'devSession.data.noService': 'The project is not fully provisioned yet, so data access cannot be requested.',
 
   'devSession.data.mode.development': 'Development data · read/write',
@@ -404,7 +404,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'devSession.data.ttl': 'Access duration (minutes)',
   'devSession.data.ttlHint': 'An integer from 5–1440 minutes, starting at approval. Leave blank for the platform default of 120 minutes.',
   'devSession.data.ttlInvalid': 'Enter an integer from 5–1440 minutes, or leave blank for 120 minutes.',
-  'devSession.data.noDevelop': 'Your role can view records. Requesting access requires project development permission.',
+  'devSession.data.noDevelop': 'Your role can view records. Resource requests must be submitted by the project owner.',
   'devSession.data.requested': 'The “{mode}” request was accepted. Actual state:',
   'devSession.data.loadingUnknown': 'Approval does not automatically load new connections into the container. Process loading and application connection are currently unconfirmed.',
   'devSession.data.readFailed': 'Records could not be refreshed. Previous records and input are retained; changes can resume after recovery.',

@@ -1,3 +1,4 @@
+import { adminProjectResourcesRoute } from './adminGlobalRoutes';
 import { systemObservabilityRoute, systemObservationTaskRoute, projectObservabilityRoute, projectObservationTaskRoute } from './observabilityRoutes';
 import { businessRecoveryRoute } from './businessRecoveryRoute';
 import { objectStorageRoute, projectObjectStorageRoute } from './objectStorageRoute';
@@ -7,7 +8,7 @@ import { clusterRoute } from './clusterRoute';
 // 两棵子树（RFC-002）：workbenchRoute 是租户空间，adminRoute 是平台管理空间。
 import {
   adminAuthenticationRoute, adminComputeRoute, adminGatewayRoute, adminProjectsRoute,
-  adminProjectComputeRoute, adminProjectResourcesRoute, adminResourceTemplatesRoute, adminRoute, adminServicePlansRoute, adminSettingsRoute, adminTaskProfilesRoute, adminUsersRoute,
+  adminProjectComputeRoute, adminResourceTemplatesRoute, adminRoute, adminServicePlansRoute, adminSettingsRoute, adminTaskProfilesRoute, adminUsersRoute,
 } from '../../features/admin';
 import { appAccessRoute, capabilitiesRoute, marketHomeRoute, marketRoute, marketLegacyRoute } from '../../features/capabilities';
 import { catalogRoute } from '../../features/catalog';
@@ -20,7 +21,7 @@ import { releaseRoute } from '../../features/release';
 import { projectRoute } from './projectRoute';
 import { adminProjectRoutes } from './adminProjectRoutes';
 import { adminCapabilitiesRoute, adminRequestsRoute, adminIntegrationsLegacyRoute, adminCatalogLegacyRoute, adminEgressLegacyRoute, adminOverviewRoute, adminProjectCreateRoute, adminProjectProvisioningRoute } from './adminGlobalRoutes';
-import { projectDevelopmentRoute, projectSettingsRoute, projectOperationsRoute, projectResourcesRoute } from './projectSections';
+import { projectDevelopmentRoute, projectSettingsRoute, projectOperationsRoute, projectResourcesRoute, projectResourceCenterRoute } from './projectSections';
 import { rootRoute } from './rootRoute';
 import { workbenchRoute } from './workbenchRoute';
 
@@ -37,6 +38,7 @@ export const routeTree = rootRoute.addChildren([
       selfProjectProvisioningRoute,
       projectSettingsRoute,
       projectResourcesRoute,
+      projectResourceCenterRoute,
       projectOperationsRoute,
       projectObservabilityRoute,
       projectObservationTaskRoute,

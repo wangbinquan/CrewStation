@@ -1,5 +1,6 @@
 // 确定性的分层排布：横向是泳道，纵向是横带；位置只由数据顺序或显式行号决定，换快照不重排；没有力导向、没有随机数。
 import type { Topology, TopologyBand, TopologyBox, TopologyEdge, TopologyNode } from './topologyModel';
+import { avoidCards } from './orthogonalRouter';
 
 export interface LayoutMetrics {
   readonly nodeW: number; readonly nodeH: number; readonly laneGap: number; readonly rowGap: number;
@@ -46,7 +47,7 @@ export function layoutTopology(topology: Topology, m: LayoutMetrics): Layout {
     const from = placed.get(edge.from), to = placed.get(edge.to);
     if (!from || !to) return [];
     const offset = reversed.has(`${edge.from}→${edge.to}`) ? (edge.from < edge.to ? -7 : 7) : 0;
-    return [routeEdge(edge, from, to, m, offset)];
+    return [routeEdge(edge, from, to, m, offset, nodes)];
   });
   const width = m.margin * 2 + topology.lanes.length * m.nodeW + (topology.lanes.length - 1) * m.laneGap;
   return { width, height: y - m.bandGap + m.margin, lanes: topology.lanes.map((title, lane) => ({ title, x: laneX(lane) })), bands, nodes, edges };
@@ -87,7 +88,7 @@ function boundingBox(nodes: readonly PlacedNode[], m: LayoutMetrics): Rect {
 type Point = readonly [number, number];
 
 /** 正交折线：相邻泳道从右侧出、左侧进；反向则镜像；同一泳道走左侧沟槽（多个子节点共用一条竖线）。 */
-function routeEdge(edge: TopologyEdge, from: PlacedNode, to: PlacedNode, m: LayoutMetrics, offset: number): PlacedEdge {
+function routeEdge(edge: TopologyEdge, from: PlacedNode, to: PlacedNode, m: LayoutMetrics, offset: number, nodes: readonly PlacedNode[]): PlacedEdge {
   const fromCy = from.y + from.h / 2 + offset, toCy = to.y + to.h / 2 + offset;
   let points: Point[];
   if (to.node.lane > from.node.lane) {
@@ -100,8 +101,10 @@ function routeEdge(edge: TopologyEdge, from: PlacedNode, to: PlacedNode, m: Layo
     const gutter = from.x - 12;
     points = [[from.x, fromCy + 10], [gutter, fromCy + 10], [gutter, toCy], [to.x, toCy]];
   }
+  points = avoidCards(points, nodes, from, to);
+  if (!points.length) return { edge, d: '', labelX: 0, labelY: 0, labelSpace: 0 };
   const label = longestHorizontal(points);
-  return { edge, d: roundedPath(points, 8), labelX: label.x, labelY: label.y - 6, labelSpace: label.length };
+  return { edge, d: roundedPath(points, 4), labelX: label.x, labelY: label.y - 6, labelSpace: label.length };
 }
 
 function longestHorizontal(points: readonly Point[]): { x: number; y: number; length: number } {

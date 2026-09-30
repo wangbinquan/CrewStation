@@ -3,9 +3,11 @@ import type { Database, Executor } from '@crewstation/persistence';
 import type { RepositoryScope, UnitOfWork } from '../../ports/unitOfWork';
 import { drizzleOperationRepository, drizzleProxyRepository } from './drizzleCatalogRepositories';
 import { drizzleGrantRepository, drizzleRequestRepository } from './drizzleGrantRepositories';
+import { drizzleApiAllocations } from './drizzleAllocations';
 
 export function scopeOver(executor: Executor): RepositoryScope {
   return {
+    allocations: drizzleApiAllocations(executor),
     proxies: drizzleProxyRepository(executor),
     operations: drizzleOperationRepository(executor),
     grants: drizzleGrantRepository(executor),

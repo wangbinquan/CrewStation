@@ -238,4 +238,13 @@ describe.skipIf(!available)('release module', () => {
     expect(snapshot[0]!.profiles.at(-1)).toEqual(legacy);
     manifestYaml = baseManifest('migration: { compatibility: none, destructive: false, rollback: switch-back }');
   });
+  test('资源全景读取两槽固定 Manifest 引用，旧 stub 没有 compute 也保留其余关系', async () => {
+    const usage = await release.api.resourceUsage(owner, serviceId); expect(usage.length).toBeGreaterThan(0); expect(usage.length).toBeLessThanOrEqual(2);
+    const slots = await release.api.getSlots(owner, serviceId); expect(new Set(usage.map((u) => u.releaseId))).toEqual(new Set(slots.flatMap((slot) => slot.releaseId ? [slot.releaseId] : [])));
+    expect(usage.every((u) => ['blue', 'green'].includes(u.physical) && ['prod', 'preview'].includes(u.role))).toBe(true);
+    expect(usage.some((u) => u.servicePlanId === BUILTIN_RESOURCES.servicePlanSmall)).toBe(true); expect(usage.some((u) => u.configDefinitionIds.includes('01a0bf5d-8f4b-7e10-85ed-74d540e5d6f8'))).toBe(true);
+    expect(JSON.stringify(usage)).not.toMatch(/GREETING|command|configValues|postgres:\/\//);
+    expect(await release.api.resourceUsage(owner, Bun.randomUUIDv7() as ServiceId)).toEqual([]);
+  });
+
 });

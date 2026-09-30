@@ -15,7 +15,7 @@ export interface OperationDetailProps {
   readonly operation?: ApiOperationDto;
   readonly pendingRequest?: ApiRequestDto;
   /** 打开「申请定向开放」弹窗。 */
-  readonly onRequest: (operation: ApiOperationDto) => void;
+  readonly onRequest?: (operation: ApiOperationDto) => void;
   readonly onInvoke?: (operation: ApiOperationDto) => void;
   /** 地址里指定的操作不在目录里：如实说明，不偷偷展示别的操作。 */
   readonly missingId?: string;

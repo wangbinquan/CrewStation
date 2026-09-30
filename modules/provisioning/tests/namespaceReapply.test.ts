@@ -6,7 +6,7 @@ import { namespaceReapplyTask } from '../workers/namespaceReapply';
 import type { ProjectFacts, ProvisioningSteps } from '../api/steps';
 
 const facts = (slug: string, kind: ProjectFacts['kind'] = 'DigitalWorker'): ProjectFacts => ({
-  projectId: `01a0bf5d-8f4b-7178-82e1-9a99060b11${slug.length}0` as ProjectId, state: 'active',
+  projectId: Bun.randomUUIDv7() as ProjectId, state: 'active',
   serviceId: '01a0bf5d-8f4b-76c5-866c-f1feda3d63bb' as ServiceId,
   slug, name: slug, namespace: `cs-${slug}`, kind, template: '01a0bf5d-8f4b-7002-9560-94caf593fb19',
 });
@@ -15,7 +15,7 @@ const facts = (slug: string, kind: ProjectFacts['kind'] = 'DigitalWorker'): Proj
 function steps(projects: readonly ProjectFacts[], calls: string[], failOn: readonly string[] = []): ProvisioningSteps {
   const forbidden = (step: string) => async () => { calls.push(`FORBIDDEN:${step}`); };
   return {
-    loadProject: async () => undefined,
+    loadProject: async (id) => projects.find((p) => p.projectId === id),
     listProjects: async () => [...projects],
     ensureNamespace: async (f) => { calls.push(f.namespace); if (failOn.includes(f.namespace)) throw new Error(`apply 被拒：${f.namespace}`); },
     ensureRepository: forbidden('repo'), ensureData: forbidden('data'), reconcileRoutes: forbidden('routes'), ensureFirstRelease: forbidden('release'),
@@ -41,6 +41,12 @@ describe('启动重下发命名空间（RFC-018）', () => {
   test('没有项目时是空转，不抛错', async () => {
     const calls: string[] = [];
     expect(await reapplyNamespacesUseCase(steps([], calls), noopLogger)()).toEqual({ applied: 0, failed: 0 });
+    expect(calls).toEqual([]);
+  });
+  test('目录载入后已经删除的项目不再声明命名空间', async () => {
+    const calls: string[] = [], original = facts('stale');
+    const candidate = steps([original], calls); candidate.loadProject = async () => ({ ...original, state: 'deleting' });
+    expect(await reapplyNamespacesUseCase(candidate, noopLogger)()).toEqual({ applied: 0, failed: 0 });
     expect(calls).toEqual([]);
   });
 

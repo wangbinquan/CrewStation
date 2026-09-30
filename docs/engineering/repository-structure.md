@@ -1,7 +1,7 @@
 # 仓库结构、模块划分与依赖原则
 
 > 状态：已确认（2026-09-11 作者裁定第 13 节四项），作为 Design §15.1 的展开并进入 Plan T0.2  
-> 版本：0.7 · 日期：2026-09-24（0.7：按 ADR-0009 新建 `data-control`（L2），模块数 21→22；0.6：按 ADR-0009 新增 `resources`（L1）、`cluster-control`（L2）与包 `resource-runtime`，模块数 19→21，`data-control`（L2）随 RFC-025 第四期再建；0.5：按 ADR-0008 退役 `egress` 模块，模块数 20→19；0.4：按 ADR-0007 补用例落位与两条新规则、`tools/testguard`，§10 指向用例防护体系；0.3：根目录补 RFC／根级说明文件，模块清单补 ADR-0003 的两个模块，§11 指向开发规则）  
+> 版本：0.8 · 日期：2026-09-30（0.8：按 ADR-0011 新增 `resource-access`（L3），当前共 24 个模块；0.7：按 ADR-0009 新建 `data-control`（L2），模块数 21→22；0.6：按 ADR-0009 新增 `resources`（L1）、`cluster-control`（L2）与包 `resource-runtime`，模块数 19→21，`data-control`（L2）随 RFC-025 第四期再建；0.5：按 ADR-0008 退役 `egress` 模块，模块数 20→19；0.4：按 ADR-0007 补用例落位与两条新规则、`tools/testguard`，§10 指向用例防护体系；0.3：根目录补 RFC／根级说明文件，模块清单补 ADR-0003 的两个模块，§11 指向开发规则）
 > 适用范围：CrewStation 代码仓（Bun workspaces monorepo）的全部代码，包括控制面、任务容器、工作台、CLI、部署与测试
 
 ## 目录
@@ -197,6 +197,7 @@ modules/<name>/
 | L2 | `project` | Project、Service、成员三级角色、preview 测试者、命名空间登记、TaskQuota、ServicePlan、TaskProfile（算力档位已按 ADR-0005 移出） | identity |
 | L3 | `scm` | SourceRepositoryBinding、建仓、代推、标签与保护标签、会话级短期 Git 凭据 | project |
 | L3 | `config` | ConfigItem、SecretValue、开发与生产两组值、版本快照、注入渲染 | project |
+| L3 | `resource-access` | RFC-036 可申请目录政策、负责人申请、管理员审批与直接管理、应用回执和审计；领域资源由所属模块经 ports 幂等应用（ADR-0011） | project |
 | L3 | `data` | DataResource、DataBinding、TaskDataBinding 三模式与审批、Provider 端口（postgres、s3、pvc） | project |
 | L3 | `api-catalog` | APIProxy 登记、操作键（proxy＋method＋path）、开放策略、APIGrant、APIRequest、Swagger 裁剪 | project |
 | L3 | `events` | EventProducer 登记、事件类型、inbox 去重、订阅、投递状态机、死信、推送 | project |

@@ -1,4 +1,5 @@
 import { runtimeImagesResource, type RuntimeImagesResource } from './resources/runtimeImages';
+import { projectResourceCenterResource, type ProjectResourceCenterResource } from './resources/resource-center/workspace';
 import { objectStorageResource, type ObjectStorageResource } from './resources/storage/objects';
 import { clusterResource } from './resources/cluster';
 import type { ClusterResourceClient } from './resources/cluster';
@@ -30,6 +31,8 @@ import type { PlatformSettingsResource } from './resources/platformSettings';
 import { platformSettingsResource } from './resources/platformSettings';
 import type { ProjectsResource } from './resources/projects';
 import { projectsResource } from './resources/projects';
+import { projectDeletionsResource } from './resources/project-deletion/client';
+import type { ProjectDeletionsResource } from './resources/project-deletion/client';
 import type { ResourcesResource } from './resources/resources';
 import { resourcesResource } from './resources/resources';
 import type { ServicesResource } from './resources/services';
@@ -57,6 +60,7 @@ export interface ApiClient {
   /** RFC-005：认证管理面（登录策略、身份提供方、身份转发；仅管理员）。 */
   readonly auth: AuthResource;
   readonly projects: ProjectsResource;
+  readonly projectDeletions: ProjectDeletionsResource;
   readonly catalog: CatalogResource;
   readonly services: ServicesResource;
   readonly devSession: DevSessionResource;
@@ -78,6 +82,7 @@ export interface ApiClient {
   readonly platformSettings: PlatformSettingsResource;
   /** RFC-025：标准资源视图、推送流与可做操作。 */
   readonly resources: ResourcesResource;
+  readonly resourceCenter: ProjectResourceCenterResource;
   readonly stream: TaskStreamResource;
 }
 
@@ -90,6 +95,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     users: usersResource(transport),
     auth: authResource(transport),
     projects: projectsResource(transport),
+    projectDeletions: projectDeletionsResource(transport),
     catalog: catalogResource(transport),
     services: servicesResource(transport),
     devSession: devSessionResource(transport),
@@ -107,6 +113,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     computeProfiles: computeProfilesResource(transport),
     platformSettings: platformSettingsResource(transport),
     resources: resourcesResource(transport),
+    resourceCenter: projectResourceCenterResource(transport),
     stream: { taskStreamUrl: (taskId, sinceSeq = 0, replay) => taskStreamUrl(transport.baseUrl, taskId, sinceSeq, replay) },
   };
 }

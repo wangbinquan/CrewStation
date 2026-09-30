@@ -45,6 +45,9 @@ export interface TestRepository {
 export const PROFILE_TEST_JOB_KIND = 'agent-runtime.profile-test';
 
 export interface ProjectPolicyRepository {
+  receipt(projectId: ProjectId, operationId: string): Promise<{ hash: string; revision: string; effect: string; applied: boolean } | undefined>;
+  saveReceipt(projectId: ProjectId, operationId: string, receipt: { hash: string; revision: string; effect: string; applied: boolean }): Promise<void>;
+  lock(projectId: ProjectId): Promise<void>;
   get(projectId: ProjectId): Promise<ProjectComputePolicyRecord | undefined>;
   save(record: ProjectComputePolicyRecord, expectedRevision: number): Promise<boolean>;
   referencing(name: string): Promise<ProjectId[]>;

@@ -78,7 +78,7 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
   const editor = useFileEditor(channel);
   const location = useDevelopmentLocation(taskId, editor, state.runnerConnected);
   const preview = usePreviewStatus(channel, projectId, state.generation, state.runnerConnected);
-  const data = useDataBindings(projectId, taskId, serviceId, { canDevelop, canManage: access.isOwner });
+  const data = useDataBindings(projectId, taskId, serviceId, { canDevelop: access.isOwner && !isAdmin, canManage: isAdmin });
   const [dataDirty, setDataDirty] = useState(false);
   // 页头「释放会话」（2026-09-23 作者裁定）：记下点击并打开会话面板；面板可见时把还没处理的那次交给「当前会话」卡展开确认，
   // 卡片回报后清掉。计数放在这一层：面板从收起到打开时内容整块重挂，放在卡片里会丢，也会重复展开。

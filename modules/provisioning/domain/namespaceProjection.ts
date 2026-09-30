@@ -1,4 +1,4 @@
-import type { ProjectId } from '@crewstation/contracts';
+import type { NamespaceQuota, ProjectId } from '@crewstation/contracts';
 
 /** 写命名空间期望要用的项目事实（结构上是开通事实 ProjectFacts 的子集）。 */
 export interface ProjectNamespace {
@@ -40,8 +40,8 @@ export interface NetworkPolicyDeclaration {
 }
 
 /** 每个项目各一条，引用就是项目 ID（同一种类下唯一）。 */
-export function namespaceDeclaration(facts: ProjectNamespace): NamespaceDeclaration {
-  const hard = PROJECT_QUOTA.hard;
+export function namespaceDeclaration(facts: ProjectNamespace, quota?: NamespaceQuota): NamespaceDeclaration {
+  const hard = quota ? { pods: String(quota.pods), 'requests.cpu': String(quota.requestsCpu), 'requests.memory': `${quota.requestsMemoryGiB}Gi`, persistentvolumeclaims: String(quota.persistentVolumeClaims) } : PROJECT_QUOTA.hard;
   return {
     kind: 'namespace', ref: facts.projectId, projectId: facts.projectId,
     spec: { children: [{ kind: 'Namespace', name: facts.namespace }, { kind: 'ResourceQuota', namespace: facts.namespace, name: PROJECT_QUOTA.name }], labels: { 'crewstation.io/project': facts.slug }, quota: { hard } },

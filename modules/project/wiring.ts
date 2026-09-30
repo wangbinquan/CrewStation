@@ -18,6 +18,7 @@ import type { ProjectUseCaseDeps } from './application/dependencies';
 import { memberUseCases } from './application/manageMembers';
 import { quotaAndPlanUseCases } from './application/manageQuotaAndPlans';
 import { servicePolicyUseCases } from './application/servicePolicies';
+import { projectResourcePolicyUseCases } from './application/resourcePolicies';
 import { servicePolicyRoutes } from './http/servicePolicyRoutes';
 import { queryProjectUseCases } from './application/queryProjects';
 import { catalogRoutes } from './http/catalogRoutes';
@@ -30,10 +31,14 @@ import { accessRequestReviewUseCases } from './application/accessRequestReview';
 import { marketListingUseCases } from './application/marketListings';
 import { projectPageUseCases } from './application/projectPages';
 import { creationCatalogUseCase } from './application/creation/eligibility';
+import { projectDomainPreviewUseCase } from './application/creation/domainPreview';
 import type { CreationTemplates } from './ports/creation';
 import type { HostNaming } from './ports/hostNaming';
 import type { ProjectSettings } from './ports/projectSettings';
 import type { TaskUsage } from './ports/taskUsage';
+import { deletionIntentUseCases } from './application/deletion/intent';
+import { deletionProgressUseCases } from './application/deletion/progress';
+import { projectDeletionOwnerUseCases } from './application/deletion/owner';
 
 export interface ProjectModuleDeps {
   db: Database;
@@ -74,6 +79,7 @@ export function createProjectModule(deps: ProjectModuleDeps): ProjectModule {
   const api: ProjectModuleApi = {
     name: 'project',
     creationCatalog: creationCatalogUseCase(useCaseDeps),
+    projectDomainPreview: projectDomainPreviewUseCase(useCaseDeps),
     isAdmin: (userId) => deps.identity.isAdmin(userId),
     ...authorizationUseCases(useCaseDeps),
     createProject: createProjectUseCase(useCaseDeps),
@@ -82,12 +88,16 @@ export function createProjectModule(deps: ProjectModuleDeps): ProjectModule {
     ...memberUseCases(useCaseDeps),
     ...quotaAndPlanUseCases(useCaseDeps),
     ...servicePolicyUseCases(useCaseDeps),
+    ...projectResourcePolicyUseCases(useCaseDeps),
     ...appVisibilityUseCases(useCaseDeps),
     ...appIconUseCases(useCaseDeps),
     ...appAccessUseCases(useCaseDeps),
     ...accessRequestReviewUseCases(useCaseDeps),
     ...marketListingUseCases(useCaseDeps),
     ...projectPageUseCases(useCaseDeps),
+    ...deletionIntentUseCases(useCaseDeps),
+    ...deletionProgressUseCases(useCaseDeps),
+    ...projectDeletionOwnerUseCases(useCaseDeps),
   };
   return { api, http: [projectRoutes(api), catalogRoutes(api), appListingRoutes(api), appIconRoutes(api), appAccessRoutes(api), servicePolicyRoutes(api)], migrations: projectMigrations };
 }

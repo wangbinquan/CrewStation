@@ -1,0 +1,39 @@
+.page { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.summary { display: grid; grid-template-columns: minmax(180px, 1.5fr) repeat(3, minmax(100px, 1fr)); border: 1px solid var(--cs-color-border); border-radius: 12px; background: var(--cs-color-surface); overflow: hidden; }
+.summary > div { padding: 15px 18px; display: grid; gap: 5px; }
+.summary small, .muted, .summary .stat span { color: var(--cs-color-text-muted); }
+.stat { appearance: none; border: 0; border-left: 1px solid var(--cs-color-border); background: transparent; color: var(--cs-color-text); display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 15px 18px; cursor: pointer; font: inherit; }
+.stat strong { font-size: 24px; font-variant-numeric: tabular-nums; }
+.stat:hover, .stat[aria-pressed='true'] { background: var(--cs-tone-info-bg); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; }
+.tabs { display: flex; gap: 3px; padding: 3px; background: var(--cs-color-surface); border: 1px solid var(--cs-color-border); border-radius: 8px; }
+.tabs button { border: 0; background: transparent; color: var(--cs-color-text-muted); font: inherit; padding: 6px 12px; cursor: pointer; border-radius: 5px; }
+.tabs button[aria-selected='true'] { color: var(--cs-tone-info-fg); background: var(--cs-tone-info-bg); font-weight: 600; }
+.controls, .inline, .legend { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.controls input, .controls select, .fields input:not([type='checkbox']), .fields select, .page textarea { min-width: 0; border: 1px solid var(--cs-color-border); border-radius: 6px; background: var(--cs-color-surface); color: var(--cs-color-text); padding: 6px 9px; font: inherit; }
+.controls input { width: 190px; }
+.fields input:not([type='checkbox']), .fields select { width: 100%; box-sizing: border-box; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 18px 0; }
+.fields input[type='checkbox'] { width: 18px; height: 18px; }
+.note, .warning { margin: 0; padding: 9px 12px; border-radius: 7px; color: var(--cs-tone-info-fg); background: var(--cs-tone-info-bg); overflow-wrap: anywhere; }
+.warning { color: var(--cs-tone-warning-fg); background: var(--cs-tone-warning-bg); }
+.stage { min-height: 240px; min-width: 0; overflow: auto; border-radius: 10px; }
+.block { display: block; color: var(--cs-color-text-muted); font-size: 11px; line-height: 1.5; max-width: 290px; overflow-wrap: anywhere; }
+.footer { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; color: var(--cs-color-text-muted); font-size: 11px; }
+.footer details { flex-basis: 100%; }
+.legend span { display: flex; align-items: center; gap: 5px; }
+.legend i { width: 25px; height: 0; border-top: 2px solid var(--cs-color-text-muted); }
+.legend [data-evidence='configured'] i { border-top-style: dashed; }
+.legend [data-evidence='proposed'] i { border-top-style: dotted; }
+.facts { display: grid; grid-template-columns: minmax(110px, .3fr) minmax(0, 1fr); gap: 9px 14px; font-size: 13px; padding: 10px 0; }
+.facts dt { color: var(--cs-color-text-muted); }
+.facts dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.factRow { display: contents; }
+.impact { color: var(--cs-color-text-muted); line-height: 1.7; padding-left: 20px; }
+.relations { list-style: none; padding: 0; display: grid; gap: 8px; }
+.relations li { display: grid; gap: 4px; padding: 9px 11px; background: var(--cs-color-surface); border: 1px solid var(--cs-color-border); border-radius: 6px; overflow-wrap: anywhere; }
+.relations small { color: var(--cs-color-text-muted); }
+.reasonCell { max-width: 300px; overflow-wrap: anywhere; white-space: pre-wrap; }
+.empty { padding: 30px; text-align: center; color: var(--cs-color-text-muted); }
+@media (min-width: 1100px) { .page { height: var(--viewport-fill, auto); } .stage { flex: 1 1 0; min-height: 200px; overscroll-behavior: contain; } }
+@media (max-width: 760px) { .summary { grid-template-columns: repeat(3, minmax(0, 1fr)); } .summary > div { grid-column: 1 / -1; border-bottom: 1px solid var(--cs-color-border); } .stat { padding: 10px; flex-direction: column; gap: 4px; } .toolbar, .controls { align-items: stretch; } .controls input { flex: 1 1 100%; width: auto; } .controls select { max-width: 100%; } .fields { grid-template-columns: 1fr; } }

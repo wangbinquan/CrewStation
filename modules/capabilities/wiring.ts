@@ -1,7 +1,7 @@
 import type { UserId } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import type { Clock } from '@crewstation/kernel';
-import { systemClock } from '@crewstation/kernel';
+import { precondition, systemClock } from '@crewstation/kernel';
 import type { Hono } from 'hono';
 import type { CapabilitiesModuleApi } from './api/moduleApi';
 import { describeCapabilitiesUseCase } from './application/describeCapabilities';
@@ -13,6 +13,9 @@ import { marketRoutes } from './http/marketRoutes';
 import type { ProjectSummarySources } from './ports/projectSummaries';
 import { projectSummaryUseCases } from './application/projectSummaries';
 import { projectSummaryRoutes } from './http/projectSummaryRoutes';
+import { projectResourceSnapshot } from './application/resource-center/snapshot';
+import type { ResourceCenterSources } from './ports/resourceCenter';
+import { projectResourceRoutes } from './http/projectResourceRoutes';
 
 export interface CapabilitiesModuleDeps {
   sources: CapabilitySources;
@@ -21,6 +24,7 @@ export interface CapabilitiesModuleDeps {
   settings: CapabilitySettings;
   isAdmin: (userId: UserId) => Promise<boolean>;
   clock?: Clock;
+  resourceCenter?: ResourceCenterSources;
 }
 
 export interface CapabilitiesModule {
@@ -31,6 +35,6 @@ export interface CapabilitiesModule {
 /** 纯聚合模块：没有自己的表，只读其他模块的公开查询。 */
 export function createCapabilitiesModule(deps: CapabilitiesModuleDeps): CapabilitiesModule {
   const clock = deps.clock ?? systemClock;
-  const api: CapabilitiesModuleApi = { name: 'capabilities', describe: describeCapabilitiesUseCase(deps.sources, deps.settings, clock), ...marketAppUseCases(deps.market, clock), ...projectSummaryUseCases(deps.projects, clock) };
-  return { api, http: [capabilityRoutes(api, deps.isAdmin), marketRoutes(api, deps.isAdmin), projectSummaryRoutes(api, deps.isAdmin)] };
+  const api: CapabilitiesModuleApi = { name: 'capabilities', projectResources: deps.resourceCenter ? projectResourceSnapshot(deps.resourceCenter, clock) : async () => { throw precondition('项目资源来源未装配'); }, describe: describeCapabilitiesUseCase(deps.sources, deps.settings, clock), ...marketAppUseCases(deps.market, clock), ...projectSummaryUseCases(deps.projects, clock) };
+  return { api, http: [capabilityRoutes(api, deps.isAdmin), marketRoutes(api, deps.isAdmin), projectSummaryRoutes(api, deps.isAdmin), projectResourceRoutes(api, deps.isAdmin)] };
 }

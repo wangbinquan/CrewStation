@@ -2,12 +2,12 @@ export const PROJECT_PATHS = {
   workbench: {
     overview: '/projects/$projectId', development: '/projects/$projectId/dev-session',
     conversations: '/projects/$projectId/dev-session/conversations', release: '/projects/$projectId/release',
-    observability: '/projects/$projectId/observability', resources: '/projects/$projectId/resources', operations: '/projects/$projectId/operations', settings: '/projects/$projectId/settings',
+    observability: '/projects/$projectId/observability', resources: '/projects/$projectId/resources', resourceCenter: '/projects/$projectId/resource-center', operations: '/projects/$projectId/operations', settings: '/projects/$projectId/settings',
   },
   admin: {
     overview: '/admin/integrations/$projectId', development: '/admin/integrations/$projectId/dev-session',
     conversations: '/admin/integrations/$projectId/dev-session/conversations', release: '/admin/integrations/$projectId/release',
-    observability: '/admin/integrations/$projectId/observability', resources: '/admin/integrations/$projectId/resources', operations: '/admin/integrations/$projectId/operations', settings: '/admin/integrations/$projectId/settings',
+    observability: '/admin/integrations/$projectId/observability', resources: '/admin/integrations/$projectId/resources', resourceCenter: '/admin/integrations/$projectId/resource-center', operations: '/admin/integrations/$projectId/operations', settings: '/admin/integrations/$projectId/settings',
   },
 } as const;
 export type ProjectPage = keyof typeof PROJECT_PATHS.workbench;

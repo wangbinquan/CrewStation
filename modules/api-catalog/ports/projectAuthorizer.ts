@@ -1,10 +1,11 @@
-import type { Actor, ProjectDto, ProjectId, UserId } from '@crewstation/contracts';
+import type { Actor, ProjectDto, ProjectId, ResourceTarget, UserId } from '@crewstation/contracts';
 
 /** 本模块用到的项目内动作子集；由 project 模块的 authorize 提供。 */
-export type CatalogProjectAction = 'view' | 'develop';
+export type CatalogProjectAction = 'view' | 'develop' | 'request-resources';
 
 export interface ProjectAuthorizer {
   isAdmin(userId: UserId): Promise<boolean>;
+  resourceRequestable?(actor: Actor, projectId: ProjectId, target: ResourceTarget): Promise<boolean>;
   /** 无权限抛 forbidden，非成员抛 not_found；返回生效角色。 */
   authorize(actor: Actor, projectId: ProjectId, action: CatalogProjectAction): Promise<string>;
   readProjectBasics(actor: Actor, ids: readonly ProjectId[]): Promise<ProjectDto[]>;

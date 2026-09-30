@@ -26,6 +26,8 @@ import { revokeBindingsOfReleasedTask } from './application/releasedTask';
 import { serviceDataUseCases } from './application/serviceData';
 import { rotateCredentialUseCase } from './application/rotateCredential';
 import { taskBindingUseCases } from './application/taskBindings';
+import { productionResourceAccess } from './application/resource-center/productionAccess';
+import type { ProductionAccessTasks } from './ports/resource-center/productionTasks';
 import type { DataCredentials } from './ports/credentials';
 import type { UserDirectory } from './ports/userDirectory';
 import { dataRoutes } from './http/dataRoutes';
@@ -72,6 +74,7 @@ import { verifyRestoredObjects } from './application/objects/restoreVerification
 import type { VerifiedBackupBundle } from './ports/objectBackups';
 
 export interface DataModuleDeps {
+  productionTasks?: ProductionAccessTasks;
   /** 申请人／审批人名字来源；缺省时绑定 DTO 只带 ID。 */
   users?: UserDirectory;
   db: Database;
@@ -134,11 +137,12 @@ export function createDataModule(deps: DataModuleDeps): DataModule {
     settings: deps.settings,
     clock: deps.clock ?? systemClock,
     logger,
+    ...(deps.productionTasks ? { productionTasks: deps.productionTasks } : {}),
     ...(deps.users ? { users: deps.users } : {}),
     ...(deps.ledger && deps.credentials ? { provisioning: { credentials: deps.credentials, ledger: deps.ledger, dsnOf: (role: string, password: string, database: string) => postgresDsn(deps.settings.postgres, role, password, database), ...deps.provisioningTiming } } : {}),
   };
   const service = serviceDataUseCases(useCaseDeps);
-  const bindings = taskBindingUseCases(useCaseDeps);
+  const bindings = { ...taskBindingUseCases(useCaseDeps), ...productionResourceAccess(useCaseDeps, deps.productionTasks, deps.isAdmin) };
   const storedObjects = objectCatalogRepository(deps.db, { requireContract: true }), objectProjection = deps.ledger ? objectLedgerProjection(storedObjects, deps.ledger, deps.clock ?? systemClock, logger) : undefined;
   const objectCatalog = objectProjection?.catalog ?? storedObjects, objectUploads = objectUploadRepository(deps.db);
   const objectOwner = `${deps.objects?.transferOwners?.podUid ? deps.objects.transferOwners.podUid + ':' : ''}${newResourceId()}`, objectContent = objectContentRepository(deps.db);

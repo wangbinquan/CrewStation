@@ -32,6 +32,7 @@
     "@crewstation/module-observability": "workspace:*",
     "@crewstation/module-project": "workspace:*",
     "@crewstation/module-provisioning": "workspace:*",
+    "@crewstation/module-resource-access": "workspace:*",
     "@crewstation/module-release": "workspace:*",
     "@crewstation/module-resources": "workspace:*",
     "@crewstation/module-runtime-environment": "workspace:*",

@@ -22,6 +22,7 @@ import { messages as clusterZh } from '../features/cluster/i18n/zh-CN';
 import { messages as eventsZh } from '../features/events/i18n/zh-CN';
 import { messages as tracesZh } from '../features/traces/i18n/zh-CN';
 import { messages as objectsZh } from '../features/object-storage/i18n/zh-CN';
+import { messages as resourceCenterZh } from '../features/project-resources/i18n/zh-CN';
 import { I18nProvider } from '../shared/lib/I18nProvider';
 import { mergeMessages } from '../shared/lib/i18n';
 import type { MessageCatalog } from '../shared/lib/i18n';
@@ -48,6 +49,7 @@ const zh = mergeMessages([
   { source: 'cluster', messages: clusterZh },
   { source: 'traces', messages: tracesZh },
   { source: 'object-storage', messages: objectsZh },
+  { source: 'project-resources', messages: resourceCenterZh },
 ]);
 const catalog: MessageCatalog = { 'zh-CN': zh, 'en-US': zh };
 

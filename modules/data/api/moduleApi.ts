@@ -6,11 +6,17 @@ import type { ArchiveHelperApi } from './archiveHelperApi';
 import type { ArchiveAdministrationApi } from './archiveAdministrationApi';
 import type { ArchiveServiceApi } from './archiveServiceApi';
 import type { TaskInputApi } from './taskInputApi';
+import type { ResourceTargetDescription, ResourceValues, UserId } from '@crewstation/contracts';
 
 /** data 模块对外能力：服务数据供给与环境变量渲染、开发会话的数据访问绑定。 */
 export interface DataModuleApi {
   readonly storageContract: { version: number; check(): Promise<{ requiredVersion: number; enabled: boolean }>; enable(): Promise<void> };
   readonly name: 'data';
+  inspectProductionAccess(actor: Actor, projectId: ProjectId, taskId: TaskId): Promise<ResourceTargetDescription>;
+  listProductionAccessTargets(actor: Actor, projectId: ProjectId): Promise<ResourceTargetDescription[]>;
+  applyProductionAccess(actor: Actor, projectId: ProjectId, input: { operationId: string; taskId: TaskId; expectedRevision: string; values: ResourceValues; requestedBy: UserId; reason: string }): Promise<{ revision: string; effect: string; applied: boolean }>;
+  observeProductionAccess(projectId: ProjectId, operationId: string): Promise<{ revision: string; effect: string; applied: boolean }>;
+  productionAccessReceipt(projectId: ProjectId, operationId: string): Promise<{ revision: string; effect: string; applied: boolean } | undefined>;
   taskStorageStatus(serviceId: ServiceId): Promise<{ available: boolean; reason: string | null }>;
   readonly objects?: ObjectStorageAdminApi;
   readonly taskInputs?: TaskInputApi;
@@ -28,7 +34,7 @@ export interface DataModuleApi {
   rotateCredential(actor: Actor, resourceId: string): Promise<DataResourceDto>;
   requestTaskBinding(actor: Actor, ids: { taskId: TaskId; serviceId: ServiceId }, input: RequestTaskDataBinding): Promise<TaskDataBindingDto>;
   decideTaskBinding(actor: Actor, bindingId: string, input: DecideTaskDataBinding): Promise<TaskDataBindingDto>;
-  revokeTaskBinding(actor: Actor, bindingId: string): Promise<TaskDataBindingDto>;
+  revokeTaskBinding(actor: Actor, bindingId: string, input?: Pick<DecideTaskDataBinding, 'decision'>): Promise<TaskDataBindingDto>;
   listTaskBindings(actor: Actor, taskId: TaskId): Promise<TaskDataBindingDto[]>;
   listProjectBindings(actor: Actor, projectId: ProjectId, states?: TaskDataBindingState[]): Promise<TaskDataBindingDto[]>;
   envForTask(taskId: TaskId): Promise<Record<string, string>>;

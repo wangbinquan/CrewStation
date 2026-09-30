@@ -1,7 +1,12 @@
 import type { ProjectRuntimeImagePolicyDto } from '@crewstation/contracts';
+import type { ImageAllocationReceipt } from '../domain/allocation';
 import type { BuildRepository, DevelopmentPolicyRepository, ImageRepository, LogRepository, ReferenceRepository, RevisionRepository, ValidationRepository, VersionRepository } from './repositories';
 
 export interface RepositoryScope {
+  readonly allocationReceipts: {
+    get(projectId: string, operationId: string): Promise<ImageAllocationReceipt | undefined>;
+    save(projectId: string, operationId: string, receipt: ImageAllocationReceipt): Promise<void>;
+  };
   readonly projectImagePolicies: {
     get(projectId: string): Promise<ProjectRuntimeImagePolicyDto | undefined>;
     save(policy: ProjectRuntimeImagePolicyDto): Promise<void>;

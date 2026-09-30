@@ -1,5 +1,6 @@
 import type { BusinessExecutionFence, CreateObjectUpload, DataEnv, ObjectStorageBlocker, ObjectStoragePlanInput, ObjectStorageQueue, ObjectStorageSample, ProjectId, RegisterObjectBackend, ServiceId, StorageWindow, UpdateObjectBackend } from '@crewstation/contracts';
 import type { ArchiveReceiptPage, ObjectArchiveHistoryPage } from '@crewstation/contracts';
+import type { ObjectResourceCommand } from '../domain/resourceAllocation';
 import type { ArchiveHelperAuthority } from '../domain/archiveHelper';
 import type {
   ObjectAttemptRecord, ObjectBackendRecord, ObjectPlanRecord, ObjectSource, ObjectSpaceRecord, ObjectUploadRecord, ObjectWriteControl,
@@ -19,6 +20,8 @@ export interface ObjectBackendObservation {
 }
 export interface ObjectProjectPolicy { readonly projectId: ProjectId; readonly revision: number; readonly planIds: readonly string[] }
 export interface ObjectCatalogRepository {
+  applyResourceChange(input: ObjectResourceCommand): Promise<{ revision: string; effect: string; applied: boolean }>;
+  resourceChangeReceipt(projectId: ProjectId, operationId: string): Promise<{ revision: string; effect: string; applied: boolean } | undefined>;
   registerBackend(record: ObjectBackendRecord): Promise<ObjectBackendRecord>;
   backend(id: string): Promise<ObjectBackendRecord | undefined>;
   backends(): Promise<ObjectBackendRecord[]>;

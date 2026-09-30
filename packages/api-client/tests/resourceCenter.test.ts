@@ -1,0 +1,11 @@
+import { expect, test } from 'bun:test';
+import { createApiClient } from '../index';
+
+test('resource center transport preserves encoded project/request scopes, cursors, revisions and values', async () => {
+  const calls: Array<{ url: URL; method: string; body: unknown }> = [], api = createApiClient({ baseUrl: 'https://example.test', fetch: (async (input, init) => { calls.push({ url: new URL(String(input)), method: init?.method ?? 'GET', body: init?.body ? JSON.parse(String(init.body)) : null }); return Response.json({}); }) as typeof fetch });
+  const p = 'p&project=other', id = 'r&request=other', target = { resourceType: 'execution-quota' as const, resourceId: p, action: 'set-quota' as const }, input = { target, expectedRevision: 'frozen-revision', values: { maxConcurrentTasks: 8 }, reason: 'Additional concurrency', requestKey: 'repeat-key' };
+  await api.resourceCenter.snapshot(p); await api.resourceCenter.requests(p, { cursor: 'next&limit=1', limit: 20, inFlight: 'true' }); await api.resourceCenter.request(p, id); await api.resourceCenter.inspect(p, target); await api.resourceCenter.targets(p, 'execution-quota'); await api.resourceCenter.create(p, input); await api.resourceCenter.direct(p, input);
+  await api.resourceCenter.decide(p, id, { expectedVersion: 2, approve: true, expectedRevision: 'current', values: { maxConcurrentTasks: 6 }, reason: 'Capacity approval' }); await api.resourceCenter.cancel(p, id, 2); await api.resourceCenter.retry(p, id, 3); await api.resourceCenter.saveCatalogPolicy(p, target, { expectedRevision: 2, requestable: false });
+  expect(calls).toHaveLength(11); expect(calls.every((c) => c.url.pathname.startsWith('/v1/projects/p%26project%3Dother/resource-center'))).toBe(true); expect(calls[1]!.url.searchParams.get('cursor')).toBe('next&limit=1'); expect(calls[1]!.url.searchParams.get('limit')).toBe('20'); expect(calls[2]!.url.pathname.endsWith('/requests/r%26request%3Dother')).toBe(true);
+  expect(calls[5]!.body).toEqual(input); expect(calls[8]!.body).toEqual({ expectedVersion: 2 }); expect(calls[9]!.body).toEqual({ expectedVersion: 3 }); expect(calls[10]).toMatchObject({ method: 'PUT', body: { target, policy: { expectedRevision: 2, requestable: false } } });
+});

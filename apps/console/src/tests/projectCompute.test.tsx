@@ -15,7 +15,7 @@ const check = async (name: string) => { const node = [...document.querySelectorA
 const button = (label: string) => [...document.querySelectorAll('button')].find((node) => node.textContent === label)!;
 
 test('授权页载入后显示继承规则；单独授予隐藏档位、项目默认及开发套餐随同一版本保存', async () => {
-  const f = projectComputeFixture(); page = await renderApp(computePagePath);
+  const f = projectComputeFixture(); page = await renderApp(computePagePath); if ([...document.querySelectorAll('button')].some((b) => b.textContent === '继承与可选范围')) await page.click('继承与可选范围');
   expect(page.text()).toContain('继承平台默认档位：standard'); expect(button('保存项目授权').disabled).toBe(true);
   await setSelect('Agent 档位范围', 'restricted');
   expect(page.text()).toContain('默认不可见的档位也可单独授予此项目');
@@ -31,7 +31,7 @@ test('授权页载入后显示继承规则；单独授予隐藏档位、项目�
 });
 
 test('取消默认档位的授权时显示字段错误并保留草稿；并发冲突不覆盖服务端，重新读取需确认丢弃', async () => {
-  const f = projectComputeFixture(); page = await renderApp(computePagePath);
+  const f = projectComputeFixture(); page = await renderApp(computePagePath); if ([...document.querySelectorAll('button')].some((b) => b.textContent === '继承与可选范围')) await page.click('继承与可选范围');
   await setSelect('Agent 档位范围', 'restricted'); await check('private-large'); await setSelect('项目默认 Agent 档位', profileIdOf('private-large')); await check('private-large');
   await page.click('保存项目授权');
   expect(document.querySelector('[role="alert"]')?.textContent).toContain('请选择允许范围'); expect(f.writes).toEqual([]);
@@ -44,7 +44,7 @@ test('取消默认档位的授权时显示字段错误并保留草稿；并发�
 
 test('目录为空仍可明确禁止全部 Agent，读失败可重试；载入期间没有可保存的表单', async () => {
   const f = projectComputeFixture(); let finish!: () => void; f.state.hold = new Promise<void>((resolve) => { finish = resolve; });
-  page = await renderApp(computePagePath); expect(button('保存项目授权')).toBeUndefined();
+  page = await renderApp(computePagePath); if ([...document.querySelectorAll('button')].some((b) => b.textContent === '继承与可选范围')) await page.click('继承与可选范围'); expect(button('保存项目授权')).toBeUndefined();
   f.state.error = true; finish(); await page.settle(); expect(page.text()).toContain('授权目录离线');
   f.state.error = false; f.state.hold = undefined; f.state.profiles = [];
   await page.reread(); await setSelect('Agent 档位范围', 'restricted');
@@ -53,9 +53,9 @@ test('目录为空仍可明确禁止全部 Agent，读失败可重试；载入�
 });
 
 test('非管理员不会读取授权编辑资料；保存前身份变化时保留草稿且不提交', async () => {
-  const f = projectComputeFixture(); f.state.admin = false; page = await renderApp(computePagePath);
+  const f = projectComputeFixture(); f.state.admin = false; page = await renderApp(computePagePath); if ([...document.querySelectorAll('button')].some((b) => b.textContent === '继承与可选范围')) await page.click('继承与可选范围');
   expect(f.calls).not.toContain(computePolicyPath); expect(button('保存项目授权')).toBeUndefined();
-  page.unmount(); f.state.admin = true; page = await renderApp(computePagePath);
+  page.unmount(); f.state.admin = true; page = await renderApp(computePagePath); if ([...document.querySelectorAll('button')].some((b) => b.textContent === '继承与可选范围')) await page.click('继承与可选范围');
   await setSelect('Agent 档位范围', 'restricted'); f.state.admin = false;
   await page.click('保存项目授权'); expect(page.text()).toContain('管理员身份已变化'); expect(f.writes).toEqual([]);
 });
@@ -71,4 +71,14 @@ test('档位行能切换默认可见性，平台默认的隐藏操作不可用�
   await act(async () => action.click()); await page.settle(); await page.click('确认');
   expect(f.writes.at(-1)).toMatchObject({ method: 'PUT', path: `/v1/admin/compute-profiles/${profileIdOf('private')}/default-visible`, body: { defaultVisible: true } });
   expect(toCreateRequest({ ...blankDraft('opencode'), defaultVisible: false }).defaultVisible).toBe(false);
+});
+
+test('同页继承配置关闭后保留未提交草稿，焦点返回触发按钮；再次打开仍需主动保存', async () => {
+  const f = projectComputeFixture(); page = await renderApp(computePagePath); button('继承与可选范围').focus(); await page.click('继承与可选范围');
+  await setSelect('Agent 档位范围', 'restricted'); await check('private-large');
+  await act(async () => document.querySelector<HTMLDialogElement>('dialog[open]')!.dispatchEvent(new Event('cancel', { cancelable: true }))); await page.settle();
+  expect(document.querySelectorAll('dialog[open]')).toHaveLength(0); expect(document.activeElement?.textContent).toBe('继承与可选范围'); expect(f.writes).toHaveLength(0);
+  await page.click('继承与可选范围'); expect(select('Agent 档位范围').value).toBe('restricted');
+  expect([...document.querySelectorAll('fieldset label')].find((label) => label.querySelector('strong')?.textContent === 'private-large')!.querySelector<HTMLInputElement>('input')!.checked).toBe(true);
+  await page.click('保存项目授权'); expect(f.writes).toHaveLength(1);
 });

@@ -1,6 +1,7 @@
 import type {
   Actor, ApiOperationDto, ApiProxyDto, ApiRequestDto, ApiRequestPage, CreateApiRequest, DecideApiRequest, OpenPolicy, OperationRoute, ProjectId, RequestPageQuery, ServiceId, UserId,
 } from '@crewstation/contracts';
+import type { ResourceTarget, ResourceValues } from '@crewstation/contracts';
 
 /** 供 gateway 生成放行表：调用方已获 Grant 且仍在目录中活动的操作键，加上对所有调用方生效的默认开放键。 */
 export interface GrantedOperations {
@@ -12,6 +13,8 @@ export interface GrantedOperations {
 /** api-catalog 模块对外能力；其他模块经 ports 注入其中的子集。 */
 export interface ApiCatalogModuleApi {
   readonly name: 'api-catalog';
+  applyResourceChange(actor: Actor, serviceId: ServiceId, input: { operationId: string; target: ResourceTarget; expectedRevision: string; values: ResourceValues }): Promise<{ revision: string; effect: string; applied: boolean }>;
+  resourceChangeReceipt(serviceId: ServiceId, operationId: string): Promise<{ revision: string; effect: string; applied: boolean } | undefined>;
   isAdmin(userId: UserId): Promise<boolean>;
   /** 目录中的活动操作；给出 serviceId 时附带该服务是否已可调（默认开放视为已授权），并要求对其项目有 view 权限。 */
   listOperations(actor: Actor, serviceId?: ServiceId): Promise<ApiOperationDto[]>;

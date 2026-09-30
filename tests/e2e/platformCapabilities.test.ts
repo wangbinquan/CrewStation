@@ -41,6 +41,7 @@ const PROJECT_PAGES = [
   { suffix: '/release', marker: '发布与上线', capability: '发布、上线与回退' },
   { suffix: '/operations', marker: '运行与诊断', capability: '健康、日志、事件投递与调用链' },
   { suffix: '/settings', marker: '项目设置', capability: '成员、可见性、配置与资源' },
+  { suffix: '/resource-center', marker: '项目资源中心', capability: '项目资源全景、申请和同页管理员调整（RFC-036）' },
   { suffix: '/settings?tab=runtime-images', marker: '运行镜像目录', capability: '项目构建目录与独立运行镜像配置（RFC-028）' },
 ] as const;
 
@@ -104,6 +105,8 @@ describe.skipIf(!session)('平台能力在当前部署的前台验收', () => {
 describe.skipIf(!project)('数字人项目的能力面', () => {
   test('管理员能从旧算力入口进入资源配置，读取真实服务范围、配额和 Agent 授权', async () => {
     await open(session!.admin, `/admin/projects/${project!.id}/compute`);
+    await session!.admin.eval<void>(`[...document.querySelectorAll('button')].find((button) => button.textContent === '继承与可选范围')?.click()`);
+    await session!.admin.waitUntil(`!!document.querySelector('dialog[open]') && document.querySelector('dialog[open]')?.textContent?.includes('Agent 档位范围')`, 15000);
     expect(await session!.admin.text()).toContain('Agent 档位范围');
     expect(await session!.admin.text()).toContain('开发容器资源套餐');
     expect(await session!.admin.text()).toContain('服务运行资源');

@@ -1,5 +1,5 @@
 import { segment } from '../requestUrl';
-import type { ProjectCreationCatalog, ComputeProfileSummaryDto, ProjectTemplateDto, ServicePlanDto, TaskProfileDto } from '@crewstation/contracts';
+import type { ProjectCreationCatalog, ProjectDomainPreview, ComputeProfileSummaryDto, ProjectTemplateDto, ServicePlanDto, TaskProfileDto } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
 import type { ServicePlanInput, TaskProfileInput } from '../requestInputs';
@@ -8,6 +8,7 @@ import type { ServicePlanInput, TaskProfileInput } from '../requestInputs';
 export interface CatalogResource {
   /** 管理员：当前控制面可用于创建项目的真实模板。 */
   projectCreation(): Promise<ProjectCreationCatalog>;
+  projectDomainPreview(slug: string): Promise<ProjectDomainPreview>;
   listProjectTemplates(): Promise<ItemsPage<ProjectTemplateDto>>;
   /** GET /v1/catalog/service-plans */
   listServicePlans(): Promise<ItemsPage<ServicePlanDto>>;
@@ -26,6 +27,7 @@ export interface CatalogResource {
 export function catalogResource(transport: Transport): CatalogResource {
   return {
     projectCreation: () => transport.request('GET', '/v1/catalog/project-creation'),
+    projectDomainPreview: (slug) => transport.request('GET', '/v1/catalog/project-domain-preview', { query: { slug } }),
     listProjectTemplates: () => transport.request<ItemsPage<ProjectTemplateDto>>('GET', '/v1/catalog/project-templates'),
     listServicePlans: () => transport.request<ItemsPage<ServicePlanDto>>('GET', '/v1/catalog/service-plans'),
     createServicePlan: (input) => transport.request<ServicePlanDto>('POST', '/v1/catalog/service-plans', { body: input }),

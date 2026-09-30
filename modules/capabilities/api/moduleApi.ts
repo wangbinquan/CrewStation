@@ -1,8 +1,10 @@
 import type { Actor, CapabilityDescriptionDto, ProjectId, MarketTrialDto, MarketAppDto, MarketAppsPage, MarketAppsQuery } from '@crewstation/contracts';
 import type { ProjectPageQuery, ProjectSummariesPage, ProjectSummaryDetail } from '@crewstation/contracts';
+import type { ProjectResourceSnapshot } from '@crewstation/contracts';
 
 export interface CapabilitiesModuleApi {
   readonly name: 'capabilities';
+  projectResources(actor: Actor, projectId: ProjectId): Promise<ProjectResourceSnapshot>;
   describe(actor: Actor, projectId: ProjectId): Promise<CapabilityDescriptionDto>;
   listMarketApps(actor: Actor, query: MarketAppsQuery): Promise<MarketAppsPage>;
   getMarketTrial(actor: Actor, projectId: ProjectId): Promise<MarketTrialDto>;

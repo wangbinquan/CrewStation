@@ -1,7 +1,7 @@
 import type { TaskDataBindingState, TaskDataMode, TaskId, UserId } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
 
-/** 开发会话内的数据访问模式（R34、Design §9.8）：development 直接生效，另两种需负责人批准且有期限。 */
+/** 开发会话内的数据访问模式（R34、Design §9.8）：development 直接生效，另两种由负责人申请、管理员批准且有期限。 */
 export interface TaskDataBinding {
   readonly legacyResourceId?: string;
   readonly id: string;

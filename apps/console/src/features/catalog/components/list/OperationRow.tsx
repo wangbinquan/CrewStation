@@ -31,7 +31,7 @@ export interface OperationRowProps {
   readonly expanded: boolean;
   readonly onToggle: () => void;
   /** 打开「申请定向开放」弹窗。 */
-  readonly onRequest: () => void;
+  readonly onRequest?: () => void;
   readonly onInvoke?: (operation: ApiOperationDto) => void;
   readonly onSelect?: (operation: ApiOperationDto) => void;
   readonly activePanel?: ReactNode;
@@ -42,7 +42,7 @@ export function OperationRow({ operation, pending, full, current, expanded, onTo
   const trailing = <>
     {status === 'pending' || status === 'blocked' ? <Badge tone={STATUS_TONE[status]}>{t(`catalog.list.status.${status}`)}</Badge> : null}
     {status === 'callable' && onInvoke && !activePanel ? <Button size="small" onClick={() => onInvoke(operation)}>{t('catalog.invoke.open')}</Button> : null}
-    {status === 'requestable' ? <Button size="small" aria-label={`${t('catalog.request.action')} ${operation.method} ${operation.path}`} onClick={onRequest}>{t('catalog.list.request')}</Button> : null}
+    {status === 'requestable' && onRequest ? <Button size="small" aria-label={`${t('catalog.request.action')} ${operation.method} ${operation.path}`} onClick={onRequest}>{t('catalog.list.request')}</Button> : null}
   </>;
   const open = !full && (expanded || !!activePanel);
   return <ResourceRow lead={<MethodTag method={operation.method} />} title={<BreakableText text={operation.path} />} current={current}

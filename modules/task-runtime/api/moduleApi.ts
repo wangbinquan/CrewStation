@@ -1,4 +1,5 @@
 import type { RuntimeImageHistoryRead, RuntimeImageHistoryItem } from '@crewstation/contracts';
+import type { ResourceWorkload, ResourceWorkloadPage } from '@crewstation/contracts';
 import type { BusinessStorageFinalization, DevelopmentSourceBinding, WorkloadStopBarrier } from '@crewstation/contracts';
 import type { BusinessRecoveryScope, BusinessWorkspaceProof, RebuildBusinessWorkspaceInput, RestartBusinessWorkspaceInput } from './businessRecovery';
 import type { BusinessSessionStorage, DevelopmentUsageStorage } from '@crewstation/contracts';
@@ -110,6 +111,8 @@ export interface RebuildRendering {
 }
 
 export interface TaskRuntimeModuleApi {
+  resourceWorkload(actor: Actor, taskId: TaskId): Promise<ResourceWorkload>;
+  resourceWorkloads(actor: Actor, projectId: ProjectId, page: { after?: string; limit: number }): Promise<ResourceWorkloadPage>;
   readonly storageCleanup?: StorageCleanupApi;
   readonly archiveExecution?: ArchiveExecutionApi;
   freezeBusinessStorage(input: BusinessStorageFinalization): Promise<void>;

@@ -14,6 +14,7 @@ export interface ObjectBackendRecord extends ObjectBackendDto {
 }
 export interface ObjectPlanRecord extends ObjectStoragePlanDto { readonly createdAt: string }
 export interface ObjectSpaceRecord extends ObjectSpaceDto {
+  readonly quotaOverrides?: { quotaBytes: number; maxObjectBytes: number; maxConcurrentTransfers: number };
   readonly maxObjectBytes: number;
   readonly maxConcurrentTransfers: number;
   readonly activeTransfers: number;
@@ -179,8 +180,8 @@ export function backendDto(record: ObjectBackendRecord): ObjectBackendDto {
   return dto;
 }
 export function spaceDto(record: ObjectSpaceRecord): ObjectSpaceDto {
-  const { maxObjectBytes: _maxObjectBytes, maxConcurrentTransfers: _maxConcurrentTransfers, activeTransfers: _activeTransfers, enabled: _enabled, ...dto } = record;
-  return dto;
+  const { quotaOverrides: _quotaOverrides, activeTransfers: _activeTransfers, enabled: _enabled, ...dto } = record;
+  return { ...dto, quotaRevision: dto.quotaRevision ?? 0, quotaSource: dto.quotaSource ?? 'plan' };
 }
 export function storedObjectDto(record: StoredObjectRecord): StoredObjectDto {
   const { backendId: _backendId, placementRevision: _placementRevision, key: _key, uploadId: _uploadId, attemptId: _attemptId, deletion: _deletion, archive: _archive, ...dto } = record;

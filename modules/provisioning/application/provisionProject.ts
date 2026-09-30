@@ -11,11 +11,13 @@ const ORDER = ['ensureNamespace', 'ensureRepository', 'ensureData', 'reconcileRo
 export function provisionProjectUseCase(steps: ProvisioningSteps, logger: Logger) {
   return async (projectId: ProjectId): Promise<'active' | 'failed' | 'skipped'> => {
     const facts = await steps.loadProject(projectId);
-    if (!facts) return 'skipped';
+    if (!facts || facts.state === 'archived' || facts.state === 'deleting') return 'skipped';
     if (facts.state === 'failed') await steps.setProjectState(projectId, 'provisioning');
     for (const step of ORDER) {
       try {
-        await steps[step](facts);
+        const current = await steps.loadProject(projectId);
+        if (!current || current.state === 'archived' || current.state === 'deleting') return 'skipped';
+        await steps[step](current);
         logger.info('provisioning step done', { projectId, slug: facts.slug, step });
       } catch (error) {
         const message = `${step} 失败：${error instanceof Error ? error.message : String(error)}`;
@@ -25,6 +27,8 @@ export function provisionProjectUseCase(steps: ProvisioningSteps, logger: Logger
       }
     }
     // 无条件推进：对已 active 的项目，这一步把上一次残留的失败原因清掉。
+    const final = await steps.loadProject(projectId);
+    if (!final || final.state === 'archived' || final.state === 'deleting') return 'skipped';
     await steps.setProjectState(projectId, 'active');
     return 'active';
   };

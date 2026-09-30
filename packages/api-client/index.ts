@@ -17,6 +17,7 @@ export type {
 export type { MeResource } from './resources/me';
 export type { UsersResource } from './resources/users';
 export type { ProjectsResource } from './resources/projects';
+export type { ProjectDeletionsResource } from './resources/project-deletion/client';
 export type { CatalogResource } from './resources/catalog';
 export type { ServicesResource } from './resources/services';
 export type { DevSessionResource, ReleaseDevSessionOptions, ReleaseDevSessionResult } from './resources/devSession';
@@ -31,6 +32,7 @@ export type { CapabilitiesResource } from './resources/capabilities';
 export type { ComputeProfilesResource } from './resources/computeProfiles';
 export type { ClusterResourceClient } from './resources/cluster';
 export type { ResourcesResource } from './resources/resources';
+export type { ProjectResourceCenterResource } from './resources/resource-center/workspace';
 export { newDraftResourceId } from './resourceId';
 export { createBusinessExecutionClient } from './businessApiClient';
 export type { BusinessExecutionClient } from './businessApiClient';

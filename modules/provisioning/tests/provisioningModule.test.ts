@@ -66,4 +66,18 @@ describe('provisioning', () => {
     // 不带 message 的 active→active：transition 会清掉旧原因。
     expect(states).toEqual(['active']);
   });
+  test('旧开通在命名空间或最后发布期间受理删除后，不能继续建仓／建库或推进 active', async () => {
+    for (const retireAt of ['namespace', 'release'] as const) {
+      let present = true; const calls: string[] = [];
+      const candidate: ProvisioningSteps = {
+        loadProject: async () => present ? facts : undefined, listProjects: async () => [facts],
+        ensureNamespace: async () => { calls.push('namespace'); if (retireAt === 'namespace') present = false; },
+        ensureRepository: async () => { calls.push('repository'); }, ensureData: async () => { calls.push('data'); },
+        reconcileRoutes: async () => { calls.push('routes'); }, ensureFirstRelease: async () => { calls.push('release'); present = false; },
+        setProjectState: async (_id, state) => { calls.push(state); },
+      };
+      expect(await provisionProjectUseCase(candidate, noopLogger)(facts.projectId)).toBe('skipped');
+      expect(calls).toEqual(retireAt === 'namespace' ? ['namespace'] : ['namespace', 'repository', 'data', 'routes', 'release']);
+    }
+  });
 });

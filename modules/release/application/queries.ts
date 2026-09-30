@@ -1,4 +1,5 @@
 import type { Actor, ReleaseDto, ReleaseId, ServiceId, SlotDto, TrafficSwitchDto } from '@crewstation/contracts';
+import type { ReleaseResourceUsage } from '@crewstation/contracts';
 import { notFound } from '@crewstation/kernel';
 import type { Release } from '../domain/release';
 import { DEFAULT_OFFLINE_POLICY } from '../domain/slotLifecycle';
@@ -39,6 +40,17 @@ export function releaseQueries(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'authorize
     return svc;
   };
   return {
+    resourceUsage: async (actor: Actor, serviceId: ServiceId): Promise<ReleaseResourceUsage[]> => {
+      const svc = await svcOf(serviceId); await authorizer.authorize(actor, svc.projectId, 'view');
+      const slots = await uow.read.slots.get(serviceId); if (!slots) return [];
+      const result: ReleaseResourceUsage[] = [];
+      for (const physical of ['blue', 'green'] as const) {
+        const releaseId = slots[physical].releaseId; if (!releaseId) continue;
+        const release = await uow.read.releases.getById(releaseId), manifest = release?.manifest, digital = manifest?.kind === 'DigitalWorker' ? manifest.spec : undefined;
+        result.push({ releaseId, physical, role: physical === slots.active ? 'prod' : 'preview', servicePlanId: manifest?.spec.service.servicePlanId ?? null, taskProfileId: digital?.tasks?.taskProfileId ?? null, computeProfileIds: (digital?.tasks?.agentProfiles ?? []).flatMap((p) => p.compute?.kind === 'profile' ? [p.compute.profileId] : []), runtimeImageVersionIds: [manifest?.spec.service.runtimeImageVersionId, digital?.tasks?.runtimeImageVersionId, ...(digital?.tasks?.agentProfiles ?? []).map((p) => p.runtimeImageVersionId)].filter((id): id is string => !!id), objectPlanId: digital?.data?.objects?.planId ?? null, configDefinitionIds: manifest?.spec.env.map((entry) => entry.configDefinitionId) ?? [], requestedApiIds: digital?.apis.requested.map((entry) => entry.operationId) ?? [], eventTypeIds: digital?.subscriptions.map((entry) => entry.eventTypeId) ?? [] });
+      }
+      return result;
+    },
     listReleases: async (actor: Actor, serviceId: ServiceId): Promise<ReleaseDto[]> => {
       const svc = await svcOf(serviceId);
       await authorizer.authorize(actor, svc.projectId, 'view');

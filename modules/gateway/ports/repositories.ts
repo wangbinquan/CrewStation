@@ -70,6 +70,8 @@ export interface RateLimitRow {
 
 /** RFC-025 T10：限流策略的存取，按版本号乐观并发（expectedRevision 为 0 表示还没有这一行）。 */
 export interface RateLimitRepository {
+  resourceChangeReceipt?(projectId: string, operationId: string): Promise<{ revision: string; effect: string; applied: boolean } | undefined>;
+  applyResourceChange?(input: { projectId: string; operationId: string; hash: string; expectedRevision: number; expectedPlatformRevision: number; override: unknown | null; actorId: UserId; now: Date }): Promise<{ revision: string; effect: string; applied: boolean }>;
   get(scope: string): Promise<RateLimitRow | undefined>;
   list(): Promise<RateLimitRow[]>;
   /** 写成返回新的一行；版本号对不上（别人先改过）返回 undefined。 */

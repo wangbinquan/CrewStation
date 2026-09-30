@@ -15,6 +15,7 @@ function fixture(admin = false) {
     const url = String(raw); let status = 200, body: unknown = { items: [] };
     if (url.endsWith('/v1/me')) body = { id: '01a0bf5d-8f4b-7fae-8c2f-e82b0fa04985', name: '开发者', platformRole: (admin) ? 'admin' : 'developer', isAdmin: admin, memberships: [{ projectId, role: 'owner' }] };
     else if (url.endsWith(`/v1/projects/${projectId}`)) body = { id: projectId, serviceId, name: '知识助理', slug: 'knowledge', kind: 'DigitalWorker', state: 'active' };
+    else if (url.endsWith('/resource-center/targets/api-operation')) body = [{ view: { target: { resourceId: '01a0bf5d-8f4b-76a3-876b-499013b49883' } }, actions: [{ kind: 'request', enabled: true }] }];
     // RFC-020 D2：接口目录住在开发页的参考面板里；没有开发会话时也能打开，所以这里明确“没有会话”。
     else if (url.endsWith('/dev-session')) { status = 404; body = { error: 'not_found', message: '没有开发会话' }; }
     else if (url.includes('/catalog/operations')) body = { items: [{ id: '01a0bf5d-8f4b-76a3-876b-499013b49883', proxyId: '01a0bf5d-8f4b-7274-8cd7-e347cbc132cf', proxy: 'billing', method: 'GET', path: '/invoices', openPolicy: 'targeted', granted: false }] };
@@ -81,4 +82,17 @@ test('理由格式首屏提示，超过上限明确报错且不发送申请', as
   await page.click('申请'); expect(page.text()).toContain('最多 500 字');
   await reason('字'.repeat(501)); await page.click('提交申请');
   expect(document.querySelector('textarea[aria-invalid="true"]')).not.toBeNull(); expect(f.writes).toHaveLength(0);
+});
+
+for (const boundary of ['developer', 'hidden'] as const) test(`旧接口目录同样执行资源申请边界：${boundary} 不提供提交入口`, async () => {
+  const f = fixture(), fallback = globalThis.fetch;
+  globalThis.fetch = (async (raw, init) => {
+    if (boundary === 'developer' && String(raw).endsWith('/v1/me')) return Response.json({ id: '01a0bf5d-8f4b-7fae-8c2f-e82b0fa04985', name: '开发者', platformRole: 'developer', isAdmin: false, memberships: [{ projectId, role: 'developer' }] });
+    if (boundary === 'hidden' && String(raw).endsWith('/resource-center/targets/api-operation')) return Response.json([]);
+    return fallback(raw, init);
+  }) as typeof fetch;
+  page = await renderApp(`/projects/${projectId}/settings?tab=resources&resource=api`);
+  expect(page.text()).toContain('/invoices');
+  expect([...document.querySelectorAll('button')].some((button) => ['申请', '申请定向开放'].includes(button.textContent ?? ''))).toBe(false);
+  expect(f.writes).toHaveLength(0);
 });

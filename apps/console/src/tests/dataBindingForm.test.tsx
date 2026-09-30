@@ -76,7 +76,7 @@ test('空时长保持平台默认，开发模式不用生产期限；重复提�
   await page.click('提交申请'); expect(f.requests.at(-1)!.body).toEqual({ mode: 'development' });
 });
 
-test('负责人审批看到真实期限，意见取消与失败保留，确认批准后仍显示接入待确认', async () => {
+test('管理员审批看到真实期限，意见取消与失败保留，确认批准后仍显示接入待确认', async () => {
   const f = setup([record('request-ro')]); page = await renderElement(<Harness />, messages); await openDetails();
   expect(page.text()).toContain('有效时长（分钟）30'); await page.click('批准');
   await input(field('审批意见')!, '字'.repeat(501)); await page.click('确认批准'); expect(f.requests).toHaveLength(0); expect(field('审批意见')!.getAttribute('aria-invalid')).toBe('true');
@@ -107,10 +107,10 @@ test('旧记录期限缺失不可盲批、后台状态变化不可沿用旧确�
   expect(f.requests).toHaveLength(0);
 });
 
-test('开发者可以申请但不审批；只读角色和未开通服务有明确原因，到期授权不进入生产摘要', async () => {
+test('负责人可以申请但不审批；只读角色和未开通服务有明确原因，到期授权不进入生产摘要', async () => {
   setup([record('x')]); page = await renderElement(<Harness canManage={false} />, messages);
   expect(page.button('批准')).toBeUndefined(); expect(page.button('提交申请').disabled).toBe(false);
-  page.unmount(); page = await renderElement(<Harness canDevelop={false} canManage={false} />, messages); expect(page.button('提交申请').disabled).toBe(true); expect(page.text()).toContain('申请需要项目开发权限');
+  page.unmount(); page = await renderElement(<Harness canDevelop={false} canManage={false} />, messages); expect(page.button('提交申请').disabled).toBe(true); expect(page.text()).toContain('资源申请由项目负责人提交');
   page.unmount(); page = await renderElement(<Harness service={null} />, messages); expect(page.button('提交申请').disabled).toBe(true); expect(page.text()).toContain('项目尚未完成开通');
   const expired = record('expired', { state: 'active', expiresAt: '2000-01-01T00:00:00.000Z' }); expect(bindingDisplayState(expired, Date.now())).toBe('expired'); expect(productionAccessModes([expired], Date.now())).toEqual([]);
 });

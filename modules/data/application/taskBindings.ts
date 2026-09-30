@@ -1,5 +1,5 @@
 import type { Actor, DecideTaskDataBinding, ProjectId, RequestTaskDataBinding, ServiceId, TaskDataBindingDto, TaskId } from '@crewstation/contracts';
-import { newId, notFound, precondition } from '@crewstation/kernel';
+import { forbidden, newId, notFound, precondition } from '@crewstation/kernel';
 import type { TaskDataBinding } from '../domain/taskDataBinding';
 import { approve, isUsable, reject, requiresApproval } from '../domain/taskDataBinding';
 import { awaitProvisioned, dataControlDsn } from './dataControl';
@@ -9,7 +9,7 @@ import { temporaryRoleUseCases } from './temporaryRoles';
 
 const ENV_BY_MODE = { development: 'CS_DATABASE_URL', 'diagnostic-readonly': 'CS_PROD_READONLY_DATABASE_URL', 'production-change': 'CS_PROD_DATABASE_URL' } as const;
 
-/** 三种模式：development 默认直接生效；诊断只读与生产变更由负责人批准，批准后建带到期时间的临时角色（G14 接受容器内共享的风险）。 */
+/** development 默认直接生效；生产访问由负责人申请、管理员批准，建立到期临时角色。 */
 import { withRequesterNames } from './requesterNames';
 
 export function taskBindingUseCases(deps: DataUseCaseDeps) {
@@ -34,7 +34,12 @@ export function taskBindingUseCases(deps: DataUseCaseDeps) {
     requestTaskBinding: async (actor: Actor, ids: { taskId: TaskId; serviceId: ServiceId }, input: RequestTaskDataBinding): Promise<TaskDataBindingDto> => {
       const svc = await services.resolveServiceById(ids.serviceId);
       if (!svc) throw notFound('服务', ids.serviceId);
-      await authorizer.authorize(actor, svc.projectId, 'develop');
+      const role = await authorizer.authorize(actor, svc.projectId, requiresApproval(input.mode) ? 'request-resources' : 'develop');
+      if (requiresApproval(input.mode) && role !== 'owner') throw forbidden('生产数据访问仅由项目负责人申请');
+      if (deps.productionTasks) {
+        const task = await deps.productionTasks.get(ids.taskId);
+        if (!task || task.projectId !== svc.projectId || task.serviceId !== ids.serviceId || task.kind !== 'dev-session') throw notFound('项目开发工作区');
+      }
       const now = clock.now();
       let binding: TaskDataBinding = { id: newId('tdb'), taskId: ids.taskId, serviceId: ids.serviceId, projectId: svc.projectId, mode: input.mode, state: 'requested', ...(input.reason ? { reason: input.reason } : {}), requestedBy: actor.userId, ttlMinutes: input.ttlMinutes, createdAt: now, updatedAt: now };
       if (!requiresApproval(input.mode)) {
@@ -49,6 +54,7 @@ export function taskBindingUseCases(deps: DataUseCaseDeps) {
     decideTaskBinding: async (actor: Actor, bindingId: string, input: DecideTaskDataBinding): Promise<TaskDataBindingDto> => {
       let binding = await load(bindingId);
       await authorizer.authorize(actor, binding.projectId as ProjectId, 'approve-data-access');
+      if (input.approve && await authorizer.authorize({ userId: binding.requestedBy, isAdmin: false }, binding.projectId as ProjectId, 'request-resources') !== 'owner') throw forbidden('申请人已不是项目负责人');
       const now = clock.now();
       binding = input.approve ? await roles.grant(approve(binding, actor.userId, now, input.decision)) : reject(binding, actor.userId, now, input.decision);
       await bindings.update(binding);
@@ -58,14 +64,7 @@ export function taskBindingUseCases(deps: DataUseCaseDeps) {
       }
       return toBindingDto(binding);
     },
-    revokeTaskBinding: async (actor: Actor, bindingId: string): Promise<TaskDataBindingDto> => {
-      const binding = await load(bindingId);
-      await authorizer.authorize(actor, binding.projectId as ProjectId, 'approve-data-access');
-      await roles.drop(binding);
-      const revoked: TaskDataBinding = { ...binding, state: 'revoked', updatedAt: clock.now() };
-      await bindings.update(revoked);
-      return toBindingDto(revoked);
-    },
+    revokeTaskBinding: async (actor: Actor, bindingId: string, input?: Pick<DecideTaskDataBinding, 'decision'>) => revokeBinding(deps, actor, await load(bindingId), input),
     listTaskBindings: async (actor: Actor, taskId: TaskId): Promise<TaskDataBindingDto[]> => {
       const list = await bindings.listByTask(taskId);
       if (list[0]) await authorizer.authorize(actor, list[0].projectId as ProjectId, 'view');
@@ -97,6 +96,14 @@ export function taskBindingUseCases(deps: DataUseCaseDeps) {
       return n;
     },
   };
+}
+
+async function revokeBinding(deps: DataUseCaseDeps, actor: Actor, binding: TaskDataBinding, input?: Pick<DecideTaskDataBinding, 'decision'>): Promise<TaskDataBindingDto> {
+  await deps.authorizer.authorize(actor, binding.projectId as ProjectId, 'approve-data-access');
+  if (binding.state === 'revoked') return toBindingDto(binding);
+  await temporaryRoleUseCases(deps).drop(binding);
+  const revoked: TaskDataBinding = { ...binding, state: 'revoked', decidedBy: actor.userId, ...(input?.decision ? { decision: input.decision } : {}), updatedAt: deps.clock.now() };
+  await deps.bindings.update(revoked); return toBindingDto(revoked);
 }
 
 export function toBindingDto(b: TaskDataBinding): TaskDataBindingDto {

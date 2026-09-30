@@ -10,6 +10,8 @@ import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit'
 import { DEFAULT_RATE_LIMITS } from '../domain/rateLimits';
 import type { GatewayModule } from '../wiring';
 import { createGatewayModule, gatewayMigrations } from '../wiring';
+import { gatewayAllocationRevision, projectRateLimitValues } from '../api/resourceLimits';
+import { newResourceId } from '@crewstation/kernel';
 
 const available = await testDatabaseAvailable();
 let tdb: TestDatabase;
@@ -45,6 +47,19 @@ beforeAll(async () => {
 afterAll(async () => { await tdb?.drop(); });
 
 describe.skipIf(!available)('网关限流策略（RFC-025 设计 §7.3、T10）', () => {
+  test('资源中心同时核对平台与项目修订，持久回执可重放，恢复继承继续跟随平台', async () => {
+    const [current, platform] = await Promise.all([gateway.api.getProjectRateLimits(admin, demoProject), gateway.api.getRateLimits(admin)]);
+    const command = { operationId: newResourceId(), target: { resourceType: 'gateway-limit' as const, resourceId: demoProject, action: 'set-quota' as const }, expectedRevision: gatewayAllocationRevision(current, platform.revision), values: { ...projectRateLimitValues(current.effective), userAverage: 20, userBurst: 40 } };
+    await expect(gateway.api.applyResourceChange({ ...developer, isAdmin: true }, demoProject, command)).rejects.toMatchObject({ kind: 'forbidden' });
+    const receipt = await gateway.api.applyResourceChange(admin, demoProject, command); expect(receipt.applied).toBe(false);
+    expect(await gateway.api.applyResourceChange(admin, demoProject, command)).toEqual(receipt);
+    expect((await gateway.api.getProjectRateLimits(admin, demoProject)).effective.userDomain.perUser).toEqual({ average: 20, burst: 40 });
+    await expect(gateway.api.applyResourceChange(admin, demoProject, { ...command, operationId: newResourceId() })).rejects.toMatchObject({ kind: 'conflict' });
+    const fresh = await gateway.api.getProjectRateLimits(admin, demoProject);
+    await expect(gateway.api.applyResourceChange(admin, demoProject, { ...command, operationId: newResourceId(), expectedRevision: gatewayAllocationRevision(fresh, platform.revision), values: { ...command.values, userBurst: 2 } })).rejects.toBeDefined();
+    await gateway.api.applyResourceChange(admin, demoProject, { ...command, operationId: newResourceId(), target: { ...command.target, action: 'set-default' }, expectedRevision: gatewayAllocationRevision(fresh, platform.revision), values: {} });
+    expect((await gateway.api.getProjectRateLimits(admin, demoProject)).override).toBeNull();
+  });
   test('平台默认：没人改过时是内置默认、版本 0；改了版本加一；拿旧版本号再改是 409；非管理员读写都是 403', async () => {
     expect(RateLimitSettingsDtoSchema.parse(await gateway.api.getRateLimits(admin))).toEqual({ ...DEFAULT_RATE_LIMITS, revision: 0, updatedAt: null });
     const tighter = { ...DEFAULT_RATE_LIMITS, platformApi: { perUser: { average: 10, burst: 20 }, inFlightPerUser: 8 } };

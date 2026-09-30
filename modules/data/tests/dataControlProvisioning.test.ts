@@ -22,6 +22,7 @@ const slug = `dcp${suffix}`;
 const serviceId = '01a0bf5d-8f4b-76c5-866c-f1feda3d6401' as ServiceId;
 const projectId = '01a0bf5d-8f4b-7178-82e1-9a99060b1402' as ProjectId;
 const taskId = '01a0bf5d-8f4b-7418-8a3f-7cbb4a1fd403' as TaskId;
+const platformAdmin: Actor = { userId: '01a0bf5d-8f4b-7210-8353-be66da3bbb41' as UserId, isAdmin: true };
 const member: Actor = { userId: '01a0bf5d-8f4b-7793-867c-efd7527b3404' as UserId, isAdmin: false };
 
 describe.skipIf(!available)('data：生产库、开发库由 data-control 建（RFC-025 I28）', () => {
@@ -34,7 +35,7 @@ describe.skipIf(!available)('data：生产库、开发库由 data-control 建（
   let ledger: DataLedger;
   const temporaryRoles: string[] = [];
   const dataModule = () => createDataModule({
-    db: tdb.db, ledger, credentials: control.api, provisioningTiming: { waitMs: 15_000, pollMs: 50 }, authorizer: { authorize: async () => undefined },
+    db: tdb.db, ledger, credentials: control.api, provisioningTiming: { waitMs: 15_000, pollMs: 50 }, authorizer: { authorize: async (actor, _projectId, action) => { if (action === 'approve-data-access' && actor.userId !== platformAdmin.userId) throw new Error('forbidden'); return actor.userId === member.userId ? 'owner' : 'admin'; } },
     services, isAdmin: async () => false, settings: settings(new URL(adminUrl)), logger: noopLogger,
   });
 
@@ -68,7 +69,7 @@ describe.skipIf(!available)('data：生产库、开发库由 data-control 建（
 
   test('开通：等 data-control 建好才就绪，data 不存连接串；渲染的连接串用它存的口令、连得上；期望里标明由它建、没有口令', async () => {
     const data = createDataModule({
-      db: tdb.db, ledger, credentials: control.api, provisioningTiming: { waitMs: 15_000, pollMs: 50 }, authorizer: { authorize: async () => undefined },
+      db: tdb.db, ledger, credentials: control.api, provisioningTiming: { waitMs: 15_000, pollMs: 50 }, authorizer: { authorize: async (actor, _projectId, action) => { if (action === 'approve-data-access' && actor.userId !== platformAdmin.userId) throw new Error('forbidden'); return actor.userId === member.userId ? 'owner' : 'admin'; } },
       services, isAdmin: async () => false, settings: settings(new URL(adminUrl)), logger: noopLogger,
     });
     const [prod, dev] = await data.api.ensureServiceData(serviceId);
@@ -94,7 +95,7 @@ describe.skipIf(!available)('data：生产库、开发库由 data-control 建（
     const owner = postgres(prodUrl, { max: 1, onnotice: () => undefined });
     try { await owner`CREATE TABLE IF NOT EXISTS orders (id int)`; await owner`INSERT INTO orders VALUES (1)`; } finally { await owner.end(); }
     const requested = await data.api.requestTaskBinding(member, { taskId, serviceId }, { mode: 'diagnostic-readonly', ttlMinutes: 30, reason: '查一下订单' });
-    const decided = await data.api.decideTaskBinding(member, requested.id, { approve: true });
+    const decided = await data.api.decideTaskBinding(platformAdmin, requested.id, { approve: true });
     expect(decided.state).toBe('active');
     temporaryRoles.push(`cs_t_${requested.id.replaceAll('-', '')}`);
     expect((await resources.api.get(requested.id))?.phase).toBe('ready');
@@ -117,7 +118,7 @@ describe.skipIf(!available)('data：生产库、开发库由 data-control 建（
     const never = { credentialOf: async () => undefined };
     const slow = createDataModule({
       db: tdb.db, ledger: { ...ledger, get: async (id) => ({ id, desired: 'present' as const, phase: 'provisioning' }) }, credentials: never, provisioningTiming: { waitMs: 60, pollMs: 20 },
-      authorizer: { authorize: async () => undefined }, services: { resolveServiceById: async () => ({ projectId, slug: `x${suffix}` }) }, isAdmin: async () => false,
+      authorizer: { authorize: async (actor, _projectId, action) => { if (action === 'approve-data-access' && actor.userId !== platformAdmin.userId) throw new Error('forbidden'); return actor.userId === member.userId ? 'owner' : 'admin'; } }, services: { resolveServiceById: async () => ({ projectId, slug: `x${suffix}` }) }, isAdmin: async () => false,
       settings: settings(new URL(adminUrl)), logger: noopLogger,
       provider: { provisionDatabase: async () => { throw new Error('不该由 data 建'); }, createTemporaryRole: async () => { throw new Error('unused'); }, dropRole: async () => undefined, dropDatabase: async () => undefined },
     });

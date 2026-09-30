@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import type { ProjectId, ServiceId } from '@crewstation/contracts';
+import type { Actor, ProjectId, ServiceId, TaskId, UserId } from '@crewstation/contracts';
 import { eventbusMigrations } from '@crewstation/eventbus';
 import type { FakeK8sClient } from '@crewstation/k8s';
 import { Resources, createFakeK8sClient } from '@crewstation/k8s';
@@ -7,6 +7,8 @@ import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import type { TaskRuntimeModule } from '../wiring';
 import { createTaskRuntimeModule, taskRuntimeMigrations } from '../wiring';
+import { eq } from 'drizzle-orm';
+import { environments } from '../adapters/persistence/tables';
 
 const available = await testDatabaseAvailable();
 let tdb: TestDatabase;
@@ -31,6 +33,7 @@ beforeAll(async () => {
     isAdmin: async () => false,
     settings: { taskImage: 'cs-task-runtime:dev', systemNamespace: 'crewstation-system', sessionUrl: 'ws://cs-session:8083/runner', userDomain: 'cs.localhost', serviceDomain: 'svc.cs.internal', workerUid: 10001, defaultProfile: '01a0bf5d-8f4b-7001-8458-107366e7de39', userAuthMiddleware: 'forward-auth-user', dropIdentityHeadersMiddleware: 'drop-identity-headers' },
   });
+
 });
 afterAll(async () => { await tdb?.drop(); });
 
@@ -182,5 +185,15 @@ describe.skipIf(!available)('task-runtime module', () => {
     expect(await runtime.api.findDevSession(projectId, { includeLatestFailure: true })).toBeUndefined();
     expect(k8s.objects.has(oldVolume)).toBe(true);
     expect(await runtime.api.getEnvironment(failed.id)).toMatchObject({ state: 'failed' });
+  });
+  test('资源实例查询分页稳定，读取冻结规格与 UID，不暴露运行环境或凭据', async () => {
+    quota = 100; const actor: Actor = { userId: Bun.randomUUIDv7() as UserId, isAdmin: false };
+    const first = await runtime.api.createEnvironment({ serviceId, kind: 'business', volumeMode: 'follow-container' }); await runtime.api.createEnvironment({ serviceId, kind: 'business', volumeMode: 'follow-container' });
+    const page = await runtime.api.resourceWorkloads(actor, projectId, { limit: 1 }); expect(page.items).toHaveLength(1); expect(page.nextCursor).not.toBeNull(); const next = await runtime.api.resourceWorkloads(actor, projectId, { limit: 500, after: page.nextCursor! }); expect(next.items.every((i) => i.id > page.items[0]!.id)).toBe(true);
+    // 旧记录没有冻结规格时保持未知，不用当前目录补成实际配置。
+    expect(await runtime.api.resourceWorkload(actor, first.id)).toMatchObject({ cpu: null, memory: null, storage: null });
+    await tdb.db.update(environments).set({ render: { image: 'frozen-image', workerUid: 10001, start: 1, resources: { cpu: '2', memory: '4Gi', storage: '20Gi' } } }).where(eq(environments.id, first.id));
+    const single = await runtime.api.resourceWorkload(actor, first.id); expect(single).toMatchObject({ taskProfileId: '01a0bf5d-8f4b-7001-8458-107366e7de39', cpu: '2', memory: '4Gi', storage: '20Gi' }); expect(JSON.stringify(single)).not.toMatch(/CS_DATABASE_URL|GREETING|RUNNER_TOKEN|credential|command/);
+    expect((await runtime.api.resourceWorkloads(actor, Bun.randomUUIDv7() as ProjectId, { limit: 500 })).items).toEqual([]); await expect(runtime.api.resourceWorkload(actor, Bun.randomUUIDv7() as TaskId)).rejects.toMatchObject({ kind: 'not_found' });
   });
 });

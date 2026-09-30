@@ -1,4 +1,5 @@
 import type { BusinessExecutionProof } from '@crewstation/contracts';
+import type { ResourceTarget, ResourceValues } from '@crewstation/contracts';
 import type {
   TerminalTest, Actor, ProjectId, ProjectComputePolicyDto, SaveProjectComputePolicy, AgentProtocol, BeforeStartMaterial, ComputeProfileDetailDto, ComputeProfileList, ComputeProfileSummaryDto, ComputeProfileSelector, ComputeUsage, CopyComputeProfileRequest, CreateComputeProfileRequest,
   LaunchSpec, ProfileRevisionRef, ProfileTestDto, ProfileTestId, RegistryPushCredential, RuntimeImagesInfo, SaveComputeProfileRequest, StartProfileTestRequest,
@@ -37,6 +38,8 @@ export interface ProfileLaunchMaterial extends ProfileLaunchMetadata {
  */
 export interface AgentRuntimeModuleApi {
   readonly name: 'agent-runtime';
+  applyResourceChange(actor: Actor, projectId: ProjectId, input: { operationId: string; target: ResourceTarget; expectedRevision: string; values: ResourceValues }): Promise<{ revision: string; effect: string; applied: boolean }>;
+  resourceChangeReceipt(projectId: ProjectId, operationId: string): Promise<{ revision: string; effect: string; applied: boolean } | undefined>;
   getProjectComputePolicy(actor: Actor, projectId: ProjectId): Promise<ProjectComputePolicyDto>;
   saveProjectComputePolicy(actor: Actor, projectId: ProjectId, input: SaveProjectComputePolicy): Promise<ProjectComputePolicyDto>;
   projectDevTaskProfile(projectId: ProjectId): Promise<string | undefined>;
