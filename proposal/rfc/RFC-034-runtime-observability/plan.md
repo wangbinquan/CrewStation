@@ -407,3 +407,10 @@ development-native-source v2设计门PASS；共享业务严格面及旧receipt�
 
 
 最终限定来源候选已再次独立门PASS，相关77/0、合同族34/0及精确lint通过。本机最终完整check被4条并行资源迁移未入锁阻断，类型仅余并行resourceAccessModule fixture错误；按共享在制品规则精确发布36自有源码/测试/RFC文档、由干净提交的hosted CI裁决，不宣称本机全量通过。共享STATE/RFC索引以及并行资源/导航输出保持原样后续登记。详见development-native-source最终回执；生产OFF、两RFC仍未完成。
+
+
+## 2026-09-30 实际来源底座精确CI与本机部署
+
+限定30源码/测试独立门PASS、77项相关与34项合同族通过及精确lint后，按共享在制品规则只发布36自有路径为 `d01ba8223fc08c8b2b70ee4db859e560c2151668`。[CI 36682129650](https://github.com/wangbinquan/CrewStation/actions/runs/36682129650) 六项全部success；本机全量被并行迁移阻断的记录保留，不宣称本机完整通过。2026-09-30T07:30:51.933Z八组件固定摘要升级完成、generation=observedGeneration且Ready=1、storage-contract=1、迁移Job Complete、公开登录HTTP200/匿名受保护根路由401。完整源码/镜像及默认Runner回执见[实际来源底座](./development-native-source.md#精确发布hosted-ci-与本机部署回执2026-09-30)。
+
+本批只关闭实际来源第一批发布/CI/部署依赖。生产开发采集仍OFF，sourceScope仍business-tasks；owner固定挂载/派发/删除屏障、consumer原价归属及两级事实/UI继续，真实身份/模型未验收，CS-R02和两个RFC不关闭。并行资源及共享登记原样留给其后续提交；AW新候选edd56ebe3的主CI与九个默认定时配置继续验收。

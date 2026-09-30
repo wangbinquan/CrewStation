@@ -20,6 +20,7 @@
 | 开发owner稳定受理底座（已推送/CI成功/已部署，生产不调用） | [owner限定范围与下一批屏障](./development-owner.md)；独立静态实现门PASS，40项/283断言相关覆盖、PG/SQLite/冻结CNY原价回归通过 | 修正候选完整4277/142skip/0、26路径指纹未变；8d2e547a精确发布、六项CI成功、本机八组件已部署；详见下方回执。实际派发、等待排空的重连、保留期删除、三类重建、platform消费及两级事实/UI仍待共同接通 |
 | 双路径render/固定元数据（已推送/CI成功/已部署，生产不调用） | 独立设计/限定实现门PASS；实际PG/渲染24项/188断言通过；完整4288/142skip/0、23路径指纹未变 | bc8522cb精确发布、六项CI成功、本机八组件已部署；最终实际原生来源/沿革与持久停止、实际派发/清理/消费/两级事实UI继续 |
 | 原键持久停止（已推送/CI成功/本机部署，生产不调用） | 独立限定实现门PASS；相关47/0与完整4307/142skip/0、23路径指纹一致 | bebb3d9b精确发布、六项CI成功及八组件本机部署；仍需实际原生来源、owner全派发/删除屏障、consumer/两级事实UI |
+| 实际原生来源第一批（已推送/CI成功/本机部署，生产不调用） | 严格可选能力与Hook前选择、实际环境/文件身份、同轮模型、独立begin/finish和journal，最终30源码/测试独立门PASS；相关77/0、合同族34/0及精确lint通过 | d01ba8223的六项CI全部success，本机八组件Ready；本机全量被并行迁移阻断的记录保留。owner挂载/派发/完整删除屏障、consumer原价历史归属、两级事实/UI及实际验收继续 |
 
 源码锚点：[统计合同](../../../packages/contracts/api/observability/runtimeStatistics.ts) 的 `sourceScope` 仍为业务任务、cohort 仍为 started；[platform 装配](../../../modules/platform/wiring.ts) 仅注入业务事实/业务数值来源；[开发生命周期](../../../modules/dev-session/application/agentExecution.ts) 仍由普通事件结束并回收；[平台健康说明](../../../apps/console/src/features/observability/i18n/zh-CN.ts) 明确应用级指标尚未采集。
 
@@ -225,3 +226,10 @@ Stage 2 Session 冻结候选完整门禁回执：2026-09-29T23:43:16Z，结构�
 
 
 最终限定来源候选已再次独立门PASS，相关77/0、合同族34/0及精确lint通过。本机最终完整check被4条并行资源迁移未入锁阻断，类型仅余并行resourceAccessModule fixture错误；按共享在制品规则精确发布36自有源码/测试/RFC文档、由干净提交的hosted CI裁决，不宣称本机全量通过。共享STATE/RFC索引以及并行资源/导航输出保持原样后续登记。详见development-native-source最终回执；生产OFF、两RFC仍未完成。
+
+
+### CS-R02 实际来源第一批精确发布与本机部署（2026-09-30）
+
+源码 `d01ba8223fc08c8b2b70ee4db859e560c2151668` 已精确推送，[CI 36682129650](https://github.com/wangbinquan/CrewStation/actions/runs/36682129650) 六项全部success。2026-09-30T07:30:51.933Z完成本机升级：storage-contract=1、迁移Job `rfc034-native-source-migrate-d01ba822` Complete、八组件generation=observedGeneration且Ready=1；console204、API198、auth96、controller163、events66、Session115、两MCP各62。登录页HTTP200，匿名根路由按现有ForwardAuth返回401；三镜像OCI revision核对源码SHA，固定摘要见[完整回执](./development-native-source.md#精确发布hosted-ci-与本机部署回执2026-09-30)。默认Runner摘要52db50f761af211ce4b766e6a2244c6e1c61af4d8c019fd408f725c44f9b4413。
+
+生产采集仍OFF、sourceScope仍business-tasks。第一批来源证明不等同项目开发消耗已接通；CS-R02后续实际owner派发/挂载约束、停止与数字排空/删除屏障、consumer固定原执行与原CNY价格历史修订、同快照事实及两级UI尚未完成，其他CS-R待办继续。真实身份/模型验收未执行；共享STATE/RFC索引及并行资源工作完整保留，未提交。AW edd56ebe3的主CI与九种默认定时配置正在验证，不将旧候选八绿当新候选全绿；两RFC不关闭。

@@ -1,6 +1,6 @@
 # RFC-034 下一阶段：开发 Agent 实际原生来源证明
 
-状态：限定设计候选，尚未实现；生产仍 OFF。原键停止底座bebb3d9b已精确CI成功及本机部署，本页只细化其后的实际来源，不解除生产准入。
+状态：第一批实际来源底座已实现、精确CI成功及本机部署；生产仍 OFF。d01ba8223只完成下文限定能力/驱动/journal范围，owner派发/挂载约束、删除排空、consumer和两级事实/UI尚未闭环，不解除生产准入。前期设计与检查记录保留历史。
 
 ## 当前问题及选择
 
@@ -87,3 +87,14 @@ OpenCode 使用最终 plan.env 的数据库路径、同轮 observer 和独立 si
 最终候选一次bun run check止于4条并行项目资源迁移未入锁（project/0014、resource-access/0001、agent-runtime/0008、runtime-environment/0006），没有进入全量测试；本批目录上限错误已消除。全项目typecheck仅余并行resourceAccessModule.test的依赖fixture错误，本批无类型错误。按docs/engineering/development-rules.md §3共享在制品规则，采用精确自有文件lint/相关真实SQLite与假启动器回归及独立门，并以干净提交的六项hosted CI为权威；不删除并行迁移，不改其锁或用例，不把本机check写成通过。
 
 精确发布候选为30源码/测试与6份RFC034文档共36路径。STATE.md新增了并行导航记录，共享STATE与RFC索引完整留在工作树后续登记，本批不提交它们；其他并行资源/导航代码保持原样。精确CI六项与部署仍待回执，生产开发来源OFF。
+
+
+### 精确发布、hosted CI 与本机部署回执（2026-09-30）
+
+源码 `d01ba8223fc08c8b2b70ee4db859e560c2151668` 已精确推送，36自有路径及Co-Authored-By经提交前后逐项核对，本地main与origin/main一致。共享STATE/RFC索引以及并行资源代码未纳入；没有删除或改写在制品。[CI 36682129650](https://github.com/wangbinquan/CrewStation/actions/runs/36682129650) 六项全部success：static、unit、module、console、实际部署e2e及gate。此干净提交结果关闭本批CI依赖；本机完整check被并行迁移阻断的历史仍保留，不改写为本机全绿。
+
+2026-09-30T07:30:51.933Z已完成本机部署：只从已提交源码构建三张镜像，OCI revision均匹配完整SHA；storage-contract=1，迁移Job `rfc034-native-source-migrate-d01ba822` Complete，八组件generation=observedGeneration且Ready=1。console204、API198、auth96、controller163、events66、Session115、两个MCP各62。公开登录页HTTP200；匿名工作台根路由HTTP401，符合现有ForwardAuth合同，没有切换身份或绕过鉴权。
+
+不可变摘要：console `sha256:1f669a8043e54ad25a5bc5348ae670d7b19008830cfba0f0936118d51df0e022`；control-plane `sha256:fd3309b61a42e280617c4d40c583ef72277a5b6e39fef44db58e933298e0b76a`；默认Runner `registry.crewstation-system.svc.cluster.local:5000/crewstation/task-runtime@sha256:52db50f761af211ce4b766e6a2244c6e1c61af4d8c019fd408f725c44f9b4413`。既有实际执行仍沿用自己的固定镜像。
+
+本批没有真实身份/模型验收，也未创建验证会话或替换既有会话。生产owner仍不选择nativeSource/developmentUsageStorage，统计sourceScope仍为business-tasks；项目开发消耗不能标为已知零。owner/consumer/清理及正式两级明细继续，CS-R02和两RFC保持In Progress。
