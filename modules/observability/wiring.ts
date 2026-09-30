@@ -1,4 +1,7 @@
 import type { RuntimeFactPage, RuntimeFactQuery } from '@crewstation/contracts';
+import { developmentUsageReconciliation } from './application/developmentUsage';
+import { valueDevelopmentUsagePage } from './application/developmentValuations';
+import type { DevelopmentUsageSource } from './ports/developmentUsage';
 import { executionValuations, valueRunnerUsagePage } from './application/executionValuations';
 import { drizzleExecutionValuations, drizzleUsageLedger, readRuntimeStatisticsLedger } from './adapters/persistence/drizzleUsageLedger';
 import { runnerUsageReconciliation, usageIngestion } from './application/usageIngestion';
@@ -36,6 +39,8 @@ export interface ObservabilityModuleDeps {
   pricingProfiles?: PricingProfileDirectory;
   executionAccess?: ExecutionObservationAccess;
   usageSource?: RunnerUsageSource;
+  /** Explicit internal participant; platform production does not supply it yet. */
+  developmentUsageSource?: DevelopmentUsageSource;
   k8s: K8sClient;
   authorizer: ProjectAuthorizer;
   services: ServiceResolver;
@@ -76,7 +81,12 @@ export function createObservabilityModule(deps: ObservabilityModuleDeps): Observ
   const observations = executionObservationUseCases({ ledger, visibility: drizzleCostVisibility(deps.db), authorizer: deps.authorizer, clock: useCaseDeps.clock,
     access: deps.executionAccess ?? { task: async () => { throw precondition('执行观测来源尚未接入'); } } });
   const valuations = drizzleExecutionValuations(deps.db), valueUsage = executionValuations({ store: valuations, pricing: executionPricing, clock: useCaseDeps.clock });
-  const reconcileUsage = deps.usageSource ? runnerUsageReconciliation({ source: deps.usageSource, store: ledger, logger, value: valueRunnerUsagePage({ store: valuations, source: deps.usageSource, value: valueUsage }) }) : async () => 0;
+  const reconcileBusinessUsage = deps.usageSource ? runnerUsageReconciliation({ source: deps.usageSource, store: ledger, logger, value: valueRunnerUsagePage({ store: valuations, source: deps.usageSource, value: valueUsage }) }) : async () => 0;
+  const reconcileDevelopment = deps.developmentUsageSource ? developmentUsageReconciliation({ source: deps.developmentUsageSource,
+    store: ledger, pricing: executionPricing, logger, value: valueDevelopmentUsagePage({ models: ledger, store: valuations, value: valueUsage }) }) : undefined;
+  let pendingUsage: Promise<number> | undefined;
+  const reconcileUsage = reconcileDevelopment ? () => pendingUsage ??= (async () => await reconcileBusinessUsage() + await reconcileDevelopment())()
+    .finally(() => { pendingUsage = undefined; }) : reconcileBusinessUsage;
   const runtimeStatistics = runtimeStatisticsUseCases({ authorizer: deps.authorizer, clock: useCaseDeps.clock, source: {
     read: async (query) => {
       const snapshot = await deps.db.transaction(async (tx) => {

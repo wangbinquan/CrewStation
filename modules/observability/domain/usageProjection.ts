@@ -1,5 +1,6 @@
 import type { UsageRecord, UsageExecutionIdentity, NativeUsageProof, NativeUsageOrder, NativeUsageStep, NativeUsageBaseline, RunnerUsageMeasurement, UsageNativeCapture, RuntimeUsageMetrics, UsageObservation } from '@crewstation/contracts';
 import { jsonHash } from '@crewstation/kernel';
+import { developmentNativeRootChanged, developmentNativeRootUsable, type DevelopmentNativeState } from './developmentNative';
 import { subtractTokenBaseline, TOKEN_BUCKETS, type TokenUsage } from './tokenUsage';
 
 export type UsageEvidence = Omit<UsageRecord, 'projection'>;
@@ -98,6 +99,7 @@ export function rebuildUsageProjection(evidence: readonly UsageEvidence[], previ
 export interface NativeCaptureDocument {
   id: string; identity: UsageExecutionIdentity; sourceId: string; proof: NativeUsageProof;
   began: boolean; baselineRoot: string | null; historicalRevisionGap: boolean;
+  development?: DevelopmentNativeState;
 }
 export type NativeBaselineEntry = NativeUsageBaseline['steps'][number];
 export interface NativeRepair {
@@ -105,6 +107,7 @@ export interface NativeRepair {
 }
 /** A correction is attached to the original request and never borrows a native revision. */
 export function nativeRepairCandidate(owner: NativeCaptureDocument, source: NativeCaptureDocument, row: NativeBaselineEntry, usage: UsageRecord, accepted?: NativeRepair): Omit<NativeRepair, 'ordinal'> | undefined {
+  if ([owner.development, source.development].some((state) => state && (!state.sourceVerified || !developmentNativeRootUsable(state)))) return;
   const before = row.before, after = row.after, order = source.proof.order, origin = owner.proof.order, baseline = source.proof.baseline.order;
   if (!row.afterObserved || !after || !order || !origin || !baseline || !source.proof.fingerprint || !source.began ||
       source.proof.state === 'pending' || source.proof.state === 'unsupported' || source.proof.baseline.kind !== 'resume' ||
@@ -166,6 +169,8 @@ export function compareNativeBaseline(row: NativeBaselineEntry, owners: readonly
 }
 export function nativeCaptureSummary(value: NativeCaptureDocument, counts: { steps: number; baselines: number; unresolved: number; revised: number; corrected?: number }): UsageNativeCapture {
   const issues = new Set(value.proof.issues);
+  if (value.development && (!value.development.sourceVerified || value.development.overflow || !developmentNativeRootUsable(value.development))) issues.add('native-evidence-incomplete');
+  if (value.development && developmentNativeRootChanged(value.development)) issues.add('native-root-changed');
   if (!value.began && value.proof.state !== 'unsupported') issues.add('native-baseline-not-started');
   if ((value.proof.state === 'complete' || value.proof.state === 'partial' && value.proof.issues.length === 1 && value.proof.issues[0] === 'native-prior-revision-gap') && (counts.steps !== value.proof.emitted || counts.baselines !== value.proof.baselineSteps)) issues.add('native-evidence-incomplete');
   if (counts.unresolved) issues.add('native-owner-unresolved');

@@ -460,3 +460,12 @@ development-native-source v2设计门PASS；共享业务严格面及旧receipt�
 默认Runner：`registry.crewstation-system.svc.cluster.local:5000/crewstation/task-runtime@sha256:91b61a26f0e573afa78dbdbccbea62d40c4eac3135e85a5d9cc93d31c4f2391f`。公开匿名路由核对：`/auth/login` HTTP200、`/` HTTP401符合现有forward-auth合同；没有切换真实身份、调用模型或创建/停止业务验证会话。构建使用git archive的该精确提交，未混入并行资源/拓扑工作；部署前验证原d01组件和默认镜像未变、更新时使用resourceVersion CAS。
 
 生产开发采集仍OFF，sourceScope仍business-tasks；仅原选择接口底座已部署，Session独立registration对拍、按turn固定页/真实文件分区、全部数字所选模型证据的同事务持久、原价修订/ACK、owner派发/完整清理屏障与两级事实/UI继续。CS-R02与两个RFC不关闭。该回执后继只写三份观测文档，不改变已部署源码；后继文档精确CI另外验证，共享STATE/RFC索引与并行输出完整保留。
+
+
+## 2026-09-30 内部开发消费者候选与发布依赖
+
+开发专用持久消费完成限定候选：独立Session/owner/冻结选择与原CNY受理核对，普通数字原模型证据私表、完整meter/per-turn来源、实际文件与两阶段根归属分区，固定页原子提交、原价修订后精确ACK和有界单飞恢复。18路径范围包括自有0013迁移与共享锁；不接生产source或启动新worker，不改变正式业务sourceScope。生产OFF，完整RFC与CS-R02继续In Progress。
+
+首轮独立实现门的唯一root错配P2已先三项红回归、再修正，最终限定功能PASS；70相关回归/374断言全部通过、没有跳过，包含真实PostgreSQL与旧业务兼容，16文件eslint通过。仅一次完整本机check被并行identity/ports目录上限阻断，单独类型检查三项错误均在并行projectDeletion/resourceCenter用例，不声称全量通过。历史失败保留，未削弱数值/预算/完整性断言。
+
+共享锁新增11份并行资源/删除迁移引用，尚未在发布基线中；完整提交锁会导致干净CI缺失这些文件，剥离并行条目又违反共享main保护规则，因此本批发布暂等对应会话正常提交其迁移/锁。接下来先精确本地提交自有20路径（17源码/测试/迁移＋3RFC文档），不带仍有并行引用的共享锁；全部引用进入本地提交树后才协调推送累计提交。候选形成时main/origin为2d4555323、已部署源码仍1d48fb170；后续同步、精确发布/CI及本机部署另记。共享登记仍按用户要求稍后补交。完整源码/测试与根边界说明见[消费者设计和候选](./development-consumer.md)。

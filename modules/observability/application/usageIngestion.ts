@@ -24,7 +24,7 @@ function parsedPage(input: UsageSourcePage): UsageSourcePage {
   for (const row of parsed.data.native ?? []) if (row.identity.projectId !== input.projectId || row.identity.taskId !== input.taskId) throw validation('原生证明与任务身份不一致');
   return parsed.data;
 }
-async function append(tx: UsageLedgerTransaction, event: UsageSourcePage['events'][number]): Promise<boolean> {
+export async function appendUsageEvidence(tx: UsageLedgerTransaction, event: UsageSourcePage['events'][number]): Promise<boolean> {
   const fingerprint = jsonHash(event.measurement), priorEvent = await tx.eventFingerprint(event.eventId);
   if (priorEvent !== undefined) {
     if (priorEvent !== fingerprint) throw conflict('来源事件内容冲突');
@@ -62,7 +62,7 @@ export function usageIngestion(store: UsageLedgerStore) {
       }
       if (await tx.cursor() !== input.expectedCursor) throw conflict('来源游标已更新');
       let applied = 0;
-      for (const event of input.events) if (await append(tx, event)) applied++;
+      for (const event of input.events) if (await appendUsageEvidence(tx, event)) applied++;
       for (const row of input.native ?? []) await tx.capture(row.identity, row.capture);
       await tx.advance(input.nextCursor, fingerprint);
       return { cursor: input.nextCursor, applied, duplicate: input.events.length - applied };

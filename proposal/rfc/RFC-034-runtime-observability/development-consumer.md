@@ -1,6 +1,6 @@
 # RFC-034 开发实际来源消费第一批设计
 
-状态：限定v3设计门已PASS；第1项原选择接口已发布、精确CI成功并本机部署，完整持久消费者尚未接通，生产 OFF。承接已发布/CI成功/本机部署的 d01ba8223 实际来源底座；沿用已批准 RFC-034 和 development-headless/development-owner。先实现内部持久消费，不启用生产派发，不扩大业务统计 sourceScope，也不关闭 CS-R02。
+状态：限定v3设计门已PASS；第1项原选择接口已发布、精确CI成功并本机部署，内部持久消费者已形成限定实现候选并通过功能复核；生产接线与两级事实/UI仍未完成，生产 OFF。承接已发布/CI成功/本机部署的 d01ba8223 实际来源底座；沿用已批准 RFC-034 和 development-headless/development-owner。先实现内部持久消费，不启用生产派发，不扩大业务统计 sourceScope，也不关闭 CS-R02。
 
 ## 实际断点
 
@@ -20,7 +20,7 @@
 
 ## 来源状态与阶段约束
 
-- 为每个 private native capture 保存 selected、原 Pod UID、expected namespace、begin 与 finish。记录只来自严格 source 帧；begin/finish 的 turn、turnIndex、namespace、plannedPathDigest 和同帧 nativeProof 匹配。finish 里的 beginStore 必须逐字匹配已持久 begin，不能靠 finish 自报补造开始证明。
+- 为每个 private native capture 保存 selected、原 Pod UID、expected namespace、begin 与 finish。记录只来自严格 source 帧；begin/finish 的 turn、turnIndex、namespace、plannedPathDigest 和同帧 nativeProof 匹配。两阶段分别持久同帧 nativeProof 的 beginRoot/finishRoot 和原 baselineKind；同阶段已知 root 不可替换。缺失旧阶段 root 为未知，不能推定为 null 或当前根。finish 里的 beginStore 必须逐字匹配已持久 begin，不能靠 finish 自报补造开始证明。
 - 原生证据早于最终来源时可以持久保留数字和 baseline，但保持待证明；不提前建立跨 capture 的 owner 或完整采集结论。未选来源、缺 begin/finish、changed/unavailable/unsupported、读/sidecar 问题不得解释成完整零。
 - sourceVerified与数字captureComplete是两个判据。sourceVerified只要求已持久begin和finish、精确阶段/同轮/计划匹配、finish finalStore observed、无来源问题、fresh的new/same或resume的same连续性；不以nativeProof.state=complete为前提。原proof的partial/native-prior-revision-gap仍可验证真实文件并进入既有修订规则，待历史10→15修复后才能按原规则恢复数字完整性；其他原生root/证据缺口不能被来源验证消除。sourceEpoch、actualPathDigest、fileIdentityDigest 三项共同绑定真实文件；snapshot_order.epoch 继续原排序含义，不能代替文件身份。
 - unsupported 的 begin/finish 也必须可持久往返。开发来源的 stage 决定开始/结束；不能套用旧 persistProof 将 unsupported 开始立即视为不可更新终态。business proof 的原冻结规则不放宽。
@@ -28,9 +28,9 @@
 
 ## 去重分区与迟到证据
 
-原步骤键不能直接沿用 namespace+root+record，否则复制库会污染 owners.limit(3) 与既有修订。开发捕获的 key 始终有独立前缀：未证明时是 capture 专属 pending 前缀，sourceVerified后是 hash(expected namespace、原 Pod UID、实际三项 store 身份) 的前缀；业务键的原字节不变。
+原步骤键不能直接沿用 namespace+root+record，否则复制库会污染 owners.limit(3) 与既有修订。开发捕获的 key 始终有独立前缀：未证明时是 capture 专属 pending 前缀，sourceVerified且原生两阶段根可用后是 hash(expected namespace、原 Pod UID、实际三项 store 身份) 的前缀；业务键的原字节不变。
 
-数字/历史页到达时按该 capture 当前持久前缀写入步骤和 baseline。finish达到sourceVerified后（即使数字proof仍为partial），原事务内将该capture已保留的两类键从pending前缀转换为已验证前缀，并重核相关修订/summary；重放不会二次加前缀。转换用受 captureId 和旧前缀约束的两条 SQL UPDATE。既有baseline最多10,000条；不能把它冒充steps也已受限。新开发选择路径另外给原生归属索引施加每capture10,000个不同步骤的硬界限：超过时仍提交普通四桶数字、固定页/游标和实际来源元数据，保留私有overflow标记及native-evidence-incomplete，不扩大原生owner候选或宣告完整；普通数字不截断。重复步骤或同一步模型补全不消费新名额，business行为不变。这样最多更新两组各10,000行，不逐条发网络请求或在项目锁内调用Session。未验证捕获不进入跨 capture owner 候选。
+数字/历史页到达时按该 capture 当前持久前缀写入步骤和 baseline。finish达到sourceVerified且根可用后（即使数字proof仍为partial），原事务内将该capture已保留的两类键从pending前缀转换为已验证前缀，并重核相关修订/summary；重放不会二次加前缀。转换用受 captureId 和旧前缀约束的两条 SQL UPDATE。既有baseline最多10,000条；不能把它冒充steps也已受限。新开发选择路径另外给原生归属索引施加每capture10,000个不同步骤的硬界限：超过时仍提交普通四桶数字、固定页/游标和实际来源元数据，保留私有overflow标记及native-evidence-incomplete，不扩大原生owner候选或宣告完整；普通数字不截断。重复步骤或同一步模型补全不消费新名额，business行为不变。这样最多更新两组各10,000行，不逐条发网络请求或在项目锁内调用Session。未验证捕获不进入跨 capture owner 候选。
 
 因此相同 session/part IDs 的不同文件分属不同 key 分区，不能合并、消耗前三个 owner 名额或撤销另一库已证明的修订。同库同 Pod 健康重开、begin/final迟到和原库步骤10→15可以重新关联原请求；重复/乱序页不新建 owner，不把原请求改名为新执行。
 
@@ -125,3 +125,14 @@ v3独立只读设计门PASS，首尾冻结hash一致，原四项P2全部关闭�
 默认Runner：`registry.crewstation-system.svc.cluster.local:5000/crewstation/task-runtime@sha256:91b61a26f0e573afa78dbdbccbea62d40c4eac3135e85a5d9cc93d31c4f2391f`。公开匿名路由核对：`/auth/login` HTTP200、`/` HTTP401符合现有forward-auth合同；没有切换真实身份、调用模型或创建/停止业务验证会话。构建使用git archive的该精确提交，未混入并行资源/拓扑工作；部署前验证原d01组件和默认镜像未变、更新时使用resourceVersion CAS。
 
 生产开发采集仍OFF，sourceScope仍business-tasks；仅原选择接口底座已部署，Session独立registration对拍、按turn固定页/真实文件分区、全部数字所选模型证据的同事务持久、原价修订/ACK、owner派发/完整清理屏障与两级事实/UI继续。CS-R02与两个RFC不关闭。该回执后继只写三份观测文档，不改变已部署源码；后继文档精确CI另外验证，共享STATE/RFC索引与并行输出完整保留。
+
+
+## 内部持久消费者实现候选（2026-09-30）
+
+限定源码功能复核PASS，生产仍OFF。新增开发专用入口、独立Session登记/owner原价与选择对拍、完整stream/per-turn meter、所有普通数字的持久所选模型证据、同事务数字/原生状态/页/cursor、原价估值后ACK及单飞有界排空。platform仅新增独立port/API适配；生产wiring未注入开发source、不新建开发worker，不扩展business v1或正式sourceScope。此候选不代表实际开发运行已采集或CS-R02已关闭。
+
+首轮独立实现门FAIL一项P2：finish先到时只保留最终proof，迟到begin的根会话未核对，可能误报空树完整，甚至将根A来源误补到根B的原owner。新增三项回归先稳定红（16pass/3fail），修正后19pass/0fail/103断言。现在beginRoot/finishRoot按阶段独立持久：fresh真实null→首次非空根可以建立归属；两个已知根必须相同；resume缺根/旧记录未知或根变更不能借最终root补造。文件sourceVerified仍独立，不要求完整数字proof，但历史分区、finalized与修订双端都要求根可用。错配留在capture专属pending分区，partial/native-root-changed，不撤销原库owner的质量或原价补算。
+
+最终相关回归70pass/0fail/0skip、374断言、6文件；真实PostgreSQL的Session outbox/ledger均执行，包含原生10,000/10,001预算、复制库与跨Pod、模型迟到/冲突、涨价后原价、事务回滚/估值失败/ACK丢失重开、原业务全部相关数值断言。自有16个TS文件eslint通过。本候选只启动一次完整本机check，arch阶段被并行modules/identity/ports的22文件超20上限阻断，未进入lint/type/test；单独typecheck只有并行projectDeletion/resourceCenter测试的三项TS2769，无自有类型错误。不能称完整本机通过，不重复全量或修改他人文件；整仓判定仍需精确提交的干净hosted CI。
+
+发布目前被共享迁移锁依赖阻断：本批只创建observability/0013_development_model_evidence.sql及对应锁值，另一会话已向同一锁加入11个资源/删除迁移，相关文件尚未在已发布基线2d455532中。锁检查明确拒绝已入锁迁移缺失。保留整个共享文件，不能剥离其条目，也不能把未授权的资源/删除源码扫入观测提交；本会话先精确提交自有源码、0013迁移及RFC文档到本地main，完整共享锁留在工作树；对应会话分别提交其自有迁移与共享锁。所有锁引用在本地提交树齐备后，才在协调的短时临界区同步并推送累计提交，验证精确SHA CI。功能PASS与发布/CI/部署分别记录；当前本机源码仍1d48fb170，未部署消费者候选。共享STATE/RFC索引继续按作者要求留待补交。

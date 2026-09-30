@@ -22,6 +22,8 @@
 | 原键持久停止（已推送/CI成功/本机部署，生产不调用） | 独立限定实现门PASS；相关47/0与完整4307/142skip/0、23路径指纹一致 | bebb3d9b精确发布、六项CI成功及八组件本机部署；仍需实际原生来源、owner全派发/删除屏障、consumer/两级事实UI |
 | 实际原生来源第一批（已推送/CI成功/本机部署，生产不调用） | 严格可选能力与Hook前选择、实际环境/文件身份、同轮模型、独立begin/finish和journal，最终30源码/测试独立门PASS；相关77/0、合同族34/0及精确lint通过 | d01ba8223的六项CI全部success，本机八组件Ready；本机全量被并行迁移阻断的记录保留。owner挂载/派发/完整删除屏障、consumer原价历史归属、两级事实/UI及实际验收继续 |
 
+内部持久consumer候选已通过限定功能复核：70项相关回归/374断言、精确16文件lint通过；真实Session PG outbox、全meter所选模型、原价、根会话/文件分区、原子cursor及ACK恢复均覆盖。生产source尚未注入，两级开发事实/UI、owner派发/删除排空仍须接通，CS-R02不关闭。源码候选尚未推送/部署：共享迁移锁含并行资源/删除的11份未发布迁移引用，须先由其所属会话正常提交；不得删锁条目或扫入他人源码。单次本机完整check因并行identity/ports目录上限失败，单独typecheck被三项外部测试字面量/品牌类型错误阻断，不能写作本机全绿。详见[消费者候选回执](./development-consumer.md#内部持久消费者实现候选2026-09-30)。
+
 源码锚点：[统计合同](../../../packages/contracts/api/observability/runtimeStatistics.ts) 的 `sourceScope` 仍为业务任务、cohort 仍为 started；[platform 装配](../../../modules/platform/wiring.ts) 仅注入业务事实/业务数值来源；[开发生命周期](../../../modules/dev-session/application/agentExecution.ts) 仍由普通事件结束并回收；[平台健康说明](../../../apps/console/src/features/observability/i18n/zh-CN.ts) 明确应用级指标尚未采集。
 
 ## 执行顺序与依赖

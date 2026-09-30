@@ -2,8 +2,12 @@ import { ExecutionUsageObservationSchema, ExecutionValuationObservationSchema, R
 import { and, asc, eq, gt, lte, inArray, sql } from 'drizzle-orm';
 import { UsageValuationSchema, UsageNativeCaptureSchema, type UsageExecutionIdentity, type RunnerUsageCapture, type RuntimeFactPage } from '@crewstation/contracts';
 import { conflict, validation, jsonHash } from '@crewstation/kernel';
+import type { DevelopmentRunnerUsageCapture, DevelopmentNativeSource } from '@crewstation/contracts';
+import type { DevelopmentUsageLedgerStore, DevelopmentUsageTransaction } from '../../ports/developmentUsage';
+import { developmentCaptureSourceId, developmentNativePrefix, developmentNativeState, developmentNativeRootUsable, type DevelopmentNativeContext } from '../../domain/developmentNative';
+import { persistDevelopmentModel, readDevelopmentModel } from './developmentUsageModels';
 import type { Database, Executor } from '@crewstation/persistence';
-import type { ExecutionValuationRequest, ExecutionValuationStore, UsageMeasurementRef, UsageLedgerStore, UsageLedgerTransaction, UsageTaskScope } from '../../ports/usageLedger';
+import type { ExecutionValuationRequest, ExecutionValuationStore, UsageMeasurementRef, UsageLedgerStore, UsageTaskScope } from '../../ports/usageLedger';
 import { costVisibility } from './tokenPriceTables';
 import type { RuntimeStatisticsSnapshot } from '../../ports/usageLedger';
 import { usageChangesWithCaptures, usageSnapshotWithCaptures, usageSnapshot, captureIncompleteAt } from './usageSnapshot';
@@ -16,10 +20,12 @@ const sourceWhere = (taskKey: string, sourceId: string) => and(eq(usageSources.t
 async function sourceCursor(db: Executor, taskKey: string, sourceId: string) {
   return (await db.select().from(usageSources).where(sourceWhere(taskKey, sourceId)).limit(1))[0]?.cursor ?? null;
 }
-function transaction(db: Executor, taskKey: string, sourceId: string, head: number): UsageLedgerTransaction {
+function transaction(db: Executor, taskKey: string, sourceId: string, head: number): DevelopmentUsageTransaction {
   let sequence = head;
   const repairKeys = new Set<string>();
   return {
+    developmentModel: (value) => persistDevelopmentModel(db, value),
+    developmentCapture: async (context, frame) => { sequence = await persistDevelopmentFrame(db, taskKey, context, frame, sequence); },
     cursor: () => sourceCursor(db, taskKey, sourceId),
     pageFingerprint: async (cursor) => (await db.select().from(usagePages).where(and(eq(usagePages.taskKey, taskKey), eq(usagePages.sourceId, sourceId), eq(usagePages.cursor, cursor))).limit(1))[0]?.fingerprint,
     eventFingerprint: async (eventId) => (await db.select().from(usageEvents).where(and(eq(usageEvents.taskKey, taskKey), eq(usageEvents.sourceId, sourceId), eq(usageEvents.eventId, eventId))).limit(1))[0]?.fingerprint,
@@ -84,20 +90,25 @@ async function reprojectNativeMeter(db: Executor, taskKey: string, key: string, 
   return document === previous ? sequence : writeUsageProjection(db, taskKey, document, sequence);
 }
 
-export function drizzleUsageLedger(db: Database): UsageLedgerStore {
+function ledgerChange<T>(db: Database, scope: UsageTaskScope, sourceId: string, work: (tx: DevelopmentUsageTransaction) => Promise<T>) {
+  return db.transaction(async (tx) => {
+    const taskKey = taskKeyOf(scope);
+    await tx.insert(usageHeads).values({ taskKey, projectId: scope.projectId, taskId: scope.taskId, sequence: 0 }).onConflictDoNothing();
+    const [head] = await tx.select().from(usageHeads).where(eq(usageHeads.taskKey, taskKey)).for('update');
+    await tx.insert(usageSources).values({ taskKey, sourceId, cursor: null }).onConflictDoNothing();
+    return work(transaction(tx, taskKey, sourceId, head!.sequence));
+  });
+}
+export function drizzleUsageLedger(db: Database): UsageLedgerStore & DevelopmentUsageLedgerStore {
   return {
     changesWithCaptures: (scope, after, limit) => usageChangesWithCaptures(db, taskKeyOf(scope), after, limit),
     snapshotWithCaptures: (scope, query, now, visibilityRevision) => usageSnapshotWithCaptures(db, taskKeyOf(scope), query, now, visibilityRevision),
     snapshot: (scope, query, now, visibilityRevision) => usageSnapshot(db, taskKeyOf(scope), query, now, visibilityRevision),
     cursor: (scope, sourceId) => sourceCursor(db, taskKeyOf(scope), sourceId),
-    change: (scope, sourceId, work) => db.transaction(async (tx) => {
-      const taskKey = taskKeyOf(scope);
-      await tx.insert(usageHeads).values({ taskKey, projectId: scope.projectId, taskId: scope.taskId, sequence: 0 }).onConflictDoNothing();
-      // A per-task lock makes sync sequence order equal commit order across sources.
-      const [head] = await tx.select().from(usageHeads).where(eq(usageHeads.taskKey, taskKey)).for('update');
-      await tx.insert(usageSources).values({ taskKey, sourceId, cursor: null }).onConflictDoNothing();
-      return work(transaction(tx, taskKey, sourceId, head!.sequence));
-    }),
+    // Both participants serialize on the same task head and commit one watermark.
+    change: (scope, sourceId, work) => ledgerChange(db, scope, sourceId, work),
+    changeDevelopment: (scope, sourceId, work) => ledgerChange(db, scope, sourceId, work),
+    developmentModel: (ref, revision) => readDevelopmentModel(db, ref, revision),
     changes: async (scope, after, limit) => {
       if (!Number.isSafeInteger(after) || after < 0 || !Number.isInteger(limit) || limit < 1 || limit > 500) throw new RangeError('Invalid usage changes page');
       const taskKey = taskKeyOf(scope);
@@ -177,18 +188,53 @@ export async function readRuntimeStatisticsLedger(db: Executor, facts: RuntimeFa
 
 
 async function captureRow(db: Executor, id: string) { return (await db.select().from(nativeCaptures).where(eq(nativeCaptures.id, id)).limit(1))[0]; }
-async function persistProof(db: Executor, taskKey: string, sourceId: string, identity: UsageExecutionIdentity, proof: NonNullable<RunnerUsageCapture['nativeProof']>) {
+interface DevelopmentFrameContext { context: DevelopmentNativeContext; source?: DevelopmentNativeSource }
+async function rekeyDevelopmentCapture(db: Executor, id: string, before: NativeCaptureDocument | undefined, after: NativeCaptureDocument, keys: Set<string>) {
+  if (!before?.development || !after.development) return;
+  const previous = developmentNativePrefix(id, before.development), current = developmentNativePrefix(id, after.development);
+  if (previous === current) return;
+  // Two guarded updates, each bounded to the capture's 10,000-row ownership index.
+  const steps = await db.update(nativeSteps).set({ nativeKey: sql`${current} || substring(${nativeSteps.nativeKey} from ${previous.length + 1}::integer)` })
+    .where(and(eq(nativeSteps.captureId, id), sql`left(${nativeSteps.nativeKey}, ${previous.length}) = ${previous}`)).returning({ key: nativeSteps.nativeKey });
+  const baselines = await db.update(nativeBaselines).set({ nativeKey: sql`${current} || substring(${nativeBaselines.nativeKey} from ${previous.length + 1}::integer)` })
+    .where(and(eq(nativeBaselines.captureId, id), sql`left(${nativeBaselines.nativeKey}, ${previous.length}) = ${previous}`)).returning({ key: nativeBaselines.nativeKey });
+  for (const row of [...steps, ...baselines]) { keys.add(row.key); keys.add(previous + row.key.slice(current.length)); }
+}
+async function persistProof(db: Executor, taskKey: string, sourceId: string, identity: UsageExecutionIdentity,
+  proof: NonNullable<RunnerUsageCapture['nativeProof']>, keys: Set<string>, development?: DevelopmentFrameContext) {
   const id = nativeCaptureId(identity, sourceId, proof.turn), previous = await captureRow(db, id), before = previous?.document;
   if (before && (before.proof.lineageKey !== proof.lineageKey || before.proof.turnIndex !== proof.turnIndex || jsonHash(before.proof.baseline) !== jsonHash(proof.baseline))) throw conflict('原生证明身份或基线冲突');
-  if (before && before.proof.state !== 'pending' && jsonHash(before.proof) !== jsonHash(proof)) throw conflict('原生最终证明内容冲突');
-  const document: NativeCaptureDocument = { id, identity, sourceId, proof,
-    began: before?.began ?? (proof.state === 'pending' || proof.state === 'unsupported'), baselineRoot: before?.baselineRoot ?? proof.root,
-    historicalRevisionGap: before?.historicalRevisionGap ?? false };
+  if (before && !!before.development !== !!development) throw conflict('原生来源不能跨接开发与旧业务证明');
+  const lateBegin = development?.source?.stage === 'begin' && before?.proof.state !== 'pending';
+  const finishFirst = development?.source?.stage === 'finish' && !before?.development?.finish;
+  if (before && before.proof.state !== 'pending' && !lateBegin && !finishFirst && jsonHash(before.proof) !== jsonHash(proof)) throw conflict('原生最终证明内容冲突');
+  const selectedProof = before && lateBegin ? before.proof : proof;
+  const state = development ? developmentNativeState(before?.development, development.context, proof, development.source) : undefined;
+  const document: NativeCaptureDocument = { id, identity, sourceId, proof: selectedProof,
+    began: state ? state.begin !== null : before?.began ?? (proof.state === 'pending' || proof.state === 'unsupported'),
+    baselineRoot: before?.baselineRoot ?? proof.root, historicalRevisionGap: before?.historicalRevisionGap ?? false,
+    ...(state ? { development: state } : {}) };
   const summary = previous?.summary ?? nativeCaptureSummary(document, { steps: 0, baselines: 0, unresolved: 0, revised: 0 });
-  const finalized = document.began && (proof.state === 'complete' || proof.state === 'partial') && proof.fingerprint !== null && !proof.issues.includes('native-root-changed');
-  const row = { id, taskKey, sourceId, turn: proof.turn, lineageKey: proof.lineageKey, root: proof.root, finalized, document, summary };
-  await db.insert(nativeCaptures).values(row).onConflictDoUpdate({ target: nativeCaptures.id, set: { document, root: proof.root, finalized } });
+  const finalProof = document.proof;
+  const finalized = document.began && (finalProof.state === 'complete' || finalProof.state === 'partial') && finalProof.fingerprint !== null &&
+    !finalProof.issues.includes('native-root-changed') && (!state || state.sourceVerified && developmentNativeRootUsable(state) && !state.overflow);
+  const row = { id, taskKey, sourceId, turn: finalProof.turn, lineageKey: finalProof.lineageKey, root: finalProof.root, finalized, document, summary };
+  await db.insert(nativeCaptures).values(row).onConflictDoUpdate({ target: nativeCaptures.id, set: { document, root: finalProof.root, finalized } });
+  await rekeyDevelopmentCapture(db, id, before, document, keys);
   return id;
+}
+function captureStepKey(capture: typeof nativeCaptures.$inferSelect, root: string, recordId: string) {
+  const key = nativeStepKey(capture.lineageKey, root, recordId);
+  return capture.document.development ? developmentNativePrefix(capture.id, capture.document.development) + key : key;
+}
+async function retainDevelopmentOverflow(db: Executor, capture: typeof nativeCaptures.$inferSelect, keys: Set<string>) {
+  const state = capture.document.development;
+  if (!state || state.overflow) return;
+  const document = { ...capture.document, development: { ...state, overflow: true } };
+  await db.update(nativeCaptures).set({ document, finalized: false }).where(eq(nativeCaptures.id, capture.id));
+  for (const row of await db.selectDistinct({ key: nativeSteps.nativeKey }).from(nativeSteps)
+    .innerJoin(nativeBaselines, and(eq(nativeSteps.taskKey, nativeBaselines.taskKey), eq(nativeSteps.nativeKey, nativeBaselines.nativeKey)))
+    .where(eq(nativeSteps.captureId, capture.id))) keys.add(row.key);
 }
 async function persistNativeMeasurements(db: Executor, taskKey: string, sourceId: string, identity: UsageExecutionIdentity, frame: RunnerUsageCapture, affected: Set<string>, nativeKeys: Set<string>) {
   for (const measurement of frame.measurements) {
@@ -196,8 +242,12 @@ async function persistNativeMeasurements(db: Executor, taskKey: string, sourceId
     const id = nativeCaptureId(identity, sourceId, measurement.scope.turn), capture = await captureRow(db, id);
     if (!capture || capture.document.proof.state === 'unsupported') continue;
     if (capture.document.proof.turnIndex !== measurement.scope.turnIndex) throw conflict('原生用量轮次不匹配');
-    const nativeKey = nativeStepKey(capture.lineageKey, measurement.scope.root, measurement.recordId);
+    const nativeKey = captureStepKey(capture, measurement.scope.root, measurement.recordId);
     const prior = (await db.select().from(nativeSteps).where(and(eq(nativeSteps.captureId, id), eq(nativeSteps.recordId, measurement.recordId))).limit(1))[0];
+    if (!prior && capture.document.development?.selection) {
+      const [count] = await db.select({ value: sql<string>`count(*)` }).from(nativeSteps).where(eq(nativeSteps.captureId, id));
+      if (Number(count!.value) >= 10000) { await retainDevelopmentOverflow(db, capture, nativeKeys); affected.add(id); continue; }
+    }
     const projected = await currentUsage(db, meterKeyOf({ identity, sourceId, recordId: measurement.recordId }));
     const modelEvidence = projected?.projection.modelRevision === measurement.revision && measurement.actualModel && jsonHash(measurement.actualModel) === projected.modelRef
       ? measurement : prior?.modelEvidence ?? null;
@@ -213,7 +263,7 @@ async function persistNativeBaseline(db: Executor, taskKey: string, sourceId: st
   const id = nativeCaptureId(identity, sourceId, baseline.turn), capture = await captureRow(db, id);
   if (!capture || capture.lineageKey !== baseline.lineageKey || capture.document.proof.baseline.kind !== 'resume' || capture.document.baselineRoot !== baseline.root || baseline.offset + baseline.steps.length > 10000) throw conflict('原生恢复基线没有对应的已接收证明');
   for (const [index, document] of baseline.steps.entries()) {
-    const ordinal = baseline.offset + index, nativeKey = nativeStepKey(baseline.lineageKey, baseline.root, nativeRecordId(document.before));
+    const ordinal = baseline.offset + index, nativeKey = captureStepKey(capture, baseline.root, nativeRecordId(document.before));
     const prior = (await db.select().from(nativeBaselines).where(and(eq(nativeBaselines.captureId, id), eq(nativeBaselines.ordinal, ordinal))).limit(1))[0];
     if (prior && (jsonHash(prior.document) !== jsonHash(document) || prior.nativeKey !== nativeKey)) throw conflict('原生恢复历史重放内容冲突');
     const sameStep = (await db.select({ ordinal: nativeBaselines.ordinal }).from(nativeBaselines).where(and(eq(nativeBaselines.captureId, id), eq(nativeBaselines.nativeKey, nativeKey))).limit(1))[0];
@@ -293,10 +343,10 @@ async function projectNativeCapture(db: Executor, taskKey: string, id: string, s
   await db.insert(nativeCaptureHistory).values({ taskKey, sequence: ++sequence, captureId: id, document: summary });
   return sequence;
 }
-async function persistNativeFrame(db: Executor, taskKey: string, sourceId: string, identity: UsageExecutionIdentity, frame: RunnerUsageCapture, sequence: number): Promise<number> {
+async function persistNativeFrame(db: Executor, taskKey: string, sourceId: string, identity: UsageExecutionIdentity, frame: RunnerUsageCapture, sequence: number, development?: DevelopmentFrameContext): Promise<number> {
   const affected = new Set<string>(), nativeKeys = new Set<string>(), meters = new Set<string>();
   if (frame.nativeProof) {
-    const id = await persistProof(db, taskKey, sourceId, identity, frame.nativeProof); affected.add(id);
+    const id = await persistProof(db, taskKey, sourceId, identity, frame.nativeProof, nativeKeys, development); affected.add(id);
     if (frame.nativeProof.state !== 'pending') {
       const rows = await db.selectDistinct({ key: nativeSteps.nativeKey }).from(nativeSteps)
         .innerJoin(nativeBaselines, and(eq(nativeSteps.taskKey, nativeBaselines.taskKey), eq(nativeSteps.nativeKey, nativeBaselines.nativeKey)))
@@ -311,5 +361,33 @@ async function persistNativeFrame(db: Executor, taskKey: string, sourceId: strin
   for (const nativeKey of nativeKeys) await reconcileNativeKey(db, taskKey, nativeKey, affected, meters);
   for (const key of meters) sequence = await reprojectNativeMeter(db, taskKey, key, sequence);
   for (const id of affected) sequence = await projectNativeCapture(db, taskKey, id, sequence);
+  return sequence;
+}
+
+/** A stream page may contain several turns; baseline-only frames resolve their retained turn exactly. */
+async function persistDevelopmentFrame(db: Executor, taskKey: string, context: DevelopmentNativeContext, frame: DevelopmentRunnerUsageCapture, sequence: number) {
+  const identity = context.registration.identity;
+  const sourceId = (turn: string, index: number) => developmentCaptureSourceId(context.streamSourceId, turn, index);
+  if (frame.nativeProof) {
+    const proof = frame.nativeProof;
+    sequence = await persistNativeFrame(db, taskKey, sourceId(proof.turn, proof.turnIndex), identity,
+      { version: frame.version, diagnostics: frame.diagnostics, measurements: [], nativeProof: proof }, sequence,
+      { context, ...(frame.nativeSource ? { source: frame.nativeSource } : {}) });
+  }
+  const groups = new Map<string, RunnerUsageCapture['measurements']>();
+  for (const measurement of frame.measurements) {
+    if (!measurement.scope) continue;
+    const id = sourceId(measurement.scope.turn, measurement.scope.turnIndex);
+    const rows = groups.get(id) ?? []; rows.push(measurement); groups.set(id, rows);
+  }
+  for (const [id, measurements] of groups) sequence = await persistNativeFrame(db, taskKey, id, identity,
+    { version: frame.version, diagnostics: frame.diagnostics, measurements }, sequence);
+  if (frame.nativeBaseline) {
+    const rows = await db.select().from(nativeCaptures).where(and(eq(nativeCaptures.taskKey, taskKey), eq(nativeCaptures.turn, frame.nativeBaseline.turn),
+      sql`${nativeCaptures.document}->'development'->>'streamSourceId' = ${context.streamSourceId}`)).limit(2);
+    if (rows.length !== 1) throw conflict('开发恢复基线尚无唯一原轮次证明');
+    sequence = await persistNativeFrame(db, taskKey, rows[0]!.sourceId, identity,
+      { version: frame.version, diagnostics: frame.diagnostics, measurements: [], nativeBaseline: frame.nativeBaseline }, sequence);
+  }
   return sequence;
 }
