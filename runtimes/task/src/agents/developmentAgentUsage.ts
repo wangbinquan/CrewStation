@@ -4,8 +4,11 @@ import { validateDevelopmentStart } from './developmentStartIntent';
 import type { DevelopmentUsageJournal } from './developmentUsageJournal';
 
 /** Reserve FULL/WAL before any Hook; a replay only returns the original numeric receipt. */
-export function reserveDevelopmentUsage(command: StartAgentCommand, journal?: DevelopmentUsageJournal): DevelopmentAgentUsage | undefined {
-  if (!command.developmentUsage) return undefined;
+export function reserveDevelopmentUsage(command: StartAgentCommand, journal?: DevelopmentUsageJournal, required?: boolean): DevelopmentAgentUsage | undefined {
+  if (!command.developmentUsage) {
+    if (required || journal) throw new RunnerCommandError('development_usage_required', '已选择开发数字布局，普通 Agent 启动必须携带原数字受理');
+    return undefined;
+  }
   if (!journal) throw new RunnerCommandError('development_usage_unsupported', '当前 Runner 未提供开发数值日志');
   const admission = validateDevelopmentStart(command, command.developmentUsage);
   const reservation = journal.reserve(admission);

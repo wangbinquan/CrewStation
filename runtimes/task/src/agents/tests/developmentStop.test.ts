@@ -30,12 +30,12 @@ function admission(journal: DevelopmentUsageJournal) {
   const base = { intent, digestNonce: 'a'.repeat(64) };
   return DevelopmentUsageAdmissionSchema.parse({ ...base, key: { executionId: context.runtimeTaskId, journalId: journal.journalId, incarnation: journal.incarnation, payloadDigest: developmentIntentDigest(base) } });
 }
-async function harness(options: { pendingCwd?: boolean; pendingHook?: boolean; ordinary?: boolean } = {}) {
+async function harness(options: { pendingCwd?: boolean; pendingHook?: boolean; ordinary?: boolean; required?: boolean; missingJournal?: boolean } = {}) {
   const root = await directory(); await mkdir(join(root, 'numeric'), { mode: 0o700 });
   const journal = open(join(root, 'numeric')), a = admission(journal);
   const cwd = signal<void>(), hook = signal<void>(), hookEntered = signal<void>(), started = signal<void>(), terminal = signal<void>(), released = signal<void>();
   const events: RunnerEvent[] = [], stream = createEventQueue<AgentEvent>();
-  let hooks = 0, models = 0, cancels = 0, sends = 0, alive = false;
+  let cwds = 0, hooks = 0, models = 0, cancels = 0, sends = 0, alive = false;
   const launcher: ProcessLauncher = { isolation: { enabled: false, uid: 1, gid: 1, wrap: (args) => args }, baseEnv: (extra) => ({ ...extra }), chownToWorker: async () => {},
     spawnPiped: () => { throw new Error('no external process allowed'); }, spawnWithStdin: () => { throw new Error('no external process allowed'); }, spawnWithTerminal: () => { throw new Error('no external process allowed'); } };
   const emit = (event: RunnerEvent) => { events.push(event); if (event.kind === 'agent' && ['completed', 'error', 'cancelled'].includes(event.event.type)) terminal.resolve(); };
@@ -50,17 +50,32 @@ async function harness(options: { pendingCwd?: boolean; pendingHook?: boolean; o
     } };
   } };
   const paths = await createWorkdirPaths(root);
-  const supervisor = createAgentSupervisor({ developmentUsage: options.ordinary ? undefined : journal, drivers: { forProtocol: () => driver }, beforeStart: before, launcher, logger: noopLogger, emit,
-    paths: { ...paths, resolveCwd: async (path) => { if (options.pendingCwd) await cwd.promise; return paths.resolveCwd(path); } } });
+  const supervisor = createAgentSupervisor({ developmentUsageRequired: options.required, developmentUsage: options.ordinary || options.missingJournal ? undefined : journal, drivers: { forProtocol: () => driver }, beforeStart: before, launcher, logger: noopLogger, emit,
+    paths: { ...paths, resolveCwd: async (path) => { cwds++; if (options.pendingCwd) await cwd.promise; return paths.resolveCwd(path); } } });
   const command = StartAgentCommandSchema.parse({ id: 'start-fixture', type: 'startAgent', agentId: a.intent.identity.agentId, compute: 'fixture-name', profileRevision: a.intent.profileRevision, launch: a.intent.launch,
     permission: a.intent.permission, mode: a.intent.mode, initialPrompt: a.intent.initialPrompt, beforeStart: { profile: a.intent.profileId, revision: a.intent.profileRevision, contentHash: 'fixture', steps: [], vars: {}, secrets: {}, configFile: { kind: 'none' }, captureOutput: false }, processAttemptId: 'fixture-attempt',
     ...(options.ordinary ? {} : { developmentUsage: a }) });
   cleanup.push(async () => { cwd.resolve(); hook.resolve(); await supervisor.cancelAll(); });
-  return { root, journal, a, command, supervisor, cwd, hook, hookEntered, started, terminal, released, stream, before, events, counts: () => ({ hooks, models, cancels, sends, alive }) };
+  return { root, journal, a, command, supervisor, cwd, hook, hookEntered, started, terminal, released, stream, before, events, cwdCalls: () => cwds, counts: () => ({ hooks, models, cancels, sends, alive }) };
 }
 afterEach(async () => { for (const end of cleanup.splice(0)) await end(); for (const journal of journals.splice(0)) journal.close(); await Promise.all(directories.splice(0).map((path) => rm(path, { recursive: true, force: true }))); });
 
 describe('durable original-key development stop', () => {
+  test('a selected actual journal refuses ordinary Start before CWD, Hook, driver or a new receipt', async () => {
+    const h = await harness();
+    const { developmentUsage: _admission, ...ordinary } = h.command;
+    await expect(h.supervisor.start(ordinary)).rejects.toMatchObject({ code: 'development_usage_required' });
+    expect(h.supervisor.size).toBe(0); expect(h.counts()).toMatchObject({ hooks: 0, models: 0, alive: false });
+    expect(h.cwdCalls()).toBe(0); expect(h.journal.info().receipt).toBeNull();
+  });
+  test('selected mode survives a missing journal without ordinary fallback or a launch entry', async () => {
+    const h = await harness({ required: true, missingJournal: true });
+    const { developmentUsage: _admission, ...ordinary } = h.command;
+    await expect(h.supervisor.start(ordinary)).rejects.toMatchObject({ code: 'development_usage_required' });
+    await expect(h.supervisor.start(h.command)).rejects.toMatchObject({ code: 'development_usage_unsupported' });
+    expect(h.supervisor.size).toBe(0); expect(h.counts()).toMatchObject({ hooks: 0, models: 0, alive: false });
+    expect(h.cwdCalls()).toBe(0); expect(h.journal.info().receipt).toBeNull();
+  });
   test('stop before a Start is durable, idempotent and survives a Runner incarnation change', async () => {
     const path = await directory(), journal = open(path), a = admission(journal);
     expect(journal.requestStop(a, context.podUid)).toMatchObject({ state: 'prevented', receipt: { phase: 'finished', result: 'cancelled', finalThrough: 0 } });

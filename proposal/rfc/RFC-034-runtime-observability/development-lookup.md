@@ -1,6 +1,6 @@
 # RFC-034 Session 按实际执行查询原数字登记
 
-状态：限定设计与11路径实现独立功能门PASS，27项相关回归、161断言、7文件、0fail/0skip，精确11TS lint与后端typecheck通过；单次完整本机门禁已结束：4560pass/143skip/1项外部失败，11路径指纹未变；详见末节。14路径已本地提交05d4ca01，随共享cc56ee88累计推送并通过该精确提交六项CI；部署回执另记。承接持久结束内部候选943789175c1bcfbc216ee49e319ccef9c1e3a9bc（原设计时仅本地，现已随cc56推送，部署另记）；新查询本身不提供Token零、物理停止或删除许可，生产开发采集仍OFF。
+状态：限定设计与11路径实现独立功能门PASS，27项相关回归、161断言、7文件、0fail/0skip，精确11TS lint与后端typecheck通过；单次完整本机门禁已结束：4560pass/143skip/1项外部失败，11路径指纹未变；详见末节。14路径已本地提交05d4ca01，随共享cc56ee88累计推送并通过该精确提交六项CI；现已随808c5af0实际部署，详细回执见末节。承接持久结束内部候选943789175c1bcfbc216ee49e319ccef9c1e3a9bc（原设计时仅本地，现已随cc56推送，部署另记）；新查询本身不提供Token零、物理停止或删除许可，生产开发采集仍OFF。
 
 ## 已有断点与本批范围
 
@@ -45,3 +45,13 @@ session-client新增同名lookup方法：调用上述GET、严格解析version/k
 14路径查询源码与文档已精确本地提交05d4ca01d8414bd38f3958a225379b048d12bba3，Co-Authored-By与路径/指纹已验证；共享锁未由本批带入。其后并行提交cc56ee8818bdb87d76932a5fe3affd947d7e39ef完成其自有模块与完整193项共享迁移锁，所有引用进入提交。消费者965b45e8、派发646da1e9、持久结束94378917及查询05d4ca01均已核实为origin/main=cc56ee88的祖先，本地与远端0/0，索引为空。之前8份缺失依赖的检查点已解除，历史失败与检查点继续保留。
 
 [共享提交精确CI36735324944](https://github.com/wangbinquan/CrewStation/actions/runs/36735324944)的static/unit/module/console/e2e/gate六项completed/success。它不是每个历史子提交各自的CI，也不包括尚未提交的实际布局查询。并行持久层修复后的catalogSummary与transactionContext真实PG定向4pass/0fail、28断言确认；未重跑历史查询完整门禁。生产开发采集OFF，sourceScope=business-tasks，实际本机部署另记，CS-R02保持In Progress。
+
+## 2026-10-01 内部底座已随实际布局版部署
+
+本页内部实现已包含在实际本机源码 `808c5af0bf80445c8cfbaf1baca112b74c723b7f`；该提交[精确CI36739319297](https://github.com/wangbinquan/CrewStation/actions/runs/36739319297)六项success，2026-09-30T16:05:16.903Z本机八组件滚动完成，实际镜像/默认Runner/匿名入口复核见[布局查询部署回执](./development-environment.md#2026-10-01-实际布局查询精确发布与本机部署)。历史限定门禁的外部失败与只在本地的检查点继续保留，不以此删除历史证据。生产调用者仍未接通，开发采集OFF、sourceScope=business-tasks，删除许可/完整两级明细与实际身份模型验收继续，两个RFC不关闭。
+
+## 2026-10-01 普通启动屏障外部失败的比例闭环
+
+迁移锁的事件等待于登记后结束；2026-09-30T17:12:59.426126Z，只重查原 platform migrationCoverage 用例得到1pass/0fail、2断言，锁/装配/SQL/持久层5依据及9个自有源码指纹均未变。原唯一完整check4585pass/143skip/1fail和首次定向0pass/1fail的回执保留，不改写成全量0fail。随后共享持久层依赖变化的相关回归仍35pass/0fail、184断言、5文件，后台types-v3通过。
+
+依据开发规则§3对他人在制品导致本地全量红的明确处理，以及用户共享候选“同内容完整门禁最多一次、无关变化只按比例核验”的要求，外部迁移失败已完成有证据的定向闭环；本批限定设计/实现审阅、精确lint/类型及相关用例有效。按17条精确路径进入发布，候选自身hosted CI另记；不收编并行迁移锁或资源删除文件，不重复完整门禁。此刻尚未提交/推送/取得自身CI或部署；实际本机仍808c5af0，生产OFF，sourceScope=business-tasks，CS-R02和两个RFC继续In Progress。

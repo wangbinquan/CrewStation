@@ -51,6 +51,8 @@ export const RunnerHelloSchema = z.object({
     previewControl: z.literal(1).optional(),
     /** RFC-027: reliable business execution, materials and replay; omitted by older runners. */
     businessExecutionV3: z.literal(1).optional(),
+    /** Selected layout rejects ordinary startAgent even when its numeric journal is unavailable. */
+    developmentStartAgentFenceV1: z.literal(1).optional(),
     developmentUsageV1: z.literal(1).optional(),
     developmentUsageStopV1: z.literal(1).optional(),
     developmentNativeSourceV1: z.literal(1).optional(),

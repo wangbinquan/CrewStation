@@ -51,6 +51,28 @@ describe.skipIf(!available)('development Session PG admission guards and owner i
     await expect(persistDevelopmentReply(store, r.runtimeTaskId, { id: 'bad-confirm', type: 'ackDevelopmentUsageEvents', key: r.key, through: 1 }, developmentReceipt(r, 1))).rejects.toThrow('未确认');
   });
 
+  test('the declared StartAgent fence rejects local and forwarded ordinary writes before pending or legacy conversion', async () => {
+    const { r, store } = await setup(); let sent = 0, converted = 0;
+    const command = StartAgentCommandSchema.parse({ id: 'ordinary-selected', type: 'startAgent', agentId: r.identity.agentId, compute: 'fixture', profileRevision: r.profileRevision,
+      launch: { protocol: 'opencode', binaryPath: '/fixture/opencode', extraArgs: [], isSandbox: false }, permission: 'edit', mode: 'oneshot',
+      beforeStart: { profile: r.profileId, revision: r.profileRevision, contentHash: 'fixture', steps: [], vars: {}, secrets: {}, configFile: { kind: 'none' }, captureOutput: false }, processAttemptId: 'fixture:1' });
+    const connection = new RunnerConnection({ type: 'hello', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, taskId: r.runtimeTaskId, runnerToken: 'fixture', workdir: '/work',
+      capabilities: { protocols: ['opencode'], pty: false, preview: false, developmentStartAgentFenceV1: 1 } }, { send: (raw) => {
+        sent++; const wire = JSON.parse(raw) as RunnerCommand; connection.pending.settle(wire.id, { ok: true, payload: {} });
+      } }, 0, 1000, 0);
+    connection.legacy = { outgoing: async (wire) => { converted++; return wire; }, incoming: async (raw) => raw };
+    const dispatch = commandDispatch({ developmentUsage: store, registry: { lookup: async () => undefined, claim: async () => {}, release: async () => {}, heartbeat: async () => {} },
+      forwarder: { forward: async () => { throw new Error('not a remote sender'); } }, clock: fixedClock('2026-10-01T00:00:00Z'),
+      settings: { selfAddress: 'local', commandTimeoutMs: 1000, runnerStaleMs: 60000, replayLimit: 100 } }, { connections: new Map([[r.runtimeTaskId, connection]]) });
+    for (const send of [dispatch.sendCommand, dispatch.sendLocalOnly]) {
+      await expect(send(r.runtimeTaskId, command)).rejects.toMatchObject({ kind: 'precondition', details: { code: 'development_usage_required' } });
+      expect(connection.pending.size).toBe(0); expect(sent).toBe(0); expect(converted).toBe(0);
+    }
+    expect(await store.lookup(r.runtimeTaskId)).toEqual({ version: 1, runtimeTaskId: r.runtimeTaskId, kind: 'absent' });
+    await dispatch.sendLocalOnly(r.runtimeTaskId, { id: 'non-agent-command', type: 'exec', execId: 'fixture-exec', command: ['true'], env: {}, timeoutSeconds: 60, wait: false });
+    expect(sent).toBe(1); expect(converted).toBe(1); expect(connection.pending.size).toBe(0);
+  });
+
   test('late pre-admission null info cannot invalidate a subsequently committed acceptance', async () => {
     const { r, store } = await setup(); await store.register(r);
     const command: RunnerCommand = { id: 'pre-admission-info', type: 'developmentUsageInfo', key: r.key };

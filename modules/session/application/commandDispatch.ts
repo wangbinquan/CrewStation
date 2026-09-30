@@ -15,6 +15,8 @@ export function commandDispatch(deps: Pick<SessionUseCaseDeps, 'registry' | 'for
   const sendLocal = (taskId: TaskId, command: RunnerCommand): Promise<unknown> | undefined => {
     const connection = hub.connections.get(taskId);
     if (!connection) return undefined;
+    if (command.type === 'startAgent' && !command.developmentUsage && connection.hello.capabilities.developmentStartAgentFenceV1 === 1)
+      throw new PlatformError('precondition', '当前执行选择开发数字布局，普通 Agent 启动必须携带原数字受理', { code: 'development_usage_required' });
     // 在写入旧 Runner 的 socket 前协商，未知命令不得干扰正在运行的 CLI。
     if (command.type === 'invokeApi' && connection.hello.capabilities.apiInvocations !== 1) throw new PlatformError('precondition', '当前开发容器不支持 API 试调；请保存工作并在容器更新后重新开启会话', { code: 'api_invocations_unavailable' });
     // RFC-016：旧镜像的 Runner 不懂这三条；previewStatus 与 restartPreview 不在此列，存量会话照常可用。

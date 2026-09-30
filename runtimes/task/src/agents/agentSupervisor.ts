@@ -22,6 +22,8 @@ export interface AgentSupervisor {
 
 export interface AgentSupervisorDeps {
   developmentUsage?: DevelopmentUsageJournal;
+  /** The original selected mode survives a failed journal open. */
+  developmentUsageRequired?: boolean;
   drivers: AgentDriverFactory;
   launcher: ProcessLauncher;
   paths: WorkdirPaths;
@@ -44,7 +46,7 @@ class PendingAgentSupervisor implements AgentSupervisor {
   async start(command: StartAgentCommand): Promise<void> {
     const { protocol } = command.launch, deps = this.deps;
     if (!isKnownProtocol(protocol)) throw new RunnerCommandError('protocol_unsupported', '通用终端协议的档位只能用于「＋ CLI」');
-    const usage = reserveDevelopmentUsage(command, deps.developmentUsage);
+    const usage = reserveDevelopmentUsage(command, deps.developmentUsage, deps.developmentUsageRequired);
     if (usage?.replayed) return;
     if (this.entries.has(command.agentId)) throw alreadyExists('agent_exists', 'agent ' + command.agentId);
     const entry: PendingAgent = { cancelled: false, usage };
