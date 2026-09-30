@@ -20,10 +20,14 @@ export interface ResolvedProfile {
   readonly image: string;
 }
 
-/** 下发一次启动的全部材料：只在派发命令时取，含解密凭据，不落库、不进日志、不进事件。 */
-export interface ProfileLaunchMaterial extends ResolvedProfile {
-  readonly terminalTest?: TerminalTest;
+/** Fixed execution metadata; name is the current display name, while ID/revision/launch remain stable. */
+export interface ProfileLaunchMetadata extends ResolvedProfile {
   readonly launch: LaunchSpec;
+}
+
+/** 下发一次启动的全部材料：只在派发命令时取，含解密凭据，不落库、不进日志、不进事件。 */
+export interface ProfileLaunchMaterial extends ProfileLaunchMetadata {
+  readonly terminalTest?: TerminalTest;
   readonly beforeStart: BeforeStartMaterial;
 }
 
@@ -69,6 +73,8 @@ export interface AgentRuntimeModuleApi {
   pinLaunchVersion(ref: ProfileRevisionRef): Promise<string>;
   launchMaterialAt(ref: ProfileRevisionRef, credentialStamp: string): Promise<ProfileLaunchMaterial>;
   launchMaterial(ref: ProfileRevisionRef): Promise<ProfileLaunchMaterial>;
+  /** Read fixed launch metadata before numeric admission without accessing/decrypting credentials. */
+  launchMetadata(ref: ProfileRevisionRef): Promise<ProfileLaunchMetadata>;
   /** 发布校验：只看存在性与协议。 */
   lookupForRelease(selector: ComputeProfileSelector): Promise<{ id: string; name: string; terminalOnly: boolean } | undefined>;
   /** 当前目录名称，供历史运行展示；包含已隐藏或停用档位，不解析启动材料。 */

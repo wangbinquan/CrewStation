@@ -33,9 +33,13 @@ export interface ResolvedCompute {
   image: string;
 }
 
-/** 派发一次启动的材料（含解密凭据）：只在下发命令时取，不落库、不进日志、不进事件。 */
-export interface ComputeLaunch extends ResolvedCompute {
+/** Fixed launch without credential reads; the admission owner retains its accepted display name. */
+export interface ComputeLaunchMetadata extends ResolvedCompute {
   launch: LaunchSpec;
+}
+
+/** 派发一次启动的材料（含解密凭据）：只在下发命令时取，不落库、不进日志、不进事件。 */
+export interface ComputeLaunch extends ComputeLaunchMetadata {
   beforeStart: BeforeStartMaterial;
 }
 
@@ -46,6 +50,8 @@ export interface ComputeLaunch extends ResolvedCompute {
 export interface ComputeCatalog {
   resolve(selector: ComputeProfileSelector | undefined, usage: ComputeUsage, projectId: ProjectId): Promise<ResolvedCompute>;
   launchMaterial(ref: ProfileRevisionRef): Promise<ComputeLaunch>;
+  /** Optional for legacy implementations; a future numeric admission requires it without material fallback. */
+  launchMetadata?(ref: ProfileRevisionRef): Promise<ComputeLaunchMetadata>;
 }
 
 /** 由 release 模块提供。 */

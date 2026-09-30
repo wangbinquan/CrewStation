@@ -3,7 +3,7 @@ import { notFound, precondition, validation } from '@crewstation/kernel';
 import type { ComputeProfile, ProfileRevision } from '../domain/computeProfile';
 import { availabilityOf } from '../domain/computeProfile';
 import { pinnedReference, repositoryOf } from '../domain/imageReference';
-import type { ProfileLaunchMaterial, ResolvedProfile } from '../api/moduleApi';
+import type { ProfileLaunchMaterial, ProfileLaunchMetadata, ResolvedProfile } from '../api/moduleApi';
 import type { AgentRuntimeUseCaseDeps } from './dependencies';
 
 /**
@@ -26,6 +26,16 @@ export function resolveProfileUseCases(deps: AgentRuntimeUseCaseDeps) {
     const { steps, vars, configFile } = revision.content;
     return { profile: profile.id, revision: revision.revision, contentHash: revision.contentHash, steps, vars: { ...vars }, secrets, configFile, captureOutput };
   };
+  const fixed = async (ref: ProfileRevisionRef) => {
+    const profile = await uow.read.profiles.get(ref.profileId);
+    const revision = profile ? await uow.read.revisions.get(ref.profileId, ref.revision) : undefined;
+    if (!profile || !revision) throw precondition(`算力档位 ${ref.profileId} 的修订 ${ref.revision} 已不存在（档位可能已被删除），请重新选择档位`, { code: 'profile_revision_missing', ...ref });
+    return { profile, revision };
+  };
+  const metadata = (profile: ComputeProfile, revision: ProfileRevision): ProfileLaunchMetadata => ({
+    id: profile.id, name: profile.name, revision: revision.revision, protocol: profile.protocol, image: pinned(revision), launch: revision.content.launch,
+    ...(revision.content.taskProfile ? { taskProfile: revision.content.taskProfile } : {}),
+  });
   return {
     pinned,
     materialFor,
@@ -42,14 +52,16 @@ export function resolveProfileUseCases(deps: AgentRuntimeUseCaseDeps) {
       if (!availability.available) throw precondition(availability.reason ?? `算力档位 ${profile.id} 暂不可用`, { code: 'profile_unavailable', profile: profile.id, state: availability.state });
       return { businessExecution: latest?.state === 'passed' && latest.contentHash === revision.contentHash ? latest.context.businessExecution : undefined, id: profile.id, name: profile.name, revision: revision.revision, protocol: profile.protocol, image: pinned(revision), ...(revision.content.taskProfile ? { taskProfile: revision.content.taskProfile } : {}) };
     },
+    launchMetadata: async (ref: ProfileRevisionRef): Promise<ProfileLaunchMetadata> => {
+      const { profile, revision } = await fixed(ref);
+      return metadata(profile, revision);
+    },
     /** 已受理的启动按固定修订取材料：停用或改了当前修订都不影响它（停用只阻止新的受理）。 */
     launchMaterial: async (ref: ProfileRevisionRef): Promise<ProfileLaunchMaterial> => {
-      const profile = await uow.read.profiles.get(ref.profileId);
-      const revision = profile ? await uow.read.revisions.get(ref.profileId, ref.revision) : undefined;
-      if (!profile || !revision) throw precondition(`算力档位 ${ref.profileId} 的修订 ${ref.revision} 已不存在（档位可能已被删除），请重新选择档位`, { code: 'profile_revision_missing', ...ref });
+      const { profile, revision } = await fixed(ref);
       return {
-        id: profile.id, name: profile.name, revision: revision.revision, protocol: profile.protocol, image: pinned(revision), launch: revision.content.launch,
-        beforeStart: await materialFor(profile, revision, false), ...(revision.content.terminalTest ? { terminalTest: revision.content.terminalTest } : {}), ...(revision.content.taskProfile ? { taskProfile: revision.content.taskProfile } : {}),
+        ...metadata(profile, revision),
+        beforeStart: await materialFor(profile, revision, false), ...(revision.content.terminalTest ? { terminalTest: revision.content.terminalTest } : {}),
       };
     },
     /** 发布校验用（§4.4）：只看存在性与协议，不看测试状态；default 解析到当前默认档位。 */

@@ -40,7 +40,7 @@ Runner 仅在日志可打开且平台显式请求时提供 developmentUsageV1；
 
 usageObservationsV1 的采集开关与 businessEvents 的业务事件映射分离。只要显式启用数字能力便创建 usageObserver，并在 ManagedAgent 和驱动两层启用有界、可处理确认的数值传递；旧路径仍无新增 usage 事件。
 
-OpenCode 每轮沿用已有实际环境原生数据库适配器：模型创建前持久 begin/baseline，退出后分页读取真实根和子会话。lineage 按受理的真实存储来源固定；resume 缺历史源则报告缺口，不把已有历史当新消耗。旧步骤校正继续复用原归属及冻结价格。Claude 常驻流只使用真实原生数值证据，没有 provider 的数值可以展示，人民币未定价；不能把配置 model 充作实际 model。
+OpenCode 每轮沿用已有实际环境原生数据库适配器：模型创建前持久 begin/baseline，退出后分页读取真实根和子会话。受理先冻结预期来源约束，Hook后的最终进程环境另作实际来源证明；当前字符串lineage不替代该证明，普通headless默认临时HOME也不能当持久PVC来源（见[下一阶段来源/停止合同](./development-owner.md#下一阶段必须补齐实际原生来源与持久停止)）；resume 缺历史源则报告缺口，不把已有历史当新消耗。旧步骤校正继续复用原归属及冻结价格。Claude 常驻流只使用真实原生数值证据，没有 provider 的数值可以展示，人民币未定价；不能把配置 model 充作实际 model。
 
 ## 6. Session outbox 与清理屏障
 
@@ -106,3 +106,23 @@ Stage 2 Session 精确发布与本机部署回执（2026-09-30）：`1326fdd1ac3
 
 
 修正后的冻结候选完整门禁回执：2026-09-30T01:03:12Z，结构、全仓lint、后端/console类型全部通过；4277 pass／142 skip／0 fail、27,123断言、854文件，测试801.28秒（完整命令849.29秒）。21源码/测试/迁移/锁＋5文档共26路径指纹未变，限定owner preparation独立实现功能门PASS。本机仍1326fdd1；生产仍未调用本批participant。142跳过项和真实身份/模型/集群验收不计为通过。只补本回执与后续删除屏障规划后精确发布，同源代码不重跑完整本地门禁；精确CI及部署另外记录，CS-R02和两RFC不关闭。
+
+### CS-R02 owner 稳定受理底座发布与部署回执（2026-09-30）
+
+- 精确源码：`8d2e547adc3251ab3307b61b3faa5134ed08aa67`，26路径提交，推后main/origin一致；独立限定范围功能门PASS，完整4277 pass/142 skip/0 fail、27123断言、854文件，候选内容未变。首轮未进入测试的类型失败及修正历史保留。
+- [精确 CI36653568384](https://github.com/wangbinquan/CrewStation/actions/runs/36653568384) 终态success，static/unit/module/console/gate/e2e六项全部success。
+- 本机于2026-09-30T01:20:19Z升级完成；迁移Job `rfc034-owner-migrate-8d2e547a` complete，owner与Session数字表存在，storage-contract=1。八组件generation=observedGeneration且Ready=1：console201、API195、auth93、controller160、events63、Session112、两个MCP各59。公开`/auth/login`只读HTTP200。
+- 实际镜像摘要：console `b596d245352af9c4d5c725605acd3b38a549aff325153761070185a26e9068bb`；control-plane `f53b151f943a77ff898b2c56fa35e7a5c95121ef60571558e1d223a9ba857738`；默认Runner `10fb9e1c2357a77197a13bd01405deed9466ac3e0b8b333f815b1b395bb26577`。三张构建镜像OCI revision均为完整源码SHA，部署引用固定到摘要。
+- 边界：未登录、未创建真实模型/开发验证资源、未重建旧会话或已固定档位。生产开发采集仍关闭；派发/排空删除、消费、正式两级事实/UI及真实身份/模型验收继续。142跳过项不是通过，CS-R02和两RFC不关闭。
+
+后续在制：受理快照的双路径透传与固定启动元数据见development-owner末节设计，独立设计门PASS；生产尚不调用，相关检查与限定实现门继续，不提前记完整门禁通过。
+
+### 受理快照透传与固定元数据候选检查点（2026-09-30）
+
+本批仅补18个源码/测试路径与5份观测交接文档：developmentUsageStorage从实际受理/PG经投影、解析到公共Pod构造器；direct保存render而省略execution，ledger保留原workspace；同执行增删选择双向冲突。launchMetadata按固定修订读取，不取凭据或Hook；显示名仍是当前目录名称，不能覆盖owner受理名称。生产派发仍未调用，清理/consumer/两级事实UI不在本批完成范围。
+
+相关24 pass/0 fail、188断言、6文件（真实PG/实际渲染/假K8s）；后端类型、18路径lint、修正后两测试lint、3368源文件结构检查通过；改到并被lcov识别的可执行行在相关用例中全部执行。独立限定实现功能门PASS（静态，未跑测试）。首轮20 pass/4 fail由套餐ID非UUID和直接准备队列夹具顺序造成，另有测试品牌类型/expected类型未收窄；已修夹具与类型，未放宽原断言。首次结果不计通过。冻结23路径后只跑一次完整本地候选门禁，精确发布/CI/本机回执另记；真实身份/模型验收未执行。
+
+### 双路径 render/固定元数据完整候选门禁回执（2026-09-30）
+
+2026-09-30T01:55:33Z，冻结23路径的一次完整本地门禁结束：结构、全仓lint、后端/console类型通过；4288 pass／142 skip／0 fail、27227断言、857文件，测试976.92秒，完整命令1035.26秒。18源码/测试与5文档在检查期间全部指纹一致；独立限定实现功能门PASS，24项相关回归通过。仅补本回执及下一阶段规划，不重复运行同内容完整门禁。精确发布/hosted CI/本机部署另记；生产开发采集仍关闭，真实身份/模型验收未执行，142跳过项不计通过。

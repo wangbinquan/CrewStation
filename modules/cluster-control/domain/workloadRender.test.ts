@@ -90,3 +90,15 @@ describe('工作卷记录 → 渲染输入', () => {
     for (const broken of [{ pvc: undefined }, { pvc: { size: '' } }, { pvc: { size: '10Gi', labels: { a: 1 } } }, { children: [{ kind: 'PersistentVolumeClaim', name: 'x' }] }]) expect(volumeRenderOf({ ...spec, ...broken })).toBeUndefined();
   });
 });
+
+// RFC-034: selected numeric layout survives ledger parsing; omission remains an ordinary workspace.
+test('numeric layout parsing keeps both private stores only for an explicit independent development workload', () => {
+  const selected = { ...pod, nodeName: 'original-node', workspace: { pod: 'original-parent', podUid: 'original-pod', pvcUid: 'original-pvc' }, developmentUsageStorage: { version: 1 } };
+  expect(workloadRenderOf('record', { children, pod: selected })?.pod.developmentUsageStorage).toEqual({ version: 1 });
+  expect(workloadRenderOf('record', { children, pod })?.pod.developmentUsageStorage).toBeUndefined();
+  for (const patch of [
+    { developmentUsageStorage: { version: 2 } }, { developmentUsageStorage: { version: 1, directory: '/work' } }, { developmentUsageStorage: null },
+    { workload: 'business-task' }, { workload: 'profile-test' }, { workspace: undefined }, { nodeName: undefined }, { pvc: undefined, emptyDir: true },
+    { checkout: { repoUrl: 'https://fixture.invalid/repo', branch: 'main', credentialSecretName: 'checkout' } }, { businessStorage: { version: 1, ownerTaskId: 'owner' } }, { archive: { ownerTaskId: 'owner' } }, { consumer: {} },
+  ]) expect(workloadRenderOf('record', { children, pod: { ...selected, ...patch } })).toBeUndefined();
+});

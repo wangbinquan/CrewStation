@@ -41,3 +41,15 @@ describe('调和器渲染的工作区对象', () => {
     expect(workloadPreviewObjects({ name: 'task-1', namespace: 'cs-demo', taskId: 'rec-1', kind: 'dev-session', targetPort: 3000 }).map((o) => o.kind)).toEqual(['Service']);
   });
 });
+
+// RFC-034: the actual reconciler renderer must forward the optional layout to the common Pod constructor.
+test('selected development Agent renders both disk stores and the actual Pod UID while legacy volumes stay unchanged', () => {
+  const selected = { ...pod, workload: 'dev-session', nodeName: 'original-node', workspace: { pod: 'parent', podUid: 'original-pod', pvcUid: 'original-pvc' }, developmentUsageStorage: { version: 1 as const } };
+  const spec = workloadPodObject(selected).spec as { volumes: unknown[]; containers: Array<{ env: unknown[]; volumeMounts: unknown[] }> };
+  expect(spec.volumes).toEqual([{ name: 'work', persistentVolumeClaim: { claimName: pod.pvc } }, { name: 'development-usage', emptyDir: {} }, { name: 'development-usage-binding', emptyDir: {} }]);
+  expect(spec.containers[0]!.env).toContainEqual({ name: 'CS_RUNTIME_POD_UID', valueFrom: { fieldRef: { fieldPath: 'metadata.uid' } } });
+  expect(spec.containers[0]!.volumeMounts).toContainEqual({ name: 'development-usage', mountPath: '/run/crewstation/development-usage', readOnly: false });
+  expect(spec.containers[0]!.volumeMounts).toContainEqual({ name: 'development-usage-binding', mountPath: '/run/crewstation/development-usage-binding', readOnly: false });
+  for (const patch of [{ workload: 'business-task' }, { workspace: undefined }, { pvc: undefined }, { consumer: {} }, { archive: {} }, { businessStorage: {} }, { checkout: {} }]) expect(() => workloadPodObject({ ...selected, ...patch } as typeof selected)).toThrow('独立开发 Agent');
+  expect((workloadPodObject(pod).spec as { volumes: unknown[] }).volumes).toHaveLength(1);
+});

@@ -1,7 +1,7 @@
 import type { RuntimeImageHistoryRead, RuntimeImageHistoryItem } from '@crewstation/contracts';
 import type { BusinessStorageFinalization, DevelopmentSourceBinding, WorkloadStopBarrier } from '@crewstation/contracts';
 import type { BusinessRecoveryScope, BusinessWorkspaceProof, RebuildBusinessWorkspaceInput, RestartBusinessWorkspaceInput } from './businessRecovery';
-import type { BusinessSessionStorage } from '@crewstation/contracts';
+import type { BusinessSessionStorage, DevelopmentUsageStorage } from '@crewstation/contracts';
 import type { RuntimeImageProbeInput, RuntimeImageProbeResult, RuntimeInitializationStatus, RuntimeImageExecutionSnapshot, Actor, ProjectId, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
 import type { DevSessionDto, DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest, StartupRecord } from '@crewstation/contracts';
 import type { BeforeStartMaterial, LaunchSpec, ProfileTestContext, ProfileTestOutcome, ProfileTestStage, TerminalTest } from '@crewstation/contracts';
@@ -82,6 +82,8 @@ export interface CreateEnvironmentInput {
  * image 是档位修订按摘要固定的镜像；省略时用平台任务镜像（RFC-006 之前受理的 CLI）。
  */
 export interface CreateNativeExecutionInput {
+  /** Opt-in only for a new independent development Agent; frozen for every retry. */
+  developmentUsageStorage?: DevelopmentUsageStorage;
   businessSession?: BusinessSessionStorage;
   runtimeImage?: RuntimeImageExecutionSnapshot;
   id: TaskId;

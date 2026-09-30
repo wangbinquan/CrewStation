@@ -1,5 +1,5 @@
-import type { BusinessStorage, WorkloadConsumerIntent } from '@crewstation/contracts';
-import { BusinessStorageSchema, TaskIdSchema, WorkloadConsumerIntentSchema } from '@crewstation/contracts';
+import type { BusinessStorage, DevelopmentUsageStorage, WorkloadConsumerIntent } from '@crewstation/contracts';
+import { BusinessStorageSchema, DevelopmentUsageStorageSchema, TaskIdSchema, WorkloadConsumerIntentSchema } from '@crewstation/contracts';
 
 /**
  * 工作区记录（开发会话、业务任务，RFC-025 I25）里调和器建出容器要用的期望，task-runtime 写、不含凭据：
@@ -7,6 +7,7 @@ import { BusinessStorageSchema, TaskIdSchema, WorkloadConsumerIntentSchema } fro
  * 记录是数据：字段不全或类型不对就不渲染，不猜。
  */
 export interface WorkloadPodRender {
+  readonly developmentUsageStorage?: DevelopmentUsageStorage;
   readonly archive?: { readonly ownerTaskId: string; readonly bindOnly?: boolean };
   readonly consumer?: WorkloadConsumerIntent;
   /** Filled only after durable consumer registration against the observed original PVC. */
@@ -107,6 +108,8 @@ function podOf(recordId: string, pod: unknown, child: { readonly namespace?: str
   const businessStorage = pod['businessStorage'] === undefined ? undefined : BusinessStorageSchema.safeParse(pod['businessStorage']);
   const consumer = pod['consumer'] === undefined ? undefined : WorkloadConsumerIntentSchema.safeParse(pod['consumer']);
   const archive = pod['archive'];
+  const developmentUsage = pod['developmentUsageStorage'] === undefined ? undefined : DevelopmentUsageStorageSchema.safeParse(pod['developmentUsageStorage']);
+  if (developmentUsage && (!developmentUsage.success || pod['workload'] !== 'dev-session' || !extras?.workspace || !text(pod['pvc']) || businessStorage || checkout || archive || consumer)) return undefined;
   if (archive !== undefined) {
     if (!isFields(archive) || Object.keys(archive).some((key) => !['ownerTaskId', 'bindOnly'].includes(key)) || archive['bindOnly'] !== undefined && typeof archive['bindOnly'] !== 'boolean' || !TaskIdSchema.safeParse(archive['ownerTaskId']).success
       || !consumer?.success || consumer.data.purpose !== 'archive' || !consumer.data.finalization || consumer.data.taskId !== archive['ownerTaskId'] || businessStorage || checkout
@@ -118,6 +121,7 @@ function podOf(recordId: string, pod: unknown, child: { readonly namespace?: str
   return {
     ...(isFields(archive) ? { archive: { ownerTaskId: archive['ownerTaskId'] as string, ...(archive['bindOnly'] === true ? { bindOnly: true } : {}) } } : {}),
     ...(consumer?.success ? { consumer: consumer.data } : {}),
+    ...(developmentUsage?.success ? { developmentUsageStorage: developmentUsage.data } : {}),
     ...(text(pod['expectedVolumeUid']) ? { expectedVolumeUid: pod['expectedVolumeUid'] } : {}),
     ...(pod['runtimeInitialization'] === true ? { runtimeInitialization: true as const } : {}),
     name: child.name, namespace: child.namespace, taskId: recordId, image: pod['image'] as string, workerUid: pod['workerUid'],

@@ -1,5 +1,5 @@
 import type { TaskId } from '@crewstation/contracts';
-import { DomainTopic, RuntimeImageExecutionSnapshotSchema } from '@crewstation/contracts';
+import { DevelopmentUsageStorageSchema, DomainTopic, RuntimeImageExecutionSnapshotSchema } from '@crewstation/contracts';
 import { conflict, jsonHash, notFound, precondition } from '@crewstation/kernel';
 import type { CreateNativeExecutionInput, ReleaseReason } from '../api/moduleApi';
 import { cancelStartup, completeStage, failStartup, initialStartup } from '../domain/podStartup';
@@ -21,7 +21,7 @@ export const requireExecutionLease = async (heartbeat: ExecutionLease) => { if (
 function sameRequest(env: TaskEnvironment, input: CreateNativeExecutionInput): boolean {
   const n = env.native;
   return !!n && purposeOf(n) === (input.purpose ?? 'cli') && n.parentTaskId === input.parentTaskId && env.createdBy === input.createdBy && n.agentId === input.agentId
-    && n.terminalId === input.terminalId && n.runnerId === input.runnerId && n.fingerprint === input.fingerprint && n.requestedProfile === (input.profile ?? null) && jsonHash(env.render?.runtimeImage ?? null) === jsonHash(input.runtimeImage ?? null) && jsonHash(env.render?.businessStorage?.session ?? null) === jsonHash(input.businessSession ?? null);
+    && n.terminalId === input.terminalId && n.runnerId === input.runnerId && n.fingerprint === input.fingerprint && n.requestedProfile === (input.profile ?? null) && jsonHash(env.render?.runtimeImage ?? null) === jsonHash(input.runtimeImage ?? null) && jsonHash(env.render?.businessStorage?.session ?? null) === jsonHash(input.businessSession ?? null) && jsonHash(env.render?.developmentUsageStorage ?? null) === jsonHash(input.developmentUsageStorage ?? null);
 }
 
 /** 各用途的父任务种类与被拒时给用户的话（RFC-006 §5.2）：额度满只影响这一个 Agent。 */
@@ -40,6 +40,7 @@ export function createNativeExecutionUseCase(deps: NativeExecutionDeps) {
       if (input.image && input.image !== input.runtimeImage.image) throw precondition('档位镜像与显式运行镜像冲突');
     }
     const purpose = input.purpose ?? 'cli', rule = ADMISSION[purpose];
+    if (input.developmentUsageStorage !== undefined && (purpose !== 'agent' || !DevelopmentUsageStorageSchema.safeParse(input.developmentUsageStorage).success)) throw precondition('只有独立开发 Agent 可选择数值日志布局 v1');
     const original = await deps.uow.read.environments.getById(input.parentTaskId);
     if (!original) throw notFound(rule.parentLabel, input.parentTaskId);
     return deps.uow.run(async (scope) => {
@@ -82,7 +83,7 @@ function executionEnvironment(deps: NativeExecutionDeps, input: CreateNativeExec
     traceId: parent.traceId, runnerTokenHash: hashRunnerToken(newRunnerToken()), connected: false, labels: parent.labels, ...(input.createdBy ? { createdBy: input.createdBy } : {}),
     native, message: `已受理，正在准备此${EXECUTION_NOUN[purpose]}的独立执行环境`, createdAt: now, updatedAt: now, lastActivityAt: now, startup: initialStartup(now),
     // 资源中心建出时的期望（I25 第二步，不含凭据）：镜像与资源取自受理时固定的档位；节点、父 Pod 与卷的 UID 在 native 里。
-    ...(deps.creation === 'ledger' ? { render: { ...storageStart(parent.render?.completionPolicy), ...(parent.kind === 'dev-session' && parent.render?.developmentObjectPlanId ? { developmentObjectPlanId: parent.render.developmentObjectPlanId } : {}), ...(input.runtimeImage ? { runtimeImage: input.runtimeImage } : {}), image: native.image, workerUid: parent.render?.businessStorage ? parent.render.workerUid : deps.settings.workerUid, resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, start: 1, execution: { workspacePod: parent.podName }, ...(parent.render?.businessStorage ? { businessStorage: { ...parent.render.businessStorage, ...(input.businessSession ? { session: input.businessSession } : {}) } } : {}) } } : {}) };
+    ...(deps.creation === 'ledger' || input.developmentUsageStorage ? { render: { ...(input.developmentUsageStorage ? { developmentUsageStorage: input.developmentUsageStorage } : {}), ...storageStart(parent.render?.completionPolicy), ...(parent.kind === 'dev-session' && parent.render?.developmentObjectPlanId ? { developmentObjectPlanId: parent.render.developmentObjectPlanId } : {}), ...(input.runtimeImage ? { runtimeImage: input.runtimeImage } : {}), image: native.image, workerUid: parent.render?.businessStorage ? parent.render.workerUid : deps.settings.workerUid, resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, start: 1, ...(deps.creation === 'ledger' ? { execution: { workspacePod: parent.podName } } : {}), ...(parent.render?.businessStorage ? { businessStorage: { ...parent.render.businessStorage, ...(input.businessSession ? { session: input.businessSession } : {}) } } : {}) } } : {}) };
 }
 
 /** 准备执行环境反复失败时给用户的话：只说这一个 Agent，不牵连其他 Agent、窗口与工作树。 */

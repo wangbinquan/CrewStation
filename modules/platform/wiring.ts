@@ -295,7 +295,7 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
   late.taskRuntime = taskRuntime.api;
   const runner = createSessionClient(settings.sessionInternalUrl);
   // 两类任务共用解析：受理固定档位修订，派发时取材料，凭据仅进入受控 Runner 通道。
-  const computeCatalog = { pinLaunchVersion: core.agentRuntime.api.pinLaunchVersion, launchMaterialAt: core.agentRuntime.api.launchMaterialAt, resolve: (name: ComputeProfileSelector | undefined, usage: ComputeUsage, projectId: ProjectId) => core.agentRuntime.api.resolveForProject(projectId, name, usage), launchMaterial: core.agentRuntime.api.launchMaterial };
+  const computeCatalog = { pinLaunchVersion: core.agentRuntime.api.pinLaunchVersion, launchMaterialAt: core.agentRuntime.api.launchMaterialAt, resolve: (name: ComputeProfileSelector | undefined, usage: ComputeUsage, projectId: ProjectId) => core.agentRuntime.api.resolveForProject(projectId, name, usage), launchMaterial: core.agentRuntime.api.launchMaterial, launchMetadata: core.agentRuntime.api.launchMetadata };
   const devSession = createDevSessionModule({
     developmentUsagePricing: developmentObservationAdmission(() => late.observability),
     runtimeImages: developmentImagePorts(runtimeImages.api),

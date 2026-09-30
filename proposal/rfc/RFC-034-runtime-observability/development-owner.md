@@ -70,3 +70,65 @@ Runner/协议 Stage 1 与 Session PG/outbox 底座已发布；Session 源码1326
 | 已发启动/ACK丢失后停止 | 不把空receipt/not_found当未运行证明，不重复Hook或模型 |
 
 源码落位：task-runtime/application/nativeExecution.ts、runnerLifecycle.ts、requestRebuild.ts、rebuildExecution.ts、ledgerResync.ts、reconcile.ts及pendingExecutions；task-runtime/domain/ledgerProjection.ts与adapters/persistence/ledgerProjection.ts；resources/application/maintenance.ts；cluster-control/application/reconcileObservations.ts；dev-session/application/agentExecution.ts及Session现有register/get/requestDrain/markUnavailable接口。CreateNativeExecutionInput→execution render→WorkloadPodRender→workloadPodObject的双卷透传也须共同验证，旧render保持原能力。
+
+## 下一批实现边界：受理快照透传与固定启动元数据
+
+本批沿用 headless §§2～3，先补未被生产选择的内部链路，不启用开发采集，也不把清理屏障记为完成。
+
+- task-runtime 的 CreateNativeExecutionInput 增加可选 developmentUsageStorage v1；只有开发工作区的独立 agent 用途接受该布局。首次受理固定到环境 render，同一执行重试必须匹配；旧请求省略字段时不追加布局。ledger 路径保留 execution.workspacePod，旧直接准备路径保存必要 render 但不带 execution，以免误交给资源调和器。
+- task-runtime 的台账投影、cluster-control 的 WorkloadPodRender 解析和 workloadPodObject 完整透传该选择，使用已有双磁盘 emptyDir/Pod UID 构造。解析要求开发工作负载、原父工作区/PVC/节点齐全，不能混入业务、档位测试或 checkout/archive 路径。缺省仍渲染既有工作卷；实际数字配置仍由 containerEnv 生成。
+- agent-runtime 增加内部 launchMetadata(ref)，只读取固定修订的名称、协议、镜像、资源套餐和 launch；不读取凭据仓储、不解密、不运行 Hook。launchMaterial 继续提供当次完整材料。dev-session 通过 compute 端口及 platform 接入元数据入口；目前尚无生产调用，之后 prepare 才能在签材料之前保存稳定意图。
+- 真实 nativeUsageLineageKey、receipt 优先派发、取消/清理、source consumer 和两级查询仍按前文接续。不能为每次新执行随机造一条 lineage，不改变 worker HOME 或现有 OpenCode 原生目录。
+
+验收包含实际 PG 的 ledger/直接两种受理与重试冲突、投影→解析→Pod 的双卷/Pod UID/原工作卷对拍、旧请求和业务/CLI/档位测试保持原布局，以及固定修订停用/当前修订变化后元数据不漂移、凭据读取/解密次数为零。独立功能门和完整候选门禁、精确 SHA CI、部署另记；这仍不是实际身份/模型验收。
+
+名称是可修改的目录展示属性，不进入稳定意图。受理名称继续沿用AgentStart的owner快照；launchMetadata返回当前名称时不得覆盖原受理名称。
+
+### CS-R02 owner 稳定受理底座发布与部署回执（2026-09-30）
+
+- 精确源码：`8d2e547adc3251ab3307b61b3faa5134ed08aa67`，26路径提交，推后main/origin一致；独立限定范围功能门PASS，完整4277 pass/142 skip/0 fail、27123断言、854文件，候选内容未变。首轮未进入测试的类型失败及修正历史保留。
+- [精确 CI36653568384](https://github.com/wangbinquan/CrewStation/actions/runs/36653568384) 终态success，static/unit/module/console/gate/e2e六项全部success。
+- 本机于2026-09-30T01:20:19Z升级完成；迁移Job `rfc034-owner-migrate-8d2e547a` complete，owner与Session数字表存在，storage-contract=1。八组件generation=observedGeneration且Ready=1：console201、API195、auth93、controller160、events63、Session112、两个MCP各59。公开`/auth/login`只读HTTP200。
+- 实际镜像摘要：console `b596d245352af9c4d5c725605acd3b38a549aff325153761070185a26e9068bb`；control-plane `f53b151f943a77ff898b2c56fa35e7a5c95121ef60571558e1d223a9ba857738`；默认Runner `10fb9e1c2357a77197a13bd01405deed9466ac3e0b8b333f815b1b395bb26577`。三张构建镜像OCI revision均为完整源码SHA，部署引用固定到摘要。
+- 边界：未登录、未创建真实模型/开发验证资源、未重建旧会话或已固定档位。生产开发采集仍关闭；派发/排空删除、消费、正式两级事实/UI及真实身份/模型验收继续。142跳过项不是通过，CS-R02和两RFC不关闭。
+
+后续在制：受理快照的双路径透传与固定启动元数据见development-owner末节设计，独立设计门PASS；生产尚不调用，相关检查与限定实现门继续，不提前记完整门禁通过。
+
+### 受理快照透传与固定元数据候选检查点（2026-09-30）
+
+本批仅补18个源码/测试路径与5份观测交接文档：developmentUsageStorage从实际受理/PG经投影、解析到公共Pod构造器；direct保存render而省略execution，ledger保留原workspace；同执行增删选择双向冲突。launchMetadata按固定修订读取，不取凭据或Hook；显示名仍是当前目录名称，不能覆盖owner受理名称。生产派发仍未调用，清理/consumer/两级事实UI不在本批完成范围。
+
+相关24 pass/0 fail、188断言、6文件（真实PG/实际渲染/假K8s）；后端类型、18路径lint、修正后两测试lint、3368源文件结构检查通过；改到并被lcov识别的可执行行在相关用例中全部执行。独立限定实现功能门PASS（静态，未跑测试）。首轮20 pass/4 fail由套餐ID非UUID和直接准备队列夹具顺序造成，另有测试品牌类型/expected类型未收窄；已修夹具与类型，未放宽原断言。首次结果不计通过。冻结23路径后只跑一次完整本地候选门禁，精确发布/CI/本机回执另记；真实身份/模型验收未执行。
+
+## 下一阶段必须补齐：实际原生来源与持久停止
+
+这是独立只读规划复核发现的未实现合同，不是当前render/元数据候选的失败，也不是生产启用许可。
+
+### 实际来源证明
+
+普通headless未传persistentHome时，beforeStartRunner为每个Agent生成runDir/home；ManagedAgent将outcome.env.HOME覆盖到最终子进程环境，结束后release清理该目录。不能由worker的/work或父PVC UID推断实际OpenCode数据库位于持久卷。Hook输出不能改HOME，但可改变XDG_DATA_HOME或OPENCODE_DB；采集须在Hook完成后、baseline与spawn之前依据最终plan.env定位。
+
+当前nativeUsageLineageKey是受理字符串，AgentRunBase直接写入证明；顺序sidecar epoch只证明扫描次序，不能单独证明原数据库未替换。下一阶段须把Hook前冻结的预期来源约束和Hook后实际来源证明分开；不可改原StartIntent/摘要，也不可为统计改变HOME/原生目录。
+
+- 实际证明区分PVC UID、规范数据库路径、执行本地来源和来源沿革。两个包含相同root/step ID的复制库（/work/a.db与/work/b.db）不能仅凭同PVC合并；每执行随机lineage也不能丢掉同一真实库内旧步骤10→15的原归属修订。
+- 仍待实现前裁定：临时HOME支持本轮执行本地原生采集，还是只保留stdout数值并将原生连续性标为未证明；数据库移动、复制、替换/重建的沿革规则。无可靠证据继续部分/未知，不将空数据库当完整零。
+- 实际provider/model继续由原生assistant精确关联；配置model不能充作实际调用。
+- 最低回归：同ID双数据库、Hook改变路径、最终环境定位、临时HOME结束清理、同库历史修订、替换/复制后的缺口、缺源resume。须验证最终capture先持久入数字日志，再清理Hook目录。
+
+源码锚点：runtimes/task/src/beforeStart/beforeStartRunner.ts、agents/managedAgent.ts、process/childEnvironment.ts；packages/agent-drivers/drivers/agentRunBase.ts、usage/opencodeModel.ts、usage/nativeCapture.ts。上述是当前源码事实，不宣称现有沿革字符串已提供实际来源证明。
+
+### 原键停止与迟到启动
+
+现有AgentSupervisor在reserve后等待resolveCwd，之后才加入running；这段窗口内cancel返回not_found，原Start随后仍可运行Hook和模型。Session现有prepareDevelopmentCommand只核loss/closure，核验到实际发送还存在异步边界。仅阻止Session新派发不能撤回已经在途的Start。
+
+- reserve后、首次await前登记可取消启动；数字路径按原key＋Pod持久停止决定，与reserve串行，Runner重启后仍有效。取消先于Start时，后来Start不得运行Hook/模型；不能因重发再次spawn。
+- 回执区分确证已阻止且从未启动、正在停止、已结束、未知；空receipt或not_found不是从未运行证据。停止决定落盘失败保留未知，不能承诺完成后删除Pod。
+- Session进入drain后拒绝新的启动派发；已经在途的Start由Runner持久停止收敛。只有确证不再产生数字，且原键/Pod的连续副本完成或明确不可取回缺口持久后，才能关闭清理屏障。
+- finalThrough=0仅证明数字传输没有剩余；它不独自证明Token已知为零。源完整性与传输完成分别判定。
+- 最低回归：暂停resolveCwd后取消、停止先于迟到Start、持久停止后重启、丢ACK重发、相异意图/原键/Pod拒绝、停止落盘失败、M8/N10先排空可读末尾。普通旧Runner保持原能力，未具备新停止合同不能启用生产数字路径。
+
+下一批先完成这两个独立基础及相应设计/实现门；实际owner派发、全清理/保留/重建旁路、consumer和两级事实/UI按前文继续。当前23路径候选未实现上述合同，CS-R02仍未关闭。
+
+### 双路径 render/固定元数据完整候选门禁回执（2026-09-30）
+
+2026-09-30T01:55:33Z，冻结23路径的一次完整本地门禁结束：结构、全仓lint、后端/console类型通过；4288 pass／142 skip／0 fail、27227断言、857文件，测试976.92秒，完整命令1035.26秒。18源码/测试与5文档在检查期间全部指纹一致；独立限定实现功能门PASS，24项相关回归通过。仅补本回执及下一阶段规划，不重复运行同内容完整门禁。精确发布/hosted CI/本机部署另记；生产开发采集仍关闭，真实身份/模型验收未执行，142跳过项不计通过。

@@ -1,4 +1,4 @@
-import type { BusinessSessionStorage } from '@crewstation/contracts';
+import type { BusinessSessionStorage, DevelopmentUsageStorage } from '@crewstation/contracts';
 import type { RuntimeInitializationStatus, RuntimeImageExecutionSnapshot, ProjectId, ServiceId, StartupRecord, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
 import { cancelStartup, completeThrough, defaultFailureCode, failStartup } from './podStartup';
@@ -50,7 +50,7 @@ export interface WorkloadRender {
   /** 开会话所选分支的对象档位；保卷重建与子执行继承，不读取生产发布。 */
   readonly developmentObjectPlanId?: string;
   /** RFC-034 opt-in for a newly admitted headless execution; legacy renders omit it. */
-  readonly developmentUsageStorage?: { readonly version: 1 };
+  readonly developmentUsageStorage?: DevelopmentUsageStorage;
   readonly objectInputsGeneration?: number;
   readonly storageFinalization?: { readonly operationId: string; readonly revision: number; readonly volumeUid: string | null; readonly computeStopped?: true };
   readonly completionPolicy?: 'archive-and-delete';

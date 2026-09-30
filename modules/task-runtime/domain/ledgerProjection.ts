@@ -116,6 +116,7 @@ function workloadRender(env: TaskEnvironment): ProjectedRecord['render'] {
     ...(env.render.completionPolicy ? { consumer: { id: env.render.workloadConsumerId, taskId: env.native?.parentTaskId ?? env.id, revision: env.render.start, purpose: env.native ? 'agent' : 'business', finalization: null } } : {}),
     ...(env.businessWorkspace ? { expectedVolumeUid: env.businessWorkspace.volumeUid } : {}),
     ...(env.render.runtimeImage ? { runtimeInitialization: true } : {}),
+    ...(env.render.developmentUsageStorage ? { developmentUsageStorage: env.render.developmentUsageStorage } : {}),
     ...(env.render.businessStorage ? { businessStorage: { ...env.render.businessStorage, initialize: !env.native && !env.rebuildId && env.render.start === 1 } } : {}),
     image, workerUid, resources, workload: WORKLOAD_LABELS[env.kind], project: env.labels['crewstation.io/project'] ?? '', service: env.labels['crewstation.io/service'] ?? '',
     // 档位测试（I25 第四步）用 Pod 内的临时目录，没有工作卷。

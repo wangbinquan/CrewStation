@@ -9,6 +9,9 @@ const sequence = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 export const DEVELOPMENT_USAGE_LIMITS = { capturesPerPage: 5, pageBytes: 1024 * 1024, spoolBytes: 64 * 1024 * 1024 } as const;
 export const DEVELOPMENT_USAGE_DIRECTORY = '/run/crewstation/development-usage';
 export const DEVELOPMENT_USAGE_BINDING_DIRECTORY = '/run/crewstation/development-usage-binding';
+/** Explicit new-execution layout selection; omission preserves every legacy render. */
+export const DevelopmentUsageStorageSchema = z.strictObject({ version: z.literal(1) });
+export type DevelopmentUsageStorage = z.infer<typeof DevelopmentUsageStorageSchema>;
 export const DevelopmentUsageRuntimeConfigSchema = z.strictObject({ version: z.literal(1), directory: z.literal(DEVELOPMENT_USAGE_DIRECTORY), bindingDirectory: z.literal(DEVELOPMENT_USAGE_BINDING_DIRECTORY), projectId: ProjectIdSchema, workspaceTaskId: TaskIdSchema });
 export type DevelopmentUsageRuntimeConfig = z.infer<typeof DevelopmentUsageRuntimeConfigSchema>;
 export const DevelopmentAgentIdentitySchema = DevelopmentUsageIdentitySchema.extend({ sourceKind: z.literal('development-agent'), executionGeneration: z.literal(1) });
