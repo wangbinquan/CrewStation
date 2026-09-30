@@ -68,8 +68,8 @@
 
 - 完整 `bun run check`：2026-09-30T11:27Z 冻结 292 个精确候选路径后启动一次，被并行 RFC-037 新增 `modules/cluster-control/ports/projectDeletion.ts` 与 `domain/deletion/objects.ts` 的 `@crewstation/k8s` 跨层导入违规阻断，未进入测试阶段。日志 `/private/tmp/rfc036-full-check.log`。未代改对方在制文件；阻断修正后才能获得完整门禁回执。
 - 资源中心定向静态结果：root／console 类型检查和候选 ESLint 通过，正式 console 生产构建通过。定向新增代码防护审计约 98.48%（2074／2106，无违规）；这是隔离测试合并覆盖的候选审计，最终以完整 SHA 的 hosted CI 为准。
-- 精确提交：按作者最新指示先提交本任务的自有清单，发送协调消息不再作为本地提交前置。清单来自 `/private/tmp/rfc036-candidate.json`；共享文件完整保留并行输出，不代提交其他会话未追踪文件。RFC-034 的 `965b45e8` 保留。`modules/platform/wiring.ts` 后续新增了并行删除准入接线，暂留工作树：最新组合专项为 19 pass／2 fail，归档命名空间操作及其清理 hook 超时（`/private/tmp/rfc036-shared-wiring-local-commit.log`），不把未通过回归的共享组合文件纳入本轮提交。`tools/arch/migrations.lock.json` 同时暂留工作树，其中并行迁移仍未全部追踪；本轮精确提交其余 290 个路径，不改写或删去对方的锁条目。
-- 当前提交前验证：root／console 类型与精确候选 lint 通过，资源中心目录／关系等组合专项通过。完整结构检查当前被其他会话 `modules/resources/adapters/persistence/migrations/0004_project_deletion_admission.sql` 未入锁阻断；未代锁其迁移。本地提交不等于发布闭环，仍需完整依赖、门禁和精确 CI 后再推送／部署。
+- 精确提交：按作者最新指示先提交本任务的自有清单，发送协调消息不再作为本地提交前置。自有 290 个路径已提交到本地 main：`b16f5140898352a6218bba0618d3c856fb3d5fd3`，核对提交路径与允许列表一致、署名齐全且暂存区为空。清单来自 `/private/tmp/rfc036-candidate.json`；共享文件完整保留并行输出，不代提交其他会话未追踪文件。RFC-034 的 `965b45e8` 保留。`modules/platform/wiring.ts` 后续新增了并行删除准入接线，暂留工作树：最新组合专项为 19 pass／2 fail，归档命名空间操作及其清理 hook 超时（`/private/tmp/rfc036-shared-wiring-local-commit.log`），不把未通过回归的共享组合文件纳入本轮提交。`tools/arch/migrations.lock.json` 同时暂留工作树，其中并行迁移仍未全部追踪；不改写或删去对方的锁条目。提交前仅移除自有 objectMetadata 文件末尾的一行空白，不改变已验证逻辑。
+- 提交前验证：root／console 类型与精确候选 lint 通过，资源中心目录／关系等组合专项通过。最近一次结构检查被其他会话 `modules/resources/adapters/persistence/migrations/0004_project_deletion_admission.sql` 未入锁阻断；对方随后已更新工作树锁文件，仍未提交全部依赖，未代锁其迁移。本地提交不等于发布闭环；完整依赖与门禁通过后才推送，核对本次精确 SHA 的 CI 后再部署。
 - 发布依赖核对：2026-09-30T11:37Z，以候选文件内容及其余文件的 HEAD 内容遍历引用，发现至少 16 个不在本次精确允许列表中的未追踪根依赖，均属于 RFC-037。包括 project 删除仓库／应用／端口、provisioning 删除控制器／路由／工作器，以及 contracts 与 api-client 的删除出口。其内部子依赖仍须由拥有者纳入自己的提交；不能只提交共享 index／wiring 而留下缺失源码。完整清单 `/private/tmp/rfc036-publication-dependencies.json`。
 - Hosted CI：须核对本次完整提交 SHA 的全部作业终态，不能借前一提交绿色作为本次证明。
 - 本机部署：已获用户授权，待可发布候选完成后执行。只部署已提交内容，不把其他在制功能带入镜像。
