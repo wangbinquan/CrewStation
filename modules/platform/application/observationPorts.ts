@@ -1,9 +1,10 @@
-import type { ObservationNameSources, ObservationUsageJournal, ObservationUsageOwner, ObservationAdmissionInput, ObservationPriceOwner, ObservationProfiles, ObservationProjects, ObservationResourceLedger, ObservationTasks } from '../ports/executionObservations';
+import type { ObservationNameSources, ObservationUsageJournal, ObservationUsageOwner, ObservationAdmissionInput, ObservationPriceOwner, ObservationDevelopmentPriceInput, ObservationDevelopmentPriceOwner, ObservationProfiles, ObservationProjects, ObservationResourceLedger, ObservationTasks } from '../ports/executionObservations';
 import { precondition } from '@crewstation/kernel';
 
 /** Use owner APIs to bind an execution to its project and expose the pricing catalog. */
-export function observationPorts(tasks: ObservationTasks, projects: ObservationProjects, runtime: ObservationProfiles) {
+export function observationPorts(tasks: ObservationTasks, projects: ObservationProjects, runtime: ObservationProfiles, resources: ObservationResourceLedger) {
   return {
+    records: observationSlotRecords(resources),
     executionAccess: { task: async (...[caller, taskId]: Parameters<ObservationTasks['getTask']>) => {
       const task = await tasks.getTask(caller, taskId), service = await projects.resolveServiceById(task.serviceId);
       if (!service) throw precondition('业务任务所属项目服务不存在');
@@ -19,6 +20,14 @@ export function businessObservationAdmission(resolve: () => ObservationPriceOwne
   return { accept: async (input: ObservationAdmissionInput) => {
     const owner = resolve(); if (!owner) throw precondition('执行价格受理尚未装配');
     await owner.acceptExecutionPrice(input);
+  } };
+}
+
+/** Preparation only: this participant does not enable production Agent capture or deletion. */
+export function developmentObservationAdmission(resolve: () => ObservationDevelopmentPriceOwner | undefined) {
+  return { accept: (input: ObservationDevelopmentPriceInput) => {
+    const owner = resolve(); if (!owner) throw precondition('开发执行人民币受理尚未装配');
+    return owner.acceptExecutionPrice(input);
   } };
 }
 

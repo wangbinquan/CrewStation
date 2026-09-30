@@ -100,3 +100,9 @@ Stage 1 精确发布与 hosted 回执：`fc491a4d6b31c6476d3222209ced880810936c3
 
 
 Stage 2 Session 冻结候选完整门禁回执：2026-09-29T23:43:16Z，结构、全仓lint、后端/console类型全部通过；4263 pass／142 skip／0 fail、27,020断言、852文件，测试591.90秒（完整命令637.67秒）。31源码/测试/迁移/锁+4文档共35路径指纹全部未变；独立Session实现功能门及文档复核PASS。只追加本回执后精确发布，同源代码不重跑完整本地门禁。142跳过项与真实身份/模型/集群验收不计为通过；本机仍94aabd6d、生产开发来源关闭，owner/CNY/实际释放屏障、platform消费及两级明细继续。
+
+
+Stage 2 Session 精确发布与本机部署回执（2026-09-30）：`1326fdd1ac3a0fdd0205bc0e4857a4423cc7df9d` 已推送，[CI36647054054](https://github.com/wangbinquan/CrewStation/actions/runs/36647054054) 终态六项 success。本机于 2026-09-30T00:04:59Z 完成 Session 先行的八组件 rollout，generation=observedGeneration、Ready=1；新增0010迁移 Job 完成，两张独立数字表存在，持久 storage-contract=1。实际镜像摘要：console `5b24dfe085612e539dd73e0d0c2ba1b42cf657edb5d6149b13529ea40f986b67`，control-plane `636479bb06e831aa7504f8ae9ccdf2f3e02e74fc6b24968edb3ccab476ed3e61`，默认 Runner `c019467571a59d8cfc4a7910453b9bb963ca8055b3393c1ef88bf7d551296121`；三个 OCI revision 均为本提交。工作台 /auth/login 只读HTTP200。没有登录、创建真实模型资源或重建旧会话/固定档位，生产开发采集仍关闭；这不是开发采集/两级真实身份验收。
+
+
+修正后的冻结候选完整门禁回执：2026-09-30T01:03:12Z，结构、全仓lint、后端/console类型全部通过；4277 pass／142 skip／0 fail、27,123断言、854文件，测试801.28秒（完整命令849.29秒）。21源码/测试/迁移/锁＋5文档共26路径指纹未变，限定owner preparation独立实现功能门PASS。本机仍1326fdd1；生产仍未调用本批participant。142跳过项和真实身份/模型/集群验收不计为通过。只补本回执与后续删除屏障规划后精确发布，同源代码不重跑完整本地门禁；精确CI及部署另外记录，CS-R02和两RFC不关闭。

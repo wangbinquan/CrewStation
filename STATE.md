@@ -1,3 +1,11 @@
+## 2026-09-30 RFC-034 owner基础候选完整门禁通过
+
+限定owner preparation独立静态功能门PASS；稳定意图/nonce/原CNY受理/实际子Pod/原journal CAS/闭准入已完成内部底座，生产未调用。修正后40项/283断言相关覆盖及完整4277 pass/142 skip/0、27,123断言、854文件通过，26路径指纹未变；首轮失败及修正历史保留。仅补回执和[后续清理旁路/验收](proposal/rfc/RFC-034-runtime-observability/development-owner.md#下一批删除屏障的补充反例与落位)后精确发布，本机仍1326fdd1；精确CI/部署另记。排空重连、保留期删除、三类rebuild、持久补队列、消费/事实/UI未接，CS-R02及两RFC不关闭。下方记录完整保留。
+
+## 2026-09-30 RFC-034 Session本机部署与owner剩余接线
+
+Session源码1326fdd1已精确推送，CI36647054054终态六项success；本机00:04:59Z完成新增迁移和八组件rollout，全部Ready=1、storage-contract=1，登录入口只读HTTP200。生产开发采集仍关闭，未登录/运行真实模型或重建旧会话。下一批内部owner稳定意图/原价/CAS绑定底座在制；派发恢复、父/子资源删除屏障、消费者和两级明细未接，见[owner接线](proposal/rfc/RFC-034-runtime-observability/development-owner.md)及[剩余清单](proposal/rfc/RFC-034-runtime-observability/remaining-work.md)。下方历史与并行记录完整保留。
+
 ## 2026-09-30 RFC-034 Session 候选完整门禁通过
 
 冻结35路径完整结构/lint/两侧类型与4263 pass/142 skip/0 fail全部通过（27,020断言、852文件）；31源码/测试/迁移/锁及4文档指纹未变。独立Session功能门和文档门PASS，只补回执后精确发布/CI。本批尚未部署，生产仍关闭、本机94aabd6d；owner稳定原键/CNY/实际生命周期排空、platform消费、正式两级明细继续，不关闭CS-R02或两RFC。此前失败与修正历史完整保留，详见[剩余清单](proposal/rfc/RFC-034-runtime-observability/remaining-work.md)。

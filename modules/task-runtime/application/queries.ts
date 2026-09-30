@@ -20,7 +20,7 @@ export interface EnvironmentDto {
   profile: string;
   podName: string;
   connected: boolean;
-  native?: Pick<NonNullable<TaskEnvironment['native']>, 'parentTaskId' | 'agentId' | 'terminalId' | 'runnerId' | 'state' | 'profile'> & { purpose: NonNullable<NonNullable<TaskEnvironment['native']>['purpose']> };
+  native?: Pick<NonNullable<TaskEnvironment['native']>, 'parentTaskId' | 'agentId' | 'terminalId' | 'runnerId' | 'podUid' | 'state' | 'profile'> & { purpose: NonNullable<NonNullable<TaskEnvironment['native']>['purpose']> };
   branch?: string;
   preview?: { command: string[]; port: number; healthPath: string };
   traceId: string;
@@ -44,7 +44,7 @@ export function environmentToDto(env: TaskEnvironment): EnvironmentDto {
     createdAt: env.createdAt.toISOString(), lastActivityAt: env.lastActivityAt.toISOString(),
     ...(env.runnerRejection ? { connectionIssue: { ...env.runnerRejection, requiredProtocol: TASKRUNNER_PROTOCOL_VERSION } } : {}),
     ...(env.startup ? { startup: env.startup } : {}),
-    ...(env.native ? { native: { purpose: env.native.purpose ?? 'cli', parentTaskId: env.native.parentTaskId, agentId: env.native.agentId, ...(env.native.terminalId ? { terminalId: env.native.terminalId } : {}), runnerId: env.native.runnerId, state: env.native.state, profile: env.native.profile, ...(env.native.failureReason ? { failureReason: env.native.failureReason } : {}) } } : {}),
+    ...(env.native ? { native: { purpose: env.native.purpose ?? 'cli', parentTaskId: env.native.parentTaskId, agentId: env.native.agentId, ...(env.native.terminalId ? { terminalId: env.native.terminalId } : {}), runnerId: env.native.runnerId, ...(env.native.podUid ? { podUid: env.native.podUid } : {}), state: env.native.state, profile: env.native.profile, ...(env.native.failureReason ? { failureReason: env.native.failureReason } : {}) } } : {}),
   };
 }
 

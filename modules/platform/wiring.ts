@@ -1,4 +1,4 @@
-import { businessObservationAdmission, observationNames, observationPorts, observationSlotRecords, observationUsageSource } from './application/observationPorts';
+import { businessObservationAdmission, developmentObservationAdmission, observationNames, observationPorts, observationUsageSource } from './application/observationPorts';
 import { executionWriterObserver, migrationWriterObserver, legacyOwnerObserver } from './adapters/executionWriters';
 import { webhookAwareAllowlist } from './application/webhookIngress';
 import { objectStorageSources } from './application/objectStorageSources';
@@ -297,6 +297,7 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
   // 两类任务共用解析：受理固定档位修订，派发时取材料，凭据仅进入受控 Runner 通道。
   const computeCatalog = { pinLaunchVersion: core.agentRuntime.api.pinLaunchVersion, launchMaterialAt: core.agentRuntime.api.launchMaterialAt, resolve: (name: ComputeProfileSelector | undefined, usage: ComputeUsage, projectId: ProjectId) => core.agentRuntime.api.resolveForProject(projectId, name, usage), launchMaterial: core.agentRuntime.api.launchMaterial };
   const devSession = createDevSessionModule({
+    developmentUsagePricing: developmentObservationAdmission(() => late.observability),
     runtimeImages: developmentImagePorts(runtimeImages.api),
     identities: deps.identities,
     // RFC-025 §11.2：名册的结束与失败照台账里执行记录的阶段（记录沿用执行环境的任务 ID，上级是工作区）。
@@ -361,9 +362,8 @@ function composeAggregates(deps: PlatformModuleDeps, late: Late, core: ReturnTyp
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, apiCatalog, isAdmin } = core;
   const serviceOfProject = project.api.resolveServiceOfProject;
-  const observability = createObservabilityModule({ runtimeTasks: readBusinessObservationFacts, runtimeNames: observationNames({ projects: project.api, profiles: core.agentRuntime.api }), usageSource: observationUsageSource(runtime.businessTask.api.v3, runtime.session.api), ...observationPorts(runtime.businessTask.api.v3, project.api, core.agentRuntime.api),
+  const observability = createObservabilityModule({ runtimeTasks: readBusinessObservationFacts, runtimeNames: observationNames({ projects: project.api, profiles: core.agentRuntime.api }), usageSource: observationUsageSource(runtime.businessTask.api.v3, runtime.session.api), ...observationPorts(runtime.businessTask.api.v3, project.api, core.agentRuntime.api, resources.api),
     db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, services: { resolveServiceOfProject: serviceOfProject }, slots: delivery.release.api,
-    records: observationSlotRecords(resources.api),
     // 调用链（Design §14）：每个来源按项目读取，跨模块接口仅在组合根装配。
     traces: {
       environments: { traceKeys: runtime.taskRuntime.api.traceKeys, activeTraceIds: runtime.taskRuntime.api.activeTraceIds, list: runtime.taskRuntime.api.listTraceEnvironments },

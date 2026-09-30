@@ -35,6 +35,8 @@ describe.skipIf(!available)('逐 CLI 独立执行环境', () => {
     const current = (await f.uow.read.environments.getById(a.id))!, n = current.native!;
     expect(n).toMatchObject({ state: 'starting', profile: { memory: '2Gi' }, parentTaskId: env.id });
     const pod = (await k8s.get(Resources.Pod!, current.podName, env.namespace))!;
+    expect(pod.metadata.uid).toBeDefined();
+    expect(await runtime.api.getEnvironment(a.id)).toMatchObject({ native: { parentTaskId: env.id, podUid: pod.metadata.uid } });
     expect(pod.spec).toMatchObject({ containers: [{ image: 'task:current', env: [], resources: { requests: { cpu: '1', memory: '2Gi', 'ephemeral-storage': '10Gi' }, limits: { cpu: '1', memory: '2Gi', 'ephemeral-storage': '10Gi' } } }],
       volumes: [{ name: 'work', persistentVolumeClaim: { claimName: env.pvcName } }], affinity: { nodeAffinity: { requiredDuringSchedulingIgnoredDuringExecution: { nodeSelectorTerms: [{ matchFields: [{ key: 'metadata.name', values: ['worker-one'] }] }] } } } });
     expect((pod.spec as Record<string, unknown>).initContainers).toBeUndefined();

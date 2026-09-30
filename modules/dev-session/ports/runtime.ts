@@ -10,7 +10,7 @@ export interface EnvironmentView {
   state: 'creating' | 'running' | 'paused' | 'releasing' | 'released' | 'failed';
   podName: string;
   connected: boolean;
-  native?: { purpose: 'cli' | 'agent' | 'subtask'; parentTaskId: TaskId; agentId: string; terminalId?: string; runnerId: string; state: 'queued' | 'starting' | 'running' | 'cleaning' | 'finished'; profile: { name: string; cpu: string; memory: string; storage: string }; failureReason?: string };
+  native?: { purpose: 'cli' | 'agent' | 'subtask'; parentTaskId: TaskId; agentId: string; terminalId?: string; runnerId: string; podUid?: string; state: 'queued' | 'starting' | 'running' | 'cleaning' | 'finished'; profile: { name: string; cpu: string; memory: string; storage: string }; failureReason?: string };
   branch?: string;
   traceId: string;
   message?: string;

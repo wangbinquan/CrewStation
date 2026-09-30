@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
-import { BusinessTaskV3DtoSchema, ExecutionObservationIdentitySchema, ComputeProfileListSchema, ProjectIdSchema, UserIdSchema } from '@crewstation/contracts';
-import { businessObservationAdmission, observationNames, observationPorts, observationSlotRecords, observationUsageSource } from './observationPorts';
+import { BusinessTaskV3DtoSchema, DevelopmentAgentIdentitySchema, ExecutionObservationIdentitySchema, ComputeProfileListSchema, ProjectIdSchema, UserIdSchema } from '@crewstation/contracts';
+import { businessObservationAdmission, developmentObservationAdmission, observationNames, observationPorts, observationSlotRecords, observationUsageSource } from './observationPorts';
 
 const id = (n: number) => '01a0bf5d-8f4b-7111-8111-' + String(n).padStart(12, '0');
 const task = BusinessTaskV3DtoSchema.parse({ id: id(1), serviceId: id(2), state: 'running', releaseId: id(3),
@@ -14,7 +14,7 @@ test('observation wiring resolves the task owner before its project and projects
     image: 'runtime', imageDigest: 'digest', binaryPath: 'opencode', availability: { state: 'ready', available: true }, updatedBy: actor.userId, updatedAt: '2026-09-28T00:00:00Z' };
   const ports = observationPorts({ getTask: async (...args) => { calls.push(args); return task; } },
     { resolveServiceById: async (...args) => { calls.push(args); return { projectId: ProjectIdSchema.parse(id(7)), serviceId: task.serviceId, slug: 'project', name: 'Project', identity: 'project/service', namespace: 'project', kind: 'DigitalWorker', state: 'active' }; } },
-    { listProfiles: async (...args) => { calls.push(args); return ComputeProfileListSchema.parse({ items: [profile, { ...profile, id: id(8), model: 'actual/model' }] }); } });
+    { listProfiles: async (...args) => { calls.push(args); return ComputeProfileListSchema.parse({ items: [profile, { ...profile, id: id(8), model: 'actual/model' }] }); } }, { list: async () => [] });
   const caller = { identity: 'project/service' };
   expect(await ports.executionAccess!.task(caller, task.id)).toEqual({ projectId: ProjectIdSchema.parse(id(7)), taskId: task.id });
   expect(await ports.pricingProfiles!.list(actor)).toEqual([
@@ -25,7 +25,7 @@ test('observation wiring resolves the task owner before its project and projects
 });
 
 test('an unresolved task service reports incomplete platform state', async () => {
-  const ports = observationPorts({ getTask: async () => task }, { resolveServiceById: async () => undefined }, { listProfiles: async () => ({ items: [] }) });
+  const ports = observationPorts({ getTask: async () => task }, { resolveServiceById: async () => undefined }, { listProfiles: async () => ({ items: [] }) }, { list: async () => [] });
   await expect(ports.executionAccess!.task({ identity: 'project/service' }, task.id)).rejects.toMatchObject({ kind: 'precondition' });
 });
 
@@ -71,4 +71,17 @@ test('name metadata is fetched once from each owning catalog and indexed by stab
   });
   expect(await read()).toEqual({ projects: { [id(1)]: 'Project display' }, profiles: { [id(2)]: 'Compute display' } });
   expect(calls.sort()).toEqual(['profiles', 'projects']);
+});
+
+
+test('development admission resolves the current price owner and returns its original CNY receipt unchanged', async () => {
+  let owner: Parameters<typeof developmentObservationAdmission>[0] extends () => infer T ? T : never = undefined;
+  const port = developmentObservationAdmission(() => owner), calls: unknown[] = [];
+  const input = { identity: DevelopmentAgentIdentitySchema.parse({ sourceKind: 'development-agent', projectId: id(1), taskId: id(2), agentId: id(3), executionId: id(4), executionGeneration: 1 }), profile: { id: id(6), revision: 7, protocol: 'opencode' as const } };
+  expect(() => port.accept(input)).toThrow('人民币受理');
+  const original = { ...input, acceptedAt: '2026-09-28T00:00:00Z', priceBookRevision: 0 };
+  owner = { acceptExecutionPrice: async (value) => { calls.push(value); return original; } };
+  expect(await port.accept(input)).toBe(original); expect(calls).toEqual([input]);
+  const failure = new Error('price owner unavailable'); owner = { acceptExecutionPrice: async () => { throw failure; } };
+  await expect(port.accept(input)).rejects.toBe(failure);
 });

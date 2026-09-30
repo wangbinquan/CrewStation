@@ -72,6 +72,7 @@
     "modules/dev-session/adapters/persistence/migrations/0009_agent_starts.sql": "e5ad3302acfd6c33b6fa1abd2da3664ceab3e4afc38c2a1e9aba1281d8d07e33",
     "modules/dev-session/adapters/persistence/migrations/0010_resource_identity.sql": "c1abfdc8854ef417a0445d82e7aa42930c2710fa338b12a2050d7dbdcb0360fb",
     "modules/dev-session/adapters/persistence/migrations/0011_resource_identity.identity.json": "e1b7a84a054896b528df285bcb221bc2bdb5422390fd257e01f29360c98ed4d5",
+    "modules/dev-session/adapters/persistence/migrations/0012_development_agent_usage.sql": "b43e376e7eb50206ba7dfe1a7b015b1f64baae79432855fe6af8d1e769fcd01b",
     "modules/events/adapters/persistence/migrations/0001_create_schema.sql": "b19de80e761ea8697df6ddb7349e8c77f0f3953bfb3294b279c546a0545a70cb",
     "modules/events/adapters/persistence/migrations/0002_event_tables.sql": "de4f64852a5917d0f59b4cfcfcf26067fc9ec1ecb0b75e5972c745753da9774d",
     "modules/events/adapters/persistence/migrations/0003_resource_identity.sql": "d738bbf128da82051cb138ab238f50357b2deef7130f9cb0988028113fff5b01",

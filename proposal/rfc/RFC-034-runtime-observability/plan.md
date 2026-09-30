@@ -332,3 +332,22 @@ Stage 1 底座发布回执（2026-09-30）：`fc491a4d6b31c6476d3222209ced880810
 
 
 Stage 2 Session 冻结候选完整门禁回执：2026-09-29T23:43:16Z，结构、全仓lint、后端/console类型全部通过；4263 pass／142 skip／0 fail、27,020断言、852文件，测试591.90秒（完整命令637.67秒）。31源码/测试/迁移/锁+4文档共35路径指纹全部未变；独立Session实现功能门及文档复核PASS。只追加本回执后精确发布，同源代码不重跑完整本地门禁。142跳过项与真实身份/模型/集群验收不计为通过；本机仍94aabd6d、生产开发来源关闭，owner/CNY/实际释放屏障、platform消费及两级明细继续。
+
+
+Stage 2 Session 精确发布与本机部署回执（2026-09-30）：`1326fdd1ac3a0fdd0205bc0e4857a4423cc7df9d` 已推送，[CI36647054054](https://github.com/wangbinquan/CrewStation/actions/runs/36647054054) 终态六项 success。本机于 2026-09-30T00:04:59Z 完成 Session 先行的八组件 rollout，generation=observedGeneration、Ready=1；新增0010迁移 Job 完成，两张独立数字表存在，持久 storage-contract=1。实际镜像摘要：console `5b24dfe085612e539dd73e0d0c2ba1b42cf657edb5d6149b13529ea40f986b67`，control-plane `636479bb06e831aa7504f8ae9ccdf2f3e02e74fc6b24968edb3ccab476ed3e61`，默认 Runner `c019467571a59d8cfc4a7910453b9bb963ca8055b3393c1ef88bf7d551296121`；三个 OCI revision 均为本提交。工作台 /auth/login 只读HTTP200。没有登录、创建真实模型资源或重建旧会话/固定档位，生产开发采集仍关闭；这不是开发采集/两级真实身份验收。
+
+
+## 实施批次20：开发owner稳定受理底座（在制，生产不调用）
+
+详见 [development-owner](./development-owner.md)。本批限定独立私表的稳定意图/nonce、首次CNY受理、实际子Pod UID公开owner查询、原journal CAS绑定、关闭准入及精确原来源解析。普通AgentStart状态更新不能覆盖这份独立绑定；关闭准入不等于Pod可删。API仅内部participant，没有新HTTP或真实派发入口。
+
+剩余派发/取消receipt恢复、真实原生沿革、双渲染透传、资源中心及task-runtime删除屏障、开发outbox消费、同快照事实及两级UI依照该页逐项接通后再启用。完整两RFC与CS-R02～05继续，不能拿内部API/合成夹具替代真实采集验收。当前本机仍是上述1326fdd1，不含本批在制源码；定向、独立实现功能门、冻结单次完整门禁及精确发布另记。
+
+
+批次20限定owner preparation的独立静态实现门PASS；实际PG/SQLite/CNY交叉回归验证原摘要、凭据轮换、重启原receipt和原价`2.000025`，生产全链路仍未启用。首次层级/长度/夹具检查问题及后续pending取消修正记在[owner检查点](./development-owner.md#本批实现复核与门禁检查点)。冻结修正候选的完整门禁、精确发布与CI继续记录，不关闭CS-R02或两RFC。
+
+
+批次20首轮冻结完整检查于2026-09-30T00:46:02Z在跨模块测试非空绑定精确断言的类型检查阶段失败，未执行全量测试、26路径指纹未变。只修该测试的非空断言，行为断言与生产源码保持；40项/283断言相关覆盖已通过，修正候选重新类型检查后再冻结完整门禁。
+
+
+修正后的冻结候选完整门禁回执：2026-09-30T01:03:12Z，结构、全仓lint、后端/console类型全部通过；4277 pass／142 skip／0 fail、27,123断言、854文件，测试801.28秒（完整命令849.29秒）。21源码/测试/迁移/锁＋5文档共26路径指纹未变，限定owner preparation独立实现功能门PASS。本机仍1326fdd1；生产仍未调用本批participant。142跳过项和真实身份/模型/集群验收不计为通过。只补本回执与后续删除屏障规划后精确发布，同源代码不重跑完整本地门禁；精确CI及部署另外记录，CS-R02和两RFC不关闭。

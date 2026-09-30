@@ -1,4 +1,4 @@
-import type { RunnerUsageMeasurement, RunnerUsageSourceIdentity, RunnerUsageSourcePage, Actor, BusinessTaskV3Dto, ExecutionObservationIdentity, ProjectId, ResourceChild, ResourceCondition, ServiceId, TaskId } from '@crewstation/contracts';
+import type { RunnerUsageMeasurement, RunnerUsageSourceIdentity, RunnerUsageSourcePage, Actor, BusinessTaskV3Dto, ExecutionObservationIdentity, ProjectId, ResourceChild, ResourceCondition, ServiceId, TaskId, UsageExecutionIdentity } from '@crewstation/contracts';
 
 /** Only the owner metadata needed to connect observability at composition time. */
 export interface ObservationTasks {
@@ -13,6 +13,12 @@ export interface ObservationAdmissionInput {
   profile: { id: string; revision: number; protocol: 'opencode' | 'claude-code' | 'terminal' } | null;
 }
 export interface ObservationPriceOwner { acceptExecutionPrice(input: ObservationAdmissionInput): Promise<unknown> }
+export interface ObservationDevelopmentPriceInput {
+  identity: UsageExecutionIdentity;
+  profile: ObservationAdmissionInput['profile'];
+}
+export interface ObservationDevelopmentAcceptedPrice extends ObservationDevelopmentPriceInput { acceptedAt: string; priceBookRevision: number }
+export interface ObservationDevelopmentPriceOwner { acceptExecutionPrice(input: ObservationDevelopmentPriceInput): Promise<ObservationDevelopmentAcceptedPrice> }
 export interface ObservationResourceLedger {
   list(filter: { projectId: ProjectId; kind: 'service-slot'; includeStopped: true }): Promise<ReadonlyArray<{
     display: Readonly<Record<string, string>>; children: readonly ResourceChild[]; conditions: readonly ResourceCondition[]; phaseSince: Date;

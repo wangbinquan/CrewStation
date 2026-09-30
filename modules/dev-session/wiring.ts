@@ -1,4 +1,7 @@
 import type { DevelopmentRuntimeImages } from './ports/runtimeImages';
+import type { DevelopmentUsagePricing } from './ports/developmentUsage';
+import { developmentUsageOwnerStore } from './adapters/persistence/developmentUsage';
+import { developmentUsageOwner } from './application/developmentUsage';
 import { join } from 'node:path';
 import type { UserId } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
@@ -37,6 +40,7 @@ import type { ExecutionRecords } from './ports/executionRecords';
 import { withExecutionPhase } from './domain/terminalPhase';
 
 export interface DevSessionModuleDeps {
+  developmentUsagePricing?: DevelopmentUsagePricing;
   identities?: ResourceIdentityDirectory;
   /** 资源台账里 CLI／Agent 执行记录的阶段（RFC-025 §11.2）；缺省时名册照 Runner 的说法给出。 */
   runtimeImages?: DevelopmentRuntimeImages;
@@ -96,6 +100,7 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
     return undefined;
   }), useCaseDeps.clock);
   const api: DevSessionModuleApi = {
+    developmentUsage: developmentUsageOwner(developmentUsageOwnerStore(deps.db), agentStarts, deps.environments, deps.developmentUsagePricing),
     invokeApi: apiInvocationUseCase(useCaseDeps),
     ...clusterAgentUseCases(useCaseDeps, agentStarts, agentExecutions), ...clusterNativeUseCases(useCaseDeps, terminals),
     name: 'dev-session', ...lifecycle, ...agents, ...native, ...activity, ...workspaceLayoutUseCases(useCaseDeps, drizzleWorkspaceLayouts(deps.db), terminals),
