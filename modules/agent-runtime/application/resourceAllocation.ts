@@ -11,6 +11,7 @@ export function computeResourceAllocationUseCases(deps: AgentRuntimeUseCaseDeps,
     applyResourceChange: async (actor: Actor, projectId: ProjectId, input: { operationId: string; target: ResourceTarget; expectedRevision: string; values: ResourceValues }) => {
       if (!await isAdmin(actor.userId)) throw forbidden('算力和开发套餐分配仅平台管理员可调整');
       await deps.projects.authorize(actor, projectId, 'view'); ResourceIdSchema.parse(input.operationId);
+      await deps.projects.assertProjectAvailable?.(projectId);
       if (!await deps.projects.name(projectId)) throw notFound('项目');
       const settingDefault = input.target.resourceType === 'compute-profile' && input.target.action === 'set-default';
       if (!settingDefault && Object.keys(input.values).length || settingDefault && (Object.keys(input.values).some((key) => key !== 'inheritDefault') || typeof input.values.inheritDefault !== 'boolean')) throw validation('档位分配参数不适用');

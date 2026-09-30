@@ -22,6 +22,8 @@
     "zod": "4.6.2"
   },
   "devDependencies": {
+    "@crewstation/eventbus": "workspace:*",
+    "@crewstation/module-project": "workspace:*",
     "@crewstation/testkit": "workspace:*",
     "@crewstation/module-identity": "workspace:*"
   }

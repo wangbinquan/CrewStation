@@ -9,6 +9,7 @@
     "modules/agent-runtime/adapters/persistence/migrations/0006_resource_identity.identity.json": "5503aa917747245efb61c48107a5fc6ff251e7cfcc7999dd31d741420ce54266",
     "modules/agent-runtime/adapters/persistence/migrations/0007_credential_versions.sql": "7cc2e441bec74cf31c3a5e105e1525158771c4e3fc694a56fe0fd82a87d44773",
     "modules/agent-runtime/adapters/persistence/migrations/0008_resource_allocations.sql": "1956b4e5402d9c25b9d363b3f2e53bb8ad7a43a4f8eb661da4f2f19fd7ceec69",
+    "modules/agent-runtime/adapters/persistence/migrations/0009_project_deletion_fences.sql": "88c92e105e482b46722b6cf1ea7710145d9de6a36c3fafebd2aa0af190b2ca8a",
     "modules/api-catalog/adapters/persistence/migrations/0001_create_schema.sql": "d24d3346ab26aedc50fceae07180fda65dfcb3724e0ae8d0d01252320f9a19b5",
     "modules/api-catalog/adapters/persistence/migrations/0002_catalog_tables.sql": "8eb39ed6fecbe299c0cc76f408cbe1b40346aa8d4917e275a704f9a184ce65e3",
     "modules/api-catalog/adapters/persistence/migrations/0003_request_pages.sql": "26581b9c5c1ea530c70f68307161ddc50370e2844584ce3315efd82db8e19f8c",

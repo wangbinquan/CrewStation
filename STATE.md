@@ -12,6 +12,10 @@ events 首次完整门禁 4642／143skip／0，30320 断言、927 文件、941.1
 
 events 最终修订候选完整 `bun run check` 已结束：4643 pass／143 skip／0 fail、4786 tests、928 文件、30329 断言、701.27 秒，37 个源码／测试／配置指纹全部保持；日志 `/private/tmp/cs-rfc037-events-full-check-2.log`。HEAD blob＋精确 43 路径内存候选的后端／console 类型均为 0 错误。仅追加回执，不重复启动相同源码全量门禁；精确发布、六项 CI 和同步 Pod UID 的实际部署继续，永久删除入口仍关闭。
 
+events 批已发布 `6c21cc85`，CI 36777322814 六项 success，2026-09-30T21:26:02.415Z 八组件本机升级完成，新 events 迁移实际执行，原 Pod UID 字段已同步且与运行中源实例一致。原 22 Namespace／48 Pod与PVC／19 PV UID、部署前当前 Runner 摘要保持，专用项目原待验证版本仍可访问，详见 [本批部署](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/events-deployment.md)。下一批算力策略／分配回执与逐请求构建凭据关闭已形成候选；仍未开放永久删除，剩余 owner／原生与数字排空／管理员界面及真实清理继续。
+
+2026-10-01 算力接续：算力候选完整用例运行 4663 pass／143 skip／5 fail（4811 tests、933 文件、30499 断言、959.04 秒）；五项失败落于并行修改的开发容器直接写入／准入检查，未作为全仓通过。22 个冻结源码／测试／配置指纹保持，算力全部新回归包括缺失许可的拒绝与回滚通过；改动覆盖 98／98、所有改动生产文件加载，精确候选后端与 console 类型无诊断。完整 check 的 lint 也被并行在制测试的未使用导入阻断；本批精确 lint／结构通过。按精确候选清单继续发布并等精确 SHA 的六项 hosted CI，不提交并行在制源码。永久删除全链路仍关闭。 见 [算力 owner 回执](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/compute-owner.md)。
+
 ## 2026-09-30 平台管理导航：项目与能力供给前移
 
 按作者要求将「供给与接入」改为「项目与能力供给」，包含项目管理／能力接入，整组排在「运行与观测」上方；左栏与总览卡片共用定义同步调整，中英文文案和 RFC-003 §4 修订已回填。导航／空间边界／文案／存储总览相关 35 pass／0 fail，精确 ESLint、console 类型与生产构建通过；回归先在旧实现上确认三项失败后修正。一次完整 `bun run check` 被并行项目资源任务三份新迁移未入锁阻断（project/0014_project_resource_policies、resource-access/0001_create_schema、agent-runtime/0008_resource_allocations），日志 `/private/tmp/cs-admin-supply-nav-check-20260930.log`。作者随后明确要求只提交上库，五个导航／文案／测试／RFC 路径已精确提交并推送为 `0a207acf9389cc6a5ee0b64a0f389c8a14f075b2`；[精确 CI 36681744659](https://github.com/wangbinquan/CrewStation/actions/runs/36681744659) 已终态六项 success（含新增代码防护与实机端到端）。最终 fetch 确认本地与 origin/main 同为并行后继 `d01ba8223fc08c8b2b70ee4db859e560c2151668`，保留本提交及其五个路径内容，暂存区为空。未部署，未改动并行迁移或锁文件；本共享 STATE 记录保留在工作树，未随代码提交。

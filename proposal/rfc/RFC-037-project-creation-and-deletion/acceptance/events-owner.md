@@ -47,3 +47,5 @@
 修订覆盖运行 **48 pass／0 fail、330 断言、15 文件**，`cs-rfc037-events-coverage-2.log`；精确生产候选 **296／296（100%）**，无未加载文件，`cs-rfc037-events-patch-coverage-2.json`。覆盖结束后只强化上述夹具的进程存活断言，生产源码未变。因 canonical 登记实际源码变化，首次完整门禁不作为最终候选回执；43 路径修订候选继续一次完整门禁、精确提交／CI／部署。本材料与 implementation-review.md 是本会话实现自查，未声称独立实现 PASS。永久删除产品和真实项目物理回收仍未完成。
 
 最终修订候选的完整 `bun run check` **4643 pass／143 skip／0 fail**，4786 tests、928 文件、30329 断言、701.27 秒，日志 `cs-rfc037-events-full-check-2.log`。43 路径冻结快照中的 37 个源码／测试／配置指纹检查后均相同。基于 `d3acac1f` Git blob 与精确允许路径的内存候选，后端／console 均 0 类型错误，日志 `cs-rfc037-events-candidate-types-2.log`；没有建立其他 checkout。追加回执不改变候选源码，后续精确提交、六项 CI 和实际部署另记。143 个环境跳过项不证明平台原容器或项目物理资源回收。
+
+本批已精确发布 `6c21cc85`，CI 36777322814 六项成功并完成本机部署。原事件 Pod UID 字段、迁移实际执行、八组件就绪及原业务资源身份保持的来源见 [events-deployment.md](./events-deployment.md)。该部署未包含后续算力 owner 在制代码。

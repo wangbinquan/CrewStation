@@ -1,4 +1,4 @@
-import type { Actor, RegistryPushCredential, RuntimeImagesInfo } from '@crewstation/contracts';
+import type { Actor, ProjectId, RegistryPushCredential, RuntimeImagesInfo } from '@crewstation/contracts';
 import { ResourceIdSchema } from '@crewstation/contracts';
 import { validation } from '@crewstation/kernel';
 import type { RegistryVerdict } from '../api/moduleApi';
@@ -6,6 +6,7 @@ import type { PushGrant } from '../domain/pushGrant';
 import { registryDecision, signGrant, verifyGrant } from '../domain/pushGrant';
 import type { AgentRuntimeUseCaseDeps } from './dependencies';
 import { adminOnly } from './toDto';
+import { registryProjects } from './registryProjects';
 
 export interface PushCredentialSettings {
   /** 签名密钥（派生自平台密钥），只在本进程内存里。 */
@@ -20,7 +21,7 @@ export interface PushCredentialSettings {
  * 镜像页（RFC-006 §7）：底座镜像的引用与摘要、推送地址与示例 Dockerfile；按需签发有期限的推送凭据，
  * 口令只出现在签发这一次响应里。网关对仓库主机的每个请求经 authorize 裁定。
  */
-export function runtimeImageUseCases(deps: Pick<AgentRuntimeUseCaseDeps, 'registry' | 'clock' | 'logger'>, settings: PushCredentialSettings) {
+export function runtimeImageUseCases(deps: Pick<AgentRuntimeUseCaseDeps, 'registry' | 'clock' | 'logger'>, settings: PushCredentialSettings, assertAvailable?: (id: ProjectId) => Promise<void>) {
   const { registry: { layout }, clock } = deps;
   const pushPrefixes = [layout.runtimePrefix];
   const pullPrefixes = [layout.runtimePrefix, layout.baseRepository];
@@ -51,6 +52,7 @@ export function runtimeImageUseCases(deps: Pick<AgentRuntimeUseCaseDeps, 'regist
     },
     issueBuildPushCredential: async (input: { projectId?: string; buildId: string; expiresAt: string; pullRepositories: readonly string[] }): Promise<RegistryPushCredential> => {
       if (input.projectId !== undefined) ResourceIdSchema.parse(input.projectId); ResourceIdSchema.parse(input.buildId);
+      if (input.projectId) await assertAvailable?.(input.projectId as ProjectId);
       const now = Math.floor(clock.now().getTime() / 1000), exp = Math.floor(Date.parse(input.expiresAt) / 1000);
       if (!Number.isSafeInteger(exp) || exp <= now || exp > now + 7200) throw validation('镜像构建推送凭据有效期必须在 2 小时内');
       if (input.pullRepositories.length > 32 || input.pullRepositories.some((path) => !/^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)*\/?$/.test(path))) throw validation('构建镜像拉取范围不合法');
@@ -59,13 +61,15 @@ export function runtimeImageUseCases(deps: Pick<AgentRuntimeUseCaseDeps, 'regist
       deps.logger.info('image build push credential issued', { projectId: input.projectId, buildId: input.buildId, expiresAt: input.expiresAt });
       return { pushHost: layout.pushHost, username: input.buildId, password: signGrant(grant, settings.signingKey), expiresAt: new Date(exp * 1000).toISOString(), pushPrefixes: push, pullPrefixes: pull };
     },
-    authorizeRegistryRequest: (input: { authorization?: string; method: string; uri: string }): RegistryVerdict => {
+    authorizeRegistryRequest: async (input: { authorization?: string; method: string; uri: string }): Promise<RegistryVerdict> => {
       const basic = /^Basic\s+(.+)$/i.exec(input.authorization ?? '')?.[1];
       if (!basic) return { status: 401, reason: '需要平台签发的推送凭据：请在平台管理的镜像页签发后 docker login' };
       const decoded = Buffer.from(basic, 'base64').toString('utf8');
       const colon = decoded.indexOf(':');
       const grant = colon > 0 ? verifyGrant(decoded.slice(colon + 1), settings.signingKey, Math.floor(clock.now().getTime() / 1000)) : undefined;
       if (!grant || grant.sub !== decoded.slice(0, colon)) return { status: 401, reason: '推送凭据无效或已过期，请重新签发' };
+      try { for (const id of registryProjects(grant, input.uri)) await assertAvailable?.(id); }
+      catch { return { status: 403, reason: '相关项目已关闭镜像访问或当前无法验证准入' }; }
       return registryDecision(grant, input.method, input.uri) === 'allow' ? { status: 200 } : { status: 403, reason: `凭据只允许推送 ${grant.push.join('、')} 前缀、拉取 ${grant.pull.join('、')}` };
     },
   };

@@ -152,7 +152,7 @@ function composeCore(deps: CompositionDeps, late: Late) {
   // 算力档位（RFC-006、ADR-0005）：测试执行在 task-runtime（L4）、已上线引用在 release（L4）、资源套餐在 project（L2），都由这里回填。
   const agentRuntime = createAgentRuntimeModule({
     db, logger, isAdmin: (id) => identity.api.isAdmin(id),
-    projects: { authorize: project.api.authorize, name: async (projectId) => (await project.api.resolveServiceOfProject(projectId))?.slug },
+    projects: { authorize: project.api.authorize, name: async (projectId) => (await project.api.resolveServiceOfProject(projectId))?.slug, assertProjectAvailable: project.api.assertProjectAvailable, assertProjectDeletionGrant: project.api.assertProjectDeletionGrant },
     executor: { run: (input, report, heartbeat) => { if (!late.taskRuntime) throw new Error('task-runtime 尚未装配'); return late.taskRuntime.runProfileTest(input, report, heartbeat); } },
     references: { listReferencingProjects: async (profile) => {
       const releaseApi = late.release;

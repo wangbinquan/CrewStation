@@ -91,3 +91,17 @@ API／资源申请批已发布部署，详见 acceptance/api-resource-deployment
 最新定向结果和真实 PG／独立 Bun 子进程／假 API Server 的区别见 acceptance/events-owner.md。当前候选尚未发布部署，完整物理资源清理继续。
 
 修订最终候选完整门禁 4643／143 skip／0 fail、30329 断言，37 个源码／测试／配置指纹一致；43 路径候选的前后端内存类型检查通过。精确发布和 Pod UID 源字段部署仍需接续，本内容 owner 回执不能替代其余物理 owner 的证明。
+
+events 已发布部署，精确 SHA／六项 CI／运行时源字段和原资源身份保持见 acceptance/events-deployment.md。
+
+## 7. 算力分配与项目构建凭据候选（2026-10-01）
+
+- 本项目内容为 project_compute_policies 与 allocation_receipts，完整聚合包括全部历史回执。profiles／profile_revisions／profile_credentials／credential_versions／profile_tests 等共享目录和最小退休身份保留；未知新内容表阻断盘点。
+- 两个内容表的数据库触发器按原 projectId 取事务 shared 咨询锁，seal 取排他锁等待实际提交；分配 operationId 原归属不可重写，根消失后仍由最小 deletion_identities 阻止借旧 ID 写到其他项目。该写入事务没有外部副作用，不拿连接中断替代原生消费者排空。
+- deletion_fences 保存原项目、原操作、世代、完整确认修订与 scope_verified。确认变化持久封闭，旧重试不能变成功；新完整确认及原操作更高世代才能刷新。清理只由正式 project 许可端口授权，并在等待原写入后重新核实。
+- 项目算力启动解析、开发套餐解析、新策略／分配及构建凭据签发核对 project 的真实可用性。Registry ForwardAuth 每个请求都核对原签名 push scope、请求目标和 blob mount 的来源，删除后未到期旧构建凭据不能继续用于平台底座或 /v2 探测；共享管理员凭据也不能写入已封闭的项目仓库。
+- 签名口令不落库、不复制到删除材料。凭据关闭只证明未来请求的准入，不证明此前已放行的上传结束或 Registry 物理 blob 已回收；原构建、上传、镜像引用与共享底层 blob 的停止／回收仍由 runtime-environment 和存储 owner 提供真实来源。
+
+本批尚未精确发布部署，正式全链路仍关闭。
+
+算力候选完整用例运行 4663 pass／143 skip／5 fail（4811 tests、933 文件、30499 断言、959.04 秒）；五项失败落于并行修改的开发容器直接写入／准入检查，未作为全仓通过。22 个冻结源码／测试／配置指纹保持，算力全部新回归包括缺失许可的拒绝与回滚通过；改动覆盖 98／98、所有改动生产文件加载，精确候选后端与 console 类型无诊断。完整 check 的 lint 也被并行在制测试的未使用导入阻断；本批精确 lint／结构通过。按精确候选清单继续发布并等精确 SHA 的六项 hosted CI，不提交并行在制源码。永久删除全链路仍关闭。 详见[算力候选回执](acceptance/compute-owner.md)。

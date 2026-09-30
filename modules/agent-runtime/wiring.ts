@@ -32,6 +32,8 @@ import type { SecretCipher } from './ports/secretCipher';
 import type { TaskProfileDirectory } from './ports/taskProfiles';
 import type { ProfileTestExecutor } from './ports/testExecutor';
 import { testWorker } from './workers/testWorker';
+import { computeDeletionRepository } from './adapters/persistence/deletionRepository';
+import { computeDeletionOwner } from './application/projectDeletion';
 
 export interface AgentRuntimeModuleDeps {
   db: Database;
@@ -78,11 +80,15 @@ export function createAgentRuntimeModule(deps: AgentRuntimeModuleDeps): AgentRun
   const queries = profileQueries(useCaseDeps);
   const tests = profileTestUseCases(useCaseDeps);
   const resolver = resolveProfileUseCases(useCaseDeps);
+  const deletion = computeDeletionRepository(deps.db, deps.projects?.assertProjectDeletionGrant);
   // 推送凭据的签名密钥与 secretbox 密钥同源但分用途派生，二者互不可替代。
   const signingKey = new Bun.CryptoHasher('sha256').update('crewstation:registry-push-key:v1').update(Buffer.from(deps.settings.secretKeyBase64, 'base64')).digest();
-  const images = runtimeImageUseCases(useCaseDeps, { signingKey, baseTag, ttlSeconds: deps.settings.pushCredentialTtlSeconds ?? 8 * 3600 });
+  const images = runtimeImageUseCases(useCaseDeps, { signingKey, baseTag, ttlSeconds: deps.settings.pushCredentialTtlSeconds ?? 8 * 3600 }, async (id) => {
+    await deletion.assertAvailable(id); await deps.projects?.assertProjectAvailable?.(id);
+  });
   const api: AgentRuntimeModuleApi = {
     name: 'agent-runtime',
+    ...(deps.projects?.assertProjectDeletionGrant ? { deletionOwner: computeDeletionOwner(deletion, deps.projects.assertProjectDeletionGrant) } : {}),
     ...projectComputePolicyUseCases(useCaseDeps), ...projectProfileUseCases(useCaseDeps),
     ...computeResourceAllocationUseCases(useCaseDeps, deps.isAdmin),
     listProfiles: queries.listProfiles, getProfile: queries.getProfile, listSummaries: queries.listSummaries, listDisplayNames: queries.listDisplayNames,

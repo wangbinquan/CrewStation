@@ -261,14 +261,14 @@ describe.skipIf(!available)('算力档位模块（RFC-006）', () => {
     const input = { projectId, buildId, expiresAt: new Date(Date.now() + 600000).toISOString(), pullRepositories: ['crewstation/task-runtime'] };
     const token = await mod.api.issueBuildPushCredential(input);
     const authorization = `Basic ${Buffer.from(`${token.username}:${token.password}`).toString('base64')}`;
-    const verdict = (method: string, repository: string) => mod.api.authorizeRegistryRequest({ authorization, method, uri: `/v2/${repository}/manifests/artifact` }).status;
+    const verdict = async (method: string, repository: string) => (await mod.api.authorizeRegistryRequest({ authorization, method, uri: `/v2/${repository}/manifests/artifact` })).status;
     expect(token.pushPrefixes).toEqual([`runtime/projects/${projectId}/${buildId}/`]);
-    expect(verdict('PUT', `runtime/projects/${projectId}/${buildId}/image`)).toBe(200);
-    expect(verdict('PUT', `runtime/projects/${projectId}/${newResourceId()}/image`)).toBe(403);
-    expect(verdict('PUT', `runtime/projects/${newResourceId()}/${buildId}/image`)).toBe(403);
-    expect(verdict('GET', 'crewstation/task-runtime')).toBe(200);
-    expect(verdict('PUT', 'crewstation/task-runtime')).toBe(403);
-    expect(verdict('DELETE', `runtime/projects/${projectId}/${buildId}/image`)).toBe(403);
+    expect(await verdict('PUT', `runtime/projects/${projectId}/${buildId}/image`)).toBe(200);
+    expect(await verdict('PUT', `runtime/projects/${projectId}/${newResourceId()}/image`)).toBe(403);
+    expect(await verdict('PUT', `runtime/projects/${newResourceId()}/${buildId}/image`)).toBe(403);
+    expect(await verdict('GET', 'crewstation/task-runtime')).toBe(200);
+    expect(await verdict('PUT', 'crewstation/task-runtime')).toBe(403);
+    expect(await verdict('DELETE', `runtime/projects/${projectId}/${buildId}/image`)).toBe(403);
     await expect(mod.api.issueBuildPushCredential({ ...input, expiresAt: new Date(Date.now() - 1000).toISOString() })).rejects.toMatchObject({ kind: 'validation' });
     await expect(mod.api.issueBuildPushCredential({ ...input, expiresAt: new Date(Date.now() + 8000000).toISOString() })).rejects.toMatchObject({ kind: 'validation' });
   });
@@ -277,13 +277,13 @@ describe.skipIf(!available)('算力档位模块（RFC-006）', () => {
     const buildId = newResourceId();
     const token = await mod.api.issueBuildPushCredential({ buildId, expiresAt: new Date(Date.now() + 600000).toISOString(), pullRepositories: ['crewstation/task-runtime'] });
     const authorization = `Basic ${Buffer.from(`${token.username}:${token.password}`).toString('base64')}`;
-    const verdict = (method: string, repository: string) => mod.api.authorizeRegistryRequest({ authorization, method, uri: `/v2/${repository}/manifests/artifact` }).status;
+    const verdict = async (method: string, repository: string) => (await mod.api.authorizeRegistryRequest({ authorization, method, uri: `/v2/${repository}/manifests/artifact` })).status;
     expect(token.pushPrefixes).toEqual([`runtime/platform/${buildId}/`]);
-    expect(verdict('PUT', `runtime/platform/${buildId}/image`)).toBe(200);
-    expect(verdict('PUT', `runtime/platform/${newResourceId()}/image`)).toBe(403);
-    expect(verdict('PUT', `runtime/projects/${newResourceId()}/${buildId}/image`)).toBe(403);
-    expect(verdict('GET', 'crewstation/task-runtime')).toBe(200);
-    expect(verdict('PUT', 'crewstation/task-runtime')).toBe(403);
+    expect(await verdict('PUT', `runtime/platform/${buildId}/image`)).toBe(200);
+    expect(await verdict('PUT', `runtime/platform/${newResourceId()}/image`)).toBe(403);
+    expect(await verdict('PUT', `runtime/projects/${newResourceId()}/${buildId}/image`)).toBe(403);
+    expect(await verdict('GET', 'crewstation/task-runtime')).toBe(200);
+    expect(await verdict('PUT', 'crewstation/task-runtime')).toBe(403);
   });
 
   test('集群停止测试后，迟到的 passed 回执不能覆盖已停止终态', async () => {

@@ -1,4 +1,4 @@
-import type { BusinessExecutionProof } from '@crewstation/contracts';
+import type { BusinessExecutionProof, ProjectDeletionOwner } from '@crewstation/contracts';
 import type { ResourceTarget, ResourceValues } from '@crewstation/contracts';
 import type {
   TerminalTest, Actor, ProjectId, ProjectComputePolicyDto, SaveProjectComputePolicy, AgentProtocol, BeforeStartMaterial, ComputeProfileDetailDto, ComputeProfileList, ComputeProfileSummaryDto, ComputeProfileSelector, ComputeUsage, CopyComputeProfileRequest, CreateComputeProfileRequest,
@@ -38,6 +38,7 @@ export interface ProfileLaunchMaterial extends ProfileLaunchMetadata {
  */
 export interface AgentRuntimeModuleApi {
   readonly name: 'agent-runtime';
+  readonly deletionOwner?: ProjectDeletionOwner;
   applyResourceChange(actor: Actor, projectId: ProjectId, input: { operationId: string; target: ResourceTarget; expectedRevision: string; values: ResourceValues }): Promise<{ revision: string; effect: string; applied: boolean }>;
   resourceChangeReceipt(projectId: ProjectId, operationId: string): Promise<{ revision: string; effect: string; applied: boolean } | undefined>;
   getProjectComputePolicy(actor: Actor, projectId: ProjectId): Promise<ProjectComputePolicyDto>;
@@ -67,7 +68,7 @@ export interface AgentRuntimeModuleApi {
   /** 仅组合根的镜像构建路径使用；固定项目／build 前缀，不开放 HTTP。 */
   issueBuildPushCredential(input: { projectId?: string; buildId: string; expiresAt: string; pullRepositories: readonly string[] }): Promise<RegistryPushCredential>;
   /** 网关对仓库主机每个请求的裁定（ForwardAuth）。 */
-  authorizeRegistryRequest(input: { authorization?: string; method: string; uri: string }): RegistryVerdict;
+  authorizeRegistryRequest(input: { authorization?: string; method: string; uri: string }): Promise<RegistryVerdict>;
   /** 租户面投影（无 actor：任何登录用户都能看下拉）。 */
   listSummaries(): Promise<ComputeProfileSummaryDto[]>;
   /** 受理新启动：default 在此解析；不可用、终端档位用错用途都抛可读错误。 */

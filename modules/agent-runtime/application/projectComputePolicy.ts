@@ -18,6 +18,7 @@ export function projectComputePolicyUseCases(deps: AgentRuntimeUseCaseDeps) {
     saveProjectComputePolicy: async (actor: Actor, projectId: ProjectId, raw: SaveProjectComputePolicy): Promise<ProjectComputePolicyDto> => {
       adminOnly(actor);
       await deps.projects.authorize(actor, projectId, 'view');
+      await deps.projects.assertProjectAvailable?.(projectId);
       const input = SaveProjectComputePolicySchema.parse(raw), { policy } = input;
       for (const name of [...new Set([...policy.allowedProfiles, ...policy.additionalProfiles ?? [], ...policy.excludedProfiles ?? [], ...policy.defaultOverrideProfile ? [policy.defaultOverrideProfile] : []])]) {
         const profile = await deps.uow.read.profiles.get(name);
@@ -31,6 +32,7 @@ export function projectComputePolicyUseCases(deps: AgentRuntimeUseCaseDeps) {
       return getProjectComputePolicy(actor, projectId);
     },
     projectDevTaskProfile: async (projectId: ProjectId): Promise<string | undefined> => {
+      await deps.projects.assertProjectAvailable?.(projectId);
       if (!await deps.projects.name(projectId)) throw notFound('项目', projectId);
       return (await deps.uow.read.projectPolicies.get(projectId))?.policy.devTaskProfile ?? undefined;
     },

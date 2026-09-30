@@ -45,8 +45,8 @@ export function computeProfileAdminRoutes(api: AgentRuntimeModuleApi, isAdmin: (
  */
 export function registryForwardAuthRoutes(api: Pick<AgentRuntimeModuleApi, 'authorizeRegistryRequest'>): Hono<AppEnv> {
   const r = new Hono<AppEnv>();
-  r.get('/forward-auth/registry', (c) => {
-    const verdict = api.authorizeRegistryRequest({
+  r.get('/forward-auth/registry', async (c) => {
+    const verdict = await api.authorizeRegistryRequest({
       method: c.req.header('x-forwarded-method') ?? 'GET', uri: c.req.header('x-forwarded-uri') ?? '/',
       ...(c.req.header('authorization') ? { authorization: c.req.header('authorization')! } : {}),
     });

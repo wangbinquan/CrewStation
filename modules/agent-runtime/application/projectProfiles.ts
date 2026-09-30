@@ -13,6 +13,7 @@ export function projectProfileUseCases(deps: AgentRuntimeUseCaseDeps) {
     return (await deps.uow.read.projectPolicies.get(projectId))?.policy ?? INHERITED_COMPUTE_POLICY;
   };
   const authorizedName = async (projectId: ProjectId, wanted?: ComputeProfileSelector): Promise<string> => {
+    await deps.projects.assertProjectAvailable?.(projectId);
     const policy = await policyOf(projectId);
     const name = wanted?.kind === 'profile' ? wanted.profileId : policy.mode === 'restricted' ? policy.defaultProfile : policy.defaultOverrideProfile ?? (await deps.uow.read.profiles.getDefault())?.id;
     if (!name) throw precondition('项目尚未配置可用的默认算力档位，请管理员分配', { code: 'no_project_default_profile' });
