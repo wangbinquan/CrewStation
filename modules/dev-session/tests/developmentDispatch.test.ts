@@ -1,7 +1,7 @@
 // RFC-034 original-key participant only. Real owner PG; synthetic Session/Runner transport, no real model or cleanup acceptance.
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { newResourceId } from '@crewstation/kernel';
-import type { TaskId } from '@crewstation/contracts';
+import { RunnerHelloSchema, type TaskId } from '@crewstation/contracts';
 import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import { dispatchDevelopmentAgent } from '../application/development/dispatch';
@@ -176,5 +176,94 @@ describe.skipIf(!available)('开发原键派发 participant', () => {
     const f = await developmentDispatchFixture(database.db), owner = { ...f.owner, get: async () => { throw new Error('PG retry'); } };
     expect(await dispatchDevelopmentAgent({ ...f.deps, owner }, f.child.id)).toEqual({ kind: 'waiting', reason: 'retry' });
     expect(f.calls).toHaveLength(0); expect(f.control.materialCalls).toBe(0);
+  });
+
+  // The new fence survives journal-open failure; incomplete source cannot be persisted as legacy.
+  for (const [label, partial] of [
+    ['only the selected-layout fence', {}],
+    ['extended observations but no journal', { usageObservationsV1: 1 }],
+    ['journal without durable stop', { usageObservationsV1: 1, developmentUsageV1: 1, developmentNativeSourceV1: 1, nativeUsageTreeV1: 1 }],
+    ['journal without selected native source', { usageObservationsV1: 1, developmentUsageV1: 1, developmentUsageStopV1: 1, nativeUsageTreeV1: 1 }],
+    ['native source without its tree', { usageObservationsV1: 1, developmentUsageV1: 1, developmentUsageStopV1: 1, developmentNativeSourceV1: 1 }],
+  ] as const) {
+    test(label + ' waits and fixes the original Pod before any source or material call', async () => {
+      const f = await developmentDispatchFixture(database.db), original = (await f.owner.get(f.child.id))!;
+      f.control.capabilities = RunnerHelloSchema.shape.capabilities.parse({ protocols: ['opencode'], pty: true, preview: false, developmentStartAgentFenceV1: 1, ...partial });
+      expect(await dispatchDevelopmentAgent(f.deps, f.child.id)).toEqual({ kind: 'waiting', reason: 'source-unavailable' });
+      const stored = (await f.owner.get(f.child.id))!;
+      expect(stored).toEqual({ ...original, capabilityPodUid: f.info.podUid });
+      expect(stored.binding).toBeNull(); expect(stored.unsupported).toBe(false);
+      expect(f.calls).toHaveLength(0); expect(f.registrations).toHaveLength(0); expect(f.control.materialCalls).toBe(0);
+      expect(f.startsSent()).toHaveLength(0); expect(f.controls.priceCalls).toBe(1);
+    });
+  }
+
+  test('fence-only observation survives owner reload and missing capabilities without legacy fallback', async () => {
+    const f = await developmentDispatchFixture(database.db);
+    f.control.capabilities = RunnerHelloSchema.shape.capabilities.parse({ protocols: ['opencode'], pty: true, preview: false, developmentStartAgentFenceV1: 1 });
+    expect(await dispatchDevelopmentAgent(f.deps, f.child.id)).toEqual({ kind: 'waiting', reason: 'source-unavailable' });
+    const original = (await f.owner.get(f.child.id))!;
+    const owner = developmentUsageOwner(f.store, f.starts, f.environmentPort);
+    f.control.capabilities = { protocols: ['opencode'], pty: true, preview: false };
+    expect(await dispatchDevelopmentAgent({ ...f.deps, owner }, f.child.id)).toEqual({ kind: 'waiting', reason: 'source-unavailable' });
+    expect(await owner.get(f.child.id)).toEqual(original);
+    await expect(owner.unsupported(f.child.id)).rejects.toMatchObject({ kind: 'precondition' });
+    expect(f.calls).toHaveLength(0); expect(f.control.materialCalls).toBe(0);
+  });
+
+  test('source recovery after fence-only waiting binds and starts only the original intent and price', async () => {
+    const f = await developmentDispatchFixture(database.db), healthy = structuredClone(f.control.capabilities);
+    const prepared = (await f.owner.get(f.child.id))!;
+    f.control.capabilities = RunnerHelloSchema.shape.capabilities.parse({ protocols: ['opencode'], pty: true, preview: false, developmentStartAgentFenceV1: 1 });
+    expect(await dispatchDevelopmentAgent(f.deps, f.child.id)).toEqual({ kind: 'waiting', reason: 'source-unavailable' });
+    f.control.capabilities = healthy; f.controls.priceRevision = 99; f.controls.priceFailure = new Error('do not reprice');
+    const owner = developmentUsageOwner(f.store, f.starts, f.environmentPort);
+    expect((await dispatchDevelopmentAgent({ ...f.deps, owner }, f.child.id)).kind).toBe('accepted');
+    const bound = (await owner.get(f.child.id))!, command = f.startsSent()[0]!;
+    expect(bound.binding).not.toBeNull();
+    if (!bound.binding) throw new Error('missing original registration');
+    expect(bound).toEqual({ ...prepared, capabilityPodUid: f.info.podUid, binding: bound.binding });
+    expect(bound.binding?.podUid).toBe(f.info.podUid); expect(bound.unsupported).toBe(false);
+    if (command.type !== 'startAgent') throw new Error('wrong command');
+    expect(command.developmentUsage).toEqual({ intent: prepared.intent, key: bound.binding!.key, digestNonce: prepared.digestNonce });
+    expect(f.registrations[0]).toEqual(bound.binding); expect(f.startsSent()).toHaveLength(1);
+    expect(f.control.materialCalls).toBe(1); expect(f.controls.priceCalls).toBe(1);
+  });
+
+  test('a delayed old capability response cannot overwrite the fence-only Pod CAS', async () => {
+    const f = await developmentDispatchFixture(database.db);
+    f.control.capabilities = RunnerHelloSchema.shape.capabilities.parse({ protocols: ['opencode'], pty: true, preview: false, developmentStartAgentFenceV1: 1 });
+    let notify!: () => void, release!: () => void;
+    const entered = new Promise<void>((resolve) => { notify = resolve; }), delayed = new Promise<void>((resolve) => { release = resolve; });
+    const session = { ...f.session, connectionStatus: async () => { notify(); await delayed; return { connected: true, capabilities: { protocols: ['opencode' as const], pty: true, preview: false } }; } };
+    const old = dispatchDevelopmentAgent({ ...f.deps, session }, f.child.id);
+    await entered;
+    const fenced = await dispatchDevelopmentAgent(f.deps, f.child.id);
+    release(); const late = await old;
+    expect(fenced).toEqual({ kind: 'waiting', reason: 'source-unavailable' }); expect(late.kind).toBe('waiting');
+    expect((await f.owner.get(f.child.id))?.capabilityPodUid).toBe(f.info.podUid);
+    expect((await f.owner.get(f.child.id))?.unsupported).toBe(false);
+    expect(f.calls).toHaveLength(0); expect(f.registrations).toHaveLength(0); expect(f.control.materialCalls).toBe(0);
+  });
+
+  test('failed original environment lookup cannot mark a fenced selection unsupported', async () => {
+    const f = await developmentDispatchFixture(database.db), original = (await f.owner.get(f.child.id))!;
+    f.control.capabilities = RunnerHelloSchema.shape.capabilities.parse({ protocols: ['opencode'], pty: true, preview: false, developmentStartAgentFenceV1: 1 });
+    const owner = developmentUsageOwner(f.store, f.starts, { getEnvironment: async () => { throw new Error('actual environment unavailable'); } });
+    expect(await dispatchDevelopmentAgent({ ...f.deps, owner }, f.child.id)).toEqual({ kind: 'waiting', reason: 'retry' });
+    expect(await f.owner.get(f.child.id)).toEqual(original);
+    expect(f.calls).toHaveLength(0); expect(f.registrations).toHaveLength(0); expect(f.control.materialCalls).toBe(0);
+  });
+
+  test('unselected and previously unsupported owners preserve their legacy contract even with a fence hello', async () => {
+    const old = await developmentDispatchFixture(database.db, { selected: false });
+    const unsupported = await developmentDispatchFixture(database.db); await unsupported.owner.unsupported(unsupported.child.id);
+    const original = (await unsupported.owner.get(unsupported.child.id))!;
+    for (const f of [old, unsupported]) {
+      f.control.capabilities = RunnerHelloSchema.shape.capabilities.parse({ protocols: ['opencode'], pty: true, preview: false, developmentStartAgentFenceV1: 1 });
+      expect(await dispatchDevelopmentAgent(f.deps, f.child.id)).toEqual({ kind: 'legacy', reason: f === old ? 'unselected' : 'unsupported' });
+      expect(f.calls).toHaveLength(0); expect(f.registrations).toHaveLength(0); expect(f.control.materialCalls).toBe(0);
+    }
+    expect(await unsupported.owner.get(unsupported.child.id)).toEqual(original);
   });
 });

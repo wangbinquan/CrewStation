@@ -20,7 +20,7 @@ export interface DevelopmentUsageOwnerRecord extends DevelopmentUsagePrepared {
   binding: DevelopmentUsageRegistration | null;
   unsupported: boolean;
   closeReason: DevelopmentUsageDrainReason | null;
-  /** Once observed, capability cannot disappear into a legacy fallback; bound to the actual original Pod. */
+  /** Numeric or selected-layout fence capability forbids legacy fallback; bound to the original Pod, not proof of a healthy journal. */
   capabilityPodUid?: string;
 }
 /** Immutable admissions live apart from AgentStart's ordinary state updates. */

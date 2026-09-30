@@ -17,6 +17,10 @@ async function bindOriginal(deps: DevelopmentDispatchDeps, original: Development
   if (!status.connected) return { kind: 'waiting', reason: 'disconnected' };
   if (!status.capabilities) return { kind: 'waiting', reason: 'unknown-capabilities' };
   if (!developmentCapabilitiesSupported(original, status.capabilities)) {
+    if (status.capabilities.developmentStartAgentFenceV1 === 1) {
+      await deps.owner.observeSupported(id); // Persist the selected-layout fence before any legacy decision.
+      return { kind: 'waiting', reason: 'source-unavailable' };
+    }
     if (original.capabilityPodUid) return { kind: 'waiting', reason: 'source-unavailable' };
     const next = await deps.owner.unsupported(id);
     return next.closeReason ? { kind: 'ending', reason: next.closeReason } : { kind: 'legacy', reason: 'unsupported' };
