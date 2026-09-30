@@ -1,4 +1,5 @@
 import { CatalogPagination } from '../../../../shared/ui/catalog/CatalogPagination';
+import { useEffect, useRef } from 'react';
 import { ProjectPageSchema, UserIdSchema } from '@crewstation/contracts';
 import type { ManifestKind } from '@crewstation/contracts';
 import { api } from '../../../../shared/api/client';
@@ -12,15 +13,23 @@ import { ActionNote } from '../../../../shared/ui/ActionNote';
 import { ProjectDirectoryFilters } from './ProjectDirectoryFilters';
 import { ProjectDirectoryTable } from './ProjectDirectoryTable';
 import { INTEGRATION_KINDS } from '../../../../shared/admin/integrationKinds';
-import { ButtonLink } from '../../../../shared/ui/navigation/ButtonLink';
+import { Button } from '../../../../shared/ui/Button';
+import { useOpenProjectCreation } from '../../../../shared/admin/ProjectCreationSlot';
 
 /** 项目管理只列数字人，接入容器只在「能力接入」里列（2026-09-24 裁定），各自只有自己那一种新建入口。 */
 export function ProjectDirectory({ search, apply, integration = false }: {
   readonly search: ProjectDirectorySearch; readonly apply: (search: ProjectDirectorySearch) => void; readonly integration?: boolean;
 }) {
   const t = useT(), kinds: ManifestKind[] = integration ? [...INTEGRATION_KINDS] : ['DigitalWorker'], scope = integration ? 'integration' : 'digital-worker';
+  const openCreation = useOpenProjectCreation(), trigger = useRef<HTMLButtonElement>(null);
+  const bookmarkOpened = useRef(false);
+  useEffect(() => {
+    if (!search.create) { bookmarkOpened.current = false; return; }
+    if (bookmarkOpened.current) return;
+    bookmarkOpened.current = true; openCreation(scope, trigger.current); apply({ ...search, create: undefined });
+  }, [search, openCreation, scope, apply]);
   const kind = search.kind && kinds.includes(search.kind) ? [search.kind] : kinds;
-  const { ownerName: _ownerName, ...filter } = search;
+  const { ownerName: _ownerName, create: _create, ...filter } = search;
   const request = { ...filter, ownerUserId: UserIdSchema.safeParse(search.ownerUserId).data, kind, limit: 20 };
   const { query, userId } = useAdminRead(queryKeys.adminProjectPage(request), async () => {
     const result = ProjectPageSchema.safeParse(await api.projects.page(request));
@@ -29,7 +38,7 @@ export function ProjectDirectory({ search, apply, integration = false }: {
   });
   const items = [401, 403, 404].includes(query.error?.status ?? 0) ? [] : query.data?.items ?? [], settled = !query.error && !query.isPending;
   return <Card compact title={t(integration ? 'admin.integrations.title' : 'admin.directory.title')}
-    extra={<ButtonLink variant="primary" to="/admin/projects/new" search={{ scope }}>{t(`projects.wizard.title.${scope}`)}</ButtonLink>}>
+    extra={<Button ref={trigger} variant="primary" onClick={() => openCreation(scope, trigger.current)}>{t(`projects.wizard.title.${scope}`)}</Button>}>
     <ProjectDirectoryFilters key={JSON.stringify(search)} search={search} items={items} userId={userId} integration={integration} apply={apply} />
     <QueryStatus isPending={query.isPending} error={query.error} isEmpty={items.length === 0} emptyTitle={t('admin.directory.empty')} emptyDescription={t('admin.directory.emptyHint')} />
     {query.error && items.length ? <ActionNote tone="neutral">{t('admin.directory.lastRead')}</ActionNote> : null}

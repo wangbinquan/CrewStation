@@ -3,6 +3,7 @@ import { and, asc, eq, gt, isNotNull, lt, sql } from 'drizzle-orm';
 import type { ChangeEntry, ChangeLog, LeaseStore, LedgerScope, LedgerUnitOfWork, ProjectLocks } from '../../ports/repositories';
 import { drizzleRecordRepository } from './drizzleRecords';
 import { changes, leases, projectLocks } from './tables';
+import { resourceDeletionWriteError } from './deletion/errors';
 
 export function drizzleChangeLog(db: Executor): ChangeLog {
   return {
@@ -49,5 +50,5 @@ export function ledgerScopeOver(executor: Executor): LedgerScope {
 
 /** 台账的事务单元；within 加入调用方（所属模块）已开的事务。 */
 export function drizzleLedgerUnitOfWork(db: Database): LedgerUnitOfWork & { within(executor: Executor): LedgerScope } {
-  return { read: ledgerScopeOver(db), run: (fn) => db.transaction((tx) => fn(ledgerScopeOver(tx))), within: ledgerScopeOver };
+  return { read: ledgerScopeOver(db), run: (fn) => db.transaction((tx) => fn(ledgerScopeOver(tx))).catch(resourceDeletionWriteError), within: ledgerScopeOver };
 }

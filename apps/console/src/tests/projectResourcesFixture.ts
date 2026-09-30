@@ -14,7 +14,7 @@ export const resourceEventTypes = [
 ] as const;
 const createdAt = '2026-09-20T01:00:00.000Z';
 export function projectResourcesFixture(admin = false) {
-  const state = { kind: admin ? 'APIProxy' : 'DigitalWorker', fail: '', invalid: false, noService: false, noWebUrl: false };
+  const state = { kind: admin ? 'APIProxy' : 'DigitalWorker', fail: '', invalid: false, noService: false, noWebUrl: false, role: 'developer' as 'owner' | 'developer' };
   const calls: string[] = [];
   const subscription = { id: '01a0bf5d-8f4b-7b9c-8c07-a2ef94c840cd', eventTypeId: '01a0bf5d-8f4b-780c-85dd-95f81e0fec71', serviceId: resourcesServiceId, eventType: 'source.changed', handlerPath: '/on-source', state: 'active' };
   const capability = {
@@ -30,12 +30,16 @@ export function projectResourcesFixture(admin = false) {
   globalThis.fetch = (async (raw) => {
     const path = new URL(String(raw), 'http://localhost').pathname; calls.push(path);
     if (state.fail && path.endsWith(`/${state.fail}`)) return Response.json({ error: 'unavailable', message: '本主题暂不可用' }, { status: 503 });
-    if (path === '/v1/me') return Response.json({ id: 'user', name: '开发者', platformRole: (admin) ? 'admin' : 'developer', isAdmin: admin, memberships: [{ projectId: resourcesProjectId, role: 'developer' }] });
+    if (path === '/v1/me') return Response.json({ id: 'user', name: '开发者', platformRole: (admin) ? 'admin' : 'developer', isAdmin: admin, memberships: [{ projectId: resourcesProjectId, role: state.role }] });
     if (path === `/v1/projects/${resourcesProjectId}`) return Response.json({ id: resourcesProjectId, ...(state.noService ? { state: 'provisioning' } : { serviceId: resourcesServiceId, state: 'active' }), name: '示例项目', slug: 'demo', namespace: 'cs-demo', kind: state.kind });
     if (path.endsWith('/capabilities')) return Response.json(state.invalid ? {} : capability);
     if (path.endsWith('/repository')) return Response.json({ serviceId: resourcesServiceId, pathWithNamespace: 'crew/demo', defaultBranch: 'main', state: 'ready', httpUrl: 'https://repo.test/crew/demo', ...(state.noWebUrl ? {} : { webUrl: 'https://gitlab.web.test/crew/demo' }) });
     if (path.endsWith('/subscriptions')) return Response.json({ items: [subscription] });
     if (path === '/v1/catalog/operations') return Response.json({ items: resourceOperations });
+    if (path.endsWith('/resource-center/targets/api-operation')) return Response.json(resourceOperations.filter((operation) => !operation.granted).map((operation) => {
+      const target = { resourceType: 'api-operation', resourceId: operation.id, action: 'grant' };
+      return { view: { target, name: `${operation.method} ${operation.path}`, revision: '1', current: {}, fields: [], impact: [], owned: false, available: true }, actions: state.role === 'owner' ? [{ id: operation.id, kind: 'request', target, revision: '1', current: {}, label: '申请', fields: [], impact: [], enabled: true }] : [], policy: null, requestable: state.role === 'owner' };
+    }));
     if (path === '/v1/catalog/event-types') return Response.json({ items: resourceEventTypes });
     if (path.endsWith('/dev-session')) return Response.json({ error: 'not_found', message: '请先创建开发会话' }, { status: 404 });
     return Response.json({ items: [] });

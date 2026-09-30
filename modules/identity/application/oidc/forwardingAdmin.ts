@@ -1,10 +1,10 @@
 import type { EffectiveForwardingDto, IdentityForwardingDto, ProjectId, UpdateIdentityForwardingRequest, UserId } from '@crewstation/contracts';
 import { UpdateIdentityForwardingRequestSchema } from '@crewstation/contracts';
-import { forbidden, validation } from '@crewstation/kernel';
+import { forbidden, precondition, validation } from '@crewstation/kernel';
 import { effectiveForwardingFields, forwardingCandidates, forwardingProjection } from '../../domain/identityForwarding';
 import type { IdentityUseCaseDeps } from '../dependencies';
 
-type Deps = Pick<IdentityUseCaseDeps, 'uow' | 'clock' | 'projects'>;
+type Deps = Pick<IdentityUseCaseDeps, 'uow' | 'clock' | 'projects' | 'projectAdmission'>;
 
 /** 注入路径上的短缓存：转发集改动最长 5 秒生效，比身份令牌 300 秒的寿命短一个数量级。 */
 const INJECTION_CACHE_MS = 5_000;
@@ -37,6 +37,7 @@ export function forwardingUseCases(deps: Deps) {
   };
 
   const effectiveForwarding = async (projectId: ProjectId): Promise<EffectiveForwardingDto> => {
+    if (deps.projectAdmission && !await deps.projectAdmission.byId(projectId)) throw precondition('项目已关闭身份转发');
     const [global, project, candidateList] = await Promise.all([
       deps.uow.read.forwarding.readGlobal(),
       deps.uow.read.forwarding.readProject(projectId),
@@ -72,6 +73,7 @@ export function forwardingUseCases(deps: Deps) {
 
     setProjectForwarding: async (actor: ForwardingActor, projectId: ProjectId, raw: unknown): Promise<void> => {
       requireAdmin(actor);
+      if (deps.projectAdmission && !await deps.projectAdmission.byId(projectId)) throw precondition('项目已关闭身份转发');
       const fields = await parseFields(raw);
       await deps.uow.run((scope) => scope.forwarding.writeProject(projectId, fields, actor.userId, deps.clock.now()));
       invalidate();
@@ -79,6 +81,7 @@ export function forwardingUseCases(deps: Deps) {
 
     clearProjectForwarding: async (actor: ForwardingActor, projectId: ProjectId): Promise<void> => {
       requireAdmin(actor);
+      if (deps.projectAdmission && !await deps.projectAdmission.byId(projectId)) throw precondition('项目已关闭身份转发');
       await deps.uow.run((scope) => scope.forwarding.clearProject(projectId));
       invalidate();
     },
@@ -91,6 +94,7 @@ export function forwardingUseCases(deps: Deps) {
 
     /** ForwardAuth 用：按主机里的项目 slug 求生效集，带 5 秒缓存以免每个业务请求都多查三次库。 */
     effectiveForwardingForSlug: async (projectSlug: string): Promise<EffectiveForwardingDto | undefined> => {
+      if (deps.projectAdmission && !await deps.projectAdmission.bySlug(projectSlug)) return undefined;
       const now = deps.clock.now().getTime();
       const cached = injectionCache.get(projectSlug);
       if (cached && now - cached.at < INJECTION_CACHE_MS) return cached.value;

@@ -4,7 +4,7 @@
 
 ## 2026-09-30 RFC-037 项目创建弹窗与彻底删除（实施中）
 
-作者已批准完整 RFC 实施、提交上库、本机部署和自主验证。[RFC-037 三件套](proposal/rfc/RFC-037-project-creation-and-deletion/proposal.md)及[交互稿](proposal/rfc/RFC-037-project-creation-and-deletion/prototype/README.md)完成；正式创建已改共享 FormDialog，实际 HostNaming 域名预览、模板内容、自建／代建／接入、旧书签和草稿／焦点接线齐全。后端域名 4、console 14 项通过，实际组件隔离浏览器已有桌面／手机截图，尚非部署验收。删除底座／配置／身份／客户端 131 项及实际队列 4 项通过；新增资源台账准入共享／排他锁、12 表全量历史／间接清零和旧键墓碑，相关 78 项通过；cluster-control 原 UID、完整 discovery、PV 与正常 Namespace 终结全模块 166 项通过。原 Pod 保护、实际工作盘／仓库／数据库／对象／镜像回收及其余 owner 继续；22 owner 全部装配前产品删除仍关闭。自有资源 0004 迁移入锁；后端类型／精确 lint 通过，当前全库结构仅被并行 dev-session 在制依赖阻断。尚未完整门禁、提交、部署或真实验证资源；保留 RFC-036／034 并行工作及下方历史，详见 plan 回执。
+作者已批准完整 RFC 实施、提交上库、本机部署和自主验证。[RFC-037 三件套](proposal/rfc/RFC-037-project-creation-and-deletion/proposal.md)与交互稿完成；正式创建为共享 FormDialog，实际域名／模板用途、书签、草稿与焦点齐全，部署验收待做。原 Pod 停止保护、原 PVC／PV／供应器位置和 CSI／local-path 来源适配器、最小回执已通过 PG／假 API 源定向，组合曾为 282 pass／0 fail。首次完整检查 4498 pass／143 skip／24 fail；已修正准入占满普通池、小池 seal 排队下的嵌套写、旧创建断言、升级边界与共享入口回归。修订准入及命名空间 11／0、创建／公开工厂／升级 38／0；源码尚未提交或部署。第二次完整检查的目录查询监测已取消 Proxy 修正，原目录摘要／连接池／准入屏障 19／0；最终完整门禁 4561 pass／143 skip／0 fail、189 路径指纹稳定，HEAD＋精确候选后端／console 类型均 0 错误，准备精确提交／CI／部署。其余物理 owner／消费者数字排空和正式 22 owner 组合仍缺，产品永久删除保持关闭；保留 RFC-036／034 完整并行内容，详见 plan 日志与边界。
 
 ## 2026-09-30 平台管理导航：项目与能力供给前移
 

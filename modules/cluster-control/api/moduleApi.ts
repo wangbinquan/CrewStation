@@ -1,4 +1,8 @@
 import type { Actor, AdoptionReport } from '@crewstation/contracts';
+import type { ClusterDeletionOwnerFactory } from './projectDeletion';
+import type { ClusterDeletionAdmission } from './projectDeletion';
+import type { ClusterPodStopReceipts, ProjectPodProtection } from './projectPodProtection';
+import type { ClusterVolumeReclamationStore, ProjectVolumeReclamation } from './projectVolumeReclamation';
 
 /** 服务槽的期望（release 写进槽记录的那一份：子对象与 slot 渲染输入，RFC-025 T8）。 */
 export type SlotSpec = {
@@ -9,6 +13,9 @@ export type SlotSpec = {
 /** cluster-control 模块对外能力（RFC-025 第一期：观测与收编空跑报告；T8：服务槽的集群预检）。 */
 export interface ClusterControlModuleApi {
   readonly name: 'cluster-control';
+  readonly projectDeletionOwner: ClusterDeletionOwnerFactory;
+  projectPodProtection(admission: ClusterDeletionAdmission, receipts: ClusterPodStopReceipts): ProjectPodProtection;
+  projectVolumeReclamation(admission: ClusterDeletionAdmission, receipts: ClusterVolumeReclamationStore): ProjectVolumeReclamation;
   inspectNamespaceRetirement(name: string, intent: { uid: string; children: readonly { kind: string; name: string; uid: string; namespace?: string }[] }): Promise<void>;
   /** 管理员：收编空跑报告，只读，不改集群也不写台账。 */
   adoptionReport(actor: Actor): Promise<AdoptionReport>;

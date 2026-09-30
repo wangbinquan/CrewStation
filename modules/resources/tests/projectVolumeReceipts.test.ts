@@ -1,0 +1,54 @@
+import { afterEach, describe, expect, test } from 'bun:test';
+import type { TaskVolumeTarget } from '@crewstation/contracts';
+import { jsonHash } from '@crewstation/kernel';
+import type { TestDatabase } from '@crewstation/testkit';
+import { testDatabaseAvailable } from '@crewstation/testkit';
+import { sql } from 'drizzle-orm';
+import { deletionFixture } from './deletionFixture';
+import { PROJECT, OTHER_PROJECT } from './fixtures';
+
+const available = await testDatabaseAvailable();
+describe.skipIf(!available)('原项目卷供应器身份与物理回收摘要（真实 PG）', () => {
+  let database: TestDatabase;
+  afterEach(async () => { await database?.drop(); });
+  test('先固定原 PVC/PV，再保存不可替换回收摘要；跨实例、清理元数据后仍可对实际来源复核', async () => {
+    const f = await deletionFixture(); database = f.database;
+    const target: TaskVolumeTarget = { kind: 'local-path', namespace: 'cs-demo', name: 'original', uid: 'original-pvc', pvName: 'original-pv', pvUid: 'original-pv-uid', nodeName: 'worker', nodeUid: 'original-node', root: '/volumes', directory: 'original-directory' };
+    const key = JSON.stringify({ apiVersion: 'v1', kind: 'PersistentVolumeClaim', namespace: target.namespace, name: target.name });
+    const originalInspect = f.physics.inspect; f.physics.inspect = async (scope) => { const report = await originalInspect(scope); return { ...report, resources: [...report.resources, { kind: 'protected:PVC', id: key, identity: JSON.stringify({ uid: target.uid, target }), count: 1 }] }; };
+    await f.plan(); const store = f.module.api.projectDeletion.volumeReclamation(f.grant);
+    await expect(store.pin(f.context('seal'), key, target)).rejects.toMatchObject({ kind: 'precondition' }); await f.run('seal');
+    await expect(store.pin(f.context('stop'), key, target)).rejects.toThrow('阶段');
+    await expect(store.pin(f.context('seal'), key, { ...target, uid: 'replacement' })).rejects.toThrow('原确认');
+    await store.pin(f.context('seal'), key, target); await store.pin(f.context('seal'), key, target);
+    expect(await store.get(f.context('purge'), key)).toEqual({ key, target, digest: null, observedAt: null });
+    await expect(store.pin(f.context('purge'), key, { ...target, pvUid: 'replacement-pv' })).rejects.toThrow('原确认');
+    const digest = jsonHash('physical-reclaim-receipt'), observedAt = '2026-09-30T12:00:00.000Z';
+    await expect(store.reclaimed(f.context('stop'), key, digest, observedAt)).rejects.toThrow('阶段');
+    await store.reclaimed(f.context('purge'), key, digest, observedAt); await store.reclaimed(f.context('prove'), key, digest, observedAt);
+    await expect(store.reclaimed(f.context('prove'), key, jsonHash('replacement-proof'), observedAt)).rejects.toThrow('不可替换');
+    for (const query of [sql`UPDATE resources.deletion_volume_receipts SET pv_uid = 'replacement' WHERE project_id = ${PROJECT}`, sql`DELETE FROM resources.deletion_volume_receipts WHERE project_id = ${PROJECT}`]) await expect(Promise.resolve(database.db.execute(query))).rejects.toMatchObject({ cause: { code: '55000' } });
+    await f.run('stop'); await f.run('purge'); await f.run('prove'); await f.run('metadata');
+    expect(await f.module.api.projectDeletion.volumeReclamation(f.grant).get(f.context('verify'), key)).toEqual({ key, target, digest, observedAt });
+    const serialized = JSON.stringify(await database.db.execute(sql`SELECT * FROM resources.deletion_volume_receipts WHERE project_id = ${PROJECT}`));
+    expect(serialized).not.toContain('spec'); expect(serialized).not.toContain('token'); f.takeover(); await expect(store.get(f.context('verify', { generation: 1 }), key)).rejects.toThrow('失效');
+  });
+  test('原 Pending PVC 可首次固定实际供应器，此后不能改 PV；全量已知原卷不混入其他项目', async () => {
+    const f = await deletionFixture(); database = f.database;
+    const target: TaskVolumeTarget = { kind: 'csi', namespace: 'cs-demo', name: 'original', uid: 'original-pvc', pvName: 'original-pv', pvUid: 'original-pv-uid', driver: 'test.csi', handleDigest: jsonHash('backend-handle'), deletionFinalizer: 'external-provisioner.volume.kubernetes.io/finalizer' };
+    const key = JSON.stringify({ apiVersion: 'v1', kind: 'PersistentVolumeClaim', namespace: target.namespace, name: target.name });
+    const writer = f.module.api.owner('task-runtime');
+    const own = await writer.declare({ kind: 'volume', ref: 'original', projectId: PROJECT, spec: { children: [{ kind: 'PersistentVolumeClaim', namespace: target.namespace, name: target.name }] } });
+    const other = await writer.declare({ kind: 'volume', ref: 'other', projectId: OTHER_PROJECT, spec: { children: [] } });
+    await database.db.execute(sql`INSERT INTO resources.task_volume_safety(resource_id,body) VALUES (${own.id},${JSON.stringify({ target })}::jsonb),(${other.id},${JSON.stringify({ target: { ...target, uid: 'other-pvc' } })}::jsonb)`);
+    f.physics.inspect = async () => ({ participant: 'resources', complete: true, revision: jsonHash('pending'), resources: [{ kind: 'protected:PVC', id: key, identity: JSON.stringify({ uid: target.uid }), count: 1 }], references: [], blockers: [] });
+    await f.plan(); await f.run('seal'); const store = f.module.api.projectDeletion.volumeReclamation(f.grant);
+    expect(await store.known(PROJECT)).toEqual([target]);
+    await expect(store.pin(f.context('purge'), key, { ...target, name: 'wrong-name' })).rejects.toThrow('原确认');
+    await store.pin(f.context('purge'), key, target);
+    expect(await f.module.api.projectDeletion.ownsVolume(PROJECT, { name: target.pvName, uid: target.pvUid })).toBe(true);
+    expect(await f.module.api.projectDeletion.ownsVolume(PROJECT, { name: target.pvName, uid: 'replacement', claim: { namespace: target.namespace, uid: target.uid } })).toBe(false);
+    await expect(store.pin(f.context('purge'), key, { ...target, pvUid: 'replacement' })).rejects.toThrow('不能替换');
+    await expect(store.reclaimed(f.context('purge'), 'unknown', jsonHash('fake'), new Date().toISOString())).rejects.toThrow('尚未固定');
+  });
+});

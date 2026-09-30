@@ -90,7 +90,7 @@ describe('六个项目入口与旧链接兼容', () => {
     const f = fixture(); page = await renderApp(`/projects/${projectId}`);
     const links = [...document.querySelectorAll('[aria-label="项目页面"] a')];
     // RFC-020 D2：「开发资源」不再是入口，左栏顺序即生命周期。
-    expect(links.map((link) => link.textContent)).toEqual(['概览', '开发', '发布与上线', '运行与诊断', '运行观测与统计', '项目设置']);
+    expect(links.map((link) => link.textContent)).toEqual(['概览', '开发', '发布与上线', '运行与诊断', '运行观测与统计', '项目资源中心', '项目设置']);
     expect(page.text()).toContain('团队知识助理'); expect(page.text()).toContain('team-knowledge');
     expect(document.querySelector('header.bar')?.textContent).not.toContain(projectId);
     // 页头的仓库链接跟着摘要走：这份夹具没有摘要，就不该去读仓库或成员。

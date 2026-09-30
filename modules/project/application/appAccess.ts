@@ -17,13 +17,13 @@ export function appAccessUseCases(deps: ProjectUseCaseDeps) {
   const ownerName = async (ownerUserId: UserId) => (await users.getUser(ownerUserId).catch(() => undefined))?.name ?? '—';
   const load = async (projectId: ProjectId, userId: UserId) => {
     const found = await uow.read.appListings.accessFacts({ projectId }, userId);
-    if (!found || found.project.state === 'archived') throw notFound('应用', projectId);
+    if (!found || found.project.state === 'archived' || found.project.state === 'deleting') throw notFound('应用', projectId);
     return found;
   };
   return {
     appAccessBySlug: async (user: { readonly id: UserId; readonly isAdmin: boolean }, projectSlug: string): Promise<AppAccessVerdict> => {
       const found = await uow.read.appListings.accessFacts({ slug: projectSlug }, user.id);
-      if (!found || found.project.state === 'archived') return { kind: 'unknown' };
+      if (!found || found.project.state === 'archived' || found.project.state === 'deleting') return { kind: 'unknown' };
       if (canUseApp(found.facts, user.isAdmin)) return { kind: 'allowed' };
       return { kind: 'denied', projectId: found.project.id, appName: found.project.name, ownerName: await ownerName(found.project.ownerUserId), requestable: acceptsRequests(found.facts) };
     },

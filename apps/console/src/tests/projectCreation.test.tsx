@@ -2,52 +2,16 @@ import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
 import { renderApp } from './renderApp';
-import { browserHistoryFixture } from './browserHistoryFixture';
+import { openDialog } from './confirmDialogDriver';
+import { creationFixtureProject, creationPlanId, creationProjectId, creationUserId, projectCreationFixture } from './projectCreationFixture';
 
 const originalFetch = globalThis.fetch;
-const userId = '01a0bf5d-8f4b-7f8b-8136-e631380738b0', projectId = '01a0bf5d-8f4b-7aef-84b8-c458233bab22';
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 
-function fixture(admin = true) {
-  const requests: Array<{ path: string; method: string; body?: Record<string, unknown> }> = [];
-  const state = { catalogFailure: false, createFailure: false, projectFailure: false, retryFailure: false, status: 'provisioning', kind: 'APIProxy',
-    holdCreate: undefined as Promise<void> | undefined, noTemplates: false, resultOverride: undefined as Record<string, unknown> | undefined };
-  globalThis.fetch = (async (raw, init) => {
-    const path = new URL(String(raw), 'http://localhost').pathname, method = init?.method ?? 'GET';
-    const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined;
-    requests.push({ path, method, body });
-    let result: unknown = { items: [] }, status = 200;
-    if (path === '/v1/me') result = { id: userId, name: '管理者', email: 'admin@test.invalid', platformRole: (admin) ? 'admin' : 'developer', isAdmin: admin, memberships: [] };
-    else if (path === '/v1/users') result = { items: [{ id: userId, name: '负责人甲', email: 'owner@test.invalid' }] };
-    else if (path === '/v1/catalog/project-creation') result = { templates: [{ id: '01a0bf5d-8f4b-7002-9560-94caf593fb19', name: 'minimal-sample', kind: 'DigitalWorker', servicePlan: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', requiredConfig: [] }], defaultServicePlan: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', maxConcurrentTasks: 3 };
-    else if (path === '/v1/catalog/project-templates') {
-      if (state.catalogFailure) { status = 503; result = { error: 'unavailable', message: '模板目录离线' }; }
-      else result = { items: state.noTemplates ? [] : [
-        { id: '01a0bf5d-8f4b-7002-9560-94caf593fb19', name: 'minimal-sample', kind: 'DigitalWorker', servicePlan: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', requiredConfig: [] },
-        { id: '01a0bf5d-8f4b-7003-9dbe-4adc78f388e9', name: 'reference-api-proxy', kind: 'APIProxy', servicePlan: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', requiredConfig: [{ name: 'GITLAB_TOKEN', from: 'secret' }] },
-        { id: '01a0bf5d-8f4b-7004-9cf7-0eb8bf66ffbc', name: 'gitlab-event-producer', kind: 'EventProducer', servicePlan: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', requiredConfig: [] },
-      ] };
-    } else if (path === '/v1/catalog/service-plans') result = { items: [{ id: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', name: 'standard-small', cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '小套餐' }, { id: '01a0bf5d-8f4b-76b5-8a28-f084e91fddf4', name: 'standard-large', cpu: '2', memory: '4Gi', maxReplicas: 4, description: '大套餐' }] };
-    else if (path === '/v1/projects' && method === 'POST') {
-      if (state.holdCreate) await state.holdCreate;
-      if (state.createFailure) { status = 409; result = { error: 'conflict', message: '项目标识已占用', details: { field: 'slug' } }; }
-      else { state.kind = String(body!.kind); result = { ...body, id: projectId, namespace: 'cs-billing', createdAt: '2026-09-13T00:00:00.000Z', state: state.status, ...state.resultOverride }; }
-    } else if (path === `/v1/projects/${projectId}`) {
-      if (state.projectFailure) { status = 503; result = { error: 'unavailable', message: '状态暂时无法读取' }; }
-      else result = { id: projectId, kind: state.kind, name: '账单接入', slug: 'billing', state: state.status, message: state.status === 'failed' ? 'ensureFirstRelease 失败：缺少 GITLAB_TOKEN' : undefined };
-    } else if (path.endsWith('/provision')) {
-      if (state.retryFailure) { status = 503; result = { error: 'unavailable', message: '排队失败' }; }
-      else { status = 202; result = { queued: true }; }
-    } else if (path.endsWith('/dev-session')) { status = 404; result = { error: 'not_found', message: '没有会话' }; }
-    return new Response(JSON.stringify(result), { status, headers: { 'content-type': 'application/json' } });
-  }) as typeof fetch;
-  return { state, requests, writes: () => requests.filter((r) => r.method !== 'GET') };
-}
-
 async function field(name: string, value: string) {
-  const node = document.querySelector<HTMLInputElement | HTMLSelectElement>(`[name="${name}"]`)!;
-  expect(node).toBeDefined();
+  const node = openDialog().querySelector<HTMLInputElement | HTMLSelectElement>(`[name="${name}"]`);
+  if (!node) throw new Error(`缺少字段 ${name}`);
   await act(async () => {
     const proto = node instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
     node.focus(); Object.getOwnPropertyDescriptor(proto, 'value')!.set!.call(node, value);
@@ -55,147 +19,136 @@ async function field(name: string, value: string) {
     node.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true }));
   }); await page!.settle();
 }
-
-test('开发列表进入简洁自建表单，代建资源表单仍属于管理空间', async () => {
-  const f = fixture(); page = await renderApp('/projects');
-  // 原版把所有 kind 和原始模板输入放在工作台日常列表上方。
-  expect(document.querySelectorAll('[name="name"], [name="slug"], [name="template"], [name="kind"]').length).toBe(0);
-  expect(document.querySelectorAll('form').length).toBe(1);
-  expect(f.writes()).toHaveLength(0);
-  await page.click('新建项目'); expect(page.path()).toBe('/projects/new');
-  expect(page.text()).toContain('项目信息'); expect(document.querySelector('[name="kind"]')).toBeNull();
-});
-
-test('逐步校验所有字段，返回保留草稿；按真实 kind 过滤模板并提交套餐与配额', async () => {
-  const f = fixture(); page = await renderApp('/admin/capabilities?tab=integrations');
-  await page.click('新建接入容器'); expect(page.search().scope).toBe('integration');
-  expect(document.querySelector('select[name="kind"] option[value="DigitalWorker"]')).toBeNull();
-  expect(page.text()).toContain('1–80 字'); expect(page.text()).toContain('3–40 位');
-  await page.click('下一步'); expect(document.querySelectorAll('[aria-invalid="true"]')).toHaveLength(3); expect(f.writes()).toHaveLength(0);
-  await field('name', '  账单接入  '); await field('slug', 'billing'); await field('ownerUserId', userId);
-  await page.click('下一步'); expect(page.text()).toContain('1–100');
-  expect(document.querySelector('[name="template"] option[value="01a0bf5d-8f4b-7002-9560-94caf593fb19"]')).toBeNull();
-  await page.click('下一步'); expect(document.querySelectorAll('[aria-invalid="true"]')).toHaveLength(2);
-  await field('template', '01a0bf5d-8f4b-7003-9dbe-4adc78f388e9'); await field('plan', '01a0bf5d-8f4b-76b5-8a28-f084e91fddf4'); await field('maxConcurrentTasks', '101');
-  await page.click('下一步'); expect(document.querySelector('[name="maxConcurrentTasks"]')!.getAttribute('aria-invalid')).toBe('true');
-  await field('maxConcurrentTasks', '7'); await page.click('下一步');
-  expect(page.text()).toContain('GITLAB_TOKEN'); expect(page.text()).toContain('不会自动提供这些值');
-  // 首个发布在项目 active 后异步失败；重新开通不会为已有发布重新打标签。
-  expect(page.text()).toContain('若首个发布失败，在“发布与上线”使用新版本号重新发布');
-  expect(page.text()).not.toContain('再重新开通');
-  await page.click('上一步'); expect(document.querySelector<HTMLInputElement>('[name="maxConcurrentTasks"]')!.value).toBe('7');
-  await page.click('上一步'); expect(document.querySelector<HTMLInputElement>('[name="name"]')!.value).toBe('  账单接入  ');
-  await page.click('下一步'); await page.click('下一步'); await page.click('创建项目');
-  expect(f.writes()).toHaveLength(1); expect(f.writes()[0]?.body).toEqual({ name: '账单接入', slug: 'billing', ownerUserId: userId, kind: 'APIProxy', template: '01a0bf5d-8f4b-7003-9dbe-4adc78f388e9', plan: '01a0bf5d-8f4b-76b5-8a28-f084e91fddf4', maxConcurrentTasks: 7 });
-  expect(page.path()).toBe(`/admin/projects/${projectId}/provisioning`); expect(page.text()).toContain('不提供逐阶段进度');
-  await page.click('进入开发'); expect(page.path()).toBe(`/admin/integrations/${projectId}/dev-session`);
-});
-
-async function readyToCreate() {
-  await field('name', '新数字人'); await field('slug', 'billing'); await field('ownerUserId', userId);
-  await page!.click('下一步'); await field('template', '01a0bf5d-8f4b-7002-9560-94caf593fb19'); await field('plan', '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10'); await page!.click('下一步');
+async function cancelWithEscape() {
+  await act(async () => { openDialog().dispatchEvent(new Event('cancel', { cancelable: true })); }); await page!.settle();
 }
+async function resources() {
+  await act(async () => { openDialog().querySelector('summary')!.click(); }); await page!.settle();
+}
+async function ready() { await field('name', '新数字人'); await field('slug', 'billing'); }
+const inputValue = (name: string) => openDialog().querySelector<HTMLInputElement>(`[name="${name}"]`)?.value;
 
-test('服务器字段错误返回原步骤并保留全部选择，空任务配额保留默认语义', async () => {
-  const f = fixture(); f.state.createFailure = true; page = await renderApp('/admin/projects/new'); await readyToCreate(); await page.click('创建项目');
-  expect(page.text()).toContain('项目标识已占用'); expect(document.querySelector('[name="slug"]')!.getAttribute('aria-invalid')).toBe('true');
-  expect(document.querySelector<HTMLInputElement>('[name="name"]')!.value).toBe('新数字人');
-  f.state.createFailure = false; await field('slug', 'new-billing'); await page.click('下一步');
-  expect(document.querySelector<HTMLSelectElement>('[name="template"]')!.value).toBe('01a0bf5d-8f4b-7002-9560-94caf593fb19');
-  await page.click('下一步'); await page.click('创建项目');
-  expect(f.writes().at(-1)!.body).not.toHaveProperty('maxConcurrentTasks');
-  expect(page.path()).toBe(`/admin/projects/${projectId}/provisioning`);
-  await page.click('进入开发'); expect(page.path()).toBe(`/projects/${projectId}/dev-session`);
+test('开发列表打开共享弹窗，无独立创建页；关闭、重开、Esc、清空保留列表与焦点', async () => {
+  const f = projectCreationFixture('developer'); f.state.rows = Array.from({ length: 40 }, (_, n) => creationFixtureProject(n + 1));
+  page = await renderApp('/projects?q=数字&cursor=page-2'); const path = page.path(), search = page.search();
+  expect(document.querySelectorAll('dialog[open]')).toHaveLength(0);
+  await page.click('新建项目'); expect(page.path()).toBe(path); expect(openDialog().getAttribute('data-cs-dialog')).toBe('');
+  expect(document.querySelectorAll('dialog[open]')).toHaveLength(1); expect(document.activeElement === openDialog().querySelector('[name="name"]')).toBe(true);
+  await ready(); await field('template', '01a0e222-de8b-7000-8cd8-207c8673b62e');
+  expect(openDialog().textContent).toContain('后台业务任务'); expect(openDialog().textContent).toContain('billing.installed.apps.test');
+  await page.click('取消'); expect(document.querySelectorAll('dialog[open]')).toHaveLength(0); expect(page.search()).toEqual(search);
+  expect(document.activeElement?.textContent).toContain('新建项目');
+  await page.click('新建项目'); expect(inputValue('name')).toBe('新数字人'); expect(inputValue('template')).toBe('01a0e222-de8b-7000-8cd8-207c8673b62e');
+  await cancelWithEscape(); expect(page.path()).toBe(path); expect(page.search()).toEqual(search); expect(f.writes()).toHaveLength(0);
+  await page.click('新建项目'); await page.click('清空'); expect(inputValue('name')).toBe(''); expect(inputValue('slug')).toBe('');
+  expect(document.querySelectorAll('dialog[open]')).toHaveLength(1); expect(document.activeElement?.getAttribute('name')).toBe('name');
 });
 
-test('目录暂时失败保留输入但不能创建；恢复后选择仍在，切类型不能沿用旧模板', async () => {
-  const f = fixture(); page = await renderApp('/admin/projects/new?scope=integration');
-  await field('name', '接入'); await field('slug', 'billing'); await field('ownerUserId', userId); await page.click('下一步');
-  await field('template', '01a0bf5d-8f4b-7003-9dbe-4adc78f388e9'); await field('plan', '01a0bf5d-8f4b-76b5-8a28-f084e91fddf4');
-  f.state.catalogFailure = true; await page.reread(); expect(page.text()).toContain('模板目录离线');
-  await page.click('下一步'); expect(f.writes()).toHaveLength(0); expect(document.querySelector<HTMLSelectElement>('[name="template"]')!.value).toBe('01a0bf5d-8f4b-7003-9dbe-4adc78f388e9');
-  f.state.catalogFailure = false; await page.reread(); await page.click('上一步'); await field('kind', 'EventProducer'); await page.click('下一步');
-  expect(document.querySelector<HTMLSelectElement>('[name="template"]')!.value).toBe('');
-  expect(document.querySelector('[name="template"] option[value="01a0bf5d-8f4b-7003-9dbe-4adc78f388e9"]')).toBeNull();
-  expect(document.querySelector('[name="template"] option[value="01a0bf5d-8f4b-7004-9cf7-0eb8bf66ffbc"]')).not.toBeNull();
+test('旧自建和管理员书签落到列表弹窗，关闭不再停留新建路由', async () => {
+  projectCreationFixture('developer'); page = await renderApp('/projects/new'); expect(page.path()).toBe('/projects'); expect(openDialog().textContent).toContain('域名标识');
+  await page.click('取消'); expect(document.querySelectorAll('dialog[open]')).toHaveLength(0);
+  page.unmount(); projectCreationFixture(); page = await renderApp('/admin/projects/new'); expect(page.path()).toBe('/admin/projects'); expect(openDialog().textContent).toContain('负责人');
+  await cancelWithEscape(); expect(document.querySelectorAll('dialog[open]')).toHaveLength(0);
 });
 
-test('开通失败可补生产配置与排队重试；202 和 active 都不冒充已经部署上线', async () => {
-  const f = fixture(); f.state.status = 'failed'; page = await renderApp(`/admin/projects/${projectId}/provisioning`);
+test('管理员在接入列表同一弹窗选择真实类型、模板、套餐与额度，配置必填项和用途同时可见', async () => {
+  const f = projectCreationFixture(); page = await renderApp('/admin/capabilities?tab=integrations&q=账单');
+  const search = page.search(); await page.click('新建接入容器'); expect(page.path()).toBe('/admin/capabilities'); expect(page.search()).toEqual(search);
+  expect(openDialog().querySelector('select[name="kind"] option[value="DigitalWorker"]')).toBeNull();
+  expect(openDialog().textContent).toContain('GITLAB_TOKEN'); expect(openDialog().textContent).toContain('不会自动提供这些值');
+  expect(openDialog().textContent).toContain('转发到 GitLab'); expect(openDialog().querySelector('[name="template"] option[value="01a0bf5d-8f4b-7002-9560-94caf593fb19"]')).toBeNull();
+  await field('name', '  账单接入  '); await field('slug', 'billing'); expect(openDialog().textContent).toContain('billing.services.test');
+  await resources(); await field('plan', '01a0bf5d-8f4b-76b5-8a28-f084e91fddf4'); await field('maxConcurrentTasks', '101'); await page.click('创建项目');
+  expect(openDialog().querySelector('[name="maxConcurrentTasks"]')?.getAttribute('aria-invalid')).toBe('true'); expect(f.writes()).toHaveLength(0);
+  await field('maxConcurrentTasks', '7'); await page.click('创建项目');
+  expect(f.writes()).toHaveLength(1); expect(f.writes()[0]?.body).toEqual({ name: '账单接入', slug: 'billing', ownerUserId: creationUserId, kind: 'APIProxy', template: '01a0bf5d-8f4b-7003-9dbe-4adc78f388e9', plan: '01a0bf5d-8f4b-76b5-8a28-f084e91fddf4', maxConcurrentTasks: 7 });
+  expect(page.path()).toBe('/admin/capabilities'); expect(openDialog().textContent).toContain('不提供逐阶段进度');
+  await cancelWithEscape(); expect(page.search()).toEqual(search);
+});
+
+test('自建负责人只读、默认资源不作为覆盖提交；成功在原列表显示真实开通结果', async () => {
+  const f = projectCreationFixture('developer'); page = await renderApp('/projects'); await page.click('新建项目');
+  expect(openDialog().querySelectorAll('[name="ownerUserId"], [name="plan"], [name="maxConcurrentTasks"]')).toHaveLength(0);
+  expect(openDialog().textContent).toContain('管理者'); expect(openDialog().textContent).toContain('最多 3 个并发任务');
+  await ready(); await page.click('创建项目');
+  expect(f.writes()).toHaveLength(1); expect(f.writes()[0]?.body).toEqual({ name: '新数字人', slug: 'billing', kind: 'DigitalWorker', template: '01a0bf5d-8f4b-7002-9560-94caf593fb19' });
+  expect(page.path()).toBe('/projects'); expect(openDialog().textContent).toContain('开通'); expect(f.requests.some((r) => r.path === '/v1/users' || r.path === '/v1/catalog/project-templates' || r.path === '/v1/catalog/service-plans')).toBe(false);
+});
+
+test('本地必填与服务端字段错误聚焦原字段，不清除已填写内容或默认资源语义', async () => {
+  const f = projectCreationFixture(); f.state.createFailure = true; page = await renderApp('/admin/projects/new');
+  await page.click('创建项目'); expect(openDialog().querySelectorAll('[aria-invalid="true"]')).toHaveLength(2);
+  expect(document.activeElement?.getAttribute('name')).toBe('name'); expect(f.writes()).toHaveLength(0);
+  await ready(); await page.click('创建项目'); expect(openDialog().textContent).toContain('项目标识已占用'); expect(document.activeElement?.getAttribute('name')).toBe('slug');
+  expect(inputValue('name')).toBe('新数字人'); f.state.createFailure = false; await field('slug', 'new-billing'); await page.click('创建项目');
+  expect(f.writes().at(-1)?.body).not.toHaveProperty('maxConcurrentTasks'); expect(page.path()).toBe('/admin/projects');
+});
+
+test('迟到域名响应不能盖新输入；非法或空标识清除旧域名，失败不猜安装后缀', async () => {
+  const f = projectCreationFixture('developer'); let release!: () => void; f.state.domainHolds.set('old-name', new Promise<void>((resolve) => { release = resolve; }));
+  page = await renderApp('/projects/new'); await field('slug', 'old-name'); expect(openDialog().textContent).toContain('正在读取域名');
+  await field('slug', 'new-name'); expect(openDialog().textContent).toContain('new-name.installed.apps.test');
+  await act(async () => { release(); }); await page.settle(); expect(openDialog().textContent).not.toContain('old-name.installed.apps.test');
+  await field('slug', 'BAD ID'); expect(openDialog().querySelectorAll('code')).toHaveLength(0); await field('slug', ''); expect(openDialog().textContent).toContain('输入域名标识');
+  expect(f.requests.filter((r) => r.path.endsWith('project-domain-preview')).map((r) => r.url.searchParams.get('slug'))).toEqual(['old-name', 'new-name']);
+  f.state.domainFailure = true; await field('slug', 'another-name'); expect(openDialog().textContent).toContain('域名暂时无法读取'); expect(openDialog().querySelectorAll('code')).toHaveLength(0);
+});
+
+test('模板目录失败保留选择且阻止提交；类型切换使用该类型目录，重读不覆盖已选套餐', async () => {
+  const f = projectCreationFixture(); page = await renderApp('/admin/projects/new?scope=integration'); await ready(); await resources();
+  await field('plan', '01a0bf5d-8f4b-76b5-8a28-f084e91fddf4'); f.state.catalogFailure = true; await page.reread();
+  expect(openDialog().textContent).toContain('模板目录离线'); await page.click('创建项目'); expect(f.writes()).toHaveLength(0);
+  expect(inputValue('plan')).toBe('01a0bf5d-8f4b-76b5-8a28-f084e91fddf4'); f.state.catalogFailure = false; await page.reread();
+  await field('kind', 'EventProducer'); expect(inputValue('template')).toBe('01a0bf5d-8f4b-7004-9cf7-0eb8bf66ffbc'); expect(openDialog().textContent).toContain('接收 GitLab Webhook');
+  await field('template', '01a0bf5d-8f4b-7004-9cf7-0eb8bf66ffbd'); expect(openDialog().textContent).toContain('接收 GitHub Webhook'); expect(inputValue('plan')).toBe('01a0bf5d-8f4b-76b5-8a28-f084e91fddf4');
+});
+
+test('不匹配的域名回执显示读取失败，不把别的项目地址作为当前预览', async () => {
+  const f = projectCreationFixture('developer'); f.state.domainMismatch = true; page = await renderApp('/projects/new'); await field('slug', 'billing');
+  expect(openDialog().textContent).toContain('域名暂时无法读取'); expect(openDialog().querySelectorAll('code')).toHaveLength(0);
+});
+
+test('创建在途锁定字段、关闭与重复提交；完成只受理一次并留下原列表', async () => {
+  const f = projectCreationFixture(); let finish!: () => void; f.state.holdCreate = new Promise<void>((resolve) => { finish = resolve; });
+  page = await renderApp('/admin/projects/new'); await ready(); await page.click('创建项目'); await page.click('创建中'); await cancelWithEscape();
+  expect(f.writes()).toHaveLength(1); expect(document.querySelectorAll('dialog[open]')).toHaveLength(1);
+  expect(openDialog().querySelector<HTMLInputElement>('[name="name"]')?.disabled).toBe(true);
+  await act(async () => { finish(); }); await page.settle(); expect(page.path()).toBe('/admin/projects'); expect(openDialog().textContent).toContain('开通');
+});
+
+test('未知创建回执不得重发；核对完整匹配项目后才显示开通，关闭不丢核对状态', async () => {
+  const f = projectCreationFixture(); f.state.resultOverride = { id: 'invalid' }; page = await renderApp('/admin/projects/new'); await ready(); await page.click('创建项目');
+  expect(openDialog().textContent).toContain('创建结果无法'); await page.click('创建项目'); expect(f.writes()).toHaveLength(1);
+  await page.click('取消'); await page.click('新建数字人'); expect(openDialog().textContent).toContain('创建结果无法'); await page.click('核对创建结果');
+  expect(openDialog().textContent).toContain('开通'); expect(f.writes()).toHaveLength(1);
+});
+
+test('空模板目录明确提示；非管理员管理入口不请求代建目录', async () => {
+  const f = projectCreationFixture(); f.state.noTemplates = true; page = await renderApp('/admin/projects/new'); await ready(); await page.click('创建项目');
+  expect(openDialog().textContent).toContain('当前类型暂无可用模板'); expect(f.writes()).toHaveLength(0);
+  page.unmount(); const denied = projectCreationFixture('developer'); page = await renderApp('/admin/projects/new?scope=integration');
+  expect(document.querySelectorAll('dialog[open]')).toHaveLength(0); expect(denied.requests.some((r) => r.path === '/v1/users' || r.path === '/v1/catalog/project-templates')).toBe(false);
+});
+
+test('离开有输入的列表仍需确认，继续编辑保留草稿，确认离开不串入下次创建', async () => {
+  const f = projectCreationFixture(); page = await renderApp('/admin/projects/new'); await field('name', '尚未完成的数字人'); await page.click('取消');
+  await page.requestNavigate('/admin/capabilities?tab=integrations'); expect(openDialog().getAttribute('role')).toBe('alertdialog');
+  await page.click('继续编辑'); expect(page.path()).toBe('/admin/projects'); await page.click('新建数字人'); expect(inputValue('name')).toBe('尚未完成的数字人'); await page.click('取消');
+  await page.requestNavigate('/admin/capabilities?tab=integrations'); await page.click('放弃输入并离开'); expect(page.path()).toBe('/admin/capabilities'); await page.click('新建接入容器');
+  expect(inputValue('name')).toBe(''); expect(f.writes()).toHaveLength(0);
+});
+
+test('原状态详情继续区分开通、发布与上线；失败后可以配置并重试', async () => {
+  const f = projectCreationFixture(); f.state.status = 'failed'; page = await renderApp(`/admin/projects/${creationProjectId}/provisioning`);
   expect(page.text()).toContain('缺少 GITLAB_TOKEN'); f.state.retryFailure = true; await page.click('重新开通'); expect(page.text()).toContain('排队失败');
-  f.state.retryFailure = false; await page.click('重新开通'); expect(page.text()).toContain('排队成功不代表开通已完成'); expect(page.text()).toContain('开通失败');
-  await page.click('补充生产配置'); expect(page.path()).toBe(`/admin/integrations/${projectId}/settings`); expect(page.search()).toMatchObject({ tab: 'config', env: 'production' });
-  await page.navigate(`/admin/projects/${projectId}/provisioning`); f.state.projectFailure = true; await page.reread();
-  expect(page.text()).toContain('状态暂时无法读取'); expect(document.querySelectorAll('button')).not.toHaveLength(0);
-  expect([...document.querySelectorAll('button')].some((button) => button.textContent === '重新开通')).toBe(false);
-  f.state.projectFailure = false; f.state.status = 'active'; await page.reread();
-  expect(page.text()).toContain('首个版本的构建与部署结果'); await page.click('查看发布与上线'); expect(page.path()).toBe(`/admin/integrations/${projectId}/release`);
+  f.state.retryFailure = false; await page.click('重新开通'); expect(page.text()).toContain('排队成功不代表开通已完成');
+  await page.click('补充生产配置'); expect(page.path()).toBe(`/admin/integrations/${creationProjectId}/settings`);
+  await page.navigate(`/admin/projects/${creationProjectId}/provisioning`); f.state.projectFailure = true; await page.reread(); expect(page.text()).toContain('状态暂时无法读取');
+  f.state.projectFailure = false; f.state.status = 'active'; await page.reread(); expect(page.text()).toContain('首个版本的构建与部署结果');
 });
 
-test('非管理员无法打开创建或开通管理页面，不请求用户和模板目录', async () => {
-  const f = fixture(false); page = await renderApp('/admin/projects/new?scope=integration');
-  expect(document.querySelector('form')).toBeNull(); expect(f.requests.some((r) => r.path === '/v1/catalog/project-templates' || r.path === '/v1/users')).toBe(false);
-  await page.navigate(`/admin/projects/${projectId}/provisioning`); expect(f.requests.some((r) => r.path === `/v1/projects/${projectId}`)).toBe(false);
-});
-
-test('创建在途不能重复提交或回退修改；目录为空显示明确原因，非法项目链接不查询', async () => {
-  const f = fixture(); page = await renderApp('/admin/projects/new'); await readyToCreate();
-  let finish!: () => void; f.state.holdCreate = new Promise<void>((resolve) => { finish = resolve; });
-  await page.click('创建项目'); await page.click('创建中'); await page.click('上一步');
-  expect(f.writes()).toHaveLength(1); expect(document.querySelector('[name="template"]')).toBeNull();
-  await act(async () => { finish(); }); await page.settle(); expect(page.path()).toBe(`/admin/projects/${projectId}/provisioning`);
-  f.state.noTemplates = true; await page.navigate('/admin/projects/new');
-  await field('name', '新数字人'); await field('slug', 'new-worker'); await field('ownerUserId', userId); await page.click('下一步');
-  expect(page.text()).toContain('当前类型暂无可用模板');
-  const before = f.requests.length; await page.requestNavigate('/admin/projects/invalid/provisioning'); await page.click('放弃输入并离开');
-  expect(page.text()).toContain('项目标识无效'); expect(f.requests.slice(before).some((r) => r.path === '/v1/projects/invalid')).toBe(false);
-});
-
-test('创建草稿：返回管理入口和切换创建类型先确认，取消保留，确认后才清空且不会串输入', async () => {
-  const f = fixture(); page = await renderApp('/admin/projects/new'); await field('name', '尚未完成的数字人');
-  // 旧向导离开直接卸载；再次进入时名称和模板选择全部消失。
-  await page.click('返回管理总览'); expect(page.path()).toBe('/admin/projects/new'); await page.click('继续编辑');
-  expect(document.querySelector<HTMLInputElement>('[name="name"]')?.value).toBe('尚未完成的数字人');
-  await page.requestNavigate('/admin/projects/new?scope=integration'); expect(page.search().scope).not.toBe('integration');
-  await page.click('放弃输入并离开'); expect(page.search().scope).toBe('integration'); expect(document.querySelector<HTMLInputElement>('[name="name"]')?.value).toBe('');
-  expect(document.querySelector<HTMLSelectElement>('[name="kind"]')?.value).toBe('APIProxy'); expect(f.writes()).toHaveLength(0);
-});
-
-test('创建草稿：目录和创建失败不清除离开保护，空白向导可直接返回', async () => {
-  const f = fixture(); page = await renderApp('/admin/projects/new');
-  await page.click('返回管理总览'); expect(page.path()).toBe('/admin'); await page.navigate('/admin/projects/new'); await readyToCreate();
-  f.state.catalogFailure = true; await page.reread(); await page.click('返回管理总览');
-  expect(page.path()).toBe('/admin/projects/new'); await page.click('继续编辑');
-  f.state.catalogFailure = false; await page.reread(); f.state.createFailure = true; await page.click('创建项目');
-  await page.click('返回管理总览'); expect(page.path()).toBe('/admin/projects/new'); await page.click('继续编辑');
-  expect(document.querySelector<HTMLInputElement>('[name="name"]')?.value).toBe('新数字人'); expect(f.writes()).toHaveLength(1);
-  f.state.createFailure = false; await field('slug', 'retry-worker'); await page.click('下一步'); await page.click('下一步'); await page.click('创建项目');
-  expect(page.path()).toBe(`/admin/projects/${projectId}/provisioning`); expect(document.querySelector('[role="alertdialog"]')).toBeNull();
-});
-
-test('创建草稿：在途离开需确认，重复 submit 只写一次，迟到创建成功不抢回当前页面', async () => {
-  const f = fixture(); let finish!: () => void; f.state.holdCreate = new Promise<void>((resolve) => { finish = resolve; });
-  page = await renderApp('/admin/projects/new'); await readyToCreate(); const form = document.querySelector('form')!;
-  await act(async () => { for (let i = 0; i < 2; i++) form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); }); await page.settle();
-  expect(f.writes()).toHaveLength(1); expect(page.text()).toContain('离开不会撤销创建或开通');
-  await page.requestNavigate('/admin/service-plans'); expect(page.path()).toBe('/admin/projects/new'); await page.click('继续编辑'); expect(page.text()).toContain('新数字人');
-  await page.requestNavigate('/admin/service-plans'); await page.click('放弃输入并离开'); expect(page.path()).toBe('/admin/projects/resource-templates');
-  await act(async () => { finish(); }); await page.settle(); expect(page.path()).toBe('/admin/projects/resource-templates'); expect(f.writes()).toHaveLength(1);
-});
-
-test('创建草稿：不匹配或无效创建回执保留复核材料，不导航到错误项目也不自动重试', async () => {
-  const f = fixture(); f.state.resultOverride = { kind: 'APIProxy' }; page = await renderApp('/admin/projects/new'); await readyToCreate(); await page.click('创建项目');
-  expect(page.path()).toBe('/admin/projects/new'); expect(page.text()).toContain('创建结果无法与本次输入对应'); expect(page.text()).toContain('新数字人'); expect(f.writes()).toHaveLength(1);
-  await page.click('上一步'); expect(document.querySelector<HTMLSelectElement>('[name="template"]')?.value).toBe('01a0bf5d-8f4b-7002-9560-94caf593fb19'); await page.click('下一步');
-  f.state.resultOverride = { id: 'invalid-project' }; await page.click('创建项目'); expect(page.path()).toBe('/admin/projects/new'); expect(f.writes()).toHaveLength(2);
-  await page.click('返回管理总览'); expect(document.querySelector('[role="alertdialog"]')).not.toBeNull(); await page.click('继续编辑');
-});
-
-test('创建草稿：浏览器返回保留资源选择，取消不写入，成功接续后返回历史不再次提交', async () => {
-  const f = fixture(), browser = browserHistoryFixture(['/admin', '/admin/projects/new']);
-  page = await renderApp('/admin/projects/new', undefined, browser.history); await readyToCreate();
-  await page.back(); expect(page.path()).toBe('/admin/projects/new'); await page.click('继续编辑');
-  expect(browser.beforeUnload()).toBe(false); expect(page.text()).toContain('minimal-sample'); expect(f.writes()).toHaveLength(0);
-  await page.click('创建项目'); expect(page.path()).toBe(`/admin/projects/${projectId}/provisioning`);
-  await page.back(); expect(page.path()).toBe('/admin'); expect(f.writes()).toHaveLength(1);
+test('非法项目详情书签不发项目请求，管理员资源空值继续使用平台默认', async () => {
+  const f = projectCreationFixture(); page = await renderApp('/admin/projects/invalid/provisioning'); expect(page.text()).toContain('项目标识无效');
+  expect(f.requests.some((r) => r.path === '/v1/projects/invalid')).toBe(false);
+  await page.navigate('/admin/projects/new'); await ready(); expect(inputValue('plan')).toBe(creationPlanId); await page.click('创建项目'); expect(f.writes()[0]?.body).not.toHaveProperty('maxConcurrentTasks');
 });

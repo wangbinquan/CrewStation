@@ -24,6 +24,14 @@ import { drizzleLedgerUnitOfWork } from './adapters/persistence/drizzleLedger';
 import { workloadSafetyRepository } from './adapters/persistence/safety/repository';
 import { taskVolumeRepository } from './adapters/persistence/safety/volumes';
 import { commitRecord } from './application/commit';
+import { resourceProjectDeletionOwner } from './application/deletion/owner';
+import { assertClusterDeletionAdmission, resourceDeletionRepository, sealClusterDeletionAdmission } from './adapters/persistence/deletion/repository';
+import { resourceDeletionWriteError } from './adapters/persistence/deletion/errors';
+import { ownsDeletionVolume } from './adapters/persistence/deletion/volumeIdentity';
+import { projectPodStopReceipts } from './adapters/persistence/deletion/podReceipts';
+import { projectVolumeReclamationStore } from './adapters/persistence/deletion/volumeReceipts';
+import { precondition } from '@crewstation/kernel';
+import type { ProjectId } from '@crewstation/contracts';
 import type { QuotaLimits, ResourceAuthorizer } from './ports/platform';
 import { resourceRoutes } from './http/resourceRoutes';
 
@@ -40,6 +48,7 @@ export interface ResourcesModuleDeps {
   readonly stream?: Partial<StreamOptions>;
   /** 维护（保留期、压缩、清理）的周期；只在 cs-controller 里跑。 */
   readonly maintenanceMs?: number;
+  readonly projectAvailable?: (id: ProjectId) => Promise<void>;
 }
 
 export interface ResourcesModule {
@@ -63,7 +72,7 @@ export function createResourcesModule(deps: ResourcesModuleDeps): ResourcesModul
   const { projectAccess, adminAccess, accessFor } = viewerAccess({ authorizer: deps.authorizer, executable: (owner, action) => action in centerActions || handlers.has(owner) });
   const owner = (module: string): OwnerLedger => ({
     ...ownerWriter(module, uow.run, deps.quotas, clock),
-    within: (tx) => ownerWriter(module, (fn) => fn(uow.within(tx as Executor)), deps.quotas, clock),
+    within: (tx) => ownerWriter(module, (fn) => fn(uow.within(tx as Executor)).catch(resourceDeletionWriteError), deps.quotas, clock),
   });
   // 删除待回收的工作卷（设计 §6.4、D8）：管理员确认后由资源中心把卷的期望改为「不要了」（以所属模块的名义），调和器按 UID 删 PVC。
   const centerActions = {
@@ -74,6 +83,15 @@ export function createResourcesModule(deps: ResourcesModuleDeps): ResourcesModul
   };
   const api: ResourcesModuleApi = {
     name: 'resources',
+    projectDeletion: {
+      volumeReclamation: (assertGrant) => projectVolumeReclamationStore(deps.db, assertGrant),
+      podStopReceipts: (assertGrant) => projectPodStopReceipts(deps.db, assertGrant),
+      ownsVolume: (id, volume) => ownsDeletionVolume(deps.db, id, volume),
+      owner: (physics, assertGrant) => resourceProjectDeletionOwner(resourceDeletionRepository(deps.db, assertGrant, deps.projectAvailable), physics, assertGrant),
+      sealClusterAdmission: (context, assertGrant) => sealClusterDeletionAdmission(deps.db, context, assertGrant),
+      assertClusterAdmission: (context, assertGrant) => assertClusterDeletionAdmission(deps.db, context, assertGrant),
+      withAdmission: (id, work) => resourceDeletionRepository(deps.db, async () => { throw precondition('普通准入不能签发删除许可'); }, deps.projectAvailable).withAdmission(id, work),
+    },
     workloadSafety: workloadSafetyRepository(deps.db),
     taskVolumes: taskVolumeRepository(deps.db, (tx, previous, draft, now) => commitRecord(uow.within(tx), previous, draft, now)),
     retireNamespace: (id, uid, inspect) => uow.run((scope) => retireNamespaceIn(scope, id, uid, inspect, clock.now())),

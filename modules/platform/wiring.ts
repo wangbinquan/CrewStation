@@ -1,3 +1,9 @@
+import { clusterMetadata } from './application/cluster/metadata';
+import { resourceCatalogs } from './application/resource-center/resourceCatalogs';
+import { projectResourceState } from './adapters/k8s/projectResourceState';
+import { projectResourceSources } from './application/resource-center/projectSources';
+import { createResourceAccessModule } from '@crewstation/module-resource-access';
+import { clusterOperationPorts } from './application/cluster/operations';
 import { businessObservationAdmission, developmentObservationAdmission, observationNames, observationPorts, observationUsageSource } from './application/observationPorts';
 import { executionWriterObserver, migrationWriterObserver, legacyOwnerObserver } from './adapters/executionWriters';
 import { webhookAwareAllowlist } from './application/webhookIngress';
@@ -8,7 +14,7 @@ import { imageValidationPorts } from './application/imageValidationPorts';
 import { businessExecutionPorts, executionHandoffPorts } from './application/businessExecutionPorts';
 import { developmentImagePorts, imageOwnerPorts } from './application/developmentImagePorts';
 import { executionRecords } from './application/executionRecords';
-import { createManagedRuntimeEnvironmentModule } from '@crewstation/module-runtime-environment';
+import { createManagedRuntimeEnvironmentModule, imageAllocationRevision } from '@crewstation/module-runtime-environment';
 import { runtimeImagePlatformPorts } from './application/runtimeImagePorts';
 import { assertRuntimeImageBuildIsolation } from './adapters/k8s/runtimeImageIsolation';
 import { projectHostAccess } from './application/projectHostAccess';
@@ -18,24 +24,24 @@ import { createClusterManagementModule } from '@crewstation/module-cluster-manag
 import { createClusterControlModule, type ClusterControlModuleApi, type SlotSpec } from '@crewstation/module-cluster-control';
 import { createResourcesModule, type ResourcesModuleApi } from '@crewstation/module-resources';
 import { installedSystemComponents } from './domain/systemComponents';
-import { BUILTIN_RESOURCES, type Actor, type ClusterResource, type ClusterInspectRequest, type ClusterOperation, type ClusterInspection, type ComputeProfileSelector, type ComputeUsage, type ProfileTestId, type ProjectId, type RebuildDevSessionRequest, type ServiceId, type TaskId, type UserId } from '@crewstation/contracts';
+import { BUILTIN_RESOURCES, type Actor, type ComputeProfileSelector, type ComputeUsage, type ProjectId, type ServiceId, type TaskId, type UserId } from '@crewstation/contracts';
 import { eventbusMigrations, type EventConsumer } from '@crewstation/eventbus';
 import { secretObject, type K8sClient } from '@crewstation/k8s';
 import { forbidden, precondition, type Logger } from '@crewstation/kernel';
-import { createAgentRuntimeModule } from '@crewstation/module-agent-runtime';
-import { createApiCatalogModule } from '@crewstation/module-api-catalog';
+import { createAgentRuntimeModule, computeAllocationRevision, taskProfileAllocationRevision } from '@crewstation/module-agent-runtime';
+import { createApiCatalogModule, apiAllocationRevision } from '@crewstation/module-api-catalog';
 import { createBusinessTaskModule, readBusinessObservationFacts, type BusinessTaskModuleApi } from '@crewstation/module-business-task';
 import { createCapabilitiesModule } from '@crewstation/module-capabilities';
 import { createConfigModule } from '@crewstation/module-config';
-import { createDataModule } from '@crewstation/module-data';
+import { createDataModule, objectPlanAllocationRevision, objectSpaceAllocationRevision } from '@crewstation/module-data';
 import { createDataControlModule, type DataControlModuleApi } from '@crewstation/module-data-control';
 import { createDevSessionModule } from '@crewstation/module-dev-session';
 import { createEventsModule, type EventsModuleApi } from '@crewstation/module-events';
-import { createGatewayModule, UNAVAILABLE_PATH, type GatewayModuleApi } from '@crewstation/module-gateway';
+import { createGatewayModule, gatewayAllocationRevision, projectRateLimitValues, UNAVAILABLE_PATH, type GatewayModuleApi } from '@crewstation/module-gateway';
 import { createIdentityModule } from '@crewstation/module-identity';
 import { createObservabilityModule, type ObservabilityModuleApi } from '@crewstation/module-observability';
 import { createProvisioningModule, type ProjectFacts } from '@crewstation/module-provisioning';
-import { createProjectModule, type ProjectModuleApi, type ResolvedService } from '@crewstation/module-project';
+import { createProjectModule, serviceAllocationRevision, namespaceQuotaRevision, executionQuotaRevision, type ProjectModuleApi, type ResolvedService } from '@crewstation/module-project';
 import { createReleaseModule, type ReleaseModuleApi } from '@crewstation/module-release';
 import { createScmModule } from '@crewstation/module-scm';
 import { createSessionModule } from '@crewstation/module-session';
@@ -66,7 +72,7 @@ export const SYSTEM_ACTOR: Actor = { userId: BUILTIN_RESOURCES.systemActor as Us
 
 const consumerLifecycle = (consumer: EventConsumer): Lifecycle => ({ start: () => consumer.start(), stop: () => consumer.stop() });
 
-interface Late { observability?: ObservabilityModuleApi; objectHistory?: NonNullable<NonNullable<Parameters<typeof createDataModule>[0]['objects']>['history']>; businessTask?: BusinessTaskModuleApi; events?: EventsModuleApi; project?: ProjectModuleApi; gateway?: GatewayModuleApi; taskRuntime?: TaskRuntimeModuleApi; release?: ReleaseModuleApi; resources?: ResourcesModuleApi; dataControl?: DataControlModuleApi; clusterControl?: ClusterControlModuleApi }
+interface Late { resourceAccess?: ReturnType<typeof createResourceAccessModule>['api']; observability?: ObservabilityModuleApi; objectHistory?: NonNullable<NonNullable<Parameters<typeof createDataModule>[0]['objects']>['history']>; businessTask?: BusinessTaskModuleApi; events?: EventsModuleApi; project?: ProjectModuleApi; gateway?: GatewayModuleApi; taskRuntime?: TaskRuntimeModuleApi; release?: ReleaseModuleApi; resources?: ResourcesModuleApi; dataControl?: DataControlModuleApi; clusterControl?: ClusterControlModuleApi }
 
 type CompositionDeps = PlatformModuleDeps & { identities: ResourceIdentityDirectory };
 
@@ -117,6 +123,10 @@ function composeCore(deps: CompositionDeps, late: Late) {
     },
     // 身份转发按项目覆盖时要把主机里的 slug 换成项目 ID；project 装配在 identity 之后，故经端口惰性取。
     projectDirectory: { idBySlug: async (slug) => (await projectApi().resolveServiceIdentity(`${slug}/${slug}`))?.projectId },
+    projectLifecycle: { available: async (id) => {
+      try { await projectApi().assertProjectAvailable(id); return true; }
+      catch (error) { if (error instanceof Error && 'kind' in error && ['precondition', 'not_found'].includes(String(error.kind))) return false; throw error; }
+    } },
     ...projectHostAccess(projectApi),
     // RFC-021：prod 主机的维护放行与 preview 主机的未部署页，判定在 gateway（L5），此处只接线。
     serviceEntry: { check: (userId, slug, slot) => gatewayApi().userEntry(userId, slug, slot) },
@@ -154,6 +164,7 @@ function composeCore(deps: CompositionDeps, late: Late) {
   });
   const data = createDataModule({
     db, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, users: userDirectory,
+    productionTasks: { get: async (id) => { const env = await late.taskRuntime?.getEnvironment(id); return env ? { taskId: id, projectId: env.projectId, serviceId: env.serviceId as ServiceId, kind: env.kind, state: env.state, podUid: (await late.taskRuntime!.resourceWorkload(SYSTEM_ACTOR, id)).podUid } : undefined; }, list: async (id) => { const env = await late.taskRuntime?.findDevSession(id); return env ? [env.id] : []; } },
     services: { resolveServiceById: async (id) => { const r = await resolveById(id); return r ? { projectId: r.projectId, slug: r.slug } : undefined; } },
     settings: { defaultPlan: 'db-small', secretKeyBase64: settings.secretKeyBase64, postgres: settings.dataPostgres },
     ...dataPorts(settings, late, objectStorageSources(identity.api, project.api, () => late.release, () => late.taskRuntime), deps.k8s),
@@ -167,11 +178,8 @@ function composeCore(deps: CompositionDeps, late: Late) {
     },
   }, settings: { baseUrl: settings.gitlab.baseUrl, groupPath: settings.gitlab.groupPath, platformToken: settings.gitlab.platformToken, platformBotName: settings.gitlab.botName, defaultBranch: 'main' } });
   const apiCatalog = createApiCatalogModule({
-    db, projects: project.api, hosts, logger, users: userDirectory,
-    onCatalogChanged: async (serviceId) => {
-      await gatewayApi().reconcileService(serviceId);
-      await gatewayApi().rebuildAllowlist();
-    },
+    db, projects: { ...project.api, resourceRequestable: async (actor, id, target) => late.resourceAccess ? (await late.resourceAccess.inspect(actor, id, target)).requestable : false }, hosts, logger, users: userDirectory,
+    onCatalogChanged: async (serviceId) => { await gatewayApi().reconcileService(serviceId); await gatewayApi().rebuildAllowlist(); },
     services: {
       resolveService: async (id) => { const r = await resolveById(id); return r ? { projectId: r.projectId, serviceId: r.serviceId, slug: r.slug, identity: r.identity } : undefined; },
       resolveServiceIdentity: async (identity) => { const r = await project.api.resolveServiceIdentity(identity); return r ? { projectId: r.projectId, serviceId: r.serviceId, slug: r.slug, identity: r.identity } : undefined; },
@@ -358,7 +366,7 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
   return { taskRuntime, devSession, businessTask, events, session, sessionClient: runner };
 }
 
-function composeAggregates(deps: PlatformModuleDeps, late: Late, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, runtime: ReturnType<typeof composeRuntime>, resources: ReturnType<typeof composeLedger>) {
+function composeAggregates(deps: PlatformModuleDeps, late: Late, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, runtime: ReturnType<typeof composeRuntime>, resources: ReturnType<typeof composeLedger>, images: ReturnType<typeof createManagedRuntimeEnvironmentModule>) {
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, apiCatalog, isAdmin } = core;
   const serviceOfProject = project.api.resolveServiceOfProject;
@@ -377,8 +385,20 @@ function composeAggregates(deps: PlatformModuleDeps, late: Late, core: ReturnTyp
     listProjectIds: async () => (await project.api.listServices()).map((s) => s.projectId),
   });
   late.observability = observability.api;
+  const resourceState = projectResourceState(k8s, { actor: SYSTEM_ACTOR, service: serviceOfProject, namespace: project.api.getNamespaceQuota, namespaceRevision: namespaceQuotaRevision, gateway: delivery.gateway.api.getProjectRateLimits, allowlist: delivery.gateway.api.currentAllowlist });
+  const resourceAccess = createResourceAccessModule({ db, project: project.api, instance: deps.instance, logger, userName: async (id) => (await core.identity.api.getUser(id))?.name ?? null,
+    adapters: resourceCatalogs({ actor: SYSTEM_ACTOR, project: project.api, compute: core.agentRuntime.api, images: images.api, objects: data.api.objects, api: apiCatalog.api, gateway: delivery.gateway.api, production: data.api,
+      revisions: { service: serviceAllocationRevision, namespace: namespaceQuotaRevision, execution: executionQuotaRevision, compute: computeAllocationRevision, task: taskProfileAllocationRevision, image: imageAllocationRevision, objectPlan: objectPlanAllocationRevision, objectSpace: objectSpaceAllocationRevision, api: apiAllocationRevision, gateway: gatewayAllocationRevision, gatewayValues: projectRateLimitValues },
+      reapplyNamespace: (id) => provisioning.api.reapplyProjectNamespace(id), ...resourceState,
+    }),
+  });
+  late.resourceAccess = resourceAccess.api;
   const capabilities = createCapabilitiesModule({
     isAdmin: (id) => isAdmin(id),
+    resourceCenter: { authorize: project.api.authorize, project: project.api.getProject, targets: resourceAccess.api.targets, requests: (actor, id) => resourceAccess.api.list(actor, id, { limit: 100 }),
+      activeRequests: async (actor, id) => { const items = []; let cursor: string | undefined; for (let page = 0; page < 5; page++) { const result = await resourceAccess.api.list(actor, id, { limit: 100, inFlight: 'true', ...(cursor ? { cursor } : {}) }); items.push(...result.items); if (!result.nextCursor) return { items, nextCursor: null }; cursor = result.nextCursor; } return { items, nextCursor: cursor ?? null }; },
+      ...projectResourceSources({ actor: SYSTEM_ACTOR, service: serviceOfProject, ledger: (actor, id) => resources.api.view(actor, id, {}), repository: core.scm.api.getBinding, releases: delivery.release.api.listReleases, slots: delivery.release.api.getSlots, releaseUsage: delivery.release.api.resourceUsage, workloads: runtime.taskRuntime.api.resourceWorkloads, config: config.api.listItems, data: data.api.listResources, spaces: data.api.objects?.spaces, bindings: (actor, id) => data.api.listProjectBindings(actor, id), apiRequests: (actor, id) => apiCatalog.api.listRequests(actor, id), subscriptions: runtime.events.api.listSubscriptions, imageVersion: images.api.getVersion, quota: resourceState.quotaObject, mcp: [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }] }),
+    },
     market: { list: project.api.listMarketListings, get: project.api.getMarketListing, slots: (serviceId) => delivery.release.api.getSlots(SYSTEM_ACTOR, serviceId), maintenance: (serviceId) => delivery.gateway.api.maintenanceOf(serviceId) },
     projects: { list: project.api.listProjectPage, read: project.api.readProjectPageEntries, get: project.api.getProjectPageEntry,
       resources: (actor, projectId) => resources.api.view(actor, projectId, { kind: 'dev-workspace', includeStopped: 'true' }),
@@ -403,7 +423,7 @@ function composeAggregates(deps: PlatformModuleDeps, late: Late, core: ReturnTyp
     },
     // 命名空间、额度与网络策略写成台账记录（RFC-025 第四期），由 cluster-control 的调和器建出、被改或被删就补回。
     ledger: { declare: (input) => resources.api.owner('provisioning').declare(input), get: (id) => resources.api.get(id) },
-    namespaces: { systemNamespace: settings.systemNamespace },
+    namespaces: { systemNamespace: settings.systemNamespace, quota: project.api.namespaceQuota },
     cleanup: { project: (id) => project.api.getProject(SYSTEM_ACTOR, id), record: resources.api.get, retire: resources.api.retireNamespace,
       inspect: (name, uid, children) => late.clusterControl!.inspectNamespaceRetirement(name, { uid, children }) },
     steps: {
@@ -426,7 +446,7 @@ function composeAggregates(deps: PlatformModuleDeps, late: Late, core: ReturnTyp
     if (action !== 'delete-namespace') throw precondition('命名空间不支持此操作');
     await provisioning.api.deleteNamespace(actor, record.id);
   });
-  return { observability, capabilities, provisioning };
+  return { observability, capabilities, provisioning, resourceAccess };
 }
 
 /**
@@ -437,6 +457,7 @@ function composeLedger(deps: CompositionDeps, core: ReturnType<typeof composeCor
   const project = core.project.api;
   return createResourcesModule({
     db: deps.db, logger: deps.logger, isAdmin: core.identity.api.isAdmin,
+    projectAvailable: project.assertProjectAvailable,
     quotas: { limitFor: project.quotaLimit },
     authorizer: { projectAccess: async (actor, projectId) => ({ operate: (await project.authorize(actor, projectId, 'view')) !== 'tester' }) },
   });
@@ -459,6 +480,7 @@ function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCo
     slots: { slotEnvValues: (ref) => release.api.slotEnvValues(ref), slotFailed: (ref, message) => release.api.slotFailed(ref, message) }, jobs: { jobEnvValues: (ref) => release.api.jobEnvValues(ref), imageBuildSecretValues: runtimeImages.imageBuildSecretValues },
     ledger: {
       workloadSafety: ledger.api.workloadSafety, taskVolumes: ledger.api.taskVolumes,
+      withProjectAdmission: (id, work) => ledger.api.projectDeletion.withAdmission(id as ProjectId, work),
       observe: (input) => ledger.api.observe(input), claimOf: (child) => ledger.api.claimOf(child), get: (id) => ledger.api.get(id),
       routeCandidates: (host, pathPrefix) => ledger.api.list({ kind: 'route', includeStopped: true, routeMatch: { host, ...(pathPrefix ? { pathPrefix } : {}) } }),
       listLive: () => ledger.api.list({}), changesSince: ledger.api.changesSince, latestChange: ledger.api.latestChange,
@@ -505,7 +527,7 @@ function composeModules(deps: CompositionDeps) {
   });
   const delivery = composeDelivery(deps, core, late, resources, runtimeEnvironment);
   const runtime = composeRuntime(deps, core, delivery, late, resources, runtimeEnvironment);
-  const aggregates = composeAggregates(deps, late, core, delivery, runtime, resources);
+  const aggregates = composeAggregates(deps, late, core, delivery, runtime, resources, runtimeEnvironment);
   const cluster = composeCluster(deps, core, delivery, runtime, resources);
   late.objectHistory = { read: cluster.objectHistory };
   const clusterControl = composeControl(deps, core, resources, runtime, delivery, runtimeEnvironment);
@@ -526,20 +548,20 @@ export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
       controller: [...m.cluster.internalHttp, ...m.data.internalHttp],
       transfers: [...m.identity.http.devSessionGate, ...m.data.transferHttp],
       // devSessionGate 只挂中间件不占路径，必须排在最前：Hono 按注册顺序执行，晚于业务路由就来不及改判身份。
-      api: [...m.identity.http.devSessionGate, ...m.project.http, ...m.identity.http.users, ...m.config.http, ...m.agentRuntime.http, ...m.runtimeEnvironment.http, ...m.data.http, ...m.scm.http, ...m.apiCatalog.http, ...m.release.http, ...m.gateway.http, ...m.taskRuntime.http, ...m.devSession.http, m.businessTask.http.service, m.businessTask.http.user, ...m.events.http.query, ...m.observability.http, ...m.cluster.http, ...m.capabilities.http, ...m.provisioning.http, ...m.clusterControl.http, ...m.resources.http],
+      api: [...m.identity.http.devSessionGate, ...m.project.http, ...m.identity.http.users, ...m.config.http, ...m.agentRuntime.http, ...m.runtimeEnvironment.http, ...m.data.http, ...m.scm.http, ...m.apiCatalog.http, ...m.release.http, ...m.gateway.http, ...m.taskRuntime.http, ...m.devSession.http, m.businessTask.http.service, m.businessTask.http.user, ...m.events.http.query, ...m.observability.http, ...m.cluster.http, ...m.capabilities.http, ...m.provisioning.http, ...m.clusterControl.http, ...m.resources.http, ...m.resourceAccess.http],
       auth: [...m.identity.http.auth, ...m.identity.http.forwardAuth, ...m.agentRuntime.forwardAuth],
       session: [m.session.http.runner, m.session.http.stream, m.session.http.internal],
       events: [...m.events.http.ingress],
     },
     background: {
-      controller: [...m.cluster.workers, ...m.data.workers, ...m.release.workers, ...m.gateway.workers, consumerLifecycle(m.gateway.subscriptions), ...m.taskRuntime.workers, ...m.agentRuntime.workers, ...m.runtimeEnvironment.workers, ...m.devSession.workers, ...m.businessTask.workers, consumerLifecycle(m.businessTask.subscriptions), ...m.apiCatalog.subscriptions.map(consumerLifecycle), ...m.data.subscriptions.map(consumerLifecycle), ...m.observability.workers, ...m.provisioning.workers, ...m.provisioning.startupTasks, consumerLifecycle(m.provisioning.subscriptions), m.resources.maintenanceWorker, m.clusterControl.observer, m.dataControl.observer],
+      controller: [...m.cluster.workers, ...m.data.workers, ...m.release.workers, ...m.gateway.workers, consumerLifecycle(m.gateway.subscriptions), ...m.taskRuntime.workers, ...m.agentRuntime.workers, ...m.runtimeEnvironment.workers, ...m.devSession.workers, ...m.businessTask.workers, consumerLifecycle(m.businessTask.subscriptions), ...m.apiCatalog.subscriptions.map(consumerLifecycle), ...m.data.subscriptions.map(consumerLifecycle), ...m.observability.workers, ...m.provisioning.workers, ...m.provisioning.startupTasks, consumerLifecycle(m.provisioning.subscriptions), m.resources.maintenanceWorker, m.clusterControl.observer, m.dataControl.observer, ...m.resourceAccess.workers],
       // 资源推送流的尾随器（RFC-025 设计 §8.2）：每个 cs-api 副本一个。
       api: [m.resources.streamWorker],
       session: [...m.session.workers],
       events: [...m.events.workers, ...m.events.subscriptions.map(consumerLifecycle)],
     },
     websocket: m.session.websocket,
-    migrations: [queueMigrations, eventbusMigrations, m.resources.migrations, m.identity.migrations, m.project.migrations, m.config.migrations, m.agentRuntime.migrations, m.runtimeEnvironment.migrations, m.data.migrations, m.scm.migrations, m.apiCatalog.migrations, m.events.migrations, m.release.migrations, m.taskRuntime.migrations, m.devSession.migrations, m.businessTask.migrations, m.session.migrations, m.gateway.migrations, m.observability.migrations, m.cluster.migrations, m.dataControl.migrations],
+    migrations: [queueMigrations, eventbusMigrations, m.resources.migrations, m.identity.migrations, m.project.migrations, m.config.migrations, m.agentRuntime.migrations, m.runtimeEnvironment.migrations, m.data.migrations, m.scm.migrations, m.apiCatalog.migrations, m.events.migrations, m.release.migrations, m.taskRuntime.migrations, m.devSession.migrations, m.businessTask.migrations, m.session.migrations, m.gateway.migrations, m.observability.migrations, m.cluster.migrations, m.dataControl.migrations, m.resourceAccess.migrations],
   };
   migrations = api.migrations;
   return { api, modules: m };
@@ -547,53 +569,10 @@ export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
 
 function composeCluster(deps: CompositionDeps, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, runtime: ReturnType<typeof composeRuntime>, resources: ReturnType<typeof composeLedger>) {
   const tasks = runtime.taskRuntime.api, dev = runtime.devSession.api, business = runtime.businessTask.api, release = delivery.release.api;
-  const inspectTask = async (actor: Actor, target: ClusterResource, request: ClusterInspectRequest): Promise<Record<string, unknown>> => {
-    if (target.purpose === 'development-cli') return dev.inspectClusterNative(actor, target.taskId as TaskId);
-    if (target.purpose === 'development-agent') return dev.inspectClusterAgent(actor, target.taskId as TaskId);
-    if (target.purpose === 'business-subtask' || target.purpose === 'business-workspace') return business.inspectClusterTask(actor, target, request);
-    if (target.purpose === 'profile-test') { if (request.action !== 'delete') throw precondition('档位测试只能停止，请从算力档位页面重新测试'); if (!target.facts.profileTestId) throw precondition('任务记录缺少档位测试关联，请从算力档位页面核对'); return { testId: target.facts.profileTestId }; }
-    const env = await tasks.getEnvironment(target.taskId as TaskId); if (!env) throw precondition('开发环境不存在');
-    const { checkedAt: _checkedAt, ...workspace } = await dev.workspaceStatus(actor, env.projectId);
-    if (request.action === 'delete') return { taskId: env.id, volumeMode: env.volumeMode, workspace };
-    const inspection = await tasks.inspectRebuild(env.projectId, true), profile = inspection.profiles.find((p) => p.id === inspection.currentProfile);
-    if (!profile) throw precondition('原任务套餐已不存在');
-    return { taskId: env.id, workspace, rebuild: { expectedTaskId: env.id, expectedUpdatedAt: inspection.updatedAt, expectedPodUid: inspection.podUid, expectedVolumeUid: inspection.volume.uid, profile: { id: profile.id, name: profile.name, cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, reason: inspection.reason } };
-  };
-  const executeTask = async (actor: Actor, op: ClusterOperation, inspection: ClusterInspection) => {
-    if (op.target.purpose === 'development-cli') return dev.manageClusterNative(actor, op.target.taskId as TaskId, op.action === 'restart', op.operationId);
-    if (op.target.purpose === 'development-agent') return dev.manageClusterAgent(actor, op.target.taskId as TaskId, op.action === 'restart', op.operationId);
-    if (op.target.purpose === 'business-subtask' || op.target.purpose === 'business-workspace') return business.executeClusterTask(actor, op);
-    if (op.target.purpose === 'profile-test') { await core.agentRuntime.api.stopClusterTest(actor, inspection.domain?.testId as ProfileTestId); await tasks.releaseEnvironment(op.target.taskId as TaskId, 'profile-test'); return { operationId: op.target.taskId! }; }
-    const env = await tasks.getEnvironment(op.target.taskId as TaskId); if (!env) throw precondition('开发环境不存在');
-    if (op.action === 'delete') await dev.releaseSession(actor, env.projectId, { force: true, expectedTaskId: env.id });
-    else await dev.rebuildSession(actor, env.projectId, { ...inspection.domain?.rebuild as Omit<RebuildDevSessionRequest, 'requestId'>, requestId: op.operationId });
-    return { operationId: op.action === 'restart' ? op.operationId : env.id };
-  };
-  const observeTask = async (op: ClusterOperation) => {
-    if (op.target.purpose === 'business-subtask' || op.target.purpose === 'business-workspace') return business.observeClusterTask(op);
-    if (op.action === 'restart' && op.target.purpose === 'development-workspace') { const rebuild = await tasks.getRebuild(op.target.taskId as TaskId); return { done: rebuild?.state === 'ready' || rebuild?.state === 'failed', failed: rebuild?.state === 'failed', reason: rebuild?.message ?? '等待新工作区 Runner 连接' }; }
-    const env = await tasks.getEnvironment((op.action === 'restart' ? op.domainOperationId : op.target.taskId) as TaskId);
-    return { done: op.action === 'delete' ? !env || env.state === 'released' : env?.state === 'running' && env.connected || env?.state === 'failed', failed: op.action === 'restart' && env?.state === 'failed', reason: env?.message ?? (op.action === 'delete' ? '等待执行环境回收' : '等待新执行连接') };
-  };
   return createClusterManagementModule({ metrics: deps.settings.clusterMetrics, resolveReleaseId: (legacy) => deps.identities.resolve('release', [legacy]), physicalOperationId: async (id) => (await deps.identities.aliases('cluster-operation', id)).find((keys) => keys.length === 1 && keys[0] !== id)?.[0] ?? id, db: deps.db, k8s: deps.k8s, instance: deps.instance, logger: deps.logger, systemNamespace: deps.settings.systemNamespace, catalog: installedSystemComponents().map((c) => c.kind === 'Namespace' ? { ...c, name: deps.settings.systemNamespace } : c), isAdmin: core.identity.api.isAdmin,
     authorizeProject: async (actor, projectId) => { await core.project.api.authorize(actor, projectId as ProjectId, 'develop'); },
     ledger: { claims: (actor, objects) => resources.api.claimsOf(actor, objects) },
-    metadata: { read: async () => {
-      const [projects, taskFacts, slots, plans] = await Promise.all([core.project.api.listClusterProjects(), tasks.listClusterTasks(), release.listClusterSlots(), core.project.api.listServicePlans()]);
-      const releases = slots.flatMap((slot) => { const project = projects.find((p) => p.serviceId === slot.serviceId); return project ? [{ ...slot, namespace: project.namespace, serviceName: project.serviceName!, ...(slot.plan ? { maxReplicas: plans.find((p) => p.id === slot.plan)?.maxReplicas ?? 0 } : {}) }] : []; });
-      const retained = projects.filter((p) => p.serviceName).flatMap((p) => ['blue', 'green'].map((slot) => ({ namespace: p.namespace, kind: 'Service', name: `${p.serviceName}-${slot}`, reason: '发布槽 Service 跨发布保留' })));
-      for (const p of projects) {
-        retained.push({ namespace: p.namespace, kind: 'ResourceQuota', name: 'crewstation-project', reason: '项目配额' });
-        // 接入容器的服务槽出向独有一条策略（RFC-018）；数字人项目没有它，登记进来会让清单显示不存在的资源。
-        const policies = ['crewstation-default', 'crewstation-task-egress', 'crewstation-build-egress', ...(p.kind === 'DigitalWorker' ? [] : ['crewstation-integration-egress'])];
-        for (const name of policies) retained.push({ namespace: p.namespace, kind: 'NetworkPolicy', name, reason: '项目网络配置' });
-      }
-      return { projects, tasks: taskFacts, releases, retained, complete: true };
-    } },
-    domains: { inspect: async (actor, target, request) => {
-      if (target.serviceId && target.kind === 'Deployment') return release.inspectSlotOperation(actor, target, request);
-      const capability = target.availableActions.find((a) => a.action === request.action)!;
-      try { const domain = await inspectTask(actor, target, request); return { capability: { ...capability, impactSummary: [...capability.impactSummary, ...(domain.volumeMode === 'follow-container' && request.action === 'delete' ? ['此工作区的工作卷也会释放，请先确认所有未提交及未推送内容'] : []), ...(target.purpose === 'development-workspace' && request.action === 'restart' ? ['保留原任务与工作卷；结束该工作区内所有 CLI 和 Agent，新工作区连接后需手动启动'] : [])] }, domain }; } catch (e) { return { capability: { ...capability, enabled: false, reason: e instanceof Error ? e.message : String(e) } }; }
-    }, execute: (actor, op, inspection) => op.target.kind === 'Deployment' ? release.executeSlotOperation(actor, op, inspection) : executeTask(actor, op, inspection), observe: (op) => op.target.kind === 'Deployment' ? release.observeSlotOperation(op) : observeTask(op) },
+    metadata: { read: () => clusterMetadata({ projects: core.project.api.listClusterProjects, tasks: tasks.listClusterTasks, slots: release.listClusterSlots, plans: core.project.api.listServicePlans }) },
+    domains: clusterOperationPorts({ tasks, dev, business, release, stopProfile: core.agentRuntime.api.stopClusterTest }),
   });
 }

@@ -5,6 +5,7 @@ import type {
 } from './types';
 import type { WorkloadSafety } from './workloadSafety';
 import type { TaskVolumes } from './taskVolumes';
+import type { ResourceProjectDeletion } from './projectDeletion';
 
 /** 所属模块的写入口：默认各自一个短事务；within(tx) 加入所属模块自己的事务，与它的状态一同提交。 */
 export interface OwnerLedger extends ResourceWriter {
@@ -14,6 +15,7 @@ export interface OwnerLedger extends ResourceWriter {
 /** resources 模块对外能力（RFC-025）：期望由所属模块写，实况由资源中心写，所有页面读同一份标准记录。 */
 export interface ResourcesModuleApi {
   readonly name: 'resources';
+  readonly projectDeletion: ResourceProjectDeletion;
   readonly workloadSafety: WorkloadSafety;
   readonly taskVolumes: TaskVolumes;
   /** 管理员归档命名空间清理：同项目锁与调和租约下核对并收尾已结束记录。 */

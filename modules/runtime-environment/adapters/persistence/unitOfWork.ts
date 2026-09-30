@@ -24,7 +24,19 @@ export function imageRepositoryScope(db: Executor): RepositoryScope {
     },
     images: imageRepository(db), revisions: revisionRepository(db), builds: buildRepository(db), versions: versionRepository(db), validations: validationRepository(db),
     references: referenceRepository(db), logs: logRepository(db), developmentPolicies: developmentPolicyRepository(db),
-    lock: async (key) => { const rows = await db.execute<{ acquired: boolean }>(sql`select pg_try_advisory_xact_lock(hashtextextended(${'runtime-environment:' + key}, 0)) as acquired`); if (!rows[0]?.acquired) throw conflict('运行镜像配置正在更新，请重试'); },
+    lock: async (key) => {
+      // 短事务并发重放须等前一次提交后读取同一回执；有界等待仍拒绝长期占用的锁。
+      const previous = (await db.execute<{ value: string }>(sql`SELECT current_setting('lock_timeout') AS value`))[0]!.value;
+      await db.execute(sql`SELECT set_config('lock_timeout','1s',true)`);
+      try { await db.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${'runtime-environment:' + key},0))`); }
+      catch (error) { if (lockUnavailable(error)) throw conflict('运行镜像配置正在更新，请重试'); throw error; }
+      await db.execute(sql`SELECT set_config('lock_timeout',${previous},true)`);
+    },
   };
 }
 export const runtimeImageUnitOfWork = (db: Database): UnitOfWork => ({ read: imageRepositoryScope(db), run: (fn) => db.transaction((tx) => fn(imageRepositoryScope(tx))) });
+
+function lockUnavailable(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  return 'code' in error && error.code === '55P03' || 'cause' in error && lockUnavailable(error.cause);
+}

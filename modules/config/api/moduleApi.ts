@@ -1,5 +1,5 @@
 import type {
-  Actor, ConfigDefinitionDto, ConfigEnv, ConfigItemDto, ConfigVersionDto, EnvEntry, ManifestEnvValidation, ProjectId, SetConfigItemRequest,
+  Actor, ConfigDefinitionDto, ConfigEnv, ConfigItemDto, ConfigVersionDto, EnvEntry, ManifestEnvValidation, ProjectDeletionOwner, ProjectId, SetConfigItemRequest,
 } from '@crewstation/contracts';
 
 /**
@@ -10,6 +10,7 @@ export interface ConfigModuleApi {
   /** Internal template provisioning: declare identity/binding without writing environment values. */
   ensureTemplateDefinition(projectId: ProjectId, definition: ConfigDefinitionDto): Promise<void>;
   readonly name: 'config';
+  readonly deletionOwner?: ProjectDeletionOwner;
   createItem(actor: Actor, projectId: ProjectId, input: SetConfigItemRequest): Promise<ConfigItemDto>;
   updateItem(actor: Actor, projectId: ProjectId, id: string, input: SetConfigItemRequest): Promise<ConfigItemDto>;
   listDefinitions(actor: Actor, projectId: ProjectId): Promise<ConfigDefinitionDto[]>;

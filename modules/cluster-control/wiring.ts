@@ -7,6 +7,10 @@ import type { Hono } from 'hono';
 import type { ClusterControlModuleApi } from './api/moduleApi';
 import { kubernetesClusterWriter, managedObjectFeed, managedObjectReader } from './adapters/k8s/managedObjects';
 import { adoptionReport } from './application/adoptionReport';
+import { clusterDeletionSource } from './adapters/k8s/deletion/owner';
+import { kubernetesProjectPodProtection } from './adapters/k8s/deletion/podProtection';
+import { kubernetesProjectVolumeReclamation } from './adapters/k8s/deletion/volumeReclamation';
+import { clusterProjectDeletionOwner } from './application/deletion/projectDeletion';
 import type { ObservationStats } from './application/observeChange';
 import { newObservationStats, observeChange } from './application/observeChange';
 import { sweepOrphans } from './application/orphanSweep';
@@ -84,6 +88,9 @@ export function createClusterControlModule(deps: ClusterControlModuleDeps): Clus
   const cluster = deps.cluster ?? kubernetesClusterWriter(deps.k8s, { systemNamespace: deps.systemNamespace, probeToken: '', probeRoot: '', probePort: 8095, ...deps.volumeProbe });
   const api: ClusterControlModuleApi = {
     name: 'cluster-control',
+    projectDeletionOwner: (admission) => clusterProjectDeletionOwner(clusterDeletionSource(deps.k8s, deps.ledger, deps.systemNamespace, admission), admission),
+    projectPodProtection: (admission, receipts) => kubernetesProjectPodProtection(deps.k8s, deps.ledger, admission, receipts, deps.systemNamespace, () => clock.now()),
+    projectVolumeReclamation: (admission, receipts) => kubernetesProjectVolumeReclamation(deps.k8s, deps.ledger, admission, receipts, { systemNamespace: deps.systemNamespace, probeToken: '', probeRoot: '', probePort: 8095, ...deps.volumeProbe }, () => clock.now()),
     inspectNamespaceRetirement: async (name, intent) => {
       if (!cluster.inspectNamespaceRetirement) throw validation('集群客户端不支持完整命名空间清理检查');
       await cluster.inspectNamespaceRetirement(name, intent, deps.systemNamespace, AbortSignal.timeout(30_000));

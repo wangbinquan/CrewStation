@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import type { AppEnv } from '@crewstation/http';
 import type { Clock } from '@crewstation/kernel';
+import type { ProjectId } from '@crewstation/contracts';
 import { systemClock } from '@crewstation/kernel';
 import type { ProjectModuleApi } from '@crewstation/module-project';
 import type { Database, MigrationSet } from '@crewstation/persistence';
@@ -19,11 +20,13 @@ import { validateManifestEnvUseCase } from './application/validateManifestEnv';
 import { ensureTemplateDefinitionUseCase } from './application/ensureTemplateDefinition';
 import { configRoutes } from './http/configRoutes';
 import type { ConfigSettings } from './ports/configSettings';
+import { configDeletionRepository } from './adapters/persistence/deletionRepository';
+import { configDeletionOwner } from './application/projectDeletion';
 
 export interface ConfigModuleDeps {
   db: Database;
   /** 角色表判定与管理员标记都来自 project 模块。 */
-  project: Pick<ProjectModuleApi, 'authorize' | 'isAdmin'>;
+  project: Pick<ProjectModuleApi, 'authorize' | 'isAdmin'> & Partial<Pick<ProjectModuleApi, 'assertProjectAvailable' | 'assertProjectDeletionGrant'>>;
   settings: ConfigSettings;
   clock?: Clock;
 }
@@ -41,6 +44,9 @@ export const configMigrations: MigrationSet = {
 };
 
 export function createConfigModule(deps: ConfigModuleDeps): ConfigModule {
+  const availableRead = <Args extends unknown[], Result>(read: (id: ProjectId, ...args: Args) => Promise<Result>) => async (id: ProjectId, ...args: Args) => {
+    await deps.project.assertProjectAvailable?.(id); return read(id, ...args);
+  };
   const useCaseDeps: ConfigUseCaseDeps = {
     uow: drizzleUnitOfWork(deps.db),
     cipher: createAesGcmSecretCipher(deps.settings.secretKeyBase64),
@@ -48,17 +54,18 @@ export function createConfigModule(deps: ConfigModuleDeps): ConfigModule {
     clock: deps.clock ?? systemClock,
   };
   const api: ConfigModuleApi = {
-    ensureTemplateDefinition: ensureTemplateDefinitionUseCase(useCaseDeps),
+    ensureTemplateDefinition: async (id, definition) => { await deps.project.assertProjectAvailable?.(id); await ensureTemplateDefinitionUseCase(useCaseDeps)(id, definition); },
     name: 'config',
+    ...(deps.project.assertProjectDeletionGrant ? { deletionOwner: configDeletionOwner(configDeletionRepository(deps.db, deps.project.assertProjectDeletionGrant), deps.project.assertProjectDeletionGrant) } : {}),
     ...configItemWriteUseCases(useCaseDeps),
     deleteItem: deleteConfigItemUseCase(useCaseDeps),
     ...queryConfigUseCases(useCaseDeps),
-    renderDefinitions: renderEnvUseCase(useCaseDeps, true),
+    renderDefinitions: availableRead(renderEnvUseCase(useCaseDeps, true)),
     secretDefinitionVersions: secretDefinitionVersionsUseCase(useCaseDeps),
-    renderPinnedSecretDefinitions: renderPinnedSecretDefinitionsUseCase(useCaseDeps),
+    renderPinnedSecretDefinitions: availableRead(renderPinnedSecretDefinitionsUseCase(useCaseDeps)),
     renderSecretDefinitions: renderSecretDefinitionsUseCase(useCaseDeps),
-    renderEnv: renderEnvUseCase(useCaseDeps),
-    validateManifestEnv: validateManifestEnvUseCase(useCaseDeps),
+    renderEnv: availableRead(renderEnvUseCase(useCaseDeps)),
+    validateManifestEnv: availableRead(validateManifestEnvUseCase(useCaseDeps)),
   };
   return { api, http: [configRoutes(api, { isAdmin: (userId) => deps.project.isAdmin(userId) })], migrations: configMigrations };
 }

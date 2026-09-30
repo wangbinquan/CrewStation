@@ -3,10 +3,13 @@ import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
 import { renderApp } from './renderApp';
 import { computeProjectId } from './projectComputeFixture';
-import { projectResourcesFixture, resourcePagePath } from './adminProjectResourcesFixture';
+import { projectResourcesFixture } from './adminProjectResourcesFixture';
+import { ProjectRateLimitCard } from '../features/admin/components/projects/ProjectRateLimitCard';
+import { messages } from '../features/admin/i18n/zh-CN';
+import { renderRouteElement } from './renderRouteElement';
 
 const originalFetch = globalThis.fetch;
-let page: Awaited<ReturnType<typeof renderApp>> | undefined;
+let page: Awaited<ReturnType<typeof renderApp>> | Awaited<ReturnType<typeof renderRouteElement>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 
 const bucket = (average: number, burst: number) => ({ average, burst });
@@ -85,7 +88,7 @@ test('网关限流（平台默认）：展示三组、校验突发不能小于�
 
 // 项目管理页：每组默认照平台设置，可以单独设置一组；撤销后回到平台默认。
 test('项目的限流：标出平台默认或单独设置；只单独设置用户域时只提交那一组；撤销单独设置回到平台默认', async () => {
-  const f = rateLimitFixture(); page = await renderApp(resourcePagePath);
+  const f = rateLimitFixture(); page = await renderRouteElement(<ProjectRateLimitCard projectId={computeProjectId} />, messages);
   const limits = card('限流');
   expect(limits.textContent).toContain('用户域（正式、待验证与开发预览） · 平台默认'); expect(limits.textContent).toContain('服务域（内部 API、数字人互调、事件推送） · 平台默认');
   expect([...limits.querySelectorAll('button')].some((node) => node.textContent === '撤销单独设置')).toBe(false);

@@ -65,9 +65,16 @@ function checkSql(path: string, sql: string, schema: string): Violation[] {
   }
   // A declared table/CTE alias qualifies columns, never a schema. Object positions still require ownership.
   const aliases = new Set([...sql.matchAll(/\b(?:from|join|update)\s+[a-z_][a-z0-9_.]*\s+as\s+([a-z_][a-z0-9_]*)/g)].map((m) => m[1]));
-  const objects = new Set([...sql.matchAll(/\b(?:from|join|update|into|table|references|index|sequence)\s+(?:if\s+(?:not\s+)?exists\s+)?([a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*)/g)].map((m) => m.index + m[0].lastIndexOf(m[1]!)));
+  // PostgreSQL 的触发器函数体内 OLD/NEW 是行变量；仍严格检查 FROM/UPDATE 等对象位置和函数调用。
+  const triggerBodies = [...sql.matchAll(/\breturns\s+trigger\b[\s\S]*?\bas\s+(\$[a-z0-9_]*\$)([\s\S]*?)\1/g)]
+    .map((m) => { const start = m.index + m[0].indexOf(m[2]!); return { start, end: start + m[2]!.length }; });
+  const objects = new Set([...sql.matchAll(/\b(?:from|join|update|into|table|references|index|sequence)\s+(?:if\s+(?:not\s+)?exists\s+)?([a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*)/g)]
+    // IS [NOT] DISTINCT FROM 比较行值，FROM 在这里并不引入关系对象。
+    .filter((m) => !m[0].startsWith('from') || !/\bis\s+(?:not\s+)?distinct\s*$/.test(sql.slice(0, m.index)))
+    .map((m) => m.index + m[0].lastIndexOf(m[1]!)));
   for (const m of sql.matchAll(QUALIFIED_RE)) {
-    if (aliases.has(m[1]) && !objects.has(m.index) && sql[m.index + m[0].length] !== '(') continue;
+    const rowVariable = ['old', 'new'].includes(m[1]!) && triggerBodies.some((body) => m.index >= body.start && m.index < body.end);
+    if ((aliases.has(m[1]) || rowVariable) && !objects.has(m.index) && sql[m.index + m[0].length] !== '(') continue;
     if (m[1] !== schema && m[1] !== 'pg_catalog') out.push({ rule: RULE, file: path, message: `引用了其他 schema 的对象 ${m[0]}` });
   }
   return out;

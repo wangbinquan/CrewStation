@@ -1,6 +1,6 @@
 import { BusinessReleaseMaterialsSchema } from '../api/business/releaseMaterials';
 import { z } from 'zod';
-import { ProjectIdSchema, ReleaseIdSchema, ServiceIdSchema, SubtaskIdSchema, TaskIdSchema, TraceIdSchema } from '../ids';
+import { ProjectIdSchema, ReleaseIdSchema, ResourceIdSchema, ServiceIdSchema, SubtaskIdSchema, TaskIdSchema, TraceIdSchema } from '../ids';
 import { ManifestSchema } from '../manifest/manifest';
 
 /**
@@ -10,6 +10,7 @@ import { ManifestSchema } from '../manifest/manifest';
 export const DomainTopic = {
   projectCreated: 'project.created',
   projectArchived: 'project.archived',
+  projectDeletionRequested: 'project.deletion-requested',
   releaseRegistered: 'release.registered',
   releaseStatusChanged: 'release.status-changed',
   trafficSwitched: 'release.traffic-switched',
@@ -28,6 +29,7 @@ const base = { occurredAt: z.iso.datetime(), traceId: TraceIdSchema.optional() }
 
 export const ProjectCreatedSchema = z.object({ ...base, projectId: ProjectIdSchema, slug: z.string(), kind: ManifestSchema.options[0].shape.kind.or(z.enum(['APIProxy', 'EventProducer'])), namespace: z.string() });
 export const ProjectArchivedSchema = z.object({ ...base, projectId: ProjectIdSchema });
+export const ProjectDeletionRequestedSchema = z.object({ ...base, projectId: ProjectIdSchema, operationId: ResourceIdSchema }).strict();
 
 /** 发布登记：Manifest 的 exposes／subscriptions／produces／tasks 段随之被 api-catalog、events、business-task 各自落表。 */
 export const ReleaseRegisteredSchema = z.object({
@@ -68,6 +70,7 @@ export const ConfigChangedSchema = z.object({ ...base, projectId: ProjectIdSchem
 export const DomainPayloadSchemas = {
   [DomainTopic.projectCreated]: ProjectCreatedSchema,
   [DomainTopic.projectArchived]: ProjectArchivedSchema,
+  [DomainTopic.projectDeletionRequested]: ProjectDeletionRequestedSchema,
   [DomainTopic.releaseRegistered]: ReleaseRegisteredSchema,
   [DomainTopic.releaseStatusChanged]: ReleaseStatusChangedSchema,
   [DomainTopic.trafficSwitched]: TrafficSwitchedSchema,

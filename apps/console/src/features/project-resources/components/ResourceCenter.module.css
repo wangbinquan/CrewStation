@@ -7,7 +7,7 @@
 .stat:hover, .stat[aria-pressed='true'] { background: var(--cs-tone-info-bg); }
 .toolbar { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; }
 .tabs { display: flex; gap: 3px; padding: 3px; background: var(--cs-color-surface); border: 1px solid var(--cs-color-border); border-radius: 8px; }
-.tabs button { border: 0; background: transparent; color: var(--cs-color-text-muted); font: inherit; padding: 6px 12px; cursor: pointer; border-radius: 5px; }
+.tabs button { border: 0; background: transparent; color: var(--cs-color-text-muted); cursor: pointer; border-radius: 5px; }
 .tabs button[aria-selected='true'] { color: var(--cs-tone-info-fg); background: var(--cs-tone-info-bg); font-weight: 600; }
 .controls, .inline, .legend { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .controls input, .controls select, .fields input:not([type='checkbox']), .fields select, .page textarea { min-width: 0; border: 1px solid var(--cs-color-border); border-radius: 6px; background: var(--cs-color-surface); color: var(--cs-color-text); padding: 6px 9px; font: inherit; }

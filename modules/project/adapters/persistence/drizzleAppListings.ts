@@ -1,7 +1,7 @@
 import type { Actor, MemberRole, ProjectId, ProjectState, ServiceId, UserId } from '@crewstation/contracts';
 import { jsonDocument } from '@crewstation/persistence';
 import type { Executor } from '@crewstation/persistence';
-import { and, eq, gt, or, sql } from 'drizzle-orm';
+import { and, eq, gt, ne, or, sql } from 'drizzle-orm';
 import { boolean, integer, text, timestamp } from 'drizzle-orm/pg-core';
 import type { AppListing } from '../../domain/appListing';
 import { defaultAppListing } from '../../domain/appListing';
@@ -40,7 +40,7 @@ export function drizzleAppListings(db: Executor): AppListingRepository {
       const rows = await db.select({ project: projects, service: services, listing: appListings, role: memberships.role })
         .from(projects).leftJoin(services, eq(services.projectId, projects.id)).leftJoin(appListings, eq(appListings.projectId, projects.id))
         .leftJoin(memberships, and(eq(memberships.projectId, projects.id), eq(memberships.userId, actor.userId)))
-        .where(and(eq(projects.kind, 'DigitalWorker'), visibleTo(actor),
+        .where(and(eq(projects.kind, 'DigitalWorker'), ne(projects.state, 'deleting'), visibleTo(actor),
           query.projectId ? eq(projects.id, query.projectId) : undefined, query.after ? gt(projects.id, query.after) : undefined,
           query.ownerId ? eq(projects.ownerUserId, query.ownerId) : undefined,
           ...query.q.split(/\s+/u).filter(Boolean).map((word) => sql`position(lower(${word}) in lower(${projects.name} || ' ' || coalesce(${appListings.description}, ''))) > 0`),

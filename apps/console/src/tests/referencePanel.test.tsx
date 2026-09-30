@@ -77,7 +77,7 @@ test('点路径在行下展开调用地址（代码里就写这个），平台�
 });
 
 test('侧栏里「申请」打开申请弹窗、不在行下展开，取消关窗；不跳到放大形态', async () => {
-  projectResourcesFixture(); page = await renderApp(`/projects/${id}/dev-session?view=reference`);
+  const f = projectResourcesFixture(); f.state.role = 'owner'; page = await renderApp(`/projects/${id}/dev-session?view=reference`);
   const request = [...rowOf('/invoices').querySelectorAll('button')].find((node) => node.textContent === '申请')!;
   expect(request.getAttribute('aria-label')).toBe('申请定向开放 GET /invoices');
   await act(async () => request.click()); await page.settle();

@@ -1,6 +1,6 @@
 import type {
   SetPlatformRoleRequest, AuthMethod, CurrentUserDto, EffectiveForwardingDto, IdentityForwardingDto, JwksDocument, LoginDiscoveryDto, LoginPolicyDto,
-  OfflineReason, OidcLoginFailureCode, OidcProbeResult, OidcProviderDto, OidcProviderId, ProjectId, ServiceId, TaskId, UserDto, UserId, WorkloadIdentity,
+  OfflineReason, OidcLoginFailureCode, OidcProbeResult, OidcProviderDto, OidcProviderId, ProjectDeletionContext, ProjectDeletionOwner, ProjectId, ServiceId, TaskId, UserDto, UserId, WorkloadIdentity,
 } from '@crewstation/contracts';
 
 /**
@@ -164,6 +164,7 @@ export type OidcCallbackOutcome =
  */
 export interface IdentityModuleApi {
   readonly name: 'identity';
+  projectDeletionOwner(assertGrant: (context: ProjectDeletionContext) => Promise<void>): ProjectDeletionOwner;
   /** 按外部标识幂等建档；供测试与其他模块播种用户，OIDC 建档走自己的事务路径。 */
   ensureUser(external: ExternalUser): Promise<UserDto>;
   getUser(userId: UserId): Promise<UserDto | undefined>;

@@ -20,7 +20,7 @@ const blocked = (code: string): WorkloadStopObservation => ({ state: 'blocked', 
 function neverRan(status: ContainerStatus | undefined): boolean {
   return !status || (!status.containerID && !status.state?.running && !status.state?.terminated && !status.lastState?.running && !status.lastState?.terminated && (status.restartCount ?? 0) === 0 && status.started !== true);
 }
-function containersOf(spec: PodSpec, status: PodStatus, neverScheduled: boolean): ContainerStopEvidence[] | undefined {
+export function stoppedContainers(spec: PodSpec, status: PodStatus, neverScheduled: boolean): ContainerStopEvidence[] | undefined {
   const groups = [['init', spec.initContainers ?? [], status.initContainerStatuses ?? []], ['container', spec.containers ?? [], status.containerStatuses ?? []], ['ephemeral', spec.ephemeralContainers ?? [], status.ephemeralContainerStatuses ?? []]] as const;
   const result: ContainerStopEvidence[] = [];
   const sandboxGone = status.conditions?.some((c) => c.type === 'PodReadyToStartContainers' && c.status === 'False');
@@ -53,7 +53,7 @@ export function classifyWorkloadStop(consumer: WorkloadConsumer, pod: ObservedOb
     if (!version || Number(version[1]) < 27) return blocked('kubelet_stop_observation_unsupported');
     if (status.reason === 'NodeLost' || !['Failed', 'Succeeded'].includes(status.phase ?? '')) return blocked('pod_termination_pending');
   }
-  const containers = containersOf(spec, status, neverScheduled);
+  const containers = stoppedContainers(spec, status, neverScheduled);
   if (!containers) return blocked('container_stop_observation_incomplete');
   return { state: 'proved', proof: { id: newResourceId(), consumer, podUid: meta.uid, type: neverScheduled ? 'never-scheduled' : 'kubelet-terminated',
     nodeName: node?.name ?? null, nodeUid: node?.uid ?? null, podResourceVersion: meta.resourceVersion, observedAt: now.toISOString(), containers } };

@@ -23,14 +23,19 @@ describe.skipIf(!available)('对象存储升级保持既有任务和身份', () 
       CS_SECRET_KEY: Buffer.alloc(32, 3).toString('base64'), CS_GITLAB_URL: 'http://127.0.0.1:9' });
     const platform = createPlatformModule({ db: tdb.db, k8s: createFakeK8sClient(), settings,
       logger: noopLogger, instance: 'synthetic-storage-upgrade' });
-    const previous = platform.api.migrations.map((set) => ({ ...set,
-      files: set.files.filter((file) => !additions.has(`${set.module}/${file.name}`)) }));
+    // 固定升级前的边界；之后追加的迁移也必须等待它依赖的对象存储／安全表先建立。
+    const previous = platform.api.migrations.map((set) => {
+      const first = [...additions].filter((path) => path.startsWith(`${set.module}/`)).map((path) => path.split('/')[1]!).sort()[0];
+      return { ...set, files: set.files.filter((file) => !first || file.name < first) };
+    });
     await runMigrations(tdb.db, previous);
     expect(await platform.api.storageContract.check()).toMatchObject({ enabled: false, requiredVersion: 0 });
     await seedPreviousRows();
     const before = await snapshot();
 
-    expect((await runMigrations(tdb.db, platform.api.migrations)).sort()).toEqual([...additions].sort());
+    const pending = platform.api.migrations.flatMap((set, index) => set.files.filter((file) => !previous[index]!.files.includes(file)).map((file) => `${set.module}/${file.name}`));
+    expect((await runMigrations(tdb.db, platform.api.migrations)).sort()).toEqual(pending.sort());
+    expect([...additions].every((path) => pending.includes(path))).toBe(true);
 
     expect(await snapshot()).toEqual(before);
     expect(await platform.api.storageContract.check()).toMatchObject({ enabled: false, requiredVersion: 0 });

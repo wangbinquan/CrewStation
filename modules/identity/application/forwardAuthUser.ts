@@ -10,7 +10,7 @@ import type { IdentityUseCaseDeps } from './dependencies';
 import type { forwardingUseCases } from './oidc/forwardingAdmin';
 import { sessionTokenUseCases } from './sessionTokens';
 
-type Deps = Pick<IdentityUseCaseDeps, 'tokens' | 'users' | 'session' | 'clock' | 'hosts' | 'previewAccess' | 'appAccess' | 'uow' | 'projects' | 'serviceEntry'>;
+type Deps = Pick<IdentityUseCaseDeps, 'tokens' | 'users' | 'session' | 'clock' | 'hosts' | 'previewAccess' | 'appAccess' | 'uow' | 'projects' | 'serviceEntry' | 'projectAdmission'>;
 
 /** 只有固定三项之外的字段才需要去查身份档案；默认配置（显示名＋邮箱）下这条路一次库都不多查。 */
 const FIXED_FIELDS = new Set(['name', 'email', 'git-name']);
@@ -85,6 +85,7 @@ export function forwardAuthUserUseCase(deps: Deps, forwarding: Pick<ReturnType<t
  * 待命槽上没有版本不在这里判：槽「已结束」时路由改指说明页（RFC-025 D13）。
  */
 async function serviceHostGate(deps: Deps, user: UserDto, target: Extract<ResolvedHost, { kind: 'service-user' }>): Promise<UserAuthDecision | undefined> {
+  if (deps.projectAdmission && !await deps.projectAdmission.bySlug(target.projectSlug)) return { kind: 'forbidden', message: '项目正在永久删除，身份准入已关闭' };
   if (target.slot !== 'prod' && !(await deps.previewAccess.canView(user.id, target.projectSlug, target.slot))) {
     return { kind: 'forbidden', message: `没有项目 ${target.projectSlug} 的 ${target.slot} 访问权限：需要项目成员或 preview 测试者` };
   }

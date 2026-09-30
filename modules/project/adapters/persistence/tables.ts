@@ -1,4 +1,4 @@
-import { integer, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
+import { bigint, integer, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
 import { projectSchema } from './schema';
 
 export const projects = projectSchema.table('projects', {
@@ -9,6 +9,7 @@ export const projects = projectSchema.table('projects', {
   namespace: text('namespace').notNull(),
   ownerUserId: text('owner_user_id').notNull(),
   state: text('state').notNull(),
+  lifecycleRevision: bigint('lifecycle_revision', { mode: 'bigint' }).notNull().default(0n),
   template: text('template').notNull(),
   initialPlan: text('initial_plan'),
   message: text('message'),

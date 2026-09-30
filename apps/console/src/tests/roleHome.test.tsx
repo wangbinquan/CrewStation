@@ -23,6 +23,7 @@ function fixture(role: PlatformRole = 'user') {
     else if (path === '/v1/users') data = { items: [{ id: otherId, name: '小周', email: 'zhou@test.invalid', platformRole: state.targetRole, isAdmin: state.targetRole === 'admin' }] };
     else if (path.endsWith('/platform-role')) { if (state.conflict) { status = 409; data = { error: 'conflict', message: '角色已被另一管理员修改' }; } else { state.targetRole = body!.platformRole as PlatformRole; data = { id: otherId, platformRole: state.targetRole }; } }
     else if (path === '/v1/catalog/project-creation') data = { templates: [{ id: '01a0bf5d-8f4b-7002-9560-94caf593fb19', name: 'minimal-sample', kind: 'DigitalWorker', servicePlan: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', requiredConfig: [] }], defaultServicePlan: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10', maxConcurrentTasks: 3 };
+    else if (path === '/v1/catalog/project-domain-preview') { const slug = new URL(String(raw), 'http://localhost').searchParams.get('slug'); data = { slug, prodHost: `${slug}.apps.test`, previewHost: `${slug}.preview.test`, serviceHost: `${slug}.services.test` }; }
     else if (path === '/v1/projects' && method === 'POST') {
       if (state.failCreate) { status = 409; data = { error: 'conflict', message: '该标识已存在', details: { field: 'slug' } }; }
       else { state.created = true; data = project; status = 201; }
@@ -62,18 +63,19 @@ test('普通用户开发 URL 被拒绝，旧试用项目链接迁移到市场，
   expect(f.calls.some((c) => c.path.includes('/dev-session') || c.path.startsWith('/v1/projects'))).toBe(false);
 });
 
-test.each(['developer', 'admin'] as const)('%s 项目列表和新建页不重复全局导航，进入项目后才出现项目菜单', async (role) => {
+test.each(['developer', 'admin'] as const)('%s 项目列表和新建弹窗不重复全局导航，进入项目后才出现项目菜单', async (role) => {
   const f = fixture(role); f.state.trial = false; f.state.created = true;
   page = await renderApp('/projects');
   // 实机项目列表的左栏重复了顶栏的“应用／项目开发”，白占一列。
   expect(Boolean(document.querySelector('nav[aria-label="主导航"]'))).toBe(false);
   expect(document.querySelectorAll('a[href="/market"]')).toHaveLength(1);
   expect(document.querySelectorAll('a[href="/projects"]')).toHaveLength(1);
-  await page.click('新建项目'); expect(page.path()).toBe('/projects/new');
+  await page.click('新建项目'); expect(page.path()).toBe('/projects'); expect(document.querySelector('[role="dialog"]')).not.toBeNull();
   expect(Boolean(document.querySelector('nav[aria-label="主导航"]'))).toBe(false);
+  await page.click('取消'); expect(document.querySelector('[role="dialog"]')).toBeNull();
   await page.navigate(`/projects/${projectId}/settings`);
   const nav = document.querySelector('nav[aria-label="主导航"]')!;
-  expect(nav.querySelectorAll('[aria-label="项目页面"] a')).toHaveLength(6);
+  expect(nav.querySelectorAll('[aria-label="项目页面"] a')).toHaveLength(7);
   expect(nav.querySelector(`a[href="/projects/${projectId}/observability"]`)?.textContent).toBe('运行观测与统计');
   expect(Boolean(nav.querySelector('a[href="/market"]'))).toBe(false);
   const back = nav.querySelector<HTMLAnchorElement>('a[href="/projects"]')!;
@@ -110,11 +112,12 @@ test('身份失败显示重试，不使用旧开发身份放行或挂载目录',
 test('开发者表单初始约束可见，逐字段错误与焦点正确，冲突保留输入并成功接续开通', async () => {
   const f = fixture('developer'); f.state.trial = false; page = await renderApp('/projects/new');
   expect(page.text()).toContain('平台默认资源'); expect(page.text()).toContain('3–40');
-  await page.click('创建项目'); expect(document.querySelectorAll('[aria-invalid="true"]')).toHaveLength(3);
+  await page.click('创建项目'); expect(document.querySelectorAll('[aria-invalid="true"]')).toHaveLength(2);
+  expect(document.querySelector<HTMLSelectElement>('[name="template"]')?.value).toBe('01a0bf5d-8f4b-7002-9560-94caf593fb19');
   expect(document.activeElement?.getAttribute('name')).toBe('name');
   await change('[name="name"]', '团队助理'); await change('[name="slug"]', 'team-helper'); await change('[name="template"]', '01a0bf5d-8f4b-7002-9560-94caf593fb19');
   f.state.failCreate = true; await page.click('创建项目'); expect(page.text()).toContain('该标识已存在'); expect(document.querySelector<HTMLInputElement>('[name="name"]')?.value).toBe('团队助理');
-  f.state.failCreate = false; await page.click('创建项目'); await page!.settle(); expect(page.path()).toBe(`/projects/${projectId}/provisioning`);
+  f.state.failCreate = false; await page.click('创建项目'); await page!.settle(); expect(page.path()).toBe('/projects'); expect(document.querySelector('[role="dialog"]')?.textContent).toContain('开通');
   const request = f.calls.find((c) => c.method === 'POST')!;
   expect(request.body).toEqual({ name: '团队助理', slug: 'team-helper', template: '01a0bf5d-8f4b-7002-9560-94caf593fb19', kind: 'DigitalWorker' });
   expect(f.calls.some((c) => c.path === '/v1/users')).toBe(false);
@@ -158,9 +161,7 @@ test('开发身份刷新失败不丢自建草稿且暂停创建，恢复后仍�
   const f = fixture('developer'); f.state.trial = false; page = await renderApp('/projects/new');
   await change('[name="name"]', '保留输入'); f.state.denied = true;
   await act(async () => { focusManager.setFocused(false); focusManager.setFocused(true); }); await page.settle();
-  const field = document.querySelector<HTMLInputElement>('[name="name"]')!;
-  expect(field.value).toBe('保留输入'); expect(field.closest('[hidden]')).not.toBeNull();
-  await act(async () => field.closest('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
   expect(f.calls.some((call) => call.method === 'POST')).toBe(false);
   f.state.denied = false; await page.reread(); expect(document.querySelector<HTMLInputElement>('[name="name"]')?.value).toBe('保留输入');
   expect(f.calls.some((call) => call.method === 'POST')).toBe(false);
@@ -178,6 +179,6 @@ test('自建回执丢失先核对本人同标识项目，不重复提交已创�
   page = await renderApp('/projects/new');
   await change('[name="name"]', '团队助理'); await change('[name="slug"]', 'team-helper'); await change('[name="template"]', '01a0bf5d-8f4b-7002-9560-94caf593fb19');
   await page.click('创建项目'); expect(page.text()).toContain('回执'); expect(document.querySelector<HTMLInputElement>('[name="slug"]')?.disabled).toBe(true);
-  await page.click('核对创建结果'); expect(page.path()).toBe(`/projects/${projectId}/provisioning`);
+  await page.click('核对创建结果'); expect(page.path()).toBe('/projects'); expect(document.querySelector('[role="dialog"]')?.textContent).toContain('开通');
   expect(f.calls.filter((call) => call.method === 'POST')).toHaveLength(1); expect(sessionStorage.getItem(`cs-project-draft:${userId}`)).toBeNull();
 });

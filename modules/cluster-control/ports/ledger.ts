@@ -23,6 +23,8 @@ export interface LedgerRecordView {
 
 /** 资源中心（resources 模块）给调和器的入口，由组合根接上。 */
 export interface LedgerObservations {
+  /** 持久项目准入共享锁覆盖实际 apply；seal 排他锁须等在途物理写退出。 */
+  withProjectAdmission?(projectId: string, work: () => Promise<void>): Promise<boolean>;
   readonly taskVolumes?: {
     get(id: string): Promise<TaskVolumeSafetyState>;
     beginProvision(id: string): Promise<void>;

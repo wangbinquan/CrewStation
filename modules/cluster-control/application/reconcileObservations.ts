@@ -291,7 +291,15 @@ export async function reconcileRecord(deps: ReconcileDeps, id: string, enqueue: 
     const current = await deps.ledger.get(id);
     if (current?.generation === record.generation && current.conditions.some((entry) => entry.type === 'Paused' && entry.status === 'true')) await removeChildren(deps, record, ['Secret']);
   }
-  if (record.desired === 'present') await APPLIERS[record.kind]?.(deps, record, enqueue);
+  if (record.desired === 'present') {
+    const apply = async () => {
+      const current = await deps.ledger.get(record.id);
+      if (current?.desired !== 'present' || current.generation !== record.generation) return;
+      await APPLIERS[record.kind]?.(deps, current, enqueue);
+    };
+    if (record.projectId && deps.ledger.withProjectAdmission) await deps.ledger.withProjectAdmission(record.projectId, apply);
+    else await apply();
+  }
   await reconcileTaskVolume(deps, record, enqueue);
   if (record.desired === 'absent') {
     if (record.kind === 'namespace') await retireNamespace(deps, record);

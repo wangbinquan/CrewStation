@@ -21,7 +21,9 @@ describe.skipIf(!available)('平台镜像目录升级', () => {
       await tdb.db.execute(sql`INSERT INTO runtime_environment.versions VALUES (${version}, ${image}, ${project}, ${build}, 'registry/tools', ${digest}, 'available', ${JSON.stringify({ id: version, projectId: project, digest })}::jsonb)`);
       await tdb.db.execute(sql`INSERT INTO runtime_environment.references VALUES (${newResourceId()}, ${version}, ${project}, 'task', 'old-task', ${JSON.stringify(snapshot)}::jsonb)`);
       await tdb.db.execute(sql`INSERT INTO runtime_environment.creation_requests VALUES (${project}, ${actor}, 'setup', 'old-fingerprint', ${image}, ${revision})`);
-      expect(await runMigrations(tdb.db, [runtimeEnvironmentMigrations])).toEqual(['runtime-environment/0005_platform_catalog.sql']);
+      const upgraded = await runMigrations(tdb.db, [runtimeEnvironmentMigrations]);
+      expect(upgraded).toEqual(runtimeEnvironmentMigrations.files.filter((file) => file.name >= '0005').map((file) => `runtime-environment/${file.name}`));
+      expect(upgraded[0]).toBe('runtime-environment/0005_platform_catalog.sql');
       expect([...(await tdb.db.execute(sql`SELECT id, default_visible, payload FROM runtime_environment.images ORDER BY name`))]).toEqual([
         { id: image, default_visible: false, payload: { id: image, defaultVisible: false } }, { id: shared, default_visible: true, payload: { id: shared, defaultVisible: true } },
       ]);

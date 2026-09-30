@@ -19,5 +19,6 @@ export function catalogRoutes(api: ProjectModuleApi): Hono<AppEnv> {
   r.put('/v1/catalog/service-plans/:id', async (c) => c.json(await api.updateServicePlan(await actorFrom(c, api), ResourceIdSchema.parse(c.req.param('id')), await parseBody(c, ServicePlanInputSchema))));
   r.put('/v1/catalog/task-profiles/:id', async (c) => c.json(await api.updateTaskProfile(await actorFrom(c, api), ResourceIdSchema.parse(c.req.param('id')), await parseBody(c, TaskProfileInputSchema))));
   r.get('/v1/catalog/project-creation', async (c) => c.json(await api.creationCatalog(await actorFrom(c, api))));
+  r.get('/v1/catalog/project-domain-preview', async (c) => c.json(await api.projectDomainPreview(await actorFrom(c, api), c.req.query('slug') ?? '')));
   return r;
 }

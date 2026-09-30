@@ -32,13 +32,14 @@ export interface FormDialogProps {
   readonly actions?: ReactNode;
   readonly size?: DialogSize;
   readonly initialFocus?: RefObject<HTMLElement | null>;
+  readonly returnFocusTo?: RefObject<HTMLElement | null>;
 }
 
 /**
  * 表单弹窗：在 Dialog 上加一个 `<form noValidate>`，底部是「提交（主按钮，最左）｜取消｜……｜清空（最右）」。
  * 校验与提交由调用方做，失败时保留输入、把原因交给 `error`。
  */
-export function FormDialog({ title, children, submitLabel, busyLabel, busy = false, submitDisabled = false, danger = false, error, onSubmit, onClose, onClear, dirty = false, cancelLabel, actions, size, initialFocus }: FormDialogProps): ReactElement {
+export function FormDialog({ title, children, submitLabel, busyLabel, busy = false, submitDisabled = false, danger = false, error, onSubmit, onClose, onClear, dirty = false, cancelLabel, actions, size, initialFocus, returnFocusTo }: FormDialogProps): ReactElement {
   const t = useT();
   const footer = <>
     {error !== undefined && error !== null && error !== false && error !== '' ? <ActionNote tone="error">{error}</ActionNote> : null}
@@ -50,5 +51,5 @@ export function FormDialog({ title, children, submitLabel, busyLabel, busy = fal
     </ActionRow>
   </>;
   // 提交键不可用时回车与 requestSubmit 也不提交。
-  return <Dialog title={title} size={size} busy={busy} onClose={onClose} onSubmit={() => { if (!submitDisabled) onSubmit(); }} footer={footer} {...(initialFocus ? { initialFocus } : {})}>{children}</Dialog>;
+  return <Dialog title={title} size={size} busy={busy} onClose={onClose} onSubmit={() => { if (!submitDisabled) onSubmit(); }} footer={footer} returnFocusTo={returnFocusTo} {...(initialFocus ? { initialFocus } : {})}>{children}</Dialog>;
 }

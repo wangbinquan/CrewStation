@@ -1,11 +1,10 @@
 import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
+import { contextualDatabase } from './transactionContext';
+import type { Database } from './databaseTypes';
 
-export type Database = ReturnType<typeof drizzle>;
-export type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
-/** 用例层接受 Database 或 Transaction，便于在事务内复用同一段查询。 */
-export type Executor = Database | Transaction;
+export type { Database, Transaction, Executor } from './databaseTypes';
 
 export interface DatabaseHandle {
   readonly db: Database;
@@ -38,9 +37,14 @@ export const POOL_OPTIONS = { connect_timeout: 10, idle_timeout: 60, max_lifetim
 
 export function connectDatabase(url: string, options: { max?: number } = {}): DatabaseHandle {
   const client = postgres(withSessionDefaults(url), { max: options.max ?? 10, ...POOL_OPTIONS });
-  const db = drizzle({ client });
+  // 只有实际跨事务准入使用时才创建连接；不挤占普通查询／UOW 的连接池。
+  let guardClient: postgres.Sql | undefined, guardDb: Database | undefined;
+  const db = contextualDatabase(drizzle({ client }), () => {
+    guardClient ??= postgres(withSessionDefaults(url), { max: 4, ...POOL_OPTIONS });
+    return guardDb ??= drizzle({ client: guardClient });
+  });
   // 关闭时等进行中的查询最多 5 秒，再强制断开，落在终止宽限期之内。
-  return { db, client, close: () => client.end({ timeout: 5 }) };
+  return { db, client, close: async () => { await Promise.all([client.end({ timeout: 5 }), guardClient?.end({ timeout: 5 })]); } };
 }
 
 /** 就绪探针用：走同一连接池的最小查询；池被占满或连接失步时它会和业务请求一起卡住，正是探针要发现的。 */

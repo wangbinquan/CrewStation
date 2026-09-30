@@ -13,6 +13,8 @@
  "modules/low/domain/thing.ts": "import { repo } from '../adapters/persistence/repo';\nexport const thing = repo;\n",
  "modules/low/adapters/persistence/repo.ts": "import { pgSchema } from 'drizzle-orm/pg-core';\nexport const repo = pgSchema('wrong');\n",
  "modules/low/adapters/persistence/migrations/0001_init.sql": "CREATE TABLE things (id text);\nCREATE TABLE other.t (id text);\n",
+ "modules/low/adapters/persistence/migrations/0002_trigger_rows.sql": "CREATE FUNCTION low.guard() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.state IS DISTINCT FROM OLD.state OR NEW.count IS NOT DISTINCT FROM OLD.count THEN NEW.state := OLD.state; END IF; RETURN NEW; END $$;\n",
+ "modules/low/adapters/persistence/migrations/0003_trigger_foreign.sql": "CREATE FUNCTION low.guard_bad() RETURNS trigger LANGUAGE plpgsql AS $body$ BEGIN NEW.state := OLD.state; SELECT value FROM old.records; PERFORM new.attack(); SELECT value FROM other.records; RETURN NEW; END $body$; SELECT old.state;\n",
  "modules/low/utils.ts": "export const u = 1;\n",
  "modules/high/package.json": "{\"name\": \"@crewstation/module-high\", \"version\": \"0.0.0\", \"private\": true, \"type\": \"module\", \"exports\": {\".\": \"./index.ts\"}, \"crewstation\": {\"layer\": 2}, \"dependencies\": {\"@crewstation/module-low\": \"workspace:*\"}}",
  "modules/high/index.ts": "export { createHigh } from './wiring';\n",

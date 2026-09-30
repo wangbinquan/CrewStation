@@ -14,7 +14,7 @@ export const creationKinds = (scope: CreationScope): readonly ManifestKind[] => 
 export const initialCreationDraft = (scope: CreationScope): CreationDraft => ({ name: '', slug: '', ownerUserId: '', kind: scope === 'integration' ? 'APIProxy' : 'DigitalWorker', template: '', plan: '', maxConcurrentTasks: '' });
 
 /** 返回文案键，组件在当前语言下呈现；每个错误都有对应字段。 */
-export function creationErrors(draft: CreationDraft, scope: CreationScope, catalog: CreationCatalog, step: number): CreationErrors {
+export function creationErrors(draft: CreationDraft, scope: CreationScope, catalog: CreationCatalog, step: number, self = false): CreationErrors {
   const errors: CreationErrors = {};
   if (!draft.name.trim() || draft.name.trim().length > 80) errors.name = 'nameError';
   if (!SlugSchema.safeParse(draft.slug.trim()).success) errors.slug = 'slugError';
@@ -22,17 +22,17 @@ export function creationErrors(draft: CreationDraft, scope: CreationScope, catal
   if (!creationKinds(scope).includes(draft.kind)) errors.kind = 'kindError';
   if (step > 0) {
     if (!catalog.templates.some((template) => template.id === draft.template && template.kind === draft.kind)) errors.template = 'templateError';
-    if (!catalog.plans.some((plan) => plan.id === draft.plan)) errors.plan = 'planError';
+    if (!self && !catalog.plans.some((plan) => plan.id === draft.plan)) errors.plan = 'planError';
     if (draft.maxConcurrentTasks.trim() !== '' && (!/^\d+$/.test(draft.maxConcurrentTasks) || Number(draft.maxConcurrentTasks) < 1 || Number(draft.maxConcurrentTasks) > 100)) errors.maxConcurrentTasks = 'quotaError';
   }
   return errors;
 }
 
-export function creationInput(draft: CreationDraft, catalog: CreationCatalog): CreateProjectInput {
+export function creationInput(draft: CreationDraft, catalog: CreationCatalog, self = false): CreateProjectInput {
   const owner = catalog.users.find((user) => user.id === draft.ownerUserId);
   if (!owner) throw new Error('负责人尚未确认');
-  return { name: draft.name.trim(), slug: draft.slug.trim(), ownerUserId: owner.id, kind: draft.kind, template: draft.template, plan: draft.plan,
-    ...(draft.maxConcurrentTasks.trim() === '' ? {} : { maxConcurrentTasks: Number(draft.maxConcurrentTasks) }) };
+  return { name: draft.name.trim(), slug: draft.slug.trim(), kind: draft.kind, template: draft.template,
+    ...(self ? {} : { ownerUserId: owner.id, plan: draft.plan, ...(draft.maxConcurrentTasks.trim() === '' ? {} : { maxConcurrentTasks: Number(draft.maxConcurrentTasks) }) }) };
 }
 
 /** 开通页只接续本次请求对应的有效项目；不把未知回执解释成已经创建成功。 */

@@ -62,6 +62,9 @@ import type { AppAccess } from './ports/appAccess';
 import type { ProjectDirectory } from './ports/projectDirectory';
 import type { ServiceEntry } from './ports/serviceEntry';
 import type { WorkloadLookup } from './ports/workloadLookup';
+import type { ProjectLifecycle } from './ports/lifecycle/projectAdmission';
+import { identityDeletionRepository, identityProjectAdmissionRepository } from './adapters/persistence/projectDeletion';
+import { identityDeletionOwner } from './application/projectDeletion';
 
 // 应用装配需要的端口类型与内置适配器只能经根入口取得，故在此转出。
 export type { AllowlistEvaluator, AllowlistTarget, AllowlistVerdict } from './ports/allowlistEvaluator';
@@ -84,6 +87,7 @@ export type { ResolvedHost, UserSlot } from './domain/hosts';
 
 /** 运行面（cs-auth）的外部能力；缺省实现一律“拒绝／未知”，不配置也安全。 */
 export interface IdentityRuntimeDeps {
+  projectLifecycle?: ProjectLifecycle;
   legacyIds?: LegacyIdentityLookup;
   /** 缺省存到本模块的 identity.signing_keys 表。 */
   keyStore?: KeyStore;
@@ -138,6 +142,8 @@ export const identityMigrations: MigrationSet = {
 };
 
 export function createIdentityModule(deps: IdentityModuleDeps): IdentityModule {
+  const closed = identityProjectAdmissionRepository(deps.db);
+  const byId: NonNullable<IdentityUseCaseDeps['projectAdmission']>['byId'] = async (id) => await closed.byId(id) && (!deps.projectLifecycle || await deps.projectLifecycle.available(id));
   const clock = deps.clock ?? systemClock;
   const session = withSessionDefaults(deps.settings);
   const idp = deps.idp ?? httpIdpClient({ ...(deps.logger ? { logger: deps.logger } : {}) });
@@ -154,12 +160,14 @@ export function createIdentityModule(deps: IdentityModuleDeps): IdentityModule {
     secrets: deps.secretCipher ?? secretBoxCipher(deps.settings.secretKey),
     tokens: keyRingTokenService({ keyStore: deps.keyStore ?? drizzleKeyStore(deps.db), issuer: TOKEN_CLAIMS.issuer, clock, logger: deps.logger }),
     ...runtimePorts(deps, session),
+    projectAdmission: { byId, bySlug: async (slug) => { const id = await deps.projectDirectory?.idBySlug(slug); return id ? byId(id) : closed.bySlug(slug); } },
   };
   const discovery = loginDiscoveryUseCases(useCaseDeps);
   // 一个实例贯穿管理面与 ForwardAuth：注入路径的短缓存要能被本副本自己的写入立刻清掉。
   const forwarding = forwardingUseCases(useCaseDeps);
   const api: IdentityModuleApi = {
     name: 'identity',
+    projectDeletionOwner: (assertGrant) => identityDeletionOwner(identityDeletionRepository(deps.db, assertGrant), assertGrant),
     ensureUser: ensureUserUseCase(useCaseDeps),
     ...queryUsersUseCases(useCaseDeps.users),
     ...platformRoleUseCases({ ...useCaseDeps, roleLock: { run: (id, work) => keyedLock(deps.db)(['platform-roles', `user-role:${id}`], work) } }),

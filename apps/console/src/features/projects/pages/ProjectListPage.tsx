@@ -1,5 +1,6 @@
 import { CatalogPagination } from '../../../shared/ui/catalog/CatalogPagination';
 import type { ReactElement } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useT } from '../../../shared/lib/useT';
 import { Card } from '../../../shared/ui/Card';
@@ -11,7 +12,8 @@ import { ProjectSummaryTable } from '../components/summary/ProjectSummaryTable';
 import { ProjectListFilters } from '../components/summary/ProjectListFilters';
 import { parseProjectListSearch } from '../model/projectListSearch';
 import { useProjectSummaries } from '../model/useProjectSummaries';
-import { ButtonLink } from '../../../shared/ui/navigation/ButtonLink';
+import { Button } from '../../../shared/ui/Button';
+import { SelfCreateProject } from '../components/creation/SelfCreateProject';
 
 /**
  * 首页：管理员看全部项目并可代建，成员只看自己参与的项目。
@@ -19,6 +21,8 @@ import { ButtonLink } from '../../../shared/ui/navigation/ButtonLink';
  */
 export function ProjectListPage(): ReactElement {
   const t = useT(), navigate = useNavigate(), search = parseProjectListSearch(useSearch({ strict: false }));
+  const [creating, setCreating] = useState(false), trigger = useRef<HTMLButtonElement>(null);
+  const closeCreation = () => { setCreating(false); if (search.create) void navigate({ to: '/projects', search: { ...search, create: undefined }, replace: true }); };
   const { me, query } = useProjectSummaries(search);
   const error = me.error ?? query.error, pending = !error && (me.isPending || query.isPending);
   const items = [401, 403, 404].includes(error?.status ?? 0) ? [] : query.data?.items ?? [];
@@ -27,18 +31,19 @@ export function ProjectListPage(): ReactElement {
   return (
     <>
       <PageHeader title={t('projects.list.title')}
-        actions={<ButtonLink variant="primary" to="/projects/new">{t('projects.self.title')}</ButtonLink>} />
+        actions={<Button ref={trigger} variant="primary" onClick={() => setCreating(true)}>{t('projects.self.title')}</Button>} />
       <Card compact>
         <ProjectListFilters key={JSON.stringify(search)} search={search} items={items} userId={me.data?.id}
           apply={(next) => { void navigate({ to: '/projects', search: next }); }} />
         <QueryStatus isPending={pending} error={error} loadingKey="projects.list.loading" errorKey="projects.list.error" />
         {error && items.length > 0 ? <ActionNote tone="neutral">{t('projects.summary.lastRead')}</ActionNote> : null}
         {settled && items.length === 0 ? <EmptyState title={t(filtered ? 'projects.summary.noMatches' : 'projects.list.emptyTitle')} description={t(filtered ? 'projects.summary.noMatchesHint' : 'projects.list.emptyDescription')}
-          action={filtered ? undefined : <ButtonLink to="/projects/new">{t('projects.self.title')}</ButtonLink>} /> : null}
+          action={filtered ? undefined : <Button onClick={() => { trigger.current?.focus(); setCreating(true); }}>{t('projects.self.title')}</Button>} /> : null}
         {items.length > 0 ? <ProjectSummaryTable items={items} available={!error && !pending} onOwner={(item) => void navigate({ to: '/projects', search: { ...search, cursor: undefined, ownerUserId: item.project.ownerUserId, ownerName: item.ownerName } })} /> : null}
         <CatalogPagination scope="projects" userId={me.data?.id} filter={[search.q, search.state, search.ownerUserId, 20]} cursor={search.cursor} next={query.data?.nextCursor} count={settled ? items.length : undefined} disabled={!settled}
           onChange={(cursor) => void navigate({ to: '/projects', search: { ...search, cursor } })} />
       </Card>
+      <SelfCreateProject open={creating || !!search.create} onClose={closeCreation} returnFocusTo={trigger} />
     </>
   );
 }

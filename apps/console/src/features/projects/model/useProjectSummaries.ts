@@ -20,7 +20,7 @@ function useSummaryPolling(userId: string | undefined, readIdentity: () => Promi
 
 export function useProjectSummaries(search: ProjectListSearch) {
   const t = useT(), me = useApiQuery(queryKeys.me(), () => api.me.get());
-  const { ownerName: _ownerName, ...request } = search;
+  const { ownerName: _ownerName, create: _create, ...request } = search;
   const query = useApiQuery(queryKeys.projectSummaries(me.data?.id ?? '', search), async () => {
     const response = ProjectSummariesPageSchema.safeParse(await api.capabilities.projectSummaries({ ...request, ownerUserId: UserIdSchema.safeParse(search.ownerUserId).data, kind: ['DigitalWorker'], limit: 20 }));
     if (!response.success || response.data.items.length > 20 || response.data.items.some((item) => item.project.kind !== 'DigitalWorker') ||

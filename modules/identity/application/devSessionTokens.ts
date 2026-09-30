@@ -5,16 +5,18 @@ import {
 } from '../domain/devSessionToken';
 import type { IdentityUseCaseDeps } from './dependencies';
 import { toDto } from './ensureUser';
+import { precondition } from '@crewstation/kernel';
 
-type Deps = Pick<IdentityUseCaseDeps, 'tokens' | 'users' | 'devSessions' | 'clock' | 'legacyIds'>;
+type Deps = Pick<IdentityUseCaseDeps, 'tokens' | 'users' | 'devSessions' | 'clock' | 'legacyIds' | 'projectAdmission'>;
 
 /**
  * 开发会话令牌：Agent 连远程 MCP 用的唯一凭据（Design §5.9）。它不是通用的用户令牌——
  * 代表的是“某人在某个项目的某个开发会话里”，会话一释放就作废。
  */
-export function devSessionTokenUseCases({ tokens, users, devSessions, clock, legacyIds }: Deps) {
+export function devSessionTokenUseCases({ tokens, users, devSessions, clock, legacyIds, projectAdmission }: Deps) {
   return {
     issueDevSessionToken: async (binding: DevSessionBinding): Promise<IssuedDevSessionToken> => {
+      if (projectAdmission && !await projectAdmission.byId(binding.projectId)) throw precondition('项目已关闭开发会话身份准入');
       const token = await tokens.sign({
         subject: devSessionSubject(binding.userId),
         audience: DEV_SESSION_AUDIENCE,
@@ -29,6 +31,7 @@ export function devSessionTokenUseCases({ tokens, users, devSessions, clock, leg
       if (!verified) return undefined;
       const binding = devSessionGrantFrom(verified.subject, verified.claims);
       if (!binding) return undefined;
+      if (projectAdmission && !await projectAdmission.byId(binding.projectId)) return undefined;
       // 现查而不是信令牌：会话释放后立即失效；项目对不上（换过会话、令牌被改）同样拒绝。
       const active = await devSessions.activeSession(binding.taskId);
       if (!active || active.projectId !== binding.projectId) return undefined;

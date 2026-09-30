@@ -1,58 +1,68 @@
 import type { ProjectDto } from '@crewstation/contracts';
-import type { CreateProjectInput } from '@crewstation/api-client';
+import { ProjectPageSchema, UserIdSchema } from '@crewstation/contracts';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../../../shared/api/client';
 import { queryKeys } from '../../../shared/api/queryKeys';
-import { useApiMutation, useApiQuery } from '../../../shared/api/useApi';
+import { isApiClientError, useApiMutation } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
-import type { CreationCatalog, CreationErrors, CreationField, CreationScope } from '../model/creationDraft';
-import { BASIC_FIELDS, confirmedCreationResult, creationErrors, creationInput, creationServerErrors, initialCreationDraft } from '../model/creationDraft';
+import type { CreationErrors, CreationField, CreationScope } from '../model/creationDraft';
+import { confirmedCreationResult, creationErrors, creationInput, creationServerErrors } from '../model/creationDraft';
+import { useCreationCatalog, useCreationDraft } from './useCreationCatalog';
 
-export function useProjectCreation(scope: CreationScope, onCreated: (project: ProjectDto) => void) {
+export function useProjectCreation(scope: CreationScope, onCreated: (project: ProjectDto) => void, open: boolean, self: boolean) {
   const t = useT(), busy = useRef(false);
-  const [draft, setDraft] = useState(() => initialCreationDraft(scope)), [step, setStep] = useState(0), [errors, setErrors] = useState<CreationErrors>({});
-  const [accepted, setAccepted] = useState<ProjectDto>(), [resultError, setResultError] = useState<string>();
-  const epoch = useRef(0), delivered = useRef<string>(undefined);
-  useEffect(() => { const generation = epoch.current + 1; epoch.current = generation; return () => { epoch.current = generation + 1; }; }, []);
-  useEffect(() => {
-    if (accepted && delivered.current !== accepted.id) { delivered.current = accepted.id; onCreated(accepted); }
-  }, [accepted, onCreated]);
-  const users = useApiQuery(queryKeys.users(), () => api.users.list());
-  const templates = useApiQuery(queryKeys.projectTemplates(), () => api.catalog.listProjectTemplates());
-  const plans = useApiQuery(queryKeys.servicePlans(), () => api.catalog.listServicePlans());
-  const catalog: CreationCatalog = { users: (users.data?.items ?? []).filter((user) => user.platformRole !== 'user'), templates: templates.data?.items ?? [], plans: plans.data?.items ?? [] };
-  const create = useApiMutation((input: CreateProjectInput) => api.projects.create(input), { invalidate: [queryKeys.projects()] });
-  const available = !accepted && !users.isPending && !users.isFetching && !users.error && !templates.isPending && !templates.isFetching && !templates.error && !plans.isPending && !plans.isFetching && !plans.error;
-  const dirty = !accepted && (create.isPending || JSON.stringify(draft) !== JSON.stringify(initialCreationDraft(scope)));
-  const validate = (at: number): boolean => {
-    const local = creationErrors(draft, scope, catalog, at);
-    setErrors(Object.fromEntries(Object.entries(local).map(([key, message]) => [key, t(`projects.wizard.${message}`)])));
-    if (Object.keys(local).length === 0) return true;
-    setStep(BASIC_FIELDS.some((field) => local[field]) ? 0 : 1);
-    return false;
-  };
-  const next = () => { if (!busy.current && available && validate(step)) setStep(Math.min(2, step + 1)); };
-  const submit = async () => {
-    if (busy.current || !available || !validate(2)) return;
-    busy.current = true; setResultError(undefined);
-    const generation = epoch.current, input = creationInput(draft, catalog);
+  const data = useCreationCatalog(scope, self, open);
+  const { draft, setEdits, resetDraft } = useCreationDraft(data.defaults);
+  const [errors, setErrors] = useState<CreationErrors>({});
+  const [unknown, setUnknown] = useState(false), [reconciling, setReconciling] = useState(false), [resultError, setResultError] = useState<string>();
+  const epoch = useRef(0);
+  useEffect(() => { const value = ++epoch.current; return () => { epoch.current = value + 1; }; }, []);
+  const create = useApiMutation((input: ReturnType<typeof creationInput>) => api.projects.create(input), { invalidate: [queryKeys.projects(), queryKeys.me()] });
+  const clear = () => { if (busy.current || unknown) return; resetDraft(); setErrors({}); create.reset(); setResultError(undefined); };
+  const dirty = !!draft.name || !!draft.slug || draft.ownerUserId !== data.defaults(draft.kind).ownerUserId ||
+    draft.kind !== data.defaults().kind || draft.template !== data.defaults(draft.kind).template || draft.plan !== data.defaults().plan || !!draft.maxConcurrentTasks;
+  const accept = (project: ProjectDto) => { resetDraft(); setErrors({}); create.reset(); setUnknown(false); setResultError(undefined); onCreated(project); };
+  const expected = () => ({ ...creationInput(draft, data.catalog, self), ownerUserId: UserIdSchema.parse(draft.ownerUserId) });
+  const reconcile = async () => {
+    if (busy.current || !unknown) return;
+    busy.current = true; setReconciling(true); const generation = epoch.current;
     try {
-      const result = await create.mutateAsync(input);
+      let cursor: string | undefined; const seen = new Set<string>();
+      do {
+        const page = ProjectPageSchema.parse(await api.projects.page({ q: draft.slug.trim(), limit: 50, cursor }));
+        const found = page.items.map((item) => confirmedCreationResult(item.project, expected())).find(Boolean);
+        if (epoch.current !== generation) return;
+        if (found) { accept(found); return; }
+        cursor = page.nextCursor; if (cursor && seen.has(cursor)) throw new Error(t('projects.wizard.resultUnknown')); if (cursor) seen.add(cursor);
+      } while (cursor);
+      setUnknown(false); setResultError(undefined);
+    } catch { if (epoch.current === generation) setResultError(t('projects.wizard.resultUnknown')); }
+    finally { busy.current = false; setReconciling(false); }
+  };
+  const submit = async () => {
+    if (busy.current || !data.available || unknown) return;
+    const local = creationErrors(draft, scope, data.catalog, 2, self);
+    setErrors(Object.fromEntries(Object.entries(local).map(([field, key]) => [field, t(`projects.wizard.${key}`)])));
+    if (Object.keys(local).length) return;
+    busy.current = true; setResultError(undefined); const generation = epoch.current;
+    try {
+      const result = await create.mutateAsync(creationInput(draft, data.catalog, self));
       if (epoch.current !== generation) return;
-      const confirmed = confirmedCreationResult(result, input);
-      if (confirmed) setAccepted(confirmed);
-      else setResultError(t('projects.wizard.resultUnknown'));
-    }
-    catch (error) {
+      const confirmed = confirmedCreationResult(result, expected());
+      if (confirmed) accept(confirmed); else setUnknown(true);
+    } catch (error) {
       if (epoch.current !== generation) return;
-      const fields = creationServerErrors(error); setErrors(fields);
-      if (Object.keys(fields).length) setStep(BASIC_FIELDS.some((field) => fields[field]) ? 0 : 1);
+      setErrors(creationServerErrors(error));
+      if (isApiClientError(error) && (error.status === 0 || error.status >= 500) && error.details.requestSent !== false) setUnknown(true);
     } finally { busy.current = false; }
   };
   const setField = (field: CreationField, value: string) => {
-    if (busy.current || accepted) return;
-    setDraft((current) => ({ ...current, [field]: value, ...(field === 'kind' ? { template: '' } : {}) }));
+    if (busy.current || unknown) return;
+    setEdits((current) => {
+      if (field === 'kind') { const { template: _template, ...rest } = current; return { ...rest, kind: value as typeof draft.kind }; }
+      return { ...current, [field]: value };
+    });
     setErrors((current) => ({ ...current, [field]: undefined })); create.reset(); setResultError(undefined);
   };
-  return { draft, step, errors, catalog, available, dirty, resultError, create, users, templates, plans, setField, next, submit, back: () => { if (!busy.current && !accepted) setStep(Math.max(0, step - 1)); } };
+  return { ...data, draft, errors, dirty, unknown, reconciling, resultError, create, clear, setField, submit, reconcile };
 }

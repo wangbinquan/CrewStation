@@ -32,12 +32,13 @@ export function namespaceFor(slug: string): string {
 }
 
 const TRANSITIONS: Record<ProjectState, readonly ProjectState[]> = {
-  provisioning: ['active', 'failed'],
+  provisioning: ['active', 'failed', 'deleting'],
   // active→active 是「重跑开通链确认一切就位」：管理员对已 active 的项目重开通时，
   // 它是唯一能把上一次的失败原因清掉的路径，否则那行原因会永远挂在工作台上。
-  active: ['active', 'archived'],
-  failed: ['provisioning', 'archived'],
-  archived: [],
+  active: ['active', 'archived', 'deleting'],
+  failed: ['provisioning', 'archived', 'deleting'],
+  archived: ['deleting'],
+  deleting: [],
 };
 
 /**

@@ -47,4 +47,15 @@ describe.skipIf(!available)('构建准入并发、幂等与日志授权', () => 
     expect(response.status).toBe(410);
     await expect(f.api.cancelBuild(f.admin, f.otherProject, image.id, build.id, 'late')).rejects.toMatchObject({ kind: 'conflict' });
   });
+  test('短准入事务串行重放，长期占用在有界时间内返回冲突而不占住连接', async () => {
+    let entered!: () => void, release!: () => void;
+    const held = new Promise<void>((resolve) => { entered = resolve; }), hold = new Promise<void>((resolve) => { release = resolve; });
+    const inFlight = f.uow.run(async (scope) => { await scope.lock('bounded-admission-fixture'); entered(); await hold; });
+    await held; const started = Date.now();
+    try {
+      await expect(f.uow.run((scope) => scope.lock('bounded-admission-fixture'))).rejects.toMatchObject({ kind: 'conflict' });
+      expect(Date.now() - started).toBeLessThan(5000);
+    } finally { release(); await inFlight; }
+    await f.uow.run((scope) => scope.lock('bounded-admission-fixture'));
+  }, 10_000);
 });

@@ -62,6 +62,12 @@ describe('persistence-ownership', () => {
     expect(messages.some((m) => m.includes('必须带 schema 前缀'))).toBe(true);
     expect(messages.some((m) => m.includes('其他 schema'))).toBe(true);
   });
+  test('触发器 OLD/NEW 行字段属于本模块，函数体外或对象／函数位置仍不能借它越过 schema 边界', () => {
+    expect(messagesOf(persistenceOwnership(ws), 'modules/low/adapters/persistence/migrations/0002_trigger_rows.sql')).toEqual([]);
+    const messages = messagesOf(persistenceOwnership(ws), 'modules/low/adapters/persistence/migrations/0003_trigger_foreign.sql');
+    for (const forbidden of ['old.records', 'new.attack', 'other.records', 'old.state']) expect(messages.some((m) => m.includes(forbidden))).toBe(true);
+    expect(messages.some((m) => m.endsWith('new.state'))).toBe(false);
+  });
 });
 
 describe('size-limit / banned-name / no-default-export', () => {
