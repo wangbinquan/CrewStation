@@ -30,13 +30,19 @@ export function developmentUsageOwner(store: DevelopmentUsageOwnerStore, starts:
   };
   return {
     prepare, get: store.get, unsupported: store.unsupported, close: store.close,
+    observeSupported: async (id) => {
+      const current = await store.get(id); if (!current) throw notFound('开发数字受理', id);
+      const execution = await environments.getEnvironment(id), native = execution?.native;
+      if (!execution || !native?.podUid || native.purpose !== 'agent' || native.agentId !== current.intent.identity.agentId || native.parentTaskId !== current.intent.identity.taskId || execution.projectId !== current.intent.identity.projectId) throw conflict('能力观察缺少实际子执行 Pod 的归属证明');
+      return store.observeSupported(id, native.podUid);
+    },
     bind: async (id, raw) => {
       const current = await store.get(id); if (!current) throw notFound('开发数字受理', id);
       const info = DevelopmentUsageInfoSchema.parse(raw);
       const execution = await environments.getEnvironment(id), native = execution?.native;
       if (!execution || !native?.podUid || native.purpose !== 'agent' || native.agentId !== current.intent.identity.agentId || native.parentTaskId !== current.intent.identity.taskId || execution.projectId !== current.intent.identity.projectId) throw conflict('数字绑定缺少实际子执行 Pod 的归属证明');
       const expectedPodUid = native.podUid;
-      if (info.runtimeTaskId !== id || info.podUid !== expectedPodUid) throw conflict('Runner 数字来源不符合实际子执行 Pod');
+      if (info.runtimeTaskId !== id || info.podUid !== expectedPodUid || (current.capabilityPodUid && current.capabilityPodUid !== expectedPodUid)) throw conflict('Runner 数字来源不符合实际子执行 Pod');
       if (current.binding) {
         const original = current.binding;
         if (info.podUid !== original.podUid || info.journalId !== original.key.journalId || (info.receipt ? jsonHash(info.receipt.key) !== jsonHash(original.key) : info.incarnation !== original.key.incarnation)) throw conflict('原开发 journal/Pod 绑定不可替换');

@@ -11,5 +11,6 @@ export const developmentAgentUsage = devSessionSchema.table('development_agent_u
   prepared: jsonDocument('prepared').$type<DevelopmentUsagePrepared>().notNull(),
   binding: jsonDocument('binding').$type<DevelopmentUsageRegistration>(),
   unsupported: boolean('unsupported').notNull().default(false),
+  capabilityPodUid: text('capability_pod_uid'),
   closeReason: text('close_reason').$type<DevelopmentUsageDrainReason>(),
 }, (t) => [index('development_agent_usage_cohort').on(t.projectId, t.acceptedAt, t.executionTaskId)]);

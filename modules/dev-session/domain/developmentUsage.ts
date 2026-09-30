@@ -21,8 +21,11 @@ export const DevelopmentUsagePreparedSchema = DevelopmentUsagePreparationSchema.
 });
 export const DevelopmentUsageOwnerRecordSchema = DevelopmentUsagePreparedSchema.safeExtend({
   binding: DevelopmentUsageRegistrationSchema.nullable(), unsupported: z.boolean(), closeReason: DevelopmentUsageDrainReasonSchema.nullable(),
+  capabilityPodUid: DevelopmentUsageRegistrationSchema.shape.podUid.optional(),
 }).superRefine((value, ctx) => {
   const binding = value.binding;
+  if (value.capabilityPodUid && (value.unsupported || (binding && binding.podUid !== value.capabilityPodUid)))
+    ctx.addIssue({ code: 'custom', message: '已观察数字能力的原 Pod 不能降级或替换' });
   if (binding && (value.unsupported || binding.key.payloadDigest !== value.payloadDigest || JSON.stringify(binding.identity) !== JSON.stringify(value.intent.identity) || binding.profileId !== value.intent.profileId || binding.profileRevision !== value.intent.profileRevision))
     ctx.addIssue({ code: 'custom', message: '原 journal 绑定不能替换开发受理或未支持状态' });
 });

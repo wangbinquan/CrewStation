@@ -20,6 +20,8 @@ export interface DevelopmentUsageOwnerRecord extends DevelopmentUsagePrepared {
   binding: DevelopmentUsageRegistration | null;
   unsupported: boolean;
   closeReason: DevelopmentUsageDrainReason | null;
+  /** Once observed, capability cannot disappear into a legacy fallback; bound to the actual original Pod. */
+  capabilityPodUid?: string;
 }
 /** Frozen non-sensitive source choice; consumer still verifies independent Session registration. */
 export interface DevelopmentUsageResolved {
@@ -32,6 +34,7 @@ export interface DevelopmentUsageOwner {
   prepare(input: DevelopmentUsagePreparation): Promise<DevelopmentUsageOwnerRecord>;
   get(executionTaskId: TaskId): Promise<DevelopmentUsageOwnerRecord | undefined>;
   bind(executionTaskId: TaskId, info: DevelopmentUsageInfo): Promise<DevelopmentUsageOwnerRecord>;
+  observeSupported(executionTaskId: TaskId): Promise<DevelopmentUsageOwnerRecord>;
   unsupported(executionTaskId: TaskId): Promise<DevelopmentUsageOwnerRecord>;
   close(executionTaskId: TaskId, reason: DevelopmentUsageDrainReason): Promise<DevelopmentUsageOwnerRecord>;
   resolve(key: DevelopmentUsageKey): Promise<DevelopmentUsageResolved | undefined>;
