@@ -2,7 +2,7 @@ import type { RuntimeImageHistoryRead, RuntimeImageHistoryItem } from '@crewstat
 import type { ResourceWorkload, ResourceWorkloadPage } from '@crewstation/contracts';
 import type { BusinessStorageFinalization, DevelopmentSourceBinding, WorkloadStopBarrier } from '@crewstation/contracts';
 import type { BusinessRecoveryScope, BusinessWorkspaceProof, RebuildBusinessWorkspaceInput, RestartBusinessWorkspaceInput } from './businessRecovery';
-import type { BusinessSessionStorage, DevelopmentUsageStorage } from '@crewstation/contracts';
+import type { BusinessSessionStorage, DevelopmentUsageStorage, DevelopmentUsageLayoutLookup } from '@crewstation/contracts';
 import type { RuntimeImageProbeInput, RuntimeImageProbeResult, RuntimeInitializationStatus, RuntimeImageExecutionSnapshot, Actor, ProjectId, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
 import type { DevSessionDto, DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest, StartupRecord } from '@crewstation/contracts';
 import type { BeforeStartMaterial, LaunchSpec, ProfileTestContext, ProfileTestOutcome, ProfileTestStage, TerminalTest } from '@crewstation/contracts';
@@ -129,6 +129,8 @@ export interface TaskRuntimeModuleApi {
   reconcileRebuild(taskId: TaskId, rebuildId: string, operations: RebuildRendering, heartbeat: () => Promise<boolean>): Promise<void>;
   readonly name: 'task-runtime';
   listClusterTasks(): Promise<Array<{ taskId: string; projectId: string; namespace: string; podName: string; podUid?: string; pvcName: string; pvcUid?: string; kind: string; state: string; purpose?: string; parentTaskId?: string; agentId?: string; terminalId?: string; profile: string; profileRevision?: number; profileTestId?: string; revision: string; volumeMode: string }>>;
+  /** Read-only actual persisted child layout; no physical-stop or cleanup permission. */
+  lookupDevelopmentUsageLayout(taskId: TaskId): Promise<DevelopmentUsageLayoutLookup>;
   resolveDevelopmentObjectSource(source: DevelopmentSourceBinding): Promise<{ projectId: ProjectId; serviceId: ServiceId; planId: string } | undefined>;
   createEnvironment(input: CreateEnvironmentInput): Promise<EnvironmentDto>;
   createNativeExecution(input: CreateNativeExecutionInput): Promise<EnvironmentDto>;

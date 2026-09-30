@@ -13,6 +13,21 @@ export const DEVELOPMENT_USAGE_BINDING_DIRECTORY = '/run/crewstation/development
 /** Explicit new-execution layout selection; omission preserves every legacy render. */
 export const DevelopmentUsageStorageSchema = z.strictObject({ version: z.literal(1) });
 export type DevelopmentUsageStorage = z.infer<typeof DevelopmentUsageStorageSchema>;
+/** Actual persisted child layout. These snapshots never authorize stop, zero or cleanup. */
+export const DevelopmentUsageLayoutLookupSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ version: z.literal(1), executionTaskId: TaskIdSchema, kind: z.literal('absent') }),
+  z.strictObject({ version: z.literal(1), executionTaskId: TaskIdSchema, kind: z.literal('legacy') }),
+  z.strictObject({
+    version: z.literal(1), executionTaskId: TaskIdSchema, kind: z.literal('selected'), layout: DevelopmentUsageStorageSchema,
+    projectId: ProjectIdSchema, workspaceTaskId: TaskIdSchema, agentId: ResourceIdSchema,
+    profileId: ResourceIdSchema, profileRevision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+    namespace: z.string().min(1).max(253), podName: z.string().min(1).max(253), podUid: z.string().min(1).max(128).nullable(),
+    state: z.enum(['creating', 'running', 'paused', 'releasing', 'released', 'failed']),
+    nativeState: z.enum(['queued', 'starting', 'running', 'cleaning', 'finished']),
+    renderStart: z.number().int().positive().max(Number.MAX_SAFE_INTEGER), revision: z.iso.datetime(),
+  }),
+]);
+export type DevelopmentUsageLayoutLookup = z.infer<typeof DevelopmentUsageLayoutLookupSchema>;
 export const DevelopmentUsageRuntimeConfigSchema = z.strictObject({ version: z.literal(1), directory: z.literal(DEVELOPMENT_USAGE_DIRECTORY), bindingDirectory: z.literal(DEVELOPMENT_USAGE_BINDING_DIRECTORY), projectId: ProjectIdSchema, workspaceTaskId: TaskIdSchema });
 export type DevelopmentUsageRuntimeConfig = z.infer<typeof DevelopmentUsageRuntimeConfigSchema>;
 export const DevelopmentAgentIdentitySchema = DevelopmentUsageIdentitySchema.extend({ sourceKind: z.literal('development-agent'), executionGeneration: z.literal(1) });

@@ -22,7 +22,7 @@
 | 原键持久停止（已推送/CI成功/本机部署，生产不调用） | 独立限定实现门PASS；相关47/0与完整4307/142skip/0、23路径指纹一致 | bebb3d9b精确发布、六项CI成功及八组件本机部署；仍需实际原生来源、owner全派发/删除屏障、consumer/两级事实UI |
 | 实际原生来源第一批（已推送/CI成功/本机部署，生产不调用） | 严格可选能力与Hook前选择、实际环境/文件身份、同轮模型、独立begin/finish和journal，最终30源码/测试独立门PASS；相关77/0、合同族34/0及精确lint通过 | d01ba8223的六项CI全部success，本机八组件Ready；本机全量被并行迁移阻断的记录保留。owner挂载/派发/完整删除屏障、consumer原价历史归属、两级事实/UI及实际验收继续 |
 
-内部持久consumer候选已通过限定功能复核：70项相关回归/374断言、精确16文件lint通过；真实Session PG outbox、全meter所选模型、原价、根会话/文件分区、原子cursor及ACK恢复均覆盖。生产source尚未注入，两级开发事实/UI、owner派发/删除排空仍须接通，CS-R02不关闭。消费者源码已本地提交965b45e8，尚未推送/部署：原键派发与dev-session/0013已本地提交646da1e9，dev-session/0014结束作业已随21路径本地提交94378917，未推送/部署；推送仍待共享迁移及对应模块依赖齐备，由各所属会话正常提交。最初11份及派发提交前6份并行引用为历史检查点；不得删锁条目或扫入他人源码。单次本机完整check因并行identity/ports目录上限失败，单独typecheck被三项外部测试字面量/品牌类型错误阻断，不能写作本机全绿。详见[消费者候选回执](./development-consumer.md#内部持久消费者实现候选2026-09-30)。
+内部持久consumer、原键派发、持久结束与Session独立登记查询均已通过各自限定功能复核，并随共享cc56ee8818bdb87d76932a5fe3affd947d7e39ef累计推送。原965b45e8、646da1e9、94378917及05d4ca01已核实为远端祖先；完整共享迁移锁和引用齐备，精确CI36735324944六项success。历史本机完整门禁的外部失败与未发布检查点保留，最新实际布局候选完整4568pass/143skip/0fail、9路径未变；该候选尚未提交。生产source尚未注入，两级开发事实/UI、owner派发/所有删除排空仍须接通，CS-R02不关闭。详见消费者、派发、结束、Session查询和[实际布局查询](./development-environment.md)各批回执。
 
 源码锚点：[统计合同](../../../packages/contracts/api/observability/runtimeStatistics.ts) 的 `sourceScope` 仍为业务任务、cohort 仍为 started；[platform 装配](../../../modules/platform/wiring.ts) 仅注入业务事实/业务数值来源；[开发生命周期](../../../modules/dev-session/application/agentExecution.ts) 仍由普通事件结束并回收；[平台健康说明](../../../apps/console/src/features/observability/i18n/zh-CN.ts) 明确应用级指标尚未采集。
 
@@ -50,7 +50,7 @@ CS-R01 的失败若不影响开发设计，可以并行推进文档与其他非�
 - [headless 细化设计](./development-headless.md) 已通过独立功能设计门：存储跨进程/容器/Pod、旧 Runner、日志故障、稳定重发、可读末尾排空及不可取回缺口已明确；实现仍须逐条符合该合同。
 - Stage 1 已有可选协议、稳定摘要、Runner 数字日志、双卷归属、同步采集 sink、读/ACK/重放；独立实现功能门 PASS，首轮完整门禁4225/142/1因旧导航异步断言失败，已补测试等待并通过23项回归及独立复核，修正候选完整4226/142/0通过，41路径指纹一致；已随 `fc491a4d6b31c6476d3222209ced880810936c3e` 精确发布，[CI 36640100860](https://github.com/wangbinquan/CrewStation/actions/runs/36640100860) 六项 success。新 render 仍未被生产准入选择，现有 Pod 不迁移/重建。
 - Stage 2 的 Session PG 逐页副本、公平固定页 outbox 和排空回执已在制并通过定向/独立复核，见 §10 检查点；全量4263/142skip/0及35路径指纹一致已确认；1326fdd1精确发布、六项CI成功、本机部署完成。下一阶段 owner 在首次发送前持久固定原 journal 键/稳定意图/nonce，接通 CNY 受理、实际生命周期清理屏障、platform 数字消费和两级明细后才启用真实来源。
-- [原键派发与排空实施设计](./development-dispatch.md) v2独立设计门PASS；限定派发participant v3独立功能门PASS、28项相关回归通过，全量25项外部失败及1错误保留。内部消费者已本地提交965b45e8，原键派发及0013已本地提交646da1e9，结束作业及0014已本地提交94378917，未推送/部署；远端推送仍待共享迁移及对应依赖齐备（最初11份、派发提交前6份为历史检查点）。持久结束内部队列与单步恢复候选已通过限定v2功能门，生产lifecycle/定时器、task-runtime/resources/项目删除全部许可和两级事实/UI仍未接，生产OFF。
+- [原键派发与排空实施设计](./development-dispatch.md)与持久结束限定实现门均PASS，历史外部全量失败保留；内部消费者965b45e8、派发及0013/646da1e9、结束及0014/94378917、Session查询05d4ca01已随共享cc56ee88推送，精确CI36735324944六项success。实际布局查询9路径限定门PASS、完整4568/143skip/0，尚待精确发布；生产lifecycle/定时器、task-runtime/resources/项目删除全部许可、consumer注入和两级事实/UI仍未接，生产OFF。
 - [owner/资源删除屏障剩余接线](./development-owner.md) 已明确实际落位和反例。内部稳定受理底座已通过独立限定范围复核与完整4277/142skip/0，生产尚不调用；不能以关闭准入替代Session排空，也不能在native cleaning/父releasing时先发布资源中心删除期望。
 - [实际原生来源与持久停止](./development-owner.md#下一阶段必须补齐实际原生来源与持久停止)仍须先完成：普通headless实际HOME为每Agent临时目录，不能由父PVC猜原生来源；Hook后最终环境须有独立实际证明。reserve→resolveCwd→running的取消窗口和迟到Start须用原key＋Pod的持久停止收敛，drain后禁止新派发；空receipt/not_found与finalThrough=0都不独自证明Token零。来源沿革/临时HOME策略及对应回归在实现前裁定。[原键持久停止限定设计与实现](./development-stop.md)已通过限定静态实现复核、47项定向验证及本页末尾完整门禁；精确发布/CI/部署待回执。实际来源证明及完整owner接线仍未完成；已补interrupted finished不能仅按phase/result判进程退出的反例，具有独立从未许可证明的prevented除外。
 - 实现受理时冻结项目/工作区/Agent/实际环境/算力修订/CNY 目录；Runner 独立数字 journal 与能力协商；Session 连续持久副本和公平 outbox；账本/估值成功后确认消费。
@@ -337,3 +337,15 @@ v1独立18前身17路径功能门FAIL一项P2：I/O后虽读过时钟，但commi
 稳定11路径单次完整check于2026-09-30T14:53:28.931660Z结束；原候选及最终HEAD均943789175c1bcfbc216ee49e319ccef9c1e3a9bc，11路径SHA256未变。结构、全仓lint、后端与console类型检查均通过；全量4560pass/143skip/1fail、29303断言、911文件（Bun测试875.05s，整门927.83s）。唯一失败在本批之外的modules/runtime-environment/tests/catalogSummary.test.ts:24，select调用计数期望1实际0；本批11路径没有失败。故不是全绿，保留该共享候选阻断，不改其并行持久层/目录输出，不因无关HEAD变化重跑完整门禁。
 
 限定查询的27项真实PG及合同/client相关回归、11TS lint、独立实现v2门和后端类型通过仍有效；完整门中的143skip包含被明确禁用的真实身份/模型验收，不能代作项目/系统页面实际验收。本批没有真实身份切换、模型调用或Pod回收，也未启用生产开发来源。精确本地提交/远端发布/CI/部署分别待回执；共享锁当时193项中仍8份RFC037迁移未进入HEAD，完整锁和其源码原样保留，待所属会话正常提交并协调发布。新内部查询不依赖新迁移，但不能单独推送仍缺迁移依赖的累计main。
+
+## 2026-09-30 共享迁移齐备与Session查询远端回执
+
+14路径查询源码与文档已精确本地提交05d4ca01d8414bd38f3958a225379b048d12bba3，Co-Authored-By与路径/指纹已验证；共享锁未由本批带入。其后并行提交cc56ee8818bdb87d76932a5fe3affd947d7e39ef完成其自有模块与完整193项共享迁移锁，所有引用进入提交。消费者965b45e8、派发646da1e9、持久结束94378917及查询05d4ca01均已核实为origin/main=cc56ee88的祖先，本地与远端0/0，索引为空。之前8份缺失依赖的检查点已解除，历史失败与检查点继续保留。
+
+[共享提交精确CI36735324944](https://github.com/wangbinquan/CrewStation/actions/runs/36735324944)的static/unit/module/console/e2e/gate六项completed/success。它不是每个历史子提交各自的CI，也不包括尚未提交的实际布局查询。并行持久层修复后的catalogSummary与transactionContext真实PG定向4pass/0fail、28断言确认；未重跑历史查询完整门禁。生产开发采集OFF，sourceScope=business-tasks，实际本机部署另记，CS-R02保持In Progress。
+
+## 2026-09-30 实际执行布局查询限定候选
+
+[实际开发执行数字布局查询](./development-environment.md)设计与9路径实现独立静态功能门PASS；真实PG、模块重建、严格合同/投影、旧原生执行和布局回归24pass/0fail/0skip、231断言、6文件，精确9TS lint与后端types通过。一次稳定候选完整门禁4568pass/143环境skip/0fail、29430断言、914文件，结束2026-09-30T15:26:34.010689Z；base05d4ca01期间main推进cc56ee88，9个任务文件未变，没有重复门禁。只有实际SQL无行才absent，坏选择/错用途/原归属/Pod UID冲突不降级；公开EnvironmentDto unchanged，无新迁移、Runner/K8s调用或写副作用。
+
+当前候选尚未提交/推送/部署，其精确远端CI另记；cc56ee88的六项成功不代作本批CI。下一步为owner关闭与首次派发前、迟到普通命令旁路和原Pod实际证明，随后全部删除/重建/保留期屏障、production与两级开发事实/UI。只读布局和Session登记不是零或清理许可；两个RFC继续In Progress，生产OFF。

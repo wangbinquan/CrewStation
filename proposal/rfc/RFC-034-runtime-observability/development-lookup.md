@@ -1,6 +1,6 @@
 # RFC-034 Session 按实际执行查询原数字登记
 
-状态：限定设计与11路径实现独立功能门PASS，27项相关回归、161断言、7文件、0fail/0skip，精确11TS lint与后端typecheck通过；单次完整本机门禁已结束：4560pass/143skip/1项外部失败，11路径指纹未变；详见末节。仅本地在制，未提交/推送/部署。承接持久结束内部候选943789175c1bcfbc216ee49e319ccef9c1e3a9bc（仅本地，未推送/部署）；新查询本身不提供Token零、物理停止或删除许可，生产开发采集仍OFF。
+状态：限定设计与11路径实现独立功能门PASS，27项相关回归、161断言、7文件、0fail/0skip，精确11TS lint与后端typecheck通过；单次完整本机门禁已结束：4560pass/143skip/1项外部失败，11路径指纹未变；详见末节。14路径已本地提交05d4ca01，随共享cc56ee88累计推送并通过该精确提交六项CI；部署回执另记。承接持久结束内部候选943789175c1bcfbc216ee49e319ccef9c1e3a9bc（原设计时仅本地，现已随cc56推送，部署另记）；新查询本身不提供Token零、物理停止或删除许可，生产开发采集仍OFF。
 
 ## 已有断点与本批范围
 
@@ -39,3 +39,9 @@ session-client新增同名lookup方法：调用上述GET、严格解析version/k
 稳定11路径单次完整check于2026-09-30T14:53:28.931660Z结束；原候选及最终HEAD均943789175c1bcfbc216ee49e319ccef9c1e3a9bc，11路径SHA256未变。结构、全仓lint、后端与console类型检查均通过；全量4560pass/143skip/1fail、29303断言、911文件（Bun测试875.05s，整门927.83s）。唯一失败在本批之外的modules/runtime-environment/tests/catalogSummary.test.ts:24，select调用计数期望1实际0；本批11路径没有失败。故不是全绿，保留该共享候选阻断，不改其并行持久层/目录输出，不因无关HEAD变化重跑完整门禁。
 
 限定查询的27项真实PG及合同/client相关回归、11TS lint、独立实现v2门和后端类型通过仍有效；完整门中的143skip包含被明确禁用的真实身份/模型验收，不能代作项目/系统页面实际验收。本批没有真实身份切换、模型调用或Pod回收，也未启用生产开发来源。精确本地提交/远端发布/CI/部署分别待回执；共享锁当时193项中仍8份RFC037迁移未进入HEAD，完整锁和其源码原样保留，待所属会话正常提交并协调发布。新内部查询不依赖新迁移，但不能单独推送仍缺迁移依赖的累计main。
+
+## 2026-09-30 共享迁移齐备与Session查询远端回执
+
+14路径查询源码与文档已精确本地提交05d4ca01d8414bd38f3958a225379b048d12bba3，Co-Authored-By与路径/指纹已验证；共享锁未由本批带入。其后并行提交cc56ee8818bdb87d76932a5fe3affd947d7e39ef完成其自有模块与完整193项共享迁移锁，所有引用进入提交。消费者965b45e8、派发646da1e9、持久结束94378917及查询05d4ca01均已核实为origin/main=cc56ee88的祖先，本地与远端0/0，索引为空。之前8份缺失依赖的检查点已解除，历史失败与检查点继续保留。
+
+[共享提交精确CI36735324944](https://github.com/wangbinquan/CrewStation/actions/runs/36735324944)的static/unit/module/console/e2e/gate六项completed/success。它不是每个历史子提交各自的CI，也不包括尚未提交的实际布局查询。并行持久层修复后的catalogSummary与transactionContext真实PG定向4pass/0fail、28断言确认；未重跑历史查询完整门禁。生产开发采集OFF，sourceScope=business-tasks，实际本机部署另记，CS-R02保持In Progress。

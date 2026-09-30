@@ -1,3 +1,4 @@
+import { developmentUsageLayoutLookup } from './application/development/layoutLookup';
 import { inspectBusinessRecovery } from './application/business/recoveryInspection';
 import { businessStorageFinalization } from './application/business/finalization';
 import { businessStorageCleanup } from './application/business/storageCleanup';
@@ -167,6 +168,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     stopRuntimeImageProbe: stopImageProbe(useCaseDeps, deps.imageProbeLeases ? imageProbeCleanup(deps.k8s, deps.imageProbeLeases.port, deps.imageProbeLeases.holder) : undefined),
     reconcileRebuild: reconcileRebuildUseCase(recoveryDeps),
     listClusterTasks: queries.listClusterTasks,
+    lookupDevelopmentUsageLayout: developmentUsageLayoutLookup(useCaseDeps),
     resourceWorkloads: queries.resourceWorkloads,
     resourceWorkload: queries.resourceWorkload,
     ...rebuild,
