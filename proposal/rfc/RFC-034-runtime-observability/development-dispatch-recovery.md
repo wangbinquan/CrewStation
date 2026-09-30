@@ -1,6 +1,6 @@
 # RFC-034 已选择数字布局后的派发恢复
 
-状态：限定设计及3路径实现门PASS、相关38pass/0fail/343断言、lint/types通过；唯一完整check保留1项外部客户端失败，原开发修复后4项比例核验通过；尚未发布。承接普通 startAgent 屏障；生产开发采集仍 OFF。本批修正内部派发恢复，不接实际生命周期或清理，不宣称未绑定零、完整来源或退出证明。
+状态：3480032ce74b672dbe71184dc00f238bb3ba1bf7已精确推送，自身六项CI成功，并于2026-09-30T18:16:51.254Z完成本机部署；八组件与匿名入口已核验。限定设计及3路径实现门PASS，相关38pass/0fail/343断言、lint/types通过；唯一完整check保留1项外部客户端失败，原开发修复后4项比例核验通过。生产开发采集仍OFF，本批不接实际生命周期或清理，不提供未绑定零、完整来源或退出证明。
 
 ## 实际断点与行为
 
@@ -44,3 +44,26 @@ developmentStartAgentFenceV1=1 的实际新 Runner 即使 journal 打开失败�
 唯一失败为packages/api-client/tests/projectDeletion.test.ts:54新增“重新盘点不能接受首次计划或另一个原操作的材料”；其客户端/测试及新项目删除合同均是并行在制内容，不在本批路径。结束后的当前客户端已由原开发补上请求原操作匹配，按比例只查该文件得到4pass/0fail、18断言/1文件；外部四依据及本批三路径在定向检查前后指纹未变。完整1fail原始回执保留，不改写为全量0fail，也不提交、剥离或修写并行文件。
 
 本批限定设计/静态实现门PASS、38项相关回归/343断言、精确lint/types仍有效。依据开发规则§3外部WIP失败的限定核验，以及用户同候选最多一次完整门禁要求，按8条本人精确路径准备提交/推送；候选自身hosted CI和本机部署另记。实际本机仍808c5af0，生产开发采集OFF，sourceScope=business-tasks，无未绑定零、退出或删除许可；两个RFC及CS-R02保持In Progress。
+
+## 2026-10-01 精确发布、CI与本机部署
+
+8个本人路径已精确提交并推送为`3480032ce74b672dbe71184dc00f238bb3ba1bf7`；提交路径、内容指纹及Co-Authored-By已核对，推送后main/origin=0/0、共享索引为空。新清理规划和并行资源删除/迁移登记文件未混入该提交。此前未发布、未部署段落为各时刻检查点，本节为后继实际回执。
+
+[候选自身CI36754924240](https://github.com/wangbinquan/CrewStation/actions/runs/36754924240)的static/unit/module/console/e2e/gate六项全部completed/success、headSha严格等于3480032c。前继屏障[CI36750655646](https://github.com/wangbinquan/CrewStation/actions/runs/36750655646)也为自身六项success；没有用前继或后继绿色代作本批精确CI。
+
+本机于2026-09-30T18:16:51.254Z（北京时间2026-10-01 02:16:51.254）完成部署，包含普通屏障7682fff3及本批派发恢复。先保存私有平台PostgreSQL备份42,657,042 bytes，SHA256 `137b43985a238520daaf04df128d5907158e29b3e4abad3b444fb90f3be02f69`；随后校验storage-contract=1、不可变镜像及并发部署版本，迁移Job `rfc034-development-dispatch-recovery-migrate-3480032c` Complete/applied=0。备份只留本机私有临时证据目录，未上库。
+
+| 组件 | generation / observedGeneration | Ready |
+| --- | --- | --- |
+| console | 208 / 208 | 1 |
+| cs-api | 202 / 202 | 1 |
+| cs-auth | 100 / 100 | 1 |
+| cs-controller | 167 / 167 | 1 |
+| cs-events | 70 / 70 | 1 |
+| cs-session | 119 / 119 | 1 |
+| mcp-capabilities | 66 / 66 | 1 |
+| mcp-operations | 66 / 66 | 1 |
+
+实际manifest摘要：console `sha256:4aaacc69e5033b3c377b0fc1f0da78b8075e494bb4db333699c29d80c4a3703f`；control-plane `sha256:95b9ef2c2e10b41e11573b1ba2d865025023e0ae15b1bf24daa9c69995d79208`；task-runtime `sha256:12f04644221524f256bcd21f7ade3bfad0e8403dbcd674a84406d798689495ba`。三个构建来源标签均严格为3480032c，默认Runner为同task-runtime摘要。
+
+2026-09-30T18:19:40.666612Z只读验收再次对拍八组件generation、Ready及镜像、默认Runner；`console.cs.localhost/auth/login`匿名HTTP200，未登录根HTTP401。没有切换身份、调用模型或创建/结束真实验证资源。生产开发采集OFF，sourceScope仍business-tasks；数字清理、实际调用者、两级开发事实/UI继续。不能把已部署内部底座视为CS-R02或两个RFC完成。

@@ -600,3 +600,7 @@ v1独立18前身17路径功能门FAIL一项P2：I/O后虽读过时钟，但commi
 唯一失败为packages/api-client/tests/projectDeletion.test.ts:54新增“重新盘点不能接受首次计划或另一个原操作的材料”；其客户端/测试及新项目删除合同均是并行在制内容，不在本批路径。结束后的当前客户端已由原开发补上请求原操作匹配，按比例只查该文件得到4pass/0fail、18断言/1文件；外部四依据及本批三路径在定向检查前后指纹未变。完整1fail原始回执保留，不改写为全量0fail，也不提交、剥离或修写并行文件。
 
 本批限定设计/静态实现门PASS、38项相关回归/343断言、精确lint/types仍有效。依据开发规则§3外部WIP失败的限定核验，以及用户同候选最多一次完整门禁要求，按8条本人精确路径准备提交/推送；候选自身hosted CI和本机部署另记。实际本机仍808c5af0，生产开发采集OFF，sourceScope=business-tasks，无未绑定零、退出或删除许可；两个RFC及CS-R02保持In Progress。
+
+## 2026-10-01 派发恢复部署后的当前回执
+
+普通启动屏障7682fff3与派发恢复3480032c已分别精确推送，各自六项hosted CI全部success；2026-09-30T18:16:51.254Z本机部署3480032c包含两批，八组件Ready=1、generation=observedGeneration，storage-contract=1、迁移Complete/applied=0，镜像来源、默认Runner及匿名入口核验通过。两批原唯一完整check的外部失败和后续比例核验均保留，没有改成全量0fail或重复完整门禁。生产source仍未注入；真实身份/模型验收、开发结束与全部清理入口、consumer调用者和两级开发事实/UI继续，CS-R02及两个RFC保持In Progress。详见[发布与实际部署回执](./development-dispatch-recovery.md#2026-10-01-精确发布ci与本机部署)。

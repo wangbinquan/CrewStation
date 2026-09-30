@@ -4,7 +4,7 @@
 
 ## 当前已实现与实际部署
 
-当前本机源码版本：`808c5af0bf80445c8cfbaf1baca112b74c723b7f`，2026-09-30T16:05:16.903Z（北京时间10-01 00:05:16.903）部署完成；[精确CI36739319297](https://github.com/wangbinquan/CrewStation/actions/runs/36739319297)六项成功，八组件Ready=1、storage-contract=1、迁移Complete/applied=0，镜像源码与默认Runner摘要已对拍。实际console.cs.localhost登录HTTP200、未登录根HTTP401。原生来源、停止、稳定受理、内部consumer/原键派发/持久结束和两项独立查询底座已部署；生产开发采集仍OFF，实际派发/清理/消费调用者和两级开发明细尚未接通。源码与后继回执文档分别记录，历史门禁失败与部署批次保留在下方。
+当前本机源码版本：`3480032ce74b672dbe71184dc00f238bb3ba1bf7`，2026-09-30T18:16:51.254Z（北京时间10-01 02:16:51.254）部署完成；[精确CI36754924240](https://github.com/wangbinquan/CrewStation/actions/runs/36754924240)六项成功，八组件Ready=1、storage-contract=1、迁移Complete/applied=0，镜像源码与默认Runner摘要已对拍。2026-09-30T18:19:40.666612Z实际console.cs.localhost登录HTTP200、未登录根HTTP401。原生来源、停止、稳定受理、内部consumer/原键派发/持久结束、两项独立查询、普通启动屏障及原选择派发恢复底座已部署；生产开发采集仍OFF，实际派发/清理/消费调用者和两级开发明细尚未接通。源码与后继回执文档分别记录，历史门禁失败与部署批次保留在下方。
 
 正式项目/系统统计已有业务任务、Agent/尝试、四桶 Token、人民币估值、基础泳道、算力贡献下钻和采集质量；项目与算力显示名称，保留稳定 ID/受理修订。已有价格配置与冻结目录、OpenCode 根/子树采集、原归属修订和原价补算；资源/容量和当前服务槽/平台 Pod 健康已有入口。
 
@@ -22,7 +22,7 @@
 | 原键持久停止（已推送/CI成功/本机部署，生产不调用） | 独立限定实现门PASS；相关47/0与完整4307/142skip/0、23路径指纹一致 | bebb3d9b精确发布、六项CI成功及八组件本机部署；仍需实际原生来源、owner全派发/删除屏障、consumer/两级事实UI |
 | 实际原生来源第一批（已推送/CI成功/本机部署，生产不调用） | 严格可选能力与Hook前选择、实际环境/文件身份、同轮模型、独立begin/finish和journal，最终30源码/测试独立门PASS；相关77/0、合同族34/0及精确lint通过 | d01ba8223的六项CI全部success，本机八组件Ready；本机全量被并行迁移阻断的记录保留。owner挂载/派发/完整删除屏障、consumer原价历史归属、两级事实/UI及实际验收继续 |
 
-内部持久consumer、原键派发、持久结束与Session独立登记查询均已通过各自限定功能复核，并随共享cc56ee8818bdb87d76932a5fe3affd947d7e39ef累计推送。原965b45e8、646da1e9、94378917及05d4ca01已核实为远端祖先；完整共享迁移锁和引用齐备，精确CI36735324944六项success。历史本机完整门禁的外部失败与未发布检查点保留，实际布局候选完整4568pass/143skip/0fail、9路径未变；已推送808c5af0、自身精确六项CI成功并本机部署。新普通启动屏障限定设计/9路径实现功能门PASS、相关35pass/0fail/184断言及lint/types通过；唯一完整check保留1项外部迁移失败，登记后比例核验和35项依赖回归通过；已精确发布7682fff3，自身六项CI成功，尚未本机部署。生产source尚未注入，两级开发事实/UI、owner派发/所有删除排空仍须接通，CS-R02不关闭。详见消费者、派发、结束、Session查询和[实际布局查询](./development-environment.md)各批回执。
+内部持久consumer、原键派发、持久结束与Session独立登记查询均已精确发布并部署；原965b45e8、646da1e9、94378917及05d4ca01均为远端祖先。实际布局808c5af0、普通启动屏障7682fff3及原选择派发恢复3480032c也已分别通过自身六项CI，并随3480032c进入实际镜像。各批原门禁失败及比例闭环历史完整保留。生产source尚未注入，两级开发事实/UI、owner派发/所有删除排空仍须接通，CS-R02不关闭。详见各专题与[当前部署回执](./development-dispatch-recovery.md#2026-10-01-精确发布ci与本机部署)。
 
 源码锚点：[统计合同](../../../packages/contracts/api/observability/runtimeStatistics.ts) 的 `sourceScope` 仍为业务任务、cohort 仍为 started；[platform 装配](../../../modules/platform/wiring.ts) 仅注入业务事实/业务数值来源；[开发生命周期](../../../modules/dev-session/application/agentExecution.ts) 仍由普通事件结束并回收；[平台健康说明](../../../apps/console/src/features/observability/i18n/zh-CN.ts) 明确应用级指标尚未采集。
 
@@ -404,3 +404,7 @@ v1独立18前身17路径功能门FAIL一项P2：I/O后虽读过时钟，但commi
 唯一失败为packages/api-client/tests/projectDeletion.test.ts:54新增“重新盘点不能接受首次计划或另一个原操作的材料”；其客户端/测试及新项目删除合同均是并行在制内容，不在本批路径。结束后的当前客户端已由原开发补上请求原操作匹配，按比例只查该文件得到4pass/0fail、18断言/1文件；外部四依据及本批三路径在定向检查前后指纹未变。完整1fail原始回执保留，不改写为全量0fail，也不提交、剥离或修写并行文件。
 
 本批限定设计/静态实现门PASS、38项相关回归/343断言、精确lint/types仍有效。依据开发规则§3外部WIP失败的限定核验，以及用户同候选最多一次完整门禁要求，按8条本人精确路径准备提交/推送；候选自身hosted CI和本机部署另记。实际本机仍808c5af0，生产开发采集OFF，sourceScope=business-tasks，无未绑定零、退出或删除许可；两个RFC及CS-R02保持In Progress。
+
+## 2026-10-01 派发恢复部署后的当前回执
+
+普通启动屏障7682fff3与派发恢复3480032c已分别精确推送，各自六项hosted CI全部success；2026-09-30T18:16:51.254Z本机部署3480032c包含两批，八组件Ready=1、generation=observedGeneration，storage-contract=1、迁移Complete/applied=0，镜像来源、默认Runner及匿名入口核验通过。两批原唯一完整check的外部失败和后续比例核验均保留，没有改成全量0fail或重复完整门禁。生产source仍未注入；真实身份/模型验收、开发结束与全部清理入口、consumer调用者和两级开发事实/UI继续，CS-R02及两个RFC保持In Progress。详见[发布与实际部署回执](./development-dispatch-recovery.md#2026-10-01-精确发布ci与本机部署)。
