@@ -10,6 +10,7 @@ import { webhookAwareAllowlist } from './application/webhookIngress';
 import { objectStorageSources } from './application/objectStorageSources';
 import { assertStorageConsumers } from './adapters/k8s/storageContract'; import { objectTransferOwners } from './adapters/k8s/objectTransferOwners';
 import { releaseImagePorts } from './application/releaseImagePorts';
+import { eventDeliveryOwners } from './adapters/k8s/eventDeliveryOwners';
 import { imageValidationPorts } from './application/imageValidationPorts';
 import { businessExecutionPorts, executionHandoffPorts } from './application/businessExecutionPorts';
 import { developmentImagePorts, imageOwnerPorts } from './application/developmentImagePorts';
@@ -335,6 +336,7 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
   });
   const events = createEventsModule({
     db, logger, projects: project.api,
+    processes: eventDeliveryOwners(deps.k8s,settings.systemNamespace,settings.platformPodUid),
     services: { resolveService: async (id) => { const r = await resolveById(id); return r ? { projectId: r.projectId, serviceId: r.serviceId, slug: r.slug, identity: r.identity } : undefined; } },
     endpoints: { resolve: async (serviceId) => { const [ep, svc] = await Promise.all([release.api.activeEndpoint(serviceId), resolveById(serviceId)]); return ep && svc ? { baseUrl: `http://${svc.slug}.${settings.serviceDomain}` } : undefined; } },
     hold: { holds: (serviceId) => delivery.gateway.api.holdsEvents(serviceId) },
@@ -554,7 +556,7 @@ export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
       events: [...m.events.http.ingress],
     },
     background: {
-      controller: [...m.cluster.workers, ...m.data.workers, ...m.release.workers, ...m.gateway.workers, consumerLifecycle(m.gateway.subscriptions), ...m.taskRuntime.workers, ...m.agentRuntime.workers, ...m.runtimeEnvironment.workers, ...m.devSession.workers, ...m.businessTask.workers, consumerLifecycle(m.businessTask.subscriptions), ...m.apiCatalog.subscriptions.map(consumerLifecycle), ...m.data.subscriptions.map(consumerLifecycle), ...m.observability.workers, ...m.provisioning.workers, ...m.provisioning.startupTasks, consumerLifecycle(m.provisioning.subscriptions), m.resources.maintenanceWorker, m.clusterControl.observer, m.dataControl.observer, ...m.resourceAccess.workers],
+      controller: [...m.cluster.workers, ...m.data.workers, ...m.release.workers, ...m.gateway.workers, consumerLifecycle(m.gateway.subscriptions), ...m.taskRuntime.workers, ...m.agentRuntime.workers, ...m.runtimeEnvironment.workers, ...m.devSession.workers, ...m.businessTask.workers, consumerLifecycle(m.businessTask.subscriptions), ...m.apiCatalog.subscriptions.map(consumerLifecycle), ...m.data.subscriptions.map(consumerLifecycle), ...m.observability.workers, ...m.provisioning.workers, ...m.provisioning.startupTasks, consumerLifecycle(m.provisioning.subscriptions), m.resources.maintenanceWorker, m.clusterControl.observer, m.dataControl.observer, ...m.resourceAccess.workers,m.events.recoveryWorker],
       // 资源推送流的尾随器（RFC-025 设计 §8.2）：每个 cs-api 副本一个。
       api: [m.resources.streamWorker],
       session: [...m.session.workers],

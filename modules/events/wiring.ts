@@ -12,6 +12,8 @@ import type { Worker } from '@crewstation/queue';
 import type { Hono } from 'hono';
 import { fetchEventPusher } from './adapters/http-client/fetchEventPusher';
 import { drizzleUnitOfWork } from './adapters/persistence/drizzleUnitOfWork';
+import { eventsDeletionRepository } from './adapters/persistence/deletion/repository';
+import { deliveryProcessReleasable, recoverDeliveryProcess } from './adapters/persistence/deliveryWork';
 import type { EventsModuleApi } from './api/moduleApi';
 import { deliverEventUseCase } from './application/deliverEvent';
 import type { EventsUseCaseDeps } from './application/dependencies';
@@ -20,6 +22,8 @@ import { eventQueryUseCases } from './application/queryEvents';
 import { registerReleaseUseCase } from './application/registerRelease';
 import { releaseHeldUseCase } from './application/releaseHeld';
 import { replayDeliveryUseCase } from './application/replayDelivery';
+import { eventsDeletionOwner } from './application/projectDeletion';
+import type { DeliveryProcessOwners } from './ports/deliveryProcesses';
 import { ingressRoutes } from './http/ingressRoutes';
 import { queryRoutes } from './http/queryRoutes';
 import type { DeliveryHold } from './ports/deliveryHold';
@@ -28,12 +32,14 @@ import type { EventsSettings } from './ports/eventsSettings';
 import type { HandlerEndpointResolver } from './ports/handlerEndpointResolver';
 import type { ServiceResolver } from './ports/serviceResolver';
 import { createDeliveryWorker } from './workers/deliveryWorker';
+import { deliveryRecoveryWorker } from './workers/deliveryRecovery';
 
 /** 装配期注入：其他模块的能力以端口形式出现在这里，由应用提供实现。 */
 export interface EventsModuleDeps {
   db: Database;
   /** project 模块：管理员标记与项目内授权。 */
-  projects: Pick<ProjectModuleApi, 'isAdmin' | 'authorize'>;
+  projects: Pick<ProjectModuleApi, 'isAdmin' | 'authorize'> & Partial<Pick<ProjectModuleApi,'assertProjectAvailable' | 'assertProjectDeletionGrant'>>;
+  processes?: DeliveryProcessOwners;
   /** 服务 ID → 归属（slug、身份）；由应用基于 project 模块装配。 */
   services: ServiceResolver;
   /** 订阅方 active prod 槽的服务域地址；由应用基于 release 模块装配（结构文档 §4.3）。 */
@@ -55,6 +61,7 @@ export interface EventsModule {
   readonly http: { readonly ingress: Hono<AppEnv>[]; readonly query: Hono<AppEnv>[] };
   /** 投递 worker 与暂存补发的兜底巡检（cs-events）。 */
   readonly workers: readonly [Worker, { start(): void; stop(): Promise<void> }];
+  readonly recoveryWorker: ReturnType<typeof deliveryRecoveryWorker>;
   /** release.registered 的消费者；承载进程负责 start()／stop()。 */
   readonly subscriptions: EventConsumer[];
   readonly migrations: MigrationSet;
@@ -76,7 +83,7 @@ export function createEventsModule(deps: EventsModuleDeps): EventsModule {
   const settings: EventsSettings = { ...DEFAULT_SETTINGS, ...deps.settings };
   const logger = deps.logger ? { logger: deps.logger } : {};
   const useCaseDeps: EventsUseCaseDeps = {
-    uow: drizzleUnitOfWork(deps.db, { jobMaxAttempts: settings.maxAttempts + JOB_ATTEMPT_MARGIN }),
+    uow: drizzleUnitOfWork(deps.db, { jobMaxAttempts: settings.maxAttempts + JOB_ATTEMPT_MARGIN,assertAvailable: deps.projects.assertProjectAvailable,processes: deps.processes }),
     services: deps.services,
     projects: { isAdmin: (id) => deps.projects.isAdmin(id), authorize: (actor, projectId, action) => deps.projects.authorize(actor, projectId, action) },
     endpoints: deps.endpoints,
@@ -87,6 +94,7 @@ export function createEventsModule(deps: EventsModuleDeps): EventsModule {
   };
   const api: EventsModuleApi = {
     name: 'events',
+    ...(deps.projects.assertProjectDeletionGrant ? { deletionOwner: eventsDeletionOwner(eventsDeletionRepository(deps.db,deps.projects.assertProjectDeletionGrant),deps.projects.assertProjectDeletionGrant) } : {}),
     isAdmin: (userId) => deps.projects.isAdmin(userId),
     produce: produceEventUseCase(useCaseDeps),
     produceLegacy: produceLegacyEventUseCase(useCaseDeps),
@@ -102,6 +110,7 @@ export function createEventsModule(deps: EventsModuleDeps): EventsModule {
     // 退出维护或放开事件开关：立即补发这个服务暂存的投递（RFC-021 B5）。
     .on(DomainTopic.maintenanceChanged, async (event) => { if (!(event.payload.active && event.payload.holdEvents)) await api.releaseHeld(event.payload.serviceId); });
   const worker = createDeliveryWorker({ db: deps.db, deliver: api.deliver, owner: deps.worker?.owner ?? 'events', concurrency: deps.worker?.concurrency ?? 4, ...logger });
+  const recoveryWorker = deliveryRecoveryWorker(async () => deps.processes?.sweep({ stopped: (process,digest) => recoverDeliveryProcess(deps.db,process,digest),releasable: (uid) => deliveryProcessReleasable(deps.db,uid) }),deps.logger);
   let timer: ReturnType<typeof setInterval> | undefined;
   const heldSweep = {
     start: () => { timer ??= setInterval(() => void api.releaseHeld().catch((error: unknown) => deps.logger?.warn('held delivery sweep failed', { error: String(error) })), HELD_SWEEP_MS); },
@@ -111,6 +120,7 @@ export function createEventsModule(deps: EventsModuleDeps): EventsModule {
     api,
     http: { ingress: [ingressRoutes(api)], query: [queryRoutes(api)] },
     workers: [worker, heldSweep],
+    recoveryWorker,
     subscriptions: [consumer],
     migrations: eventsMigrations,
   };

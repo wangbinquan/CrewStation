@@ -10,10 +10,18 @@ export function registerReleaseUseCase({ uow, services, clock }: EventsUseCaseDe
     const { manifest } = event;
     if (manifest.kind === 'APIProxy') return;
     const now = clock.now();
-    await uow.run(async (scope) => {
+    const projectIds = [event.projectId];
+    if (manifest.kind === 'DigitalWorker') for (const subscription of manifest.spec.subscriptions) {
+      const type = await uow.read.eventTypes.getById(subscription.eventTypeId);
+      const producer = type ? await uow.read.producers.getById(type.producerId) : undefined;
+      if (!type || type.state !== 'active' || !producer) throw notFound('事件类型',subscription.eventTypeId);
+      projectIds.push(producer.projectId);
+    }
+    await uow.withAdmission(projectIds,() => uow.run(async (scope) => {
+      const resolved = await services.resolveService(event.serviceId);
+      if (!resolved) throw notFound('服务', event.serviceId);
+      if (resolved.serviceId !== event.serviceId || resolved.projectId !== event.projectId) throw conflict('事件登记的原服务与项目归属不符');
       if (manifest.kind === 'EventProducer') {
-        const resolved = await services.resolveService(event.serviceId);
-        if (!resolved) throw notFound('服务', event.serviceId);
         const byCode = await scope.producers.getByCode(manifest.spec.producer);
         if (byCode && byCode.serviceId !== event.serviceId) throw conflict(`生产方编码 ${manifest.spec.producer} 已被占用`);
         const previous = byCode ?? await scope.producers.getByService(event.serviceId);
@@ -44,6 +52,6 @@ export function registerReleaseUseCase({ uow, services, clock }: EventsUseCaseDe
       const changes = reconcileSubscriptions(existing, declared, event, newResourceId, now);
       for (const id of changes.removedIds) await scope.subscriptions.remove(id);
       for (const subscription of changes.upserts) await scope.subscriptions.upsert(subscription);
-    });
+    }));
   };
 }

@@ -22,7 +22,10 @@ export function produceEventUseCase({ uow, clock }: EventsUseCaseDeps) {
       dedupKey: input.dedupKey, occurredAt: new Date(input.occurredAt), receivedAt: now,
       traceId: (input.traceId ?? newTraceId()) as TraceId, payload: input.payload ?? null,
     };
-    return uow.run(async (scope) => {
+    const candidates = await uow.read.subscriptions.listActiveByEventType(type.id);
+    return uow.withAdmission([producer.projectId,...candidates.map((s) => s.projectId)],() => uow.run(async (scope) => {
+      const fresh = await scope.eventTypes.getById(type.id);
+      if (!fresh || fresh.state !== 'active' || fresh.producerId !== producer.id) throw notFound('事件类型',input.eventTypeId);
       if (!(await scope.inbox.insert(event))) {
         const existing = await scope.inbox.getByDedup(event.producerId, event.dedupKey);
         return { eventId: existing?.id ?? event.id, deduplicated: true, deliveries: 0 };
@@ -34,7 +37,7 @@ export function produceEventUseCase({ uow, clock }: EventsUseCaseDeps) {
         await scope.scheduler.schedule(delivery.id);
       }
       return { eventId: event.id, deduplicated: false, deliveries: subscriptions.length };
-    });
+    }));
   };
 }
 

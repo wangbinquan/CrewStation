@@ -19,13 +19,13 @@ export function releaseHeldUseCase({ uow, hold, clock }: EventsUseCaseDeps) {
       if (await hold.holds(service)) continue;
       for (const delivery of held.filter((d) => d.serviceId === service)) {
         const at = new Date(base + released);
-        const ok = await uow.run(async (scope) => {
+        const ok = await uow.withDeliveryAdmission(delivery.id,() => uow.run(async (scope) => {
           const fresh = await scope.deliveries.getById(delivery.id);
           if (fresh?.state !== 'held') return false;
           await scope.deliveries.update(releaseHeldDelivery(fresh, at));
           await scope.scheduler.schedule(fresh.id, at);
           return true;
-        }).catch(() => false);
+        }),false).catch(() => false);
         if (ok) released += 1;
       }
     }

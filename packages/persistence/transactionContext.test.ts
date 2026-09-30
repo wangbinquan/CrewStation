@@ -4,7 +4,7 @@ import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit'
 import { sql } from 'drizzle-orm';
 import { connectDatabase } from './connection';
 import type { DatabaseHandle } from './connection';
-import { withExclusiveDatabaseAdmission, withSharedDatabaseAdmission } from './transactionContext';
+import { withExclusiveDatabaseAdmission, withSharedDatabaseAdmission, withSharedDatabaseAdmissions } from './transactionContext';
 
 const available = await testDatabaseAvailable(), KEY = 'resources.project-admission:test';
 describe.skipIf(!available)('持久准入独立连接池（真实 PG）', () => {
@@ -49,11 +49,31 @@ describe.skipIf(!available)('持久准入独立连接池（真实 PG）', () => 
     } finally { write(); }
     await inFlight; expect(await sealing).toBe('sealed');
   }, 10_000);
-  for (const mode of ['shared', 'exclusive'] as const) test(`${mode} 准入断线后拒绝原调用，仍在退出的外部回调不能使驱动提交已关闭的连接`, async () => {
+  test('多个来源由同一 backend 按稳定次序保护，普通单连接事务和嵌套子集无需重复锁；无关来源可继续', async () => {
+    database = await createTestDatabase(); single = connectDatabase(database.url, { max: 1 });
+    const keys = [KEY, 'events.project-admission:second'].sort();
+    await withSharedDatabaseAdmissions(single.db, [keys[1]!, keys[0]!, keys[1]!], async (guard) => {
+      const backend = Number((await guard.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`))[0]!.pid);
+      await single.db.transaction(async (tx) => {
+        const [row] = await tx.execute<{ keys: string; pid: string; locks: number }>(sql`SELECT current_setting('crewstation.shared_admission_keys') AS keys,current_setting('crewstation.shared_admission_pid') AS pid,(SELECT count(*)::integer FROM pg_locks WHERE pid=${backend} AND locktype='advisory' AND granted AND mode='ShareLock') AS locks`);
+        expect(row).toEqual({ keys: JSON.stringify(keys), pid: String(backend), locks: 2 });
+      });
+      await withSharedDatabaseAdmission(single.db, keys[1]!, async (nested) => { expect(nested).toBe(guard); });
+      await withSharedDatabaseAdmissions(single.db, [keys[1]!], async (nested) => { expect(nested).toBe(guard); });
+      expect(() => withSharedDatabaseAdmissions(single.db, ['unprotected'], async () => undefined)).toThrow('Cannot expand');
+      for (const key of keys) expect(() => withExclusiveDatabaseAdmission(single.db, key, async () => undefined)).toThrow('active shared');
+      expect(await withExclusiveDatabaseAdmission(database.db, 'unrelated', async () => 'available')).toBe('available');
+    });
+    for (const key of keys) expect(await withExclusiveDatabaseAdmission(single.db, key, async () => 'drained')).toBe('drained');
+    expect(() => withSharedDatabaseAdmissions(single.db, [], async () => undefined)).toThrow('nonempty');
+    expect(() => withSharedDatabaseAdmissions(single.db, [''], async () => undefined)).toThrow('nonempty');
+  }, 10_000);
+  for (const mode of ['shared', 'multiple', 'exclusive'] as const) test(`${mode} 准入断线后拒绝原调用，仍在退出的外部回调不能使驱动提交已关闭的连接`, async () => {
     database = await createTestDatabase(); single = connectDatabase(database.url, { max: 1 });
     let entered!: (pid: number) => void, release!: () => void, exited!: (key?: string) => void;
     const ready = new Promise<number>((resolve) => { entered = resolve; }), held = new Promise<void>((resolve) => { release = resolve; }), late = new Promise<string | undefined>((resolve) => { exited = resolve; });
-    const admission = mode === 'shared' ? withSharedDatabaseAdmission : withExclusiveDatabaseAdmission;
+    const admission = mode === 'shared' ? withSharedDatabaseAdmission : mode === 'exclusive' ? withExclusiveDatabaseAdmission
+      : (db: Parameters<typeof withSharedDatabaseAdmission>[0], key: string, work: Parameters<typeof withSharedDatabaseAdmission>[2]) => withSharedDatabaseAdmissions(db, [key, 'events.project-admission:other'], work);
     const pending = admission(single.db, KEY, async (guard) => {
       entered(Number((await guard.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`))[0]!.pid)); await held;
       const key = await single.db.transaction(async (tx) => (await tx.execute<{ key?: string }>(sql`SELECT current_setting('crewstation.shared_admission_key',true) AS key`))[0]?.key);

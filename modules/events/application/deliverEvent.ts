@@ -17,7 +17,7 @@ export function deliverEventUseCase({ uow, endpoints, pusher, settings, clock, h
     await uow.run((scope) => scope.deliveries.update(next));
     return { state: next.state, error };
   };
-  return async (deliveryId: string): Promise<DeliverOutcome> => {
+  const attemptDelivery = async (deliveryId: string): Promise<DeliverOutcome> => {
     const delivery = await uow.read.deliveries.getById(deliveryId);
     if (!delivery) return { state: 'dead', error: `投递 ${deliveryId} 不存在` };
     if (delivery.state === 'delivered' || delivery.state === 'dead' || delivery.state === 'held') return { state: delivery.state };
@@ -40,6 +40,12 @@ export function deliverEventUseCase({ uow, endpoints, pusher, settings, clock, h
     if (!result.ok) return settle(attempt, result.error ?? `HTTP ${result.status}`, false);
     await uow.run((scope) => scope.deliveries.update(markDelivered(attempt, clock.now())));
     return { state: 'delivered' };
+  };
+  return async (deliveryId: string): Promise<DeliverOutcome> => {
+    const original = await uow.read.deliveries.getById(deliveryId);
+    if (!original) return { state: 'dead',error: `投递 ${deliveryId} 不存在` };
+    if (['delivered','dead','held'].includes(original.state)) return { state: original.state };
+    return uow.withDeliveryAdmission(deliveryId,() => attemptDelivery(deliveryId));
   };
 }
 

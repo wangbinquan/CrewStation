@@ -78,4 +78,16 @@
 - 两个新 owner 的失败 seal 均持久化 scope_verified=false，重复调用或普通 retry 不会冒充成功。只有 project 验证的新确认材料和新世代可以重新比较尚未完成的范围。
 - 明确标记本批内容盘点为 metadata。集群对象以 UID 为 sourceIdentity，当前 spec／内容摘要另保留于 identity。未分类旧项按物理来源保护，不允许把消失或替换的原来源重新认领；实际供给的物理清理仍由所属 owner 证明。
 
-以上尚属后续发布候选，不表示剩余 22 方清理、平台装配或实机回收完成。
+API／资源申请批已发布部署，详见 acceptance/api-resource-deployment.md；不表示剩余 22 方清理、平台装配或实机回收完成。
+
+## 6. 事件和平台投递来源候选（2026-10-01）
+
+- events 内容为 producers／event_types／subscriptions／inbox／deliveries，以及持久实际推送 deletion_work；直接和原 ID 关系同时确定生产方／消费方，清除本项目内容及本来源派生投递。其他项目订阅配置原文和其他来源内容保留，失效订阅由原 owner 暂停。
+- deletion_entities／deletion_links 只保留原 ID、serviceId／slug 与项目关联；deletion_fences 保存原操作、世代、确认修订和 scope_verified。内容表新增未知种类或遗留关系不可识别时盘点失败。
+- deletion_work 保存原 deliveryId／backend PID／世代及 Pod UID／containerID／Node UID／nodeName；deletion_process_stops 保存四项原身份和停止摘要。不保留事件载荷、handler 路径、trace、错误正文。队列租约或连接消失不代表实际工作退出。
+- 项目 seal 排空所有原双端 shared 准入，并等待实际回调 finally 或完整原容器停止恢复。platform 保护实际平台投递 Pod、保留外部 finalizer；原容器已停摘要先持久化，全 Pod 停止且无待恢复事实后才能释放本 owner 保护。
+- 实际投递运行在共享平台 Pod，其停止恢复由专用 process port 提供；events 不拥有独立项目物理存储。metadata 汇总不能冒充项目卷、数据库、仓库或镜像回收。其他 owner 和原资源回收必须各自证明。
+
+最新定向结果和真实 PG／独立 Bun 子进程／假 API Server 的区别见 acceptance/events-owner.md。当前候选尚未发布部署，完整物理资源清理继续。
+
+修订最终候选完整门禁 4643／143 skip／0 fail、30329 断言，37 个源码／测试／配置指纹一致；43 路径候选的前后端内存类型检查通过。精确发布和 Pod UID 源字段部署仍需接续，本内容 owner 回执不能替代其余物理 owner 的证明。

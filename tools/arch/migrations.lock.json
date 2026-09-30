@@ -85,6 +85,7 @@
     "modules/events/adapters/persistence/migrations/0003_resource_identity.sql": "d738bbf128da82051cb138ab238f50357b2deef7130f9cb0988028113fff5b01",
     "modules/events/adapters/persistence/migrations/0004_resource_identity.identity.json": "6c6cc7207ab52d6f6eca53df43a9736cd043f6b171b84af0c941ab530bd90d58",
     "modules/events/adapters/persistence/migrations/0005_held_deliveries.sql": "d123153d1994999d3492459c00114b7bfc09347c825e7efcc96eb1c05f07a4cc",
+    "modules/events/adapters/persistence/migrations/0006_project_deletion_fences.sql": "1bf8119b8a9174c8af421e460449735c21c1af806265e8ad34231fa15fea033c",
     "modules/gateway/adapters/persistence/migrations/0001_create_schema.sql": "10ea06636a973ec7d8ff76692e667182e3d243f69bc1010c7019a3cf168a9062",
     "modules/gateway/adapters/persistence/migrations/0002_gateway_tables.sql": "cb448d7db293ed3d30ee2ef01f85ab094db9828695e11dbb3732482344569126",
     "modules/gateway/adapters/persistence/migrations/0003_resource_identity.sql": "6746becca231f1446ac91c4f6c4043c61d4e7bc07b3a00ee9af64805ce776a89",

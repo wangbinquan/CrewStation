@@ -1,6 +1,7 @@
 import type {
   Actor, DeliveryDto, DeliveryState, EventTypeDto, LegacyProducedEvent, ProducedEvent, ProduceResultDto, ProjectId, ServiceActor, ServiceId, SubscriptionDto, UserId,
 } from '@crewstation/contracts';
+import type { ProjectDeletionOwner } from '@crewstation/contracts';
 
 /** 调用链的时间键：firstAt 为毫秒精度的开始时间；before 取上一页最后一条的 (firstAt, traceId)。 */
 export interface TraceKeyDto { traceId: string; firstAt: string; lastAt: string; active: boolean }
@@ -23,6 +24,7 @@ export interface DeliverOutcome {
 /** events 模块对外能力（cs-events 的 ingress 与投递，cs-api 的查询）；其他模块经 ports 注入其中的子集。 */
 export interface EventsModuleApi {
   readonly name: 'events';
+  readonly deletionOwner?: ProjectDeletionOwner;
   isAdmin(userId: UserId): Promise<boolean>;
   /** EventProducer 经服务域投递原始事件：校验调用方是该事件类型的登记生产方，inbox 按 (producer, dedupKey) 去重，为每个活动订阅建投递并入队。 */
   produceLegacy(caller: ServiceActor, input: LegacyProducedEvent): Promise<ProduceResultDto>;

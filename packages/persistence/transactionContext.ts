@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Database, Transaction } from './databaseTypes';
 import { sql } from 'drizzle-orm';
 
-interface Scope { readonly database: Database; readonly key: string; readonly backend: number; readonly transaction: Transaction; active: boolean }
+interface Scope { readonly database: Database; readonly key: string; readonly keys: readonly string[]; readonly backend: number; readonly transaction: Transaction; active: boolean }
 const scopes = new AsyncLocalStorage<Scope>();
 const guards = new WeakMap<Database, () => Database>();
 
@@ -13,7 +13,7 @@ export function contextualDatabase(database: Database, guard: () => Database): D
     const scope = scopes.getStore();
     if (!scope?.active || scope.database !== database) return transaction(work, config);
     return transaction(async (tx) => {
-      await tx.execute(sql`SELECT set_config('crewstation.shared_admission_pid', ${String(scope.backend)}, true),set_config('crewstation.shared_admission_key', ${scope.key}, true)`);
+      await tx.execute(sql`SELECT set_config('crewstation.shared_admission_pid', ${String(scope.backend)}, true),set_config('crewstation.shared_admission_key', ${scope.key}, true),set_config('crewstation.shared_admission_keys', ${JSON.stringify(scope.keys)}, true)`);
       return work(tx);
     }, config);
   };
@@ -27,13 +27,33 @@ export function contextualDatabase(database: Database, guard: () => Database): D
  */
 export function withSharedDatabaseAdmission<T>(db: Database, key: string, work: (transaction: Transaction) => Promise<T>): Promise<T> {
   const current = scopes.getStore();
-  if (current?.active && current.database === db && current.key === key) return work(current.transaction);
+  if (current?.active && current.database === db && current.keys.includes(key)) return work(current.transaction);
   const guard = guards.get(db); if (!guard) throw new Error('Database admission requires connectDatabase');
   let admitted: Scope | undefined;
   return admissionTransaction(guard(), async (transaction) => {
     await transaction.execute(sql`SELECT pg_advisory_xact_lock_shared(hashtextextended(${key},0))`);
     const backend = Number((await transaction.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`))[0]!.pid);
-    const scope: Scope = { database: db, key, backend, transaction, active: true }; admitted = scope;
+    const scope: Scope = { database: db, key, keys: [key], backend, transaction, active: true }; admitted = scope;
+    try { return await scopes.run(scope, () => work(transaction)); }
+    finally { scope.active = false; }
+  }, () => { if (admitted) admitted.active = false; });
+}
+
+/** 一个实际 backend 按稳定次序保护多个来源；普通 UOW 可验证每个 key 的真实 shared 锁。 */
+export function withSharedDatabaseAdmissions<T>(db: Database, requested: readonly string[], work: (transaction: Transaction) => Promise<T>): Promise<T> {
+  const keys = [...new Set(requested)].sort();
+  if (!keys.length || keys.some((key) => !key.length)) throw new Error('Shared admission requires nonempty keys');
+  const current = scopes.getStore();
+  if (current?.active && current.database === db) {
+    if (keys.every((key) => current.keys.includes(key))) return work(current.transaction);
+    throw new Error('Cannot expand an active shared admission');
+  }
+  const guard = guards.get(db); if (!guard) throw new Error('Database admission requires connectDatabase');
+  let admitted: Scope | undefined;
+  return admissionTransaction(guard(), async (transaction) => {
+    for (const key of keys) await transaction.execute(sql`SELECT pg_advisory_xact_lock_shared(hashtextextended(${key},0))`);
+    const backend = Number((await transaction.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`))[0]!.pid);
+    const scope: Scope = { database: db, key: keys[0]!, keys, backend, transaction, active: true }; admitted = scope;
     try { return await scopes.run(scope, () => work(transaction)); }
     finally { scope.active = false; }
   }, () => { if (admitted) admitted.active = false; });
@@ -60,7 +80,7 @@ function abandonedAdmission<T>(): Promise<T> {
 /** 排他封闭也使用准入池，避免等待 shared 回调时占满它完成 UOW 所需的普通连接。 */
 export function withExclusiveDatabaseAdmission<T>(db: Database, key: string, work: (transaction: Transaction) => Promise<T>): Promise<T> {
   const current = scopes.getStore();
-  if (current?.active && current.database === db && current.key === key) throw new Error('Cannot seal an active shared admission');
+  if (current?.active && current.database === db && current.keys.includes(key)) throw new Error('Cannot seal an active shared admission');
   const guard = guards.get(db); if (!guard) throw new Error('Database admission requires connectDatabase');
   return admissionTransaction(guard(), async (transaction) => {
     await transaction.execute(sql`SET LOCAL lock_timeout = '30s'`);
