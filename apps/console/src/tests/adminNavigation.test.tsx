@@ -47,8 +47,8 @@ function linkTree(root: Element | null): RenderedGroup[] {
 
 const EXPECTED_TREE: readonly RenderedGroup[] = [
   { title: null, pages: ['总览', '申请审批'] },
+  { title: '项目与能力供给', pages: ['项目管理', '能力接入'] },
   { title: '运行与观测', pages: ['运行观测与统计', '集群管理', '业务执行恢复', '对象存储', '网关'] },
-  { title: '供给与接入', pages: ['项目管理', '能力接入'] },
   { title: '身份与访问', pages: ['用户与权限', '认证'] },
   { title: '资源与网络', pages: ['运行镜像', '算力档位'] },
   // RFC-021 M28、B10：平台级参数单独成组放在末尾，上面四组不动。
@@ -58,7 +58,8 @@ const EXPECTED_TREE: readonly RenderedGroup[] = [
 describe('管理空间的分组树（2026-09-21 修订 RFC-003 §4）', () => {
   // 锁的是作者反馈的真实问题：集群管理、网关是看运行状态的呈现类页面，曾和六个配置页一起挂在「平台设置」下。
   // 这里同时锁分组、组序与组内顺序；谁把呈现类页面挪回配置分组，这条就红。
-  test('左栏：待处理 → 运行与观测 → 供给与接入 → 身份与访问 → 资源与网络 → 平台', async () => {
+  // 2026-09-30 作者要求：项目与能力供给整组排在运行与观测之前，总览同步使用这个顺序。
+  test('左栏：待处理 → 项目与能力供给 → 运行与观测 → 身份与访问 → 资源与网络 → 平台', async () => {
     asAdmin(); page = await renderApp('/admin');
     const tree = linkTree(document.querySelector('nav[aria-label="主导航"]'));
     expect(tree).toEqual([...EXPECTED_TREE]);
@@ -131,6 +132,8 @@ describe('分组定义本身', () => {
     ];
     expect({ 中文缺少: keys.filter((key) => !zh[key]), 英文缺少: keys.filter((key) => !en[key]) }).toEqual({ 中文缺少: [], 英文缺少: [] });
     expect(en['nav.admin.groupObservability']).toBe('Runtime and observability');
+    expect(zh['nav.admin.groupSupply']).toBe('项目与能力供给');
+    expect(en['nav.admin.groupSupply']).toBe('Projects and capability supply');
     expect(zh['nav.admin.groupSettings']).toBeUndefined();
     expect(en['nav.admin.groupSettings']).toBeUndefined();
   });

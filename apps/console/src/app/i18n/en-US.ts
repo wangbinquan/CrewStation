@@ -234,7 +234,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'nav.workbenchHint': 'Discover apps, build capabilities',
   'nav.adminHint': 'Supply and run shared capabilities',
   'nav.admin.groupObservability': 'Runtime and observability',
-  'nav.admin.groupSupply': 'Supply and integrations',
+  'nav.admin.groupSupply': 'Projects and capability supply',
   'nav.admin.groupIdentity': 'Identity and access',
   'nav.admin.groupResources': 'Resources and network',
   'nav.admin.groupPlatform': 'Platform',

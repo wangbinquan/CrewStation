@@ -40,21 +40,21 @@ export const ADMIN_PENDING_PAGES: readonly AdminNavPage[] = [
 ];
 
 /**
- * 管理空间的分组树，左栏与总览入口卡片共用这一份（2026-09-21 修订 RFC-003 §4）。
+ * 管理空间的分组树，左栏与总览入口卡片共用这一份（RFC-003 §4，2026-09-30 项目与能力供给前移）。
  * 归属按页面性质：只看运行状态、对运行实例动手的页面进「运行与观测」，保存后影响之后行为的配置页按主题分到后两组；
  * 每页保留独立 URL（RFC-002 §2.1）。
  */
 export const ADMIN_ENTRY_GROUPS: readonly AdminEntryGroup[] = [
+  { id: 'supply', titleKey: 'nav.admin.groupSupply', pages: [
+    { to: '/admin/projects', labelKey: 'nav.admin.projects', hintKey: 'admin.directory.description' },
+    { to: '/admin/capabilities', labelKey: 'nav.admin.capabilities', hintKey: 'admin.capabilities.hint' },
+  ] },
   { id: 'observability', titleKey: 'nav.admin.groupObservability', pages: [
     { to: '/admin/observability', labelKey: 'runtime.title', hintKey: 'runtime.description' },
     { to: '/admin/cluster', labelKey: 'cluster.title', hintKey: 'cluster.description' },
     { to: '/admin/business-execution', labelKey: 'executionRecovery.title', hintKey: 'executionRecovery.hint' },
     { to: '/admin/object-storage', labelKey: 'objects.title', hintKey: 'objects.description' },
     { to: '/admin/gateway', labelKey: 'nav.admin.gateway', hintKey: 'admin.overview.gateway' },
-  ] },
-  { id: 'supply', titleKey: 'nav.admin.groupSupply', pages: [
-    { to: '/admin/projects', labelKey: 'nav.admin.projects', hintKey: 'admin.directory.description' },
-    { to: '/admin/capabilities', labelKey: 'nav.admin.capabilities', hintKey: 'admin.capabilities.hint' },
   ] },
   { id: 'identity', titleKey: 'nav.admin.groupIdentity', pages: [
     { to: '/admin/users', labelKey: 'nav.admin.users', hintKey: 'admin.overview.users' },

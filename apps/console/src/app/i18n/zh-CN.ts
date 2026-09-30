@@ -237,7 +237,7 @@ export const messages = {
   'nav.workbenchHint': '发现应用，构建能力',
   'nav.adminHint': '公共能力的供给与运行',
   'nav.admin.groupObservability': '运行与观测',
-  'nav.admin.groupSupply': '供给与接入',
+  'nav.admin.groupSupply': '项目与能力供给',
   'nav.admin.groupIdentity': '身份与访问',
   'nav.admin.groupResources': '资源与网络',
   'nav.admin.groupPlatform': '平台',
