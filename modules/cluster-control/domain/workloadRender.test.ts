@@ -102,3 +102,20 @@ test('numeric layout parsing keeps both private stores only for an explicit inde
     { checkout: { repoUrl: 'https://fixture.invalid/repo', branch: 'main', credentialSecretName: 'checkout' } }, { businessStorage: { version: 1, ownerTaskId: 'owner' } }, { archive: { ownerTaskId: 'owner' } }, { consumer: {} },
   ]) expect(workloadRenderOf('record', { children, pod: { ...selected, ...patch } })).toBeUndefined();
 });
+
+// RFC-034: an explicitly protected digital layout must retain the original consumer and PVC instead of being rejected or downgraded.
+test('explicit protected development layouts keep their original agent consumer; incomplete or conflicting selections do not render', () => {
+  const record = '019f0000-0000-7000-8000-000000000003', parent = '019f0000-0000-7000-8000-000000000002';
+  const pvcUid = 'd7aa3cff-94e3-453a-9c04-c6f7a8678438';
+  const selected = { ...pod, nodeName: 'original-node', workspace: { pod: 'parent', podUid: 'd624eb08-2bfa-46f6-812f-29bdecc0d961', pvcUid },
+    labels: { 'crewstation.io/workspace-task': parent }, annotations: { 'crewstation.io/cli-intent': 'a'.repeat(64) },
+    expectedVolumeUid: pvcUid, developmentUsageStorage: { version: 1 }, developmentUsageProtection: { version: 1 },
+    consumer: { id: '019f0000-0000-7000-8000-000000000007', taskId: parent, revision: 1, purpose: 'agent', finalization: null } };
+  expect(workloadRenderOf(record, { children, pod: selected })?.pod).toMatchObject({ developmentUsageProtection: { version: 1 }, consumer: selected.consumer, expectedVolumeUid: pvcUid });
+  for (const patch of [
+    { developmentUsageProtection: undefined }, { developmentUsageProtection: null }, { developmentUsageProtection: { version: 2 } }, { developmentUsageProtection: { version: 1, extra: true } },
+    { developmentUsageStorage: undefined }, { consumer: undefined }, { expectedVolumeUid: undefined }, { expectedVolumeUid: crypto.randomUUID() },
+    { consumer: { ...selected.consumer, purpose: 'business' } }, { consumer: { ...selected.consumer, taskId: record } }, { consumer: { ...selected.consumer, revision: 0 } },
+    { labels: {} }, { workspace: undefined }, { nodeName: undefined }, { businessStorage: { version: 1, ownerTaskId: parent } },
+  ]) expect(workloadRenderOf(record, { children, pod: { ...selected, ...patch } })).toBeUndefined();
+});

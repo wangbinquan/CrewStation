@@ -1,4 +1,6 @@
 import type { ClusterPurpose, ResourceConditionStatus, ResourceKind, StartupRecord } from '@crewstation/contracts';
+import { developmentWorkloadProtection } from './development/protection';
+import type { DevelopmentWorkloadProtection } from './development/protection';
 import type { ExecutionPurpose, TaskEnvironment, WorkloadRender } from './taskEnvironment';
 import { canonicalNativeIntent, EXECUTION_INTENT_ANNOTATION, WORKSPACE_TASK_LABEL } from './physicalIdentity';
 import { checkoutSecretOf, podNameFor, purposeOf, reconcilerCreates, runnerSecretOf, WORKLOAD_LABELS, wantsProvisioning } from './taskEnvironment';
@@ -109,10 +111,11 @@ function provisioningOf(env: TaskEnvironment): ProjectedCondition {
  * 调和器建 Pod、Runner Secret 与开发预览要用的期望（RFC-025 I25）：镜像、资源、标签、工作卷、检出与 Secret 名；预览的端口与主机。
  * 凭据不在这里：Secret 的内容建的时候向 task-runtime 要（runnerValues）。
  */
-function workloadRender(env: TaskEnvironment): ProjectedRecord['render'] {
+function workloadRender(env: TaskEnvironment, protection: DevelopmentWorkloadProtection | undefined): ProjectedRecord['render'] {
   if (!reconcilerCreates(env)) return undefined;
   const { image, workerUid, resources, checkout } = env.render;
   const pod = {
+    ...(protection ?? {}),
     ...(env.render.completionPolicy ? { consumer: { id: env.render.workloadConsumerId, taskId: env.native?.parentTaskId ?? env.id, revision: env.render.start, purpose: env.native ? 'agent' : 'business', finalization: null } } : {}),
     ...(env.businessWorkspace ? { expectedVolumeUid: env.businessWorkspace.volumeUid } : {}),
     ...(env.render.runtimeImage ? { runtimeInitialization: true } : {}),
@@ -150,30 +153,32 @@ function workloadDisplay(env: TaskEnvironment): Record<string, string> {
  * 工作负载的子对象（与 task-runtime 建出的名字一一对应）：Pod；执行环境与重建过的工作区另有一个 Runner Secret（`<Pod 名>-runner`）；
  * 有开发预览的工作区另有预览 Service 与 IngressRoute——重建后沿用原路由名（按环境 ID 算），避免同 Host 两条路由（rebuildProvisioner）。
  */
-function workloadChildren(env: TaskEnvironment): ProjectedRecord['children'] {
+function workloadChildren(env: TaskEnvironment, protection: DevelopmentWorkloadProtection | undefined): ProjectedRecord['children'] {
   const at = (kind: string, name: string) => ({ kind, namespace: env.namespace, name });
   // 资源中心建出的环境（I25）：每次启动一个 Runner Secret（检出用的 Git 凭据由资源中心建的也归这一次启动），预览与 Pod 同名。
   if (reconcilerCreates(env)) {
     const checkout = env.render.checkout && !env.render.checkout.credentialSecretName ? [at('Secret', checkoutSecretOf(env)!)] : [];
-    return [at('Pod', env.podName), at('Secret', runnerSecretOf(env)), ...(env.render.completionPolicy ? [at('Secret', `${env.podName}-admission`)] : []), ...checkout, ...(env.preview ? [at('Service', env.rebuildId ? podNameFor(env.id) : env.podName), at('IngressRoute', env.rebuildId ? podNameFor(env.id) : env.podName)] : [])];
+    return [at('Pod', env.podName), at('Secret', runnerSecretOf(env)), ...(env.render.completionPolicy || protection ? [at('Secret', `${env.podName}-admission`)] : []), ...checkout, ...(env.preview ? [at('Service', env.rebuildId ? podNameFor(env.id) : env.podName), at('IngressRoute', env.rebuildId ? podNameFor(env.id) : env.podName)] : [])];
   }
   const route = env.rebuildId ? podNameFor(env.id) : env.podName;
   return [
     at('Pod', env.podName), ...(env.native || env.rebuildId ? [at('Secret', `${env.podName}-runner`)] : []),
+    ...(protection ? [at('Secret', `${env.podName}-admission`)] : []),
     ...(env.preview && !env.native ? [at('Service', route), at('IngressRoute', route)] : []),
   ];
 }
 
 export function projectEnvironment(env: TaskEnvironment, previewRoute: WorkloadRender['previewRoute'] = env.render?.previewRoute): EnvironmentProjection {
+  const protection = developmentWorkloadProtection(env), render = workloadRender(env, protection);
   const release = releaseOf(env);
   const split = !!env.preview && !env.native && !!previewRoute;
   const workload: ProjectedRecord = {
     id: env.id, kind: workloadKind(env), ref: env.id, projectId: env.projectId,
     ...(env.native ? { parentId: env.native.parentTaskId } : {}),
-    purpose: workloadPurpose(env), children: workloadChildren(env).filter((child) => !split || child.kind !== 'IngressRoute'),
+    purpose: workloadPurpose(env), children: workloadChildren(env, protection).filter((child) => !split || child.kind !== 'IngressRoute'),
     display: workloadDisplay(env), conditions: conditionsOf(env), ...(env.startup ? { startup: env.startup } : {}), ...(release ? { release } : {}),
     ...(env.legacyCluster?.taskId ? { aliases: [{ source: 'tsk' as const, alias: env.legacyCluster.taskId }] } : {}),
-    ...(workloadRender(env) ? { render: workloadRender(env)! } : {}),
+    ...(render ? { render } : {}),
   };
   // Agent 执行挂父工作区的卷；档位测试用一次性的空目录。只有工作区自己有工作卷。保留期满回收的会话，卷不随之删除（D8、D9）。
   const ownsVolume = !env.native && env.kind !== 'profile-test';

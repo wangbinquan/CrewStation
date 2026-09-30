@@ -85,6 +85,7 @@ export function kubernetesNativeExecutions(k8s: K8sClient, workerUid: number): N
   return {
     inspectWorkspace: (parent) => inspectWorkspace(k8s, parent),
     prepare: async (env, values) => {
+      if (env.render?.developmentUsageProtection !== undefined) throw precondition('开发数字工作负载保护的持久启动许可尚未装配');
       const n = env.native!;
       const secret = await createOrRead<Secret>(k8s, Resources.Secret!, env, secretName(env), async () => ({
         ...secretObject({ name: secretName(env), namespace: env.namespace, stringData: await values(), labels: { [LABELS.task]: env.id, [workspaceKey]: n.parentTaskId } }),

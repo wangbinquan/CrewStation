@@ -2,18 +2,8 @@ import { isDeepStrictEqual } from 'node:util';
 import type { K8sObject } from '@crewstation/k8s';
 import type { ObservedObject } from '../../domain/observation';
 
-/**
- * 期望里的每个字段在观测到的对象里都相同；API Server 补上的缺省字段不算不一致，数组按位置逐个比、长度要相等。
- * 期望是空数组、观测里没有这个字段也算相同：Kubernetes 输出对象时把空列表省略（Deployment 的 env、volumes）。
- */
-export function covers(live: unknown, desired: unknown): boolean {
-  if (Array.isArray(desired) && desired.length === 0 && live === undefined) return true;
-  if (Array.isArray(desired)) return Array.isArray(live) && live.length === desired.length && desired.every((item, index) => covers(live[index], item));
-  if (typeof desired === 'object' && desired !== null) {
-    return typeof live === 'object' && live !== null && Object.entries(desired).every(([field, value]) => covers((live as Record<string, unknown>)[field], value));
-  }
-  return live === desired;
-}
+import { k8sObjectCovers as covers } from '@crewstation/k8s';
+export { k8sObjectCovers as covers } from '@crewstation/k8s';
 
 /**
  * spec 整个由平台写、API Server 不补缺省的种类，逐字段相同才算一致。网络策略里的空对象有含义（`podSelector: {}` 全选、

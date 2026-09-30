@@ -1,12 +1,12 @@
 # RFC-034 开发数字执行的结束与资源清理接入
 
-状态：下一批限定设计v2，首轮独立设计门发现估值阻塞回收的P2，按实际两级ACK修正后待复核。当前生产开发采集OFF。普通启动屏障7682fff3和派发恢复3480032c均已推送、自身六项CI成功，并随3480032c本机部署。本规划不把内部结束evidence-complete、Pod不存在或Session absent解释成资源删除许可或Token零。
+状态：完整清理接入规划v2独立限定设计门PASS；首轮估值阻塞回收P2及修订历史保留。当前生产开发采集OFF。普通启动屏障7682fff3和派发恢复3480032c均已推送、自身六项CI成功，并随3480032c本机部署。本规划不把内部结束evidence-complete、Pod不存在或Session absent解释成资源删除许可或Token零。
 
 ## 当前真实断点
 
 - task-runtime/application/nativeExecution.ts 的 scheduleExecutionCleanup 先改 releasing/cleaning、旋转Runner令牌并connected=false；cleanupNativeExecution随后删除Pod。开发日志与绑定分别是两个emptyDir，Pod被删除后不能假定可读。
 - domain/ledgerProjection.ts 的releaseOf会把releasing/cleaning投影为资源absent；Failed/Paused/ReleasePending也可能触发cluster-control删除，不能只拦releaseEnvironment一个入口。
-- cluster-control/adapters/k8s/workloadObjects.ts:9明确拒绝数字布局与consumer共存；task-runtime/adapters/k8s/nativeExecutions.ts的旧Pod匹配又拒绝任何initContainer。直接把business completionPolicy套给开发执行既不兼容，也会错误继承归档语义。
+- 基线24d91bdc的cluster-control/adapters/k8s/workloadObjects.ts拒绝数字布局与consumer共存；task-runtime/adapters/k8s/nativeExecutions.ts的旧Pod匹配又拒绝任何initContainer。直接把business completionPolicy套给开发执行既不兼容，也会错误继承归档语义。
 - 现有resources WorkloadSafety承诺原PVC、Pod、Node和全部容器的独立停止证明；它没有承诺数字日志已复制或CNY估值已入账。原数字stop/closure反向也不证明全部容器退出。
 
 这些是运行正确性与数据完整性问题。本批复用既有拥有者和停止证明，不另建跨模块SQL连接或依赖跨实例进程内总线。
@@ -73,3 +73,13 @@ Task-runtime L4不能导入dev-session L5；由L4声明数字结束/排空端口
 首轮13项指纹不变的只读复核发现1处P2：把观测估值成功当成Session closure及Pod回收前置，会在原日志已完整复制但定价失败时无限保留容器与额度。现已区分Runner复制ACK和消费者source ACK，保留原始副本、原归属、模型与原价证据供回收后重放；不以金额永久不变证明清理。
 
 依据为Session `application/developmentUsageIngestion.ts`的PG ingest后复制ACK、`adapters/persistence/developmentUsageState.ts`的独立水位closure、`developmentUsageSources.ts`只推进source ACK而不删除events；dev-session `application/developmentUsage.ts`在owner关闭后仍解析原registration/price/selection；observability `application/developmentUsage.ts`在ledger ingest及value后才source ACK，`drizzleTokenPricing.ts`沿原acceptedAt/priceBookRevision读取冻结价目。具体源码候选仍需单独冻结和设计门，首轮FAIL没有改写为PASS。
+
+## 渲染兼容的限定进展
+
+[渲染保护候选](./development-protection.md)已通过独立设计和实现门，55项相关回归覆盖新选择、双disk、真实API默认字段、两分支许可Secret认领及公开孤儿清理。它只接通纯对象规格和旧direct的提前拒绝；没有新的活动环境选择、实际direct准入、数字回收许可或所有清理入口，不能关闭本规划。保留期、投影/补投影、父子重建及项目删除的实接仍按上述全部入口推进。当前本机3480032c，生产OFF。
+
+## 2026-10-01 单次完整检查与外部定向闭环
+
+完整五组件于2026-09-30T20:06:11.436315Z结束，958.36秒；lint、后端及控制台类型通过，实际4640pass/143skip/2fail、30318断言、927文件。本批16路径首尾指纹一致。结构14项违规及两项用例失败均指向并行events的0006_project_deletion_fences.sql归属解析/迁移登记；完整aggregate=1原回执保留，不改写为全量绿色。
+
+原开发随后修改迁移并完成登记；只定向运行原结构规则和平台真实隔离PG迁移清单两个文件，2026-09-30T20:08:37.676464Z得到30pass/0fail、45断言。本批源码16路径和外部4依据在定向检查前后均未变，没有重复完整门禁、提交或删改并行文件。依据开发规则§3与用户单次候选规则，限定设计/实现审阅及55相关回归仍有效，按自有20路径准备发布；候选自身hosted CI与本机部署另记，当前本机仍3480032c，生产OFF。

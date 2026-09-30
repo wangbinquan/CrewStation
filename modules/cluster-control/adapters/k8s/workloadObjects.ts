@@ -6,7 +6,7 @@ import { archivePodObject } from './safety/archivePod';
 
 /** 工作区的 Pod（RFC-025 I25）：与 task-runtime 自己建时同一个构造函数；环境只从 Runner Secret 引用，Pod 规格里没有凭据。 */
 export function workloadPodObject(pod: WorkloadPodRender): K8sObject {
-  if (pod.developmentUsageStorage && (pod.workload !== 'dev-session' || !pod.workspace || !pod.pvc || pod.businessStorage || pod.checkout || pod.archive || pod.consumer)) throw new Error('只有独立开发 Agent 可选择数值日志布局');
+  if (pod.developmentUsageStorage && (pod.workload !== 'dev-session' || !pod.workspace || !pod.pvc || pod.businessStorage || pod.checkout || pod.archive || pod.developmentUsageProtection === undefined && pod.consumer)) throw new Error('只有独立开发 Agent 可选择数值日志布局');
   if (pod.archive) return archivePodObject(pod);
   const object = taskPodObject({
     ...(pod.developmentUsageStorage ? { developmentUsageStorage: pod.developmentUsageStorage } : {}),

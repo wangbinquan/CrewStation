@@ -1,49 +1,13 @@
 import type { WorkloadStartPermit } from '@crewstation/contracts';
-import { WORKLOAD_CONSUMER_ANNOTATION, WORKLOAD_STOP_FINALIZER } from '@crewstation/contracts';
 import type { K8sClient, K8sObject } from '@crewstation/k8s';
-import { LABELS, Resources, secretObject } from '@crewstation/k8s';
+import { assertWorkloadGate, LABELS, Resources, secretObject } from '@crewstation/k8s';
 import { conflict, precondition } from '@crewstation/kernel';
-import { covers } from '../coverage';
 import type { WorkloadPodRender } from '../../../domain/workloadRender';
 import { nodeEvidence } from './workloadStop';
 
-const VOLUME_ANNOTATION = 'crewstation.io/work-volume-uid';
-const gateScript = 'set -eu\nwhile :; do\n  if [ -r /run/admission/podUid ] && [ "$(cat /run/admission/podUid)" = "$CS_ADMISSION_POD_UID" ]; then exit 0; fi\n  sleep 1\ndone';
-type PodSpec = { volumes: Array<Record<string, unknown>>; initContainers?: Array<Record<string, unknown>>; containers: Array<Record<string, unknown>>; nodeName?: string; automountServiceAccountToken?: boolean };
-function gate(pod: WorkloadPodRender) {
-  const entry = pod.consumer?.purpose === 'archive' ? 'archive-helper' : 'task-runner';
-  const check = `/opt/crewstation/bin/${entry} storage-contract 1 >/dev/null`;
-  return { name: 'workload-admission', image: pod.image, command: ['/bin/sh', '-c', `set -eu\n${check}\n${gateScript}`],
-    env: [{ name: 'CS_ADMISSION_POD_UID', valueFrom: { fieldRef: { fieldPath: 'metadata.uid' } } }],
-    volumeMounts: [{ name: 'workload-admission', mountPath: '/run/admission', readOnly: true }],
-    securityContext: { runAsUser: pod.workerUid, runAsGroup: pod.workerUid, runAsNonRoot: true, allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: ['ALL'] } },
-    resources: { requests: { cpu: '10m', memory: '64Mi' }, limits: { cpu: '500m', memory: '256Mi' } } };
-}
-function gateVolume(pod: WorkloadPodRender) { return { name: 'workload-admission', secret: { secretName: `${pod.name}-admission`, optional: true } }; }
+export { assertWorkloadGate, protectWorkloadPod } from '@crewstation/k8s';
+type PodSpec = { nodeName?: string };
 
-/** This first init has no work mount. All storage initialization and user processes remain behind it. */
-export function protectWorkloadPod(object: K8sObject, pod: WorkloadPodRender): K8sObject {
-  if (!pod.consumer) return object;
-  if (!pod.consumerVolumeUid) throw precondition('工作卷消费者尚未登记');
-  const spec = object.spec as PodSpec;
-  object.metadata.annotations = { ...object.metadata.annotations, [WORKLOAD_CONSUMER_ANNOTATION]: pod.consumer.id, [VOLUME_ANNOTATION]: pod.consumerVolumeUid };
-  object.metadata.finalizers = [...object.metadata.finalizers ?? [], WORKLOAD_STOP_FINALIZER];
-  spec.initContainers = [gate(pod), ...spec.initContainers ?? []]; spec.volumes.push(gateVolume(pod));
-  for (const container of spec.containers) {
-    const env = (container['env'] ?? []) as Array<{ name: string }>;
-    container['env'] = [...env.filter((e) => e.name !== 'CS_RUNTIME_POD_UID'), { name: 'CS_RUNTIME_POD_UID', valueFrom: { fieldRef: { fieldPath: 'metadata.uid' } } }];
-  }
-  spec.automountServiceAccountToken = false;
-  return object;
-}
-export function assertWorkloadGate(object: K8sObject, pod: WorkloadPodRender): void {
-  const spec = object.spec as PodSpec, actual = spec.initContainers?.[0], expected = gate(pod);
-  if (!pod.consumer || !pod.consumerVolumeUid || object.metadata.name !== pod.name || object.metadata.namespace !== pod.namespace
-    || object.metadata.annotations?.[WORKLOAD_CONSUMER_ANNOTATION] !== pod.consumer.id || object.metadata.annotations?.[VOLUME_ANNOTATION] !== pod.consumerVolumeUid
-    || !object.metadata.finalizers?.includes(WORKLOAD_STOP_FINALIZER) || object.metadata.labels?.[LABELS.task] !== pod.taskId || spec.automountServiceAccountToken !== false
-    || !actual || Object.keys(expected).filter((k) => k !== 'resources').some((k) => !covers(actual[k], expected[k as keyof typeof expected]))
-    || !spec.volumes.some((v) => covers(v, gateVolume(pod)))) throw conflict('Pod 未具备匹配的工作卷启动保护');
-}
 export async function inspectWorkloadStart(k8s: K8sClient, pod: WorkloadPodRender): Promise<Omit<WorkloadStartPermit, 'grantedAt'> | undefined> {
   const signal = AbortSignal.timeout(15_000), object = await k8s.get<K8sObject>(Resources.Pod!, pod.name, pod.namespace, signal);
   if (!object || object.metadata.deletionTimestamp) return undefined;

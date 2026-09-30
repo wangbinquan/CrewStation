@@ -51,6 +51,8 @@ export interface WorkloadRender {
   readonly developmentObjectPlanId?: string;
   /** RFC-034 opt-in for a newly admitted headless execution; legacy renders omit it. */
   readonly developmentUsageStorage?: DevelopmentUsageStorage;
+  /** Explicit new protection selection; a missing field never upgrades an old environment. */
+  readonly developmentUsageProtection?: { readonly version: 1 };
   readonly objectInputsGeneration?: number;
   readonly storageFinalization?: { readonly operationId: string; readonly revision: number; readonly volumeUid: string | null; readonly computeStopped?: true };
   readonly completionPolicy?: 'archive-and-delete';

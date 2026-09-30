@@ -22,3 +22,6 @@ export type { PodEventLike, PodImagePull, PodStartupContainer, PodStartupObserva
 export { podStartup } from './podStartup';
 
 export { resourcesMatch } from './quantities';
+export { k8sObjectCovers } from './objects/coverage';
+export type { WorkloadAdmissionPod } from './objects/workloadAdmission';
+export { assertWorkloadGate, protectWorkloadPod } from './objects/workloadAdmission';
