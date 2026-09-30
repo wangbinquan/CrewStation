@@ -1,8 +1,8 @@
 import { publishDomainEvent } from '@crewstation/eventbus';
 import type { Logger } from '@crewstation/kernel';
-import { isPlatformError, noopLogger, quotaExceeded } from '@crewstation/kernel';
+import { isPlatformError, noopLogger, precondition, quotaExceeded } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
-import { enqueueJob } from '@crewstation/queue';
+import { enqueueJob, lockJobLease } from '@crewstation/queue';
 import { REBUILD_JOB_KIND } from '../../ports/rebuilds';
 import { NATIVE_EXECUTION_JOB_KIND } from '../../ports/repositories';
 import type { AdmissionRepository } from '../../ports/repositories';
@@ -49,6 +49,7 @@ export function scopeOver(executor: Executor, projection?: LedgerProjection): Re
     environments: sync ? ledgerEnvironmentRepository(environments, sync) : environments,
     ...(sync && projection ? { ledger: { sync, workload: (env: TaskEnvironment) => findWorkloadRecord(executor, projection.ledger, env) } } : {}),
     admissions,
+    nativeLease: { requireCurrent: async (identity, taskId) => { if (!await lockJobLease(executor, identity.jobId, identity.fencingToken, { kind: NATIVE_EXECUTION_JOB_KIND, payload: { taskId } })) throw precondition('开发执行作业租约已失效', { code: 'execution_lease_lost' }); } },
     quota: taskQuota(executor, admissions, projection),
     rebuilds: drizzleRebuildRepository(executor),
     rebuildQueue: { enqueue: async (requestId) => { await enqueueJob(executor, REBUILD_JOB_KIND, { requestId }, { dedupKey: requestId, maxAttempts: 5 }); } },

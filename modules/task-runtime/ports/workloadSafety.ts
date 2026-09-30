@@ -2,6 +2,7 @@ import type { WorkloadAdmissionIdentity, WorkloadConsumer, WorkloadStartPermit, 
 
 /** Supplied by resources; the runtime cannot fabricate node or container stop evidence. */
 export interface WorkloadSafetyPort {
+  register?(consumer: WorkloadConsumer): Promise<{ consumer: WorkloadConsumer; admissionClosed: boolean; startPermit: WorkloadStartPermit | null; stopProof: WorkloadStopProof | null }>;
   sealConsumers(taskId: string, finalization: WorkloadFinalizationFence): Promise<void>;
   freezeTask(taskId: string, finalization: WorkloadFinalizationFence): Promise<void>;
   scanStopped(taskId: string, finalization: WorkloadFinalizationFence, scope: 'business' | 'all'): Promise<WorkloadStopBarrier>;

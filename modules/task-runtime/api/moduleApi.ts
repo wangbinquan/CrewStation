@@ -85,6 +85,8 @@ export interface CreateEnvironmentInput {
 export interface CreateNativeExecutionInput {
   /** Opt-in only for a new independent development Agent; frozen for every retry. */
   developmentUsageStorage?: DevelopmentUsageStorage;
+  /** Explicit private opt-in; no production caller until the complete digital cleanup barrier is ready. */
+  developmentUsageProtection?: { readonly version: 1 };
   businessSession?: BusinessSessionStorage;
   runtimeImage?: RuntimeImageExecutionSnapshot;
   id: TaskId;

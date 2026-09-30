@@ -4,7 +4,7 @@
 
 ## 当前已实现与实际部署
 
-当前本机源码版本：`3480032ce74b672dbe71184dc00f238bb3ba1bf7`，2026-09-30T18:16:51.254Z（北京时间10-01 02:16:51.254）部署完成；[精确CI36754924240](https://github.com/wangbinquan/CrewStation/actions/runs/36754924240)六项成功，八组件Ready=1、storage-contract=1、迁移Complete/applied=0，镜像源码与默认Runner摘要已对拍。2026-09-30T18:19:40.666612Z实际console.cs.localhost登录HTTP200、未登录根HTTP401。原生来源、停止、稳定受理、内部consumer/原键派发/持久结束、两项独立查询、普通启动屏障及原选择派发恢复底座已部署；生产开发采集仍OFF，实际派发/清理/消费调用者和两级开发明细尚未接通。源码与后继回执文档分别记录，历史门禁失败与部署批次保留在下方。
+当前本机源码版本：`d3acac1fe0daab77e1ce741604f9e77131f943a4`，2026-09-30T20:33:55.504Z（北京时间10-01 04:33:55.504）部署完成；[精确CI36771444783](https://github.com/wangbinquan/CrewStation/actions/runs/36771444783)六项成功，八组件Ready=1、代次一致、storage-contract=1、迁移Complete/applied=0，三镜像源码与默认Runner摘要已对拍。2026-09-30T20:37:32.936952Z公开console.cs.localhost登录HTTP200、未登录根HTTP401。原生来源、内部consumer/派发/结束/独立查询/普通屏障/派发恢复和本批严格保护渲染已部署；resources实际开发消费者准入尚待本候选接通，生产开发采集仍OFF，完整数字清理/消费和两级开发明细未完成。历史门禁失败与各部署批次保留在下方。
 
 正式项目/系统统计已有业务任务、Agent/尝试、四桶 Token、人民币估值、基础泳道、算力贡献下钻和采集质量；项目与算力显示名称，保留稳定 ID/受理修订。已有价格配置与冻结目录、OpenCode 根/子树采集、原归属修订和原价补算；资源/容量和当前服务槽/平台 Pod 健康已有入口。
 
@@ -22,7 +22,7 @@
 | 原键持久停止（已推送/CI成功/本机部署，生产不调用） | 独立限定实现门PASS；相关47/0与完整4307/142skip/0、23路径指纹一致 | bebb3d9b精确发布、六项CI成功及八组件本机部署；仍需实际原生来源、owner全派发/删除屏障、consumer/两级事实UI |
 | 实际原生来源第一批（已推送/CI成功/本机部署，生产不调用） | 严格可选能力与Hook前选择、实际环境/文件身份、同轮模型、独立begin/finish和journal，最终30源码/测试独立门PASS；相关77/0、合同族34/0及精确lint通过 | d01ba8223的六项CI全部success，本机八组件Ready；本机全量被并行迁移阻断的记录保留。owner挂载/派发/完整删除屏障、consumer原价历史归属、两级事实/UI及实际验收继续 |
 
-内部持久consumer、原键派发、持久结束与Session独立登记查询均已精确发布并部署；原965b45e8、646da1e9、94378917及05d4ca01均为远端祖先。实际布局808c5af0、普通启动屏障7682fff3及原选择派发恢复3480032c也已分别通过自身六项CI，并随3480032c进入实际镜像。各批原门禁失败及比例闭环历史完整保留。生产source尚未注入，两级开发事实/UI、owner派发/所有删除排空仍须接通，CS-R02不关闭。详见各专题与[当前部署回执](./development-dispatch-recovery.md#2026-10-01-精确发布ci与本机部署)。
+内部持久consumer、原键派发、持久结束与Session独立登记查询均已精确发布并部署；原965b45e8、646da1e9、94378917及05d4ca01均为远端祖先。实际布局808c5af0、普通启动屏障7682fff3及原选择派发恢复3480032c也已分别通过自身六项CI，并随3480032c进入实际镜像。各批原门禁失败及比例闭环历史完整保留。生产source尚未注入，两级开发事实/UI、owner派发/所有删除排空仍须接通，CS-R02不关闭。详见各专题与[当前部署回执](./development-protection.md#2026-10-01-精确发布ci与本机部署)。
 
 源码锚点：[统计合同](../../../packages/contracts/api/observability/runtimeStatistics.ts) 的 `sourceScope` 仍为业务任务、cohort 仍为 started；[platform 装配](../../../modules/platform/wiring.ts) 仅注入业务事实/业务数值来源；[开发生命周期](../../../modules/dev-session/application/agentExecution.ts) 仍由普通事件结束并回收；[平台健康说明](../../../apps/console/src/features/observability/i18n/zh-CN.ts) 明确应用级指标尚未采集。
 
@@ -420,3 +420,23 @@ v1独立18前身17路径功能门FAIL一项P2：I/O后虽读过时钟，但commi
 完整五组件于2026-09-30T20:06:11.436315Z结束，958.36秒；lint、后端及控制台类型通过，实际4640pass/143skip/2fail、30318断言、927文件。本批16路径首尾指纹一致。结构14项违规及两项用例失败均指向并行events的0006_project_deletion_fences.sql归属解析/迁移登记；完整aggregate=1原回执保留，不改写为全量绿色。
 
 原开发随后修改迁移并完成登记；只定向运行原结构规则和平台真实隔离PG迁移清单两个文件，2026-09-30T20:08:37.676464Z得到30pass/0fail、45断言。本批源码16路径和外部4依据在定向检查前后均未变，没有重复完整门禁、提交或删改并行文件。依据开发规则§3与用户单次候选规则，限定设计/实现审阅及55相关回归仍有效，按自有20路径准备发布；候选自身hosted CI与本机部署另记，当前本机仍3480032c，生产OFF。
+
+## 2026-10-01 工作负载保护渲染的发布部署回执
+
+限定20路径`d3acac1fe0daab77e1ce741604f9e77131f943a4`已精确推送，[自身CI36771444783](https://github.com/wangbinquan/CrewStation/actions/runs/36771444783)六项全部success。2026-09-30T20:33:55.504Z本机八组件已升级，Ready=1且代次一致；storage-contract=1、实际迁移Complete/applied=0，三镜像源码标签、默认Runner和公开入口复核通过。原本地完整2项外部失败与30项定向闭环历史保留。
+
+实际resources准入目前仅接受business-workspace/taskStorage；纯渲染、严格解析和Secret认领不等于开发ledger实际启动已接通。该边界已纠正，下一批实际归属/PVC准入与direct持久恢复，继而数字复制/全部清理、production消费及两级开发事实/UI仍待完成。生产OFF、sourceScope=business-tasks，CS-R02及两个RFC保持In Progress。详见[实际发布与部署回执](./development-protection.md#2026-10-01-精确发布ci与本机部署)。
+
+## 2026-10-01 原开发消费者实际准入候选设计
+
+接续[工作负载实际准入与持久接续](./development-workload-admission.md)。拟在自有27源码/测试路径接通原开发台账/PVC消费者登记、项目锁外受理与直接创建、原controller持久授予/激活、同选择重放及回收等待；没有production caller。原清理全入口、数字复制、事实/UI和真实验收仍未完成，生产OFF；设计未通过前不改源码。
+
+开发实际工作卷准入 v3 独立门发现绑定恢复 P2，原 FAIL 回执保留；v4 精确限定缺持久子 Pod UID 为 development_workload_binding_pending，让原 controller 继续读取与绑定，新增真实 PG 重启恢复验证。候选扩至 28 条源码；设计门通过前仍不改源码。
+
+开发实际准入公开模块回归已运行：native原注册与许可正向通过；ledger实际发现pinnedVolume旧owner误认子Agent，原失败保留。v5限定原父工作卷owner修订，扩入2条现有源码/测试，精确30条源候选；完整两路与丢响应恢复仍待通过。
+
+### 2026-10-01 当前开发准入候选进度
+
+实际开发消费者准入已在本地候选中实现，64项相关真实PG/公开Task-Resources-Controller组合回归通过，详见[准入实现检查点](./development-workload-admission.md#2026-10-01-实现候选与相关回归)。独立整体实现审查、唯一完整门禁、精确CI和本机升级待完成；顶部所列d3仍是实际部署。生产开发采集继续OFF，CS-R02及完整清理/消费/两级开发明细仍未关闭。
+
+开发准入v2整体限定实现门PASS，唯一完整门禁的自有64项全部通过、30源码稳定；全量4659pass/143skip/18fail及后续并行7项类型错误保留在[准入门禁检查点](./development-workload-admission.md#2026-10-01-唯一完整门禁与共享在制边界)。参考兼容PASS、自有精确lint通过，按开发规则§3精确发布并核该SHA hosted CI；发布/部署仍未记完成，现行d3与生产OFF保持。

@@ -6,7 +6,7 @@
 
 基线24d91bdc的cluster-control/workloadRenderOf和workloadPodObject拒绝developmentUsageStorage与consumer共存，而工作负载停止保护的init/finalizer已有真实PG消费者和UID许可合同。task-runtime的对象构造只渲染两个私有日志卷，原direct writer拒绝任何initContainer，也没有消费者register/grantStart的端口。本候选不向该旧writer偷偷补一个空保护或绕过许可；新保护选择在其第一次K8s读取、Secret/Pod写入及环境材料回调之前明确拒绝。旧无该选择的直接数字布局和其他用途保持原行为。
 
-本候选不增加CreateNativeExecutionInput、HTTP字段、producer调用或新表/迁移，因此没有新活动环境被选中。两个创建通路的共同对象构造均可产生一致受保护规格；当前ledger既有register→create→原Pod permit→activate链可以消费这一渲染形状，direct实际创建仍明确不可用，需另一个冻结候选接通原消费者准入及持久恢复后才可受理。该差异必须留在后续清单，不宣称两条实际启动路径完成。
+本候选不增加CreateNativeExecutionInput、HTTP字段、producer调用或新表/迁移，因此没有新活动环境被选中。两个创建通路的共同对象构造均可产生一致受保护规格；共同parser/对象构造可以解析这一渲染形状，但实际resources register/grantStart的guard目前只接受business-workspace及taskStorage工作卷，尚不接受开发父环境；ledger和direct的实际受理都需另一个冻结候选接通原开发归属、PVC确认、消费者准入及持久恢复。旧direct writer仍明确拒绝新选择。该差异必须留在后续清单，不宣称两条实际启动路径完成。
 
 ## 不可变形状与严格解析
 
@@ -64,3 +64,19 @@ domain/development/protection声明纯函数，只读取实际同一TaskEnvironm
 完整五组件于2026-09-30T20:06:11.436315Z结束，958.36秒；lint、后端及控制台类型通过，实际4640pass/143skip/2fail、30318断言、927文件。本批16路径首尾指纹一致。结构14项违规及两项用例失败均指向并行events的0006_project_deletion_fences.sql归属解析/迁移登记；完整aggregate=1原回执保留，不改写为全量绿色。
 
 原开发随后修改迁移并完成登记；只定向运行原结构规则和平台真实隔离PG迁移清单两个文件，2026-09-30T20:08:37.676464Z得到30pass/0fail、45断言。本批源码16路径和外部4依据在定向检查前后均未变，没有重复完整门禁、提交或删改并行文件。依据开发规则§3与用户单次候选规则，限定设计/实现审阅及55相关回归仍有效，按自有20路径准备发布；候选自身hosted CI与本机部署另记，当前本机仍3480032c，生产OFF。
+
+## 2026-10-01 精确发布、CI与本机部署
+
+限定20路径已提交并推送`d3acac1fe0daab77e1ce741604f9e77131f943a4`，主干与origin同步、共享索引为空；[自身CI36771444783](https://github.com/wangbinquan/CrewStation/actions/runs/36771444783)的static/unit/module/console/e2e/gate六项全部completed/success。提交保留了完整门禁2项外部失败及后续定向闭环历史，没有将其改写为本地全量绿色。
+
+已批准的本机部署于2026-09-30T20:33:55.504Z完成；先保存私有平台数据库备份，再按storage-contract=1预检和不可变摘要绑定逐个升级八组件。实际迁移Job `rfc034-development-protection-migrate-d3acac1f`（UID `e87928ac-2059-4d0e-9185-698fb0da42a0`）Complete，原日志`migrations done`确认applied=0。三镜像源码revision均为d3acac1f：console摘要`ca399561cdecbb87923ebd7e133b513634629c83de0d2192c28d2be07f3efa87`，control-plane摘要`2d9371e904de6157922e0af1e65d65b775542bac886d6ccc353ffa9b1277ace8`，task-runtime摘要`b229e919f43ea5d5e283f474dad1c5fa2b7792f264fa5986c90dad53c77454b0`；默认Runner核为最后一个摘要。
+
+2026-09-30T20:37:32.936952Z只读复核：八组件Ready=1且generation=observedGeneration（console210、api204、auth102、controller169、events72、session121、mcp-capabilities68、mcp-operations68）；公开`console.cs.localhost/auth/login`为200，未登录根为401。没有切换真实身份、调用模型或创建/结束真实开发验证资源。
+
+接续源码检查确认resources实际准入guard仍是business-workspace/taskStorage范围，不能由纯渲染PASS推出开发ledger启动已可用；上文边界已纠正。producer保持OFF、sourceScope=business-tasks；下一批接通开发实际归属/PVC消费者准入和direct持久恢复，再落实数字复制、全部清理入口、production消费和两级事实/UI。CS-R02及两个RFC保持In Progress。
+
+### 2026-10-01 原消费者准入实现候选
+
+[开发工作负载准入](./development-workload-admission.md)已在未发布候选中接通：实际resources消费者注册/许可、ledger与native原Pod绑定、原父所属PVC、事务内实际作业租约核验。64项相关回归通过；完整候选审查/门禁及发布部署待完成。这里不是已部署保护能力或生产采集开启的证据，完整数字清理屏障仍继续。
+
+当前准入候选v2完整限定实现门PASS，公开controller清理保留也已有实际组合证据。唯一完整门禁原aggregate=1及并行18失败完整保留；30源码稳定、相关64项均通过，精确lint和参考兼容门通过。按共享在制规则继续自有精确发布，不把外部失败改为全量成功。生产OFF和完整数字清理/消费/UI未闭环边界保持。

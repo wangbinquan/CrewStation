@@ -45,7 +45,7 @@ export async function syncEnvironmentLedger(executor: Executor, ledger: Environm
     });
   } catch (error) {
     // RFC-027 的额度释放依赖清理确认条件，投影失败必须与环境状态一起回滚。
-    if (env.render?.businessStorage) throw error;
+    if (env.render?.businessStorage || env.render?.developmentUsageProtection !== undefined) throw error;
     logger.warn('resource ledger projection failed', { taskId: env.id, error: error instanceof Error ? error.message : String(error) });
   }
 }

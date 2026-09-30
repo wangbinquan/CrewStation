@@ -616,3 +616,23 @@ v1独立18前身17路径功能门FAIL一项P2：I/O后虽读过时钟，但commi
 完整五组件于2026-09-30T20:06:11.436315Z结束，958.36秒；lint、后端及控制台类型通过，实际4640pass/143skip/2fail、30318断言、927文件。本批16路径首尾指纹一致。结构14项违规及两项用例失败均指向并行events的0006_project_deletion_fences.sql归属解析/迁移登记；完整aggregate=1原回执保留，不改写为全量绿色。
 
 原开发随后修改迁移并完成登记；只定向运行原结构规则和平台真实隔离PG迁移清单两个文件，2026-09-30T20:08:37.676464Z得到30pass/0fail、45断言。本批源码16路径和外部4依据在定向检查前后均未变，没有重复完整门禁、提交或删改并行文件。依据开发规则§3与用户单次候选规则，限定设计/实现审阅及55相关回归仍有效，按自有20路径准备发布；候选自身hosted CI与本机部署另记，当前本机仍3480032c，生产OFF。
+
+## 2026-10-01 工作负载保护渲染的发布部署回执
+
+限定20路径`d3acac1fe0daab77e1ce741604f9e77131f943a4`已精确推送，[自身CI36771444783](https://github.com/wangbinquan/CrewStation/actions/runs/36771444783)六项全部success。2026-09-30T20:33:55.504Z本机八组件已升级，Ready=1且代次一致；storage-contract=1、实际迁移Complete/applied=0，三镜像源码标签、默认Runner和公开入口复核通过。原本地完整2项外部失败与30项定向闭环历史保留。
+
+实际resources准入目前仅接受business-workspace/taskStorage；纯渲染、严格解析和Secret认领不等于开发ledger实际启动已接通。该边界已纠正，下一批实际归属/PVC准入与direct持久恢复，继而数字复制/全部清理、production消费及两级开发事实/UI仍待完成。生产OFF、sourceScope=business-tasks，CS-R02及两个RFC保持In Progress。详见[实际发布与部署回执](./development-protection.md#2026-10-01-精确发布ci与本机部署)。
+
+## 2026-10-01 原开发消费者实际准入候选设计
+
+接续[工作负载实际准入与持久接续](./development-workload-admission.md)。拟在自有27源码/测试路径接通原开发台账/PVC消费者登记、项目锁外受理与直接创建、原controller持久授予/激活、同选择重放及回收等待；没有production caller。原清理全入口、数字复制、事实/UI和真实验收仍未完成，生产OFF；设计未通过前不改源码。
+
+开发实际工作卷准入 v3 独立门发现绑定恢复 P2，原 FAIL 回执保留；v4 精确限定缺持久子 Pod UID 为 development_workload_binding_pending，让原 controller 继续读取与绑定，新增真实 PG 重启恢复验证。候选扩至 28 条源码；设计门通过前仍不改源码。
+
+开发实际准入公开模块回归已运行：native原注册与许可正向通过；ledger实际发现pinnedVolume旧owner误认子Agent，原失败保留。v5限定原父工作卷owner修订，扩入2条现有源码/测试，精确30条源候选；完整两路与丢响应恢复仍待通过。
+
+### 2026-10-01 开发工作负载准入实现候选（未发布）
+
+[准入设计与验证](./development-workload-admission.md) v5限定设计门PASS；30条源码/测试中的实际准入、原卷owner和作业事务fence已接通，64项相关真实PG/公开模块回归、架构和精确lint通过。原故障及夹具/类型失败保留。整个候选独立实现门、唯一完整门禁、发布CI与部署尚待完成；现行d3部署和生产开发采集OFF边界不变。完整数字清理/消费/两级事实UI仍为后续依赖。
+
+开发准入v2整体独立实现门PASS（51文件/6证据稳定），补公开controller清理保留组合1项/14断言通过。唯一完整门禁4659/143skip/18fail，30源码稳定、同轮相关64/0；18失败及后续7项类型错误均属并行events/来源改造。自有精确lint通过，参考兼容PASS；按开发规则§3只精确提交自有路径，保留外部结果，不重复全量，以本提交hosted CI为最终结论。发布与本机部署回执继续。

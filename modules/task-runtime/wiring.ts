@@ -146,7 +146,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
   const reconcile = reconcileUseCase(useCaseDeps, lifecycle);
   const observeStartup = observeStartupUseCase(useCaseDeps, lifecycle);
   const recoveryDeps = { ...useCaseDeps, recoveryCluster: kubernetesTaskRecoveryCluster(deps.k8s), provisioner: kubernetesRebuildProvisioner(deps.k8s, deps.settings.workerUid) };
-  const executionDeps = { ...useCaseDeps, nativeCluster: kubernetesNativeExecutions(deps.k8s, deps.settings.workerUid) };
+  const executionDeps = { ...useCaseDeps, nativeCluster: kubernetesNativeExecutions(deps.k8s, deps.settings.workerUid, deps.workloadSafety) };
   const createNative = createNativeExecutionUseCase(executionDeps);
   const rebuild = rebuildUseCases(recoveryDeps);
   const createTestEnvironment = createTestEnvironmentUseCase(useCaseDeps);

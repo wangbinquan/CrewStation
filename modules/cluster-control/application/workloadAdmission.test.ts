@@ -10,7 +10,7 @@ import { applyWorkload } from './workloadApply';
 function fixture() {
   const taskId = TaskIdSchema.parse(newResourceId()), calls: string[] = [], id = newResourceId();
   const state = { registered: undefined as WorkloadConsumer | undefined, closed: false, grantFailure: false, scheduled: false, registrationFailure: false,
-    permit: null as WorkloadStartPermit | null, lateClose: false };
+    permit: null as WorkloadStartPermit | null, lateClose: false, bindingPending: false, bindFailure: false, bindingCode: 'development_workload_binding_pending' };
   const volumeUid = crypto.randomUUID(), permit = { podUid: crypto.randomUUID(), nodeName: 'node-1', nodeUid: crypto.randomUUID() };
   const record: LedgerRecordView = { id: taskId, kind: 'business-workspace', desired: 'present', generation: 1, phase: 'provisioning', children: [], conditions: [{ type: 'Provisioning', status: 'true' }],
     spec: { children: [{ kind: 'Pod', namespace: 'cs-gate', name: 'task-1' }, { kind: 'Secret', namespace: 'cs-gate', name: 'task-1-runner' }], workloadConsumerId: id,
@@ -20,14 +20,14 @@ function fixture() {
   const ledger = { get: async () => record, observeConditions: async () => ({ status: 'recorded' }), workloadSafety: {
     get: async () => state.registered ? { consumer: state.registered, admissionClosed: state.closed, startPermit: state.permit, stopProof: null } : undefined,
     register: async (consumer: WorkloadConsumer) => { calls.push('register'); if (state.registrationFailure) throw new Error('PG unavailable'); state.registered = consumer; return { consumer, admissionClosed: state.closed }; },
-    grantStart: async (_id: string, grant: typeof permit) => { calls.push('grant'); if (state.grantFailure || state.closed) throw precondition('admission closed'); state.permit = { ...grant, grantedAt: new Date().toISOString() }; },
+    grantStart: async (_id: string, grant: typeof permit) => { calls.push('grant'); if (state.bindingPending) throw precondition('missing binding', { code: state.bindingCode }); if (state.grantFailure || state.closed) throw precondition('admission closed'); state.permit = { ...grant, grantedAt: new Date().toISOString() }; },
   } } as unknown as LedgerObservations;
   const cluster = { inspectWorkloadStart: async () => { calls.push('inspect'); return state.scheduled ? permit : undefined; },
     activateWorkload: async () => { if (!state.permit) throw new Error('missing persisted grant'); calls.push('activate'); },
     ensureRunnerSecret: async () => { calls.push('secret'); return { uid: 'secret', created: true }; },
     ensurePod: async () => { calls.push('pod'); if (state.lateClose) state.closed = true; return { uid: permit.podUid, created: true }; },
   } as unknown as ClusterWriter;
-  const deps = { ledger, feed, cluster, logger: noopLogger, stats: newObservationStats(), workloads: { runnerValues: async () => ({}), checkoutValues: async () => ({ token: '' }), bindWorkload: async () => { calls.push('bind'); }, workloadUnavailable: async () => {} } };
+  const deps = { ledger, feed, cluster, logger: noopLogger, stats: newObservationStats(), workloads: { runnerValues: async () => ({}), checkoutValues: async () => ({ token: '' }), bindWorkload: async () => { calls.push('bind'); if (state.bindFailure) throw new Error('bind commit lost'); state.bindingPending = false; }, workloadUnavailable: async () => {} } };
   const enqueue = () => { calls.push('retry'); };
   return { deps, record, state, calls, enqueue };
 }
@@ -60,4 +60,21 @@ test('closure during an in-flight create leaves its Pod behind a closed gate; a 
   expect(f.state.permit).toBeNull(); f.calls.length = 0;
   await expect(applyWorkload(f.deps, f.record, f.enqueue)).rejects.toMatchObject({ details: { code: 'workload_admission_closed' } });
   expect(f.calls).toEqual(['register']);
+});
+
+test('only missing durable development binding waits while the original provisioning path still binds and recovers', async () => {
+  const f = fixture();
+  f.state.scheduled = true; f.state.bindingPending = true; f.state.bindFailure = true;
+  await expect(applyWorkload(f.deps, f.record, f.enqueue)).rejects.toThrow('bind commit lost');
+  expect(f.calls).toEqual(['register', 'secret', 'pod', 'bind']);
+  expect(f.state.permit).toBeNull();
+  f.calls.length = 0; f.state.bindFailure = false;
+  await applyWorkload(f.deps, f.record, f.enqueue);
+  expect(f.calls).toEqual(['inspect', 'grant', 'retry', 'register', 'secret', 'pod', 'bind', 'inspect', 'grant', 'activate']);
+  expect(f.state.permit).not.toBeNull();
+  f.calls.length = 0; f.state.bindingPending = true;
+  await applyWorkload(f.deps, { ...f.record, conditions: [{ type: 'Provisioning', status: 'false' }] }, f.enqueue);
+  expect(f.calls).toEqual(['inspect', 'grant', 'retry']);
+  f.state.bindingCode = 'development_workload_pending';
+  await expect(applyWorkload(f.deps, { ...f.record, conditions: [] }, f.enqueue)).rejects.toMatchObject({ details: { code: 'development_workload_pending' } });
 });

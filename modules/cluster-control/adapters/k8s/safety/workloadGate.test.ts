@@ -63,3 +63,32 @@ test('WaitForFirstConsumer can schedule the original pending PVC, but it cannot 
   expect(await inspectWorkloadStart(f.k8s, f.pod)).toBeUndefined();
   expect(await f.k8s.get(Resources.Secret!, `${f.pod.name}-admission`, f.pod.namespace)).toBeUndefined();
 });
+
+test('fresh original development parent evidence is required again before every start grant', async () => {
+  const f = await fixture(), parentId = TaskIdSchema.parse(newResourceId()), parentUid = crypto.randomUUID();
+  const pod: WorkloadPodRender = { ...f.pod, businessStorage: undefined, workload: 'dev-session', developmentUsageStorage: { version: 1 }, developmentUsageProtection: { version: 1 },
+    consumer: { id: f.pod.consumer!.id, taskId: parentId, revision: 1, purpose: 'agent', finalization: null }, expectedVolumeUid: f.pod.consumerVolumeUid,
+    nodeName: 'node-1', workspace: { pod: 'original-parent', podUid: parentUid, pvcUid: f.pod.consumerVolumeUid! },
+    labels: { 'crewstation.io/workspace-task': parentId }, annotations: { 'crewstation.io/cli-intent': 'a'.repeat(64) } };
+  const desired = workloadPodObject(pod);
+  await f.k8s.apply({ ...desired, metadata: { ...desired.metadata, uid: f.object.metadata.uid }, spec: { ...(desired.spec as object), nodeName: 'node-1' }, status: { phase: 'Pending' } });
+  const volume = (await f.k8s.get(Resources.PersistentVolumeClaim!, 'work', pod.namespace))!;
+  await f.k8s.apply({ ...volume, metadata: { ...volume.metadata, labels: { [LABELS.task]: parentId } } });
+  const parent = { apiVersion: 'v1', kind: 'Pod', metadata: { name: 'original-parent', namespace: pod.namespace, uid: parentUid, labels: { [LABELS.task]: parentId } },
+    spec: { nodeName: 'node-1', volumes: [{ name: 'work', persistentVolumeClaim: { claimName: 'work' } }] }, status: { phase: 'Running' } };
+  await f.k8s.create(parent);
+  expect((await inspectWorkloadStart(f.k8s, pod))?.podUid).toBe(f.object.metadata.uid);
+  for (const altered of [
+    { ...parent, metadata: { ...parent.metadata, uid: crypto.randomUUID() } },
+    { ...parent, metadata: { ...parent.metadata, labels: { [LABELS.task]: newResourceId() } } },
+    { ...parent, metadata: { ...parent.metadata, deletionTimestamp: new Date().toISOString() } },
+    { ...parent, status: { phase: 'Failed' } },
+    { ...parent, spec: { ...parent.spec, nodeName: 'replacement-node' } },
+    { ...parent, spec: { ...parent.spec, volumes: [{ name: 'work', persistentVolumeClaim: { claimName: 'replacement-work' } }] } },
+  ]) {
+    await f.k8s.apply(altered);
+    await expect(inspectWorkloadStart(f.k8s, pod)).rejects.toThrow();
+  }
+  await f.k8s.delete(Resources.Pod!, parent.metadata.name, pod.namespace);
+  await expect(inspectWorkloadStart(f.k8s, pod)).rejects.toThrow();
+});

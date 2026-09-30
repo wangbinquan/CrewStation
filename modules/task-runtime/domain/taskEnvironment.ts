@@ -53,6 +53,7 @@ export interface WorkloadRender {
   readonly developmentUsageStorage?: DevelopmentUsageStorage;
   /** Explicit new protection selection; a missing field never upgrades an old environment. */
   readonly developmentUsageProtection?: { readonly version: 1 };
+  readonly developmentUsageRequestHash?: string;
   readonly objectInputsGeneration?: number;
   readonly storageFinalization?: { readonly operationId: string; readonly revision: number; readonly volumeUid: string | null; readonly computeStopped?: true };
   readonly completionPolicy?: 'archive-and-delete';
@@ -80,7 +81,7 @@ export interface WorkloadRender {
    * 执行环境（I25 第二步）：父工作区受理那一刻的 Pod 名（重建过的工作区 Pod 换了名）。节点与父 Pod、工作卷的 UID 取自 `native`，
    * 调和器建之前照它们核对父工作区还是受理时那一个。
    */
-  readonly execution?: { readonly workspacePod: string };
+  readonly execution?: { readonly workspacePod: string; readonly creator?: 'native' };
   /** 保卷重建：确认的卷实例与不可变请求摘要；不创建卷、不重新检出。 */
   readonly rebuild?: { readonly id: string; readonly volumeUid: string; readonly intent: string; readonly nodeName?: string };
 }
@@ -205,7 +206,7 @@ export const WORKLOAD_LABELS: Readonly<Record<TaskKind, string>> = { 'dev-sessio
  * 没有的照旧由本模块建。
  */
 export function reconcilerCreates(env: TaskEnvironment): env is TaskEnvironment & { readonly render: WorkloadRender } {
-  return !!env.render && (!env.rebuildId || env.render.rebuild?.id === env.rebuildId) && (!env.native || !!env.render.execution);
+  return !!env.render && !(env.render.developmentUsageProtection !== undefined && env.render.execution?.creator === 'native') && (!env.rebuildId || env.render.rebuild?.id === env.rebuildId) && (!env.native || !!env.render.execution);
 }
 
 /**

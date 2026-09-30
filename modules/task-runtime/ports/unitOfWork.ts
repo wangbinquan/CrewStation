@@ -21,7 +21,10 @@ export interface TaskQuota {
   running(projectId: TaskEnvironment['projectId']): Promise<number>;
 }
 
+export interface NativeExecutionJobLease { readonly jobId: number; readonly fencingToken: number }
+
 export interface RepositoryScope {
+  readonly nativeLease?: { requireCurrent(identity: NativeExecutionJobLease, taskId: TaskId): Promise<void> };
   readonly environments: EnvironmentRepository;
   /** 项目行锁（串行化同一项目的创建、释放、恢复）与旧的额度计数器；额度经 quota。 */
   readonly admissions: AdmissionRepository;

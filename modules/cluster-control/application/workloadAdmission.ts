@@ -1,5 +1,5 @@
 import { WorkloadConsumerSchema } from '@crewstation/contracts';
-import { precondition } from '@crewstation/kernel';
+import { isPlatformError, precondition } from '@crewstation/kernel';
 import type { WorkloadPodRender } from '../domain/workloadRender';
 import { workloadRenderOf } from '../domain/workloadRender';
 import type { ObservedObject } from '../domain/observation';
@@ -30,6 +30,10 @@ export async function reconcileWorkloadAdmission(deps: AdmissionDeps, record: Le
   const pod = { ...render.pod, consumerVolumeUid: state.consumer.volumeUid };
   const permit = await deps.cluster.inspectWorkloadStart(pod);
   if (!permit) { enqueue(record.id, deps.retryMs ?? 2_000); return; }
-  await safety.grantStart(intent.id, permit);
+  try { await safety.grantStart(intent.id, permit); }
+  catch (error) {
+    if (!isPlatformError(error) || error.details['code'] !== 'development_workload_binding_pending') throw error;
+    enqueue(record.id, deps.retryMs ?? 2_000); return;
+  }
   await deps.cluster.activateWorkload(pod, permit);
 }

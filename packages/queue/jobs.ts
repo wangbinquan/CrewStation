@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import { jsonHash } from '@crewstation/kernel';
 import type { Executor, MigrationSet } from '@crewstation/persistence';
 import { readMigrationDir } from '@crewstation/persistence';
 
@@ -55,6 +56,18 @@ export async function heartbeatJob(executor: Executor, id: number, fencingToken:
     UPDATE platform_infra.jobs SET lease_until = now() + make_interval(secs => ${leaseSeconds}), updated_at = now()
     WHERE id = ${id} AND fencing_token = ${fencingToken} AND state = 'running' RETURNING id`));
   return rows.length === 1;
+}
+
+/** Caller must use its actual transaction: lock first, then check database wall time after any wait. */
+export async function lockJobLease(executor: Executor, id: number, fencingToken: number, expected?: { readonly kind: string; readonly payload: unknown }): Promise<boolean> {
+  if (!Number.isSafeInteger(id) || id <= 0 || !Number.isSafeInteger(fencingToken) || fencingToken <= 0) return false;
+  const locked = rowsOf(await executor.execute(sql`SELECT id FROM platform_infra.jobs WHERE id = ${id} FOR UPDATE`));
+  if (locked.length !== 1) return false;
+  const rows = rowsOf<{ kind: string; payload: unknown }>(await executor.execute(sql`
+    SELECT kind, payload FROM platform_infra.jobs
+    WHERE id = ${id} AND fencing_token = ${fencingToken} AND state = 'running' AND lease_until > clock_timestamp()`));
+  const row = rows[0];
+  return !!row && (!expected || row.kind === expected.kind && jsonHash(parseJsonColumn(row.payload)) === jsonHash(expected.payload));
 }
 
 export async function completeJob(executor: Executor, id: number, fencingToken: number): Promise<boolean> {

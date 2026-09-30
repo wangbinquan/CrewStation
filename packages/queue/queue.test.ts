@@ -1,6 +1,7 @@
+import { sql } from 'drizzle-orm';
 import { describe, expect, setSystemTime, test } from 'bun:test';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
-import { claimJobs, completeJob, enqueueJob, failJob, getJobState, queueMigrations } from './jobs';
+import { claimJobs, completeJob, enqueueJob, failJob, getJobState, lockJobLease, queueMigrations } from './jobs';
 import { createWorker } from './worker';
 
 const available = await testDatabaseAvailable();
@@ -56,5 +57,56 @@ describe.skipIf(!available)('PostgreSQL 表队列', () => {
       const claimed = await claimJobs(tdb.db, ['clock'], 'clock-test', 30, 5);
       expect(claimed.map((job) => job.payload)).toEqual([{ immediate: true }]);
     } finally { await tdb.drop(); }
+  });
+});
+
+describe.skipIf(!available)('RFC-034 atomic original execution lease', () => {
+  test('the transaction fences live identity, payload and kind; an old token cannot commit after takeover', async () => {
+    const tdb = await createTestDatabase([queueMigrations]);
+    try {
+      await enqueueJob(tdb.db, 'native', { taskId: 'original' });
+      const [job] = await claimJobs(tdb.db, ['native'], 'original-owner', 30, 1);
+      const expected = { kind: 'native', payload: { taskId: 'original' } };
+      expect(await tdb.db.transaction((tx) => lockJobLease(tx, job!.id, job!.fencingToken, expected))).toBe(true);
+      for (const other of [{ kind: 'other', payload: expected.payload }, { ...expected, payload: { taskId: 'replacement' } }]) {
+        expect(await tdb.db.transaction((tx) => lockJobLease(tx, job!.id, job!.fencingToken, other))).toBe(false);
+      }
+      expect(await tdb.db.transaction((tx) => lockJobLease(tx, job!.id, 0, expected))).toBe(false);
+      await tdb.db.execute(sql`UPDATE platform_infra.jobs SET lease_until = clock_timestamp() - interval '1 second' WHERE id = ${job!.id}`);
+      const [newOwner] = await claimJobs(tdb.db, ['native'], 'replacement-owner', 30, 1);
+      expect(newOwner!.fencingToken).toBe(job!.fencingToken + 1);
+      expect(await tdb.db.transaction((tx) => lockJobLease(tx, job!.id, job!.fencingToken, expected))).toBe(false);
+      expect(await tdb.db.transaction((tx) => lockJobLease(tx, job!.id, newOwner!.fencingToken, expected))).toBe(true);
+      await completeJob(tdb.db, job!.id, newOwner!.fencingToken);
+      expect(await tdb.db.transaction((tx) => lockJobLease(tx, job!.id, newOwner!.fencingToken, expected))).toBe(false);
+      expect(await tdb.db.transaction((tx) => lockJobLease(tx, job!.id + 100, newOwner!.fencingToken, expected))).toBe(false);
+    } finally { await tdb.drop(); }
+  });
+  test('lease expiry while waiting for the job row is measured after the actual PostgreSQL lock', async () => {
+    const tdb = await createTestDatabase([queueMigrations]);
+    let release!: () => void, locked!: () => void;
+    const ready = new Promise<void>((resolve) => { locked = resolve; }), unblock = new Promise<void>((resolve) => { release = resolve; });
+    let holder: Promise<unknown> | undefined, checking: Promise<boolean> | undefined;
+    try {
+      await enqueueJob(tdb.db, 'native', { taskId: 'original' });
+      const [job] = await claimJobs(tdb.db, ['native'], 'owner', 30, 1);
+      holder = tdb.db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT id FROM platform_infra.jobs WHERE id = ${job!.id} FOR UPDATE`);
+        locked(); await unblock;
+        await tx.execute(sql`UPDATE platform_infra.jobs SET lease_until = clock_timestamp() - interval '1 second' WHERE id = ${job!.id}`);
+      });
+      await ready;
+      checking = tdb.db.transaction((tx) => lockJobLease(tx, job!.id, job!.fencingToken, { kind: 'native', payload: { taskId: 'original' } }));
+      const deadline = Date.now() + 2_000;
+      let waiting = false;
+      while (Date.now() < deadline) {
+        const rows = await tdb.db.execute(sql`SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND query LIKE '%platform_infra.jobs%'`) as unknown as Array<{ n: number }>;
+        if (rows[0]!.n > 0) { waiting = true; break; }
+        await Bun.sleep(5);
+      }
+      expect(waiting).toBe(true);
+      release(); await holder;
+      expect(await checking).toBe(false);
+    } finally { release?.(); await Promise.allSettled([holder, checking]); await tdb.drop(); }
   });
 });

@@ -9,7 +9,7 @@ export async function assertPinnedVolume(k8s: K8sClient, pod: WorkloadPodRender,
   if (!expectedUid) return;
   if (!pod.pvc) throw precondition('缺少已固定身份的工作卷');
   const volume = await k8s.get<K8sObject & { status?: { phase?: string } }>(Resources.PersistentVolumeClaim!, pod.pvc, pod.namespace, signal);
-  const owner = pod.businessStorage?.ownerTaskId ?? pod.archive?.ownerTaskId ?? pod.taskId;
+  const owner = pod.businessStorage?.ownerTaskId ?? pod.archive?.ownerTaskId ?? (pod.developmentUsageProtection !== undefined ? pod.consumer?.taskId : pod.taskId);
   const initializing = !!pod.consumer && pod.businessStorage?.initialize === true;
-  if (!volume || volume.metadata.uid !== expectedUid || volume.metadata.deletionTimestamp || volume.metadata.labels?.[LABELS.task] !== owner || (!initializing && volume.status?.phase !== 'Bound')) throw precondition('恢复工作卷实例已变化，拒绝创建容器', { code: 'workspace_volume_changed' });
+  if (!owner || !volume || volume.metadata.uid !== expectedUid || volume.metadata.deletionTimestamp || volume.metadata.labels?.[LABELS.task] !== owner || (!initializing && volume.status?.phase !== 'Bound')) throw precondition('恢复工作卷实例已变化，拒绝创建容器', { code: 'workspace_volume_changed' });
 }

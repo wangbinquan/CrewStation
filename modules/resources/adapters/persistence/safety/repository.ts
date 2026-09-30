@@ -8,6 +8,7 @@ import { assertConsumerOwner, assertTaskAllowsConsumer, lockStorageTask, require
 import { admissionClosures, consumers, storageFences, stopProofs } from './tables';
 import { workloadAdmissionClosures } from './admissionClosures';
 import { workloadStopBarrier } from './stopBarrier';
+import { needsDevelopmentOwnerCheck } from './development';
 
 async function state(tx: Executor, row: typeof consumers.$inferSelect): Promise<WorkloadConsumerState> {
   const proof = (await tx.select().from(stopProofs).where(eq(stopProofs.consumerId, row.id)))[0];
@@ -29,7 +30,14 @@ export function workloadSafetyRepository(db: Database): WorkloadSafety {
     register: (raw) => db.transaction(async (tx) => {
       const consumer = WorkloadConsumerSchema.parse(raw); await lockStorageTask(tx, consumer.taskId);
       const prior = (await tx.select().from(consumers).where(eq(consumers.id, consumer.id)))[0];
-      if (prior) { if (jsonHash(prior.consumer) !== jsonHash(consumer)) throw conflict('消费者身份不可复用'); return state(tx, prior); }
+      if (prior) {
+        if (jsonHash(prior.consumer) !== jsonHash(consumer)) throw conflict('消费者身份不可复用');
+        const records = drizzleRecordRepository(tx);
+        if (!prior.admissionClosed && needsDevelopmentOwnerCheck(await records.get(consumer.resourceId), await records.get(consumer.taskId), consumer)) {
+          await assertConsumerOwner(tx, consumer); await assertTaskAllowsConsumer(tx, consumer);
+        }
+        return state(tx, prior);
+      }
       if ((await tx.select().from(admissionClosures).where(eq(admissionClosures.id, consumer.id))).length) throw precondition('此消费者启动准入已封存', { code: 'workload_admission_closed' });
       await assertConsumerOwner(tx, consumer); await assertTaskAllowsConsumer(tx, consumer);
       await tx.insert(storageFences).values({ taskId: consumer.taskId }).onConflictDoNothing();
@@ -56,7 +64,7 @@ export function workloadSafetyRepository(db: Database): WorkloadSafety {
     }),
     grantStart: (id, input) => mutate(id, async (tx, row) => {
       if (row.admissionClosed) throw precondition('此消费者启动准入已关闭', { code: 'workload_admission_closed' });
-      await assertTaskAllowsConsumer(tx, row.consumer); await assertConsumerOwner(tx, row.consumer);
+      await assertTaskAllowsConsumer(tx, row.consumer); await assertConsumerOwner(tx, row.consumer, input);
       if ((await tx.select().from(stopProofs).where(eq(stopProofs.consumerId, id))).length) throw precondition('此消费者已确认停止', { code: 'workload_admission_closed' });
       if (row.startPermit) {
         if (jsonHash({ ...row.startPermit, grantedAt: null }) !== jsonHash({ ...input, grantedAt: null })) throw conflict('启动许可已绑定其他 Pod 或节点');

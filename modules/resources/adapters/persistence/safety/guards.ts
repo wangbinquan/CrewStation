@@ -1,9 +1,10 @@
 import { eq, sql } from 'drizzle-orm';
 import type { Executor } from '@crewstation/persistence';
-import type { WorkloadConsumer } from '@crewstation/contracts';
+import type { WorkloadConsumer, WorkloadStartPermit } from '@crewstation/contracts';
 import { conflict, notFound, precondition } from '@crewstation/kernel';
 import { drizzleRecordRepository } from '../drizzleRecords';
 import { consumers, storageFences } from './tables';
+import { assertDevelopmentConsumerOwner, needsDevelopmentOwnerCheck } from './development';
 
 /** Serializes admission, closure and finalization across every API/controller replica. */
 export async function lockStorageTask(tx: Executor, taskId: string): Promise<void> {
@@ -14,8 +15,12 @@ export async function requireConsumer(tx: Executor, id: string) {
   if (!row) throw notFound('工作卷消费者', id);
   return row;
 }
-export async function assertConsumerOwner(tx: Executor, consumer: WorkloadConsumer): Promise<void> {
+export async function assertConsumerOwner(tx: Executor, consumer: WorkloadConsumer, permit?: Omit<WorkloadStartPermit, 'grantedAt'>): Promise<void> {
   const records = drizzleRecordRepository(tx), record = await records.get(consumer.resourceId), parent = await records.get(consumer.taskId);
+  if (needsDevelopmentOwnerCheck(record, parent, consumer)) {
+    const volume = await records.getByOwner({ module: 'task-runtime', ref: consumer.taskId + '/work' }, 'volume');
+    assertDevelopmentConsumerOwner(record, parent, volume, consumer, permit); return;
+  }
   if (!record || record.owner.module !== 'task-runtime' || record.desired !== 'present' || !parent || parent.owner.module !== 'task-runtime' || parent.kind !== 'business-workspace') throw precondition('执行资源已不可准入', { code: 'workload_admission_closed' });
   if (record.projectId !== parent.projectId || (record.id !== parent.id && record.parentId !== parent.id)) throw conflict('工作卷消费者归属不匹配');
   if (!record.spec.children.some((c) => c.kind === 'Pod' && c.namespace === consumer.namespace && c.name === consumer.podName)) throw conflict('Pod 身份不属于此执行资源');

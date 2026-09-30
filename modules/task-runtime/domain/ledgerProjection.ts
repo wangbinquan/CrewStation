@@ -75,6 +75,7 @@ function workloadPurpose(env: TaskEnvironment): ClusterPurpose {
  * （释放完才把 `released: <原因>` 写进 message），先报泛泛的 released，台账在拿到具体原因时补上。
  */
 function releaseOf(env: TaskEnvironment): ProjectedRecord['release'] {
+  if (env.render?.developmentUsageProtection !== undefined && env.native?.state === 'cleaning') return undefined;
   const executionEnded = env.native?.state === 'cleaning' || env.native?.state === 'finished';
   if (env.state !== 'releasing' && env.state !== 'released' && !executionEnded) return undefined;
   // 执行环境的说明写结局（进程为何结束），不写「正在回收」这类过程——它在已结束的记录上也一直显示。
@@ -96,6 +97,7 @@ function conditionsOf(env: TaskEnvironment): ProjectedCondition[] {
     { type: 'Paused', status: env.state === 'paused' ? 'true' : 'false' },
     { type: 'Rebuilding', status: env.rebuildId && env.state === 'creating' ? 'true' : 'false' },
   ];
+  if (env.render?.developmentUsageProtection !== undefined) conditions.push({ type: 'ReleasePending', status: env.native?.state === 'cleaning' ? 'true' : 'false', reason: 'development-digital-cleanup-pending', message: '开发数值排空与原执行停止尚未确认' });
   if (env.render?.businessStorage) conditions.push({ type: 'ReleasePending', status: (env.render.completionPolicy && env.businessWorkspace?.phase === 'pausing') || (env.state === 'releasing' && (!!env.native || !!env.release?.occupied)) ? 'true' : 'false', reason: 'execution-cleanup-pending', message: '执行资源尚未完成回收确认' });
   if (env.native) conditions.push({ type: 'Prepared', status: env.native.state === 'queued' ? 'false' : 'true' });
   if (env.render) conditions.push(provisioningOf(env));
@@ -112,23 +114,25 @@ function provisioningOf(env: TaskEnvironment): ProjectedCondition {
  * 凭据不在这里：Secret 的内容建的时候向 task-runtime 要（runnerValues）。
  */
 function workloadRender(env: TaskEnvironment, protection: DevelopmentWorkloadProtection | undefined): ProjectedRecord['render'] {
-  if (!reconcilerCreates(env)) return undefined;
-  const { image, workerUid, resources, checkout } = env.render;
+  if (!reconcilerCreates(env) && !(protection && env.render?.execution?.creator === 'native')) return undefined;
+  const render = env.render!;
+  const { image, workerUid, resources, checkout } = render;
   const pod = {
     ...(protection ?? {}),
-    ...(env.render.completionPolicy ? { consumer: { id: env.render.workloadConsumerId, taskId: env.native?.parentTaskId ?? env.id, revision: env.render.start, purpose: env.native ? 'agent' : 'business', finalization: null } } : {}),
+    ...(protection && env.native?.podUid ? { expectedPodUid: env.native.podUid } : {}),
+    ...(render.completionPolicy ? { consumer: { id: render.workloadConsumerId, taskId: env.native?.parentTaskId ?? env.id, revision: render.start, purpose: env.native ? 'agent' : 'business', finalization: null } } : {}),
     ...(env.businessWorkspace ? { expectedVolumeUid: env.businessWorkspace.volumeUid } : {}),
-    ...(env.render.runtimeImage ? { runtimeInitialization: true } : {}),
-    ...(env.render.developmentUsageStorage ? { developmentUsageStorage: env.render.developmentUsageStorage } : {}),
-    ...(env.render.businessStorage ? { businessStorage: { ...env.render.businessStorage, initialize: !env.native && !env.rebuildId && env.render.start === 1 } } : {}),
+    ...(render.runtimeImage ? { runtimeInitialization: true } : {}),
+    ...(render.developmentUsageStorage ? { developmentUsageStorage: render.developmentUsageStorage } : {}),
+    ...(render.businessStorage ? { businessStorage: { ...render.businessStorage, initialize: !env.native && !env.rebuildId && render.start === 1 } } : {}),
     image, workerUid, resources, workload: WORKLOAD_LABELS[env.kind], project: env.labels['crewstation.io/project'] ?? '', service: env.labels['crewstation.io/service'] ?? '',
     // 档位测试（I25 第四步）用 Pod 内的临时目录，没有工作卷。
-    ...(env.render.workVolume === 'emptyDir' ? { emptyDir: true } : { pvc: env.pvcName }), secret: runnerSecretOf(env), ...executionRender(env),
-    ...(env.render.rebuild ? { labels: { 'crewstation.io/rebuild': env.render.rebuild.id }, annotations: { 'crewstation.io/rebuild-intent': env.render.rebuild.intent }, ...(env.render.rebuild.nodeName ? { nodeName: env.render.rebuild.nodeName } : {}) } : {}),
+    ...(render.workVolume === 'emptyDir' ? { emptyDir: true } : { pvc: env.pvcName }), secret: runnerSecretOf({ ...env, render }), ...executionRender(env),
+    ...(render.rebuild ? { labels: { 'crewstation.io/rebuild': render.rebuild.id }, annotations: { 'crewstation.io/rebuild-intent': render.rebuild.intent }, ...(render.rebuild.nodeName ? { nodeName: render.rebuild.nodeName } : {}) } : {}),
     // 检出（I25）：没带 Secret 名的，凭据 Secret 由资源中心按这一次启动建（ownedCredential），令牌建的时候向本模块要。
-    ...(checkout ? { checkout: { repoUrl: checkout.repoUrl, branch: checkout.branch, credentialSecretName: checkoutSecretOf(env)!, ...(checkout.credentialSecretName ? {} : { ownedCredential: true }) } } : {}),
+    ...(checkout ? { checkout: { repoUrl: checkout.repoUrl, branch: checkout.branch, credentialSecretName: checkoutSecretOf({ ...env, render })!, ...(checkout.credentialSecretName ? {} : { ownedCredential: true }) } } : {}),
   };
-  return { pod, ...(env.render.workloadConsumerId ? { workloadConsumerId: env.render.workloadConsumerId } : {}), ...(env.render.rebuild ? { rebuild: env.render.rebuild } : {}), ...(env.preview ? { preview: { port: env.preview.port, kind: env.kind } } : {}) };
+  return { pod, ...(render.workloadConsumerId ? { workloadConsumerId: render.workloadConsumerId } : {}), ...(render.rebuild ? { rebuild: render.rebuild } : {}), ...(env.preview ? { preview: { port: env.preview.port, kind: env.kind } } : {}) };
 }
 
 /**
