@@ -1,6 +1,6 @@
 # RFC-034 开发实际来源消费第一批设计
 
-状态：限定v3设计门已PASS，尚未实现，生产 OFF。承接已发布/CI成功/本机部署的 d01ba8223 实际来源底座；沿用已批准 RFC-034 和 development-headless/development-owner。先实现内部持久消费，不启用生产派发，不扩大业务统计 sourceScope，也不关闭 CS-R02。
+状态：限定v3设计门已PASS；第1项原选择接口已有实现候选，完整持久消费者尚未接通，生产 OFF。承接已发布/CI成功/本机部署的 d01ba8223 实际来源底座；沿用已批准 RFC-034 和 development-headless/development-owner。先实现内部持久消费，不启用生产派发，不扩大业务统计 sourceScope，也不关闭 CS-R02。
 
 ## 实际断点
 
@@ -82,3 +82,13 @@ v2独立门仍FAIL：前三项P2已关闭，但仅取当前页模型不能给投
 v3独立只读设计门PASS，首尾冻结hash一致，原四项P2全部关闭、没有新功能阻断。来源验证/数字完整性解耦，Session独立registration对拍，原turn与完整meter分离，普通数字所选模型证据随页/游标原子保存并覆盖此前ACK/无scope/超原生索引预算等反例。复核未改写文件、运行测试或调用集群；这是设计PASS，尚未开始消费实现，不启用生产、不关闭CS-R02或整个RFC。
 
 前一发布回执文档b643e53196e2eea0d61a6160df7f543263c5a561的[CI 36685062165](https://github.com/wangbinquan/CrewStation/actions/runs/36685062165) 已终态success；它只记录已部署d01ba8223，不改变本机源码镜像。新设计的精确提交/CI另记，共享STATE/RFC索引仍留在工作树、并行资源改动完整保留。
+
+## 原选择接口实现候选（2026-09-30）
+
+第1项限定四路径实现门PASS：dev-session.resolve继续只接受精确原key；在原持久intent选择nativeSource时返回非敏感nativeSelection.version/expectedNamespace，未选择的legacy完整省略该字段。registration/首次人民币受理不变，不读取当前workspace、hello或价目配置；API与port各自独立类型同步，不返回prompt、digestNonce、launch或MCP启动材料。生产wiring、Session来源、账本和UI未变，这不是完整消费者完成。
+
+真实PG回归先10pass/1fail，唯一失败为旧resolve缺nativeSelection；实现后11pass/0fail、96断言。新增覆盖关闭后重读、价目变化及丢失当前环境时仍取原选择，原选择/namespace替换冲突、精确原key、旧返回形状和启动材料不外泄；所有旧数值/人民币断言保留。四文件eslint与diff-check成功，冻结源码hash首尾匹配。
+
+该候选仅启动一次本机完整check，arch阶段被并行工作阻断：data/application和data/ports各超目录上限，console拓扑两文件环，以及project/api-catalog/resource-access/agent-runtime/data/gateway/runtime-environment七份未入锁迁移，共10项；没有进入lint/type/test阶段，不能写作完整本机通过。均不在这四个源码文件内，按development-rules §3保留并行内容，限定文件检查有效，最终整仓判断交精确提交的clean hosted CI。未重跑全量、未补锁/修正他人资源或拓扑文件。
+
+下一批仍须Session独立registration对拍、固定页/完整meter归属、实际文件分区、所有数字的持久所选模型证据及原子cursor/估值/ACK；原owner派发/清理屏障、两级事实/UI及真实运行验收继续。生产采集OFF、sourceScope business-tasks；本机仍为已验证d01ba8223，源码候选发布/CI与后续部署单独回执。

@@ -49,7 +49,9 @@ export function developmentUsageOwner(store: DevelopmentUsageOwnerStore, starts:
     },
     resolve: async (key) => {
       const current = await store.get(key.executionId as TaskId);
-      return current?.binding && jsonHash(current.binding.key) === jsonHash(key) ? { registration: current.binding, price: current.price } : undefined;
+      if (!current?.binding || jsonHash(current.binding.key) !== jsonHash(key)) return undefined;
+      return { registration: current.binding, price: current.price,
+        ...(current.intent.nativeSource ? { nativeSelection: { version: current.intent.nativeSource.version, expectedNamespace: current.intent.nativeUsageLineageKey } } : {}) };
     },
   };
 }

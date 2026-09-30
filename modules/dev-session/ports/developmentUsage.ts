@@ -29,6 +29,12 @@ export interface DevelopmentUsageOwnerStore {
   unsupported(executionTaskId: TaskId): Promise<DevelopmentUsageOwnerRecord>;
   close(executionTaskId: TaskId, reason: DevelopmentUsageDrainReason): Promise<DevelopmentUsageOwnerRecord>;
 }
+/** Frozen non-sensitive source choice; consumer still verifies independent Session registration. */
+export interface DevelopmentUsageResolved {
+  registration: DevelopmentUsageRegistration;
+  price: DevelopmentAcceptedPrice;
+  nativeSelection?: { version: 1; expectedNamespace: string };
+}
 /** Closing this admission is NOT authorization to delete a Pod: Session closure is still required. */
 export interface DevelopmentUsageOwner {
   prepare(input: DevelopmentUsagePreparation): Promise<DevelopmentUsageOwnerRecord>;
@@ -36,5 +42,5 @@ export interface DevelopmentUsageOwner {
   bind(executionTaskId: TaskId, info: DevelopmentUsageInfo): Promise<DevelopmentUsageOwnerRecord>;
   unsupported(executionTaskId: TaskId): Promise<DevelopmentUsageOwnerRecord>;
   close(executionTaskId: TaskId, reason: DevelopmentUsageDrainReason): Promise<DevelopmentUsageOwnerRecord>;
-  resolve(key: DevelopmentUsageKey): Promise<{ registration: DevelopmentUsageRegistration; price: DevelopmentAcceptedPrice } | undefined>;
+  resolve(key: DevelopmentUsageKey): Promise<DevelopmentUsageResolved | undefined>;
 }

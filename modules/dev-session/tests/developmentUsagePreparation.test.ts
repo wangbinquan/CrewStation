@@ -102,6 +102,28 @@ describe.skipIf(!available)('开发 owner 稳定意图与人民币原受理', ()
     await expect(f.owner.bind(f.child.id, { ...f.info, podUid: 'replaced-pod' })).rejects.toMatchObject({ kind: 'conflict' }); expect(await f.owner.get(f.child.id)).toEqual(bound);
   });
 
+  test('consumer resolves only the originally selected native source without private intent or current configuration', async () => {
+    const f = await developmentUsageFixture(database.db);
+    const preparation = { ...f.preparation, intent: { ...f.preparation.intent, nativeSource: { version: 1 as const } } };
+    const prepared = await f.owner.prepare(preparation), bound = await f.owner.bind(f.child.id, f.info);
+    const expected = { registration: bound.binding!, price: prepared.price,
+      nativeSelection: { version: 1, expectedNamespace: preparation.intent.nativeUsageLineageKey } };
+    // A consumer must verify the frozen choice before trusting any Runner source frame.
+    expect(await f.owner.resolve(bound.binding!.key)).toEqual(expected);
+    f.controls.priceRevision = 99;
+    f.controls.priceFailure = new Error('do not reprice an old execution');
+    const restored = developmentUsageOwner(f.store, f.starts, { getEnvironment: async () => { throw new Error('do not borrow current workspace or capabilities'); } });
+    await restored.close(f.child.id, 'workspace-released');
+    const resolved = await restored.resolve(bound.binding!.key);
+    expect(resolved).toEqual(expected); expect(f.controls.priceCalls).toBe(1);
+    expect(Object.keys(resolved!).sort()).toEqual(['nativeSelection', 'price', 'registration']);
+    for (const secret of [prepared.digestNonce, 'owner-private-prompt', '/usr/local/bin/opencode', 'http://platform.example.test/']) expect(JSON.stringify(resolved)).not.toContain(secret);
+    await expect(restored.prepare(f.preparation)).rejects.toMatchObject({ kind: 'conflict' });
+    await expect(restored.prepare({ ...preparation, intent: { ...preparation.intent, nativeUsageLineageKey: 'new-current-namespace' } })).rejects.toMatchObject({ kind: 'conflict' });
+    expect(await restored.resolve({ ...bound.binding!.key, incarnation: crypto.randomUUID() })).toBeUndefined();
+    expect(await f.store.get(f.child.id)).toMatchObject({ intent: preparation.intent, price: prepared.price, payloadDigest: prepared.payloadDigest });
+  });
+
   test('a new Runner incarnation can report its original receipt, but cannot substitute key, owner, Pod or revision', async () => {
     const f = await developmentUsageFixture(database.db); await f.owner.prepare(f.preparation); const bound = await f.owner.bind(f.child.id, f.info);
     const receipt: DevelopmentUsageReceipt = { key: bound.binding!.key, podUid: f.info.podUid, identity: f.preparation.intent.identity, profileId: f.preparation.intent.profileId, profileRevision: 2, phase: 'unknown', lastSequence: 0, acknowledgedSequence: 0, finalThrough: null, result: null, interruption: 'runner-restarted' };
