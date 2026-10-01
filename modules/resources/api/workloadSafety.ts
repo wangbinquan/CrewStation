@@ -1,4 +1,4 @@
-import type { WorkloadAdmissionIdentity, WorkloadConsumer, WorkloadStartPermit, WorkloadStopProof, WorkloadStopBarrier, WorkloadFinalizationFence } from '@crewstation/contracts';
+import type { WorkloadAdmissionIdentity, WorkloadConsumer, WorkloadStartPermit, WorkloadStopProof, WorkloadStopBarrier, WorkloadFinalizationFence, DevelopmentAdmissionState, DevelopmentAdmissionReceipt } from '@crewstation/contracts';
 
 export interface WorkloadConsumerState {
   readonly consumer: WorkloadConsumer;
@@ -6,6 +6,8 @@ export interface WorkloadConsumerState {
   readonly admissionClosed: boolean;
   readonly startPermit: WorkloadStartPermit | null;
   readonly stopProof: WorkloadStopProof | null;
+  /** Omitted for legacy rows; only the first original registration selects receipt protection. */
+  readonly developmentAdmission?: DevelopmentAdmissionState;
 }
 
 /** Internal, authenticated owner/observer ports. No public caller can issue start or stop evidence. */
@@ -21,4 +23,5 @@ export interface WorkloadSafety {
   freezeTask(taskId: string, finalization: { operationId: string; revision: number }): Promise<void>;
   grantStart(consumerId: string, input: Omit<WorkloadStartPermit, 'grantedAt'>): Promise<WorkloadConsumerState>;
   recordStop(proof: WorkloadStopProof): Promise<WorkloadStopProof>;
+  bindDevelopmentAdmission?(receipt: DevelopmentAdmissionReceipt): Promise<WorkloadConsumerState>;
 }

@@ -5,6 +5,7 @@ import { workloadRenderOf } from '../domain/workloadRender';
 import type { ObservedObject } from '../domain/observation';
 import type { LedgerObservations, LedgerRecordView } from '../ports/ledger';
 import type { ClusterWriter } from '../ports/cluster';
+import { commitDevelopmentAdmissionReceipt, requireDevelopmentReceiptCapabilities } from './development/admissionReceipts';
 
 interface AdmissionDeps { ledger: LedgerObservations; cluster: ClusterWriter; retryMs?: number }
 
@@ -13,9 +14,11 @@ export async function prepareWorkloadAdmission(deps: AdmissionDeps, pod: Workloa
   if (!pod.consumer) return pod;
   const safety = deps.ledger.workloadSafety;
   if (!safety?.register || !deps.cluster.inspectWorkloadStart || !deps.cluster.activateWorkload || !volume?.metadata.uid) throw precondition('工作卷启动保护不可用');
+  if (pod.developmentRemovalProtection !== undefined) requireDevelopmentReceiptCapabilities(safety, deps.cluster);
   const consumer = WorkloadConsumerSchema.parse({ ...pod.consumer, resourceId: pod.taskId, namespace: pod.namespace, podName: pod.name, volumeUid: volume.metadata.uid });
   const state = await safety.register(consumer);
   if (state.admissionClosed) throw precondition('工作卷消费者启动许可已关闭', { code: 'workload_admission_closed' });
+  if (pod.developmentRemovalProtection !== undefined && !state.developmentAdmission) throw precondition('原准入回执选择尚未持久注册');
   return { ...pod, consumerVolumeUid: state.consumer.volumeUid };
 }
 
@@ -27,6 +30,10 @@ export async function reconcileWorkloadAdmission(deps: AdmissionDeps, record: Le
   if (!safety?.grantStart || !deps.cluster.inspectWorkloadStart || !deps.cluster.activateWorkload) throw precondition('工作卷启动保护不可用');
   const state = await safety.get(intent.id);
   if (!state || state.admissionClosed) return;
+  if (render.pod.developmentRemovalProtection !== undefined) {
+    requireDevelopmentReceiptCapabilities(safety, deps.cluster);
+    if (!state.developmentAdmission) throw precondition('原准入回执选择尚未持久注册');
+  }
   const pod = { ...render.pod, consumerVolumeUid: state.consumer.volumeUid };
   const permit = await deps.cluster.inspectWorkloadStart(pod);
   if (!permit) { enqueue(record.id, deps.retryMs ?? 2_000); return; }
@@ -35,5 +42,7 @@ export async function reconcileWorkloadAdmission(deps: AdmissionDeps, record: Le
     if (!isPlatformError(error) || error.details['code'] !== 'development_workload_binding_pending') throw error;
     enqueue(record.id, deps.retryMs ?? 2_000); return;
   }
-  await deps.cluster.activateWorkload(pod, permit);
+  const receipt = await deps.cluster.activateWorkload(pod, permit, pod.developmentRemovalProtection !== undefined ? state.developmentAdmission : undefined);
+  if (receipt) await commitDevelopmentAdmissionReceipt(safety, deps.cluster, receipt);
+  else if (pod.developmentRemovalProtection !== undefined && !state.developmentAdmission?.secretUid) throw precondition('原实际创建回执尚未取得');
 }

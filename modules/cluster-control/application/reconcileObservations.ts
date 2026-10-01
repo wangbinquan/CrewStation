@@ -19,6 +19,7 @@ import { applyVolume, applyWorkload } from './workloadApply';
 import { applyArchive } from './archiveApply';
 import type { ArchiveOwners } from '../ports/ledger';
 import { reconcileWorkloadSafety } from './workloadSafety';
+import { replayDevelopmentAdmissionReceipts } from './development/admissionReceipts';
 import { reconcileTaskVolume } from './storage/taskVolume';
 
 /** 删的顺序（设计 §6.2）：先工作负载（Deployment、Job、Pod），再 Secret、Service、路由与它引用的中间件；PVC 只随工作卷记录删。 */
@@ -278,6 +279,7 @@ const APPLIERS: Readonly<Record<string, (deps: ReconcileDeps, record: LedgerReco
  * 重新排进队列（工作卷的「待回收」要在这之后判定）。只在观测缓存同步完成后调用。
  */
 export async function reconcileRecord(deps: ReconcileDeps, id: string, enqueue: Enqueue): Promise<void> {
+  await replayDevelopmentAdmissionReceipts(deps, id);
   const record = await deps.ledger.get(id);
   if (!record) return;
   await reconcileWorkloadSafety(deps, record, enqueue);

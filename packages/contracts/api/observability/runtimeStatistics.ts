@@ -34,6 +34,7 @@ export interface RuntimeFactPage { items: RuntimeTaskFact[]; partial: boolean; s
 
 export const RuntimeUsageMetricsSchema = z.strictObject({
   tokens: z.strictObject({ input: count, cacheRead: count, cacheWrite: count, output: count, total: count, hasKnown: z.boolean(), complete: z.boolean(),
+    hasKnownBuckets: z.strictObject({ input: z.boolean(), cacheRead: z.boolean(), cacheWrite: z.boolean(), output: z.boolean() }).optional(),
     unknownBuckets: z.strictObject({ input: z.number().int().nonnegative(), cacheRead: z.number().int().nonnegative(), cacheWrite: z.number().int().nonnegative(), output: z.number().int().nonnegative() }),
   }),
   cost: z.strictObject({ currency: z.literal('CNY'), amount, complete: z.boolean(), visible: z.boolean() }),

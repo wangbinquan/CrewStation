@@ -1,8 +1,9 @@
-import { DevelopmentUsageStorageSchema, ResourceIdSchema } from '@crewstation/contracts';
+import { DevelopmentUsageStorageSchema, DevelopmentRemovalProtectionSchema, DevelopmentAdmissionStateSchema, WorkloadConsumerSchema, ResourceIdSchema } from '@crewstation/contracts';
 import { conflict, isPlatformError, jsonHash, precondition } from '@crewstation/kernel';
 import type { CreateNativeExecutionInput } from '../../api/moduleApi';
 import { developmentWorkloadProtection } from '../../domain/development/protection';
 import { completeStage } from '../../domain/podStartup';
+import { canonicalNativeIntent } from '../../domain/physicalIdentity';
 import { hashRunnerToken, newRunnerToken } from '../../domain/runnerToken';
 import type { TaskEnvironment } from '../../domain/taskEnvironment';
 import { reconcilerCreates } from '../../domain/taskEnvironment';
@@ -21,9 +22,11 @@ export function developmentRequestHash(input: CreateNativeExecutionInput): strin
   return jsonHash({ id: input.id, parentTaskId: input.parentTaskId, purpose: input.purpose ?? 'cli', createdBy: input.createdBy ?? null,
     agentId: input.agentId, terminalId: input.terminalId ?? null, runnerId: input.runnerId, fingerprint: input.fingerprint, profile: input.profile ?? null,
     image: input.image ?? null, computeProfile: input.computeProfile ?? null, runtimeImage: input.runtimeImage ?? null, businessSession: input.businessSession ?? null,
-    developmentUsageStorage: input.developmentUsageStorage ?? null, developmentUsageProtection: input.developmentUsageProtection ?? null });
+    developmentUsageStorage: input.developmentUsageStorage ?? null, developmentUsageProtection: input.developmentUsageProtection ?? null,
+    ...(input.developmentRemovalProtection !== undefined ? { developmentRemovalProtection: input.developmentRemovalProtection } : {}) });
 }
 export function assertDevelopmentAdmission(deps: Deps, input: CreateNativeExecutionInput): void {
+  if (input.developmentRemovalProtection !== undefined && (!DevelopmentRemovalProtectionSchema.safeParse(input.developmentRemovalProtection).success || !deps.workloadSafety?.get)) throw precondition('原开发准入回执选择或读取能力无效');
   if (!DevelopmentUsageStorageSchema.safeParse(input.developmentUsageProtection).success || !DevelopmentUsageStorageSchema.safeParse(input.developmentUsageStorage).success
     || input.purpose !== 'agent' || input.terminalId !== undefined || input.businessSession !== undefined || !ResourceIdSchema.safeParse(input.agentId).success
     || input.profile !== undefined && !ResourceIdSchema.safeParse(input.profile).success || !ResourceIdSchema.safeParse(input.computeProfile?.profileId).success
@@ -73,6 +76,17 @@ async function verifyWorkspace(deps: Deps, parent: TaskEnvironment, env: TaskEnv
 async function heartbeat(renew: () => Promise<boolean>): Promise<void> {
   if (!await renew()) throw new Error('开发 Agent 执行作业租约已被接管');
 }
+async function requireOriginalReceiptSelection(deps: Deps, env: TaskEnvironment): Promise<boolean> {
+  if (env.render?.developmentRemovalProtection === undefined) return true;
+  const protection = developmentWorkloadProtection(env);
+  if (!protection || !deps.workloadSafety?.register) throw precondition('原开发消费者注册能力未装配');
+  const consumer = WorkloadConsumerSchema.parse({ ...protection.consumer, resourceId: env.id, namespace: env.namespace, podName: env.podName, volumeUid: protection.expectedVolumeUid });
+  const state = await deps.workloadSafety.register(consumer), selected = DevelopmentAdmissionStateSchema.safeParse(state.developmentAdmission);
+  if (state.admissionClosed) throw precondition('原开发消费者准入已关闭');
+  if (state.developmentAdmission === undefined) return false;
+  if (!selected.success || selected.data.intentHash !== canonicalNativeIntent(env.id, env.native!)) throw precondition('原开发准入回执选择与原意图不匹配');
+  return true;
+}
 /** No project transaction is held during registration, cluster reads/writes, material or heartbeat. */
 export async function prepareDevelopmentWorkload(deps: Deps, env: TaskEnvironment, renew: () => Promise<boolean>, identity: NativeExecutionJobLease | undefined): Promise<void> {
   requireIdentity(deps, identity);
@@ -80,6 +94,7 @@ export async function prepareDevelopmentWorkload(deps: Deps, env: TaskEnvironmen
   const parent = await deps.uow.read.environments.getById(env.native!.parentTaskId);
   requireParent(parent);
   await heartbeat(renew); await verifyWorkspace(deps, parent, env);
+  if (!await requireOriginalReceiptSelection(deps, env)) return;
   const svc = await deps.services.resolveServiceById(env.serviceId);
   if (!svc) throw precondition('此 Agent 所属服务已不存在');
   let prepared: Awaited<ReturnType<NativeExecutionCluster['prepare']>>;

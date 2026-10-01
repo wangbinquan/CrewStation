@@ -1,5 +1,6 @@
 import { Database } from 'bun:sqlite';
 import { jsonHash } from '@crewstation/kernel';
+import { opencodeOutput } from './opencodeOutput';
 import type { NativeUsageStep, NativeUsageOrder } from '@crewstation/contracts';
 import { identifier, object, readUsage } from './capture';
 
@@ -12,7 +13,7 @@ interface ScanState { steps: NativeUsageStep[]; sessions: ScanNode[]; issues: Se
 
 function step(row: PartRow, ancestors: string[], issues: Set<string>): NativeUsageStep {
   const tokens = object(JSON.parse(row.tokens ?? 'null')), cache = object(tokens?.cache), diagnostics: string[] = [];
-  const usage = readUsage({ input: tokens?.input, output: tokens?.output, cacheRead: cache?.read, cacheWrite: cache?.write }, diagnostics);
+  const usage = readUsage({ input: tokens?.input, output: opencodeOutput(tokens, diagnostics), cacheRead: cache?.read, cacheWrite: cache?.write }, diagnostics);
   if (Object.values(usage).some((value) => value === null)) issues.add('native-token-bucket-unknown');
   const provider = identifier(row.provider), model = identifier(row.model);
   const actualModel = provider && provider.length <= 200 && model && model.length <= 300 ? { provider, model, condition: null } : null;

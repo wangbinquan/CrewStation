@@ -1,6 +1,7 @@
-import { WorkloadConsumerSchema, WorkloadStartPermitSchema, WorkloadStopProofSchema } from '@crewstation/contracts';
+import { DevelopmentAdmissionStateSchema, WorkloadConsumerSchema, WorkloadStartPermitSchema, WorkloadStopProofSchema } from '@crewstation/contracts';
 import { jsonHash, precondition } from '@crewstation/kernel';
 import { developmentWorkloadProtection } from '../../domain/development/protection';
+import { canonicalNativeIntent } from '../../domain/physicalIdentity';
 import type { TaskEnvironment } from '../../domain/taskEnvironment';
 import type { DevelopmentPhysicalStopEvidence } from '../../ports/developmentCleanup';
 import type { WorkloadSafetyPort } from '../../ports/workloadSafety';
@@ -9,6 +10,15 @@ function originalConsumer(env: TaskEnvironment) {
   const protection = developmentWorkloadProtection(env);
   if (!protection) throw precondition('原开发工作卷保护缺失');
   return WorkloadConsumerSchema.parse({ ...protection.consumer, resourceId: env.id, namespace: env.namespace, podName: env.podName, volumeUid: protection.expectedVolumeUid });
+}
+/** Read before every destructive job fence, after the Task transaction ends. Legacy choices add no read. */
+export async function developmentAdmissionSecretUid(safety: WorkloadSafetyPort | undefined, env: TaskEnvironment): Promise<string | undefined> {
+  if (env.render?.developmentRemovalProtection === undefined) return undefined;
+  const expected = originalConsumer(env), state = await safety?.get(expected.id), selected = DevelopmentAdmissionStateSchema.safeParse(state?.developmentAdmission);
+  if (!state?.startPermit || !selected.success || !selected.data.secretUid) throw precondition('等待原准入 Secret 历史 UID 回执');
+  if (jsonHash(WorkloadConsumerSchema.parse(state.consumer)) !== jsonHash(expected) || selected.data.intentHash !== canonicalNativeIntent(env.id, env.native!)
+    || state.startPermit.podUid !== env.native!.podUid || state.startPermit.nodeName !== env.native!.nodeName || !WorkloadStartPermitSchema.safeParse(state.startPermit).success) throw precondition('原准入 Secret 回执的消费者、意图或许可已变化');
+  return selected.data.secretUid;
 }
 export async function closeDevelopmentAdmission(safety: WorkloadSafetyPort | undefined, env: TaskEnvironment): Promise<void> {
   if (!safety) throw precondition('原开发消费者关闭能力未装配');
@@ -26,5 +36,6 @@ export async function developmentPhysicalStop(safety: WorkloadSafetyPort | undef
   if (jsonHash(consumer) !== jsonHash(expected) || jsonHash(stopProof.consumer) !== jsonHash(expected) || startPermit.podUid !== env.native!.podUid
     || startPermit.nodeName !== env.native!.nodeName || stopProof.podUid !== startPermit.podUid || stopProof.nodeUid !== startPermit.nodeUid
     || stopProof.nodeName !== startPermit.nodeName || stopProof.type !== 'kubelet-terminated') throw precondition('开发停止证明不属于原 Pod、工作卷与节点');
-  return { consumer, startPermit, stopProof };
+  const admissionSecretUid = await developmentAdmissionSecretUid(safety, env);
+  return { consumer, startPermit, stopProof, ...(admissionSecretUid ? { admissionSecretUid } : {}) };
 }

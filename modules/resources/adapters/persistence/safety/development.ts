@@ -1,5 +1,5 @@
 import type { WorkloadConsumer, WorkloadStartPermit } from '@crewstation/contracts';
-import { DevelopmentUsageStorageSchema, WorkloadConsumerIntentSchema, WorkloadStartPermitSchema } from '@crewstation/contracts';
+import { DevelopmentUsageStorageSchema, DevelopmentRemovalProtectionSchema, WorkloadConsumerIntentSchema, WorkloadStartPermitSchema } from '@crewstation/contracts';
 import { conflict, jsonHash, precondition } from '@crewstation/kernel';
 import type { LedgerRecord } from '../../../domain/record';
 
@@ -29,6 +29,7 @@ function originalPod(record: LedgerRecord, parent: LedgerRecord, consumer: Workl
     || !fields(pod['annotations']) || !/^[0-9a-f]{64}$/.test(String(pod['annotations']['crewstation.io/cli-intent'] ?? ''))
     || !fields(pod['workspace']) || !text(pod['workspace']['pod']) || !WorkloadStartPermitSchema.shape.podUid.safeParse(pod['workspace']['podUid']).success
     || pod['workspace']['pvcUid'] !== consumer.volumeUid || pod['expectedVolumeUid'] !== consumer.volumeUid) throw conflict('开发工作卷保护快照不完整或冲突');
+  if (pod['developmentRemovalProtection'] !== undefined && !DevelopmentRemovalProtectionSchema.safeParse(pod['developmentRemovalProtection']).success) throw conflict('开发准入回执选择无效');
   const intent = WorkloadConsumerIntentSchema.safeParse(pod['consumer']);
   const { resourceId: _resource, namespace: _namespace, podName: _name, volumeUid: _volume, ...expected } = consumer;
   if (!intent.success || jsonHash(intent.data) !== jsonHash(expected)) throw conflict('开发工作卷消费者或启动修订已变化');

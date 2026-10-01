@@ -3,6 +3,8 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { Resources } from '@crewstation/k8s';
 import { testDatabaseAvailable } from '@crewstation/testkit';
 import { TaskIdSchema } from '@crewstation/contracts';
+import { jsonHash } from '@crewstation/kernel';
+import { developmentRequestHash } from '../application/development/workloadAdmission';
 import { claimJobs } from '@crewstation/queue';
 import { sql } from 'drizzle-orm';
 import { NATIVE_EXECUTION_JOB_KIND } from '../ports/repositories';
@@ -33,6 +35,41 @@ const available = await testDatabaseAvailable();
 describe.skipIf(!available)('RFC-034 actual development workload admission', () => {
   let f: DevelopmentWorkloadFixture;
   afterEach(async () => { await f?.close(); });
+  test('missing new selector keeps the exact legacy request hash; submitting it freezes a distinct first choice', async () => {
+    f = await developmentWorkloadFixture('native'); const input = f.request();
+    const legacy = jsonHash({ id: input.id, parentTaskId: input.parentTaskId, purpose: input.purpose ?? 'cli', createdBy: input.createdBy ?? null,
+      agentId: input.agentId, terminalId: input.terminalId ?? null, runnerId: input.runnerId, fingerprint: input.fingerprint, profile: input.profile ?? null,
+      image: input.image ?? null, computeProfile: input.computeProfile ?? null, runtimeImage: input.runtimeImage ?? null, businessSession: input.businessSession ?? null,
+      developmentUsageStorage: input.developmentUsageStorage ?? null, developmentUsageProtection: input.developmentUsageProtection ?? null });
+    expect(developmentRequestHash(input)).toBe(legacy); expect(developmentRequestHash({ ...input, developmentRemovalProtection: { version: 1 } })).not.toBe(legacy);
+    const admitted = await f.runtime.api.createNativeExecution(input); expect((await f.load(admitted.id)).render).not.toHaveProperty('developmentRemovalProtection');
+    await expect(f.runtime.api.createNativeExecution({ ...input, developmentRemovalProtection: { version: 1 } })).rejects.toMatchObject({ kind: 'conflict' });
+  });
+  for (const mode of ['ledger', 'native'] as const) {
+    test(mode + ': first receipt selection reaches the original Resources registration and actual Controller Secret UID', async () => {
+      f = await developmentWorkloadFixture(mode); const input = { ...f.request(), developmentRemovalProtection: { version: 1 as const } };
+      const admitted = await f.runtime.api.createNativeExecution(input), original = await f.load(admitted.id);
+      expect(original.render?.developmentRemovalProtection).toEqual({ version: 1 });
+      expect((await f.resources.api.get(original.id))?.spec['pod']).toMatchObject({ developmentRemovalProtection: { version: 1 } });
+      if (mode === 'native') await f.runNative();
+      const activated = f.receipt('activation'), control = f.controller(); control.observer.start(); await activated; await control.reconciled();
+      const actual = (await f.k8s.get(Resources.Secret!, original.podName + '-admission', original.namespace))!;
+      expect((await f.safety.get(original.render!.workloadConsumerId!))?.developmentAdmission?.secretUid).toBe(actual.metadata.uid);
+      await expect(f.runtime.api.createNativeExecution({ ...input, developmentRemovalProtection: undefined })).rejects.toMatchObject({ kind: 'conflict' });
+    }, 15_000);
+  }
+  test('unsupported or incomplete receipt choice rejects before admission and native preparation waits if the original selected state is missing', async () => {
+    f = await developmentWorkloadFixture('native'); const input = { ...f.request(), developmentRemovalProtection: { version: 1 as const } };
+    for (const patch of [{ developmentUsageProtection: undefined }, { developmentUsageStorage: undefined }, { purpose: 'cli' as const }, { terminalId: crypto.randomUUID() },
+      { developmentRemovalProtection: { version: 2 } as unknown as { version: 1 } }, { developmentRemovalProtection: { version: 1 as const, extra: true } }]) {
+      await expect(f.runtime.api.createNativeExecution({ ...input, ...patch })).rejects.toThrow(); expect(await f.resources.api.occupancy(f.parent.projectId)).toBe(1);
+    }
+    const registered = f.safety.register;
+    f.safety.register = async (consumer) => ({ ...await registered(consumer), developmentAdmission: undefined });
+    const admitted = await f.runtime.api.createNativeExecution(input); await f.runNative();
+    expect((await f.load(admitted.id)).native?.state).toBe('queued'); expect(f.calls.some((call) => call === 'materials' || call.startsWith('create:'))).toBe(false);
+    expect(await f.resources.api.occupancy(f.parent.projectId)).toBe(2);
+  });
   for (const mode of ['ledger', 'native'] as const) {
     test(mode + ': original admission projects protection and only the public controller activates the bound UID', async () => {
       f = await developmentWorkloadFixture(mode);

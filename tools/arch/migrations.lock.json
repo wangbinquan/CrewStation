@@ -159,6 +159,7 @@
     "modules/resources/adapters/persistence/migrations/0005_project_pod_stop_receipts.sql": "92d2139194093d8c3906ae85bc968358f16cab1b68f9638de2e22ded940406ee",
     "modules/resources/adapters/persistence/migrations/0006_project_volume_reclaim_receipts.sql": "d7dc552c5ae91a6bf2d1c817c3db1562c1c0fa20c240cb14f2db24ad1fe45bae",
     "modules/resources/adapters/persistence/migrations/0007_project_admission_lock_holder.sql": "5d241200cc7e4ebc625587c13a56f6525f9d7742168996cbb7e84571e42f260c",
+    "modules/resources/adapters/persistence/migrations/0008_development_admission_receipts.sql": "ad698a506da4cbe6cdcbc1c3172f3aa7d2c17116c663c7be4998c065e6c5ae82",
     "modules/runtime-environment/adapters/persistence/migrations/0001_create_schema.sql": "94397e8eb7c7bf75aa48673ba31173f63c58cad6e86c157f39bc10219a6274c8",
     "modules/runtime-environment/adapters/persistence/migrations/0002_runtime_images.sql": "a28fa25dcc2266e723b7a264cfb3fd1a993e2aecfed4eb4d6d8e72960e830150",
     "modules/runtime-environment/adapters/persistence/migrations/0003_creation_requests.sql": "85e9ebd5342c5f252bfc6cece2dacf2e9d78f1b382859841c087421610f020ef",

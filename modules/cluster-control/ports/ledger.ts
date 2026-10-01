@@ -1,6 +1,6 @@
 import type { ResourceChild } from '@crewstation/contracts';
 import type { TaskVolumeSafetyState, TaskVolumeTarget, TaskVolumeReclaimProof } from '@crewstation/contracts';
-import type { WorkloadAdmissionIdentity, WorkloadConsumer, WorkloadStartPermit, WorkloadStopProof } from '@crewstation/contracts';
+import type { WorkloadAdmissionIdentity, WorkloadConsumer, WorkloadStartPermit, WorkloadStopProof, DevelopmentAdmissionReceipt, DevelopmentAdmissionState } from '@crewstation/contracts';
 import type { LegacyTask } from '../domain/adoption';
 import type { ObservedCondition } from '../domain/observation';
 
@@ -35,11 +35,12 @@ export interface LedgerObservations {
   readonly workloadSafety?: {
     closeAdmission?(identity: WorkloadAdmissionIdentity): Promise<void>;
     admissionClosed?(id: string): Promise<boolean>;
-    get(id: string): Promise<{ consumer: WorkloadConsumer; admissionClosed: boolean; startPermit: WorkloadStartPermit | null; stopProof: WorkloadStopProof | null } | undefined>;
-    register?(consumer: WorkloadConsumer): Promise<{ consumer: WorkloadConsumer; admissionClosed: boolean }>;
+    get(id: string): Promise<{ consumer: WorkloadConsumer; admissionClosed: boolean; startPermit: WorkloadStartPermit | null; stopProof: WorkloadStopProof | null; developmentAdmission?: DevelopmentAdmissionState } | undefined>;
+    register?(consumer: WorkloadConsumer): Promise<{ consumer: WorkloadConsumer; admissionClosed: boolean; developmentAdmission?: DevelopmentAdmissionState }>;
     grantStart?(id: string, permit: Omit<WorkloadStartPermit, 'grantedAt'>): Promise<unknown>;
-    closeConsumer(id: string): Promise<{ consumer: WorkloadConsumer; admissionClosed: boolean; startPermit: WorkloadStartPermit | null; stopProof: WorkloadStopProof | null }>;
+    closeConsumer(id: string): Promise<{ consumer: WorkloadConsumer; admissionClosed: boolean; startPermit: WorkloadStartPermit | null; stopProof: WorkloadStopProof | null; developmentAdmission?: DevelopmentAdmissionState }>;
     recordStop(proof: WorkloadStopProof): Promise<WorkloadStopProof>;
+    bindDevelopmentAdmission?(receipt: DevelopmentAdmissionReceipt): Promise<{ consumer: WorkloadConsumer; admissionClosed: boolean; startPermit: WorkloadStartPermit | null; stopProof: WorkloadStopProof | null; developmentAdmission?: DevelopmentAdmissionState }>;
   };
   get(id: string): Promise<LedgerRecordView | undefined>;
   /** 在册的记录（不含已结束的）：调和器启动与定期全量核对时逐条排进队列。 */

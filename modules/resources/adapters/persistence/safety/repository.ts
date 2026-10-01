@@ -9,10 +9,11 @@ import { admissionClosures, consumers, storageFences, stopProofs } from './table
 import { workloadAdmissionClosures } from './admissionClosures';
 import { workloadStopBarrier } from './stopBarrier';
 import { needsDevelopmentOwnerCheck } from './development';
+import { bindDevelopmentAdmission, developmentAdmissionSelection } from './developmentAdmission';
 
 async function state(tx: Executor, row: typeof consumers.$inferSelect): Promise<WorkloadConsumerState> {
   const proof = (await tx.select().from(stopProofs).where(eq(stopProofs.consumerId, row.id)))[0];
-  return { consumer: row.consumer, admissionClosed: row.admissionClosed, startPermit: row.startPermit, stopProof: proof?.record ?? null };
+  return { consumer: row.consumer, admissionClosed: row.admissionClosed, startPermit: row.startPermit, stopProof: proof?.record ?? null, ...(row.developmentAdmission ? { developmentAdmission: row.developmentAdmission } : {}) };
 }
 export function workloadSafetyRepository(db: Database): WorkloadSafety {
   const mutate = <T>(id: string, run: (tx: Executor, row: typeof consumers.$inferSelect) => Promise<T>) => db.transaction(async (tx) => {
@@ -25,7 +26,7 @@ export function workloadSafetyRepository(db: Database): WorkloadSafety {
     list: async (taskId, after) => {
       const rows = await db.select({ consumer: consumers, proof: stopProofs.record }).from(consumers).leftJoin(stopProofs, eq(stopProofs.consumerId, consumers.id))
         .where(and(eq(consumers.taskId, taskId), after ? gt(consumers.id, after) : undefined)).orderBy(asc(consumers.id)).limit(101);
-      return { items: rows.slice(0, 100).map(({ consumer: row, proof }) => ({ consumer: row.consumer, admissionClosed: row.admissionClosed, startPermit: row.startPermit, stopProof: proof })), next: rows.length > 100 ? rows[99]!.consumer.id : null };
+      return { items: rows.slice(0, 100).map(({ consumer: row, proof }) => ({ consumer: row.consumer, admissionClosed: row.admissionClosed, startPermit: row.startPermit, stopProof: proof, ...(row.developmentAdmission ? { developmentAdmission: row.developmentAdmission } : {}) })), next: rows.length > 100 ? rows[99]!.consumer.id : null };
     },
     register: (raw) => db.transaction(async (tx) => {
       const consumer = WorkloadConsumerSchema.parse(raw); await lockStorageTask(tx, consumer.taskId);
@@ -40,8 +41,9 @@ export function workloadSafetyRepository(db: Database): WorkloadSafety {
       }
       if ((await tx.select().from(admissionClosures).where(eq(admissionClosures.id, consumer.id))).length) throw precondition('此消费者启动准入已封存', { code: 'workload_admission_closed' });
       await assertConsumerOwner(tx, consumer); await assertTaskAllowsConsumer(tx, consumer);
+      const developmentAdmission = await developmentAdmissionSelection(tx, consumer);
       await tx.insert(storageFences).values({ taskId: consumer.taskId }).onConflictDoNothing();
-      const row = (await tx.insert(consumers).values({ id: consumer.id, taskId: consumer.taskId, resourceId: consumer.resourceId, namespace: consumer.namespace, podName: consumer.podName, consumer }).onConflictDoNothing().returning())[0];
+      const row = (await tx.insert(consumers).values({ id: consumer.id, taskId: consumer.taskId, resourceId: consumer.resourceId, namespace: consumer.namespace, podName: consumer.podName, consumer, developmentAdmission: developmentAdmission ?? null }).onConflictDoNothing().returning())[0];
       if (!row) throw conflict('消费者 Pod 名称或身份已经占用');
       return state(tx, row);
     }),
@@ -74,6 +76,7 @@ export function workloadSafetyRepository(db: Database): WorkloadSafety {
       const startPermit = WorkloadStartPermitSchema.parse({ ...input, grantedAt: new Date(at).toISOString() });
       await tx.update(consumers).set({ startPermit }).where(eq(consumers.id, id)); return state(tx, { ...row, startPermit });
     }),
+    bindDevelopmentAdmission: (receipt) => mutate(receipt.consumer.id, async (tx, row) => state(tx, await bindDevelopmentAdmission(tx, row, receipt))),
     recordStop: (raw) => {
       const proof = WorkloadStopProofSchema.parse(raw);
       return mutate(proof.consumer.id, async (tx, row) => {

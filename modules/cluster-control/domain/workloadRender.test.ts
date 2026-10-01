@@ -112,6 +112,9 @@ test('explicit protected development layouts keep their original agent consumer;
     expectedVolumeUid: pvcUid, developmentUsageStorage: { version: 1 }, developmentUsageProtection: { version: 1 },
     consumer: { id: '019f0000-0000-7000-8000-000000000007', taskId: parent, revision: 1, purpose: 'agent', finalization: null } };
   expect(workloadRenderOf(record, { children, pod: selected })?.pod).toMatchObject({ developmentUsageProtection: { version: 1 }, consumer: selected.consumer, expectedVolumeUid: pvcUid });
+  expect(workloadRenderOf(record, { children, pod: { ...selected, developmentRemovalProtection: { version: 1 } } })?.pod.developmentRemovalProtection).toEqual({ version: 1 });
+  expect(workloadRenderOf(record, { children, pod: selected })?.pod).not.toHaveProperty('developmentRemovalProtection');
+  for (const patch of [{ developmentRemovalProtection: null }, { developmentRemovalProtection: { version: 2 } }, { developmentRemovalProtection: { version: 1, extra: true } }, { developmentRemovalProtection: { version: 1 }, developmentUsageProtection: undefined }]) expect(workloadRenderOf(record, { children, pod: { ...selected, ...patch } })).toBeUndefined();
   for (const patch of [
     { developmentUsageProtection: undefined }, { developmentUsageProtection: null }, { developmentUsageProtection: { version: 2 } }, { developmentUsageProtection: { version: 1, extra: true } },
     { developmentUsageStorage: undefined }, { consumer: undefined }, { expectedVolumeUid: undefined }, { expectedVolumeUid: crypto.randomUUID() },

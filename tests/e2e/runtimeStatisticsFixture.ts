@@ -25,13 +25,15 @@ export async function installRuntimeStatisticsFixture(page: Page) {
 }
 
 export async function measureRuntimeOverview(page: Page) {
-  return page.eval<{ overflow: number; mainOverflow: number; gap: number; expectedGap: number; sectionGap: number; expectedSectionGap: number; bars: number; chartOverflow: number; tokenLabels: string[]; alignedRange: boolean; noExport: boolean }>(`(() => {
+  return page.eval<{ overflow: number; mainOverflow: number; gap: number; expectedGap: number; sectionGap: number; expectedSectionGap: number; bars: number; chartOverflow: number; tokenLabels: string[]; tokenBuckets: string[]; bucketPairsAligned: boolean; stackPercent: string[]; alignedRange: boolean; noExport: boolean }>(`(() => {
     const grid = document.querySelector('[data-runtime-metrics]'), cards = [...grid.children];
     const a = cards[0].getBoundingClientRect(), b = cards[1].getBoundingClientRect();
     const chart = document.querySelector('[data-runtime-statistics] [role="tabpanel"] [role="group"]');
     const rect = chart.getBoundingClientRect(), bars = [...chart.querySelectorAll('button')];
     const main = document.querySelector('main'), trend = chart.closest('section');
     const input = document.querySelector('input[type="datetime-local"]'), row = input.closest('label').parentElement, apply = row.querySelector('button');
+    const tokenRows = [...grid.querySelector('[data-token-buckets]').children], segments = [...bars[0].querySelectorAll('[data-token-bucket]')];
+    const bucketPairsAligned = tokenRows.every(row => {const a=row.querySelector('dt').getBoundingClientRect(), b=row.querySelector('dd').getBoundingClientRect();return Math.abs((a.top+a.height/2)-(b.top+b.height/2))<1 && b.left>=a.right});
     const alignedRange = getComputedStyle(row).alignItems === 'flex-end' && (innerWidth < 800 || Math.abs(input.getBoundingClientRect().bottom-apply.getBoundingClientRect().bottom)<1);
     return {overflow:document.documentElement.scrollWidth-innerWidth,mainOverflow:main.scrollWidth-main.clientWidth,
       gap:Math.abs(a.top-b.top)<1 ? b.left-a.right : b.top-a.bottom,
@@ -39,6 +41,6 @@ export async function measureRuntimeOverview(page: Page) {
       expectedSectionGap:parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cs-space-3')),
       expectedGap:parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cs-space-4')),
       bars:bars.length,chartOverflow:Math.max(0,...bars.map(bar=>bar.getBoundingClientRect().right-rect.left-chart.parentElement.scrollWidth)),
-      tokenLabels:bars.map(bar=>bar.firstElementChild.textContent),alignedRange,noExport:![...document.querySelectorAll('button')].some(b=>/CSV/.test(b.textContent))};
+      tokenLabels:bars.map(bar=>bar.firstElementChild.textContent),tokenBuckets:tokenRows.map(row=>row.querySelector('dd').textContent),bucketPairsAligned,stackPercent:segments.map(segment=>segment.style.height),alignedRange,noExport:![...document.querySelectorAll('button')].some(b=>/CSV/.test(b.textContent))};
   })()`);
 }

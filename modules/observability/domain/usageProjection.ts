@@ -190,7 +190,7 @@ export function qualifyNativeMetrics(metrics: RuntimeUsageMetrics, captures: rea
   if (complete && metrics.records === 0 && captures.every((capture) => capture.receivedSteps === 0 && capture.proof.emitted === 0 && capture.proof.steps === capture.proof.baselineSteps)) {
     const reasons = metrics.reasons.filter((reason) => reason !== 'usage-missing');
     return { ...metrics, observedExecutions: 1, reasons,
-      tokens: { ...metrics.tokens, hasKnown: true, complete: !metrics.partial, unknownBuckets: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } },
+      tokens: { ...metrics.tokens, hasKnown: true, hasKnownBuckets: { input: true, cacheRead: true, cacheWrite: true, output: true }, complete: !metrics.partial, unknownBuckets: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } },
       cost: { ...metrics.cost, amount: metrics.cost.visible ? '0' : null, complete: metrics.cost.visible && !metrics.partial } };
   }
   if (complete) return metrics;

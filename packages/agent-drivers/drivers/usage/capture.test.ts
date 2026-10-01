@@ -7,7 +7,7 @@ import { normalizeClaudeUsage } from './claude';
 import { normalizeOpencodeUsage } from './opencode';
 
 const at = Date.parse('2026-09-28T12:00:00Z');
-const step = (tokens: unknown = { input: 10, output: 3, cache: { read: 2, write: 0 } }) => ({ type: 'step_finish', sessionID: 'native', part: { id: 'part-one', sessionID: 'native', tokens } });
+const step = (tokens: unknown = { input: 10, output: 3, reasoning: 0, cache: { read: 2, write: 0 } }) => ({ type: 'step_finish', sessionID: 'native', part: { id: 'part-one', sessionID: 'native', tokens } });
 const final = (input = 10, id = 'result-one') => ({ type: 'result', uuid: id, session_id: 'native', usage: { input_tokens: input }, modelUsage: { actual: { inputTokens: input, outputTokens: 3, cacheReadInputTokens: 2, cacheCreationInputTokens: 0 } } });
 
 test('OpenCode records exact disjoint counters and actual-model absence without configured defaults', () => {
@@ -78,4 +78,31 @@ test('source schema rejects noncanonical buckets, amounts, and inconsistent nati
     { ...item, scope: { ...item.scope, ancestors: ['wrong'] } }]) {
     expect(RunnerUsageCaptureSchema.safeParse({ ...value, measurements: [candidate] }).success).toBe(false);
   }
+});
+
+// RFC-034 real GLM-5.2 task steps: native text output excludes reasoning.
+test('OpenCode includes native reasoning once and late updates retain one original record', () => {
+  const observer = createUsageObserver(normalizeOpencodeUsage, 'agent'), capture = observer.beginTurn();
+  const evidence = (reasoning: unknown) => opencode(JSON.stringify(step({ input: 9013, output: 53, reasoning, cache: { read: 0, write: 0 } })))!;
+  const first = capture(evidence(1), at)!;
+  expect(first.measurements[0]?.usage.output).toBe('54');
+  expect(capture(evidence(1), at + 1)).toBeUndefined();
+  observer.beginTurn();
+  const corrected = capture(evidence(7), at + 2)!;
+  expect(corrected.measurements[0]).toMatchObject({ recordId: first.measurements[0]!.recordId, usage: { output: '60' }, scope: first.measurements[0]!.scope });
+  expect(corrected.measurements[0]!.revision).toBeGreaterThan(first.measurements[0]!.revision);
+  for (const reasoning of [undefined, null, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, 'bad']) {
+    const value = createUsageObserver(normalizeOpencodeUsage, 'agent').beginTurn()(evidence(reasoning), at + 3)!;
+    expect(value.measurements[0]).toMatchObject({ usage: { output: null }, coverage: 'partial' });
+  }
+});
+test('all five real steps and exact large strings use the same canonical output bucket', () => {
+  const samples = [[53, 1, '54'], [81, 209, '290'], [77, 170, '247'], [55, 317, '372'], [63, 228, '291'],
+    ['9007199254740993', '2', '9007199254740995'], [3, 0, '3']] as const;
+  for (const [output, reasoning, expected] of samples) {
+    const result = createUsageObserver(normalizeOpencodeUsage, 'agent').beginTurn()(opencode(JSON.stringify(step({ input: 0, output, reasoning, cache: { read: 0, write: 0 } })))!, at)!;
+    expect(result.measurements[0]?.usage.output).toBe(expected);
+  }
+  const overflow = createUsageObserver(normalizeOpencodeUsage, 'agent').beginTurn()(opencode(JSON.stringify(step({ input: 0, output: '9'.repeat(60), reasoning: '9'.repeat(60), cache: { read: 0, write: 0 } })))!, at)!;
+  expect(overflow.measurements[0]?.usage.output).toBeNull();
 });

@@ -37,7 +37,7 @@ const ADMISSION: Record<ExecutionPurpose, { parentKind: TaskEnvironment['kind'];
 /** 受理只登记意图。配额、不可变执行身份与队列在同一项目事务中提交。 */
 export function createNativeExecutionUseCase(deps: NativeExecutionDeps) {
   return async (input: CreateNativeExecutionInput): Promise<TaskEnvironment> => {
-    if (input.developmentUsageProtection !== undefined) assertDevelopmentAdmission(deps, input);
+    if (input.developmentUsageProtection !== undefined || input.developmentRemovalProtection !== undefined) assertDevelopmentAdmission(deps, input);
     if (input.runtimeImage) {
       RuntimeImageExecutionSnapshotSchema.parse(input.runtimeImage);
       if (deps.creation !== 'ledger') throw precondition('运行镜像需要资源台账准入');
@@ -47,7 +47,7 @@ export function createNativeExecutionUseCase(deps: NativeExecutionDeps) {
     if (input.developmentUsageStorage !== undefined && (purpose !== 'agent' || !DevelopmentUsageStorageSchema.safeParse(input.developmentUsageStorage).success)) throw precondition('只有独立开发 Agent 可选择数值日志布局 v1');
     const original = await deps.uow.read.environments.getById(input.parentTaskId);
     if (!original) throw notFound(rule.parentLabel, input.parentTaskId);
-    if (input.developmentUsageProtection !== undefined) return createDevelopmentWorkload(deps, input, original, (env) => sameRequest(env, input), (parent, workspace, profile) => executionEnvironment(deps, input, parent, workspace, profile));
+    if (input.developmentUsageProtection !== undefined || input.developmentRemovalProtection !== undefined) return createDevelopmentWorkload(deps, input, original, (env) => sameRequest(env, input), (parent, workspace, profile) => executionEnvironment(deps, input, parent, workspace, profile));
     return deps.uow.run(async (scope) => {
       await scope.admissions.lock(original.projectId);
       const previous = await scope.environments.getById(input.id);
@@ -88,7 +88,7 @@ function executionEnvironment(deps: NativeExecutionDeps, input: CreateNativeExec
     traceId: parent.traceId, runnerTokenHash: hashRunnerToken(newRunnerToken()), connected: false, labels: parent.labels, ...(input.createdBy ? { createdBy: input.createdBy } : {}),
     native, message: `已受理，正在准备此${EXECUTION_NOUN[purpose]}的独立执行环境`, createdAt: now, updatedAt: now, lastActivityAt: now, startup: initialStartup(now),
     // 资源中心建出时的期望（I25 第二步，不含凭据）：镜像与资源取自受理时固定的档位；节点、父 Pod 与卷的 UID 在 native 里。
-    ...(deps.creation === 'ledger' || input.developmentUsageStorage ? { render: { ...(input.developmentUsageProtection ? { developmentUsageProtection: input.developmentUsageProtection, workloadConsumerId: newResourceId(), developmentUsageRequestHash: developmentRequestHash(input) } : {}), ...(input.developmentUsageStorage ? { developmentUsageStorage: input.developmentUsageStorage } : {}), ...storageStart(parent.render?.completionPolicy), ...(parent.kind === 'dev-session' && parent.render?.developmentObjectPlanId ? { developmentObjectPlanId: parent.render.developmentObjectPlanId } : {}), ...(input.runtimeImage ? { runtimeImage: input.runtimeImage } : {}), image: native.image, workerUid: parent.render?.businessStorage ? parent.render.workerUid : deps.settings.workerUid, resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, start: 1, ...(deps.creation === 'ledger' || input.developmentUsageProtection ? { execution: { workspacePod: parent.podName, ...(input.developmentUsageProtection && deps.creation !== 'ledger' ? { creator: 'native' as const } : {}) } } : {}), ...(parent.render?.businessStorage ? { businessStorage: { ...parent.render.businessStorage, ...(input.businessSession ? { session: input.businessSession } : {}) } } : {}) } } : {}) };
+    ...(deps.creation === 'ledger' || input.developmentUsageStorage ? { render: { ...(input.developmentUsageProtection ? { developmentUsageProtection: input.developmentUsageProtection, ...(input.developmentRemovalProtection !== undefined ? { developmentRemovalProtection: input.developmentRemovalProtection } : {}), workloadConsumerId: newResourceId(), developmentUsageRequestHash: developmentRequestHash(input) } : {}), ...(input.developmentUsageStorage ? { developmentUsageStorage: input.developmentUsageStorage } : {}), ...storageStart(parent.render?.completionPolicy), ...(parent.kind === 'dev-session' && parent.render?.developmentObjectPlanId ? { developmentObjectPlanId: parent.render.developmentObjectPlanId } : {}), ...(input.runtimeImage ? { runtimeImage: input.runtimeImage } : {}), image: native.image, workerUid: parent.render?.businessStorage ? parent.render.workerUid : deps.settings.workerUid, resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, start: 1, ...(deps.creation === 'ledger' || input.developmentUsageProtection ? { execution: { workspacePod: parent.podName, ...(input.developmentUsageProtection && deps.creation !== 'ledger' ? { creator: 'native' as const } : {}) } } : {}), ...(parent.render?.businessStorage ? { businessStorage: { ...parent.render.businessStorage, ...(input.businessSession ? { session: input.businessSession } : {}) } } : {}) } } : {}) };
 }
 
 /** 准备执行环境反复失败时给用户的话：只说这一个 Agent，不牵连其他 Agent、窗口与工作树。 */

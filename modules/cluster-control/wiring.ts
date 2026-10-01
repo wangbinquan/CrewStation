@@ -110,7 +110,7 @@ export function createClusterControlModule(deps: ClusterControlModuleDeps): Clus
     ...(deps.reconciler?.retryMs ? { retryMs: deps.reconciler.retryMs } : {}), ...(deps.explainer ? { explainer: deps.explainer } : {}), ...(deps.workloads ? { workloads: deps.workloads } : {}), ...(deps.archives ? { archives: deps.archives } : {}),
     ...(deps.slots ? { slots: deps.slots } : {}), ...(deps.jobs ? { jobs: deps.jobs } : {}),
   };
-  const reconciler = ledgerReconciler(deps.ledger, feed, (id, enqueue, signal) => reconcileRecord({ ...reconcileDeps, ...(signal ? { signal } : {}) }, id, enqueue), logger, { ...deps.reconciler, ...(deps.leases ? { leases: deps.leases } : {}) });
+  const reconciler = ledgerReconciler(deps.ledger, feed, (id, enqueue, signal) => reconcileRecord({ ...reconcileDeps, ...(signal ? { signal } : {}) }, id, enqueue), logger, { ...deps.reconciler, ...(cluster.pendingDevelopmentAdmissionReceipts ? { pendingRecordIds: () => [...new Set(cluster.pendingDevelopmentAdmissionReceipts!().map((receipt) => receipt.consumer.resourceId))] } : {}), ...(deps.leases ? { leases: deps.leases } : {}) });
   // Pod 先交给身份索引（来源 IP 认人，越早越好），再写台账观测；两边失败互不耽误。调和器渲染的对象一有变化就把认领它的记录排进去核对。
   const handle = async (change: ObjectChange) => {
     if (change.kind === 'Pod' && deps.pods) await deps.pods.changed(change.object, change.gone).catch((error: unknown) => logger.warn('pod identity sync failed', { name: change.object.metadata.name, error: String(error) }));

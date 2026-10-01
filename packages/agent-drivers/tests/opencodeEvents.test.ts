@@ -88,3 +88,10 @@ describe('OpenCode 会话不存在判定', () => {
     expect(detectOpencodeSessionNotFound('provider auth failed')).toBe(false);
   });
 });
+
+// RFC-034 real task regression: old token deltas include only native OpenCode reasoning.
+test('native reasoning is included in the legacy token delta without changing generic totals', () => {
+  expect(computeTokenDelta({ tokens: { input: 9013, output: 53, reasoning: 1 } })?.output).toBe(54);
+  expect(computeTokenDelta({ usage: { output_tokens: 54, reasoning: 1 } })?.output).toBe(54);
+  expect(computeTokenDelta({ usage: { output: null, output_tokens: 54, reasoning: 1 } })?.output).toBe(54);
+});

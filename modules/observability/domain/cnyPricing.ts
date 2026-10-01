@@ -87,6 +87,7 @@ export function runtimeUsageMetrics(observations: UsageObservation[], visible: b
   for (const bucket of TOKEN_BUCKETS) unknownBuckets[bucket] += missing + selection.conflicts;
   return { tokens: { ...tokens.known, total: tokens.totalKnown, unknownBuckets,
     hasKnown: selected.some((r) => TOKEN_BUCKETS.some((b) => r.contribution[b] !== null)),
+    hasKnownBuckets: { input: selected.some((r) => r.contribution.input !== null), cacheRead: selected.some((r) => r.contribution.cacheRead !== null), cacheWrite: selected.some((r) => r.contribution.cacheWrite !== null), output: selected.some((r) => r.contribution.output !== null) },
     complete: expected > 0 && !missing && !partial && !selection.incomplete && tokens.complete === selected.length && selected.length > 0 && selected.every((r) => r.record.projection.complete) },
     cost: { currency: 'CNY', visible, amount: visible && amounts.length ? sumCnyAmounts(amounts) : null,
       complete: visible && expected > 0 && !missing && !partial && !selection.incomplete && priced === selected.length && selected.length > 0 },
@@ -99,7 +100,13 @@ export function aggregateRuntimeMetrics(rows: RuntimeUsageMetrics[], partial = f
   for (const bucket of TOKEN_BUCKETS) { tokens[bucket] = rows.reduce((n, r) => n + BigInt(r.tokens[bucket]), 0n).toString(); unknownBuckets[bucket] = sum((r) => r.tokens.unknownBuckets[bucket]); }
   partial ||= rows.some((r) => r.partial); visible &&= rows.every((r) => r.cost.visible);
   const amounts = rows.flatMap((r) => r.cost.amount === null ? [] : [r.cost.amount]);
-  return { tokens: { ...tokens, unknownBuckets, total: TOKEN_BUCKETS.reduce((n, b) => n + BigInt(tokens[b]), 0n).toString(), hasKnown: rows.some((r) => r.tokens.hasKnown), complete: active.length > 0 && !partial && active.every((r) => r.tokens.complete) },
+  return { tokens: { ...tokens, unknownBuckets, total: TOKEN_BUCKETS.reduce((n, b) => n + BigInt(tokens[b]), 0n).toString(), hasKnown: rows.some((r) => r.tokens.hasKnown),
+    hasKnownBuckets: {
+      input: rows.some((r) => r.tokens.hasKnownBuckets?.input ?? (r.tokens.hasKnown && (r.tokens.complete || BigInt(r.tokens.input) > 0n))),
+      cacheRead: rows.some((r) => r.tokens.hasKnownBuckets?.cacheRead ?? (r.tokens.hasKnown && (r.tokens.complete || BigInt(r.tokens.cacheRead) > 0n))),
+      cacheWrite: rows.some((r) => r.tokens.hasKnownBuckets?.cacheWrite ?? (r.tokens.hasKnown && (r.tokens.complete || BigInt(r.tokens.cacheWrite) > 0n))),
+      output: rows.some((r) => r.tokens.hasKnownBuckets?.output ?? (r.tokens.hasKnown && (r.tokens.complete || BigInt(r.tokens.output) > 0n))),
+    }, complete: active.length > 0 && !partial && active.every((r) => r.tokens.complete) },
     cost: { currency: 'CNY', visible, amount: visible && amounts.length ? sumCnyAmounts(amounts) : null, complete: visible && active.length > 0 && !partial && active.every((r) => r.cost.complete) },
     executions: sum((r) => r.executions), observedExecutions: sum((r) => r.observedExecutions), records: sum((r) => r.records),
     reasons: [...new Set([...rows.flatMap((r) => r.reasons), ...(partial ? ['truncated'] : [])])], partial };

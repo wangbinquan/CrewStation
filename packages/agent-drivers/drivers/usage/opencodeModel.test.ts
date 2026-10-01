@@ -19,7 +19,7 @@ function seed(file: string, model = 'native-model') {
   db.close();
 }
 const raw = (input = 10) => ({ type: 'step_finish', sessionID: 'session', timestamp: 1000,
-  part: { id: 'step', sessionID: 'session', messageID: 'message', tokens: { input, output: 3, cache: { read: 2, write: 0 } } } });
+  part: { id: 'step', sessionID: 'session', messageID: 'message', tokens: { input, output: 3, reasoning: 0, cache: { read: 2, write: 0 } } } });
 const event = (input = 10) => parseEvent(JSON.stringify(raw(input)))!;
 
 test('uses the final child environment including explicit relative DB, without borrowing the parent HOME', () => {

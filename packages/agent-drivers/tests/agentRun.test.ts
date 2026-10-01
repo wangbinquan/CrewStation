@@ -283,7 +283,7 @@ async function waitFor(predicate: () => boolean, timeoutMs = 2000): Promise<void
 
 test('RFC-034 opt-in root captures travel with legacy usage events while unselected drivers stay unchanged', async () => {
   recordOpencodeBinaryVersion('/bin/opencode', '1.18.29');
-  const frame = JSON.stringify({ type: 'step_finish', sessionID: 'native-usage', part: { id: 'step-usage', tokens: { input: 9, output: 2, cache: { read: 3, write: 0 } } } });
+  const frame = JSON.stringify({ type: 'step_finish', sessionID: 'native-usage', part: { id: 'step-usage', tokens: { input: 9, output: 2, reasoning: 0, cache: { read: 3, write: 0 } } } });
   for (const enabled of [false, true]) {
     const host = createFakeProcessHost([{ stdout: [frame] }]);
     const events = await collect(createOpencodeDriver(() => '/bin/opencode').start(openSpec({ businessEvents: true, ...(enabled ? { usageObservationsV1: 1 as const } : {}) }), context(host)));
@@ -315,7 +315,7 @@ test('RFC-034 resident Claude retains tree identity and advances coverage withou
 
 test('RFC-034 native model retry precedes success or failure and never repeats legacy usage', async () => {
   recordOpencodeBinaryVersion('/bin/opencode', '1.18.29');
-  const frame = JSON.stringify({ type: 'step_finish', sessionID: 'native-usage', part: { id: 'step-usage', messageID: 'message-usage', sessionID: 'native-usage', tokens: { input: 9, output: 2, cache: { read: 3, write: 0 } } } });
+  const frame = JSON.stringify({ type: 'step_finish', sessionID: 'native-usage', part: { id: 'step-usage', messageID: 'message-usage', sessionID: 'native-usage', tokens: { input: 9, output: 2, reasoning: 0, cache: { read: 3, write: 0 } } } });
   for (const exitCode of [0, 1, 143]) {
     const host = createFakeProcessHost([{ stdout: [frame], exitCode, ...(exitCode === 143 ? { onFrame: () => [] } : {}) }]), ctx = context(host), file = join(ctx.runDir!, 'opencode.db');
     ctx.env.OPENCODE_DB = file;
@@ -344,7 +344,7 @@ test('RFC-034 native model retry precedes success or failure and never repeats l
 
 test('RFC-034 output-pump failure still emits the model revision before surfacing the original error', async () => {
   recordOpencodeBinaryVersion('/bin/opencode', '1.18.29');
-  const frame = JSON.stringify({ type: 'step_finish', sessionID: 'native', part: { id: 'step', messageID: 'message', sessionID: 'native', tokens: { input: 9, output: 2, cache: { read: 3, write: 0 } } } });
+  const frame = JSON.stringify({ type: 'step_finish', sessionID: 'native', part: { id: 'step', messageID: 'message', sessionID: 'native', tokens: { input: 9, output: 2, reasoning: 0, cache: { read: 3, write: 0 } } } });
   const host = createFakeProcessHost([{ stdout: [frame] }]), ctx = context(host), file = join(ctx.runDir!, 'native.db'); ctx.env.OPENCODE_DB = file;
   const original = host.pumpLines, failure = new Error('stdout read interrupted');
   host.pumpLines = (stream, onLine) => original(stream, (line) => {
@@ -367,14 +367,14 @@ test('RFC-034 output-pump failure still emits the model revision before surfacin
 // RFC-034: the actual one-shot driver persists pending before spawn and the subtree proof after final numbers.
 test('native child capture uses final process environment and shares root revisions before completion', async () => {
   recordOpencodeBinaryVersion('/bin/opencode', '1.18.29');
-  const frame = JSON.stringify({ type: 'step_finish', sessionID: 'root-native', part: { id: 'root-step', sessionID: 'root-native', messageID: 'root-message', tokens: { input: 9, output: 2, cache: { read: 3, write: 0 } } } });
+  const frame = JSON.stringify({ type: 'step_finish', sessionID: 'root-native', part: { id: 'root-step', sessionID: 'root-native', messageID: 'root-message', tokens: { input: 9, output: 2, reasoning: 0, cache: { read: 3, write: 0 } } } });
   const host = createFakeProcessHost([{ stdout: [frame] }]), ctx = context(host), file = join(tmpdir(), `cs-native-driver-${crypto.randomUUID()}.db`); roots.push(file); ctx.env.OPENCODE_DB = file;
   const db = new Database(file);
   db.exec('CREATE TABLE session(id TEXT PRIMARY KEY,parent_id TEXT); CREATE TABLE message(id TEXT PRIMARY KEY,session_id TEXT,data TEXT); CREATE TABLE part(id TEXT PRIMARY KEY,session_id TEXT,message_id TEXT,time_created INTEGER,data TEXT)');
   for (const [session, parent, id, input] of [['root-native', null, 'root', 9], ['child-native', 'root-native', 'child', 13]] as const) {
     db.query('INSERT INTO session VALUES (?,?)').run(session, parent);
     db.query('INSERT INTO message VALUES (?,?,?)').run(id + '-message', session, JSON.stringify({ role: 'assistant', providerID: 'actual-provider', modelID: 'actual-model' }));
-    db.query('INSERT INTO part VALUES (?,?,?,?,?)').run(id + '-step', session, id + '-message', Date.now(), JSON.stringify({ type: 'step-finish', tokens: { input, output: 2, cache: { read: 3, write: 0 } } }));
+    db.query('INSERT INTO part VALUES (?,?,?,?,?)').run(id + '-step', session, id + '-message', Date.now(), JSON.stringify({ type: 'step-finish', tokens: { input, output: 2, reasoning: 0, cache: { read: 3, write: 0 } } }));
   }
   const events = await collect(createOpencodeDriver(() => '/bin/opencode').start(openSpec({ businessEvents: true, usageObservationsV1: 1, nativeUsageTreeV1: 1, nativeUsageLineageKey: 'business-session' }), ctx)); db.close();
   const captures = events.flatMap((event) => event.usageCapture ? [event.usageCapture] : []);
@@ -388,7 +388,7 @@ test('native child capture uses final process environment and shares root revisi
 
 test('unavailable native store preserves business completion with a partial proof', async () => {
   recordOpencodeBinaryVersion('/bin/opencode', '1.18.29');
-  const frame = JSON.stringify({ type: 'step_finish', sessionID: 'root', part: { id: 'step', tokens: { input: 9, output: 2, cache: { read: 3, write: 0 } } } });
+  const frame = JSON.stringify({ type: 'step_finish', sessionID: 'root', part: { id: 'step', tokens: { input: 9, output: 2, reasoning: 0, cache: { read: 3, write: 0 } } } });
   const host = createFakeProcessHost([{ stdout: [frame] }]), ctx = context(host); ctx.env.OPENCODE_DB = ':memory:';
   const events = await collect(createOpencodeDriver(() => '/bin/opencode').start(openSpec({ businessEvents: true, usageObservationsV1: 1, nativeUsageTreeV1: 1, nativeUsageLineageKey: 'lineage' }), ctx));
   // RFC-034: absent native storage also has no persisted snapshot order; business completion is unchanged.

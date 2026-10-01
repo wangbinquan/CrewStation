@@ -126,3 +126,16 @@ test.skipIf(!available)('actual projection -> PG claim -> public controller keep
     expect(f.control.stats().removed).toBe(1);
   } finally { if (timer) clearTimeout(timer); await f.control.observer.stop(); await f.database.drop(); }
 }, 20_000);
+
+// The new receipt selector rides the original projection spread; absence keeps the legacy object shape.
+test('new receipt choice survives both original render paths and cannot stand alone or silently downgrade', () => {
+  for (const ledger of [true, false]) {
+    const env = environment(true, ledger), selected = { ...env, render: { ...env.render, ...(!ledger ? { execution: { workspacePod: 'original-parent', creator: 'native' as const } } : {}), developmentRemovalProtection: { version: 1 as const } } };
+    expect(projectEnvironment(selected).workload.render?.pod).toMatchObject({ developmentRemovalProtection: { version: 1 } });
+    expect(projectEnvironment(env).workload.render?.pod ?? {}).not.toHaveProperty('developmentRemovalProtection');
+    for (const patch of [{ developmentUsageProtection: undefined }, { developmentRemovalProtection: null }, { developmentRemovalProtection: { version: 2 } }, { developmentRemovalProtection: { version: 1, extra: true } }]) {
+      const broken = { ...selected, render: { ...selected.render, ...patch } } as unknown as TaskEnvironment;
+      expect(() => projectEnvironment(broken)).toThrow();
+    }
+  }
+});

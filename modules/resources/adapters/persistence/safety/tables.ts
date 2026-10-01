@@ -1,5 +1,5 @@
 import { boolean, index, integer, primaryKey, text, uniqueIndex } from 'drizzle-orm/pg-core';
-import type { WorkloadAdmissionIdentity, WorkloadConsumer, WorkloadStartPermit, WorkloadStopProof } from '@crewstation/contracts';
+import type { WorkloadAdmissionIdentity, WorkloadConsumer, WorkloadStartPermit, WorkloadStopProof, DevelopmentAdmissionState } from '@crewstation/contracts';
 import { jsonDocument } from '@crewstation/persistence';
 import { resourcesSchema } from '../schema';
 
@@ -16,6 +16,7 @@ export const consumers = resourcesSchema.table('workload_consumers', {
   id: text('id').primaryKey(), taskId: text('task_id').notNull(), resourceId: text('resource_id').notNull(), namespace: text('namespace').notNull(), podName: text('pod_name').notNull(),
   consumer: jsonDocument('consumer').$type<WorkloadConsumer>().notNull(), admissionClosed: boolean('admission_closed').notNull().default(false),
   startPermit: jsonDocument('start_permit').$type<WorkloadStartPermit>(),
+  developmentAdmission: jsonDocument('development_admission').$type<DevelopmentAdmissionState>(),
 }, (t) => [uniqueIndex('workload_consumers_namespace_pod_name_key').on(t.namespace, t.podName), index('workload_consumers_task').on(t.taskId, t.id)]);
 export const stopProofs = resourcesSchema.table('workload_stop_proofs', {
   consumerId: text('consumer_id').primaryKey().references(() => consumers.id), record: jsonDocument('record').$type<WorkloadStopProof>().notNull(),

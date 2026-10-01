@@ -56,6 +56,7 @@ export interface WorkloadRender {
   readonly developmentUsageStorage?: DevelopmentUsageStorage;
   /** Explicit new protection selection; a missing field never upgrades an old environment. */
   readonly developmentUsageProtection?: { readonly version: 1 };
+  readonly developmentRemovalProtection?: { readonly version: 1 };
   readonly developmentUsageRequestHash?: string;
   readonly objectInputsGeneration?: number;
   readonly storageFinalization?: { readonly operationId: string; readonly revision: number; readonly volumeUid: string | null; readonly computeStopped?: true };

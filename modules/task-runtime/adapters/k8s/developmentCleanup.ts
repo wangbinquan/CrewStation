@@ -1,3 +1,4 @@
+import { WorkloadStartPermitSchema } from '@crewstation/contracts';
 import type { K8sClient, K8sObject } from '@crewstation/k8s';
 import { k8sObjectCovers, LABELS, Resources } from '@crewstation/k8s';
 import { precondition } from '@crewstation/kernel';
@@ -17,11 +18,12 @@ const runnerName = (env: TaskEnvironment) => env.podName + '-runner';
 function value(secret: Secret, key: string): string | undefined {
   return secret.stringData?.[key] ?? (secret.data?.[key] ? Buffer.from(secret.data[key]!, 'base64').toString('utf8') : undefined);
 }
-function originalSecret(secret: Secret, env: TaskEnvironment, stop: DevelopmentPhysicalStopEvidence, admission: boolean): string {
+function originalSecret(secret: Secret, env: TaskEnvironment, stop: DevelopmentPhysicalStopEvidence, admission: boolean, historicalUid?: string): string {
   const uid = secret.metadata.uid;
   if (!uid || !secret.immutable || secret.metadata.namespace !== env.namespace || secret.metadata.name !== (admission ? env.podName + '-admission' : runnerName(env))
     || secret.metadata.labels?.[LABELS.task] !== env.id) throw precondition('原开发凭据的不可变归属已变化');
   if (admission) {
+    if (env.render?.developmentRemovalProtection !== undefined && (!historicalUid || uid !== historicalUid || uid !== stop.admissionSecretUid)) throw precondition('同名准入 Secret 不是持久的原历史 UID');
     const fields = { podUid: stop.startPermit.podUid, nodeUid: stop.startPermit.nodeUid, consumerId: stop.consumer.id, volumeUid: stop.consumer.volumeUid };
     if (Object.entries(fields).some(([key, expected]) => value(secret, key) !== expected)) throw precondition('开发准入凭据不是原工作卷许可');
   } else {
@@ -61,11 +63,19 @@ export async function cleanupDevelopmentExecution(k8s: K8sClient, env: TaskEnvir
   const selection = developmentCleanupSelection(env);
   if (!selection) throw precondition('原开发清理选择尚未固定');
   requireDevelopmentCleanupEvidence(env.native!.developmentCleanup, selection);
+  const selected = env.render?.developmentRemovalProtection !== undefined;
+  if (selected && !guard.admissionSecretUid) throw precondition('原准入 Secret 回执读取能力未装配');
   await guard.current();
+  const historicalUid = selected ? await guard.admissionSecretUid!() : undefined;
+  if (selected && !WorkloadStartPermitSchema.shape.podUid.safeParse(historicalUid).success) throw precondition('原准入 Secret 历史 UID 尚未取得');
+  const current = async () => {
+    await guard.current();
+    if (selected && await guard.admissionSecretUid!() !== historicalUid) throw precondition('原准入 Secret 历史 UID 已冲突');
+  };
   const pod = await k8s.get(Resources.Pod!, env.podName, env.namespace, AbortSignal.timeout(15_000));
   if (pod) {
     if (pod.metadata.uid !== env.native!.podUid) throw precondition('同名开发 Pod 已被替换');
-    admittedSpec(pod, env); await guard.current();
+    admittedSpec(pod, env); await current();
     await k8s.delete(Resources.Pod!, env.podName, env.namespace, { gracePeriodSeconds: 30, preconditions: { uid: env.native!.podUid } });
     if (await k8s.get(Resources.Pod!, env.podName, env.namespace, AbortSignal.timeout(15_000))) throw precondition('等待原开发 Pod 与 Controller 停止 finalizer 完成');
   }
@@ -74,7 +84,7 @@ export async function cleanupDevelopmentExecution(k8s: K8sClient, env: TaskEnvir
     const name = admission ? env.podName + '-admission' : runnerName(env);
     const secret = await k8s.get<Secret>(Resources.Secret!, name, env.namespace, AbortSignal.timeout(15_000));
     if (!secret) continue;
-    const uid = originalSecret(secret, env, stopped, admission); await guard.current();
+    const uid = originalSecret(secret, env, stopped, admission, historicalUid); await current();
     await k8s.delete(Resources.Secret!, name, env.namespace, { preconditions: { uid } });
     if (await k8s.get(Resources.Secret!, name, env.namespace, AbortSignal.timeout(15_000))) throw precondition('等待原开发凭据回收确认');
   }

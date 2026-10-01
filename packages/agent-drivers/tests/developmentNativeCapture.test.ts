@@ -26,10 +26,10 @@ function seed(path: string, input = 10, model = 'actual-model') {
   db.exec('CREATE TABLE session(id TEXT PRIMARY KEY,parent_id TEXT); CREATE TABLE message(id TEXT PRIMARY KEY,session_id TEXT,data TEXT); CREATE TABLE part(id TEXT PRIMARY KEY,session_id TEXT,message_id TEXT,time_created INTEGER,data TEXT)');
   db.query('INSERT INTO session VALUES(?,?)').run('root', null);
   db.query('INSERT INTO message VALUES(?,?,?)').run('message', 'root', JSON.stringify({ role: 'assistant', providerID: 'actual-provider', modelID: model }));
-  db.query('INSERT INTO part VALUES(?,?,?,?,?)').run('step', 'root', 'message', at, JSON.stringify({ type: 'step-finish', tokens: { input, output: 3, cache: { read: 2, write: 0 } } })); db.close();
+  db.query('INSERT INTO part VALUES(?,?,?,?,?)').run('step', 'root', 'message', at, JSON.stringify({ type: 'step-finish', tokens: { input, output: 3, reasoning: 0, cache: { read: 2, write: 0 } } })); db.close();
 }
 function capture(path: string, resumeSessionId?: string) { let revision = 0; return createDevelopmentNativeUsageCapture({ lineageKey: 'expected-namespace', turn: 'turn', turnIndex: 0, resumeSessionId, nextRevision: () => ++revision }, { OPENCODE_DB: path }); }
-const raw = JSON.stringify({ type: 'step_finish', sessionID: 'root', timestamp: at, part: { id: 'step', sessionID: 'root', messageID: 'message', tokens: { input: 10, output: 3, cache: { read: 2, write: 0 } } } });
+const raw = JSON.stringify({ type: 'step_finish', sessionID: 'root', timestamp: at, part: { id: 'step', sessionID: 'root', messageID: 'message', tokens: { input: 10, output: 3, reasoning: 0, cache: { read: 2, write: 0 } } } });
 const spec: DriverAgentSpec = { agentId: 'source-agent', compute: 'named compute', profileRevision: 1, launch: { protocol: 'opencode', binaryPath: '/bin/opencode', extraArgs: [], isSandbox: false }, permission: 'full', mode: 'oneshot', initialPrompt: 'private-prompt', mcp: [], usageObservationsV1: 1, nativeUsageTreeV1: 1, nativeUsageLineageKey: 'expected-namespace', developmentNativeSourceV1: 1 };
 async function collect(events: AsyncIterable<AgentEvent>) { const result: AgentEvent[] = []; for await (const event of events) result.push(event); return result; }
 
@@ -47,7 +47,7 @@ test('a fresh pending source creates no upstream DB and only actual final creati
 test('healthy resume keeps store identity and ordering while historical revisions remain separately attributable', () => {
   const path = file(); seed(path); const c = capture(path, 'root'), begin = c.begin(at);
   expect(c.includesRecord('root', 'step')).toBe(false);
-  const db = new Database(path); db.query('UPDATE part SET data=?').run(JSON.stringify({ type: 'step-finish', tokens: { input: 15, output: 3, cache: { read: 2, write: 0 } } })); db.close();
+  const db = new Database(path); db.query('UPDATE part SET data=?').run(JSON.stringify({ type: 'step-finish', tokens: { input: 15, output: 3, reasoning: 0, cache: { read: 2, write: 0 } } })); db.close();
   const frames = c.finish('root', at + 1), end = frames.at(-1)!;
   expect(end.nativeSource?.finalStore).toEqual(begin.nativeSource?.beginStore); expect(end.nativeSource?.continuity).toBe('same');
   expect(end.nativeProof).toMatchObject({ state: 'partial', priorRevisionGap: true });

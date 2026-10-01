@@ -24,7 +24,7 @@ function store() {
   };
   return { db, path, session, part };
 }
-const numeric = (input: number | string = 10) => ({ type: 'step-finish', tokens: { input, output: 3, cache: { read: 2, write: 0 } } });
+const numeric = (input: number | string = 10, reasoning: unknown = 0) => ({ type: 'step-finish', tokens: { input, output: 3, reasoning, cache: { read: 2, write: 0 } } });
 function step(id: string, input = '10'): NativeUsageStep {
   return { id, sessionId: 'root', parentSessionId: null, ancestors: [], occurredAt: new Date(at).toISOString(),
     usage: { input, output: '3', cacheRead: '2', cacheWrite: '0' }, actualModel: { provider: 'p', model: 'm', condition: null } };
@@ -58,7 +58,7 @@ test('bounded scans and unfinished steps never produce a complete fingerprint', 
 });
 
 test('missing model, time and buckets stay unknown without making an unusable baseline', () => {
-  const s = store(); s.session('root'); s.part('step', 'root', { type: 'step-finish', tokens: { input: -1, output: 0 } }, -1);
+  const s = store(); s.session('root'); s.part('step', 'root', { type: 'step-finish', tokens: { input: -1, output: 0, reasoning: 0 } }, -1);
   s.db.exec('DELETE FROM message');
   const value = readNativeUsageSnapshot(s.path, 'root');
   expect(value.fingerprint).toBeString(); expect(value.issues.sort()).toEqual(['native-model-unavailable', 'native-time-unavailable', 'native-token-bucket-unknown']);
@@ -178,4 +178,16 @@ test('resume preserves native order evidence and an epoch reset cannot certify c
   expect(NativeUsageProofSchema.safeParse({ ...valid, order: { epoch: 'epoch', sequence: 1 } }).success).toBe(false);
   expect(NativeUsageProofSchema.safeParse({ ...valid, order: undefined }).success).toBe(false);
   expect(NativeUsageProofSchema.safeParse({ ...valid, order: undefined, baseline: { kind: 'resume', fingerprint: 'fingerprint' } }).success).toBe(true);
+});
+
+// RFC-034: native final evidence must agree with stdout, including child sessions.
+test('native roots and children merge reasoning exactly and keep missing reasoning unknown', () => {
+  const s = store(); s.session('root'); s.session('child', 'root');
+  s.part('root-step', 'root', numeric(10, 1)); s.part('child-step', 'child', numeric(10, '9007199254740993'));
+  const value = readNativeUsageSnapshot(s.path, 'root');
+  expect(value.steps.map((row) => row.usage.output)).toEqual(['4', '9007199254740996']);
+  s.part('unknown', 'child', numeric(10, null));
+  const partial = readNativeUsageSnapshot(s.path, 'root');
+  expect(partial.steps.find((row) => row.id === 'unknown')?.usage.output).toBeNull(); expect(partial.issues).toContain('native-token-bucket-unknown');
+  s.db.close();
 });

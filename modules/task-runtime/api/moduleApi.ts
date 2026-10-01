@@ -88,6 +88,7 @@ export interface CreateNativeExecutionInput {
   developmentUsageStorage?: DevelopmentUsageStorage;
   /** Explicit private opt-in; no production caller until the complete digital cleanup barrier is ready. */
   developmentUsageProtection?: { readonly version: 1 };
+  developmentRemovalProtection?: { readonly version: 1 };
   businessSession?: BusinessSessionStorage;
   runtimeImage?: RuntimeImageExecutionSnapshot;
   id: TaskId;

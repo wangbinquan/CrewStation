@@ -1,5 +1,5 @@
 import type { BusinessStorage, DevelopmentUsageStorage, WorkloadConsumerIntent } from '@crewstation/contracts';
-import { BusinessStorageSchema, DevelopmentUsageStorageSchema, TaskIdSchema, WorkloadConsumerIntentSchema, WorkloadConsumerSchema, WorkloadStartPermitSchema } from '@crewstation/contracts';
+import { BusinessStorageSchema, DevelopmentRemovalProtectionSchema, DevelopmentUsageStorageSchema, TaskIdSchema, WorkloadConsumerIntentSchema, WorkloadConsumerSchema, WorkloadStartPermitSchema } from '@crewstation/contracts';
 
 /**
  * 工作区记录（开发会话、业务任务，RFC-025 I25）里调和器建出容器要用的期望，task-runtime 写、不含凭据：
@@ -9,6 +9,7 @@ import { BusinessStorageSchema, DevelopmentUsageStorageSchema, TaskIdSchema, Wor
 export interface WorkloadPodRender {
   readonly developmentUsageStorage?: DevelopmentUsageStorage;
   readonly developmentUsageProtection?: { readonly version: 1 };
+  readonly developmentRemovalProtection?: { readonly version: 1 };
   readonly archive?: { readonly ownerTaskId: string; readonly bindOnly?: boolean };
   readonly consumer?: WorkloadConsumerIntent;
   /** Filled only after durable consumer registration against the observed original PVC. */
@@ -110,6 +111,8 @@ function podOf(recordId: string, pod: unknown, child: { readonly namespace?: str
   const consumer = pod['consumer'] === undefined ? undefined : WorkloadConsumerIntentSchema.safeParse(pod['consumer']);
   const archive = pod['archive'];
   const protection = pod['developmentUsageProtection'] === undefined ? undefined : DevelopmentUsageStorageSchema.safeParse(pod['developmentUsageProtection']);
+  const removal = pod['developmentRemovalProtection'] === undefined ? undefined : DevelopmentRemovalProtectionSchema.safeParse(pod['developmentRemovalProtection']);
+  if (removal && (!removal.success || !protection?.success)) return undefined;
   const developmentUsage = pod['developmentUsageStorage'] === undefined ? undefined : DevelopmentUsageStorageSchema.safeParse(pod['developmentUsageStorage']);
   if (developmentUsage && (!developmentUsage.success || pod['workload'] !== 'dev-session' || !extras?.workspace || !text(pod['pvc']) || businessStorage || checkout || archive || !protection && consumer)) return undefined;
   if (protection && (!protection.success || !developmentUsage?.success || !consumer?.success || consumer.data.purpose !== 'agent' || consumer.data.finalization !== null
@@ -129,6 +132,7 @@ function podOf(recordId: string, pod: unknown, child: { readonly namespace?: str
     ...(consumer?.success ? { consumer: consumer.data } : {}),
     ...(developmentUsage?.success ? { developmentUsageStorage: developmentUsage.data } : {}),
     ...(protection?.success ? { developmentUsageProtection: protection.data } : {}),
+    ...(removal?.success ? { developmentRemovalProtection: removal.data } : {}),
     ...(text(pod['expectedVolumeUid']) ? { expectedVolumeUid: pod['expectedVolumeUid'] } : {}),
     ...(pod['runtimeInitialization'] === true ? { runtimeInitialization: true as const } : {}),
     name: child.name, namespace: child.namespace, taskId: recordId, image: pod['image'] as string, workerUid: pod['workerUid'],

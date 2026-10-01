@@ -16,7 +16,7 @@ const equivalent = (before: NativeUsageStep, after: NativeUsageStep) => jsonHash
 function measurement(input: NativeCaptureInput, step: NativeUsageStep, root: string, at: number): RunnerUsageMeasurement {
   return { recordId: `opencode:step:${jsonHash({ session: step.sessionId, id: step.id })}`, revision: input.nextRevision(),
     observedAt: new Date(at).toISOString(), occurredAt: step.occurredAt, actualModel: step.actualModel,
-    adapterVersion: 'opencode-native-child/cs@1', reporting: 'delta', inclusion: 'self',
+    adapterVersion: 'opencode-native-child/1.15.5-1.18.31/cs@2', reporting: 'delta', inclusion: 'self',
     scope: { root, session: step.sessionId, parentSession: step.parentSessionId, ancestors: step.ancestors, turn: input.turn, turnIndex: input.turnIndex, level: 'request' },
     coverage: Object.values(step.usage).every((value) => value !== null) ? 'complete' : 'partial', validity: 'valid',
     coveredThroughTurn: null, usage: step.usage, basis: { kind: 'invocation' } };

@@ -1,4 +1,5 @@
 import { stopMigrationJob } from './stoppedMigrationJob';
+import { developmentAdmissionReceiptBuffer } from './safety/developmentAdmissionReceipts';
 import { inspectTaskClaim, inspectTaskVolume, taskVolumeReclaimed, removeTaskVolume } from './safety/volumeReclaim';
 import type { VolumeProbeOptions } from './safety/volumeReclaim';
 import { assertPinnedVolume } from './pinnedVolume';
@@ -61,6 +62,7 @@ async function ensureNamed(k8s: K8sClient, kind: ObservedKind, target: { readonl
 }
 
 export function kubernetesClusterWriter(k8s: K8sClient, volumeProbe?: VolumeProbeOptions): ClusterWriter {
+  const developmentReceipts = developmentAdmissionReceiptBuffer();
   const apply = async (desired: K8sObject, current: Parameters<typeof objectCovered>[0]): Promise<'applied' | 'unchanged'> => {
     if (objectCovered(current, desired)) return 'unchanged';
     await k8s.apply(desired);
@@ -70,7 +72,9 @@ export function kubernetesClusterWriter(k8s: K8sClient, volumeProbe?: VolumeProb
     inspectTaskClaim: (namespace, name) => inspectTaskClaim(k8s, namespace, name),
     ...(volumeProbe ? { inspectTaskVolume: (namespace: string, name: string, now: Date) => inspectTaskVolume(k8s, namespace, name, volumeProbe, now), taskVolumeReclaimed: (target: Parameters<typeof taskVolumeReclaimed>[1], now: Date) => taskVolumeReclaimed(k8s, target, volumeProbe, now), removeTaskVolume: (target: Parameters<typeof taskVolumeReclaimed>[1], now: Date) => removeTaskVolume(k8s, target, volumeProbe, now) } : {}),
     inspectWorkloadStart: (pod) => inspectWorkloadStart(k8s, pod),
-    activateWorkload: (pod, permit) => activateWorkload(k8s, pod, permit),
+    activateWorkload: (pod, permit, state) => activateWorkload(k8s, pod, permit, state, developmentReceipts),
+    pendingDevelopmentAdmissionReceipts: () => developmentReceipts.pending(),
+    acknowledgeDevelopmentAdmissionReceipt: (receipt) => developmentReceipts.acknowledge(receipt),
     observeWorkloadStop: (consumer, now) => observeWorkloadStop(k8s, consumer, now),
     releaseWorkloadStop: (proof) => releaseWorkloadStop(k8s, proof),
     inspectNamespaceRetirement: async (name, intent, systemNamespace, signal) => { await inspectNamespaceRetirement(k8s, name, intent, systemNamespace, signal); },

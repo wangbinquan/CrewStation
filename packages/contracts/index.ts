@@ -110,6 +110,7 @@ export * from './taskrunner/businessStorage';
 export * from './taskrunner/businessExecution';
 export * from './taskrunner/executionCompletion';
 export * from './api/resources/workloadSafety';
+export * from './api/resources/developmentAdmission';
 export * from './api/resources/taskVolume';
 
 export * from './api/runtimeImages/development';

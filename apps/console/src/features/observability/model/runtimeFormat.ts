@@ -8,10 +8,12 @@ export function runtimeComputeLabel(profile: { profileName?: string | null; prof
 export function runtimeAgentName(agent: Pick<RuntimeAgentStatistics, 'name' | 'sourceKind' | 'agentId'>, t: Translate) { return agent.sourceKind === 'development-agent' ? `${t('runtime.developmentExecution')} · ${agent.agentId?.slice(-8) ?? ''}` : agent.name; }
 export function runtimeSourceLabel(kind: RuntimeSourceKind | undefined, t: Translate) { return t(kind === 'development-agent' ? 'runtime.source.development-agent' : 'runtime.source.business-task'); }
 export function runtimeObjectLabel(data: RuntimeStatistics, t: Translate) { return t(data.filters.sourceKind === 'business-task' ? 'runtime.tasks' : data.filters.sourceKind === 'development-agent' ? 'runtime.developmentExecutions' : data.sourceScope === 'project-executions' ? 'runtime.objects' : 'runtime.tasks'); }
+export const RUNTIME_TOKEN_BUCKETS = ['input', 'cacheRead', 'cacheWrite', 'output'] as const;
 const grouped = (count: string) => BigInt(count).toLocaleString();
 export function runtimeTokens(m: RuntimeUsageMetrics, bucket?: 'input' | 'cacheRead' | 'cacheWrite' | 'output'): string {
-  const value = bucket ? m.tokens[bucket] : m.tokens.total, unknown = !m.tokens.hasKnown || (bucket ? m.tokens.unknownBuckets[bucket] > 0 : false);
-  if (unknown && value === '0') return '—';
+  const value = bucket ? m.tokens[bucket] : m.tokens.total;
+  const hasKnown = m.tokens.hasKnown && (bucket ? m.tokens.hasKnownBuckets?.[bucket] ?? (m.tokens.complete || BigInt(value) > 0n) : true);
+  if (!hasKnown) return '—';
   return `${m.tokens.complete ? '' : '≥ '}${grouped(value)}`;
 }
 export function runtimeCny(m: RuntimeUsageMetrics): string {

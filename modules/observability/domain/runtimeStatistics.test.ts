@@ -1,10 +1,12 @@
 // RFC-034: exact known subtotals, native parent coverage and valuations must agree.
 import { expect, test } from 'bun:test';
-import { ExecutionUsageObservationSchema, ExecutionValuationObservationSchema } from '@crewstation/contracts';
+import { ExecutionUsageObservationSchema, ExecutionValuationObservationSchema, UsageExecutionIdentitySchema } from '@crewstation/contracts';
 import { newResourceId } from '@crewstation/kernel';
 import { aggregateRuntimeMetrics, runtimeUsageMetrics } from './cnyPricing';
 import { selectRuntimeUsage } from './tokenUsage';
-const identity = { projectId: newResourceId(), taskId: newResourceId(), subtaskId: newResourceId(), executionId: newResourceId(), executionGeneration: 1 };
+import { qualifyNativeMetrics } from './usageProjection';
+import type { UsageNativeCapture } from '@crewstation/contracts';
+const identity = UsageExecutionIdentitySchema.parse({ projectId: newResourceId(), taskId: newResourceId(), subtaskId: newResourceId(), executionId: newResourceId(), executionGeneration: 1 });
 const at = '2026-09-28T12:00:00.000Z';
 const usage = (patch: Record<string, unknown> = {}) => ExecutionUsageObservationSchema.parse({ kind: 'usage', identity, sourceId: 'runner', recordId: 'a', revision: 1, occurredAt: at, observedAt: at,
   adapterVersion: 'test', modelRef: null, reporting: 'delta', inclusion: 'self', coverage: 'complete', validity: 'valid', scope: null, coveredThroughTurn: null,
@@ -53,4 +55,20 @@ test('ambiguous overlap is bounded below, source/generation are separate and inc
   expect(selectRuntimeUsage([child, bad])).toMatchObject({ selected: [], conflicts: 1, incomplete: true });
   const conflict = runtimeUsageMetrics([child, bad, base], true, 1);
   expect(conflict.tokens.total).toBe('10'); expect(conflict.tokens.complete).toBe(false); expect(conflict.tokens.unknownBuckets.input).toBe(1); expect(conflict.reasons).toContain('coverage-conflict');
+});
+
+test('per-bucket affirmative zero survives missing execution, native gaps and proven empty mixed with unknown output', () => {
+  const base = usage(), zero = usage({ projection: { ...base.projection, contribution: { input: '0', cacheRead: '0', cacheWrite: '0', output: '10' } } });
+  const missing = runtimeUsageMetrics([zero], false, 2);
+  expect(missing.tokens.hasKnownBuckets).toEqual({ input: true, cacheRead: true, cacheWrite: true, output: true });
+  expect(missing.tokens.input).toBe('0'); expect(missing.tokens.unknownBuckets.input).toBe(1); expect(missing.tokens.complete).toBe(false);
+  const partial = runtimeUsageMetrics([usage({ projection: { ...base.projection, contribution: { input: '10', cacheRead: '0', cacheWrite: '0', output: null }, complete: false } })], true, 1);
+  expect(partial.tokens.hasKnownBuckets!.input).toBe(true); expect(partial.tokens.hasKnownBuckets!.output).toBe(false);
+  const capture: UsageNativeCapture = { id: 'empty', identity, sourceId: 'runner', proof: { contract: 'opencode-child-steps-v1', lineageKey: 'root', turn: 'turn', turnIndex: 0, state: 'complete', root: 'root', observedAt: at, baseline: { kind: 'fresh', fingerprint: null }, fingerprint: 'snapshot', sessions: 1, steps: 0, emitted: 0, baselineSteps: 0, priorRevisionGap: false, issues: [] }, state: 'complete', issues: [], receivedSteps: 0, receivedBaselineSteps: 0, unresolvedBaselineSteps: 0, revisedBaselineSteps: 0, historicalRevisionGap: false };
+  const empty = qualifyNativeMetrics(runtimeUsageMetrics([], false, 1), [capture], []);
+  expect(empty.tokens.hasKnownBuckets).toEqual({ input: true, cacheRead: true, cacheWrite: true, output: true }); expect(empty.tokens.complete).toBe(true); expect(empty.cost.complete).toBe(false);
+  const mixed = aggregateRuntimeMetrics([empty, partial]);
+  expect(mixed.tokens.output).toBe('0'); expect(mixed.tokens.hasKnownBuckets!.output).toBe(true); expect(mixed.tokens.complete).toBe(false);
+  for (const state of ['pending', 'partial'] as const) { const gap = qualifyNativeMetrics(partial, [{ ...capture, state }], []); expect(gap.tokens.hasKnownBuckets!.input).toBe(true); expect(gap.tokens.complete).toBe(false); }
+  const truncated = aggregateRuntimeMetrics([empty, partial], true); expect(truncated.tokens.hasKnownBuckets!.output).toBe(true); expect(truncated.tokens.complete).toBe(false);
 });

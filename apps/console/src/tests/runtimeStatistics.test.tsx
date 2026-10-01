@@ -132,3 +132,38 @@ test('native capture evidence stays inside the selected attempt dialog, follows 
   await act(async () => openDialog().dispatchEvent(new Event('cancel', { cancelable: true }))); await page.settle();
   expect(document.activeElement).toBe(bar); expect(document.querySelector('dialog')).toBeNull();
 });
+
+// Acceptance regression: input/cache/output must be readable at both levels and every task/Agent/compute grouping.
+test('individual bucket coverage preserves exact input, known zero, partial zero and unknown output', () => {
+  const f = runtimeStatisticsFixture(), m = { ...f.metrics, records: 2, tokens: { ...f.metrics.tokens, input: '9007199254740993', output: '3', total: '9007199254740996', complete: false, hasKnownBuckets: { input: true, cacheRead: true, cacheWrite: true, output: true }, unknownBuckets: { input: 0, cacheRead: 0, cacheWrite: 0, output: 1 } } };
+  expect(runtimeTokens(m, 'input')).toBe('≥ 9,007,199,254,740,993'); expect(runtimeTokens(m, 'cacheRead')).toBe('≥ 0'); expect(runtimeTokens(m, 'output')).toBe('≥ 3');
+  expect(runtimeTokens({ ...m, tokens: { ...m.tokens, output: '0' } }, 'output')).toBe('≥ 0');
+  expect(runtimeTokens({ ...m, tokens: { ...m.tokens, output: '0', hasKnownBuckets: { ...m.tokens.hasKnownBuckets, output: false }, unknownBuckets: { ...m.tokens.unknownBuckets, output: 2 } } }, 'output')).toBe('—');
+  expect(runtimeTokens({ ...m, tokens: { ...m.tokens, hasKnown: false } }, 'input')).toBe('—');
+});
+test('system/project summaries, grouping tables and keyboard-selected trend expose all four exact token buckets', async () => {
+  const f = runtimeStatisticsFixture(), row = f.data.trend[0]!;
+  row.metrics = { ...row.metrics, tokens: { ...row.metrics.tokens, input: '40', cacheRead: '30', cacheWrite: '10', output: '20', total: '100' } };
+  for (const root of ['/admin/observability', '/projects/' + f.projectId + '/observability']) {
+    page = await renderApp(root + '?' + f.query);
+    const summary = document.querySelector('[data-runtime-metrics] [data-token-buckets]')!;
+    expect([...summary.querySelectorAll('[data-token-bucket] dd')].map((el) => el.textContent)).toEqual(['1,920', '0', '0', '480']);
+    expect(page.text()).toContain('输出包含推理 Token');
+    expect(document.querySelector('tbody tr')?.querySelectorAll('[data-token-bucket]')).toHaveLength(4);
+    const column = document.querySelector<HTMLButtonElement>('[aria-label="任务与 Token 趋势"] button')!;
+    expect([...column.querySelectorAll<HTMLElement>('[data-token-color]')].map((el) => el.style.height)).toEqual(['40%', '30%', '10%', '20%']);
+    expect(column.getAttribute('aria-label')).toContain('缓存读取 Token 30');
+    await act(async () => column.focus()); await page.settle();
+    expect([...document.querySelectorAll('[aria-label="当前趋势区间"] [data-token-bucket] dd')].map((el) => el.textContent)).toEqual(['40', '30', '10', '20']);
+    for (const tab of ['任务明细', 'Agent 分析', '用量与费用']) {
+      await page.click(tab); expect(document.querySelector('tbody tr')?.querySelectorAll('[data-token-bucket]')).toHaveLength(4);
+    }
+    page.unmount(); page = undefined;
+  }
+});
+
+test('older incomplete zero without per-bucket evidence is unobserved, but newer partial zero stays a lower bound', () => {
+  const f = runtimeStatisticsFixture(), m = { ...f.metrics, tokens: { ...f.metrics.tokens, complete: false } };
+  expect(runtimeTokens(m, 'cacheRead')).toBe('—');
+  expect(runtimeTokens({ ...m, tokens: { ...m.tokens, hasKnownBuckets: { input: true, cacheRead: true, cacheWrite: true, output: true } } }, 'cacheRead')).toBe('≥ 0');
+});

@@ -16,6 +16,27 @@ describe.skipIf(!available)('RFC-034 bound development native cleanup', () => {
   let f: DevelopmentCleanupFixture;
   afterEach(async () => { await f?.close(); });
   const startStop = async () => { const removed = f.wait('finalizer-removed'), controller = f.controller(); controller.observer.start(); await f.runNative(); await removed; await controller.reconciled(); await controller.observer.stop(); };
+  test('new choice retains Pod, both Secrets, Runner token and quota when original receipt reading is unavailable, then resumes from the same UID', async () => {
+    f = await developmentCleanupFixture('native', true, true); const before = await f.load(f.env.id), get = f.safety.get;
+    const originalUid = (await get(f.env.render!.workloadConsumerId!))!.developmentAdmission!.secretUid;
+    f.safety.get = async (id) => { const state = await get(id); return state ? { ...state, developmentAdmission: undefined } : undefined; };
+    await f.runNative(); expect(f.physical.state.deleteRequests).toEqual([]); expect(f.control.calls).toBe(0);
+    expect(await f.load(f.env.id)).toMatchObject({ runnerTokenHash: before.runnerTokenHash, connected: true, native: { state: 'cleaning' } });
+    expect(await f.resources.api.occupancy(f.env.projectId)).toBe(2);
+    for (const name of [f.env.podName + '-runner', f.env.podName + '-admission']) expect(await f.k8s.get(Resources.Secret!, name, f.env.namespace)).toBeDefined();
+    f.safety.get = get; await startStop(); await f.runNative(); expect((await f.load(f.env.id)).native?.state).toBe('finished');
+    expect((await get(f.env.render!.workloadConsumerId!))?.developmentAdmission?.secretUid).toBe(originalUid);
+    await f.settle();
+    expect(await f.resources.api.occupancy(f.env.projectId)).toBe(1);
+  }, 15_000);
+  test('new choice keeps a same-name same-content admission clone instead of borrowing its current UID after all original containers stop', async () => {
+    f = await developmentCleanupFixture('ledger', true, true); await startStop();
+    const original = (await f.k8s.get(Resources.Secret!, f.env.podName + '-admission', f.env.namespace))!, replacement = crypto.randomUUID();
+    await f.k8s.mergePatch(Resources.Secret!, original.metadata.name, f.env.namespace, { metadata: { uid: replacement } });
+    await f.runNative(); expect(f.physical.state.deleteRequests).not.toContain('Secret:' + original.metadata.name);
+    expect((await f.k8s.get(Resources.Secret!, original.metadata.name, f.env.namespace))?.metadata.uid).toBe(replacement);
+    expect((await f.load(f.env.id)).native?.state).toBe('cleaning'); expect(await f.resources.api.occupancy(f.env.projectId)).toBe(2);
+  }, 15_000);
   for (const mode of ['ledger', 'native'] as const) {
     test(mode + ': actual Controller proof precedes Secret reclaim and final single quota release', async () => {
       f = await developmentCleanupFixture(mode); const before = await f.load(f.env.id);

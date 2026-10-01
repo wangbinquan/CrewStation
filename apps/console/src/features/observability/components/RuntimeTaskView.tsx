@@ -5,9 +5,9 @@ import { Button } from '../../../shared/ui/Button';
 import { Stack } from '../../../shared/ui/Stack';
 import { Card } from '../../../shared/ui/Card';
 import { DataTable } from '../../../shared/ui/DataTable';
-import { RuntimeMetrics, RuntimeTokenBuckets } from './RuntimeMetrics';
+import { RuntimeMetrics, RuntimeTokenBuckets, RuntimeTokenMetric } from './RuntimeMetrics';
 import { RuntimeTimeline } from './RuntimeTimeline';
-import { runtimeTokens, runtimeCny, runtimeDate, runtimeTaskName, runtimeAttemptName, runtimeSourceLabel } from '../model/runtimeFormat';
+import { runtimeCny, runtimeDate, runtimeTaskName, runtimeAttemptName, runtimeSourceLabel } from '../model/runtimeFormat';
 import styles from './RuntimeStatistics.module.css';
 export function RuntimeTaskView({ task, back }: { task: RuntimeTaskObservation; back: () => void }) {
   const t = useT(); return <Stack data-runtime-task>
@@ -17,7 +17,7 @@ export function RuntimeTaskView({ task, back }: { task: RuntimeTaskObservation; 
     <RuntimeMetrics metrics={task.metrics} duration={task.wallMs} /><RuntimeTimeline task={task} />
     <Card title={t('runtime.buckets')}><RuntimeTokenBuckets metrics={task.metrics} /></Card>
     <Card title={t('runtime.attempts')}><DataTable className={styles.table} columns={['agent', 'attempt', 'state', 'tokens', 'cost'].map((k) => t('runtime.' + k))}>
-      {task.attempts.map((a) => <tr key={a.id}><td>{runtimeAttemptName(task, a, t)}<span className={styles.identity}>{a.profileName ?? t('runtime.nameUnavailable')} · r{a.profileRevision ?? '—'}</span></td><td>{a.attempt}</td><td>{t('runtime.state.' + a.state)}</td><td>{runtimeTokens(a.metrics)}</td><td>{runtimeCny(a.metrics)}</td></tr>)}
+      {task.attempts.map((a) => <tr key={a.id}><td>{runtimeAttemptName(task, a, t)}<span className={styles.identity}>{a.profileName ?? t('runtime.nameUnavailable')} · r{a.profileRevision ?? '—'}</span></td><td>{a.attempt}</td><td>{t('runtime.state.' + a.state)}</td><td><RuntimeTokenMetric metrics={a.metrics} /></td><td>{runtimeCny(a.metrics)}</td></tr>)}
     </DataTable></Card>
   </Stack>;
 }

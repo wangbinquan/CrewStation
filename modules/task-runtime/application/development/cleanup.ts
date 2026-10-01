@@ -8,7 +8,7 @@ import { occupiesQuota } from '../../domain/taskEnvironment';
 import type { NativeExecutionCluster } from '../../ports/cluster';
 import type { RepositoryScope, NativeExecutionJobLease } from '../../ports/unitOfWork';
 import type { TaskRuntimeUseCaseDeps } from '../dependencies';
-import { closeDevelopmentAdmission, developmentPhysicalStop } from './workloadStop';
+import { closeDevelopmentAdmission, developmentPhysicalStop, developmentAdmissionSecretUid } from './workloadStop';
 
 type Deps = TaskRuntimeUseCaseDeps & { nativeCluster: NativeExecutionCluster };
 async function withCurrent<T>(deps: Deps, original: TaskEnvironment, identity: NativeExecutionJobLease | undefined, selection: DevelopmentCleanupSelection,
@@ -34,6 +34,7 @@ export async function cleanupDevelopmentWorkload(deps: Deps, original: TaskEnvir
   if (!selection || !deps.developmentCleanup || !deps.nativeCluster.cleanupDevelopment) throw precondition('等待开发数字排空与原执行停止屏障装配');
   await requireHeartbeat(renew);
   let current = await withCurrent(deps, original, identity, selection, async (_scope, env) => env);
+  await developmentAdmissionSecretUid(deps.workloadSafety, current);
   if (!current.native!.developmentCleanup) {
     const result = await deps.developmentCleanup.advance(selection);
     if (result.kind !== 'permitted') throw precondition('等待开发数字排空的持久出口');
@@ -52,9 +53,11 @@ export async function cleanupDevelopmentWorkload(deps: Deps, original: TaskEnvir
     await withCurrent(deps, original, identity, selection, async (_scope, env) => {
       if (jsonHash(requireDevelopmentCleanupEvidence(env.native!.developmentCleanup, selection)) !== jsonHash(evidence)) throw precondition('原开发清理许可已冲突');
     });
+    await developmentAdmissionSecretUid(deps.workloadSafety, current);
   };
   await fence(); await closeDevelopmentAdmission(deps.workloadSafety, current);
-  await deps.nativeCluster.cleanupDevelopment(current, { current: fence, stopped: () => developmentPhysicalStop(deps.workloadSafety, current) });
+  await deps.nativeCluster.cleanupDevelopment(current, { current: fence, stopped: () => developmentPhysicalStop(deps.workloadSafety, current),
+    ...(current.render?.developmentRemovalProtection !== undefined ? { admissionSecretUid: async () => { const uid = await developmentAdmissionSecretUid(deps.workloadSafety, current); if (!uid) throw precondition('原准入 UID 回执缺失'); return uid; } } : {}) });
   await fence();
   await withCurrent(deps, original, identity, selection, async (scope, env) => {
     const n = env.native!, now = deps.clock.now();

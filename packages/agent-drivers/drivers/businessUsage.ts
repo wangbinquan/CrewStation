@@ -1,5 +1,6 @@
 import type { BusinessUsage } from '@crewstation/contracts';
 import { jsonHash } from '@crewstation/kernel';
+import { opencodeOutputNumber } from './usage/opencodeOutput';
 
 const object = (value: unknown): Record<string, unknown> | undefined => value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
 const count = (value: unknown): number | null => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
@@ -14,7 +15,7 @@ export function businessUsage(protocol: 'claude-code' | 'opencode', source: Reco
   const cache = object(usage?.['cache']);
   const counters = {
     inputTokens: count(usage?.['input_tokens'] ?? usage?.['input'] ?? usage?.['prompt_tokens']),
-    outputTokens: count(usage?.['output_tokens'] ?? usage?.['output'] ?? usage?.['completion_tokens']),
+    outputTokens: protocol === 'opencode' && usage?.['output'] !== undefined ? opencodeOutputNumber(usage) : count(usage?.['output_tokens'] ?? usage?.['output'] ?? usage?.['completion_tokens']),
     cacheReadTokens: count(usage?.['cache_read_input_tokens'] ?? usage?.['cache_read'] ?? usage?.['cacheRead'] ?? cache?.['read']),
     cacheWriteTokens: count(usage?.['cache_creation_input_tokens'] ?? usage?.['cache_creation'] ?? usage?.['cacheCreation'] ?? cache?.['write']),
   };

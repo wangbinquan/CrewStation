@@ -77,8 +77,8 @@ function stoppableApi(f: Awaited<ReturnType<typeof developmentWorkloadFixture>>,
     await rawDelete(Resources.Pod!, env.podName, env.namespace, { preconditions: { uid: env.native!.podUid } });
   } };
 }
-export async function developmentCleanupFixture(mode: 'ledger' | 'native' = 'ledger', release = true) {
-  const f = await developmentWorkloadFixture(mode), input = f.request();
+export async function developmentCleanupFixture(mode: 'ledger' | 'native' = 'ledger', release = true, receiptProtection = false) {
+  const f = await developmentWorkloadFixture(mode), input = { ...f.request(), ...(receiptProtection ? { developmentRemovalProtection: { version: 1 as const } } : {}) };
   await f.runtime.api.createNativeExecution(input);
   if (mode === 'native') await f.runNative();
   const activated = f.receipt('activation'), admission = f.controller(); admission.observer.start(); await activated; await admission.reconciled(); await admission.observer.stop();

@@ -117,7 +117,8 @@ export function computeTokenDelta(evt: Record<string, unknown>): NormalizedToken
   ]);
   if (!tokens) return null;
   const input = numOrZero(tokens.input ?? tokens.input_tokens ?? tokens.prompt_tokens);
-  const output = numOrZero(tokens.output ?? tokens.output_tokens ?? tokens.completion_tokens);
+  // Native output excludes reasoning; generic completion totals already include it.
+  const output = numOrZero(tokens.output ?? tokens.output_tokens ?? tokens.completion_tokens) + (tokens.output != null ? numOrZero(tokens.reasoning) : 0);
   // opencode 1.15.5+ 把缓存计数嵌在 `cache: { read, write }` 下；旧的扁平 `cache_read`／`cache_creation`
   // 作为回退保留 —— 只读扁平键会静默丢掉缓存 token（源实测约 15 倍低估）。
   const cache = tokens.cache as Record<string, unknown> | undefined;

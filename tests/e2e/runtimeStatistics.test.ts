@@ -20,6 +20,16 @@ describe.skipIf(!session)('RFC-034 formal runtime observation', () => {
         await page.eval(`document.querySelector('header button[lang="${locale}"]').click()`); await settle(page);
         const actual = await measureRuntimeOverview(page);
         expect(actual.bars).toBe(24); expect(actual.tokenLabels).toEqual(['2,400', ...Array.from({ length: 23 }, () => '0')]); expect(actual.alignedRange).toBe(true); expect(actual.noExport).toBe(true); expect(actual.gap).toBeCloseTo(actual.expectedGap, 0); expect(actual.gap).toBeGreaterThan(0); expect(actual.sectionGap).toBeCloseTo(actual.expectedSectionGap, 0);
+        expect(actual.tokenBuckets).toEqual(['1,920', '0', '0', '480']); expect(actual.bucketPairsAligned).toBe(true); expect(actual.stackPercent).toEqual(['80%', '0%', '0%', '20%']);
+        await page.eval(`document.querySelector('[data-runtime-statistics] [role="tabpanel"] [role="group"] button').focus()`);
+        await page.cmd('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+        await page.cmd('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 }); await settle(page);
+        expect(await page.eval<boolean>(`(() => {const groups=document.querySelectorAll('[data-runtime-statistics] [role="tabpanel"] [role="group"]'), second=groups[0].querySelectorAll('button')[1];return document.activeElement===second && groups[1].textContent.includes(second.getAttribute('aria-label').split(' · ')[0])})()`)).toBe(true);
+        expect(await page.eval<string[]>(`[...document.querySelectorAll('[data-runtime-statistics] [role="tabpanel"] [role="group"]')[1].querySelectorAll('[data-token-buckets] dd')].map(node=>node.textContent)`)).toEqual(['0', '0', '0', '0']);
+        await page.cmd('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers: 8 });
+        await page.cmd('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers: 8 }); await settle(page);
+        expect(await page.eval<boolean>(`document.activeElement===document.querySelector('[data-runtime-statistics] [role="tabpanel"] [role="group"] button')`)).toBe(true);
+        expect(await page.eval<string[]>(`[...document.querySelectorAll('[data-runtime-statistics] [role="tabpanel"] [role="group"]')[1].querySelectorAll('[data-token-buckets] dd')].map(node=>node.textContent)`)).toEqual(['1,920', '0', '0', '480']);
         expect(actual.overflow).toBeLessThanOrEqual(1); expect(actual.mainOverflow).toBeLessThanOrEqual(1); expect(actual.chartOverflow).toBeLessThanOrEqual(1);
         for (const tab of ['tasks', 'agents', 'usage', 'performance']) {
           await open(page, root + '?tab=' + tab + '&' + f.query);
