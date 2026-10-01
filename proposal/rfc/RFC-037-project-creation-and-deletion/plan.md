@@ -119,3 +119,5 @@
 网关精确提交树检查发现共享 platform/wiring.ts 还依赖另一会话未提交的 runtimeFactSources 与 readDevelopmentObservationFacts；单独发布会缺源码，当前未提交网关候选，保留全部共享输出并等待依赖按其自身范围发布。数据库／对象／SCM 及其余 owner、正式全链路装配和 PD 实机回收继续；全删除产品入口仍关闭。
 
 原 owner 已在 `50dbd7a7` 发布全部接线依赖。数据库原生物理来源新增实际 base／tablespace、原 OID／服务器与全目录复核，7 项真实 PG 通过；data-control 定向 43／3 skip／0、251 断言、改动行 67／67。合并候选定向 **185／3 skip／0、1528 断言、42 文件**，精确后端／console 类型均无诊断；完整 `bun run check` **4797／143 skip／0、4940 tests、955 文件、31775 断言、1096.24 秒**，原网关 39 个和新数据库 6 个源码／测试／配置指纹保持。继续精确合并发布／CI／实际部署，不重复相同候选全量。实际数据库／角色 DROP、两套供给封闭、其余 owner 和全删除产品入口继续，详见[数据库候选回执](acceptance/database-physics.md)及 [ADR-0012](../../../docs/adr/0012-project-resource-owner-growth.md)的结构盘点。
+
+原生写入屏障与库/角色执行批已精确发布 b6999edf，CI 36832635556 六项成功；2026-10-01T08:05:21.813Z 本机八组件 Ready=1，data_control/0004 实际应用且源码校验和一致。部署后实际 native SELECT 回调在途/退出、原 Pod 保护和旧生产凭据 SELECT 通过；原专用库 OID/目录保持。Chrome 本批连接失败，新的界面复测未计通过，上批弹窗证据保持。详见[部署与实际调用](acceptance/native-writers-deployment.md)。独立原生卷来源、正式 data-control owner、剩余内容 owner、管理员二次确认和 PD 全链路回收继续，删除入口关闭。

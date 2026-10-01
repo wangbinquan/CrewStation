@@ -6,6 +6,8 @@
 
 ## 2026-09-30 RFC-037 项目创建弹窗与彻底删除（实施中）
 
+2026-10-01 原生写入屏障批已精确发布 b6999edf15ec81a43d42bd59c3fb80218b204af8，CI 36832635556 六项成功，本机 2026-10-01T08:05:21.813Z 八组件 Ready=1；data_control/0004 实际应用、运行源码校验和核对一致。原 22 Namespace／48 Pod及PVC／19 PV、共享 PostgreSQL 全身份和部署前当前 Runner 587a0766 保持。部署后在真正原 cs-api 上核对 native SELECT 的独立在途事实、实际退出、原 Pod finalizer及旧生产凭据查询；原验收库 OID 276598/目录保持。本批 Chrome 连接失败，新的界面复测没有记通过；上批创建弹窗证据保持。见[本批部署与实际调用](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/native-writers-deployment.md)。独立卷来源、正式 owner、其余内容清理、管理员二次确认与完整实际回收仍继续；永久删除入口关闭，专用项目保留。下方候选、失败历史与所有并行输出完整保留。
+
 2026-10-01 原库执行与全部新旧写入候选接续：数据库正常 DROP/原文件复核、原角色 OID/全库依赖/预备事务保护、新旧 DDL 原生名字锁、口令先独立提交、实际回调持久在途及两段轮换屏障已落实。组合 222／11 Garage skip／0、1596 断言，组合根迁移/角色补跑 10／0、改动覆盖 391／391；新 data-control/0004 精确入锁但尚未应用实际平台。首轮完整门禁停于用例断言类型；修正候选单次完整 check **4829／143 skip／0、4972 tests、958 文件、32001 断言、852.07 秒**，静态四层通过，40 个源码/测试/配置指纹全部保持。轮换自等待的超时夹具已按原 OID、全部测试身份和测试密钥正常 DROP，其他测试库保持。详见[原生执行候选回执](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/database-execution.md)。正式 owner、独立原生卷来源和剩余全部内容 owner/管理员确认仍待接齐；不把端口替身或 SQL 来源摘要当完整物理验收，原专用项目保留、永久删除入口关闭。下方历史与并行输出完整保留。
 
 2026-10-01 网关／数据库批已精确发布 65545ab4，CI 36813913732 六项成功。首次部署被并发 cs-api 更新 CAS 正确阻断；核对仅增四个文档、完整包含本批源码的后继 557cb50c 与其六项 CI 后，于 2026-10-01T04:32:58.487Z 对齐八组件，Ready=1。gateway/0011 已由并发后继迁移实际应用并只读核对源码校验和；原 22 Namespace／48 Pod与PVC／19 PV UID 和部署前当前 Runner 587a0766 保持。实机原专用库 cs_rfc037_creation_proof / OID 276598 的原目录 present，48 原生库清单不变；新建仍为统一 FormDialog，实际 1280／390／320px 域名、模板和关闭焦点通过。详见[网关／数据库部署回执](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/gateway-database-deployment.md)。下一步原生数据库执行、全写入者与正式 owner 继续；尚未删除原专用项目或开放永久删除入口。下方历史与并行记录完整保留。
