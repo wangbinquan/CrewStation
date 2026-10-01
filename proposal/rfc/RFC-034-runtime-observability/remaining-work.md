@@ -4,7 +4,7 @@
 
 ## 当前已实现与实际部署
 
-当前本机源码版本：`b9508486d94fb3bbcaa460dc03dcc697d877b37d`，2026-09-30T23:33:28.986Z（北京时间10-01 07:33:28.986）部署完成；[精确CI36790207172](https://github.com/wangbinquan/CrewStation/actions/runs/36790207172)六项成功，八组件Ready=1、代次一致、storage-contract=1、迁移Complete/applied=0，三镜像源码与默认Runner摘要已对拍。2026-09-30T23:34:31.149611+00:00公开console.cs.localhost登录HTTP200、未登录根HTTP401。原生来源、内部consumer/派发/结束/独立查询/普通屏障/派发恢复、严格保护渲染与实际开发工作卷消费者准入已部署；生产开发采集仍OFF，完整数字清理/消费和两级开发明细未完成。历史门禁失败与各部署批次保留在下方。
+当前本机源码版本：`2fb06f388fc3bfc10ae7c34b5603a8711a5d45af`，2026-10-01T01:40:44.408Z（北京时间10-01 09:40:44.408）部署完成；[精确CI 36801111766](https://github.com/wangbinquan/CrewStation/actions/runs/36801111766)六项成功，八组件Ready=1、代次一致、storage-contract=1、迁移Complete/applied=0，三镜像源码与默认Runner摘要已对拍。2026-10-01T01:41:20.842404+00:00公开console.cs.localhost登录HTTP200、未登录根HTTP401。原bound数字与物理清理代码已部署，生产开发采集仍OFF；未绑定/通用入口、完整消费和两级开发明细未完成。历史门禁失败与各部署批次保留在下方。
 
 正式项目/系统统计已有业务任务、Agent/尝试、四桶 Token、人民币估值、基础泳道、算力贡献下钻和采集质量；项目与算力显示名称，保留稳定 ID/受理修订。已有价格配置与冻结目录、OpenCode 根/子树采集、原归属修订和原价补算；资源/容量和当前服务槽/平台 Pod 健康已有入口。
 
@@ -461,3 +461,14 @@ v1独立18前身17路径功能门FAIL一项P2：I/O后虽读过时钟，但commi
 ### 2026-10-01 原绑定清理完整候选验收
 
 独立完整实现门PASS；唯一完整检查五组件全部exit=0、4738pass/143skip/0fail、31146断言/945文件，1118.804秒，31源码首尾稳定。同次四个新增清理文件36/0/0，12个相关文件83/0。参见[完整验证](./development-cleanup.md#2026-10-01-原绑定清理的独立实现门与唯一完整验证)。准入Secret历史UID边界和首次失败记录保留，143环境/身份模型跳过不算实际部署或模型验收。精确发布CI与本机升级待回执；未绑定、通用删除/保留期/重建、生产消费、项目和系统两级开发事实/UI继续，生产OFF，CS-R02及两个RFC不关闭。
+
+
+## 2026-10-01 原绑定清理精确发布与本机部署
+
+- 源码34条批准路径已精确提交并推送 `2fb06f388fc3bfc10ae7c34b5603a8711a5d45af`；提交含 `Co-Authored-By: Codex <noreply@openai.com>`。发布后main/origin同步、共享索引为空，其他会话在制文件保留。独立实现/最终发布复核PASS，唯一稳定本地完整检查4738pass/143skip/0fail；未重跑完整检查。
+- [本提交CI 36801111766](https://github.com/wangbinquan/CrewStation/actions/runs/36801111766) 的static、unit、module、console、e2e、gate六项全部completed/success。AW修复edd56ebe的主线/九种定时配置成功及最近实际调度八种全部成功仍保留，不以CS CI替代AW结果。
+- 部署前按实际OCI镜像核对源码：console为602bd144、control-plane为25d0f545、默认Runner为b9508486，均是本提交祖先；升级保留并行已部署输出。完成时间 `2026-10-01T01:40:44.408Z`（北京时间10-01 09:40:44.408）。八组件均Ready=1、generation=observedGeneration：console 217、cs-api 209、cs-auth 107、cs-controller 174、cs-events 77、cs-session 126、mcp-capabilities 73、mcp-operations 73。storage-contract=1，原owner/Session数字表存在。
+- 数据库custom备份0600，42804334字节，SHA256=`8d7665645c3c1fc7d3dfcd0aa2a4ca3fbdeb9a2941e975e9e70588049cc80dcf`。迁移Job `rfc034-development-digital-cleanup-migrate-2fb06f38`，UID=`e5df75e1-7ec7-49bd-a20f-076dd791d041`，Complete；实际applied=0、roles.initialized=0。
+- console镜像摘要 `sha256:5521687c6d52d0b420fcf0ac9acc63bbd5f60c763ac1b8b197d3d2f6db69dcec`；control-plane `sha256:0af73210f463a7fa02f0bbe4f1b81255c9466227bc3c66a7f267dc8fcc16fb93`；task-runtime/默认Runner `sha256:587a0766440bae22f69bd6e68e101f2348ec8bda95f8b4c3ce6ddef0fa010928`，三镜像OCI源码label均为本提交。已有执行/固定档位Runner没有重建。
+- 公开只读验收 `2026-10-01T01:41:20.842404+00:00`：console.cs.localhost/auth/login HTTP200、未登录根HTTP401，八组件和三个摘要全部对拍。没有身份切换、实际模型调用、真实开发验证资源创建或结束。
+- 边界：内部原bound清理代码已部署；生产数字producer/cleanup组合尚未注入，仍OFF，sourceScope=business-tasks。143跳过项不算真实身份/模型验收。未绑定/整个日志头未知、全部通用删除/保留期/重建入口、生产消费/项目和系统开发明细与实际AW联合验收继续；CS-R02和两个RFC保持In Progress。
