@@ -1,3 +1,4 @@
+import type { DevelopmentCleanupEvidence } from './development/cleanupEvidence';
 import type { BusinessSessionStorage, DevelopmentUsageStorage } from '@crewstation/contracts';
 import type { RuntimeInitializationStatus, RuntimeImageExecutionSnapshot, ProjectId, ServiceId, StartupRecord, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
@@ -39,6 +40,8 @@ export interface NativeExecution {
   readonly secretUid?: string;
   readonly failureReason?: string;
   readonly preparedAt?: string;
+  /** Durable numeric exit only; physical stop and final reclaim remain independently required. */
+  readonly developmentCleanup?: DevelopmentCleanupEvidence;
 }
 
 /**

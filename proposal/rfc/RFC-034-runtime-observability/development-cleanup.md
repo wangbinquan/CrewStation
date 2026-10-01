@@ -1,6 +1,6 @@
 # RFC-034 开发数字执行的结束与资源清理接入
 
-状态：完整清理接入规划v2独立限定设计门PASS；首轮估值阻塞回收P2及修订历史保留。当前生产开发采集OFF；本机已升级至b9508486，实际开发工作卷准入自身六项CI成功、八组件Ready，见[准入部署回执](./development-workload-admission.md#2026-10-01-实际开发工作卷准入的精确发布与部署)。普通启动屏障与派发恢复的历史回执保留。本规划不把内部结束evidence-complete、Pod不存在或Session absent解释成资源删除许可或Token零。
+状态：原绑定数字与物理清理已实现，独立完整实现门PASS，稳定候选唯一完整本机检查4738pass/143skip/0fail；精确发布CI与部署待回执。首轮估值阻塞回收P2及修订历史保留。生产开发采集OFF；实际本机仍b9508486，见[准入部署回执](./development-workload-admission.md#2026-10-01-实际开发工作卷准入的精确发布与部署)。未绑定及所有通用入口、生产消费与两级开发事实继续。内部ending、Pod不存在或Session absent不单独代表删除许可或Token零。
 
 ## 当前真实断点
 
@@ -136,3 +136,80 @@ TaskEnvironment私有render新增版本化清理回执，记录完整原选择�
 ### 首候选独立设计复核回执
 
 2026-10-01限定设计v1 PASS，无新增P1/P2；37条冻结文档/源码与3条补充物理停止参考首尾指纹一致。明确旧storageStop helper在无business completionPolicy时直接返回，开发路径必须独立核原consumer/permit/stopProof；执行顺序为数字许可→原UID删除请求→Controller持久全部容器停止proof并移除原finalizer→最终释放，不先等Pod消失才触发停止。该PASS只允许按首候选继续实现；未绑定与全部删除入口完成前producer OFF。实现、真实PG组合回归、完整单次门禁、精确源码CI及部署仍须各自完成。
+
+
+### 首候选v2：精确文件与物理执行选择（限定设计已复核）
+
+沿用上述bound限定范围，选择Task专用持久native worker推进两种创建来源的原对象回收。选中cleaning始终保持资源desired=present与ReleasePending=true，直到Pod、原停止proof和两个Secret均确认回收后，最终事务才进入finished并投影absent。数字出口持久只是物理阶段准入，不把它直接当资源整体已停止；现有Controller负责原Pod finalizer/停止proof，不用generic Failed/absent删除完成本候选。全部通用物理入口仍是后续开启前置。
+
+NativeExecutionCluster新增可选cleanupDevelopment方法，缺方法即在物理I/O前等待，原cleanup继续拒绝选中保护。此方法先严格核Task持久数字回执和原Pod UID/完整受理规格，调用UID条件Pod delete并等待；再通过锁外回调取得Resources的原closed consumer + startPermit + stopProof，三者必须核同一execution/parent/consumer/Pod/volume/node。仅该独立证明成立后删除原Runner Secret与原-admission Secret。Runner Secret核Task/原意图或资源认领、immutable、原token hash与已知UID；Admission Secret核immutable、任务与permit的podUid/nodeUid/consumerId/volumeUid。对象替换或内容不匹配等待，不按名字删除；Task和K8s adapter绝不移除finalizer，也不操作父Pod/PVC。
+
+Task内部readonly inspectDevelopmentCleanupSelection仅为L6显式组合提供当前完整保护选择，在选中cleaning及原Pod已绑定时可返回。摘要覆盖全部Task持久原身份/render/资源/卷/Pod/节点/Runner/Secret/hash，不含current state、connected、activity、清理重试时钟或消费者金额水位；Task实际job事务在写回执和最终quota release时重新构造并对拍。摘要值之外的跨模块input只含version、完整UsageExecutionIdentity、compute profile/revision、原Pod UID、consumerId与renderStart。API/ports/domain分别保持自己允许的依赖，不从api导入ports/domain，也不跨模块import私有文件；结构一致性在L6真实组合测试编译/运行核对，不改共享contracts/index或business golden。
+
+DevSession cleanup参与者按自己的原owner/AgentStart/真实Task环境核对上述实际身份与原profile/Pod，采用原ending存储顺序关闭派发，再在锁外stop/drain并以Session公开getDevelopmentUsage复核原登记和持久closure。输出只含不可撤销前缀：原selection、registration、ending持久stop/closure、首次关闭原因、owner payloadDigest、原acceptedAt/profile/CNY目录修订。消费者sourceAcknowledgedThrough/offeredThrough/金额或最新查询时间不进入清理摘要；消费者重试/ACK推进不能使已持久数字许可失效。原关闭后价格/原binding不可替换，不能借claim busy/evidence-complete跳过真实Session原副本复核。
+
+Platform新增显式adapter，在锁外通过公开Task query确认input选择，再调用公开DevSession参与者；不改当前并行platform/wiring，也不在生产注入source、清理adapter或计时器。新Task/Dev可选deps缺省保持等待与生产OFF。新副本证明不能授权平台/项目其他用途。
+
+冻结源码/测试29条、RFC文档3条如下。实施前对现有文件与新增路径做指纹登记；若需要别的文件/能力，先更新设计并独立复核，不能临时扫入并行在制品：
+
+- `modules/task-runtime/api/developmentCleanup.ts`
+- `modules/task-runtime/api/moduleApi.ts`
+- `modules/task-runtime/index.ts`
+- `modules/task-runtime/domain/development/cleanupEvidence.ts`
+- `modules/task-runtime/domain/development/cleanupSelection.ts`
+- `modules/task-runtime/domain/taskEnvironment.ts`
+- `modules/task-runtime/ports/developmentCleanup.ts`
+- `modules/task-runtime/ports/cluster.ts`
+- `modules/task-runtime/application/dependencies.ts`
+- `modules/task-runtime/application/development/cleanup.ts`
+- `modules/task-runtime/application/development/workloadStop.ts`
+- `modules/task-runtime/application/nativeExecution.ts`
+- `modules/task-runtime/adapters/k8s/developmentCleanup.ts`
+- `modules/task-runtime/adapters/k8s/developmentExecutions.ts`
+- `modules/task-runtime/adapters/k8s/nativeExecutions.ts`
+- `modules/task-runtime/wiring.ts`
+- `modules/task-runtime/tests/developmentCleanupFixture.ts`
+- `modules/task-runtime/tests/developmentCleanup.test.ts`
+- `modules/dev-session/api/developmentCleanup.ts`
+- `modules/dev-session/api/moduleApi.ts`
+- `modules/dev-session/domain/development/cleanup.ts`
+- `modules/dev-session/ports/developmentCleanup.ts`
+- `modules/dev-session/application/development/cleanup.ts`
+- `modules/dev-session/wiring.ts`
+- `modules/dev-session/tests/developmentCleanupFixture.ts`
+- `modules/dev-session/tests/developmentCleanup.test.ts`
+- `modules/platform/application/developmentCleanupPorts.ts`
+- `modules/platform/ports/developmentCleanup.ts`
+- `modules/platform/tests/developmentCleanup.test.ts`
+- `proposal/rfc/RFC-034-runtime-observability/development-cleanup.md`
+- `proposal/rfc/RFC-034-runtime-observability/plan.md`
+- `proposal/rfc/RFC-034-runtime-observability/remaining-work.md`
+
+
+### 首候选v3：真实数值副本的跨模块回归落位
+
+v2独立设计复核于2026-10-01 PASS，无新增P1/P2；43条参考、14条已有候选及4条补充参考首尾一致，18个新增路径未创建。删除中原Pod使用独立重试校验：保持原UID、原归属和完整受理规格，但不要求仍保留初始finalizer；finalizer消失不授权提前删Secret或释放额度。原Runner Secret UID在两种创建来源均已持久保存，必须核该UID与原令牌摘要。
+
+为落实本节已经要求的真实PG＋Runner SQLite日志＋原owner/AgentStart/ending＋Task native job/Resources/公开Controller组合验证，精确新增`tests/e2e/developmentCleanupFixture.ts`和`tests/e2e/developmentCleanup.test.ts`两条测试路径。根级跨模块用例遵循既有`tests/e2e/developmentUsageJournalCopy.test.ts`落位，可组合实际模块私有适配器与Runner日志；模块内各自的测试仍只经其他模块根API。该调整只增加测试落位，生产源码范围仍29条，RFC文档仍3条；共34条候选。测试以受控传输与K8s模拟故障，不启动真实模型，不手工写Session closure或Resources grant。原source消费ACK、金额估值失败与重试必须不改变已许可摘要。生产producer/cleanup组合继续OFF，全部通用入口与未绑定分支仍未关闭。
+
+
+## 2026-10-01 原绑定数字与物理清理实现候选
+
+v3限定设计门PASS（53条参考、14条现有候选、20条新增路径及3条补充参考稳定）。34条批准路径内已实现内部Task/Dev/Platform清理参与者：Task只在真实作业事务fence内保存原数字出口及最终额度事务；Kubernetes操作和Session传输均在锁外。原Pod完整规格/UID、Runner Secret已知UID/原令牌、准入Secret任务归属/不可变四元许可以及删除前实际UID条件分别核验。Controller先持久全部原容器停止证明，再移自己的finalizer；Task不移finalizer，不删除父工作区Pod或PVC。生产装配仍未启用。
+
+准入Secret的历史UID未在既有受理记录持久保存。本批核原permit四元值及当次读取UID，以API UID前置条件防止读取与删除之间替换；原Runner Secret则必须核已持久的历史UID。不能把前一种校验写成已检测“首次读取前、相同完整许可内容的另一UID”。该边界纳入实现复核，未批准范围之外不增加迁移或修改共享准入来源。
+
+Task/Dev/Platform隔离模块首轮失败和修复保留：资源消失观测会通过对象认领返回record而不携带input.resourceId，等待现以真实record身份确认；替换Agent/项目夹具改用平台UUIDv7，不放宽身份规则。Task补充原Runner UID、错误准入卷、读取后Secret UID替换、错误Node/consumer/不完整容器证明及最终I/O期间作业接管的反例，16项/90断言通过；原三模块合计21项/105断言通过，新补反例后的组合回归另记。
+
+根级10项/62断言真实组合全部通过：Runner SQLite→Session PostgreSQL副本/ACK→owner/AgentStart/ending→Task job→Resources/公开Controller→原Pod/两个Secret→额度。两种创建来源、数字未复制保持凭据/额度、stop/drain/Runner ACK/ending提交丢响应、Session实例重建、原日志关闭后数值重放、source ACK推进/新价格不改变原许可均有验证。首次中断场景失败日志保留：本候选要求独立停止与Session已知末尾对拍。已验证的中断为原日志头N=10仍可读取、实际数值页只复制M=5后明确不可读，最终真实PG closure保留missingAfter=5/missingThrough=10/tailUnknown，不手写closure或grant、不以超时判丢失。整个日志头未知或未绑定仍等待后续独立证明。
+
+本地受控Kubernetes/Runner传输不等于已部署或真实模型验收。定向类型检查通过；首轮lint的一处import()类型注解已改为type import，复验待回执。独立完整实现复核、稳定候选唯一完整门禁、精确发布CI及本机升级尚未完成。未绑定、全部通用删除入口、消费者生产装配与两级事实/UI继续，两个RFC保持In Progress。
+
+
+## 2026-10-01 原绑定清理的独立实现门与唯一完整验证
+
+独立完整实现复核PASS，无本限定范围P1/P2，31源码/测试、3文档、50参考和8完成回执及补充依据首尾指纹一致；明确准入Secret只核原许可内容和当次读取UID，不冒称历史UID。稳定源码在2026-10-01T01:01:26.425013Z至01:20:05.198489Z仅运行一次完整五组件检查，耗时1118.804秒：架构、全仓lint、后端类型、工作台类型和测试全部exit=0，aggregate=0，源码31条首尾不变。
+
+测试实际4738pass/143skip/0fail，31146断言、945文件（4881测试）。四个新增清理测试文件共36pass/0fail/0skip，同次12个相关文件83pass/0fail；跨模块10项实际SQLite/PG、公开Controller停止证明和物理回收成功。143跳过保留明确环境/真实身份模型条件，不算实际模型或部署验收。第一轮缺口夹具、观测等待、UUID和type-import失败与修复日志继续保留。
+
+期间main由其他会话正常推进至602bd144（项目资源权限列表/文档）；冻结源、三个RFC文档和50参考均未变。按用户候选内容规则复用这次完整检查，不因HEAD推进取消或重跑。发布仅34条批准路径，共享STATE/RFC索引及外部在制品不纳入。待最终发布回执和本候选精确六项CI成功后升级本机；现行b9508486与生产OFF不变，未绑定/全部通用入口、consumer生产调用、两级开发明细和实际联合验收仍继续。

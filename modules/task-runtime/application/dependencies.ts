@@ -1,3 +1,4 @@
+import type { DevelopmentCleanupParticipant } from '../ports/developmentCleanup';
 import type { TaskRecoveryCluster } from '../ports/recoveryCluster';
 import type { RuntimeImageExecutionSnapshot, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
 import type { Clock, Logger } from '@crewstation/kernel';
@@ -8,6 +9,7 @@ import type { WorkloadSafetyPort, TaskVolumePort } from '../ports/workloadSafety
 import type { UnprovisionedStorage } from '../ports/unprovisionedStorage';
 
 export interface TaskRuntimeUseCaseDeps {
+  developmentCleanup?: DevelopmentCleanupParticipant;
   unprovisionedStorage?: UnprovisionedStorage;
   workloadSafety?: WorkloadSafetyPort;
   taskVolumes?: TaskVolumePort;

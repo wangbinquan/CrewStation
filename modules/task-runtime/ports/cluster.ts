@@ -1,3 +1,4 @@
+import type { DevelopmentCleanupGuard } from './developmentCleanup';
 import type { StartupObservation } from '../domain/podStartup';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
 
@@ -29,6 +30,7 @@ export interface NativeExecutionCluster {
   inspectWorkspace(parent: TaskEnvironment): Promise<{ podUid: string; pvcUid: string; nodeName: string }>;
   prepare(env: TaskEnvironment, values: () => Promise<Record<string, string>>): Promise<{ podUid: string; secretUid: string; token: string }>;
   cleanup(env: TaskEnvironment): Promise<void>;
+  cleanupDevelopment?(env: TaskEnvironment, guard: DevelopmentCleanupGuard): Promise<void>;
 }
 
 export type PodPhase = 'Pending' | 'Running' | 'Succeeded' | 'Failed' | 'Unknown' | 'Missing';

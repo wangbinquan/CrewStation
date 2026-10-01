@@ -1,3 +1,6 @@
+import type { DevelopmentCleanupSession } from './ports/developmentCleanup';
+import { developmentCleanupParticipant } from './application/development/cleanup';
+import { developmentEndingStore } from './adapters/persistence/ending/store';
 import type { DevelopmentRuntimeImages } from './ports/runtimeImages';
 import type { DevelopmentUsagePricing } from './ports/developmentUsage';
 import { developmentUsageOwnerStore } from './adapters/persistence/developmentUsage';
@@ -41,6 +44,7 @@ import { withExecutionPhase } from './domain/terminalPhase';
 
 export interface DevSessionModuleDeps {
   developmentUsagePricing?: DevelopmentUsagePricing;
+  developmentCleanupSession?: DevelopmentCleanupSession;
   identities?: ResourceIdentityDirectory;
   /** 资源台账里 CLI／Agent 执行记录的阶段（RFC-025 §11.2）；缺省时名册照 Runner 的说法给出。 */
   runtimeImages?: DevelopmentRuntimeImages;
@@ -99,8 +103,11 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
     useCaseDeps.logger.warn('native activity query unavailable', { taskId });
     return undefined;
   }), useCaseDeps.clock);
+  const developmentUsage = developmentUsageOwner(developmentUsageOwnerStore(deps.db), agentStarts, deps.environments, deps.developmentUsagePricing);
   const api: DevSessionModuleApi = {
-    developmentUsage: developmentUsageOwner(developmentUsageOwnerStore(deps.db), agentStarts, deps.environments, deps.developmentUsagePricing),
+    developmentUsage,
+    ...(deps.developmentCleanupSession ? { developmentCleanup: developmentCleanupParticipant({ owner: developmentUsage, store: developmentEndingStore(deps.db, useCaseDeps.clock),
+      environments: deps.environments, session: deps.developmentCleanupSession, clock: useCaseDeps.clock }) } : {}),
     invokeApi: apiInvocationUseCase(useCaseDeps),
     ...clusterAgentUseCases(useCaseDeps, agentStarts, agentExecutions), ...clusterNativeUseCases(useCaseDeps, terminals),
     name: 'dev-session', ...lifecycle, ...agents, ...native, ...activity, ...workspaceLayoutUseCases(useCaseDeps, drizzleWorkspaceLayouts(deps.db), terminals),

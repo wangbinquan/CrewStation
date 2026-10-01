@@ -1,3 +1,5 @@
+import { developmentCleanupSelection } from './domain/development/cleanupSelection';
+import type { DevelopmentCleanupParticipant } from './ports/developmentCleanup';
 import { developmentUsageLayoutLookup } from './application/development/layoutLookup';
 import { inspectBusinessRecovery } from './application/business/recoveryInspection';
 import { businessStorageFinalization } from './application/business/finalization';
@@ -59,6 +61,7 @@ import { ledgerResyncWorker } from './workers/ledgerResyncWorker';
 import type { EnvironmentSources, ProfileCatalog, ProjectAuthorizer, QuotaSource, ServiceResolver, SourceCheckoutSource, TaskRuntimeSettings, TestRunner } from './ports/platform';
 
 export interface TaskRuntimeModuleDeps {
+  developmentCleanup?: DevelopmentCleanupParticipant;
   archive?: { credentials: ArchiveCredentials; apiUrl: string };
   workloadSafety?: WorkloadSafetyPort;
   taskVolumes?: TaskVolumePort;
@@ -117,7 +120,7 @@ function ledgerProjectionFor(deps: TaskRuntimeModuleDeps): Parameters<typeof dri
 
 function taskRuntimeUseCaseDeps(deps: TaskRuntimeModuleDeps): TaskRuntimeUseCaseDeps {
   return {
-    workloadSafety: deps.workloadSafety, taskVolumes: deps.taskVolumes,
+    developmentCleanup: deps.developmentCleanup, workloadSafety: deps.workloadSafety, taskVolumes: deps.taskVolumes,
     ...(deps.ledger && deps.creation === 'ledger' ? { unprovisionedStorage: unprovisionedStorage(deps.db, deps.ledger) } : {}),
     uow: drizzleUnitOfWork(deps.db, ledgerProjectionFor(deps)),
     cluster: deps.cluster ?? kubernetesTaskCluster(deps.k8s, deps.settings.workerUid),
@@ -169,6 +172,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     reconcileRebuild: reconcileRebuildUseCase(recoveryDeps),
     listClusterTasks: queries.listClusterTasks,
     lookupDevelopmentUsageLayout: developmentUsageLayoutLookup(useCaseDeps),
+    inspectDevelopmentCleanupSelection: async (taskId) => { const env = await useCaseDeps.uow.read.environments.getById(taskId); return env ? developmentCleanupSelection(env) : undefined; },
     resourceWorkloads: queries.resourceWorkloads,
     resourceWorkload: queries.resourceWorkload,
     ...rebuild,

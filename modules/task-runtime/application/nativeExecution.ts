@@ -1,3 +1,4 @@
+import { cleanupDevelopmentWorkload } from './development/cleanup';
 import type { TaskId } from '@crewstation/contracts';
 import { DevelopmentUsageStorageSchema, DomainTopic, RuntimeImageExecutionSnapshotSchema } from '@crewstation/contracts';
 import { conflict, jsonHash, newResourceId, notFound, precondition } from '@crewstation/kernel';
@@ -196,7 +197,7 @@ export async function runNativeExecution(deps: NativeExecutionDeps, taskId: Task
   const original = await deps.uow.read.environments.getById(taskId);
   if (!original) return;
   if (original.render?.developmentUsageProtection !== undefined) {
-    if (original.native?.state === 'cleaning') throw new Error('等待开发数字排空与原执行停止屏障');
+    if (original.native?.state === 'cleaning') await cleanupDevelopmentWorkload(deps, original, heartbeat, identity);
     if (original.native?.state === 'queued' && !reconcilerCreates(original)) await prepareDevelopmentWorkload(deps, original, heartbeat, identity);
     return;
   }

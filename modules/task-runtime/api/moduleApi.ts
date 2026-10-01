@@ -1,6 +1,7 @@
 import type { RuntimeImageHistoryRead, RuntimeImageHistoryItem } from '@crewstation/contracts';
 import type { ResourceWorkload, ResourceWorkloadPage } from '@crewstation/contracts';
 import type { BusinessStorageFinalization, DevelopmentSourceBinding, WorkloadStopBarrier } from '@crewstation/contracts';
+import type { DevelopmentCleanupSelection } from './developmentCleanup';
 import type { BusinessRecoveryScope, BusinessWorkspaceProof, RebuildBusinessWorkspaceInput, RestartBusinessWorkspaceInput } from './businessRecovery';
 import type { BusinessSessionStorage, DevelopmentUsageStorage, DevelopmentUsageLayoutLookup } from '@crewstation/contracts';
 import type { RuntimeImageProbeInput, RuntimeImageProbeResult, RuntimeInitializationStatus, RuntimeImageExecutionSnapshot, Actor, ProjectId, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
@@ -113,6 +114,8 @@ export interface RebuildRendering {
 }
 
 export interface TaskRuntimeModuleApi {
+  /** Internal L6 cleanup composition only, never exposed by HTTP. */
+  inspectDevelopmentCleanupSelection?(taskId: TaskId): Promise<DevelopmentCleanupSelection | undefined>;
   resourceWorkload(actor: Actor, taskId: TaskId): Promise<ResourceWorkload>;
   resourceWorkloads(actor: Actor, projectId: ProjectId, page: { after?: string; limit: number }): Promise<ResourceWorkloadPage>;
   readonly storageCleanup?: StorageCleanupApi;

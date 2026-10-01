@@ -1,3 +1,4 @@
+import { cleanupDevelopmentExecution } from './developmentCleanup';
 import { isDeepStrictEqual } from 'node:util';
 import type { K8sClient, K8sObject, ResourceRef } from '@crewstation/k8s';
 import { LABELS, Resources, resourcesMatch, secretObject } from '@crewstation/k8s';
@@ -85,6 +86,7 @@ function verifyDevelopmentStorage(pod: K8sObject, env: TaskEnvironment): void {
 /** 所有写入只针对本次执行 Pod／Secret；接口没有创建、修改或删除 PVC 的能力。 */
 export function kubernetesNativeExecutions(k8s: K8sClient, workerUid: number, safety?: Pick<WorkloadSafetyPort, 'register'>): NativeExecutionCluster {
   return {
+    cleanupDevelopment: (env, guard) => cleanupDevelopmentExecution(k8s, env, guard),
     inspectWorkspace: (parent) => inspectWorkspace(k8s, parent),
     prepare: async (env, values) => {
       const protection = await registerDevelopmentExecution(env, safety);
