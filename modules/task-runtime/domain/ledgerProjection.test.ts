@@ -138,6 +138,30 @@ describe('任务环境投影到资源台账（RFC-025 第二期）', () => {
     expect(rebuilt.volume).not.toHaveProperty('render');
   });
 
+  // RFC-034 真档位验收：哨兵仅用于并发计数，平台测试资源不能冒充不存在的租户项目。
+  test('平台档位测试不投影哨兵项目；项目镜像验证仍固定真实项目，开发与业务子任务不变', () => {
+    const render = { image: 'img', workerUid: 10001, resources: { cpu: '1', memory: '2Gi', storage: '10Gi' }, start: 1, workVolume: 'emptyDir' as const };
+    const platform = env({ kind: 'profile-test', render });
+    expect(projectEnvironment(platform).workload).not.toHaveProperty('projectId');
+    const projectId = '01a0bf5d-8f4b-7c01-8e19-e226732a7777' as ProjectId;
+    expect(projectEnvironment({ ...platform, render: { ...render, runtimeValidation: { projectId, usage: 'task', quotaHeld: true } } }).workload.projectId).toBe(projectId);
+    expect(() => projectEnvironment({ ...platform, render: { ...render, runtimeValidation: { projectId: 'invalid', usage: 'task', quotaHeld: true } } })).toThrow();
+    for (const kind of ['dev-session', 'business'] as const) {
+      const parent = env({ kind, render });
+      expect(projectEnvironment(parent).workload.projectId).toBe(parent.projectId);
+      expect(projectEnvironment(parent).volume?.projectId).toBe(parent.projectId);
+      expect(projectEnvironment({ ...parent, native: native() }).workload.projectId).toBe(parent.projectId);
+    }
+  });
+
+  // Drizzle 对持久 JSON 仅做类型断言：显式非法值不能降级成无租户的平台测试。
+  for (const invalid of [null, false, 0, '']) {
+    test('持久 JSON 的 runtimeValidation=' + JSON.stringify(invalid) + ' 拒绝投影，不绕过项目准入', () => {
+      const persisted = JSON.parse(JSON.stringify(env({ kind: 'profile-test', render: { image: 'img', workerUid: 10001, resources: { cpu: '1', memory: '2Gi', storage: '10Gi' }, start: 1, workVolume: 'emptyDir', runtimeValidation: invalid as never } }))) as TaskEnvironment;
+      expect(() => projectEnvironment(persisted)).toThrow();
+    });
+  }
+
   test('资源中心建出的档位测试（I25 第四步）：Pod 用临时目录、没有工作卷记录，Runner Secret 归这一次启动', () => {
     const render = { image: 'img', workerUid: 10001, resources: { cpu: '1', memory: '2Gi', storage: '10Gi' }, start: 1, workVolume: 'emptyDir' as const };
     const test = projectEnvironment(env({ kind: 'profile-test', state: 'creating', connected: false, namespace: 'crewstation-system', render, labels: { 'crewstation.io/project': 'platform', 'crewstation.io/service': 'profile-test' } }));

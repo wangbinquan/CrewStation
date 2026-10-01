@@ -15,6 +15,8 @@ describe.skipIf(!available)('隔离镜像任务验证', () => {
     for (let i = 0; i < 100 && !await f.uow.read.environments.getById(id); i++) await Bun.sleep(10);
     const env = await f.load(id); expect(env.kind).toBe('profile-test');
     expect(env.render?.workVolume).toBe('emptyDir');
+    // 项目镜像验证不能随平台档位测试一起失去真实项目的存在／删除准入保护。
+    expect((await f.resources.api.get(id))?.projectId).toBe(f.projectId);
     const { values } = await f.bind(id); expect(values.GREETING).toBeUndefined();
     await f.k8s.mergePatch(Resources.Pod!, env.podName, env.namespace, { status: { containerStatuses: [{ name: 'taskrunner', imageID: image.image }] } });
     await f.status(id, 'succeeded'); await f.runtime.api.observeStartup();

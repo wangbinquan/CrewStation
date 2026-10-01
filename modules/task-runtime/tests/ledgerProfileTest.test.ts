@@ -1,10 +1,12 @@
 import { sql } from 'drizzle-orm';
 import { PROFILE_TEST_PROJECT_ID } from '../domain/profileTestEnvironment';
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import type { RunnerCommand, RunnerEvent, TaskId } from '@crewstation/contracts';
+import type { ProjectId, RunnerCommand, RunnerEvent, TaskId } from '@crewstation/contracts';
 import { LaunchSpecSchema, PLATFORM_ENV } from '@crewstation/contracts';
 import { eventbusMigrations } from '@crewstation/eventbus';
-import { createFakeK8sClient, Resources, taskPodObject } from '@crewstation/k8s';
+import { createFakeK8sClient, Resources } from '@crewstation/k8s';
+import { newResourceId, notFound } from '@crewstation/kernel';
+import { createClusterControlModule } from '@crewstation/module-cluster-control';
 import type { ResourcesModule } from '@crewstation/module-resources';
 import { createResourcesModule, resourcesMigrations } from '@crewstation/module-resources';
 import { queueMigrations } from '@crewstation/queue';
@@ -27,13 +29,15 @@ describe.skipIf(!available)('档位测试由资源中心建出（RFC-025 I25 第
   let resources: ResourcesModule;
   let runtime: TaskRuntimeModule;
   const k8s = createFakeK8sClient();
+  const admissionCalls: string[] = [];
+  const warnings: string[] = [];
   const events = new Map<string, Array<{ seq: number; at: string; event: RunnerEvent }>>();
   const emit = (taskId: string, event: RunnerEvent) => { const list = events.get(taskId) ?? []; list.push({ seq: list.length + 1, at: new Date().toISOString(), event }); events.set(taskId, list); };
   const agent = (agentId: string, seq: number, event: Record<string, unknown> & { type: string }): RunnerEvent => ({ kind: 'agent', event: { agentId, seq, at: new Date().toISOString(), ...event } } as RunnerEvent);
 
   beforeAll(async () => {
     tdb = await createTestDatabase([eventbusMigrations, queueMigrations, resourcesMigrations, taskRuntimeMigrations]);
-    resources = createResourcesModule({ db: tdb.db, quotas: { limitFor: async () => 4 }, authorizer: { projectAccess: async () => ({ operate: true }) }, isAdmin: async () => true });
+    resources = createResourcesModule({ db: tdb.db, quotas: { limitFor: async () => 4 }, authorizer: { projectAccess: async () => ({ operate: true }) }, isAdmin: async () => true, projectAvailable: async (id) => { admissionCalls.push(id); throw notFound('项目', id); } });
     const owner = resources.api.owner('task-runtime');
     const ledger: EnvironmentLedger = { within: (tx) => owner.within(tx as object), live: async () => (await resources.api.list({})).filter((record) => record.owner.module === 'task-runtime'), occupancy: resources.api.occupancy };
     runtime = createTaskRuntimeModule({
@@ -62,23 +66,43 @@ describe.skipIf(!available)('档位测试由资源中心建出（RFC-025 I25 第
   });
   afterAll(async () => { await tdb.drop(); });
 
-  /** 模拟调和器：等要建的档位测试记录出现，停一会儿（让等 Runner 的轮询先看到 Pod 还不在），再照期望建 Pod、要值、交回实例，Runner 连上。 */
-  async function reconcileOnce(): Promise<{ id: TaskId; spec: Record<string, unknown>; values: Record<string, string> }> {
-    for (;;) {
-      const record = (await resources.api.list({ kind: 'agent-execution' })).find((entry) => entry.conditions.some((c) => c.type === 'Provisioning' && c.status === 'true'));
-      if (record) {
-        await Bun.sleep(150);
-        const id = record.id as TaskId, pod = record.spec['pod'] as { secret: string };
-        const values = await runtime.api.runnerValues(id);
-        const created = await k8s.create(taskPodObject({ name: record.spec.children[0]!.name, namespace: 'crewstation-system', taskId: id, workload: 'profile-test', project: 'platform', service: 'profile-test',
-          image, workerUid: 10001, resources: { cpu: '1', memory: '2Gi', storage: '10Gi' }, workVolume: { emptyDir: true }, envFromSecret: pod.secret }));
-        await k8s.mergePatch(Resources.Pod!, created.metadata.name, 'crewstation-system', { status: { phase: 'Running', containerStatuses: [{ name: 'task', imageID: image }] } });
-        await runtime.api.bindWorkload(id, created.metadata.uid!);
-        expect(await runtime.api.onRunnerConnected(id, values['CS_RUNNER_TOKEN']!)).toBe(true);
-        return { id, spec: record.spec as Record<string, unknown>, values };
-      }
-      await Bun.sleep(10);
+  function controller() {
+    const ledger = resources.api, objects = () => [...k8s.objects.values()];
+    return createClusterControlModule({ k8s, systemNamespace: 'crewstation-system', isAdmin: async () => true, orphanSweep: false,
+      legacy: { resolveTaskId: async () => undefined, task: async () => undefined },
+      logger: { debug: () => {}, info: () => {}, warn: (message, fields) => { warnings.push(message + ' ' + JSON.stringify(fields)); }, error: () => {}, child() { return this; } },
+      reconciler: { pollMs: 10, retryMs: 10, concurrency: 1 },
+      ledger: { ...ledger, withProjectAdmission: (id, work) => ledger.projectDeletion.withAdmission(id as ProjectId, work),
+        listLive: () => ledger.list({}), children: (parentId) => ledger.list({ parentId, includeStopped: true }), adoptOrphanVolume: async () => {} },
+      feed: { start: () => {}, stop: async () => {}, synced: async () => {}, cached: (kind, ns, name) => objects().find((o) => o.kind === kind && o.metadata.namespace === ns && o.metadata.name === name), list: (kind) => objects().filter((o) => o.kind === kind) },
+      workloads: { runnerValues: (id) => runtime.api.runnerValues(id as TaskId), checkoutValues: (id) => runtime.api.checkoutValues(id as TaskId),
+        bindWorkload: (id, podUid, secretUid) => runtime.api.bindWorkload(id as TaskId, podUid, secretUid), workloadUnavailable: (id, code) => runtime.api.workloadUnavailable(id as TaskId, code) },
+    });
+  }
+
+  /** RFC-034 真实失败回归：公共调和器、真实 PG 删除准入和 Kubernetes writer，不能手工建 Pod 绕过项目 guard。 */
+  async function reconcileOnce(): Promise<{ id: TaskId; spec: Record<string, unknown>; values: Record<string, string> } | undefined> {
+    const deadline = Date.now() + 2500;
+    let record;
+    while (!record && Date.now() < deadline) {
+      record = (await resources.api.list({ kind: 'agent-execution' })).find((entry) => entry.conditions.some((c) => c.type === 'Provisioning' && c.status === 'true'));
+      if (!record) await Bun.sleep(10);
     }
+    if (!record) return undefined;
+    await Bun.sleep(150);
+    const id = record.id as TaskId, podName = record.spec.children[0]!.name, secretName = (record.spec['pod'] as { secret: string }).secret;
+    const control = controller(); control.observer.start();
+    try {
+      while (!await k8s.get(Resources.Pod!, podName, 'crewstation-system') && Date.now() < deadline) await Bun.sleep(10);
+      if (!await k8s.get(Resources.Pod!, podName, 'crewstation-system')) return undefined;
+      await control.reconciled();
+      const secret = await k8s.get(Resources.Secret!, secretName, 'crewstation-system');
+      // 假 API Server 保留标准 writer 的 stringData（真实 API Server 会编码到 data）。
+      const values = secret!.stringData as Record<string, string>;
+      await k8s.mergePatch(Resources.Pod!, podName, 'crewstation-system', { status: { phase: 'Running', containerStatuses: [{ name: 'task', imageID: image }] } });
+      expect(await runtime.api.onRunnerConnected(id, values['CS_RUNNER_TOKEN']!)).toBe(true);
+      return { id, spec: record.spec as Record<string, unknown>, values };
+    } finally { await control.observer.stop(); }
   }
 
   test('受理只登记、临时目录不等卷；Pod 建出之前不判没起来；Runner 的内容建的时候才给（平台服务、没有租户配置）；测完释放', async () => {
@@ -88,11 +112,16 @@ describe.skipIf(!available)('档位测试由资源中心建出（RFC-025 I25 第
       prompt: `Output this exact token verbatim and nothing else: ${nonce}`, expectedReply: nonce,
     };
     const run = runtime.api.runProfileTest(input, async () => undefined, async () => true);
-    const { id, spec, values } = await reconcileOnce();
+    const captured = await reconcileOnce();
+    const outcome = await run;
+    expect(captured).toBeDefined();
+    if (!captured) throw new Error('真实项目准入阻止平台测试建 Pod：' + warnings.join('\n'));
+    const { id, spec, values } = captured;
+    expect(admissionCalls).toEqual([]);
+    expect((await resources.api.get(id))?.projectId).toBeUndefined();
     expect(spec['pod']).toMatchObject({ image, emptyDir: true, workload: 'profile-test', project: 'platform', service: 'profile-test', secret: `${(spec as { children: Array<{ name: string }> }).children[0]!.name}-runner-1` });
     expect(spec['pod']).not.toHaveProperty('pvc');
     expect(values).toMatchObject({ [PLATFORM_ENV.project]: 'platform', [PLATFORM_ENV.service]: 'profile-test' });
-    const outcome = await run;
     expect(outcome).toMatchObject({ state: 'passed', outcome: 'passed' });
     expect(await runtime.api.getEnvironment(id)).toMatchObject({ kind: 'profile-test', state: 'released' });
     expect((await resources.api.get(id))?.desired).toBe('absent');
@@ -101,6 +130,28 @@ describe.skipIf(!available)('档位测试由资源中心建出（RFC-025 I25 第
     await runtime.api.releaseEnvironment(id, 'profile-test');
     expect((await tdb.db.execute(sql`SELECT running FROM task_runtime.admissions WHERE project_id=${PROFILE_TEST_PROJECT_ID}`))[0]?.['running']).toBe(0);
   });
+  test('平台测试的修复仍保留真实项目存在和闭准入校验，均不建 Pod / Secret', async () => {
+    const projectId = newResourceId() as ProjectId, id = newResourceId(), name = 'task-real-project-rejected';
+    const original = (await resources.api.list({ kind: 'agent-execution', includeStopped: true }))[0]!;
+    await resources.api.owner('task-runtime').declare({ id, ref: id, kind: 'agent-execution', projectId, purpose: 'profile-test',
+      conditions: [{ type: 'Provisioning', status: 'true' }], spec: { ...original.spec, children: [{ kind: 'Pod', namespace: 'crewstation-system', name }, { kind: 'Secret', namespace: 'crewstation-system', name: name + '-runner' }], pod: { ...(original.spec['pod'] as object), secret: name + '-runner' } } });
+    const control = controller(); control.observer.start();
+    try {
+      for (let i = 0; i < 100 && !admissionCalls.includes(projectId); i++) await Bun.sleep(10);
+      await control.reconciled();
+      expect(admissionCalls).toContain(projectId);
+      expect(await k8s.get(Resources.Pod!, name, 'crewstation-system')).toBeUndefined();
+      expect(await k8s.get(Resources.Secret!, name + '-runner', 'crewstation-system')).toBeUndefined();
+      expect(warnings.some((message) => message.includes('项目 ' + projectId + ' 不存在'))).toBe(true);
+    } finally { await control.observer.stop(); }
+    let applied = false;
+    const closedId = newResourceId() as ProjectId;
+    await tdb.db.execute(sql`INSERT INTO resources.deletion_fences(project_id,operation_id) VALUES (${closedId},${newResourceId()})`);
+    expect(await resources.api.projectDeletion.withAdmission(closedId, async () => { applied = true; })).toBe(false);
+    expect(applied).toBe(false);
+    expect(admissionCalls).not.toContain(closedId);
+  });
+
   test('修复迁移仅重算哨兵，保留清理中与用途验证未退容量，重复执行不减活动容量', async () => {
     const repair = await Bun.file(new URL('../adapters/persistence/migrations/0016_profile_test_admission_repair.sql', import.meta.url)).text();
     const count = async () => (await tdb.db.execute(sql`SELECT running FROM task_runtime.admissions WHERE project_id=${PROFILE_TEST_PROJECT_ID}`))[0]?.['running'];

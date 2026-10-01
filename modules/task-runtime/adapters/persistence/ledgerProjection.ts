@@ -21,7 +21,7 @@ async function syncRecord(writer: LedgerWriter, record: ProjectedRecord, connect
   const runner = connected === undefined ? [] : runnerCondition(connected, existing?.conditions ?? []);
   const declare = sourceId && writer.splitChildren ? (input: Parameters<LedgerWriter['declare']>[0]) => writer.splitChildren!(sourceId, input) : (input: Parameters<LedgerWriter['declare']>[0]) => writer.declare(input);
   const saved = await declare({
-    ...(record.id ? { id: record.id } : {}), kind: record.kind, ref: record.ref, projectId: record.projectId,
+    ...(record.id ? { id: record.id } : {}), kind: record.kind, ref: record.ref, ...(record.projectId ? { projectId: record.projectId } : {}),
     ...(record.parentId ? { parentId: record.parentId } : {}), ...(record.purpose ? { purpose: record.purpose } : {}),
     spec: { children: record.children, ...(record.reclaim ? { reclaim: record.reclaim } : {}), ...record.render }, display: record.display, conditions: [...record.conditions, ...runner],
     ...(record.aliases ? { aliases: record.aliases } : {}),
@@ -57,7 +57,7 @@ export async function syncEnvironmentLedger(executor: Executor, ledger: Environm
 export async function admitEnvironment(executor: Executor, ledger: EnvironmentLedger, env: TaskEnvironment): Promise<void> {
   const { workload } = projectEnvironment(env);
   await ledger.within(executor).admit({
-    ...(workload.id ? { id: workload.id } : {}), kind: workload.kind, ref: workload.ref, projectId: workload.projectId,
+    ...(workload.id ? { id: workload.id } : {}), kind: workload.kind, ref: workload.ref, ...(workload.projectId ? { projectId: workload.projectId } : {}),
     ...(workload.parentId ? { parentId: workload.parentId } : {}), ...(workload.purpose ? { purpose: workload.purpose } : {}),
     spec: { children: workload.children, ...workload.render }, display: workload.display, conditions: workload.conditions,
   });

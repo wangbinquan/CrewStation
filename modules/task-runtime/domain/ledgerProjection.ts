@@ -1,4 +1,5 @@
 import type { ClusterPurpose, ResourceConditionStatus, ResourceKind, StartupRecord } from '@crewstation/contracts';
+import { ProjectIdSchema } from '@crewstation/contracts';
 import { developmentWorkloadProtection } from './development/protection';
 import type { DevelopmentWorkloadProtection } from './development/protection';
 import type { ExecutionPurpose, TaskEnvironment, WorkloadRender } from './taskEnvironment';
@@ -23,7 +24,8 @@ export interface ProjectedRecord {
   readonly id?: string;
   readonly kind: ResourceKind;
   readonly ref: string;
-  readonly projectId: TaskEnvironment['projectId'];
+  /** 平台档位自测没有租户项目；项目镜像验证仍用请求固定的真实项目。 */
+  readonly projectId?: TaskEnvironment['projectId'];
   /** 上级记录的 ID：工作负载记录沿用环境 ID，所以 Agent 执行的上级就是父工作区的环境 ID。 */
   readonly parentId?: string;
   readonly purpose?: ClusterPurpose;
@@ -172,12 +174,19 @@ function workloadChildren(env: TaskEnvironment, protection: DevelopmentWorkloadP
   ];
 }
 
+/** 哨兵仅用于平台并发计数；资源归属决定真实项目的可用性与删除准入，不能混用。 */
+function workloadProject(env: TaskEnvironment): Pick<ProjectedRecord, 'projectId'> {
+  if (env.kind !== 'profile-test') return { projectId: env.projectId };
+  if (env.render?.runtimeValidation === undefined) return {};
+  return { projectId: ProjectIdSchema.parse(env.render.runtimeValidation.projectId) };
+}
+
 export function projectEnvironment(env: TaskEnvironment, previewRoute: WorkloadRender['previewRoute'] = env.render?.previewRoute): EnvironmentProjection {
   const protection = developmentWorkloadProtection(env), render = workloadRender(env, protection);
   const release = releaseOf(env);
   const split = !!env.preview && !env.native && !!previewRoute;
   const workload: ProjectedRecord = {
-    id: env.id, kind: workloadKind(env), ref: env.id, projectId: env.projectId,
+    id: env.id, kind: workloadKind(env), ref: env.id, ...workloadProject(env),
     ...(env.native ? { parentId: env.native.parentTaskId } : {}),
     purpose: workloadPurpose(env), children: workloadChildren(env, protection).filter((child) => !split || child.kind !== 'IngressRoute'),
     display: workloadDisplay(env), conditions: conditionsOf(env), ...(env.startup ? { startup: env.startup } : {}), ...(release ? { release } : {}),
