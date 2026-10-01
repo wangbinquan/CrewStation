@@ -12,6 +12,7 @@ import { postgresDataPlane } from './adapters/postgres/postgresDataPlane';
 import { postgresDatabaseReclamation } from './adapters/postgres/databaseReclamation';
 import type { DatabaseReclamationReader } from './api/databaseReclamation';
 import type { NativePostgresOrigin, NativePostgresProcesses } from './api/databaseRemoval';
+import type { NativePostgresSource } from './api/storageSource';
 import { markNativeCredentialTransaction, nativePostgresWork } from './adapters/persistence/nativeWork';
 import { stageCredentialRotation, finishCredentialRotation } from './application/rotateCredential';
 import { credentialOf, prepareProvisionCredential, provisionDatabase, seedNativeCredential } from './application/provisionDatabase';
@@ -37,6 +38,7 @@ export interface DataControlModuleDeps {
   readonly adminUrl?: string;
   readonly plane?: DataPlaneReader & DataPlaneWriter;
   readonly databaseReclamation?: DatabaseReclamationReader;
+  readonly nativePostgresSource?: NativePostgresSource;
   readonly logger?: Logger;
   readonly clock?: Clock;
   readonly observer?: DataPlaneObserverOptions;
@@ -103,6 +105,7 @@ export function createDataControlModule(deps: DataControlModuleDeps): DataContro
       });
     } } } : {}),
     ...(databaseReclamation ? { databaseReclamation } : {}),
+    ...(deps.nativePostgresSource ? { nativePostgresSource: deps.nativePostgresSource } : {}),
     stageRotation: async (id, transaction) => forResource(await originOf(id), async (guard) => { if (guard) await markNativeCredentialTransaction(transaction as Executor, guard); return stageCredentialRotation({ ledger: deps.ledger, ...rotationVault(transaction) }, id); }),
     finishRotation: async (id, transaction) => forResource(await originOf(id), async (guard) => { if (guard) await markNativeCredentialTransaction(transaction as Executor, guard); return finishCredentialRotation({ ledger: deps.ledger, plane, ...rotationVault(transaction) }, id); }),
     ...(vault ? { objects: createObjectPlane(deps.db!, vault.cipher) } : {}),

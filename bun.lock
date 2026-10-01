@@ -416,6 +416,7 @@
       "dependencies": {
         "@crewstation/contracts": "workspace:*",
         "@crewstation/eventbus": "workspace:*",
+        "@crewstation/filesystem-metrics": "workspace:*",
         "@crewstation/http": "workspace:*",
         "@crewstation/k8s": "workspace:*",
         "@crewstation/kernel": "workspace:*",

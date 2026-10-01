@@ -175,7 +175,9 @@ spec:
   podSelector: { matchLabels: { app: cs-storage-probe } }
   policyTypes: [Ingress, Egress]
   ingress:
-    - from: [{ podSelector: { matchLabels: { app.kubernetes.io/name: cs-controller } } }]
+    - from:
+        - podSelector: { matchLabels: { app.kubernetes.io/name: cs-api } }
+        - podSelector: { matchLabels: { app.kubernetes.io/name: cs-controller } }
       ports: [{ protocol: TCP, port: 8095 }]
   egress: []
 ---

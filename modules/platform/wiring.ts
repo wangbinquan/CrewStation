@@ -11,6 +11,7 @@ import { executionWriterObserver, migrationWriterObserver, legacyOwnerObserver }
 import { webhookAwareAllowlist } from './application/webhookIngress';
 import { objectStorageSources } from './application/objectStorageSources';
 import { nativeWorkloadOwnership, originalGatewayPodProject } from './adapters/k8s/workloadOwnership';
+import { nativePostgresSource } from './adapters/k8s/nativePostgresSource';
 import { assertStorageConsumers } from './adapters/k8s/storageContract'; import { objectTransferOwners } from './adapters/k8s/objectTransferOwners';
 import { releaseImagePorts } from './application/releaseImagePorts';
 import { eventDeliveryOwners, projectCallbackOwners } from './adapters/k8s/eventDeliveryOwners';
@@ -526,6 +527,7 @@ function composeDataControl(deps: CompositionDeps, ledger: ReturnType<typeof com
     // I28：口令表在平台库里，用平台密钥加密。
     adminUrl: deps.settings.dataPostgres.adminUrl, logger: deps.logger, db: deps.db, secretKeyBase64: deps.settings.secretKeyBase64,
     projectAvailable: project.assertProjectAvailable, processes: projectCallbackOwners(deps.k8s, deps.settings.systemNamespace, deps.settings.platformPodUid, 'crewstation.io/data-control-native-stop'),
+    ...(deps.settings.clusterMetrics ? { nativePostgresSource: nativePostgresSource(deps.k8s, { namespace: deps.settings.systemNamespace, service: 'postgres', adminUrl: deps.settings.dataPostgres.adminUrl, ...deps.settings.clusterMetrics }) } : {}),
     observer: { leases: { port: resources.leases, holder: `${deps.instance}.data-control` } },
     ledger: {
       get: (id) => resources.get(id), changesSince: resources.changesSince, latestChange: resources.latestChange, observe: (input) => resources.observe(input),

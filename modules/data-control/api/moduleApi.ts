@@ -1,5 +1,6 @@
 import type { DatabaseReclamationReader } from './databaseReclamation';
 import type { NativePostgresWork } from './databaseRemoval';
+import type { NativePostgresSource } from './storageSource';
 
 interface ObjectLocation { readonly backendId: string; readonly placementRevision: number; readonly key: string }
 interface ObjectEndpointConfig { readonly endpoint: string; readonly region: string; readonly bucket: string; readonly accessKeyId: string; readonly secretAccessKey: string; readonly monitoring?: { readonly endpoint: string; readonly token: string } }
@@ -23,6 +24,8 @@ export interface DataControlModuleApi {
   readonly databaseReclamation?: DatabaseReclamationReader;
   /** Trusted composition only; every original writer shares native name locks and durable work facts. */
   readonly nativePostgres?: NativePostgresWork;
+  /** Internal read-only independent storage observer; unavailable sources block complete purge. */
+  readonly nativePostgresSource?: NativePostgresSource;
   /**
    * RFC-025 I28：data-control 建库时生成的运行角色口令（解密后的明文）；data 渲染容器的连接串时经端口要，值不进台账。
    * 这条记录的库不是 data-control 建的（旧库）或还没存下口令时返回 undefined。
