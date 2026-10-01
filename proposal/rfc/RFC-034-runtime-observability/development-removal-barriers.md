@@ -1,6 +1,6 @@
 # RFC-034 开发采集的通用删除与未绑定退出屏障
 
-状态：下一阶段设计草案，尚未通过设计门，未开始实现。原绑定清理已部署；开发明细底座已发布为 `50dbd7a7464bbdd7ca304eb82dc2c47146f068fa`，其精确 CI/部署另记。共享组合根仍暂留，生产开发 producer OFF。本草案不扩大既有回执的结论。
+状态：下一阶段草案的独立只读设计复核 v2 已 PASS，尚无任何实施批次的精确源码 allowlist，未开始本草案的实现。原绑定清理已部署；开发明细 35 路径与完整组合根已在 `557cb50c5b6800771a5d016526d7a4d49d61eb77` 完整部署八组件 Ready，consumer 与两级事实已接通；回执提交 `1d896ab777b9dbe133a4db79f98d585fb5600831` 六项 CI 成功。生产开发 producer 仍 OFF；本草案 PASS 不构成通用删除、未绑定和全 writer 封口的实现或验收结论。
 
 ## 必须解决的问题
 
@@ -56,3 +56,16 @@ Resources 的到期/压缩过程先在锁外取得单调 owner 状态或请求�
 回归至少覆盖：数字未复制时所有物理材料保持；原 Pod/Secret UID 替换；无 grant/有 grant 的未绑定分别验证；迟到创建/迟到 Start/exec、seal ACK 丢失与实例重启；真实 job 过期接管；到期与 owner 同时请求结束；child 集合变化；重建期间原父令牌/Pod 保持；单个孤儿等待时其他旧对象仍清理；数字/CNY 消费重复与估值失败；原副本可恢复、M/N 缺口及完全 unknown tail。使用实际 PG/SQLite 和受控 Kubernetes/Runner 传输，夹具不得手写 grant/closure 绕过实际链路。
 
 本草案是 CS-R02 后续依赖的落档，不关闭 CS-R02、真实身份/模型验收或完整 RFC。
+
+## 原准入 Secret 回执第一步的精确设计
+
+[原准入 UID 回执设计](./development-admission-receipts.md)明确 ledger/direct 都由 Controller 在实际准入创建后登记，提出独立新选择和 Resources 持久回执，保留旧批准四元许可/current UID 例外。缺失真实创建回执不得倒填历史 UID；生产 producer 仍 OFF。本批精确源码冻结和独立设计门尚待完成，后续通用删除/父操作/未绑定/全 writer seal 不因此关闭。
+
+### 第一步 v1 失败与 v2 补交边界
+
+第一步 v1 独立 FAIL 的真实 P2 是已知 create UID 在 PG 保存失败后被 closure/ReleasePending 早退跳过。v2 以同 creator 的 128 项有界原回执、成功 CAS 才 ACK、公共 reconcileRecord 在 ledger/关闭判断前的仅补交入口及有限 pending ID resync 覆盖此缺口；不重开准入，不凭同名对象倒填，不冒称跨进程 unknown 回执恢复。v2 独立设计门待验，所有源码仍未改，完整删除/全部 writer seal 与生产 producer OFF 边界保持。共享 migration lock 的并行条目由 owner 保留并准备发布依赖，观测文档继续独立提交。
+
+
+### 原准入回执第一步 v2 设计门（2026-10-01）
+
+[限定回执设计](./development-admission-receipts.md#v2-独立设计复核与共享前置条件2026-10-01)独立复核 PASS；原 v1 已知 UID 在 PG 失败后被关闭早退跳过的 P2 已在设计层闭合，原 FAIL 保留。共享 migration lock 已由并行 owner 随 `b6999edf` 发布；四份观测设计可独立提交，不收编共享登记或并行源码。43 路径实现、完整验证和部署仍未完成，producer OFF；全部 writer seal、通用删除、未绑定与跨进程 unknown receipt 继续，不能据此关闭 CS-R02。

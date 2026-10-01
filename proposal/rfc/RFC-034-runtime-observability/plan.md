@@ -674,3 +674,16 @@ v1独立18前身17路径功能门FAIL一项P2：I/O后虽读过时钟，但commi
 - console镜像摘要 `sha256:5521687c6d52d0b420fcf0ac9acc63bbd5f60c763ac1b8b197d3d2f6db69dcec`；control-plane `sha256:0af73210f463a7fa02f0bbe4f1b81255c9466227bc3c66a7f267dc8fcc16fb93`；task-runtime/默认Runner `sha256:587a0766440bae22f69bd6e68e101f2348ec8bda95f8b4c3ce6ddef0fa010928`，三镜像OCI源码label均为本提交。已有执行/固定档位Runner没有重建。
 - 公开只读验收 `2026-10-01T01:41:20.842404+00:00`：console.cs.localhost/auth/login HTTP200、未登录根HTTP401，八组件和三个摘要全部对拍。没有身份切换、实际模型调用、真实开发验证资源创建或结束。
 - 边界：内部原bound清理代码已部署；生产数字producer/cleanup组合尚未注入，仍OFF，sourceScope=business-tasks。143跳过项不算真实身份/模型验收。未绑定/整个日志头未知、全部通用删除/保留期/重建入口、生产消费/项目和系统开发明细与实际AW联合验收继续；CS-R02和两个RFC保持In Progress。
+
+## 2026-10-01 CS-R02 原准入 UID 回执实施设计草案
+
+[第一步设计](./development-admission-receipts.md)固定新私有选择，按实际两路创建者保存原准入 Secret UID：Task.prepare/bindWorkload 不虚构后续 Controller 的创建结果，Resources 事务只保存本 owner 的原选择和真实 UID，Task 的每次数字/物理清理仍对拍真实 job fence。新选择缺回执保留对象、令牌和额度，旧批准例外继续。精确允许文件及独立设计门待冻结，本阶段尚未写源码；完整通用删除、父操作、未绑定/unknown tail、全部 writer seal 和生产装配仍依次推进。
+
+### 原准入回执第一步 v2：同 creator 的已知响应恢复
+
+v1 独立设计 FAIL 保留唯一 P2：create(U) 后 PG 提交/ACK 失败，关闭/ReleasePending 早退会丢过真实回执。v2 将真实响应先保存到同 writer 的 128 项有界容器，公共 reconcileRecord 在任何 ledger/关闭早退前仅补交原 UID，成功 CAS 后精确 ACK；既有错误退避和可选 pending record ID resync 处理同实例 stop/start。新增适配器容器/application replay/公开调和与 worker wiring 的精确路径及真实回归详见[第一步设计](./development-admission-receipts.md#v1-p2-的同-creator-回执恢复)。独立 v2 设计门待验，无源码实施；全删除/全 writer seal、跨进程不可恢复回执和生产开启不由此完成。并行 migration lock 不删不收编未提交依赖。
+
+
+### 原准入回执第一步 v2 设计复核（2026-10-01）
+
+[原准入 UID 回执设计](./development-admission-receipts.md#v2-独立设计复核与共享前置条件2026-10-01)已独立 PASS，原 v1 FAIL/P2 保留；待按限定 43 路径实现同 creator 有界回执、关闭前公共 replay 与同实例 pending IDs resync。共享迁移锁 owner 前置发布已完成，本步骤只精确登记自己的新 migration。自有/参考稳定，3 份并行文档指纹变化如实记录；不因无关 main 前进重跑设计门。实现门、定向回归、一次稳定候选完整检查、精确远端 CI、本机部署另验；producer OFF，CS-R02 与两个 RFC 未关闭。

@@ -480,3 +480,14 @@ v1独立18前身17路径功能门FAIL一项P2：I/O后虽读过时钟，但commi
 - console镜像摘要 `sha256:5521687c6d52d0b420fcf0ac9acc63bbd5f60c763ac1b8b197d3d2f6db69dcec`；control-plane `sha256:0af73210f463a7fa02f0bbe4f1b81255c9466227bc3c66a7f267dc8fcc16fb93`；task-runtime/默认Runner `sha256:587a0766440bae22f69bd6e68e101f2348ec8bda95f8b4c3ce6ddef0fa010928`，三镜像OCI源码label均为本提交。已有执行/固定档位Runner没有重建。
 - 公开只读验收 `2026-10-01T01:41:20.842404+00:00`：console.cs.localhost/auth/login HTTP200、未登录根HTTP401，八组件和三个摘要全部对拍。没有身份切换、实际模型调用、真实开发验证资源创建或结束。
 - 边界：内部原bound清理代码已部署；生产数字producer/cleanup组合尚未注入，仍OFF，sourceScope=business-tasks。143跳过项不算真实身份/模型验收。未绑定/整个日志头未知、全部通用删除/保留期/重建入口、生产消费/项目和系统开发明细与实际AW联合验收继续；CS-R02和两个RFC保持In Progress。
+
+### CS-R02 原准入 Secret 回执第一步设计（2026-10-01）
+
+下一批[原准入 UID 回执](./development-admission-receipts.md)区分原 Task Pod/Runner UID 与 Controller 后创建的准入 Secret UID；新显式选择从原 request/render 及 Resources 的首次注册固定，旧记录不回填、不升级。真实创建响应丢失仍 pending，不能用同名/同内容填补原 UID。阶段候选尚待精确设计门与实现；生产开发 producer OFF，通用删除、未绑定、全 writer seal、CLI/算力测试及真实联合验收均继续。共享 STATE/RFC 索引和 RFC-036/037 在制品不收编。
+
+第一步 v1 的独立 FAIL 保留，唯一 P2 是已知原创建 UID 在 PG 失败后被关闭早退跳过。v2 已明确同 creator 有界回执、公共入口先补交、CAS 成功才 ACK 与 pending IDs resync；独立设计待验，未改源码。共享 migration lock 已有并行变化，其条目与依赖由原 owner 准备发布，不能为观测批次删除或扫入未提交依赖。跨进程 unknown receipt 与完整清理/producer 仍是 CS-R02 后续工作，不能由本步骤宣布关闭。
+
+
+### 原准入回执第一步 v2 设计门回执（2026-10-01）
+
+独立复核 PASS，原 v1 FAIL 的已知实际 UID 补交 P2 在设计层闭合；[设计及复核边界](./development-admission-receipts.md#v2-独立设计复核与共享前置条件2026-10-01)保留 manifest/回执摘要和同名克隆不得回填的规则。共享迁移锁现已由 owner 随 `b6999edf` 发布，字节与 HEAD 相等；不再以已解除的锁前置条件阻挡独立实现。限定 43 路径源码尚未改动，实施复核、真实定向验证、稳定候选完整检查、精确远端 CI 与本机部署仍待完成。跨进程 unknown receipt、完整清理/全 writer seal、CLI/算力测试及联合验收继续，生产开发 producer OFF，CS-R02 和两个 RFC 保持 In Progress。共享 STATE/RFC 索引稍后补交，其他 RFC 在制品保留。
