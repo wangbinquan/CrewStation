@@ -1,7 +1,7 @@
 import type { RuntimeImageHistoryRead, RuntimeImageHistoryItem } from '@crewstation/contracts';
 import type { ReleaseResourceUsage } from '@crewstation/contracts';
 import type { ClusterResource, ClusterInspectRequest, ClusterInspection, ClusterOperation } from '@crewstation/contracts';
-import type { Actor, AutoOfflinePolicyDto, PostponeOfflineRequest, PublishRequest, RedeployPrecheckDto, RedeployRequest, ReleaseDto, ReleaseId, ServiceId, SetAutoOfflinePolicyRequest, SlotDto, SlotEventDto, TakeOfflineRequest, TrafficSwitchDto, TrafficSwitchRequest } from '@crewstation/contracts';
+import type { Actor, AutoOfflinePolicyDto, PostponeOfflineRequest, ProjectId, PublishRequest, RedeployPrecheckDto, RedeployRequest, ReleaseDto, ReleaseId, ServiceId, SetAutoOfflinePolicyRequest, SlotDto, SlotEventDto, TakeOfflineRequest, TrafficSwitchDto, TrafficSwitchRequest } from '@crewstation/contracts';
 
 export type PhysicalSlot = 'blue' | 'green';
 
@@ -31,6 +31,8 @@ export interface ActiveEndpoint {
 
 /** release 模块对外能力：发布、切流、查询；流水线推进由工作器调用。 */
 export interface ReleaseModuleApi {
+  /** 原发布 UUID 的不可替换项目／服务归属，供工作负载来源核对；不按 tag 或同名服务解析。 */
+  sourceOwnership(releaseId: ReleaseId): Promise<{ projectId: ProjectId; serviceId: ServiceId } | undefined>;
   resourceUsage(actor: Actor, serviceId: ServiceId): Promise<ReleaseResourceUsage[]>;
   objectStorageContract(serviceId: ServiceId, releaseId: ReleaseId): Promise<{ planId: string; fenced: boolean } | undefined>;
   imageHistory(input: RuntimeImageHistoryRead): Promise<RuntimeImageHistoryItem[]>;

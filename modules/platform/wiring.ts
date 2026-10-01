@@ -8,6 +8,7 @@ import { businessObservationAdmission, developmentObservationAdmission, observat
 import { executionWriterObserver, migrationWriterObserver, legacyOwnerObserver } from './adapters/executionWriters';
 import { webhookAwareAllowlist } from './application/webhookIngress';
 import { objectStorageSources } from './application/objectStorageSources';
+import { nativeWorkloadOwnership } from './adapters/k8s/workloadOwnership';
 import { assertStorageConsumers } from './adapters/k8s/storageContract'; import { objectTransferOwners } from './adapters/k8s/objectTransferOwners';
 import { releaseImagePorts } from './application/releaseImagePorts';
 import { eventDeliveryOwners } from './adapters/k8s/eventDeliveryOwners';
@@ -133,6 +134,7 @@ function composeCore(deps: CompositionDeps, late: Late) {
     serviceEntry: { check: (userId, slug, slot) => gatewayApi().userEntry(userId, slug, slot) },
     membershipLookup: { membershipsOf: (userId) => projectApi().listUserMemberships(userId) },
     workloadLookup: { byIp: (ip) => gatewayApi().lookupByIp(ip) },
+    workloadOwnership: nativeWorkloadOwnership(deps.k8s, projectApi, () => late.release, () => late.taskRuntime, (kind, value) => deps.identities?.resolve(kind, [value]) ?? Promise.resolve(undefined)),
     allowlistEvaluator: webhookAwareAllowlist({ domain: settings.serviceDomain, services: () => projectApi().listServices(), release: () => late.release, maintenance: (id) => gatewayApi().maintenanceOf(id) }, (caller, target) => gatewayApi().evaluate(caller, target)),
     // 开发会话令牌的即时吊销点：每次校验现查环境，释放（releasing／released）即查不到，令牌当场失效。
     // 与 runningTasks 同理，task-runtime 装配前返回 undefined，也就是一律拒绝。
@@ -336,6 +338,7 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
   });
   const events = createEventsModule({
     db, logger, projects: project.api,
+    ingressSource: { resolve: async ({ identity, token }) => { const source = token ? await core.identity.api.resolveEventSource(token) : undefined; return source?.identity === identity ? source : undefined; } },
     processes: eventDeliveryOwners(deps.k8s,settings.systemNamespace,settings.platformPodUid),
     services: { resolveService: async (id) => { const r = await resolveById(id); return r ? { projectId: r.projectId, serviceId: r.serviceId, slug: r.slug, identity: r.identity } : undefined; } },
     endpoints: { resolve: async (serviceId) => { const [ep, svc] = await Promise.all([release.api.activeEndpoint(serviceId), resolveById(serviceId)]); return ep && svc ? { baseUrl: `http://${svc.slug}.${settings.serviceDomain}` } : undefined; } },

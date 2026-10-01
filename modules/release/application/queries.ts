@@ -40,6 +40,10 @@ export function releaseQueries(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'authorize
     return svc;
   };
   return {
+    sourceOwnership: async (releaseId: ReleaseId) => {
+      const original = await uow.read.releases.getById(releaseId);
+      return original ? { projectId: original.projectId, serviceId: original.serviceId } : undefined;
+    },
     resourceUsage: async (actor: Actor, serviceId: ServiceId): Promise<ReleaseResourceUsage[]> => {
       const svc = await svcOf(serviceId); await authorizer.authorize(actor, svc.projectId, 'view');
       const slots = await uow.read.slots.get(serviceId); if (!slots) return [];

@@ -10,6 +10,7 @@ export const allowlists = gatewaySchema.table('allowlists', {
 });
 
 export const podIdentities = gatewaySchema.table('pod_identities', {
+  podUid: text('pod_uid'),
   source: jsonDocument('service_source').$type<ServiceSourceBinding>(),
   developmentSource: jsonDocument('development_source').$type<DevelopmentSourceBinding>(),
   namespace: text('namespace').notNull(),

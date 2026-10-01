@@ -34,7 +34,7 @@ describe.skipIf(!available)('RFC-021 维护期间的事件暂存与补发', () =
       await publish('EventProducer', { producer: 'source', ingress: { path: '/events' }, produces: [{ eventType: 'source.updated' }] });
       const type = (await deps.uow.read.eventTypes.list())[0]!;
       await publish('DigitalWorker', { subscriptions: [{ eventTypeId: type.id, handlerPath: '/handle' }] });
-      const caller = { identity: 'source/app', project: 'source', service: 'app' };
+      const caller = { identity: 'source/app', project: 'source', service: 'app', projectId, serviceId };
       const deliver = deliverEventUseCase(deps), release = releaseHeldUseCase(deps);
 
       holds.add(serviceId);
@@ -84,7 +84,7 @@ describe.skipIf(!available)('RFC-021 维护期间的事件暂存与补发', () =
       await publish('EventProducer', { producer: 'source', ingress: { path: '/events' }, produces: [{ eventType: 'source.updated' }] });
       const type = (await deps.uow.read.eventTypes.list())[0]!;
       await publish('DigitalWorker', { subscriptions: [{ eventTypeId: type.id, handlerPath: '/handle' }] });
-      await produceEventUseCase(deps)({ identity: 'source/app', project: 'source', service: 'app' }, { eventTypeId: type.id, dedupKey: '1', occurredAt: new Date().toISOString(), payload: {} });
+      await produceEventUseCase(deps)({ identity: 'source/app', project: 'source', service: 'app', projectId, serviceId }, { eventTypeId: type.id, dedupKey: '1', occurredAt: new Date().toISOString(), payload: {} });
       const delivery = (await deps.uow.read.deliveries.listByProject(projectId, undefined, 1))[0]!;
       expect(await deliverEventUseCase(deps)(delivery.id)).toEqual({ state: 'held' });
       expect(await releaseHeldUseCase(deps)()).toBe(0);

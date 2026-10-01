@@ -12,6 +12,7 @@ export interface PodLabels {
 }
 
 export interface PodIdentityRecord {
+  podUid?: string;
   source?: ServiceSourceBinding;
   developmentSource?: DevelopmentSourceBinding;
   ip: string;
@@ -49,6 +50,7 @@ export function toWorkloadIdentity(record: PodIdentityRecord, prodPhysical: stri
     project: record.project,
     service: record.service,
     kind: record.workload,
+    ...(record.podUid ? { pod: { uid: record.podUid, name: record.podName, namespace: record.namespace, ip: record.ip } } : {}),
     ...(slot ? { slot } : {}),
     ...(record.taskId ? { taskId: record.taskId as WorkloadIdentity['taskId'] } : {}),
     ...(record.workload === 'service' && record.source ? { source: record.source } : {}),

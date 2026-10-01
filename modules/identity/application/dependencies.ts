@@ -17,6 +17,7 @@ import type { ProjectDirectory } from '../ports/projectDirectory';
 import type { TokenService } from '../ports/tokenService';
 import type { UserRepository } from '../ports/userRepository';
 import type { WorkloadLookup } from '../ports/workloadLookup';
+import type { WorkloadOwnership } from '../ports/source/workloadOwnership';
 import type { ProjectAdmission } from '../ports/lifecycle/projectAdmission';
 
 export interface IdentityUseCaseDeps {
@@ -39,6 +40,7 @@ export interface IdentityUseCaseDeps {
   serviceEntry: ServiceEntry;
   projects: ProjectDirectory;
   workloads: WorkloadLookup;
+  workloadOwnership?: WorkloadOwnership;
   allowlist: AllowlistEvaluator;
   memberships: MembershipLookup;
   devSessions: DevSessionState;

@@ -45,7 +45,7 @@ export * from './api/data';
 export * from './api/observability';
 export * from './api/observability/tokenPricing';
 export * from './api/trace/traceChain';
-export type { Actor, ServiceActor } from './api/actor';
+export type { Actor, ServiceActor, ProjectServiceActor } from './api/actor';
 export * from './api/scm';
 export * from './api/auth/session';
 export * from './api/auth/oidc';

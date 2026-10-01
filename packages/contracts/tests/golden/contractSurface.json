@@ -42,6 +42,8 @@
         "jwks": "/.well-known/jwks.json"
       },
       "TOKEN_CLAIMS": {
+        "sourceProjectId": "cs_source_project_id",
+        "sourceServiceId": "cs_source_service_id",
         "sourceIp": "cs_source_ip",
         "sourcePodUid": "cs_source_pod_uid",
         "sourceTaskId": "cs_source_task_id",

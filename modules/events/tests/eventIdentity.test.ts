@@ -31,7 +31,7 @@ describe.skipIf(!available)('event resource identities', () => {
       await publish('EventProducer', producer);
       expect((await deps.uow.read.eventTypes.list())[0]!.id).toBe(type.id);
       await publish('DigitalWorker', { subscriptions: [{ eventTypeId: type.id, handlerPath: '/handle' }] });
-      const caller = { identity: 'source/app', project: 'source', service: 'app' }, input = { eventTypeId: type.id, dedupKey: '1', occurredAt: new Date().toISOString(), payload: { eventType: 'source.updated', unchanged: true } };
+      const caller = { identity: 'source/app', project: 'source', service: 'app', projectId, serviceId }, input = { eventTypeId: type.id, dedupKey: '1', occurredAt: new Date().toISOString(), payload: { eventType: 'source.updated', unchanged: true } };
       const result = await produceEventUseCase(deps)(caller, input);
       expect(result.deliveries).toBe(1);
       const duplicate = await produceLegacyEventUseCase(deps)(caller, { ...input, eventType: 'source.updated' });

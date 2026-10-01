@@ -27,6 +27,21 @@ const ingressRoutesOf = (namespace: string): string[] =>
 let prodPhysical: 'blue' | 'green' = 'blue';
 
 describe.skipIf(!available)('RFC-027 可信服务 Pod 发布身份', () => {
+  test('业务和平台工作负载也持久保存原 Pod UID，旧同名删除事件不能撤销替换实例', async () => {
+    for (const kind of ['business-task', 'platform'] as const) {
+      const ip = kind === 'business-task' ? '10.244.35.2' : '10.244.35.3', taskId = newResourceId() as TaskId;
+      const pod = { metadata: { name: `original-${kind}`, namespace: 'cs-demo', uid: `first-${kind}`, labels: {
+        'app.kubernetes.io/managed-by': 'crewstation', 'crewstation.io/project': 'demo', 'crewstation.io/service': 'demo', 'crewstation.io/workload': kind, 'crewstation.io/task': taskId,
+      } }, status: { podIP: ip, phase: 'Running' } };
+      await gateway.api.syncObservedPod(pod, false);
+      expect((await newGateway().api.lookupByIp(ip))?.pod).toEqual({ uid: `first-${kind}`, name: pod.metadata.name, namespace: 'cs-demo', ip });
+      const replacement = { ...pod, metadata: { ...pod.metadata, uid: `second-${kind}` } };
+      await gateway.api.syncObservedPod(replacement, false); await gateway.api.syncObservedPod(pod, true);
+      expect((await gateway.api.lookupByIp(ip))?.pod?.uid).toBe(`second-${kind}`);
+      await gateway.api.syncObservedPod(replacement, true); expect(await gateway.api.lookupByIp(ip)).toBeUndefined();
+    }
+  });
+
   test('开发对象来源持久绑定任务与 Pod UID，旧删除事件不撤销同名新 Pod', async () => {
     const taskId = newResourceId() as TaskId, ip = '10.244.35.1';
     const pod = { metadata: { name: 'object-dev', namespace: 'cs-demo', uid: 'dev-first', labels: {

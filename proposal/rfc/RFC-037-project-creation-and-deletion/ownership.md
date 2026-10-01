@@ -102,6 +102,12 @@ events 已发布部署，精确 SHA／六项 CI／运行时源字段和原资源
 - 项目算力启动解析、开发套餐解析、新策略／分配及构建凭据签发核对 project 的真实可用性。Registry ForwardAuth 每个请求都核对原签名 push scope、请求目标和 blob mount 的来源，删除后未到期旧构建凭据不能继续用于平台底座或 /v2 探测；共享管理员凭据也不能写入已封闭的项目仓库。
 - 签名口令不落库、不复制到删除材料。凭据关闭只证明未来请求的准入，不证明此前已放行的上传结束或 Registry 物理 blob 已回收；原构建、上传、镜像引用与共享底层 blob 的停止／回收仍由 runtime-environment 和存储 owner 提供真实来源。
 
-本批尚未精确发布部署，正式全链路仍关闭。
+算力批已精确发布 `333e631ddfaac5b34ec44ee8d7fcd2fa7de420c0`，六项 CI 36783829899 成功；2026-09-30T22:34:14.745Z 本机八组件部署完成，agent_runtime/0009 实际应用，原项目资源 UID 与 Runner 摘要保持。详见[部署回执](acceptance/compute-deployment.md)。正式全链路仍关闭。
 
 算力候选完整用例运行 4663 pass／143 skip／5 fail（4811 tests、933 文件、30499 断言、959.04 秒）；五项失败落于并行修改的开发容器直接写入／准入检查，未作为全仓通过。22 个冻结源码／测试／配置指纹保持，算力全部新回归包括缺失许可的拒绝与回滚通过；改动覆盖 98／98、所有改动生产文件加载，精确候选后端与 console 类型无诊断。完整 check 的 lint 也被并行在制测试的未使用导入阻断；本批精确 lint／结构通过。按精确候选清单继续发布并等精确 SHA 的六项 hosted CI，不提交并行在制源码。永久删除全链路仍关闭。 详见[算力候选回执](acceptance/compute-owner.md)。
+
+## 8. 同标识重建与原事件来源（2026-10-01）
+
+events 不再以可复用 slug 推断项目归属，旧最小 slug 记录保留但不能拦截新 UUID 的生产方。原 producer/type/event/subscription/delivery 与 project/service ID 不可改写，未知归属拒绝；旧内容恢复和同名新根的合法生产分别验证。gateway 为全部已观测工作负载保存原 Pod UID，旧服务／开发无损回填，旧业务从实际 Pod 重列，原删除事件不能移除新 UID。identity/platform 在固定事件受众验签后核对原 release/task 及实际 Pod，再核对原项目准入；HTTP 读取正文前固定原调用者，v1 迟到正文不能重新按编码授权给新 UUID。
+
+候选完整 check 4694 pass／143 skip／0 fail、46 内容指纹保持，原失败与修复、模块层／真实 PG／签名与 FakeK8s 证据边界见[来源验收](acceptance/original-event-source.md)。来源准入不能代替消费者停止、原卷与外部仓库／镜像回收，完整永久删除继续。

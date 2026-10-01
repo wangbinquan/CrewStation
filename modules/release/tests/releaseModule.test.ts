@@ -86,6 +86,8 @@ describe.skipIf(!available)('release module', () => {
     const dto = await release.api.publish(owner, serviceId, { branch: 'main', version: 'patch', expectedCommitSha: 'a'.repeat(40) });
     expect(dto.status).toBe('pending');
     expect(dto.commitSha).toBe('a'.repeat(40));
+    expect(await release.api.sourceOwnership(dto.id)).toEqual({ projectId, serviceId });
+    expect(await release.api.sourceOwnership('01a0bf5d-8f4b-7c03-891e-3d6d1b2b3fdb' as ReleaseId)).toBeUndefined();
     await expect(release.api.publish(owner, serviceId, { branch: 'main', version: 'patch' })).rejects.toMatchObject({ kind: 'conflict' });
 
     expect(await release.api.runPipelineStep(dto.id)).toEqual({ done: false, retryAfterSeconds: 5 });
@@ -145,6 +147,8 @@ describe.skipIf(!available)('release module', () => {
     expect([rolled.fromSlot, rolled.toSlot]).toEqual(['preview', 'prod']);
     expect(rolled.releaseId).toBe(second.id);
     expect(rolled.previousReleaseId).toBe(dto.id);
+    expect(await release.api.sourceOwnership(dto.id)).toEqual({ projectId, serviceId });
+    expect(await release.api.sourceOwnership(second.id)).toEqual({ projectId, serviceId });
   });
 
   test('迁移失败不切流；破坏性迁移在非维护窗口被拒', async () => {

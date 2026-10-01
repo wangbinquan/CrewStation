@@ -39,8 +39,8 @@ describe.skipIf(!available)('对象存储升级保持既有任务和身份', () 
 
     expect(await snapshot()).toEqual(before);
     expect(await platform.api.storageContract.check()).toMatchObject({ enabled: false, requiredVersion: 0 });
-    expect([...(await tdb.handle.client`SELECT development_source FROM gateway.pod_identities`)])
-      .toEqual([{ development_source: null }]);
+    expect([...(await tdb.handle.client`SELECT development_source, pod_uid FROM gateway.pod_identities`)])
+      .toEqual([{ development_source: null, pod_uid: null }]);
     for (const table of ['data.objects', 'data.finalization_bindings', 'business_task.finalizations',
       'task_runtime.archive_executions', 'task_runtime.unprovisioned_storage']) {
       expect((await tdb.handle.client.unsafe(`SELECT count(*)::integer AS count FROM ${table}`))[0]?.count).toBe(0);
@@ -74,6 +74,6 @@ async function snapshot(): Promise<unknown> {
   return {
     tasks: await tdb.handle.client`SELECT to_jsonb(t) AS value FROM business_task.tasks t ORDER BY id`,
     environments: await tdb.handle.client`SELECT to_jsonb(t) AS value FROM task_runtime.environments t ORDER BY id`,
-    identities: await tdb.handle.client`SELECT to_jsonb(t)-'development_source' AS value FROM gateway.pod_identities t ORDER BY pod_name`,
+    identities: await tdb.handle.client`SELECT to_jsonb(t)-ARRAY['development_source','pod_uid'] AS value FROM gateway.pod_identities t ORDER BY pod_name`,
   };
 }

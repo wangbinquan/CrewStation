@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import type { Actor, EventId, Manifest, ProjectId, ReleaseId, ServiceActor, ServiceId, TraceId, UserId } from '@crewstation/contracts';
+import type { Actor, EventId, Manifest, ProjectId, ReleaseId, ProjectServiceActor, ServiceId, TraceId, UserId } from '@crewstation/contracts';
 import { BUILTIN_RESOURCES, DomainTopic, EVENT_HEADERS, EventDeliverySchema, IDENTITY_HEADERS, ManifestSchema } from '@crewstation/contracts';
 import { eventbusMigrations, publishDomainEvent } from '@crewstation/eventbus';
 import { createApp } from '@crewstation/http';
@@ -12,6 +12,7 @@ import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import type { EventsModule } from '../wiring';
 import { createEventsModule, eventsMigrations } from '../wiring';
+import { eventIngressFixture } from './ingressFixture';
 
 interface Target { projectId: ProjectId; serviceId: ServiceId }
 interface Received { path: string; headers: Record<string, string>; body: unknown }
@@ -20,6 +21,7 @@ const available = await testDatabaseAvailable();
 let tdb: TestDatabase;
 let project: ProjectModule;
 let events: EventsModule;
+let sources: ReturnType<typeof eventIngressFixture>;
 let admin: Actor;
 let owner: Actor;
 let dev: Actor;
@@ -33,7 +35,8 @@ const endpoints = new Map<ServiceId, string>();
 const eventTypes = new Map<string, { id: string; producerId: string }>();
 const typeId = (code: string): string => eventTypes.get(code)!.id;
 const PIPELINE = 'gitlab.pipeline.finished';
-const gitlab: ServiceActor = { identity: 'gitlab-events/gitlab-events', project: 'gitlab-events', service: 'gitlab-events', slot: 'prod' };
+const gitlab = { identity: 'gitlab-events/gitlab-events', project: 'gitlab-events', service: 'gitlab-events', slot: 'prod' };
+const gitlabSource = (): ProjectServiceActor => ({ ...gitlab, ...producerProject });
 
 const hosts = { prodHost: (s: string) => `${s}.cs.localhost`, previewHost: (s: string) => `preview.${s}.cs.localhost`, serviceHost: (s: string) => `${s}.svc.cs.internal` };
 const service = { command: ['bun', 'run', 'src/main.ts'], port: 3000, servicePlanId: BUILTIN_RESOURCES.servicePlanSmall };
@@ -95,8 +98,12 @@ beforeAll(async () => {
     },
   });
   endpoints.set(demo.serviceId, `http://127.0.0.1:${subscriber.port}`);
+  sources = eventIngressFixture(tdb.db, project.api);
+  sources.add({ ...producerProject, slug: 'gitlab-events' });
+  sources.add({ ...demo, slug: 'demo' });
   events = createEventsModule({
     db: tdb.db,
+    ingressSource: sources.ingress,
     projects: project.api,
     services: {
       resolveService: async (serviceId) => {
@@ -138,13 +145,13 @@ describe.skipIf(!available)('events module', () => {
 
   test('produce：生产方身份核对、未知事件类型、去重与每订阅一条投递入队', async () => {
     const input = { eventTypeId: typeId(PIPELINE), dedupKey: 'pipeline-1', occurredAt: '2026-09-11T08:00:00.000Z', traceId, payload: { pipeline: 42, status: 'success' } };
-    await expect(events.api.produce({ identity: 'demo/demo', project: 'demo', service: 'demo' }, input)).rejects.toMatchObject({ kind: 'forbidden' });
-    await expect(events.api.produce(gitlab, { ...input, eventTypeId: Bun.randomUUIDv7() })).rejects.toMatchObject({ kind: 'not_found' });
-    const result = await events.api.produce(gitlab, input);
+    await expect(events.api.produce({ identity: 'demo/demo', project: 'demo', service: 'demo', ...demo }, input)).rejects.toMatchObject({ kind: 'forbidden' });
+    await expect(events.api.produce(gitlabSource(), { ...input, eventTypeId: Bun.randomUUIDv7() })).rejects.toMatchObject({ kind: 'not_found' });
+    const result = await events.api.produce(gitlabSource(), input);
     expect(result).toMatchObject({ deduplicated: false, deliveries: 2 });
     expect(result.eventId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     eventId = result.eventId;
-    expect(await events.api.produce(gitlab, { ...input, payload: { different: true } })).toEqual({ eventId, deduplicated: true, deliveries: 0 });
+    expect(await events.api.produce(gitlabSource(), { ...input, payload: { different: true } })).toEqual({ eventId, deduplicated: true, deliveries: 0 });
     const demoDeliveries = await events.api.listDeliveries(owner, demo.projectId);
     expect(demoDeliveries).toHaveLength(1);
     expect(demoDeliveries[0]).toMatchObject({ eventId, eventType: PIPELINE, state: 'pending', attempts: 0, traceId });
@@ -199,7 +206,7 @@ describe.skipIf(!available)('events module', () => {
   });
 
   test('订阅被移除后待投递的记录直接 dead；没给 traceId 时由 cs-events 生成', async () => {
-    const result = await events.api.produce(gitlab, { eventTypeId: typeId(PIPELINE), dedupKey: 'pipeline-2', occurredAt: new Date().toISOString(), payload: null });
+    const result = await events.api.produce(gitlabSource(), { eventTypeId: typeId(PIPELINE), dedupKey: 'pipeline-2', occurredAt: new Date().toISOString(), payload: null });
     expect(result.deliveries).toBe(2);
     const pending = (await events.api.listDeliveries(owner, other.projectId, { state: 'pending' }))[0]!;
     expect(pending.traceId).toMatch(/^[0-9a-f]{32}$/);
@@ -218,11 +225,12 @@ describe.skipIf(!available)('events module', () => {
     const body = JSON.stringify({ eventTypeId: typeId(PIPELINE), dedupKey: 'pipeline-3', occurredAt: new Date().toISOString(), payload: { n: 3 } });
     expect((await app.request('/v2/events/produce', { method: 'POST', headers: json, body })).status).toBe(401);
     expect((await app.request('/v2/events/produce', { method: 'POST', headers: { ...json, ...asUser(admin) }, body })).status).toBe(403);
-    const produced = await app.request('/v2/events/produce', { method: 'POST', headers: { ...json, [IDENTITY_HEADERS.sourceService]: gitlab.identity, [IDENTITY_HEADERS.sourceSlot]: 'prod' }, body });
+    const sourceHeaders = await sources.headers(gitlab.identity);
+    const produced = await app.request('/v2/events/produce', { method: 'POST', headers: { ...json, ...sourceHeaders }, body });
     expect(produced.status).toBe(202);
     expect(await produced.json()).toMatchObject({ deduplicated: false, deliveries: 1 });
-    expect((await app.request('/v2/events/produce', { method: 'POST', headers: { ...json, [IDENTITY_HEADERS.sourceService]: gitlab.identity }, body: JSON.stringify({ eventType: PIPELINE }) })).status).toBe(400);
-    expect((await app.request('/v2/events/produce', { method: 'POST', headers: { ...json, [IDENTITY_HEADERS.sourceService]: 'demo/demo' }, body })).status).toBe(403);
+    expect((await app.request('/v2/events/produce', { method: 'POST', headers: { ...json, ...sourceHeaders }, body: JSON.stringify({ eventType: PIPELINE }) })).status).toBe(400);
+    expect((await app.request('/v2/events/produce', { method: 'POST', headers: { ...json, ...await sources.headers('demo/demo') }, body })).status).toBe(403);
     const types = await app.request('/v1/catalog/event-types', { headers: asUser(dev) });
     expect(((await types.json()) as { items: unknown[] }).items).toHaveLength(2);
     const subs = await app.request(`/v1/projects/${demo.projectId}/subscriptions`, { headers: asUser(dev) });

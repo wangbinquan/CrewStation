@@ -67,6 +67,8 @@ export const PLATFORM_PATHS = {
 
 /** JWT 声明名；identity token、source token 与开发会话令牌都遵守。 */
 export const TOKEN_CLAIMS = {
+  sourceProjectId: 'cs_source_project_id',
+  sourceServiceId: 'cs_source_service_id',
   sourceIp: 'cs_source_ip',
   sourcePodUid: 'cs_source_pod_uid',
   sourceTaskId: 'cs_source_task_id',

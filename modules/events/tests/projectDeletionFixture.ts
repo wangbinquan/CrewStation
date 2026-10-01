@@ -5,6 +5,7 @@ import { createIdentityModule, identityMigrations } from '@crewstation/module-id
 import { createProjectModule, projectMigrations } from '@crewstation/module-project';
 import { jsonHash, newResourceId } from '@crewstation/kernel';
 import { runMigrations } from '@crewstation/persistence';
+import type { Database } from '@crewstation/persistence';
 import { queueMigrations } from '@crewstation/queue';
 import { createTestDatabase } from '@crewstation/testkit';
 import { sql } from 'drizzle-orm';
@@ -12,9 +13,9 @@ import { createEventsModule, eventsMigrations } from '../wiring';
 import type { EventPusher } from '../ports/eventPusher';
 import type { DeliveryProcessOwners } from '../ports/deliveryProcesses';
 
-export async function eventsDeletionFixture() {
+export async function eventsDeletionFixture(beforeUpgrade?: (db: Database) => Promise<void>) {
   const database = await createTestDatabase([eventbusMigrations, queueMigrations, identityMigrations, projectMigrations,
-    { ...eventsMigrations, files: eventsMigrations.files.filter((f) => !f.name.startsWith('0006_')) }]);
+    { ...eventsMigrations, files: eventsMigrations.files.filter((f) => f.name < '0006_') }]);
   const identity = createIdentityModule({ db: database.db, settings: { adminEmails: ['events-delete@tests.invalid'] } });
   const user = await identity.api.ensureUser({ externalId: 'events-admin', name: 'Admin', email: 'events-delete@tests.invalid' });
   const admin: Actor = { userId: user.id, isAdmin: true };
@@ -40,6 +41,7 @@ export async function eventsDeletionFixture() {
   for (const [id, p, event, subscription, type, code, error] of [[ids.delivery, own, ids.foreignEvent, ids.subscription, ids.foreignType, 'retain.updated', 'erase-error'], [ids.incomingDelivery, other, ids.event, ids.incoming, ids.type, 'erase.updated', 'source-error'], [ids.foreignDelivery, other, ids.foreignEvent, ids.foreignSubscription, ids.foreignType, 'retain.updated', 'retain-error']] as const) {
     await database.db.execute(sql`INSERT INTO events.deliveries(id,event_id,subscription_id,service_id,project_id,event_type_id,event_type,state,attempts,next_attempt_at,last_error,trace_id,delivered_at,created_at,updated_at) VALUES (${id},${event},${subscription},${p.serviceId},${p.id},${type},${code},'pending',0,now(),${error},${event},null,now(),now())`);
   }
+  await beforeUpgrade?.(database.db);
   await runMigrations(database.db, [eventsMigrations]);
   const directory = [own, other, source];
   const application = (pusher?: EventPusher, processes?: DeliveryProcessOwners) => createEventsModule({ db: database.db, projects: project.api,processes,

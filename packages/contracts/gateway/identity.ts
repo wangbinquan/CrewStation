@@ -36,6 +36,8 @@ export const WorkloadIdentitySchema = z.object({
   taskId: TaskIdSchema.optional(),
   source: ServiceSourceBindingSchema.optional(),
   developmentSource: DevelopmentSourceBindingSchema.optional(),
+  /** 所有工作负载共有的原 Pod 实例；来自控制器观测，不接受业务自报。 */
+  pod: z.strictObject({ uid: z.string().min(1).max(128), name: z.string().min(1).max(253), namespace: z.string().min(1).max(253), ip: z.union([z.ipv4(), z.ipv6()]) }).optional(),
 });
 
 /** Pod 身份索引：cs-controller 按 Pod 创建与删除增量维护，cs-auth 按源 Pod IP 反查。 */

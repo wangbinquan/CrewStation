@@ -39,6 +39,8 @@ async function setup({ blockBoth = false, holdSettlement = false } = {}) {
   const event = { id: eventId, eventTypeId: '01a0bf5d-8f4b-7101-8bdd-4156390b171c', eventType: 'qa.replay', traceId, producerId: '01a0bf5d-8f4b-7588-86ec-6acc76da4738', producer: 'qa', producerProject: 'qa', dedupKey: 'replay-concurrency', occurredAt: now, receivedAt: now, payload: { marker: 'replay-only-once' } };
   const subscription = { id: 'sub-replay', projectId, serviceId, eventTypeId: event.eventTypeId, eventType: event.eventType, handlerPath: '/events/qa', state: 'active' as const, updatedAt: now };
   await uow.run(async (scope) => {
+    await scope.producers.upsert({ id: event.producerId, name: 'qa', producer: 'qa', projectId, serviceId, projectSlug: 'qa', serviceIdentity: 'qa/qa', updatedAt: now });
+    await scope.eventTypes.replaceForProducer(event.producerId, [{ id: event.eventTypeId, name: event.eventType, eventType: event.eventType, producerId: event.producerId, producer: 'qa', producerProject: 'qa', state: 'active' }]);
     await scope.inbox.insert(event); await scope.subscriptions.upsert(subscription);
     await scope.deliveries.insert(newDelivery(deliveryId, event, subscription, now)); await scope.scheduler.schedule(deliveryId);
   });

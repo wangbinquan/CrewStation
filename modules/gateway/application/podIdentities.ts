@@ -47,7 +47,7 @@ export function podIdentityUseCases(deps: GatewayUseCaseDeps) {
     }
     const source = identity.workload === 'service' ? ServiceSourceBindingSchema.safeParse({ podUid: pod.uid, ip: pod.ip, releaseId: pod.labels['crewstation.io/release'], physicalSlot: identity.physicalSlot, ready: pod.ready ?? false }) : undefined;
     const development = identity.workload === 'dev-session' ? DevelopmentSourceBindingSchema.safeParse({ podUid: pod.uid, podName: pod.name, ip: pod.ip, taskId: identity.taskId, ready: pod.ready ?? false }) : undefined;
-    await deps.pods.upsert({ ip: pod.ip, podName: pod.name, namespace: pod.namespace, ...identity, ...(source?.success ? { source: source.data } : {}), ...(development?.success ? { developmentSource: development.data } : {}), updatedAt: now });
+    await deps.pods.upsert({ ip: pod.ip, podName: pod.name, namespace: pod.namespace, ...identity, ...(pod.uid ? { podUid: pod.uid } : {}), ...(source?.success ? { source: source.data } : {}), ...(development?.success ? { developmentSource: development.data } : {}), updatedAt: now });
   };
   return {
     syncPod,

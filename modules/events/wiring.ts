@@ -31,12 +31,14 @@ import type { EventPusher } from './ports/eventPusher';
 import type { EventsSettings } from './ports/eventsSettings';
 import type { HandlerEndpointResolver } from './ports/handlerEndpointResolver';
 import type { ServiceResolver } from './ports/serviceResolver';
+import type { EventIngressSource } from './ports/ingressSource';
 import { createDeliveryWorker } from './workers/deliveryWorker';
 import { deliveryRecoveryWorker } from './workers/deliveryRecovery';
 
 /** 装配期注入：其他模块的能力以端口形式出现在这里，由应用提供实现。 */
 export interface EventsModuleDeps {
   db: Database;
+  ingressSource?: EventIngressSource;
   /** project 模块：管理员标记与项目内授权。 */
   projects: Pick<ProjectModuleApi, 'isAdmin' | 'authorize'> & Partial<Pick<ProjectModuleApi,'assertProjectAvailable' | 'assertProjectDeletionGrant'>>;
   processes?: DeliveryProcessOwners;
@@ -94,6 +96,7 @@ export function createEventsModule(deps: EventsModuleDeps): EventsModule {
   };
   const api: EventsModuleApi = {
     name: 'events',
+    resolveIngressSource: (caller) => deps.ingressSource?.resolve(caller) ?? Promise.resolve(undefined),
     ...(deps.projects.assertProjectDeletionGrant ? { deletionOwner: eventsDeletionOwner(eventsDeletionRepository(deps.db,deps.projects.assertProjectDeletionGrant),deps.projects.assertProjectDeletionGrant) } : {}),
     isAdmin: (userId) => deps.projects.isAdmin(userId),
     produce: produceEventUseCase(useCaseDeps),

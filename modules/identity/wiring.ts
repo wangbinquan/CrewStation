@@ -63,6 +63,8 @@ import type { ProjectDirectory } from './ports/projectDirectory';
 import type { ServiceEntry } from './ports/serviceEntry';
 import type { WorkloadLookup } from './ports/workloadLookup';
 import type { ProjectLifecycle } from './ports/lifecycle/projectAdmission';
+import type { WorkloadOwnership } from './ports/source/workloadOwnership';
+import { resolveEventSource } from './application/source/events';
 import { identityDeletionRepository, identityProjectAdmissionRepository } from './adapters/persistence/projectDeletion';
 import { identityDeletionOwner } from './application/projectDeletion';
 
@@ -83,10 +85,12 @@ export type { AppAccess, AppAccessVerdict } from './ports/appAccess';
 export type { ProjectDirectory } from './ports/projectDirectory';
 export type { ServiceEntry } from './ports/serviceEntry';
 export type { WorkloadLookup } from './ports/workloadLookup';
+export type { WorkloadOwnership } from './ports/source/workloadOwnership';
 export type { ResolvedHost, UserSlot } from './domain/hosts';
 
 /** 运行面（cs-auth）的外部能力；缺省实现一律“拒绝／未知”，不配置也安全。 */
 export interface IdentityRuntimeDeps {
+  workloadOwnership?: WorkloadOwnership;
   projectLifecycle?: ProjectLifecycle;
   legacyIds?: LegacyIdentityLookup;
   /** 缺省存到本模块的 identity.signing_keys 表。 */
@@ -160,6 +164,7 @@ export function createIdentityModule(deps: IdentityModuleDeps): IdentityModule {
     secrets: deps.secretCipher ?? secretBoxCipher(deps.settings.secretKey),
     tokens: keyRingTokenService({ keyStore: deps.keyStore ?? drizzleKeyStore(deps.db), issuer: TOKEN_CLAIMS.issuer, clock, logger: deps.logger }),
     ...runtimePorts(deps, session),
+    ...(deps.workloadOwnership ? { workloadOwnership: deps.workloadOwnership } : {}),
     projectAdmission: { byId, bySlug: async (slug) => { const id = await deps.projectDirectory?.idBySlug(slug); return id ? byId(id) : closed.bySlug(slug); } },
   };
   const discovery = loginDiscoveryUseCases(useCaseDeps);
@@ -197,6 +202,7 @@ export function createIdentityModule(deps: IdentityModuleDeps): IdentityModule {
     authorizeServiceRequest: forwardAuthServiceUseCase(useCaseDeps),
     resolveServiceSource: resolveServiceSourceUseCase(useCaseDeps),
     resolveDevelopmentSource: resolveDevelopmentSource(useCaseDeps),
+    resolveEventSource: resolveEventSource(useCaseDeps),
     ...loginPolicyUseCases(useCaseDeps),
     ...providerAdminUseCases(useCaseDeps),
     ...forwarding,

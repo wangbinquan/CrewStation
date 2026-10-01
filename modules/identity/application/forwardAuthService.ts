@@ -7,7 +7,7 @@ import { PLATFORM_API_AUDIENCE, SOURCE_TOKEN_TTL_SECONDS, serviceAudience, servi
 import type { TokenClaimValue } from '../ports/tokenService';
 import type { IdentityUseCaseDeps } from './dependencies';
 
-type Deps = Pick<IdentityUseCaseDeps, 'tokens' | 'workloads' | 'allowlist' | 'projectAdmission'>;
+type Deps = Pick<IdentityUseCaseDeps, 'tokens' | 'workloads' | 'allowlist' | 'projectAdmission' | 'workloadOwnership'>;
 
 /**
  * 服务域 ForwardAuth（Design §7.2、§8.3）：源 Pod IP → 调用方身份 → 放行表 → 绑定目标 aud 的来源令牌与 trace_id。
@@ -24,7 +24,9 @@ export function forwardAuthServiceUseCase(deps: Deps) {
     if (!ip) return deny('缺少来源地址：网关未传 X-Forwarded-For', 'missing-source-ip');
     const caller = await deps.workloads.byIp(ip);
     if (!caller) return deny(`来源 ${ip} 不是已登记的平台工作负载`, 'unknown-workload');
-    if (deps.projectAdmission && !await deps.projectAdmission.bySlug(caller.project)) return deny('来源项目正在永久删除', 'project-deleting');
+    const ownership = await deps.workloadOwnership?.resolve(caller);
+    if (deps.workloadOwnership && caller.kind !== 'platform' && !ownership) return deny('来源工作负载的原归属无法核实', 'unknown-original-workload');
+    if (deps.projectAdmission && !(ownership ? await deps.projectAdmission.byId(ownership.projectId) : await deps.projectAdmission.bySlug(caller.project))) return deny('来源项目正在永久删除', 'project-deleting');
     const verdict = await deps.allowlist.evaluate(caller, target);
     // 目标正式版本维护中（RFC-021）：503 而不是 403，调用方可以按 Retry-After 稍后重试。
     if (!verdict.allowed && verdict.unavailable) return { kind: 'unavailable', message: verdict.unavailable.message, ...(verdict.unavailable.retryAfterSeconds ? { retryAfterSeconds: verdict.unavailable.retryAfterSeconds } : {}) };
@@ -35,6 +37,8 @@ export function forwardAuthServiceUseCase(deps: Deps) {
     const claims: Record<string, TokenClaimValue> = {
       [TOKEN_CLAIMS.kind]: caller.kind,
       [TOKEN_CLAIMS.project]: caller.project,
+      ...(ownership ? { [TOKEN_CLAIMS.sourceProjectId]: ownership.projectId, [TOKEN_CLAIMS.sourceServiceId]: ownership.serviceId } : {}),
+      ...(caller.pod ? { [TOKEN_CLAIMS.sourceIp]: caller.pod.ip, [TOKEN_CLAIMS.sourcePodUid]: caller.pod.uid } : {}),
       ...(caller.slot ? { [TOKEN_CLAIMS.slot]: caller.slot } : {}),
       [TOKEN_CLAIMS.traceId]: traceId,
       ...(caller.kind === 'service' && caller.source ? {

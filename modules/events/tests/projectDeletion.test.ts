@@ -31,7 +31,7 @@ describe.skipIf(!available)('events 永久删除（真实 PG）', () => {
   test('关闭源和订阅方的新登记、生产、重放及旧 ID 写入；删除后也不能借换项目复活', async () => {
     f = await eventsDeletionFixture(); const owner = f.events.api.deletionOwner!, started = await f.begin();
     expect((await owner.run(started.context)).kind).toBe('done');
-    await expect(f.events.api.produce({ identity: `${f.own.slug}/${f.own.slug}`, project: f.own.slug, service: f.own.slug }, { eventTypeId: f.ids.type, dedupKey: 'late', occurredAt: new Date().toISOString(), payload: 'private' })).rejects.toThrow();
+    await expect(f.events.api.produce({ identity: `${f.own.slug}/${f.own.slug}`, project: f.own.slug, service: f.own.slug, projectId: f.own.id, serviceId: f.own.serviceId! }, { eventTypeId: f.ids.type, dedupKey: 'late', occurredAt: new Date().toISOString(), payload: 'private' })).rejects.toThrow();
     await expect(f.events.api.deliver(f.ids.incomingDelivery)).rejects.toThrow();
     await expect(f.events.api.deliver(f.ids.delivery)).rejects.toThrow();
     await expect(Promise.resolve(f.database.db.execute(sql`UPDATE events.producers SET project_id=${f.other.id} WHERE id=${f.ids.producer}`))).rejects.toThrow();
@@ -64,8 +64,10 @@ describe.skipIf(!available)('events 永久删除（真实 PG）', () => {
     await expect(Promise.resolve(f.database.db.execute(sql`DELETE FROM events.subscriptions WHERE id=${f.ids.subscription}`))).rejects.toThrow();
   });
   test('无法识别的历史来源明确阻断，而不是遗漏出盘点结果',async () => {
-    f = await eventsDeletionFixture();
-    await f.database.db.execute(sql`INSERT INTO events.event_types(id,name,state,event_type,producer_id,producer,producer_project) VALUES (${Bun.randomUUIDv7()},'unknown','active','unknown.type',${Bun.randomUUIDv7()},'unknown-producer','unknown-project')`);
+    f = await eventsDeletionFixture(async (db) => {
+      // 真正的旧库内容在升级前写入；升级后的普通写入已经拒绝无归属来源。
+      await db.execute(sql`INSERT INTO events.event_types(id,name,state,event_type,producer_id,producer,producer_project) VALUES (${Bun.randomUUIDv7()},'unknown','active','unknown.type',${Bun.randomUUIDv7()},'unknown-producer','unknown-project')`);
+    });
     const report = await f.events.api.deletionOwner!.inspect(await f.project.api.deletionScope(f.own.id));
     expect(report.complete).toBe(false); expect(report.blockers).toMatchObject([{ code: 'ownership-unresolved' }]);
   });

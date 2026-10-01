@@ -1,5 +1,5 @@
 import type {
-  Actor, DeliveryDto, DeliveryState, EventTypeDto, LegacyProducedEvent, ProducedEvent, ProduceResultDto, ProjectId, ServiceActor, ServiceId, SubscriptionDto, UserId,
+  Actor, DeliveryDto, DeliveryState, EventTypeDto, LegacyProducedEvent, ProducedEvent, ProduceResultDto, ProjectId, ProjectServiceActor, ServiceId, SubscriptionDto, UserId,
 } from '@crewstation/contracts';
 import type { ProjectDeletionOwner } from '@crewstation/contracts';
 
@@ -25,10 +25,12 @@ export interface DeliverOutcome {
 export interface EventsModuleApi {
   readonly name: 'events';
   readonly deletionOwner?: ProjectDeletionOwner;
+  /** HTTP 正文读取前固定签名来源；缺失装配或无法核实原身份时不返回调用者。 */
+  resolveIngressSource(caller: { identity: string; token?: string }): Promise<ProjectServiceActor | undefined>;
   isAdmin(userId: UserId): Promise<boolean>;
   /** EventProducer 经服务域投递原始事件：校验调用方是该事件类型的登记生产方，inbox 按 (producer, dedupKey) 去重，为每个活动订阅建投递并入队。 */
-  produceLegacy(caller: ServiceActor, input: LegacyProducedEvent): Promise<ProduceResultDto>;
-  produce(caller: ServiceActor, input: ProducedEvent): Promise<ProduceResultDto>;
+  produceLegacy(caller: ProjectServiceActor, input: LegacyProducedEvent): Promise<ProduceResultDto>;
+  produce(caller: ProjectServiceActor, input: ProducedEvent): Promise<ProduceResultDto>;
   listEventTypes(actor: Actor): Promise<EventTypeDto[]>;
   listSubscriptions(actor: Actor, projectId: ProjectId): Promise<SubscriptionDto[]>;
   listDeliveries(actor: Actor, projectId: ProjectId, filter?: DeliveryFilter): Promise<DeliveryDto[]>;

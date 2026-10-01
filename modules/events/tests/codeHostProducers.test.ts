@@ -13,6 +13,7 @@ import { createApp as githubApp } from '../../../integrations/github-event-produ
 import { createApp as gitlabApp } from '../../../integrations/gitlab-event-producer/src/main';
 import { createEventsModule, eventsMigrations } from '../wiring';
 import type { EventsModule } from '../wiring';
+import { eventIngressFixture } from './ingressFixture';
 
 const available = await testDatabaseAvailable();
 let tdb: TestDatabase;
@@ -47,7 +48,9 @@ beforeAll(async () => {
   const projects = createProjectModule({ db: tdb.db, identity: identity.api, hosts: { prodHost: (s) => `${s}.local`, previewHost: (s) => `preview.${s}.local`, serviceHost: (s) => `${s}.svc.local` },
     settings: { defaultMaxConcurrentTasks: 3, defaultServicePlan: BUILTIN_RESOURCES.servicePlanSmall } });
   await projects.api.updateServicePlan(admin, BUILTIN_RESOURCES.servicePlanSmall, { name: 'small', cpu: '500m', memory: '512Mi', maxReplicas: 3, description: '' });
+  const sources = eventIngressFixture(tdb.db, projects.api);
   events = createEventsModule({ db: tdb.db, projects: projects.api,
+    ingressSource: sources.ingress,
     services: { resolveService: async (id) => { const s = await projects.api.getService(admin, id); return { projectId: s.projectId, serviceId: s.id, slug: s.name, identity: s.identity }; } },
     endpoints: { resolve: async (id) => { const baseUrl = endpoints.get(id); return baseUrl ? { baseUrl } : undefined; } },
     settings: { maxAttempts: 2, pushTimeoutMs: 2000 } });
@@ -56,6 +59,7 @@ beforeAll(async () => {
   for (const name of ['gitlab', 'github', 'consumer']) {
     const dto = await projects.api.createProject(admin, { slug: name, name, kind: name === 'consumer' ? 'DigitalWorker' : 'EventProducer', ownerUserId: user.id, template: BUILTIN_RESOURCES.minimalTemplate });
     const target = { projectId: dto.id, serviceId: dto.serviceId! };
+    sources.add({ ...target, slug: name });
     if (name === 'consumer') { consumer = target; continue; }
     const manifest = ManifestSchema.parse(Bun.YAML.parse(await Bun.file(`${import.meta.dir}/../../../integrations/${name}-event-producer/crewstation.yaml`).text()));
     await register(target, manifest);
@@ -63,6 +67,7 @@ beforeAll(async () => {
       const headers = new Headers(init?.headers);
       headers.set(IDENTITY_HEADERS.sourceService, `${name}/${name}`);
       headers.set(IDENTITY_HEADERS.sourceSlot, 'prod');
+      for (const [key, value] of Object.entries(await sources.headers(`${name}/${name}`))) headers.set(key, value);
       const response = await ingress.request(url, { ...init, headers });
       if (loseReceipt && response.ok) { loseReceipt = false; throw new Error('receipt lost after commit'); }
       return response;

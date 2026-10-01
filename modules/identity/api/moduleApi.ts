@@ -1,6 +1,6 @@
 import type {
   SetPlatformRoleRequest, AuthMethod, CurrentUserDto, EffectiveForwardingDto, IdentityForwardingDto, JwksDocument, LoginDiscoveryDto, LoginPolicyDto,
-  OfflineReason, OidcLoginFailureCode, OidcProbeResult, OidcProviderDto, OidcProviderId, ProjectDeletionContext, ProjectDeletionOwner, ProjectId, ServiceId, TaskId, UserDto, UserId, WorkloadIdentity,
+  OfflineReason, OidcLoginFailureCode, OidcProbeResult, OidcProviderDto, OidcProviderId, ProjectDeletionContext, ProjectDeletionOwner, ProjectId, ProjectServiceActor, ServiceId, TaskId, UserDto, UserId, WorkloadIdentity,
 } from '@crewstation/contracts';
 
 /**
@@ -230,6 +230,8 @@ export interface IdentityModuleApi {
   /** RFC-027：签名令牌 + 当前 Pod 索引；不接受调用方自报 release／Pod UID。 */
   resolveServiceSource(token: string): Promise<(WorkloadIdentity & { source: NonNullable<WorkloadIdentity['source']> }) | undefined>;
   resolveDevelopmentSource(token: string): Promise<(WorkloadIdentity & { developmentSource: NonNullable<WorkloadIdentity['developmentSource']> }) | undefined>;
+  /** 事件入口固定受众与原项目／服务 UUID；名称与原来源不符不返回调用者。 */
+  resolveEventSource(token: string): Promise<ProjectServiceActor | undefined>;
   currentUser(userId: UserId, authMethod?: AuthMethod): Promise<CurrentUserDto>;
   jwks(): Promise<JwksDocument>;
   /** 生成新签名钥，旧钥进入重叠期继续验签。 */
