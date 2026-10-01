@@ -75,3 +75,12 @@ BEGIN 时序修复已精确发布 `1c17f893f644c6ec08f70e5350f94fe327177a7a`，�
 
 
 停止时后置身份稳定候选的单次完整 `bun run check` 在 arch 阶段被并行在制源码阻断：task-runtime/ports/cluster.ts 的 ports→api 引用、task-runtime 四文件环和 cluster-control 两文件环，共3项；本批两源码/测试指纹保持，未动这些外来路径，也不把这次完整检查称通过。按开发规则§3处理共享树在制阻断：本批精确lint、完整后端类型通过；较宽 data-control/实际来源组合95 pass／3 Garage环境skip／0、98 tests、17文件、540断言，数据供给/HTTP口令轮换4／0、23断言，精确24／0、115断言保持。官方改动行8／8、无未加载生产文件或违规。完整日志、类型、覆盖与指纹均为 `/private/tmp/cs-rfc037-native-closing-observation-` 前缀；本候选无新迁移/契约变更。精确发布后须等该提交树六项CI，不以旧1c17f893的成功替代；正式owner与全部回收继续。
+
+
+## 2026-10-02 停止观测精确发布与同路实机回执
+
+修订已精确发布 `45753bb8dadf2fce49c47ed9ca853d7e4f252a5f`，六路径、真实署名、空共享索引与发布后 main/origin 0/0 已核对；[CI 36900606880](https://github.com/wangbinquan/CrewStation/actions/runs/36900606880) 六项全部 success。2026-10-01T17:52:20.918Z 八组件 Ready=1、generation 与 observedGeneration 一致；控制面 manifest `sha256:5107b0d85d224cc902f55cd2c6cfe528aa5f52d8f8444d0a95a253ca188e3e40`，console `sha256:1e90bd307466b3bdb72914bf16d9e691acc49d5de3f2e2d0e3f1ae2fd6fc8bbe`，来自精确提交归档。原只读探针、策略、共享 PG/PVC/PV、专用项目对象和 Runner 保持。
+
+实际 API Pod `4e3b1506-ea87-47ad-9792-5956af1fbcac` 的安装代码经真实组合根核验通过：原 native SELECT 内公开端口返回 running，前后原 OID/独立来源保留；原回调实际退出为 finished，公开事实与独立持久表完整语义相等，原 Pod 保护和旧生产凭据 SELECT 通过。workId `01a0f89b-d962-7000-ae87-6582acfcf0ad`。真实来源采样先 16 次明确 HTTP409，再两次 HTTP200；这是同一原连接中的有界忙碌等待，不是替身或改造探针。前后来源保持 `37a5d248a52b478038a570883375b439cdb6a4829bc3648c284ef46e3b47095f`；48 库/48 角色全名字和 OID 前后相等。实际链路未执行 CREATE/DROP、密码改写或项目删除。
+
+私有证据 `/private/tmp/cs-rfc037-45753bb8dadf-native-journal-live-receipt.json`、同前缀 CI/image-build/deployment receipts 和 native-catalog-before/after 保留。停止场景的 CREATE/关闭/拒绝后续 DROP 回归由隔离实际 PG 证明，本次平台 Root 联验没有人为改变项目生命周期。正式 owner、全历史 scope 与物理 drain/purge/verify、其余资源 owner、管理员二次确认和 PD 全回收仍在实施，永久删除入口继续关闭。

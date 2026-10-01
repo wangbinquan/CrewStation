@@ -1,5 +1,10 @@
 import type { Actor, DataEnv, DataResourceDto, ProjectId, ServiceId } from '@crewstation/contracts';
-import { newId, notFound } from '@crewstation/kernel';
+import { DataEnvSchema, DataResourceKindSchema, DataResourceStateSchema, TaskDataBindingStateSchema, TaskDataModeSchema } from '@crewstation/contracts';
+import { createHash } from 'node:crypto';
+import { newId, notFound, precondition } from '@crewstation/kernel';
+import type { DataNativePostgresDsn, DataNativePostgresHistory } from '../api/moduleApi';
+import type { NativePostgresHistoryStore } from '../ports/repositories';
+import type { SecretCipher } from '../ports/providers';
 import type { DataResource } from '../domain/dataResource';
 import { ENV_VAR_BY_KIND, postgresObjectName, transition } from '../domain/dataResource';
 import { awaitProvisioned, dataControlDsn } from './dataControl';
@@ -81,4 +86,63 @@ async function awaitDataControl(deps: DataUseCaseDeps, resource: DataResource): 
 
 export function toDto(r: DataResource): DataResourceDto {
   return { id: r.id, projectId: r.projectId, kind: r.kind, env: r.env, plan: r.plan, state: r.state, envVar: r.envVar, ...(r.message ? { message: r.message } : {}), createdAt: r.createdAt.toISOString() };
+}
+
+const nativeHistoryDigest = (value: string): string => createHash('sha256').update(value).digest('hex');
+const nativeHistoryName = (name: string): boolean => name.length > 0 && !name.includes('\0') && Buffer.byteLength(name, 'utf8') <= 63;
+type NativeHistoryGaps = Array<DataNativePostgresHistory['gaps'][number]>;
+
+async function legacyDsn(box: string | null, cipher: SecretCipher, applicable = true): Promise<DataNativePostgresDsn> {
+  const ciphertextDigest = box === null ? null : nativeHistoryDigest(box);
+  if (!applicable) return { state: 'not-applicable', ciphertextDigest, origin: null };
+  if (box === null) return { state: 'absent', ciphertextDigest, origin: null };
+  let plain: string;
+  try { plain = await cipher.decrypt(box); } catch { return { state: 'unreadable', ciphertextDigest, origin: null }; }
+  try {
+    const url = new URL(plain), path = /^(?:postgres|postgresql):\/\/[^/?#]+\/([^?#]*)$/.exec(plain)?.[1];
+    const database = path === undefined ? '' : decodeURIComponent(path), role = decodeURIComponent(url.username);
+    // URI query parameters can override host/user/dbname. Unsupported forms are a gap, never a guessed endpoint.
+    if (!['postgres:', 'postgresql:'].includes(url.protocol) || !url.hostname || /[,/%\\]/.test(url.hostname) || url.search || url.hash || !nativeHistoryName(database) || !nativeHistoryName(role)) throw new Error('invalid origin');
+    const port = url.port ? Number(url.port) : 5432;
+    if (!Number.isSafeInteger(port) || port < 1 || port > 65535) throw new Error('invalid port');
+    return { state: 'available', ciphertextDigest, origin: { hostname: url.hostname, port, database, role } };
+  } catch { return { state: 'invalid', ciphertextDigest, origin: null }; }
+}
+
+function legacyDsnGaps(gaps: NativeHistoryGaps, source: 'resource' | 'binding', id: string, dsn: DataNativePostgresDsn): void {
+  if (dsn.state === 'unreadable') gaps.push({ source, id, code: 'legacy-dsn-unreadable', message: '保留的原连接串无法解密，不能确认原生来源' });
+  if (dsn.state === 'invalid') gaps.push({ source, id, code: 'legacy-dsn-invalid', message: '保留的连接串来源不明确或不受支持，不能确认原生来源' });
+}
+
+/** Read-only original legacy declarations; never calls envFor, credentials, projection or provider. */
+export function nativePostgresHistoryUseCases(store: NativePostgresHistoryStore, cipher: SecretCipher) {
+  return { read: async (projectId: ProjectId): Promise<DataNativePostgresHistory> => {
+    const snapshot = await store.read(projectId), gaps: NativeHistoryGaps = [];
+    const common = (row: (typeof snapshot.resources)[number] | (typeof snapshot.bindings)[number]) => {
+      if (row.projectId !== projectId || !row.id || !row.serviceId || !Number.isFinite(row.createdAt.getTime()) || !Number.isFinite(row.updatedAt.getTime())) throw precondition('原生数据保留历史的原归属或时间格式不合法');
+      return { id: row.id, serviceId: row.serviceId, state: row.state, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
+    };
+    const resources: Array<DataNativePostgresHistory['resources'][number]> = [];
+    for (const row of snapshot.resources) {
+      const dsn = await legacyDsn(row.secretBox, cipher, row.kind === 'postgres');
+      if (!DataResourceKindSchema.safeParse(row.kind).success || !DataEnvSchema.safeParse(row.env).success || !DataResourceStateSchema.safeParse(row.state).success) gaps.push({ source: 'resource', id: row.id, code: 'legacy-row-invalid', message: '保留数据资源的种类、环境或状态不能解读' });
+      if (row.kind === 'postgres' && !nativeHistoryName(row.objectName)) gaps.push({ source: 'resource', id: row.id, code: 'legacy-name-invalid', message: '保留数据库原名字不合法' });
+      if (dsn.origin && dsn.origin.database !== row.objectName) gaps.push({ source: 'resource', id: row.id, code: 'legacy-dsn-conflict', message: '原连接串与保留数据库名字不一致' });
+      legacyDsnGaps(gaps, 'resource', row.id, dsn);
+      resources.push({ ...common(row), kind: row.kind, env: row.env, objectName: row.objectName, dsn });
+    }
+    const bindings: Array<DataNativePostgresHistory['bindings'][number]> = [];
+    for (const row of snapshot.bindings) {
+      const dsn = await legacyDsn(row.secretBox, cipher);
+      if (!row.taskId || !TaskDataModeSchema.safeParse(row.mode).success || !TaskDataBindingStateSchema.safeParse(row.state).success) gaps.push({ source: 'binding', id: row.id, code: 'legacy-row-invalid', message: '保留访问绑定的原任务、模式或状态不能解读' });
+      if (row.expiresAt !== null && !Number.isFinite(row.expiresAt.getTime())) throw precondition('原生数据保留历史的有效期格式不合法');
+      const sharedDevelopment = row.mode === 'development' && row.roleName === 'development';
+      if (row.roleName !== null && !sharedDevelopment && (!nativeHistoryName(row.roleName) || row.roleName === 'development')) gaps.push({ source: 'binding', id: row.id, code: 'legacy-name-invalid', message: '保留临时角色原名字不合法' });
+      if (dsn.origin && row.roleName !== null && !sharedDevelopment && dsn.origin.role !== row.roleName) gaps.push({ source: 'binding', id: row.id, code: 'legacy-dsn-conflict', message: '原连接串与保留临时角色名字不一致' });
+      legacyDsnGaps(gaps, 'binding', row.id, dsn);
+      bindings.push({ ...common(row), taskId: row.taskId, legacyResourceId: row.legacyResourceId, mode: row.mode, roleName: row.roleName, expiresAt: row.expiresAt?.toISOString() ?? null, dsn });
+    }
+    const revision = nativeHistoryDigest(JSON.stringify({ version: 1, projectId, resources, bindings, gaps }));
+    return { projectId, retainedRecordsComplete: true, revision, resources, bindings, gaps };
+  } };
 }

@@ -1,9 +1,9 @@
 import type { DataEnv, DataResourceKind, DataResourceState, ProjectId, ServiceId, TaskDataBindingState, TaskDataMode, TaskId, UserId } from '@crewstation/contracts';
-import type { Executor } from '@crewstation/persistence';
-import { and, eq, inArray, lt } from 'drizzle-orm';
+import type { Database, Executor, Transaction } from '@crewstation/persistence';
+import { and, eq, inArray, lt, sql } from 'drizzle-orm';
 import type { DataResource } from '../../domain/dataResource';
 import type { TaskDataBinding } from '../../domain/taskDataBinding';
-import type { DataResourceRepository, TaskDataBindingRepository } from '../../ports/repositories';
+import type { DataResourceRepository, NativePostgresHistoryStore, TaskDataBindingRepository } from '../../ports/repositories';
 import { resources, taskBindings } from './tables';
 
 const opt = <T>(v: T | null): { [k: string]: T } | Record<string, never> => (v === null ? {} : { value: v });
@@ -49,3 +49,32 @@ export function drizzleTaskBindingRepository(db: Executor): TaskDataBindingRepos
 }
 
 void opt;
+
+type NativeSnapshot = Awaited<ReturnType<NativePostgresHistoryStore['read']>>;
+type NativeResourceRow = NativeSnapshot['resources'][number];
+type NativeBindingRow = NativeSnapshot['bindings'][number];
+type SqlDates<T> = Omit<T, 'createdAt' | 'updatedAt' | 'expiresAt'> & { createdAt: string; updatedAt: string; expiresAt?: string | null };
+
+async function nativeHistoryPages<T extends { id: string } & Record<string, unknown>>(tx: Transaction, select: ReturnType<typeof sql>, projectId: ProjectId, table: 'resources' | 'task_bindings'): Promise<T[]> {
+  const out: T[] = [];
+  let cursor: string | null = null;
+  for (;;) {
+    const rows = await tx.execute<T>(sql`SELECT ${select} FROM ${sql.identifier('data')}.${sql.identifier(table)} WHERE project_id=${projectId} AND (${cursor}::text IS NULL OR id>${cursor}) ORDER BY id LIMIT 500`) as T[];
+    out.push(...rows);
+    if (rows.length < 500) return out;
+    cursor = rows[rows.length - 1]!.id;
+  }
+}
+
+/** BEGIN options precede contextual admission SQL; no SET TRANSACTION after a SELECT. */
+export function drizzleNativePostgresHistory(db: Database): NativePostgresHistoryStore {
+  return { read: (projectId) => db.transaction(async (tx) => {
+    const common = sql`id,project_id AS "projectId",service_id AS "serviceId",state,secret_box AS "secretBox",created_at AS "createdAt",updated_at AS "updatedAt"`;
+    const resourceRows = await nativeHistoryPages<SqlDates<NativeResourceRow>>(tx, sql`${common},kind,env,object_name AS "objectName"`, projectId, 'resources');
+    const bindingRows = await nativeHistoryPages<SqlDates<NativeBindingRow>>(tx, sql`${common},task_id AS "taskId",legacy_resource_id AS "legacyResourceId",mode,role_name AS "roleName",expires_at AS "expiresAt"`, projectId, 'task_bindings');
+    return {
+      resources: resourceRows.map((row) => ({ ...row, createdAt: new Date(row.createdAt), updatedAt: new Date(row.updatedAt) })),
+      bindings: bindingRows.map((row) => ({ ...row, createdAt: new Date(row.createdAt), updatedAt: new Date(row.updatedAt), expiresAt: row.expiresAt === null ? null : new Date(row.expiresAt!) })),
+    };
+  }, { isolationLevel: 'repeatable read', accessMode: 'read only' }) };
+}

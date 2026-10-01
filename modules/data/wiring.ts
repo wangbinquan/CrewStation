@@ -16,14 +16,14 @@ import type { Database, MigrationSet } from '@crewstation/persistence';
 import { readMigrationDir } from '@crewstation/persistence';
 import type { Hono } from 'hono';
 import { secretboxCipher } from './adapters/crypto/secretboxCipher';
-import { drizzleDataResourceRepository, drizzleTaskBindingRepository } from './adapters/persistence/drizzleRepositories';
+import { drizzleDataResourceRepository, drizzleNativePostgresHistory, drizzleTaskBindingRepository } from './adapters/persistence/drizzleRepositories';
 import type { PostgresProviderSettings } from './adapters/postgres/postgresProvider';
 import { postgresDsn, postgresJsProvider } from './adapters/postgres/postgresProvider';
 import type { DataModuleApi } from './api/moduleApi';
 import type { DataUseCaseDeps } from './application/dependencies';
 import { dataLedgerProjection } from './application/ledgerProjection';
 import { revokeBindingsOfReleasedTask } from './application/releasedTask';
-import { serviceDataUseCases } from './application/serviceData';
+import { nativePostgresHistoryUseCases, serviceDataUseCases } from './application/serviceData';
 import { rotateCredentialUseCase } from './application/rotateCredential';
 import { taskBindingUseCases } from './application/taskBindings';
 import { productionResourceAccess } from './application/resource-center/productionAccess';
@@ -143,6 +143,7 @@ export function createDataModule(deps: DataModuleDeps): DataModule {
     ...(deps.ledger && deps.credentials ? { provisioning: { credentials: deps.credentials, ledger: deps.ledger, dsnOf: (role: string, password: string, database: string) => postgresDsn(deps.settings.postgres, role, password, database), ...deps.provisioningTiming } } : {}),
   };
   const service = serviceDataUseCases(useCaseDeps);
+  const nativeHistory = nativePostgresHistoryUseCases(drizzleNativePostgresHistory(deps.db), useCaseDeps.cipher);
   const bindings = { ...taskBindingUseCases(useCaseDeps), ...productionResourceAccess(useCaseDeps, deps.productionTasks, deps.isAdmin) };
   const storedObjects = objectCatalogRepository(deps.db, { requireContract: true }), objectProjection = deps.ledger ? objectLedgerProjection(storedObjects, deps.ledger, deps.clock ?? systemClock, logger) : undefined;
   const objectCatalog = objectProjection?.catalog ?? storedObjects, objectUploads = objectUploadRepository(deps.db);
@@ -156,7 +157,7 @@ export function createDataModule(deps: DataModuleDeps): DataModule {
   const helper = deps.objects ? archiveHelpers({ helpers: helperStore, bindings: archiveBindingRepository(deps.db), plans: archivePlanRepository(deps.db), catalog: objectCatalog, uploads: objectUploads, plane: deps.objects.plane, owner: objectOwner, secretKeyBase64: deps.settings.secretKeyBase64 }) : undefined;
   const archiveApi = deps.objects?.tasks ? archiveFinalization(archiveBindingRepository(deps.db), deps.objects.tasks, { plans: archivePlanRepository(deps.db), reads: objectReadRepository(deps.db), helpers: helperStore }) : undefined;
   const archiveAdmin = deps.objects?.tasks ? archiveAdministration({ plans: archivePlanRepository(deps.db), catalog: objectCatalog, tasks: deps.objects.tasks, authorizer: deps.authorizer, bindings: archiveBindingRepository(deps.db), loss: archiveLossRepository(deps.db) }) : undefined;
-  const api: DataModuleApi = { taskStorageStatus: taskStorageStatus(objectCatalog, storageContractRepository(deps.db)), ...(inputs ? { taskInputs: inputs } : {}), storageContract: storageContractRepository(deps.db), ...(archiveAdmin ? { archiveAdministration: archiveAdmin } : {}), ...(archives ? { archiveService: archives } : {}), ...(helper ? { archiveHelper: helper } : {}), ...(archiveApi ? { archiveFinalization: archiveApi } : {}), name: 'data', applyObjectWriteControl: objectCatalog.applyWriteControl, ensureServiceData: service.ensureServiceData, envFor: service.envFor, listResources: service.listResources, rotateCredential: rotateCredentialUseCase(useCaseDeps), ...bindings, ...(objects ? { objects } : {}), ...(objectBusiness ? { objectService: objectBusiness } : {}), ...(deps.objects?.provisioning ? { objectEnv: objectProvisioning(objectCatalog, deps.services, deps.objects.provisioning) } : {}) };
+  const api: DataModuleApi = { nativePostgresHistory: nativeHistory, taskStorageStatus: taskStorageStatus(objectCatalog, storageContractRepository(deps.db)), ...(inputs ? { taskInputs: inputs } : {}), storageContract: storageContractRepository(deps.db), ...(archiveAdmin ? { archiveAdministration: archiveAdmin } : {}), ...(archives ? { archiveService: archives } : {}), ...(helper ? { archiveHelper: helper } : {}), ...(archiveApi ? { archiveFinalization: archiveApi } : {}), name: 'data', applyObjectWriteControl: objectCatalog.applyWriteControl, ensureServiceData: service.ensureServiceData, envFor: service.envFor, listResources: service.listResources, rotateCredential: rotateCredentialUseCase(useCaseDeps), ...bindings, ...(objects ? { objects } : {}), ...(objectBusiness ? { objectService: objectBusiness } : {}), ...(deps.objects?.provisioning ? { objectEnv: objectProvisioning(objectCatalog, deps.services, deps.objects.provisioning) } : {}) };
   let timer: ReturnType<typeof setInterval> | undefined, expiring = false;
   const expireTick = () => {
     if (expiring) return;

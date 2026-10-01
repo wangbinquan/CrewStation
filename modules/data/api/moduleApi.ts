@@ -10,6 +10,8 @@ import type { ResourceTargetDescription, ResourceValues, UserId } from '@crewsta
 
 /** data 模块对外能力：服务数据供给与环境变量渲染、开发会话的数据访问绑定。 */
 export interface DataModuleApi {
+  /** Internal retained-history read; does not issue credentials or prove physical absence. */
+  readonly nativePostgresHistory?: { read(projectId: ProjectId): Promise<DataNativePostgresHistory> };
   readonly storageContract: { version: number; check(): Promise<{ requiredVersion: number; enabled: boolean }>; enable(): Promise<void> };
   readonly name: 'data';
   inspectProductionAccess(actor: Actor, projectId: ProjectId, taskId: TaskId): Promise<ResourceTargetDescription>;
@@ -39,4 +41,27 @@ export interface DataModuleApi {
   listProjectBindings(actor: Actor, projectId: ProjectId, states?: TaskDataBindingState[]): Promise<TaskDataBindingDto[]>;
   envForTask(taskId: TaskId): Promise<Record<string, string>>;
   expireBindings(): Promise<number>;
+}
+
+export interface DataNativePostgresDsn {
+  readonly state: 'absent' | 'available' | 'unreadable' | 'invalid' | 'not-applicable';
+  readonly ciphertextDigest: string | null;
+  readonly origin: { readonly hostname: string; readonly port: number; readonly database: string; readonly role: string } | null;
+}
+interface DataNativePostgresRecord {
+  readonly id: string;
+  readonly serviceId: string;
+  readonly state: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly dsn: DataNativePostgresDsn;
+}
+export interface DataNativePostgresHistory {
+  readonly projectId: ProjectId;
+  /** Only retained tables are complete; missing DSNs/OIDs require independent history. */
+  readonly retainedRecordsComplete: true;
+  readonly revision: string;
+  readonly resources: readonly (DataNativePostgresRecord & { readonly kind: string; readonly env: string; readonly objectName: string })[];
+  readonly bindings: readonly (DataNativePostgresRecord & { readonly taskId: string; readonly legacyResourceId: string | null; readonly mode: string; readonly roleName: string | null; readonly expiresAt: string | null })[];
+  readonly gaps: readonly { readonly source: 'resource' | 'binding'; readonly id: string; readonly code: 'legacy-row-invalid' | 'legacy-name-invalid' | 'legacy-dsn-unreadable' | 'legacy-dsn-invalid' | 'legacy-dsn-conflict'; readonly message: string }[];
 }

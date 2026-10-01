@@ -1,3 +1,7 @@
+## 2026-10-02 RFC-037停止观测已实机通过，旧供给历史端口接续
+
+45753bb8已精确发布、CI36900606880六项成功；17:52:20Z八组件部署。同路真实API Root公开journal/前后独立事实/原Pod保护/旧凭据SELECT通过，实际来源16次409后两次200，原48库/48角色全名字/OID及共享设施保持。data的旧资源/绑定/DSN完整只读端口在既有生产文件内实现；13专项和51较宽通过，改动行75/75及提交树两侧类型通过；最终全量4954/143 skip/2 fail，六指纹保持，失败在外范围接口参考/发布加载用例，原失败保留。按规则§3精确发布/CI/部署继续。正式native owner、其余全部清理与管理员二次确认/PD全回收未完成，入口关闭。见[journal回执](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/native-identity-journal.md)及[旧供给历史](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/data-native-history.md)。下方历史和并行输出完整保留。
+
 ## 2026-10-02 RFC-037准入快照已部署实机通过，停止观测候选接续
 
 1c17f893已精确发布、CI36892472830六项成功，16:58:57Z八组件Ready=1；原探针/策略/共享PG卷/原项目/Runner保持。新API原Pod的同路Root联验通过：回调内公开journal读取、前后原来源两次HTTP200、独立事实匹配、原Pod保护与旧生产凭据SELECT；48库/48角色全名字/OID保持。首个监视器网络EOF及之前真实25001失败保留，未重跑CI或覆盖失败。停止后后置身份采集的PG反例先红后修：写入仍拒绝，实际原shared backend及名字锁下只读观测保留已提交OID；24／0、115断言及lint通过；单次完整检查被并行task-runtime/cluster-control三项结构违规阻断，两指纹保持，后端类型/较宽95／3Garage skip／0/供给轮换4／0及改动行8／8通过。按开发规则§3精确发布并等本SHA CI/部署，未动外来源码。正式owner、原生物理drain/purge/verify、其余全部清理和管理员二次确认及PD全回收未完成，入口关闭。见[journal验收](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/native-identity-journal.md)。下方历史及并行输出完整保留。

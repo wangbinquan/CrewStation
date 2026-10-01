@@ -23,3 +23,20 @@ export interface TaskDataBindingRepository {
   /** 还没结束的绑定：申请中、已批准、生效中（台账补投影用）。 */
   listOpen(): Promise<TaskDataBinding[]>;
 }
+
+interface NativePostgresHistoryRow {
+  readonly id: string;
+  readonly projectId: string;
+  readonly serviceId: string;
+  readonly state: string;
+  readonly secretBox: string | null;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+}
+/** Private ciphertext stays inside data; both tables are read in one original snapshot. */
+export interface NativePostgresHistoryStore {
+  read(projectId: ProjectId): Promise<{
+    resources: readonly (NativePostgresHistoryRow & { readonly kind: string; readonly env: string; readonly objectName: string })[];
+    bindings: readonly (NativePostgresHistoryRow & { readonly taskId: string; readonly legacyResourceId: string | null; readonly mode: string; readonly roleName: string | null; readonly expiresAt: Date | null })[];
+  }>;
+}
