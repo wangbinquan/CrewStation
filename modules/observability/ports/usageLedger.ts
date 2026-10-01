@@ -1,4 +1,4 @@
-import type { ExecutionObservationV2, ExecutionObservation, RuntimeNativeCapture } from '@crewstation/contracts';
+import type { ExecutionObservationV2, UsageNativeCapture } from '@crewstation/contracts';
 import type { RuntimeFactQuery, RuntimeTaskFact, RunnerUsageCapture } from '@crewstation/contracts';
 import type { UsageExecutionIdentity, RunnerUsageMeasurement, RunnerUsageSourceIdentity, RunnerUsageSourcePage } from '@crewstation/contracts';
 import type { UsageRecord, UsageObservation, UsageValuation, ProjectId, TaskId, ExecutionCostVisibilityDto, SetExecutionCostVisibility } from '@crewstation/contracts';
@@ -76,9 +76,10 @@ export interface RunnerUsageSource {
 
 export interface RuntimeStatisticsSnapshot {
   tasks: RuntimeTaskFact[];
-  observations: ExecutionObservation[];
+  observations: UsageObservation[];
   costVisible: Readonly<Record<string, boolean>>;
-  nativeCaptures?: RuntimeNativeCapture[];
+  nativeCaptures?: UsageNativeCapture[];
+  sourceScope?: 'business-tasks' | 'project-executions';
   partial: boolean;
 }
 export interface RuntimeStatisticsSource {

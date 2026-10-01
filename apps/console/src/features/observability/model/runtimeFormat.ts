@@ -1,7 +1,16 @@
-import type { RuntimeUsageMetrics } from '@crewstation/contracts';
+import type { RuntimeUsageMetrics, RuntimeTaskSummary, RuntimeAttemptFact, RuntimeSourceKind, RuntimeStatistics, RuntimeAgentStatistics } from '@crewstation/contracts';
+import type { Translate } from '../../../shared/lib/useT';
+export function runtimeTaskName(task: Pick<RuntimeTaskSummary, 'name' | 'source'>, t: Translate): string {
+  return task.source?.kind === 'development-agent' ? `${t('runtime.developmentExecution')} · ${task.source.identity.agentId.slice(-8)}` : task.name;
+}
+export function runtimeAttemptName(task: Pick<RuntimeTaskSummary, 'name' | 'source'>, attempt: RuntimeAttemptFact, t: Translate) { return task.source?.kind === 'development-agent' ? runtimeTaskName(task, t) : attempt.name; }
+export function runtimeComputeLabel(profile: { profileName?: string | null; profileRevision: number | null }, t: Translate) { return `${profile.profileName ?? t('runtime.nameUnavailable')} · r${profile.profileRevision ?? '—'}`; }
+export function runtimeAgentName(agent: Pick<RuntimeAgentStatistics, 'name' | 'sourceKind' | 'agentId'>, t: Translate) { return agent.sourceKind === 'development-agent' ? `${t('runtime.developmentExecution')} · ${agent.agentId?.slice(-8) ?? ''}` : agent.name; }
+export function runtimeSourceLabel(kind: RuntimeSourceKind | undefined, t: Translate) { return t(kind === 'development-agent' ? 'runtime.source.development-agent' : 'runtime.source.business-task'); }
+export function runtimeObjectLabel(data: RuntimeStatistics, t: Translate) { return t(data.filters.sourceKind === 'business-task' ? 'runtime.tasks' : data.filters.sourceKind === 'development-agent' ? 'runtime.developmentExecutions' : data.sourceScope === 'project-executions' ? 'runtime.objects' : 'runtime.tasks'); }
 const grouped = (count: string) => BigInt(count).toLocaleString();
 export function runtimeTokens(m: RuntimeUsageMetrics, bucket?: 'input' | 'cacheRead' | 'cacheWrite' | 'output'): string {
-  const value = bucket ? m.tokens[bucket] : m.tokens.total, unknown = bucket ? m.tokens.unknownBuckets[bucket] > 0 : !m.tokens.hasKnown;
+  const value = bucket ? m.tokens[bucket] : m.tokens.total, unknown = !m.tokens.hasKnown || (bucket ? m.tokens.unknownBuckets[bucket] > 0 : false);
   if (unknown && value === '0') return '—';
   return `${m.tokens.complete ? '' : '≥ '}${grouped(value)}`;
 }

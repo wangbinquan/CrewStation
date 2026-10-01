@@ -17,6 +17,7 @@ import { RuntimeResourceMetrics } from '../components/RuntimeResourceMetrics';
 import { RuntimeHealth } from '../components/RuntimeHealth';
 import { RuntimeAnalysis } from '../components/RuntimeAnalysis';
 import { RuntimeFilters } from '../components/RuntimeFilters';
+import { RuntimeSourceFilter } from '../components/RuntimeSources';
 import { RuntimeTaskView } from '../components/RuntimeTaskView';
 import { RUNTIME_TABS, parseRuntimeSearch, runtimeWindow, type RuntimeSearch } from '../model/runtimeSearch';
 import { runtimeDate } from '../model/runtimeFormat';
@@ -28,7 +29,7 @@ function RuntimeViewTabs({ projectId, search, change, children }: { projectId?: 
 }
 function RuntimeTaskPage({ projectId, taskId, go }: PageProps & { taskId: string }) {
   const t = useT(), search = parseRuntimeSearch(useSearch({ strict: false }));
-  const query = useApiQuery(['runtime-task', projectId ?? 'system', taskId], () => projectId ? api.observability.projectRuntimeTask(projectId, taskId) : api.observability.systemRuntimeTask(taskId), AUTO_REFRESH);
+  const query = useApiQuery(['runtime-task', projectId ?? 'system', taskId, search.sourceKind], () => projectId ? api.observability.projectRuntimeTask(projectId, taskId) : api.observability.systemRuntimeTask(taskId), AUTO_REFRESH);
   return <Stack className={styles.page}><QueryStatus isPending={query.isPending} error={query.error} />
     {!query.error && query.data ? <RuntimeTaskView task={query.data} back={() => go(search)} /> : <Button onClick={() => go(search)}>{t('runtime.back')}</Button>}
   </Stack>;
@@ -37,7 +38,7 @@ function RuntimeOverviewPage({ projectId, go }: PageProps) {
   const t = useT(), search = parseRuntimeSearch(useSearch({ strict: false }));
   const [initialNow] = useState(() => Date.now());
   const window = runtimeWindow(search, initialNow), operations = search.tab === 'resources' || search.tab === 'health';
-  const filters = { ...window, q: search.q, state: search.state, quality: search.quality };
+  const filters = { ...window, q: search.q, state: search.state, quality: search.quality, sourceKind: search.sourceKind };
   const query = useApiQuery<RuntimeStatistics>(['runtime-statistics', projectId ?? 'system', filters], () => projectId ? api.observability.projectRuntimeStatistics(projectId, filters) : api.observability.systemRuntimeStatistics(filters), { ...AUTO_REFRESH, enabled: !operations });
   const change = (next: RuntimeSearch) => go({ ...search, from: window.from, to: window.to, ...next });
   const data = operations || query.error ? undefined : query.data;
@@ -49,6 +50,7 @@ function RuntimeOverviewPage({ projectId, go }: PageProps) {
       meta={data ? t('runtime.snapshot', { at: runtimeDate(data.asOf, window.timezone), zone: window.timezone }) : undefined}
       actions={!operations && !projectId ? <ButtonLink to="/admin/compute" search={{ tab: 'pricing' }}>{t('runtime.configurePricing')}</ButtonLink> : undefined} />
     {!operations ? <RuntimeFilters key={window.from + window.to} window={window} search={search} change={change} states={[...new Set([...(data?.tasks.map((task) => task.state) ?? []), ...(search.state ? [search.state] : [])])]} /> : null}
+    {!operations ? <RuntimeSourceFilter search={search} change={change} /> : null}
     {!operations ? <QueryStatus isPending={query.isPending} error={query.error} /> : null}
     <RuntimeViewTabs projectId={projectId} search={search} change={change}>{search.tab === 'resources' ? <RuntimeResourceMetrics projectId={projectId} search={search} change={change} /> : search.tab === 'health' ? <RuntimeHealth projectId={projectId} /> : data ? <Stack><p className={styles.hint}>{t('runtime.scopeHint', { tasks: data.limits.tasks, attempts: data.limits.attempts, records: data.limits.records })}</p>
       {data.partial ? <p role="status" className={styles.notice}>{t('runtime.partial')}</p> : null}

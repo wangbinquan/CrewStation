@@ -2,13 +2,19 @@
 
 更新：2026-10-01。状态：In Progress。本文是当前待办入口；[plan.md](./plan.md) 的批次是历史回执。源代码已存在、通过门禁、已推送、已部署、真实用户/模型验收分别记录，不互相替代。
 
+## 最新在制批次
+
+[两级开发明细](./development-statistics.md)的35路径实现已通过独立完整复核：同快照原owner事实、Session PG数字消费、来源范围/预算隔离、原算力逐对象摘要和两级正式页面。定向55/0、四项静态成功；完整4789/143skip/1fail仅为并行data-control结构违规，原作者修正后定向29/0，35源码未变。实际页面的24组合、标准12px间隔、大整数柱数字、48行末行返回/原滚动焦点及键盘Dialog通过；仅HTTP形状夹具，没有真实身份/模型。
+
+34个独立源码/测试先固化，共享platform/wiring.ts含并行RFC-037的未提交依赖，完整保留并等待依赖发布。此批精确CI、装配与部署继续；本机已部署版本仍以下述实际回执为准，生产producer/全入口清理仍OFF，CS-R02/03/04/13保持未完成。
+
 ## 当前已实现与实际部署
 
 当前本机源码版本：`2fb06f388fc3bfc10ae7c34b5603a8711a5d45af`，2026-10-01T01:40:44.408Z（北京时间10-01 09:40:44.408）部署完成；[精确CI 36801111766](https://github.com/wangbinquan/CrewStation/actions/runs/36801111766)六项成功，八组件Ready=1、代次一致、storage-contract=1、迁移Complete/applied=0，三镜像源码与默认Runner摘要已对拍。2026-10-01T01:41:20.842404+00:00公开console.cs.localhost登录HTTP200、未登录根HTTP401。原bound数字与物理清理代码已部署，生产开发采集仍OFF；未绑定/通用入口、完整消费和两级开发明细未完成。历史门禁失败与各部署批次保留在下方。
 
 正式项目/系统统计已有业务任务、Agent/尝试、四桶 Token、人民币估值、基础泳道、算力贡献下钻和采集质量；项目与算力显示名称，保留稳定 ID/受理修订。已有价格配置与冻结目录、OpenCode 根/子树采集、原归属修订和原价补算；资源/容量和当前服务槽/平台 Pod 健康已有入口。
 
-页面修正、实际 Token 柱形数字、时间按钮对齐、项目/算力名称和取消 CSV 已在本机部署。当前业务统计来源仍被合同显式限定为 `business-tasks`；开发内部身份扩展不能当成开发 Token 已接通。
+页面修正、实际 Token 柱形数字、时间按钮对齐、项目/算力名称和取消 CSV 已在本机部署。已部署的 `2fb06f38` 及当前已提交的组合根仍仅返回 `business-tasks`。本批合同已新增 `project-executions` 能力，但开发事实与数字 consumer 的组合根装配尚未发布；合同能力和夹具验证不能当成生产开发 Token 已接通。
 
 | 批次 | 已有证据 | 尚缺的关闭条件 |
 | --- | --- | --- |
@@ -24,7 +30,7 @@
 
 内部持久consumer、原键派发、持久结束与Session独立登记查询均已精确发布并部署；原965b45e8、646da1e9、94378917及05d4ca01均为远端祖先。实际布局808c5af0、普通启动屏障7682fff3及原选择派发恢复3480032c也已分别通过自身六项CI，并随3480032c进入实际镜像。各批原门禁失败及比例闭环历史完整保留。生产source尚未注入，两级开发事实/UI、owner派发/所有删除排空仍须接通，CS-R02不关闭。详见各专题与[当前部署回执](./development-protection.md#2026-10-01-精确发布ci与本机部署)。
 
-源码锚点：[统计合同](../../../packages/contracts/api/observability/runtimeStatistics.ts) 的 `sourceScope` 仍为业务任务、cohort 仍为 started；[platform 装配](../../../modules/platform/wiring.ts) 仅注入业务事实/业务数值来源；[开发生命周期](../../../modules/dev-session/application/agentExecution.ts) 仍由普通事件结束并回收；[平台健康说明](../../../apps/console/src/features/observability/i18n/zh-CN.ts) 明确应用级指标尚未采集。
+源码锚点：[本批统计合同](../../../packages/contracts/api/observability/runtimeStatistics.ts) 支持 `business-tasks` 与 `project-executions`，cohort 字段仍为 `started`；业务样本按任务启动时间、开发样本按原受理时间进入范围。[platform 装配](../../../modules/platform/wiring.ts) 的已提交版本仅注入业务事实/数值来源，工作树完整在制版本已接入两类事实与可选开发 consumer，但包含并行网关未提交依赖，暂留且不在本批提交内。当前部署仍为前述 `2fb06f38`。[平台健康说明](../../../apps/console/src/features/observability/i18n/zh-CN.ts) 仍明确应用级指标尚未采集。
 
 ## 执行顺序与依赖
 
@@ -72,7 +78,7 @@ CS-R01 的失败若不影响开发设计，可以并行推进文档与其他非�
 - 依赖：Runner 数字能力及 agent-runtime 的真实受理事实，旧测试没有来源时不补历史零。
 - 退出证据：失败/取消测试也保留消耗，重复回执不重计、零/未知/未定价区分，项目接口不可见平台内部金额。
 
-### CS-R05 项目→来源→算力→执行明细〔业务下钻已有，开发待接；T4～6/T9、PO-01/02/03/11〕
+### CS-R05 项目→来源→算力→执行明细〔开发实现候选与页面夹具已通过，精确发布/装配待完成；T4～6/T9、PO-01/02/03/11〕
 
 - dev-session/task-runtime 各自提供有界事实查询，通过 platform 在同一快照装配；observability 不联查其他 owner 的私表。
 - 开发执行按受理时间进入样本，不能因为父工作区很早创建就漏掉今日消耗。详情 ID 用真实独立环境，读账本时按父工作区再按完整执行身份过滤。

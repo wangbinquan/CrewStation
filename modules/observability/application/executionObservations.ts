@@ -1,5 +1,6 @@
 import { ProjectRuntimeStatisticsSchema, SystemRuntimeStatisticsSchema, RuntimeTaskObservationSchema, RuntimeStatisticsQuerySchema } from '@crewstation/contracts';
-import type { RuntimeStatisticsQuery, RuntimeFactQuery, RuntimeTaskFact, RuntimeTaskObservation, RuntimeAttemptFact, RuntimeAttemptSummary, RuntimeNativeCapture, RuntimeStatistics, RuntimeAgentStatistics, ExecutionObservation } from '@crewstation/contracts';
+import type { RuntimeStatisticsQuery, RuntimeFactQuery, RuntimeTaskFact, RuntimeTaskObservation, RuntimeAttemptFact, RuntimeAttemptSummary, UsageNativeCapture, RuntimeStatistics, RuntimeAgentStatistics, UsageObservation } from '@crewstation/contracts';
+import { runtimeSourceKind, runtimeMatchesAttempt, runtimeOwnsIdentity, validateRuntimeFacts } from '../domain/runtimeIdentity';
 import { notFound } from '@crewstation/kernel';
 import { aggregateRuntimeMetrics as aggregate, runtimeUsageMetrics } from '../domain/cnyPricing';
 import { selectRuntimeUsage } from '../domain/tokenUsage';
@@ -92,34 +93,35 @@ interface StatisticsDeps { source: RuntimeStatisticsSource; authorizer: ProjectA
 const running = new Set(['running', 'awaiting-input', 'verifying', 'cancelling']);
 const terminal = new Set(['closed', 'succeeded', 'failed', 'cancelled']);
 const limits = { tasks: 200, attempts: 2000, records: 20000 };
-function attemptRecords(task: RuntimeTaskFact, attempt: RuntimeAttemptFact, rows: ExecutionObservation[]) {
-  return rows.filter(({ identity: i }) => i.projectId === task.projectId && i.taskId === task.id && i.subtaskId === attempt.id && i.executionId === attempt.executionId && i.executionGeneration === attempt.attempt);
+function attemptRecords(task: RuntimeTaskFact, attempt: RuntimeAttemptFact, rows: UsageObservation[]) {
+  return rows.filter(({ identity }) => runtimeMatchesAttempt(task, attempt, identity));
 }
-function attemptSummary(task: RuntimeTaskFact, attempt: RuntimeAttemptFact, rows: ExecutionObservation[], visible: boolean, asOf: number, partial: boolean, captures: RuntimeNativeCapture[]): RuntimeAttemptSummary {
+function attemptSummary(task: RuntimeTaskFact, attempt: RuntimeAttemptFact, rows: UsageObservation[], visible: boolean, asOf: number, partial: boolean, captures: UsageNativeCapture[]): RuntimeAttemptSummary {
   const start = attempt.startedAt === null ? null : Date.parse(attempt.startedAt);
   const open = attempt.endedAt === null && running.has(attempt.state) && !terminal.has(task.state) && task.closedAt === null;
   const end = attempt.endedAt === null ? open ? asOf : null : Date.parse(attempt.endedAt);
   const durationMs = start !== null && end !== null && start <= end && end <= asOf ? end - start : null;
-  const nativeCaptures = captures.filter(({ identity: i }) => i.projectId === task.projectId && i.taskId === task.id && i.subtaskId === attempt.id && i.executionId === attempt.executionId && i.executionGeneration === attempt.attempt);
+  const nativeCaptures = captures.filter(({ identity }) => runtimeMatchesAttempt(task, attempt, identity));
   const metrics = runtimeUsageMetrics(attemptRecords(task, attempt, rows), visible, attempt.kind === 'agent' ? 1 : 0, partial);
   return { ...attempt, durationMs, open: open && durationMs !== null, nativeCaptures, metrics: attempt.kind === 'agent' ? qualifyNativeMetrics(metrics, nativeCaptures, attemptRecords(task, attempt, rows)) : metrics };
 }
 function taskSummary(task: RuntimeTaskFact, snapshot: RuntimeStatisticsSnapshot, scope: 'project' | 'system', asOf: string): RuntimeTaskObservation {
   const now = Date.parse(asOf), visible = scope === 'system' || snapshot.costVisible[task.projectId] === true;
-  const rows = snapshot.observations.filter((row) => row.identity.taskId === task.id && row.identity.projectId === task.projectId);
-  const captures = (snapshot.nativeCaptures ?? []).filter((row) => row.identity.taskId === task.id && row.identity.projectId === task.projectId);
-  const unmatched = [...rows, ...captures].some((r) => !task.attempts.some((a) => a.executionId === r.identity.executionId && a.id === r.identity.subtaskId && a.attempt === r.identity.executionGeneration));
+  const rows = snapshot.observations.filter((row) => runtimeOwnsIdentity(task, row.identity));
+  const captures = (snapshot.nativeCaptures ?? []).filter((row) => runtimeOwnsIdentity(task, row.identity));
+  const unmatched = [...rows, ...captures].some((r) => !task.attempts.some((a) => runtimeMatchesAttempt(task, a, r.identity)));
   const partial = snapshot.partial || task.attemptsPartial || unmatched;
   const attempts = task.attempts.map((a) => attemptSummary(task, a, rows, visible, now, partial, captures));
   const intervals = attempts.flatMap((a) => a.durationMs === null || a.startedAt === null ? [] : [{ start: Date.parse(a.startedAt), end: Date.parse(a.startedAt) + a.durationMs }]);
   const durations = intervalDurations(intervals, { from: 0, to: now, asOf: now });
   const unknownIntervals = attempts.filter((a) => a.durationMs === null).length;
   const start = Date.parse(task.createdAt), end = task.closedAt === null ? terminal.has(task.state) ? null : now : Date.parse(task.closedAt);
-  const wallMs = end !== null && end >= start && end <= now ? end - start : null;
+  const wallMs = runtimeSourceKind(task) !== 'development-agent' && end !== null && end >= start && end <= now ? end - start : null;
   const metrics = aggregate(attempts.map((a) => a.metrics), partial, visible);
   if (unmatched) metrics.reasons.push('identity-unmatched');
   if (unknownIntervals) metrics.reasons.push('timing-missing');
-  return RuntimeTaskObservationSchema.parse({ ...task, scope, asOf, attempts, attemptCount: attempts.length, metrics, wallMs, ...durations, unknownIntervals, partial });
+  const acceptedProfiles = [...new Map(attempts.filter((a) => a.kind === 'agent').map((a) => [JSON.stringify([a.profileId, a.profileRevision, a.profileName]), { profileId: a.profileId, profileName: a.profileName ?? null, profileRevision: a.profileRevision }])).values()];
+  return RuntimeTaskObservationSchema.parse({ ...task, acceptedProfiles, scope, asOf, attempts, attemptCount: attempts.length, metrics, wallMs, ...durations, unknownIntervals, partial });
 }
 function grouped<T>(items: T[], key: (item: T) => string): T[][] {
   const groups = new Map<string, T[]>();
@@ -128,10 +130,10 @@ function grouped<T>(items: T[], key: (item: T) => string): T[][] {
 }
 function agentStatistics(tasks: RuntimeTaskObservation[]): RuntimeAgentStatistics[] {
   const pairs = tasks.flatMap((task) => task.attempts.filter((a) => a.kind === 'agent').map((attempt) => ({ task, attempt })));
-  const key = ({ task, attempt: a }: typeof pairs[number]) => JSON.stringify([task.projectId, a.agentId ?? a.executionId ?? a.id, a.profileId, a.profileRevision, a.kind]);
+  const key = ({ task, attempt: a }: typeof pairs[number]) => JSON.stringify([...(runtimeSourceKind(task) === 'development-agent' ? ['development-agent'] : []), task.projectId, a.agentId ?? a.executionId ?? a.id, a.profileId, a.profileRevision, a.kind]);
   return grouped(pairs, key).map((group) => {
     const first = group[0]!, a = first.attempt;
-    return { key: key(first), projectId: first.task.projectId, projectName: first.task.projectName, agentId: a.agentId, profileId: a.profileId, profileName: a.profileName, profileRevision: a.profileRevision, kind: a.kind, name: a.name,
+    return { sourceKind: runtimeSourceKind(first.task), key: key(first), projectId: first.task.projectId, projectName: first.task.projectName, agentId: a.agentId, profileId: a.profileId, profileName: a.profileName, profileRevision: a.profileRevision, kind: a.kind, name: a.name,
       metrics: aggregate(group.map((x) => x.attempt.metrics)), tasks: grouped(group, (x) => x.task.id).map((rows) => ({ taskId: rows[0]!.task.id, metrics: aggregate(rows.map((x) => x.attempt.metrics)), attempts: rows.length })) };
   });
 }
@@ -144,7 +146,7 @@ function trends(tasks: RuntimeTaskObservation[], query: RuntimeStatisticsQuery) 
   });
 }
 function durationStatistics(tasks: RuntimeTaskObservation[]) {
-  const samples = tasks.filter((task) => terminal.has(task.state) && task.closedAt !== null && task.wallMs !== null).map((task) => task.wallMs!).sort((a, b) => a - b);
+  const samples = tasks.filter((task) => runtimeSourceKind(task) === 'business-task' && terminal.has(task.state) && task.closedAt !== null && task.wallMs !== null).map((task) => task.wallMs!).sort((a, b) => a - b);
   const percentile = (p: number) => samples.length ? samples[Math.ceil(samples.length * p) - 1]! : null;
   return { samples: samples.length, p50Ms: percentile(.5), p95Ms: percentile(.95), maxMs: samples.at(-1) ?? null };
 }
@@ -168,15 +170,23 @@ function systemDistributions(tasks: RuntimeTaskObservation[], snapshot: RuntimeS
   return { models };
 }
 function statistics(snapshot: RuntimeStatisticsSnapshot, query: RuntimeStatisticsQuery, asOf: string, projectId?: ProjectId): RuntimeStatistics {
-  const scope = projectId === undefined ? 'system' : 'project', tasks = snapshot.tasks.map((t) => taskSummary(t, snapshot, scope, asOf)).filter((task) => (!query.q || `${task.name} ${task.id} ${task.projectName ?? ''} ${task.projectId}`.toLowerCase().includes(query.q.toLowerCase())) && (!query.state || task.state === query.state) && (!query.quality || task.metrics.reasons.includes(query.quality)));
+  validateRuntimeFacts(snapshot.tasks);
+  const scope = projectId === undefined ? 'system' : 'project', tasks = snapshot.tasks.map((t) => taskSummary(t, snapshot, scope, asOf)).filter((task) => (!query.sourceKind || runtimeSourceKind(task) === query.sourceKind) && (!query.q || `${task.name} ${task.id} ${task.projectName ?? ''} ${task.projectId}`.toLowerCase().includes(query.q.toLowerCase())) && (!query.state || task.state === query.state) && (!query.quality || task.metrics.reasons.includes(query.quality)));
   const quality = new Map<string, string[]>();
   for (const task of tasks) for (const reason of task.metrics.reasons) { const ids = quality.get(reason) ?? []; ids.push(task.id); quality.set(reason, ids); }
   const projects = grouped(tasks, (t) => t.projectId).map((rows) => ({ projectId: rows[0]!.projectId, projectName: rows[0]!.projectName, tasks: rows.length, metrics: aggregate(rows.map((r) => r.metrics)) }));
   const common = { asOf, projectionVersion: 1, cohort: 'started', filters: query, partial: snapshot.partial || tasks.some((t) => t.partial), limits,
     metrics: aggregate(tasks.map((t) => t.metrics), snapshot.partial, projectId === undefined || snapshot.costVisible[projectId] === true),
     tasks: tasks.map(({ attempts: _a, scope: _s, asOf: _at, partial: _p, ...task }) => task), agents: agentStatistics(tasks), projects, profiles: profileStatistics(tasks),
-    trend: trends(tasks, query), durations: durationStatistics(tasks), quality: [...quality].map(([reason, taskIds]) => ({ reason, taskIds })), sourceScope: 'business-tasks' };
+    trend: trends(tasks, query), durations: durationStatistics(tasks), quality: [...quality].map(([reason, taskIds]) => ({ reason, taskIds })), sourceScope: snapshot.sourceScope ?? 'business-tasks', sources: sourceStatistics(tasks, snapshot.partial, projectId === undefined || snapshot.costVisible[projectId] === true) };
   return projectId === undefined ? SystemRuntimeStatisticsSchema.parse({ ...common, scope, ...systemDistributions(tasks, snapshot) }) : ProjectRuntimeStatisticsSchema.parse({ ...common, scope, projectId });
+}
+
+function sourceStatistics(tasks: RuntimeTaskObservation[], partial: boolean, visible: boolean) {
+  return (['business-task', 'development-agent'] as const).map((kind) => {
+    const rows = tasks.filter((task) => runtimeSourceKind(task) === kind);
+    return { kind, objects: rows.length, metrics: aggregate(rows.map((row) => row.metrics), partial, visible), collectionState: kind === 'development-agent' ? 'production-disabled' as const : 'available' as const };
+  });
 }
 
 export function runtimeStatisticsUseCases(deps: StatisticsDeps) {
@@ -192,7 +202,8 @@ export function runtimeStatisticsUseCases(deps: StatisticsDeps) {
   const detail = async (actor: Actor, taskId: TaskId, projectId?: ProjectId) => {
     await authorize(actor, projectId); const asOf = deps.clock.now().toISOString();
     const query: RuntimeFactQuery = { from: '1970-01-01T00:00:00.000Z', to: asOf, timezone: 'Asia/Shanghai', taskId, ...(projectId === undefined ? {} : { projectId }) };
-    const snapshot = await deps.source.read(query), task = snapshot.tasks.find((t) => t.id === taskId && (projectId === undefined || t.projectId === projectId));
+    const snapshot = await deps.source.read(query); validateRuntimeFacts(snapshot.tasks);
+    const task = snapshot.tasks.find((t) => t.id === taskId && (projectId === undefined || t.projectId === projectId));
     await authorize(actor, projectId); if (!task) throw notFound('找不到本范围内的任务');
     return taskSummary(task, snapshot, projectId === undefined ? 'system' : 'project', asOf);
   };

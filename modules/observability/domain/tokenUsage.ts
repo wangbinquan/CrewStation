@@ -1,4 +1,4 @@
-import type { ExecutionUsageObservation } from '@crewstation/contracts';
+import type { UsageRecord } from '@crewstation/contracts';
 /** RFC-034: four disjoint buckets. Decimal strings preserve large aggregates. */
 export const TOKEN_BUCKETS = ['input', 'cacheRead', 'cacheWrite', 'output'] as const
 export type TokenBucket = (typeof TOKEN_BUCKETS)[number]
@@ -70,8 +70,8 @@ export function subtractTokenBaseline(current: TokenUsage, baseline: TokenUsage)
 
 
 class NativeCoverageConflict extends Error {}
-type ScopedUsage = ExecutionUsageObservation & { scope: NonNullable<ExecutionUsageObservation['scope']> };
-export interface SelectedRuntimeUsage { record: ExecutionUsageObservation; contribution: TokenUsage; whole: boolean }
+type ScopedUsage<T extends UsageRecord = UsageRecord> = T & { scope: NonNullable<T['scope']> };
+export interface SelectedRuntimeUsage<T extends UsageRecord = UsageRecord> { record: T; contribution: TokenUsage; whole: boolean }
 function coverageRelation(a: ScopedUsage, b: ScopedUsage, bucket: TokenBucket) {
   const x = a.scope, y = b.scope;
   const inside = x.session === y.session || x.level === 'tree-total' && y.ancestors.includes(x.session);
@@ -84,10 +84,10 @@ function coverageRelation(a: ScopedUsage, b: ScopedUsage, bucket: TokenBucket) {
   const modelCovered = a.modelRef === null || a.modelRef === b.modelRef;
   return inside && modelCovered && x.turnIndex <= y.turnIndex && aEnd >= bEnd ? 'covered' : 'partial';
 }
-function selectCoverageGroup(records: ScopedUsage[]) {
+function selectCoverageGroup<T extends UsageRecord>(records: ScopedUsage<T>[]) {
   const rank = { 'tree-total': 0, 'self-total': 1, request: 2 };
   const ordered = [...records].sort((a, b) => rank[a.scope.level] - rank[b.scope.level] || a.scope.ancestors.length - b.scope.ancestors.length || a.scope.turnIndex - b.scope.turnIndex || a.recordId.localeCompare(b.recordId));
-  const allocated = new Map<ScopedUsage, Record<TokenBucket, string | null>>(), ancestry = new Map<string, string>();
+  const allocated = new Map<ScopedUsage<T>, Record<TokenBucket, string | null>>(), ancestry = new Map<string, string>();
   let incomplete = false;
   for (const { scope } of ordered) {
     const path = [...scope.ancestors, scope.session];
@@ -98,7 +98,7 @@ function selectCoverageGroup(records: ScopedUsage[]) {
     }
   }
   for (const bucket of TOKEN_BUCKETS) {
-    const totals: ScopedUsage[] = [];
+    const totals: ScopedUsage<T>[] = [];
     for (const record of ordered) {
       const relation = totals.map((a) => coverageRelation(a, record, bucket));
       if (relation.includes('covered')) continue;
@@ -114,13 +114,13 @@ function selectCoverageGroup(records: ScopedUsage[]) {
 }
 
 /** Parent and child measurements are allocated once, independently for each token bucket. */
-export function selectRuntimeUsage(records: ExecutionUsageObservation[]): { selected: SelectedRuntimeUsage[]; incomplete: boolean; conflicts: number } {
-  const groups = new Map<string, ScopedUsage[]>(), selected: SelectedRuntimeUsage[] = [];
+export function selectRuntimeUsage<T extends UsageRecord>(records: T[]): { selected: SelectedRuntimeUsage<T>[]; incomplete: boolean; conflicts: number } {
+  const groups = new Map<string, ScopedUsage<T>[]>(), selected: SelectedRuntimeUsage<T>[] = [];
   let incomplete = false, conflicts = 0;
   for (const record of records) {
     if (!record.scope) { selected.push({ record, contribution: record.projection.contribution, whole: true }); continue; }
     const key = JSON.stringify([record.sourceId, record.identity, record.scope.root]);
-    const group = groups.get(key) ?? []; group.push(record as ScopedUsage); groups.set(key, group);
+    const group = groups.get(key) ?? []; group.push(record as ScopedUsage<T>); groups.set(key, group);
   }
   for (const group of groups.values()) {
     try { const result = selectCoverageGroup(group); selected.push(...result.selected); incomplete ||= result.incomplete; }

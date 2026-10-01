@@ -1,4 +1,4 @@
-import type { ExecutionObservation, ExecutionUsageObservation, RuntimeUsageMetrics } from '@crewstation/contracts';
+import type { UsageObservation, UsageRecord, RuntimeUsageMetrics } from '@crewstation/contracts';
 import { TOKEN_BUCKETS, tokenCount, summarizeTokenUsage, selectRuntimeUsage, type TokenBucket, type TokenUsage } from './tokenUsage'
 
 /** Yuan per million tokens, up to six decimal places; null means unpriced. */
@@ -59,10 +59,10 @@ export function formatCnyAmount(amount: string): string {
 }
 
 
-const observationKey = (row: ExecutionObservation) => JSON.stringify([row.identity, row.sourceId, row.recordId]);
+const observationKey = (row: UsageObservation) => JSON.stringify([row.identity, row.sourceId, row.recordId]);
 /** A valuation belongs to one whole canonical record at exactly its current projection revision. */
-export function runtimeUsageMetrics(observations: ExecutionObservation[], visible: boolean, expected: number, partial = false): RuntimeUsageMetrics {
-  const usage = observations.filter((r): r is ExecutionUsageObservation => r.kind === 'usage');
+export function runtimeUsageMetrics(observations: UsageObservation[], visible: boolean, expected: number, partial = false): RuntimeUsageMetrics {
+  const usage = observations.filter((r): r is UsageRecord => r.kind === 'usage');
   const selection = selectRuntimeUsage(usage), selected = selection.selected;
   const values = new Map(observations.flatMap((r) => r.kind === 'valuation' ? [[observationKey(r), r] as const] : []));
   const tokens = summarizeTokenUsage(selected.map((r) => r.contribution)), amounts: string[] = [], reasons = new Set<string>();
@@ -76,7 +76,7 @@ export function runtimeUsageMetrics(observations: ExecutionObservation[], visibl
     else if (value.availability !== 'priced') reasons.add(value.availability);
     else { amounts.push(value.amountDecimal); if (value.completeness === 'complete') priced++; else reasons.add('valuation-partial'); }
   }
-  const observed = new Set(usage.map((r) => JSON.stringify([r.identity.executionId, r.identity.executionGeneration]))).size;
+  const observed = new Set(usage.map((r) => JSON.stringify(r.identity))).size;
   const missing = Math.max(0, expected - observed);
   if (missing) reasons.add('usage-missing');
   if (selection.incomplete) reasons.add('coverage-overlap');

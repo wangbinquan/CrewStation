@@ -39,7 +39,7 @@ export interface ObservabilityModuleDeps {
   pricingProfiles?: PricingProfileDirectory;
   executionAccess?: ExecutionObservationAccess;
   usageSource?: RunnerUsageSource;
-  /** Explicit internal participant; platform production does not supply it yet. */
+  /** Consume existing Session numeric copies without enabling development producers. */
   developmentUsageSource?: DevelopmentUsageSource;
   k8s: K8sClient;
   authorizer: ProjectAuthorizer;
@@ -85,7 +85,11 @@ export function createObservabilityModule(deps: ObservabilityModuleDeps): Observ
   const reconcileDevelopment = deps.developmentUsageSource ? developmentUsageReconciliation({ source: deps.developmentUsageSource,
     store: ledger, pricing: executionPricing, logger, value: valueDevelopmentUsagePage({ models: ledger, store: valuations, value: valueUsage }) }) : undefined;
   let pendingUsage: Promise<number> | undefined;
-  const reconcileUsage = reconcileDevelopment ? () => pendingUsage ??= (async () => await reconcileBusinessUsage() + await reconcileDevelopment())()
+  const reconcileUsage = reconcileDevelopment ? () => pendingUsage ??= (async () => {
+    const results = await Promise.allSettled([reconcileBusinessUsage(), reconcileDevelopment()]);
+    for (const result of results) if (result.status === 'rejected') logger.warn('execution usage participant unavailable');
+    return results.reduce((sum, result) => sum + (result.status === 'fulfilled' ? result.value : 0), 0);
+  })()
     .finally(() => { pendingUsage = undefined; }) : reconcileBusinessUsage;
   const runtimeStatistics = runtimeStatisticsUseCases({ authorizer: deps.authorizer, clock: useCaseDeps.clock, source: {
     read: async (query) => {
@@ -100,7 +104,7 @@ export function createObservabilityModule(deps: ObservabilityModuleDeps): Observ
       });
       if (!names) return snapshot;
       return { ...snapshot, tasks: snapshot.tasks.map((task) => ({ ...task, projectName: names.projects[task.projectId] ?? null,
-        attempts: task.attempts.map((attempt) => ({ ...attempt, profileName: attempt.profileId ? names.profiles[attempt.profileId] ?? null : null })) })) };
+        attempts: task.attempts.map((attempt) => ({ ...attempt, profileName: attempt.profileName ?? (attempt.profileId ? names.profiles[attempt.profileId] ?? null : null) })) })) };
     },
   } });
   const api: ObservabilityModuleApi = { ...runtimeStatistics,
@@ -114,7 +118,7 @@ export function createObservabilityModule(deps: ObservabilityModuleDeps): Observ
   return {
     api,
     http: [observabilityRoutes(api, deps.isAdmin), tokenPricingRoutes(api, deps.isAdmin), executionObservationRoutes(api, deps.isAdmin)],
-    workers: [...(deps.usageSource ? [executionUsageWorker(reconcileUsage, logger)] : []), { start: () => { timer ??= setInterval(() => void sweepAll(), 30_000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } }],
+    workers: [...(deps.usageSource || deps.developmentUsageSource ? [executionUsageWorker(reconcileUsage, logger)] : []), { start: () => { timer ??= setInterval(() => void sweepAll(), 30_000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } }],
     migrations: observabilityMigrations,
   };
 }

@@ -1,6 +1,6 @@
 // RFC-034: project/system statistics preserve exact CNY, field visibility and explicit missing evidence.
 import { expect, test } from 'bun:test';
-import { RuntimeStatisticsQuerySchema, RuntimeUsageMetricsSchema, ProjectRuntimeStatisticsSchema, SystemRuntimeStatisticsSchema, RuntimeTaskFactSchema } from './runtimeStatistics';
+import { RuntimeStatisticsQuerySchema, RuntimeUsageMetricsSchema, ProjectRuntimeStatisticsSchema, SystemRuntimeStatisticsSchema, RuntimeTaskFactSchema, RuntimeTaskSourceSchema } from './runtimeStatistics';
 const id = '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10';
 const window = { from: '2026-09-28T00:00:00.000Z', to: '2026-09-29T00:00:00.000Z', timezone: 'Asia/Shanghai' };
 const metrics = { tokens: { input: '90071992547409930001', cacheRead: '0', cacheWrite: '0', output: '0', total: '90071992547409930001', hasKnown: true, complete: true, unknownBuckets: { input: 0, cacheRead: 0, cacheWrite: 0, output: 0 } },
@@ -43,4 +43,15 @@ test('unknown output remains distinct from a known zero with incomplete coverage
   expect(zero.tokens.unknownBuckets.output).toBe(0);
   expect(unknown.tokens.unknownBuckets.output).toBe(1);
   expect(RuntimeUsageMetricsSchema.safeParse({ ...metrics, tokens: { ...tokens, unknownBuckets: { ...tokens.unknownBuckets, output: -1 } } }).success).toBe(false);
+});
+
+test('development source identity and collection state are additive, strict and never business subtasks', () => {
+  expect(RuntimeStatisticsQuerySchema.parse({ ...window, sourceKind:'development-agent' }).sourceKind).toBe('development-agent');
+  expect(RuntimeStatisticsQuerySchema.safeParse({ ...window, sourceKind:'development-cli' }).success).toBe(false);
+  const source={ kind:'development-agent',workspaceName:null,identity:{sourceKind:'development-agent',projectId:id,taskId:id,agentId:id,executionId:id,executionGeneration:1} };
+  const task={id,projectId:id,serviceId:id,name:'dev',protocol:'development',state:'closed',createdAt:window.from,closedAt:null,traceId:null,attempts:[],attemptsPartial:false,source};
+  expect(RuntimeTaskFactSchema.parse(task).source).toEqual(RuntimeTaskSourceSchema.parse(source));
+  expect(RuntimeTaskFactSchema.safeParse({...task,source:{...source,identity:{...source.identity,subtaskId:id}}}).success).toBe(false);
+  expect(RuntimeTaskFactSchema.safeParse({...task,source:{...source,identity:{...source.identity,executionGeneration:2}}}).success).toBe(false);
+  expect(SystemRuntimeStatisticsSchema.parse({...common,scope:'system',models:[],sourceScope:'project-executions',sources:[{kind:'development-agent',objects:0,metrics,collectionState:'production-disabled'}]}).sources?.[0]?.collectionState).toBe('production-disabled');
 });

@@ -1,6 +1,7 @@
-import { ExecutionUsageObservationSchema, ExecutionValuationObservationSchema, RuntimeNativeCaptureSchema } from '@crewstation/contracts';
-import { and, asc, eq, gt, lte, inArray, sql } from 'drizzle-orm';
-import { UsageValuationSchema, UsageNativeCaptureSchema, type UsageExecutionIdentity, type RunnerUsageCapture, type RuntimeFactPage } from '@crewstation/contracts';
+import { UsageRecordSchema } from '@crewstation/contracts';
+import { runtimeLedgerScope, validateRuntimeFacts } from '../../domain/runtimeIdentity';
+import { and, asc, eq, gt, lte, inArray, or, sql, type SQL } from 'drizzle-orm';
+import { UsageValuationSchema, UsageNativeCaptureSchema, type UsageExecutionIdentity, type RunnerUsageCapture, type RuntimeFactPage, type RuntimeTaskFact } from '@crewstation/contracts';
 import { conflict, validation, jsonHash } from '@crewstation/kernel';
 import type { DevelopmentRunnerUsageCapture, DevelopmentNativeSource } from '@crewstation/contracts';
 import type { DevelopmentUsageLedgerStore, DevelopmentUsageTransaction } from '../../ports/developmentUsage';
@@ -172,20 +173,30 @@ export function drizzleExecutionValuations(db: Database): ExecutionValuationStor
 
 /** Called inside the same repeatable-read transaction as the owner task facts. */
 export async function readRuntimeStatisticsLedger(db: Executor, facts: RuntimeFactPage): Promise<RuntimeStatisticsSnapshot> {
-  if (!facts.items.length) return { tasks: [], observations: [], costVisible: {}, nativeCaptures: [], partial: facts.partial };
-  const keys = facts.items.map((task) => taskKeyOf({ projectId: task.projectId as UsageTaskScope['projectId'], taskId: task.id as UsageTaskScope['taskId'] }));
-  const usage = await db.select({ document: usageProjections.document }).from(usageProjections).where(inArray(usageProjections.taskKey, keys)).orderBy(asc(usageProjections.meterKey)).limit(20001);
+  validateRuntimeFacts(facts.items);
+  if (!facts.items.length) return { tasks: [], observations: [], costVisible: {}, nativeCaptures: [], partial: facts.partial, sourceScope: facts.sourceScope };
+  const keys = [...new Set(facts.items.map((task) => taskKeyOf(runtimeLedgerScope(task) as UsageTaskScope)))];
+  const usage = await db.select({ document: usageProjections.document }).from(usageProjections).where(and(inArray(usageProjections.taskKey, keys), selectedStatisticsIdentity(sql`${usageProjections.document}->'identity'`, facts.items))).orderBy(asc(usageProjections.meterKey)).limit(20001);
   const remaining = Math.max(0, 20000 - usage.length);
-  const valued = await db.select({ document: executionValuations.document }).from(executionValuations).where(inArray(executionValuations.taskKey, keys)).orderBy(asc(executionValuations.meterKey)).limit(remaining + 1);
-  const captures = await db.select({ summary: nativeCaptures.summary }).from(nativeCaptures).where(inArray(nativeCaptures.taskKey, keys)).orderBy(asc(nativeCaptures.id)).limit(2001);
+  const valued = await db.select({ document: executionValuations.document }).from(executionValuations).where(and(inArray(executionValuations.taskKey, keys), selectedStatisticsIdentity(sql`${executionValuations.document}->'identity'`, facts.items))).orderBy(asc(executionValuations.meterKey)).limit(remaining + 1);
+  const captures = await db.select({ summary: nativeCaptures.summary }).from(nativeCaptures).where(and(inArray(nativeCaptures.taskKey, keys), selectedStatisticsIdentity(sql`${nativeCaptures.summary}->'identity'`, facts.items))).orderBy(asc(nativeCaptures.id)).limit(2001);
   const projects = [...new Set(facts.items.map((task) => task.projectId))];
   const policies = await db.select().from(costVisibility).where(inArray(costVisibility.projectId, projects));
-  return { tasks: facts.items, observations: [...usage.slice(0, 20000).map((r) => ExecutionUsageObservationSchema.parse(r.document)), ...valued.slice(0, remaining).map((r) => ExecutionValuationObservationSchema.parse(r.document))],
+  return { tasks: facts.items, observations: [...usage.slice(0, 20000).map((r) => UsageRecordSchema.parse(r.document)), ...valued.slice(0, remaining).map((r) => UsageValuationSchema.parse(r.document))],
     costVisible: Object.fromEntries(policies.map((r) => [r.projectId, r.document.visibility === 'project-members-and-services'])),
-    nativeCaptures: captures.slice(0, 2000).map((row) => RuntimeNativeCaptureSchema.parse(row.summary)),
-    partial: facts.partial || usage.length > 20000 || valued.length > remaining || captures.length > 2000 };
+    nativeCaptures: captures.slice(0, 2000).map((row) => UsageNativeCaptureSchema.parse(row.summary)),
+    sourceScope: facts.sourceScope, partial: facts.partial || usage.length > 20000 || valued.length > remaining || captures.length > 2000 };
 }
 
+
+function selectedStatisticsIdentity(identity: SQL, tasks: RuntimeTaskFact[]) {
+  return or(...tasks.map((task) => {
+    const scope = runtimeLedgerScope(task), common = sql`${identity}->>'projectId' = ${scope.projectId} AND ${identity}->>'taskId' = ${scope.taskId}`;
+    return task.source?.kind === 'development-agent'
+      ? and(common, sql`${identity}->>'sourceKind' = 'development-agent' AND ${identity}->>'executionId' = ${task.id} AND ${identity}->>'executionGeneration' = '1'`)
+      : and(common, sql`${identity}->>'sourceKind' IS NULL`);
+  }));
+}
 
 async function captureRow(db: Executor, id: string) { return (await db.select().from(nativeCaptures).where(eq(nativeCaptures.id, id)).limit(1))[0]; }
 interface DevelopmentFrameContext { context: DevelopmentNativeContext; source?: DevelopmentNativeSource }
