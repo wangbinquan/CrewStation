@@ -1,0 +1,732 @@
+{
+  "completedAt": "2026-10-01T01:27:51.435Z",
+  "sourceSha": "602bd14400f83ba95d7539134d5fbf4e298616e4",
+  "ciRun": 36800206366,
+  "ciUrl": "https://github.com/wangbinquan/CrewStation/actions/runs/36800206366",
+  "image": "docker.io/library/cs-console@sha256:555272b8213fd0a328fb2ca348f5b7eebfdea893d86a6f6fd3723af3bb775714",
+  "sourceImageConfigId": "sha256:b930c9dcea7db90e50461e94a02025625ad7603c6fc1465050efff8fd4584f37",
+  "requiredStorageContract": 1,
+  "console": {
+    "generation": 216,
+    "observedGeneration": 216,
+    "ready": 1
+  },
+  "beforeComponents": [
+    {
+      "name": "console",
+      "uid": "c4874a0e-6415-4c2b-b141-74ac25ea10ed",
+      "generation": 215,
+      "observedGeneration": 215,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-console@sha256:cf4a367cb97e313c5b914ba589339b9bf43b6f88c256fc01923cfa51ae42c258"
+      ]
+    },
+    {
+      "name": "cs-api",
+      "uid": "b29a07a4-f251-46d4-8b67-d6c456c85749",
+      "generation": 208,
+      "observedGeneration": 208,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:b54172022eec5f82cc4c87d8a597e254b974911454991ef53d8918001d99c602"
+      ]
+    },
+    {
+      "name": "cs-auth",
+      "uid": "a9682e05-2aee-4b76-9842-223da720574e",
+      "generation": 106,
+      "observedGeneration": 106,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:b54172022eec5f82cc4c87d8a597e254b974911454991ef53d8918001d99c602"
+      ]
+    },
+    {
+      "name": "cs-controller",
+      "uid": "5107f19e-22d5-4d7b-8850-78204f329e82",
+      "generation": 173,
+      "observedGeneration": 173,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:b54172022eec5f82cc4c87d8a597e254b974911454991ef53d8918001d99c602"
+      ]
+    },
+    {
+      "name": "cs-events",
+      "uid": "483d82fb-89c0-41df-b03e-9b025822fe1a",
+      "generation": 76,
+      "observedGeneration": 76,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:b54172022eec5f82cc4c87d8a597e254b974911454991ef53d8918001d99c602"
+      ]
+    },
+    {
+      "name": "cs-session",
+      "uid": "68a3334b-917a-43b7-808e-e3d366fdc2ef",
+      "generation": 125,
+      "observedGeneration": 125,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:b54172022eec5f82cc4c87d8a597e254b974911454991ef53d8918001d99c602"
+      ]
+    },
+    {
+      "name": "mcp-capabilities",
+      "uid": "c53a1d73-3ec1-4848-a370-6c4579f31edc",
+      "generation": 72,
+      "observedGeneration": 72,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:b54172022eec5f82cc4c87d8a597e254b974911454991ef53d8918001d99c602"
+      ]
+    },
+    {
+      "name": "mcp-operations",
+      "uid": "e979a774-d521-4031-a3fa-af9c7dafb80a",
+      "generation": 72,
+      "observedGeneration": 72,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:b54172022eec5f82cc4c87d8a597e254b974911454991ef53d8918001d99c602"
+      ]
+    }
+  ],
+  "components": [
+    {
+      "name": "console",
+      "uid": "c4874a0e-6415-4c2b-b141-74ac25ea10ed",
+      "generation": 216,
+      "observedGeneration": 216,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-console@sha256:555272b8213fd0a328fb2ca348f5b7eebfdea893d86a6f6fd3723af3bb775714"
+      ]
+    },
+    {
+      "name": "cs-api",
+      "uid": "b29a07a4-f251-46d4-8b67-d6c456c85749",
+      "generation": 208,
+      "observedGeneration": 208,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:b54172022eec5f82cc4c87d8a597e254b974911454991ef53d8918001d99c602"
+      ]
+    },
+    {
+      "name": "cs-auth",
+      "uid": "a9682e05-2aee-4b76-9842-223da720574e",
+      "generation": 106,
+      "observedGeneration": 106,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:b54172022eec5f82cc4c87d8a597e254b974911454991ef53d8918001d99c602"
+      ]
+    },
+    {
+      "name": "cs-controller",
+      "uid": "5107f19e-22d5-4d7b-8850-78204f329e82",
+      "generation": 173,
+      "observedGeneration": 173,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:b54172022eec5f82cc4c87d8a597e254b974911454991ef53d8918001d99c602"
+      ]
+    },
+    {
+      "name": "cs-events",
+      "uid": "483d82fb-89c0-41df-b03e-9b025822fe1a",
+      "generation": 76,
+      "observedGeneration": 76,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:b54172022eec5f82cc4c87d8a597e254b974911454991ef53d8918001d99c602"
+      ]
+    },
+    {
+      "name": "cs-session",
+      "uid": "68a3334b-917a-43b7-808e-e3d366fdc2ef",
+      "generation": 125,
+      "observedGeneration": 125,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:b54172022eec5f82cc4c87d8a597e254b974911454991ef53d8918001d99c602"
+      ]
+    },
+    {
+      "name": "mcp-capabilities",
+      "uid": "c53a1d73-3ec1-4848-a370-6c4579f31edc",
+      "generation": 72,
+      "observedGeneration": 72,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:b54172022eec5f82cc4c87d8a597e254b974911454991ef53d8918001d99c602"
+      ]
+    },
+    {
+      "name": "mcp-operations",
+      "uid": "e979a774-d521-4031-a3fa-af9c7dafb80a",
+      "generation": 72,
+      "observedGeneration": 72,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:b54172022eec5f82cc4c87d8a597e254b974911454991ef53d8918001d99c602"
+      ]
+    }
+  ],
+  "unchangedOtherComponents": true,
+  "unchangedRunner": true,
+  "runnerImage": "registry.crewstation-system.svc.cluster.local:5000/crewstation/task-runtime@sha256:e7b0153ee23280606b90f88f6cf198543f1fb8d467e13f904c089d0f2cdd6da4",
+  "beforeWorkloads": [
+    {
+      "kind": "Pod",
+      "name": "rfc035-objects-0929-blue-6778c5fb78-8x4hb",
+      "uid": "4d3ff6c0-df4c-4d86-8198-d64e97880d35",
+      "images": [
+        "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+      ]
+    },
+    {
+      "kind": "Pod",
+      "name": "rfc035-objects-0929-blue-6778c5fb78-q8j9g",
+      "uid": "ab17146c-3203-4e2b-b62e-bc7dd5d9f5bb",
+      "images": [
+        "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+      ]
+    },
+    {
+      "kind": "Pod",
+      "name": "rfc035-objects-0929-green-754d8d8848-cxqfv",
+      "uid": "01c681f1-10c2-4241-8187-5113c86be21c",
+      "images": [
+        "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+      ]
+    },
+    {
+      "kind": "Pod",
+      "name": "rfc035-objects-0929-green-754d8d8848-fsbhn",
+      "uid": "9853c695-3a76-4a11-9b43-64c4a8677915",
+      "images": [
+        "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+      ]
+    }
+  ],
+  "afterWorkloads": [
+    {
+      "kind": "Pod",
+      "name": "rfc035-objects-0929-blue-6778c5fb78-8x4hb",
+      "uid": "4d3ff6c0-df4c-4d86-8198-d64e97880d35",
+      "images": [
+        "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+      ]
+    },
+    {
+      "kind": "Pod",
+      "name": "rfc035-objects-0929-blue-6778c5fb78-q8j9g",
+      "uid": "ab17146c-3203-4e2b-b62e-bc7dd5d9f5bb",
+      "images": [
+        "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+      ]
+    },
+    {
+      "kind": "Pod",
+      "name": "rfc035-objects-0929-green-754d8d8848-cxqfv",
+      "uid": "01c681f1-10c2-4241-8187-5113c86be21c",
+      "images": [
+        "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+      ]
+    },
+    {
+      "kind": "Pod",
+      "name": "rfc035-objects-0929-green-754d8d8848-fsbhn",
+      "uid": "9853c695-3a76-4a11-9b43-64c4a8677915",
+      "images": [
+        "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+      ]
+    }
+  ],
+  "missing": [],
+  "changed": [],
+  "ci": {
+    "headSha": "602bd14400f83ba95d7539134d5fbf4e298616e4",
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/wangbinquan/CrewStation/actions/runs/36800206366",
+    "jobs": [
+      {
+        "name": "console（工作台）",
+        "conclusion": "success",
+        "status": "completed",
+        "completedAt": "2026-10-01T01:17:32Z"
+      },
+      {
+        "name": "unit（方法级 UT）",
+        "conclusion": "success",
+        "status": "completed",
+        "completedAt": "2026-10-01T01:15:39Z"
+      },
+      {
+        "name": "e2e（实机端到端）",
+        "conclusion": "success",
+        "status": "completed",
+        "completedAt": "2026-10-01T01:24:25Z"
+      },
+      {
+        "name": "static（结构规则 · lint · 类型）",
+        "conclusion": "success",
+        "status": "completed",
+        "completedAt": "2026-10-01T01:17:17Z"
+      },
+      {
+        "name": "module（模块级 UT）",
+        "conclusion": "success",
+        "status": "completed",
+        "completedAt": "2026-10-01T01:21:44Z"
+      },
+      {
+        "name": "gate（汇总 · 新增代码防护）",
+        "conclusion": "success",
+        "status": "completed",
+        "completedAt": "2026-10-01T01:22:11Z"
+      }
+    ]
+  },
+  "browser": {
+    "before": {
+      "height": 720,
+      "nodes": [
+        {
+          "id": "project:01a0e955-7714-7000-8e27-16c2372b16a5",
+          "title": "RFC035 服务对象存储验收，已有能力，自动赋予 · active"
+        },
+        {
+          "id": "allocation:01a0e955-7714-7000-8e27-16c2372b16a5:gateway-limit:01a0e955-7714-7000-8e27-16c2372b16a5",
+          "title": "网关请求限流，已有能力，继承平台 · 已授权"
+        },
+        {
+          "id": "allocation:01a0e955-7714-7000-8e27-16c2372b16a5:namespace-quota:01a0e955-7714-7000-8e27-16c2372b16a5",
+          "title": "命名空间资源额度，已有能力，实际观测 · 实际额度已读取"
+        },
+        {
+          "id": "group:foundation:Middleware:project:owned",
+          "title": "Middleware · 6，已有能力，实际观测 · Present"
+        },
+        {
+          "id": "observability:01a0e955-7714-7000-8e27-16c2372b16a5",
+          "title": "日志、指标与调用链，已有能力，自动赋予 · 已配置"
+        },
+        {
+          "id": "physical:IngressRoute:cs-rfc035-objects-0929:716ec4bf-70f3-46fb-924e-de97d74047a5",
+          "title": "rfc035-objects-0929-prod，已有能力，实际观测 · Present"
+        },
+        {
+          "id": "physical:IngressRoute:cs-rfc035-objects-0929:86eae5e4-8a14-40d7-81b1-3fd606c4fb1b",
+          "title": "rfc035-objects-0929-preview，已有能力，实际观测 · Present"
+        },
+        {
+          "id": "physical:IngressRoute:cs-rfc035-objects-0929:b63304f8-d2cf-4a51-b374-03c96d6791b9",
+          "title": "rfc035-objects-0929-service，已有能力，实际观测 · Present"
+        },
+        {
+          "id": "physical:Namespace::85ae25ea-d335-4df9-a1af-5b81550f5302",
+          "title": "cs-rfc035-objects-0929，已有能力，实际观测 · Present"
+        },
+        {
+          "id": "physical:NetworkPolicy:cs-rfc035-objects-0929:6a9d20a3-abab-470a-8083-9fcd8535abc9",
+          "title": "crewstation-task-egress，已有能力，实际观测 · Present"
+        },
+        {
+          "id": "physical:NetworkPolicy:cs-rfc035-objects-0929:8fefc80e-8520-4210-ab14-717c7364cdcd",
+          "title": "crewstation-default，已有能力，实际观测 · Present"
+        },
+        {
+          "id": "physical:NetworkPolicy:cs-rfc035-objects-0929:9b03570c-3c54-4eae-83d0-3666e0164f2d",
+          "title": "crewstation-build-egress，已有能力，实际观测 · Present"
+        },
+        {
+          "id": "physical:ResourceQuota:cs-rfc035-objects-0929:33718e1f-37b5-480d-a3e6-efe7a1650fd3",
+          "title": "crewstation-project，已有能力，实际观测 · Present"
+        },
+        {
+          "id": "resource:01a0e955-77a7-7000-a56b-53c1b44a2957",
+          "title": "rate-limit-policy · project:，已有能力，实际观测 · ready"
+        },
+        {
+          "id": "resource:01a0e955-77b3-7000-aa33-8453ae15c9af",
+          "title": "route · 01a0e955，已有能力，实际观测 · ready"
+        },
+        {
+          "id": "resource:01a0e955-77bb-7000-928a-efb6857de1b3",
+          "title": "route · 01a0e955，已有能力，实际观测 · ready"
+        },
+        {
+          "id": "resource:01a0e955-77c0-7000-9f3e-16ad440abfe5",
+          "title": "route · 01a0e955，已有能力，实际观测 · ready"
+        },
+        {
+          "id": "resource:01a0e955-7b41-7000-9e68-7fba5d1e1702",
+          "title": "namespace · 01a0e955，已有能力，实际观测 · ready"
+        },
+        {
+          "id": "resource:01a0e955-7b49-7000-aaa6-5047f4af0afb",
+          "title": "network-policy-set · 01a0e955，已有能力，实际观测 · ready"
+        },
+        {
+          "id": "group:service:release:project:owned",
+          "title": "release · 5，已有能力，自动赋予 · superseded"
+        },
+        {
+          "id": "group:service:Secret:project:owned",
+          "title": "Secret · 5，已有能力，实际观测 · Present"
+        },
+        {
+          "id": "group:service:service-plan:project:owned",
+          "title": "服务套餐 · 7，已有能力，继承平台 · 已授权"
+        },
+        {
+          "id": "physical:Deployment:cs-rfc035-objects-0929:12d6bed3-3627-4f51-a1e8-3d207e4976b2",
+          "title": "rfc035-objects-0929-blue，已有能力，实际观测 · Available"
+        },
+        {
+          "id": "physical:Deployment:cs-rfc035-objects-0929:66ee73e8-171b-4ea9-ac00-5baec59fc66f",
+          "title": "rfc035-objects-0929-green，已有能力，实际观测 · Available"
+        },
+        {
+          "id": "physical:Job:cs-rfc035-objects-0929:migrate-01a0e965cc8c7000a4b81801e46abff5",
+          "title": "migrate-01a0e965cc8c7000a4b81801e46abff5，已有能力，实际观测 · absent"
+        },
+        {
+          "id": "physical:Pod:cs-rfc035-objects-0929:01c681f1-10c2-4241-8187-5113c86be21c",
+          "title": "rfc035-objects-0929-green-754d8d8848-cxqfv，已有能力，实际观测 · Running"
+        },
+        {
+          "id": "physical:Pod:cs-rfc035-objects-0929:4d3ff6c0-df4c-4d86-8198-d64e97880d35",
+          "title": "rfc035-objects-0929-blue-6778c5fb78-8x4hb，已有能力，实际观测 · Running"
+        },
+        {
+          "id": "physical:Pod:cs-rfc035-objects-0929:9853c695-3a76-4a11-9b43-64c4a8677915",
+          "title": "rfc035-objects-0929-green-754d8d8848-fsbhn，已有能力，实际观测 · Running"
+        },
+        {
+          "id": "physical:Pod:cs-rfc035-objects-0929:ab17146c-3203-4e2b-b62e-bc7dd5d9f5bb",
+          "title": "rfc035-objects-0929-blue-6778c5fb78-q8j9g，已有能力，实际观测 · Running"
+        },
+        {
+          "id": "physical:Service:cs-rfc035-objects-0929:0ddcdd3e-ee2a-4141-9c02-32e41c234373",
+          "title": "rfc035-objects-0929-blue，已有能力，实际观测 · Present"
+        },
+        {
+          "id": "physical:Service:cs-rfc035-objects-0929:dc5da1d7-8347-4249-8e52-3c0d7490423a",
+          "title": "rfc035-objects-0929-green，已有能力，实际观测 · Present"
+        },
+        {
+          "id": "repository:01a0e955-7714-7001-90f0-301119790b31",
+          "title": "crewstation/rfc035-objects-0929，已有能力，自动赋予 · ready"
+        },
+        {
+          "id": "resource:01a0e955-9930-7000-96e4-b86638110af8",
+          "title": "service-slot · 01a0e955，已有能力，实际观测 · ready"
+        },
+        {
+          "id": "resource:01a0e955-993e-7000-b4c6-b574d594679a",
+          "title": "service-slot · 01a0e955，已有能力，实际观测 · ready"
+        },
+        {
+          "id": "resource:01a0e965-f5bf-7000-bb54-65bc232e62ac",
+          "title": "migration-job · 01a0e965，已有能力，实际观测 · failed"
+        },
+        {
+          "id": "service:01a0e955-7714-7001-90f0-301119790b31",
+          "title": "rfc035-objects-0929，已有能力，自动赋予 · 已配置"
+        },
+        {
+          "id": "allocation:01a0e955-7714-7000-8e27-16c2372b16a5:compute-profile:01a0e956-7cdf-7000-b1b4-c3a49d858c18",
+          "title": "rfc035-object-workspaces，已有能力，项目授权 · 已授权"
+        },
+        {
+          "id": "allocation:01a0e955-7714-7000-8e27-16c2372b16a5:execution-quota:01a0e955-7714-7000-8e27-16c2372b16a5",
+          "title": "执行并发额度，已有能力，项目配置 · 已授权"
+        },
+        {
+          "id": "group:execution:compute-profile:project:unavailable",
+          "title": "算力档位 · 6，暂不可用，项目授权 · 目录资源"
+        },
+        {
+          "id": "group:execution:runtime-image:project:unavailable",
+          "title": "运行镜像 · 12，暂不可用，继承平台 · 目录资源"
+        },
+        {
+          "id": "group:execution:task-profile:project:owned",
+          "title": "任务规格 · 10，已有能力，继承平台 · 已授权"
+        },
+        {
+          "id": "allocation:01a0e955-7714-7000-8e27-16c2372b16a5:object-plan:01a0e955-76e5-7000-9280-2bea2b2e88d3",
+          "title": "Local object storage，已有能力，项目授权 · 已授权"
+        },
+        {
+          "id": "allocation:01a0e955-7714-7000-8e27-16c2372b16a5:object-space:01a0e95b-e949-7000-8c3c-c3dfc81ea493",
+          "title": "生产对象空间，已有能力，项目配置 · ready"
+        },
+        {
+          "id": "physical:PostgresDatabase::250905",
+          "title": "cs_rfc035_objects_0929，已有能力，实际观测 · Present"
+        },
+        {
+          "id": "physical:PostgresDatabase::250907",
+          "title": "cs_rfc035_objects_0929_dev，已有能力，实际观测 · Present"
+        },
+        {
+          "id": "physical:PostgresRole::250904",
+          "title": "cs_rfc035_objects_0929，已有能力，实际观测 · Present"
+        },
+        {
+          "id": "physical:PostgresRole::250906",
+          "title": "cs_rfc035_objects_0929_dev，已有能力，实际观测 · Present"
+        },
+        {
+          "id": "resource:01a0e955-8f2e-7000-8d4b-e0d50a189e9c",
+          "title": "database · 01a0e955，已有能力，实际观测 · ready"
+        },
+        {
+          "id": "resource:01a0e955-95cd-7000-929e-93ffbac9f6d8",
+          "title": "database · 01a0e955，已有能力，实际观测 · ready"
+        },
+        {
+          "id": "resource:01a0e95b-e949-7000-8c3c-c3dfc81ea493",
+          "title": "object-space · 01a0e95b，已有能力，实际观测 · ready"
+        },
+        {
+          "id": "allocation:01a0e955-7714-7000-8e27-16c2372b16a5:api-operation:01a0c12a-de18-7018-898c-fd1c69b92b15",
+          "title": "GET /v4/projects/{id}/repository/commits/{sha}，已有能力，继承平台 · 已授权"
+        },
+        {
+          "id": "allocation:01a0e955-7714-7000-8e27-16c2372b16a5:api-operation:01a0ccb2-cc32-7000-bb68-52b47a4114da",
+          "title": "GET /api/hello，已有能力，继承平台 · 已授权"
+        },
+        {
+          "id": "group:integration:api-operation:project:unavailable",
+          "title": "API 操作 · 29，暂不可用，项目授权 · 目录资源"
+        },
+        {
+          "id": "mcp:01a0e955-7714-7000-8e27-16c2372b16a5:capabilities",
+          "title": "MCP · capabilities，已有能力，自动赋予 · 已配置"
+        },
+        {
+          "id": "mcp:01a0e955-7714-7000-8e27-16c2372b16a5:operations",
+          "title": "MCP · operations，已有能力，自动赋予 · 已配置"
+        }
+      ],
+      "observedAt": "2026-10-01T01:20:06.821Z",
+      "overflow": 0,
+      "viewBox": "0 0 1018 5464",
+      "width": 1280
+    },
+    "after": {
+      "height": 720,
+      "nodes": [
+        {
+          "id": "project:01a0e955-7714-7000-8e27-16c2372b16a5",
+          "title": "RFC035 服务对象存储验收，已有能力，自动赋予 · active"
+        },
+        {
+          "id": "group:foundation:gateway-limit",
+          "title": "网关限流 · 2，权限列表，2 项记录"
+        },
+        {
+          "id": "group:foundation:Middleware",
+          "title": "网关中间件 · 6，权限列表，6 项记录"
+        },
+        {
+          "id": "group:foundation:namespace",
+          "title": "命名空间 · 2，权限列表，2 项记录"
+        },
+        {
+          "id": "group:foundation:namespace-quota",
+          "title": "命名空间配额 · 2，权限列表，2 项记录"
+        },
+        {
+          "id": "group:foundation:network-policy",
+          "title": "网络隔离策略 · 4，权限列表，4 项记录"
+        },
+        {
+          "id": "group:foundation:observability",
+          "title": "日志与观测 · 1，权限列表，1 项记录"
+        },
+        {
+          "id": "group:foundation:route",
+          "title": "访问路由 · 6，权限列表，6 项记录"
+        },
+        {
+          "id": "group:service:Deployment",
+          "title": "部署实例 · 2，权限列表，2 项记录"
+        },
+        {
+          "id": "group:service:Job",
+          "title": "集群任务 · 1，权限列表，1 项记录"
+        },
+        {
+          "id": "group:service:migration-job",
+          "title": "数据库迁移 · 1，权限列表，1 项记录"
+        },
+        {
+          "id": "group:service:Pod",
+          "title": "运行容器 · 4，权限列表，4 项记录"
+        },
+        {
+          "id": "group:service:release",
+          "title": "发布版本 · 5，权限列表，5 项记录"
+        },
+        {
+          "id": "group:service:repository",
+          "title": "源码仓库 · 1，权限列表，1 项记录"
+        },
+        {
+          "id": "group:service:Secret",
+          "title": "密钥声明 · 5，权限列表，5 项记录"
+        },
+        {
+          "id": "group:service:service",
+          "title": "业务服务 · 1，权限列表，1 项记录"
+        },
+        {
+          "id": "group:service:Service",
+          "title": "集群服务 · 2，权限列表，2 项记录"
+        },
+        {
+          "id": "group:service:service-plan",
+          "title": "服务套餐 · 7，权限列表，7 项记录"
+        },
+        {
+          "id": "group:service:service-slot",
+          "title": "服务槽位 · 2，权限列表，2 项记录"
+        },
+        {
+          "id": "group:execution:compute-profile",
+          "title": "算力档位 · 7，权限列表，7 项记录"
+        },
+        {
+          "id": "group:execution:execution-quota",
+          "title": "执行并发 · 1，权限列表，1 项记录"
+        },
+        {
+          "id": "group:execution:runtime-image",
+          "title": "运行镜像 · 12，权限列表，12 项记录"
+        },
+        {
+          "id": "group:execution:task-profile",
+          "title": "任务规格 · 10，权限列表，10 项记录"
+        },
+        {
+          "id": "group:data:database",
+          "title": "数据库 · 4，权限列表，4 项记录"
+        },
+        {
+          "id": "group:data:database-role",
+          "title": "数据库角色 · 2，权限列表，2 项记录"
+        },
+        {
+          "id": "group:data:object-plan",
+          "title": "对象存储套餐 · 1，权限列表，1 项记录"
+        },
+        {
+          "id": "group:data:object-space",
+          "title": "对象空间 · 2，权限列表，2 项记录"
+        },
+        {
+          "id": "group:integration:api-operation",
+          "title": "API 操作 · 31，权限列表，31 项记录"
+        },
+        {
+          "id": "group:integration:mcp",
+          "title": "平台工具 · 2，权限列表，2 项记录"
+        }
+      ],
+      "observedAt": "2026-10-01T01:28:47.736Z",
+      "overflow": 0,
+      "viewBox": "0 0 1018 2872",
+      "width": 1280
+    },
+    "detailReturn": {
+      "access": "owned",
+      "dialogs": 1,
+      "focus": "详情",
+      "query": "commits/{sha}",
+      "rows": 1
+    },
+    "projectMobile": {
+      "at": "2026-10-01T01:32:24.664Z",
+      "projectPage390": {
+        "height": 844,
+        "overflow": 0,
+        "svgCount": 0,
+        "tableCount": 0,
+        "types": [
+          "RFC035 服务对象存储验收自动赋予 · active已有能力",
+          "算力档位 · 77 项记录权限列表",
+          "执行并发 · 11 项记录权限列表",
+          "运行镜像 · 1212 项记录权限列表",
+          "任务规格 · 1010 项记录权限列表"
+        ],
+        "width": 390
+      },
+      "projectDialog320": {
+        "dialogs": [
+          {
+            "clientWidth": 286,
+            "left": 16,
+            "right": 304,
+            "scrollWidth": 286,
+            "title": "算力档位 · 7"
+          }
+        ],
+        "height": 720,
+        "overflow": 0,
+        "rows": 7,
+        "width": 320
+      }
+    },
+    "adminMobile": {
+      "bounds": [
+        {
+          "clientWidth": 356,
+          "left": 16,
+          "right": 374,
+          "scrollWidth": 356
+        }
+      ],
+      "dialog": "API 操作 · 31",
+      "height": 844,
+      "overflow": 0,
+      "rows": 31,
+      "width": 390
+    },
+    "realViewer": "existing platform administrator; no identity switch",
+    "quotaObserved": {
+      "metric": "maxConcurrentTasks",
+      "limit": 3,
+      "used": 0
+    },
+    "applicationWrites": 0
+  },
+  "localGate": {
+    "startedAt": "2026-10-01T01:13:17.323Z",
+    "completedAt": "2026-10-01T01:13:18.340Z",
+    "checkExit": 1,
+    "changedPaths": [],
+    "fingerprints": {
+      "apps/console/src/features/project-resources/components/ResourceDetailDialog.tsx": "e35c3205795eb51400d9e02e249497317505dd01c077a4a86857c178fc67c29c",
+      "apps/console/src/features/project-resources/components/ResourceList.tsx": "0983d2d4ebad3bff06597a2c860b4ec9514193f447677695b628293e2eea8587",
+      "apps/console/src/features/project-resources/i18n/en-US.ts": "7b1c0bf6ddd60d67c85ec7481606c1e16fe445f32336d1cb911581cdba63c0cc",
+      "apps/console/src/features/project-resources/i18n/zh-CN.ts": "067bf569ee58ff89d483c97b867fd4fde93b2a5ff5bbeff5b4ff30b8a54ed02c",
+      "apps/console/src/features/project-resources/model/topology.ts": "a01cf573fd6de70239d7470b29486621739f5029a66169f651f1bdbe86a2bfec",
+      "apps/console/src/features/project-resources/pages/ProjectResourceCenterView.tsx": "8f4ee85cc1611038371719217975f3306c3fb37d63faf0fc03891c1d72ff096c",
+      "apps/console/src/tests/resourceCenter.test.tsx": "c2cbdc5b7571666658bf130874ce13697ed22fb215d4a44f1c87e9b7c063f3a0",
+      "apps/console/src/tests/resourceCenterGrouping.test.tsx": "2f0abb1e79f64bb76c35811190c2418449d5e1b25ae6b2f2fd61b27b031675c6",
+      "apps/console/src/tests/resourceCenterModel.test.ts": "d2df0202cca7c1ef12ce7076b2116336d5f348dcd24527745ff954c9e12bbfc4",
+      "proposal/rfc/RFC-036-project-resource-workspace/design.md": "f1e7c0800a24b3b298fe870757ab0621c473dce9fc934190161bc775edc88b88",
+      "proposal/rfc/RFC-036-project-resource-workspace/plan.md": "04afb1f7f7ac51e59adbba6ea11a84567c621cab32fa2051fac6a3eca315c405",
+      "proposal/rfc/RFC-036-project-resource-workspace/proposal.md": "2e09bd97c407fb7c7570ea36acbea373ffc2e1c97fabe599e4897d911ccada93"
+    }
+  }
+}
