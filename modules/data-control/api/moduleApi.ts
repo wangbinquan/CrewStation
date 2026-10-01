@@ -1,6 +1,6 @@
 import type { DatabaseReclamationReader } from './databaseReclamation';
 import type { NativePostgresWork } from './databaseRemoval';
-import type { NativePostgresSource } from './storageSource';
+import type { NativePostgresJournal, NativePostgresSource } from './storageSource';
 
 interface ObjectLocation { readonly backendId: string; readonly placementRevision: number; readonly key: string }
 interface ObjectEndpointConfig { readonly endpoint: string; readonly region: string; readonly bucket: string; readonly accessKeyId: string; readonly secretAccessKey: string; readonly monitoring?: { readonly endpoint: string; readonly token: string } }
@@ -24,6 +24,7 @@ export interface DataControlModuleApi {
   readonly databaseReclamation?: DatabaseReclamationReader;
   /** Trusted composition only; every original writer shares native name locks and durable work facts. */
   readonly nativePostgres?: NativePostgresWork;
+  readonly nativePostgresJournal?: NativePostgresJournal;
   /** Internal read-only independent storage observer; unavailable sources block complete purge. */
   readonly nativePostgresSource?: NativePostgresSource;
   /**

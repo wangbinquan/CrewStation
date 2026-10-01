@@ -138,13 +138,13 @@ test.skipIf(!available)('原容器来源缺一键时拒绝外部 DDL，不补造
 }));
 
 test.skipIf(!available)('旧口令库真实升级保留全部密文原文；原资源归属固定后才允许读取', async () => {
-  const old = await createTestDatabase([{ ...dataControlMigrations, files: dataControlMigrations.files.filter((file) => file.name !== '0004_native_work.sql') }]);
+  const old = await createTestDatabase([{ ...dataControlMigrations, files: dataControlMigrations.files.filter((file) => !['0004_native_work.sql', '0005_native_identity_journal.sql'].includes(file.name)) }]);
   const id = Bun.randomUUIDv7(), projectId = Bun.randomUUIDv7() as ProjectId, key = generateSecretKey(), password = 'OriginalUpgrade_1234567890', boxed = await secretboxCipher(key).encrypt(password);
   let control: ReturnType<typeof createDataControlModule> | undefined;
   try {
     await old.db.execute("INSERT INTO data_control.credentials(resource_id,role,secret_box) VALUES ('" + id + "','cs_upgrade_original','" + boxed + "')");
     const before = await old.db.execute('SELECT * FROM data_control.credentials');
-    expect(await runMigrations(old.db, [dataControlMigrations])).toEqual(['data_control/0004_native_work.sql']);
+    expect(await runMigrations(old.db, [dataControlMigrations])).toEqual(['data_control/0004_native_work.sql', 'data_control/0005_native_identity_journal.sql']);
     expect(await old.db.execute('SELECT * FROM data_control.credentials')).toEqual(before);
     expect(await old.db.execute('SELECT * FROM data_control.deletion_entities')).toHaveLength(0);
     const ledger = { get: async () => undefined, listLive: async () => [], latestChange: async () => 0, changesSince: async () => [], observe: async () => ({ status: 'unchanged' as const }) };

@@ -65,7 +65,7 @@ export interface DataControlModule {
 
 export function createDataControlModule(deps: DataControlModuleDeps): DataControlModule {
   const logger = deps.logger ?? noopLogger;
-  const nativeWork = deps.db ? nativePostgresWork({ db: deps.db, adminUrl: deps.adminUrl ?? '', available: deps.projectAvailable, processes: deps.processes }) : undefined;
+  const nativeWork = deps.db ? nativePostgresWork({ db: deps.db, adminUrl: deps.adminUrl ?? '', available: deps.projectAvailable, processes: deps.processes, source: deps.nativePostgresSource }) : undefined;
   const plane = deps.plane ?? (deps.adminUrl ? postgresDataPlane(deps.adminUrl, deps.clock ?? systemClock, nativeWork?.native) : undefined);
   if (!plane) throw new Error('data-control 需要数据面的管理连接（adminUrl）或 plane');
   const stats = newDataObservationStats();
@@ -95,6 +95,7 @@ export function createDataControlModule(deps: DataControlModuleDeps): DataContro
       return forResource(origin, () => credentialOf(vault, resourceId));
     },
     withCredentialAdmission: async (resourceId, work) => forResource(await originOf(resourceId), work),
+    ...(nativeWork ? { nativePostgresJournal: nativeWork.journal } : {}),
     ...(nativeWork && deps.adminUrl ? { nativePostgres: { ...nativeWork.native, credential: async (origin: NativePostgresOrigin, role: string) => {
       if (!vault) throw precondition('未配置原数据库口令存储');
       return forResource(origin, async () => {

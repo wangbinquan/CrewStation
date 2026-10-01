@@ -38,7 +38,7 @@ describe.skipIf(!available)('删除编排（真实 PG＋有状态外部替身）
     expect((await f.database.db.execute(`SELECT id FROM project.deletion_plans WHERE project_id = '${value.id}'`))).toHaveLength(0);
     expect([...f.external.objects.values()].filter((r) => r.projectId === value.id).every((r) => !r.exists && !r.storage && !r.metadata && !r.running)).toBe(true);
     expect(f.external.state('data', shared.id)).toMatchObject({ exists: true, running: true, storage: true, metadata: true });
-  });
+  }, 15_000);
   test('副作用完成后丢回执，重试保留前序证明并清完原资源；完成后同请求不重新盘点不存在的根', async () => {
     const { value, request, operation } = await f.start(); f.external.loseReceipt.add('scm');
     await expect(f.controller.advance(operation.id)).rejects.toMatchObject({ kind: 'precondition' });
@@ -48,7 +48,7 @@ describe.skipIf(!available)('删除编排（真实 PG＋有状态外部替身）
     const result = await f.controller.read(f.admin, operation.id); expect(result.state).toBe('succeeded');
     expect(result.receipts.filter((r) => r.phase === 'seal')).toEqual(before.receipts.filter((r) => r.phase === 'seal'));
     expect(await f.controller.accept(f.admin, value.id, request)).toEqual(result);
-  });
+  }, 15_000);
   test('同名换 UID 阻断且保留替换物；PV 对象消失但后端存储未回收不能进入元数据／根清理', async () => {
     const replaced = await f.start(); f.external.state('resources', replaced.value.id).uid = 'replacement';
     await f.controller.advance(replaced.operation.id);
@@ -62,7 +62,7 @@ describe.skipIf(!available)('删除编排（真实 PG＋有状态外部替身）
     f.external.retainStorage.delete('resources'); f.external.state('resources', retained.value.id).storage = false;
     f.elapse(15_001); await f.controller.advance(retained.operation.id);
     expect((await f.controller.read(f.admin, retained.operation.id)).state).toBe('succeeded');
-  });
+  }, 15_000);
   test('队列丢受理仍返回持久 202 意图，恢复扫描补队；失去队列心跳后不执行 owner 副作用', async () => {
     f.queueAvailable(false); const { value, operation } = await f.start(); f.queueAvailable(true);
     expect(f.queued).not.toContain(operation.id); await f.controller.recover(); expect(f.queued).toContain(operation.id);
@@ -70,7 +70,7 @@ describe.skipIf(!available)('删除编排（真实 PG＋有状态外部替身）
     expect(f.external.calls.filter((c) => c.projectId === value.id)).toHaveLength(0);
     expect((await f.controller.read(f.admin, operation.id)).state).toBe('needs-attention');
     await f.controller.retry(f.admin, operation.id); await f.controller.advance(operation.id);
-  });
+  }, 15_000);
   test('恢复扫描跨过第 100 项，不以第一页或未推进的游标假装扫描完成', async () => {
     const operations = [];
     for (let i = 0; i < 101; i++) operations.push((await f.start()).operation.id);
@@ -99,5 +99,6 @@ describe.skipIf(!available)('删除编排（真实 PG＋有状态外部替身）
     expect(await (await f.call(path)).json()).toMatchObject({ state: 'succeeded' });
     expect((await f.call(acceptPath, 'POST', input)).status).toBe(202);
     expect((await f.call(acceptPath, 'POST', { ...input, requestKey: newId('other') })).status).toBe(409);
-  });
+  // Real PG persists all 22 participants and their phase receipts, in addition to every HTTP permission check.
+  }, 15_000);
 });

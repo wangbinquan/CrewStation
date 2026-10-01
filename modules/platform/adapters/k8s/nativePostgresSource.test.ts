@@ -89,3 +89,21 @@ test('complete endpoint paging and exact source response reject repeated cursors
     await expect(nativePostgresSource(g.k8s, g.options, fetcher).capture(g.connection)).rejects.toThrow();
   }
 });
+test('only the actual source endpoint 409 classifies shared measurement contention; 503 remains unavailable', async () => {
+  const f = await fixture();
+  for (const status of [409, 503]) {
+    const fetcher = (async (_url, _init) => new Response(null, { status })) as typeof fetch;
+    const error = await nativePostgresSource(f.k8s, f.options, fetcher).capture(f.connection).then(() => null, (error: unknown) => error);
+    expect(error).toMatchObject({ kind: 'precondition', details: { code: status === 409 ? 'native_postgres_source_busy' : 'native_postgres_source_unavailable' } });
+  }
+});
+test('unregistered external endpoints and CSI providers are explicitly unsupported, while stale known sources stay unavailable', async () => {
+  for (const mode of ['external', 'csi', 'stale']) {
+    const f = await fixture();
+    if (mode === 'external') f.options.adminUrl = 'postgres://private@external.invalid/postgres';
+    if (mode === 'csi') await f.k8s.mergePatch(Resources.PersistentVolume!, 'pv', undefined, { spec: { csi: { driver: 'unknown', volumeHandle: 'original' } } });
+    if (mode === 'stale') await f.k8s.mergePatch(Resources.Lease!, 'node', 'kube-node-lease', { spec: { renewTime: '2000-01-01T00:00:00Z' } });
+    const error = await f.adapter.capture(f.connection).then(() => null, (error: unknown) => error);
+    expect(error).toMatchObject({ kind: 'precondition', details: { code: mode === 'stale' ? 'native_postgres_source_unavailable' : 'native_postgres_source_unsupported' } });
+  }
+});

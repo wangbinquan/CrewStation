@@ -18,6 +18,7 @@ interface PodStatus { podIP?: string; conditions?: Array<{ type: string; status:
 interface PvSpec { claimRef?: { uid?: string; name?: string; namespace?: string }; hostPath?: { path: string }; local?: { path: string }; csi?: unknown }
 const endpointSlice: ResourceRef = { apiVersion: 'discovery.k8s.io/v1', kind: 'EndpointSlice', plural: 'endpointslices', namespaced: true };
 const unavailable = (message: string) => precondition(message, { code: 'native_postgres_source_unavailable' });
+const unsupported = (message: string) => precondition(message, { code: 'native_postgres_source_unsupported' });
 
 async function complete(k8s: K8sClient, ref: ResourceRef, namespace: string, selector: string): Promise<K8sObject[]> {
   const objects: K8sObject[] = [], cursors = new Set<string>(); let cursor: string | undefined, version: string | undefined;
@@ -42,7 +43,7 @@ async function sqlSource(connection: NativeSourceConnection): Promise<{ server: 
 async function serverPod(k8s: K8sClient, options: NativePostgresSourceOptions, server: SqlServer, service: K8sObject): Promise<K8sObject> {
   const url = new URL(options.adminUrl), allowed = [options.service, `${options.service}.${options.namespace}`, `${options.service}.${options.namespace}.svc`, `${options.service}.${options.namespace}.svc.cluster.local`];
   const spec = service['spec'] as { ports?: Array<{ port: number; targetPort?: string | number }> } | undefined;
-  if (!allowed.includes(url.hostname) || !spec?.ports?.some((port) => port.port === Number(url.port || 5432))) throw unavailable('外部原生数据库没有已登记的来源适配器');
+  if (!allowed.includes(url.hostname) || !spec?.ports?.some((port) => port.port === Number(url.port || 5432))) throw unsupported('外部原生数据库没有已登记的来源适配器');
   const slices = await complete(k8s, endpointSlice, options.namespace, `kubernetes.io/service-name=${options.service}`), matches: Array<{ name: string; uid: string }> = [];
   for (const slice of slices) {
     if (!slice.metadata.uid || slice.metadata.deletionTimestamp || !slice.metadata.ownerReferences?.some((owner) => owner.kind === 'Service' && owner.uid === service.metadata.uid)) throw unavailable('原生服务端点来源未知');
@@ -71,15 +72,20 @@ async function probePod(k8s: K8sClient, options: NativePostgresSourceOptions, no
 }
 async function volumeSource(k8s: K8sClient, options: NativePostgresSourceOptions, pod: K8sObject, mount: NonNullable<NonNullable<PodSpec['containers']>[number]['volumeMounts']>[number], entries: SourceRequest['entries'], nodeUid: string, fetcher: typeof fetch, pinned: K8sObject[]) {
   const spec = pod['spec'] as PodSpec, claimName = spec.volumes?.find((volume) => volume.name === mount.name)?.persistentVolumeClaim?.claimName;
-  if (!claimName || mount.subPath || mount.subPathExpr) throw unavailable('原生数据挂载未绑定可核实的完整 PVC');
+  if (!claimName || mount.subPath || mount.subPathExpr) throw unsupported('原生数据挂载尚无完整独立来源适配器');
   const pvc = await k8s.get(Resources.PersistentVolumeClaim!, claimName, options.namespace), pvcSpec = pvc?.['spec'] as { volumeName?: string } | undefined;
   const pv = pvcSpec?.volumeName ? await k8s.get(Resources.PersistentVolume!, pvcSpec.volumeName) : undefined, pvSpec = pv?.['spec'] as PvSpec | undefined;
   const path = pvSpec?.hostPath?.path ?? pvSpec?.local?.path;
-  if (!pvc?.metadata.uid || pvc.metadata.deletionTimestamp || !pv?.metadata.uid || pv.metadata.deletionTimestamp || pvSpec?.claimRef?.uid !== pvc.metadata.uid || pvSpec.claimRef.name !== claimName || pvSpec.claimRef.namespace !== options.namespace
-    || pv.metadata.annotations?.['pv.kubernetes.io/provisioned-by'] !== 'rancher.io/local-path' || pv.metadata.annotations?.['local.path.provisioner/selected-node'] !== spec.nodeName || pvSpec.csi || !path || dirname(path) !== options.probeRoot) throw unavailable('原生卷供应器没有独立可观测的物理来源');
+  if (!pvc?.metadata.uid || pvc.metadata.deletionTimestamp || !pv?.metadata.uid || pv.metadata.deletionTimestamp || pvSpec?.claimRef?.uid !== pvc.metadata.uid || pvSpec.claimRef.name !== claimName || pvSpec.claimRef.namespace !== options.namespace) throw unavailable('原生 PVC/PV 绑定无法核实');
+  if (pvSpec.csi || pv.metadata.annotations?.['pv.kubernetes.io/provisioned-by'] !== 'rancher.io/local-path') throw unsupported('原生卷供应器尚无独立来源适配器');
+  if (pv.metadata.annotations?.['local.path.provisioner/selected-node'] !== spec.nodeName || !path || dirname(path) !== options.probeRoot) throw unavailable('原生卷供应器没有独立可观测的物理来源');
   const probe = await probePod(k8s, options, spec.nodeName!), address = (probe['status'] as PodStatus).podIP!, key = `${pvc.metadata.uid}/${pv.metadata.uid}`, started = Date.now();
   const response = await fetcher(`http://${isIP(address) === 6 ? `[${address}]` : address}:${options.probePort}/source`, { method: 'POST', headers: { authorization: `Bearer ${options.probeToken}`, 'content-type': 'application/json' }, body: JSON.stringify({ key, rootId: 'local', directory: basename(path), entries }), signal: AbortSignal.timeout(10_000), redirect: 'error' });
-  if (!response.ok) { await response.body?.cancel(); throw unavailable('独立原生卷来源探针暂不可用'); }
+  if (!response.ok) {
+    await response.body?.cancel();
+    if (response.status === 409) throw precondition('独立原生卷来源探针正在采样', { code: 'native_postgres_source_busy' });
+    throw unavailable('独立原生卷来源探针暂不可用');
+  }
   const observed = SourceResponseSchema.parse(JSON.parse(await boundedMetricsText(response, 16_384)));
   if (observed.key !== key || Date.parse(observed.observedAt) < started - 5000 || Date.parse(observed.observedAt) > Date.now() + 5000 || jsonHash(observed.items.map(({ identity: _identity, ...entry }) => entry)) !== jsonHash(entries)) throw unavailable('原生卷来源回执身份、清单或时间不符');
   pinned.push(pvc, pv, probe);
@@ -101,7 +107,8 @@ export function nativePostgresSource(k8s: K8sClient, options: NativePostgresSour
     const groups = new Map<string, { mount: NonNullable<typeof container.volumeMounts>[number]; entries: SourceRequest['entries'] }>();
     for (const location of locations) {
       const matches = container.volumeMounts?.filter((mount) => location.path.startsWith(mount.mountPath + '/')).sort((left, right) => right.mountPath.length - left.mountPath.length);
-      const mount = matches?.[0]; if (!mount || (matches?.[1]?.mountPath.length === mount.mountPath.length)) throw unavailable('原表空间没有唯一可观测的完整挂载');
+      const mount = matches?.[0]; if (!mount) throw unsupported('原表空间尚无独立来源适配器');
+      if (matches?.[1]?.mountPath.length === mount.mountPath.length) throw unavailable('原表空间没有唯一可观测的完整挂载');
       const group = groups.get(mount.name) ?? { mount, entries: [] }; group.entries.push({ key: location.key, relativePath: posix.relative(mount.mountPath, location.path), kind: location.kind }); groups.set(mount.name, group);
     }
     const pinned = [service, pod], volumes: Awaited<ReturnType<typeof volumeSource>>[] = [];
