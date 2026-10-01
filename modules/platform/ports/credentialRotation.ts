@@ -6,6 +6,7 @@ export interface RotationLedger {
   owner(module: string): { within(tx: object): { report(id: string, report: { conditions: { type: string; status: 'true' | 'false'; reason?: string; message?: string }[] }): Promise<unknown> } };
 }
 export interface RotationControl {
+  withCredentialAdmission?<T>(resourceId: string, work: () => Promise<T>): Promise<T>;
   stageRotation(id: string, transaction: object): Promise<void>;
   finishRotation(id: string, transaction: object): Promise<void>;
 }

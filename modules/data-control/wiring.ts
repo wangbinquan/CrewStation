@@ -3,14 +3,18 @@ import type { Clock, Logger } from '@crewstation/kernel';
 import { noopLogger, systemClock } from '@crewstation/kernel';
 import type { Database, Executor, MigrationSet, Transaction } from '@crewstation/persistence';
 import { readMigrationDir } from '@crewstation/persistence';
+import { precondition } from '@crewstation/kernel';
+import type { ProjectId } from '@crewstation/contracts';
 import type { DataControlModuleApi } from './api/moduleApi';
 import { secretboxCipher } from './adapters/crypto/secretboxCipher';
 import { drizzleCredentialStore } from './adapters/persistence/credentialStore';
 import { postgresDataPlane } from './adapters/postgres/postgresDataPlane';
 import { postgresDatabaseReclamation } from './adapters/postgres/databaseReclamation';
 import type { DatabaseReclamationReader } from './api/databaseReclamation';
+import type { NativePostgresOrigin, NativePostgresProcesses } from './api/databaseRemoval';
+import { markNativeCredentialTransaction, nativePostgresWork } from './adapters/persistence/nativeWork';
 import { stageCredentialRotation, finishCredentialRotation } from './application/rotateCredential';
-import { credentialOf, provisionDatabase } from './application/provisionDatabase';
+import { credentialOf, prepareProvisionCredential, provisionDatabase, seedNativeCredential } from './application/provisionDatabase';
 import type { DataObservationStats } from './application/observeDataPlane';
 import { newDataObservationStats } from './application/observeDataPlane';
 import type { DataPlaneReader, DataPlaneWriter } from './ports/dataPlane';
@@ -39,6 +43,8 @@ export interface DataControlModuleDeps {
   /** RFC-025 I28：口令表所在的平台库与平台密钥；都给了才建库、才答得出 credentialOf。 */
   readonly db?: Database;
   readonly secretKeyBase64?: string;
+  readonly projectAvailable?: (id: ProjectId) => Promise<void>;
+  readonly processes?: NativePostgresProcesses;
 }
 
 export const dataControlMigrations: MigrationSet = {
@@ -57,23 +63,48 @@ export interface DataControlModule {
 
 export function createDataControlModule(deps: DataControlModuleDeps): DataControlModule {
   const logger = deps.logger ?? noopLogger;
-  const plane = deps.plane ?? (deps.adminUrl ? postgresDataPlane(deps.adminUrl, deps.clock ?? systemClock) : undefined);
+  const nativeWork = deps.db ? nativePostgresWork({ db: deps.db, adminUrl: deps.adminUrl ?? '', available: deps.projectAvailable, processes: deps.processes }) : undefined;
+  const plane = deps.plane ?? (deps.adminUrl ? postgresDataPlane(deps.adminUrl, deps.clock ?? systemClock, nativeWork?.native) : undefined);
   if (!plane) throw new Error('data-control 需要数据面的管理连接（adminUrl）或 plane');
   const stats = newDataObservationStats();
   const databaseReclamation = deps.databaseReclamation ?? (deps.adminUrl ? postgresDatabaseReclamation(deps.adminUrl, deps.clock ?? systemClock) : undefined);
   // 口令（I28）：生成、加密存下都在 data-control；没给平台库或密钥时只观测、不建库。
   const vault = deps.db && deps.secretKeyBase64 ? { store: drizzleCredentialStore(deps.db), cipher: secretboxCipher(deps.secretKeyBase64) } : undefined;
-  const apply = vault ? (snapshot: Parameters<typeof provisionDatabase>[1], record: Parameters<typeof provisionDatabase>[2]) => deps.db!.transaction((tx) => provisionDatabase({ ledger: deps.ledger, plane, stats, logger, cipher: vault.cipher, store: drizzleCredentialStore(tx) }, snapshot, record)) : undefined;
-  const observer = dataPlaneObserver(deps.ledger, plane, stats, logger, deps.observer, apply);
+  const forResource = <T>(origin: NativePostgresOrigin | undefined, work: (guard?: Executor) => Promise<T>): Promise<T> => {
+    if (!nativeWork) return work();
+    if (!origin) throw precondition('数据库口令缺少原项目归属');
+    return nativeWork.withResource(origin, work);
+  };
+  const originOf = async (id: string) => { const record = await deps.ledger.get(id), original = await nativeWork?.originOf(id); if (record?.projectId && original && record.projectId !== original.projectId) throw precondition('原数据库资源不能转归其他项目'); return original ?? (record?.projectId ? { projectId: record.projectId, resourceId: id } : undefined); };
+  const apply = vault ? (snapshot: Parameters<typeof provisionDatabase>[1], record: Parameters<typeof provisionDatabase>[2]) => forResource(record.projectId ? { projectId: record.projectId, resourceId: record.id } : undefined, async () => {
+    await deps.db!.transaction((tx) => prepareProvisionCredential({ cipher: vault.cipher, store: drizzleCredentialStore(tx) }, snapshot, record));
+    return deps.db!.transaction((tx) => provisionDatabase({ ledger: deps.ledger, plane, stats, logger, cipher: vault.cipher, store: drizzleCredentialStore(tx) }, snapshot, record));
+  }) : undefined;
+  const observer = dataPlaneObserver(deps.ledger, plane, stats, logger, { ...deps.observer, ...(nativeWork ? { sweepNativeCallbacks: nativeWork.sweep } : {}) }, apply);
   const rotationVault = (transaction: object) => {
     if (!vault) throw new Error('未配置口令存储，无法轮换');
     return { cipher: vault.cipher, store: drizzleCredentialStore(transaction as Executor) };
   };
   const api: DataControlModuleApi = {
-    name: 'data-control', credentialOf: async (resourceId) => (vault ? credentialOf(vault, resourceId) : undefined),
+    name: 'data-control', credentialOf: async (resourceId) => {
+      if (!vault) return undefined;
+      const origin = await originOf(resourceId);
+      if (!origin && !await vault.store.get(resourceId)) return undefined;
+      return forResource(origin, () => credentialOf(vault, resourceId));
+    },
+    withCredentialAdmission: async (resourceId, work) => forResource(await originOf(resourceId), work),
+    ...(nativeWork && deps.adminUrl ? { nativePostgres: { ...nativeWork.native, credential: async (origin: NativePostgresOrigin, role: string) => {
+      if (!vault) throw precondition('未配置原数据库口令存储');
+      return forResource(origin, async () => {
+        await deps.db!.transaction((tx) => seedNativeCredential({ cipher: vault.cipher, store: drizzleCredentialStore(tx) }, origin.resourceId, role));
+        const stored = await credentialOf(vault, origin.resourceId);
+        if (!stored) throw precondition('原数据库口令未持久提交');
+        return stored;
+      });
+    } } } : {}),
     ...(databaseReclamation ? { databaseReclamation } : {}),
-    stageRotation: (id, transaction) => stageCredentialRotation({ ledger: deps.ledger, ...rotationVault(transaction) }, id),
-    finishRotation: (id, transaction) => finishCredentialRotation({ plane, ...rotationVault(transaction) }, id),
+    stageRotation: async (id, transaction) => forResource(await originOf(id), async (guard) => { if (guard) await markNativeCredentialTransaction(transaction as Executor, guard); return stageCredentialRotation({ ledger: deps.ledger, ...rotationVault(transaction) }, id); }),
+    finishRotation: async (id, transaction) => forResource(await originOf(id), async (guard) => { if (guard) await markNativeCredentialTransaction(transaction as Executor, guard); return finishCredentialRotation({ ledger: deps.ledger, plane, ...rotationVault(transaction) }, id); }),
     ...(vault ? { objects: createObjectPlane(deps.db!, vault.cipher) } : {}),
   };
   return { api, migrations: dataControlMigrations, observer: { start: observer.start, stop: async () => { try { await observer.stop(); } finally { await databaseReclamation?.close(); } } }, stats: () => ({ ...stats }) };

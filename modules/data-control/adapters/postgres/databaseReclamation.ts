@@ -11,7 +11,11 @@ function validate(target: { name: string; oid: string }) {
   if (!/^cs_[a-z0-9_]{1,60}$/.test(target.name) || !/^[1-9][0-9]*$/.test(target.oid) || Number(target.oid) > 4_294_967_295) throw precondition('原数据库名字或 OID 不合法');
 }
 async function source(admin: Sql, endpoint: string): Promise<string> {
-  const [row] = await admin<{ system_identifier: string; pg_control_version: number; catalog_version_no: number; directory: string }[]>`SELECT system_identifier::text,pg_control_version,catalog_version_no,current_setting('data_directory') AS directory FROM pg_control_system()`;
+  return postgresServerSource((text) => admin.unsafe(text), endpoint);
+}
+/** Shared native source fingerprint for database directories and original roles. */
+export async function postgresServerSource(query: (text: string) => PromiseLike<readonly { system_identifier: string; pg_control_version: number; catalog_version_no: number; directory: string }[]>, endpoint: string): Promise<string> {
+  const [row] = await query("SELECT system_identifier::text,pg_control_version,catalog_version_no,current_setting('data_directory') AS directory FROM pg_control_system()");
   if (!row || !/^[0-9]+$/.test(row.system_identifier) || !row.directory || !Number.isInteger(row.pg_control_version) || !Number.isInteger(row.catalog_version_no)) throw precondition('原 PostgreSQL 服务器来源不完整');
   return jsonHash({ endpoint, ...row });
 }

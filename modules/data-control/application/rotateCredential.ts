@@ -13,9 +13,10 @@ export async function stageCredentialRotation(deps: { ledger: DataLedgerObservat
 }
 
 /** 先 ALTER，再提交有效口令和清除标记；任何一步失败，已提交的 pendingBox 都能用于重试。 */
-export async function finishCredentialRotation(deps: { store: CredentialStore; cipher: SecretCipher; plane: DataPlaneWriter }, id: string): Promise<void> {
+export async function finishCredentialRotation(deps: { ledger: DataLedgerObservations; store: CredentialStore; cipher: SecretCipher; plane: DataPlaneWriter }, id: string): Promise<void> {
   const stored = await deps.store.get(id);
   if (!stored?.pendingBox) return;
-  await deps.plane.rotatePassword({ role: stored.role, password: await deps.cipher.decrypt(stored.pendingBox) });
+  const record = await deps.ledger.get(id);
+  await deps.plane.rotatePassword({ role: stored.role, password: await deps.cipher.decrypt(stored.pendingBox), ...(record?.projectId ? { origin: { projectId: record.projectId, resourceId: id } } : {}) });
   await deps.store.finishRotation(id, stored.pendingBox);
 }

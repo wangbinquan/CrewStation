@@ -4,7 +4,7 @@ import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit'
 import { sql } from 'drizzle-orm';
 import { connectDatabase } from './connection';
 import type { DatabaseHandle } from './connection';
-import { withExclusiveDatabaseAdmission, withSharedDatabaseAdmission, withSharedDatabaseAdmissions } from './transactionContext';
+import { assertSharedDatabaseAdmissionActive, withExclusiveDatabaseAdmission, withSharedDatabaseAdmission, withSharedDatabaseAdmissions } from './transactionContext';
 
 const available = await testDatabaseAvailable(), KEY = 'resources.project-admission:test';
 describe.skipIf(!available)('持久准入独立连接池（真实 PG）', () => {
@@ -52,7 +52,11 @@ describe.skipIf(!available)('持久准入独立连接池（真实 PG）', () => 
   test('多个来源由同一 backend 按稳定次序保护，普通单连接事务和嵌套子集无需重复锁；无关来源可继续', async () => {
     database = await createTestDatabase(); single = connectDatabase(database.url, { max: 1 });
     const keys = [KEY, 'events.project-admission:second'].sort();
+    expect(() => assertSharedDatabaseAdmissionActive(single.db, KEY)).toThrow('has exited');
     await withSharedDatabaseAdmissions(single.db, [keys[1]!, keys[0]!, keys[1]!], async (guard) => {
+      for (const key of keys) expect(() => assertSharedDatabaseAdmissionActive(single.db, key)).not.toThrow();
+      expect(() => assertSharedDatabaseAdmissionActive(single.db, 'unrelated')).toThrow('has exited');
+      expect(() => assertSharedDatabaseAdmissionActive(database.db, KEY)).toThrow('has exited');
       const backend = Number((await guard.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`))[0]!.pid);
       await single.db.transaction(async (tx) => {
         const [row] = await tx.execute<{ keys: string; pid: string; locks: number }>(sql`SELECT current_setting('crewstation.shared_admission_keys') AS keys,current_setting('crewstation.shared_admission_pid') AS pid,(SELECT count(*)::integer FROM pg_locks WHERE pid=${backend} AND locktype='advisory' AND granted AND mode='ShareLock') AS locks`);
@@ -76,6 +80,7 @@ describe.skipIf(!available)('持久准入独立连接池（真实 PG）', () => 
       : (db: Parameters<typeof withSharedDatabaseAdmission>[0], key: string, work: Parameters<typeof withSharedDatabaseAdmission>[2]) => withSharedDatabaseAdmissions(db, [key, 'events.project-admission:other'], work);
     const pending = admission(single.db, KEY, async (guard) => {
       entered(Number((await guard.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`))[0]!.pid)); await held;
+      expect(() => assertSharedDatabaseAdmissionActive(single.db, KEY)).toThrow('has exited');
       const key = await single.db.transaction(async (tx) => (await tx.execute<{ key?: string }>(sql`SELECT current_setting('crewstation.shared_admission_key',true) AS key`))[0]?.key);
       exited(key || undefined);
     }).then(() => 'unexpected-success', () => 'disconnected');

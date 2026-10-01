@@ -61,6 +61,7 @@
     "modules/data-control/adapters/persistence/migrations/0001_credentials.sql": "6eab70e440bdb494c792ff0be6b84b97dc9feb8ea657473bce57077427c802d8",
     "modules/data-control/adapters/persistence/migrations/0002_credential_rotation.sql": "5cfe1355a473dd630e13a13372311e507eff5a71360c86ac5cbd7e1a9240bcf4",
     "modules/data-control/adapters/persistence/migrations/0003_object_endpoints.sql": "669cabc9c58bc228f2d6c63a64b64b62c014cf83b33268b1811efc7100acca34",
+    "modules/data-control/adapters/persistence/migrations/0004_native_work.sql": "4664e3cc8651b06c911fca74597452e14114996f132b33889a33e2c873a2f635",
     "modules/data/adapters/persistence/migrations/0001_create_schema.sql": "87065494bbec2f3bd8915fe24775f0ca02e493279243f74d4264dcc25c20cabd",
     "modules/data/adapters/persistence/migrations/0002_data_tables.sql": "9ab5855f04513620a62f0fdfcaa2c4d886de8a1420f49d948fe73ca80674a429",
     "modules/data/adapters/persistence/migrations/0003_resource_identity.sql": "918dc451c39a3187c1d614386507ba5b93422dede7fc9141ec05b2c99a928348",

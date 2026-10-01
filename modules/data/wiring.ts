@@ -34,7 +34,7 @@ import { dataRoutes } from './http/dataRoutes';
 import type { DataLedger } from './ports/ledger';
 import { dataLedgerResyncWorker } from './workers/dataLedgerResync';
 import type { DataSettings, ProjectAuthorizer, ServiceResolver } from './ports/platform';
-import type { PostgresProvider } from './ports/providers';
+import type { PostgresNativeWork, PostgresProvider } from './ports/providers';
 import { objectCatalogRepository } from './adapters/persistence/objectCatalog';
 import { objectReadRepository } from './adapters/persistence/objectReads';
 import { objectUploadRepository } from './adapters/persistence/objectUploads';
@@ -83,6 +83,7 @@ export interface DataModuleDeps {
   isAdmin: (userId: UserId) => Promise<boolean>;
   settings: DataSettings & { secretKeyBase64: string; postgres: PostgresProviderSettings };
   provider?: PostgresProvider;
+  nativePostgres?: PostgresNativeWork;
   clock?: Clock;
   logger?: Logger;
   /** 收到期绑定的间隔，缺省 BINDING_EXPIRY_INTERVAL_MS；用例里调短。 */
@@ -130,7 +131,7 @@ export function createDataModule(deps: DataModuleDeps): DataModule {
   const useCaseDeps: DataUseCaseDeps = {
     resources: projection ? projection.resources(stored.resources) : stored.resources,
     bindings: projection ? projection.bindings(stored.bindings, stored.resources) : stored.bindings,
-    postgres: deps.provider ?? postgresJsProvider(deps.settings.postgres),
+    postgres: deps.provider ?? postgresJsProvider(deps.settings.postgres, deps.nativePostgres),
     cipher: secretboxCipher(deps.settings.secretKeyBase64),
     authorizer: deps.authorizer,
     services: deps.services,

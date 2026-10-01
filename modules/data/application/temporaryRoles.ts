@@ -1,4 +1,4 @@
-import type { ServiceId } from '@crewstation/contracts';
+import type { ProjectId, ServiceId } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
 import type { TaskDataBinding } from '../domain/taskDataBinding';
 import { activate } from '../domain/taskDataBinding';
@@ -15,13 +15,13 @@ export function temporaryRoleUseCases(deps: DataUseCaseDeps) {
       const roleName = binding.roleName ?? (binding.legacyResourceId ? `${prod.roleName}_t_${binding.legacyResourceId.slice(-8)}` : `cs_t_${binding.id.replaceAll('-', '')}`);
       // 由 data-control 建（RFC-025 I28 第二步）：这里只记下角色名、置为生效，投影把期望（到期、只读与否、所在的库）写进台账。
       if (deps.provisioning) return activate(binding, roleName, undefined, deps.clock.now());
-      const { dsn } = await deps.postgres.createTemporaryRole({ databaseName: prod.databaseName, roleName, ownerRole: prod.roleName, readOnly: binding.mode === 'diagnostic-readonly', validUntil: binding.expiresAt ?? deps.clock.now() });
+      const { dsn } = await deps.postgres.createTemporaryRole({ databaseName: prod.databaseName, roleName, ownerRole: prod.roleName, readOnly: binding.mode === 'diagnostic-readonly', validUntil: binding.expiresAt ?? deps.clock.now(), origin: { projectId: binding.projectId as ProjectId, resourceId: binding.id } });
       return activate(binding, roleName, await deps.cipher.encrypt(dsn), deps.clock.now());
     },
     drop: async (binding: TaskDataBinding): Promise<void> => {
       if (!binding.roleName || binding.roleName === 'development') return;
       const prod = await data.productionDatabase(binding.serviceId as ServiceId);
-      await deps.postgres.dropRole({ roleName: binding.roleName, ...(prod ? { databaseName: prod.databaseName, reassignTo: prod.roleName } : {}) });
+      await deps.postgres.dropRole({ roleName: binding.roleName, origin: { projectId: binding.projectId as ProjectId, resourceId: binding.id }, ...(prod ? { databaseName: prod.databaseName, reassignTo: prod.roleName } : {}) });
     },
   };
 }

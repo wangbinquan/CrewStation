@@ -6,6 +6,12 @@ interface Scope { readonly database: Database; readonly key: string; readonly ke
 const scopes = new AsyncLocalStorage<Scope>();
 const guards = new WeakMap<Database, () => Database>();
 
+/** The original callback can outlive a rejected driver transaction. Never query that abandoned scope. */
+export function assertSharedDatabaseAdmissionActive(database: Database, key: string): void {
+  const scope = scopes.getStore();
+  if (!scope?.active || scope.database !== database || !scope.keys.includes(key)) throw new Error('Original database admission has exited');
+}
+
 /** 普通 UOW 仍独立提交；只有显式 shared 准入上下文向事务注入实际锁持有者身份。 */
 export function contextualDatabase(database: Database, guard: () => Database): Database {
   const transaction = database.transaction.bind(database);

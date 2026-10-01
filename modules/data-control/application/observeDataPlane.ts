@@ -47,7 +47,7 @@ export async function removeReleasedRoles(ledger: DataLedgerObservations, writer
   const { plans, skipped } = roleRemovals(record, snapshot);
   if (skipped.length) logger.warn('data role removal skipped', { resourceId: record.id, roles: skipped });
   for (const plan of plans) {
-    const outcome = await writer.dropRole(plan);
+    const outcome = await writer.dropRole({ ...plan, ...(record.projectId ? { origin: { projectId: record.projectId, resourceId: record.id } } : {}) });
     if (outcome === 'replaced') continue;
     if (outcome === 'dropped') {
       stats.removed += 1;

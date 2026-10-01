@@ -1,8 +1,9 @@
-import type { ResourceChild } from '@crewstation/contracts';
+import type { ProjectId, ResourceChild } from '@crewstation/contracts';
 
 /** 台账记录里数据面观测用得到的部分（结构上是 resources 模块 LedgerRecord 的子集）。 */
 export interface DataRecordView {
   readonly id: string;
+  readonly projectId?: ProjectId;
   readonly kind: string;
   readonly desired?: 'present' | 'absent';
   /** 子对象清单是公共部分；访问绑定另有临时角色所在的库与运行角色（`database`、`ownerRole`）。 */

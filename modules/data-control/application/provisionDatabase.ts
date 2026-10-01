@@ -22,6 +22,19 @@ export function newPassword(): string {
   return Buffer.from(crypto.getRandomValues(new Uint8Array(24))).toString('base64url');
 }
 
+/** Commit this short credential seed before starting external DDL; subsequent DDL keeps the row lock. */
+export async function prepareProvisionCredential(deps: Pick<ProvisionDeps, 'store' | 'cipher'>, snapshot: DataPlaneSnapshot, record: DataRecordView): Promise<void> {
+  const role = databaseToProvision(record, snapshot)?.role ?? temporaryRoleToProvision(record, snapshot)?.role;
+  if (role) await seedNativeCredential(deps, record.id, role);
+}
+
+/** Shared by current and legacy provisioning; retries never choose a new password. */
+export async function seedNativeCredential(deps: Pick<ProvisionDeps, 'store' | 'cipher'>, resourceId: string, role: string): Promise<void> {
+  if (!/^cs_[a-z0-9_]{1,60}$/.test(role)) throw conflict('原数据库角色名不合法');
+  const stored = await deps.store.get(resourceId) ?? await deps.store.putIfAbsent({ resourceId, role, secretBox: await deps.cipher.encrypt(newPassword()) });
+  if (stored.role !== role) throw conflict('原数据库资源不能改绑其他角色');
+}
+
 /**
  * 建库与临时角色（RFC-025 I28 裁定：data-control 生成口令）：先把口令加密存下（按记录 ID，已存的就用存的——重试时角色的口令与存下的一致），
  * 再建运行角色与库（或访问绑定的临时角色），当场补一次观测（不等下一轮全量，data 正等它就绪）。返回之后的快照（没建就原样返回）。
@@ -34,8 +47,9 @@ export async function provisionDatabase(deps: ProvisionDeps, snapshot: DataPlane
   if (stored.pendingBox) return snapshot;
   const password = await deps.cipher.decrypt(stored.secretBox);
   // 临时角色（第二步）同一套：口令先存再建，到期时间由数据库自己执行。
-  if (database) await deps.plane.ensureDatabase({ ...database, password });
-  else await deps.plane.ensureTemporaryRole({ ...temporary!, password });
+  const origin = record.projectId ? { projectId: record.projectId, resourceId: record.id } : undefined;
+  if (database) await deps.plane.ensureDatabase({ ...database, password, origin });
+  else await deps.plane.ensureTemporaryRole({ ...temporary!, password, origin });
   deps.stats.provisioned += 1;
   deps.logger.info('data role provisioned', { resourceId: record.id, role, ...(database ? { database: database.database } : { temporary: true }) });
   const fresh = await deps.plane.snapshot();

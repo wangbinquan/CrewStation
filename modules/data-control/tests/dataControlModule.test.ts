@@ -6,6 +6,7 @@ import type { ResourcesModule } from '@crewstation/module-resources';
 import { createResourcesModule, resourcesMigrations } from '@crewstation/module-resources';
 import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
+import postgres from 'postgres';
 import type { DataPlaneObject } from '../domain/dataPlane';
 import type { DataPlaneReader, DataPlaneWriter } from '../ports/dataPlane';
 import { createDataControlModule, dataControlMigrations } from '../wiring';
@@ -147,6 +148,26 @@ describe.skipIf(!available)('data-control：数据面观测写回台账（RFC-02
     await Bun.sleep(100);
     expect(plane.ensured.some((entry) => entry.startsWith('cs_legacy'))).toBe(false);
     expect(await control.api.credentialOf(legacy.id)).toBeUndefined();
+  });
+
+  test('外部建库成功后丢回执：口令在副作用前独立持久化，不能随主事务回滚丢失', async () => {
+    const external = plane.plane.ensureDatabase, nativeRead = postgres(database.url, { max: 1, onnotice: () => undefined });
+    const observations: boolean[] = [];
+    plane.plane.ensureDatabase = async (input) => {
+      if (input.database !== 'cs_committed_credential') return external(input);
+      const rows = await nativeRead.unsafe<{ secret_box: string }[]>('SELECT secret_box FROM data_control.credentials WHERE role=$1', [input.role]);
+      observations.push(rows.length === 1);
+      await external(input);
+      throw new Error('fixture external response lost');
+    };
+    try {
+      const record = await resources.api.owner('data').declare({ kind: 'database', ref: 'db-committed-credential', projectId: PROJECT,
+        spec: { children: [{ kind: 'PostgresDatabase', name: 'cs_committed_credential' }, { kind: 'PostgresRole', name: 'cs_committed_credential' }], engine: 'postgres', provision: 'data-control' } });
+      await until('外部实际对象被下一轮观测为就绪', async () => (await resources.api.get(record.id))?.phase === 'ready');
+      expect(observations.length).toBeGreaterThan(0); expect(observations.every(Boolean)).toBe(true);
+      const stored = await control.api.credentialOf(record.id);
+      expect(stored?.role).toBe('cs_committed_credential'); expect(Boolean(stored?.password)).toBe(true);
+    } finally { plane.plane.ensureDatabase = external; await nativeRead.end(); }
   });
 
   // I28 第二步：访问绑定的临时角色同一套——口令先存再建，到期时间与只读与否照期望。

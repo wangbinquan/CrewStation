@@ -7,6 +7,8 @@
 
 PostgreSQL 的原 OID／实际目录核对见[数据库物理来源](database-physics.md)，非事务原库隔离与恢复步骤见[原生执行设计](database-operations.md)。它们沿 data-control 的现有 L2 边界补充设计 §6.2，不开放按名字删除的捷径。后续模块增长的结构盘点与候选拆分见 [ADR-0012](../../../docs/adr/0012-project-resource-owner-growth.md)，尚未实施新模块／层或 schema 转移。
 
+原生服务器与共享卷的独立来源、实际安装核对及正式 owner 依赖见[原生 PostgreSQL 来源](native-postgres-source.md)。SQL system_identifier/目录摘要和 JS 回调停止保护各自不能替代这个存储来源；外部管理地址及未知 tablespace 缺少适配器时保持阻断。
+
 ## 1. 边界与现有约束
 
 使用现有模块，不新增模块或调整 layer。模块只操作自己的 PostgreSQL schema，经公开 API 与反转端口协作；不在 `platform` 写跨模块删除 SQL。已有 `resources` 台账、`cluster-control` 的 UID 调和、`data-control` 数据面与队列／outbox 是执行基础，不能由前端或一个 `kubectl delete namespace` 替代。

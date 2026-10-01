@@ -29,7 +29,7 @@ export function eventDeliveryOwners(k8s: K8sClient, namespace: string, currentPo
 }
 
 /** 每个内容 owner 的原回调使用独立保护，停止证明不跨 owner 冒用。 */
-export function projectCallbackOwners(k8s: K8sClient, namespace: string, currentPodUid: string | undefined, finalizer: 'crewstation.io/events-delivery-stop' | 'crewstation.io/gateway-project-stop') {
+export function projectCallbackOwners(k8s: K8sClient, namespace: string, currentPodUid: string | undefined, finalizer: 'crewstation.io/events-delivery-stop' | 'crewstation.io/gateway-project-stop' | 'crewstation.io/data-control-native-stop') {
   return {
     protectCurrent: async (): Promise<Process> => {
       if (!currentPodUid) throw precondition('当前投递进程缺少原 Pod UID');

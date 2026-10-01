@@ -80,11 +80,12 @@ interface Late { resourceAccess?: ReturnType<typeof createResourceAccessModule>[
 
 type CompositionDeps = PlatformModuleDeps & { identities: ResourceIdentityDirectory };
 
-function dataPorts(settings: PlatformSettings, late: Late, sources: ReturnType<typeof objectStorageSources>, k8s: PlatformModuleDeps['k8s']): Pick<Parameters<typeof createDataModule>[0], 'ledger' | 'credentials' | 'objects'> {
+function dataPorts(settings: PlatformSettings, late: Late, sources: ReturnType<typeof objectStorageSources>, k8s: PlatformModuleDeps['k8s']): Pick<Parameters<typeof createDataModule>[0], 'ledger' | 'credentials' | 'objects' | 'nativePostgres'> {
   const ledger = () => { if (!late.resources) throw new Error('resources 尚未装配'); return late.resources; };
   const dataControl = () => { if (!late.dataControl) throw new Error('data-control 尚未装配'); return late.dataControl; };
   const objectPlane = () => { const plane = dataControl().objects; if (!plane) throw new Error('对象数据面尚未配置'); return plane; };
   return {
+    nativePostgres: { run: (origin, names, effect) => { const work = dataControl().nativePostgres; if (!work) throw precondition('原数据库写入端口尚未装配'); return work.run(origin, names, effect); }, credential: (origin, role) => { const work = dataControl().nativePostgres; if (!work?.credential) throw precondition('原数据库口令端口尚未装配'); return work.credential(origin, role); } },
     objects: { inputApiUrl: `http://cs-api.${settings.systemNamespace}.svc:8087`, transferOwners: objectTransferOwners(k8s, settings.systemNamespace, settings.platformPodUid), sources, provisioning: { deploymentMode: settings.objectStorage?.deploymentMode ?? 'production', apiUrl: settings.objectStorage?.apiUrl ?? `http://api.${settings.serviceDomain}:8088` }, exporterToken: settings.clusterMetrics?.exporterToken ?? '', history: { read: (input) => { if (!late.objectHistory) throw new Error('对象历史指标尚未装配'); return late.objectHistory.read(input); } }, plane: {
       configure: (...args) => objectPlane().configure(...args), prepareRotation: (...args) => { const plane = objectPlane(); if (!plane.prepareRotation) throw precondition('对象凭据轮换不可用'); return plane.prepareRotation(...args); }, probe: (...args) => objectPlane().probe(...args), metrics: () => objectPlane().metrics(),
       inspectWrite: (...args) => objectPlane().inspectWrite?.(...args) ?? Promise.resolve('unknown'), put: (...args) => objectPlane().put(...args), get: (...args) => objectPlane().get(...args), verify: (...args) => objectPlane().verify(...args), remove: (...args) => objectPlane().remove(...args),
@@ -519,11 +520,12 @@ function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCo
 }
 
 /** RFC-025 第四期：数据面的调和（L2）——观测平台数据库集群上的库与角色，写回 data 的 `database`／`data-binding` 记录。 */
-function composeDataControl(deps: CompositionDeps, ledger: ReturnType<typeof composeLedger>) {
+function composeDataControl(deps: CompositionDeps, ledger: ReturnType<typeof composeLedger>, project: ProjectModuleApi) {
   const resources = ledger.api;
   return createDataControlModule({
     // I28：口令表在平台库里，用平台密钥加密。
     adminUrl: deps.settings.dataPostgres.adminUrl, logger: deps.logger, db: deps.db, secretKeyBase64: deps.settings.secretKeyBase64,
+    projectAvailable: project.assertProjectAvailable, processes: projectCallbackOwners(deps.k8s, deps.settings.systemNamespace, deps.settings.platformPodUid, 'crewstation.io/data-control-native-stop'),
     observer: { leases: { port: resources.leases, holder: `${deps.instance}.data-control` } },
     ledger: {
       get: (id) => resources.get(id), changesSince: resources.changesSince, latestChange: resources.latestChange, observe: (input) => resources.observe(input),
@@ -548,7 +550,7 @@ function composeModules(deps: CompositionDeps) {
   const cluster = composeCluster(deps, core, delivery, runtime, resources);
   late.objectHistory = { read: cluster.objectHistory };
   const clusterControl = composeControl(deps, core, resources, runtime, delivery, runtimeEnvironment);
-  const dataControl = composeDataControl(deps, resources);
+  const dataControl = composeDataControl(deps, resources, core.project.api);
   late.dataControl = dataControl.api;
   late.clusterControl = clusterControl.api;
   return { cluster, resources, clusterControl, dataControl, runtimeEnvironment, identity: core.identity, project: core.project, config: core.config, data: core.data, scm: core.scm, apiCatalog: core.apiCatalog, agentRuntime: core.agentRuntime, ...delivery, ...runtime, ...aggregates };

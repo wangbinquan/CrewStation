@@ -80,6 +80,7 @@ export function taskBindingUseCases(deps: DataUseCaseDeps) {
       const values: Record<string, string> = {};
       for (const b of await bindings.listByTask(taskId)) {
         if (!isUsable(b, now)) continue;
+        await deps.authorizer.assertProjectAvailable?.(b.projectId as ProjectId);
         const dsn = b.mode === 'development' ? await liveDsn(b) : b.secretBox ? await cipher.decrypt(b.secretBox) : await liveDsn(b);
         if (dsn) values[ENV_BY_MODE[b.mode]] = dsn;
       }

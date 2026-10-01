@@ -1,6 +1,7 @@
 import type { Actor, ProjectId, ServiceId } from '@crewstation/contracts';
 
 export interface ProjectAuthorizer {
+  assertProjectAvailable?(projectId: ProjectId): Promise<void>;
   authorize(actor: Actor, projectId: ProjectId, action: 'view' | 'develop' | 'approve-data-access' | 'manage-task-storage' | 'request-resources'): Promise<unknown>;
 }
 

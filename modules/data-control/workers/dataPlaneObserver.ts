@@ -13,6 +13,7 @@ export interface DataPlaneObserverOptions {
   readonly resyncMs?: number;
   /** 多副本分工（设计 §6.3）：全量一轮持作业租约，尾随逐条持记录的租约；不给就不分工（单副本、用例）。 */
   readonly leases?: { readonly port: LeasePort; readonly holder: string };
+  readonly sweepNativeCallbacks?: () => Promise<void>;
 }
 
 /** 全量核对整轮持的作业租约：同一时刻只有一个副本在扫数据面，另一个副本这一轮跳过。 */
@@ -55,6 +56,7 @@ export function dataPlaneObserver(ledger: DataLedgerObservations, plane: DataPla
     for (const record of records) await leased(record.id, LEASE_TTL_MS, () => reconcile(snapshot, record), 0);
   }, (error) => logger.warn('data plane tail failed', { error: String(error) }), options.pollMs ?? 1_000);
   const full = periodicJob(() => leased(DATA_PLANE_RESYNC_LEASE, LEASE_TTL_MS, async () => {
+    await options.sweepNativeCallbacks?.();
     const snapshot = await plane.snapshot();
     let recorded = 0;
     const records = await ledger.listLive();

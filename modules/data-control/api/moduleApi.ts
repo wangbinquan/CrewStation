@@ -1,4 +1,5 @@
 import type { DatabaseReclamationReader } from './databaseReclamation';
+import type { NativePostgresWork } from './databaseRemoval';
 
 interface ObjectLocation { readonly backendId: string; readonly placementRevision: number; readonly key: string }
 interface ObjectEndpointConfig { readonly endpoint: string; readonly region: string; readonly bucket: string; readonly accessKeyId: string; readonly secretAccessKey: string; readonly monitoring?: { readonly endpoint: string; readonly token: string } }
@@ -20,11 +21,14 @@ export interface DataControlModuleApi {
   readonly objects?: ObjectDataPlaneApi;
   /** Internal original-OID physical evidence; does not authorize or perform deletion. */
   readonly databaseReclamation?: DatabaseReclamationReader;
+  /** Trusted composition only; every original writer shares native name locks and durable work facts. */
+  readonly nativePostgres?: NativePostgresWork;
   /**
    * RFC-025 I28：data-control 建库时生成的运行角色口令（解密后的明文）；data 渲染容器的连接串时经端口要，值不进台账。
    * 这条记录的库不是 data-control 建的（旧库）或还没存下口令时返回 undefined。
    */
   credentialOf(resourceId: string): Promise<{ role: string; password: string } | undefined>;
+  withCredentialAdmission<T>(resourceId: string, work: () => Promise<T>): Promise<T>;
   /** 仅供组合根在项目空闲锁下调用；传入同一数据库事务，与台账轮换标记一起提交。 */
   stageRotation(resourceId: string, transaction: object): Promise<void>;
   finishRotation(resourceId: string, transaction: object): Promise<void>;

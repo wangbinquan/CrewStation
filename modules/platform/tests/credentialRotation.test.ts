@@ -4,6 +4,7 @@ import { createResourcesModule, resourcesMigrations } from '@crewstation/module-
 import { createDataControlModule, dataControlMigrations } from '@crewstation/module-data-control';
 import { createTestDatabase, testDatabaseAvailable, type TestDatabase } from '@crewstation/testkit';
 import { rotateDataCredential } from '../application/credentialRotation';
+import { withExclusiveDatabaseAdmission } from '@crewstation/persistence';
 
 const available = await testDatabaseAvailable();
 const projectId = '01a0bf5d-8f4b-7178-82e1-9a99060b14ff' as ProjectId;
@@ -59,4 +60,26 @@ describe.skipIf(!available)('I31：轮换与启动共享项目锁，失败意图
     expect(await admission).toContain('正在轮换');
   });
 
+  test('数据库准入覆盖两段事务和实际回调，seal 只能在口令与台账条件完整提交后返回', async () => {
+    const id = Bun.randomUUIDv7() as ProjectId;
+    const resources = createResourcesModule({ db: db.db, quotas: { limitFor: async () => 10 }, authorizer: { projectAccess: async () => ({ operate: true }) }, isAdmin: async () => true });
+    const record = await resources.api.owner('data').declare({ kind: 'database', ref: 'native-rotation-admission', projectId: id, spec: { children: [{ kind: 'PostgresRole', name: 'cs_native_rotation' }] } });
+    const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
+    const control = createDataControlModule({ db: db.db, secretKeyBase64: Buffer.alloc(32, 6).toString('base64'),
+      ledger: { get: resources.api.get, listLive: async () => [], latestChange: async () => 0, changesSince: async () => [], observe: async () => ({ status: 'unchanged' }) },
+      plane: { snapshot: async () => ({ databases: new Map(), roles: new Map(), observedAt: new Date().toISOString() }), close: async () => {}, dropRole: async () => 'absent', ensureDatabase: async () => {}, ensureTemporaryRole: async () => {}, rotatePassword: async () => { entered.resolve(); await release.promise; } },
+    });
+    const rotating = rotateDataCredential(resources.api, control.api, record.id, id); await entered.promise;
+    let sealed = false;
+    const sealing = withExclusiveDatabaseAdmission(db.db, 'data-control.project-admission:' + id, async () => {
+      sealed = true;
+      expect((await resources.api.get(record.id))?.conditions).toContainEqual(expect.objectContaining({ type: 'CredentialRotating', status: 'false' }));
+      const [stored] = await db.db.execute<{ pending_box: string | null }>("SELECT pending_box FROM data_control.credentials WHERE resource_id='" + record.id + "'");
+      expect(stored?.pending_box).toBeNull();
+    });
+    try { await Bun.sleep(30); expect(sealed).toBe(false); }
+    finally { release.resolve(); await rotating; await sealing; await control.observer.stop(); }
+    expect(sealed).toBe(true);
+    expect((await control.api.credentialOf(record.id))?.password).toBeString();
+  }, 10000);
 });

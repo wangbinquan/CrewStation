@@ -29,7 +29,7 @@ export function serviceDataUseCases(deps: DataUseCaseDeps) {
       return resource;
     }
     try {
-      const { dsn } = await postgres.provisionDatabase({ databaseName: objectName, roleName: objectName });
+      const { dsn } = await postgres.provisionDatabase({ databaseName: objectName, roleName: objectName, origin: { projectId: resource.projectId as ProjectId, resourceId: resource.id } });
       resource = transition(resource, 'ready', clock.now(), { secretBox: await cipher.encrypt(dsn) });
     } catch (error) {
       resource = transition(resource, 'failed', clock.now(), { message: error instanceof Error ? error.message : String(error) });
@@ -43,6 +43,7 @@ export function serviceDataUseCases(deps: DataUseCaseDeps) {
     ensureServiceData: async (serviceId: ServiceId): Promise<DataResourceDto[]> => {
       const svc = await services.resolveServiceById(serviceId);
       if (!svc) throw notFound('服务', serviceId);
+      await deps.authorizer.assertProjectAvailable?.(svc.projectId);
       const out: DataResource[] = [];
       for (const env of ['production', 'development'] as DataEnv[]) out.push(await provision(serviceId, svc.projectId, svc.slug, env));
       return out.map(toDto);
@@ -51,6 +52,7 @@ export function serviceDataUseCases(deps: DataUseCaseDeps) {
       const values: Record<string, string> = {};
       for (const resource of await resources.listByService(serviceId)) {
         if (resource.env !== env || resource.state !== 'ready') continue;
+        await deps.authorizer.assertProjectAvailable?.(resource.projectId as ProjectId);
         // 旧库的连接串 data 自己存着；data-control 建的（I28）经端口要口令，这里拼成连接串，不落库。
         const dsn = await dataControlDsn(deps, resource.id, resource.objectName) ?? (resource.secretBox ? await cipher.decrypt(resource.secretBox) : undefined);
         if (dsn) values[resource.envVar] = dsn;

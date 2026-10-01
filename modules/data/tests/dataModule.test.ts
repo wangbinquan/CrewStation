@@ -6,13 +6,16 @@ import { eventbusMigrations, publishDomainEvent } from '@crewstation/eventbus';
 import { generateSecretKey } from '@crewstation/secretbox';
 import type { TestDatabase } from '@crewstation/testkit';
 import { DEFAULT_TEST_DATABASE_URL, createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
+import { createDataControlModule, dataControlMigrations } from '@crewstation/module-data-control';
 import type { DataModule } from '../wiring';
 import { createDataModule, dataMigrations } from '../wiring';
+import { postgresJsProvider } from '../adapters/postgres/postgresProvider';
 
 const available = await testDatabaseAvailable();
 const adminUrl = process.env.CS_TEST_DATABASE_URL ?? DEFAULT_TEST_DATABASE_URL;
 let tdb: TestDatabase;
 let data: DataModule;
+let control: ReturnType<typeof createDataControlModule>;
 const suffix = Bun.randomUUIDv7().replace(/-/g, '').slice(0, 8);
 const slug = `t${suffix}`;
 const serviceId = '01a0bf5d-8f4b-76c5-866c-f1feda3d63bb' as ServiceId;
@@ -26,9 +29,12 @@ type DataDeps = Parameters<typeof createDataModule>[0];
 let deps: Omit<DataDeps, 'db'>;
 beforeAll(async () => {
   if (!available) return;
-  tdb = await createTestDatabase([eventbusMigrations, dataMigrations]);
+  tdb = await createTestDatabase([eventbusMigrations, dataMigrations, dataControlMigrations]);
+  control = createDataControlModule({ db: tdb.db, adminUrl, secretKeyBase64: generateSecretKey(), ledger: { get: async () => undefined, listLive: async () => [], latestChange: async () => 0, changesSince: async () => [], observe: async () => ({ status: 'unchanged' }) } });
+  const native = control.api.nativePostgres!;
   const url = new URL(adminUrl);
   deps = {
+    nativePostgres: { run: native.run, credential: native.credential! },
     users: { displayName: async (id) => id === dev.userId ? '开发者小李' : id === owner.userId ? '负责人小周' : undefined },
     authorizer: { authorize: async (actor, _p, action) => { if (action === 'approve-data-access' && actor.userId !== platformAdmin.userId) throw new Error('forbidden'); return actor.userId === owner.userId ? 'owner' : actor.userId === platformAdmin.userId ? 'admin' : 'developer'; } },
     services: { resolveServiceById: async () => ({ projectId, slug }) },
@@ -44,6 +50,7 @@ afterAll(async () => {
   const roles = (await admin`SELECT rolname FROM pg_roles WHERE rolname LIKE ${`cs_${slug}%`}`) as Array<{ rolname: string }>;
   for (const r of roles) await admin.unsafe(`DROP ROLE "${r.rolname}"`);
   await admin.end();
+  await control?.observer.stop();
   await tdb?.drop();
 });
 
@@ -53,6 +60,12 @@ const canQuery = async (dsn: string, sql: string): Promise<boolean> => {
 };
 
 describe.skipIf(!available)('data module', () => {
+  test('旧供给不能绕过原项目写入与口令端口；按名字 DROP DATABASE 已关闭', async () => {
+    const legacy = postgresJsProvider(deps.settings.postgres);
+    await expect(legacy.provisionDatabase({ databaseName: 'cs_unclaimed', roleName: 'cs_unclaimed' })).rejects.toThrow('原项目');
+    await expect(legacy.dropRole({ roleName: 'cs_unclaimed' })).rejects.toThrow('原项目');
+    await expect(legacy.dropDatabase('cs_unclaimed')).rejects.toThrow('原 OID');
+  });
   test('供给生产库与开发库：幂等、连接串加密、PUBLIC 不能连接', async () => {
     const first = await data.api.ensureServiceData(serviceId);
     expect(first.map((r) => [r.env, r.state, r.envVar])).toEqual([['production', 'ready', 'CS_DATABASE_URL'], ['development', 'ready', 'CS_DATABASE_URL']]);
@@ -140,5 +153,18 @@ describe.skipIf(!available)('data module', () => {
       await data.subscriptions[0]!.runOnce();
       expect(await statesOf(released)).toEqual({ [active.id]: 'revoked', [pending.id]: 'revoked' });
     } finally { await admin.end(); }
+  });
+  test('原项目封闭后，旧密文连接串和开发绑定都停止续发，现有原库仍保留', async () => {
+    const anotherTask = Bun.randomUUIDv7() as TaskId;
+    const binding = await data.api.requestTaskBinding(dev, { taskId: anotherTask, serviceId }, { mode: 'development', ttlMinutes: 120 });
+    expect(binding.state).toBe('active');
+    const before = await data.api.envFor(serviceId, 'production');
+    deps.authorizer.assertProjectAvailable = async () => { throw new Error('fixture project deletion closed'); };
+    try {
+      await expect(data.api.envFor(serviceId, 'production')).rejects.toThrow('deletion closed');
+      await expect(data.api.envForTask(anotherTask)).rejects.toThrow('deletion closed');
+      await expect(data.api.ensureServiceData(serviceId)).rejects.toThrow('deletion closed');
+      expect(await canQuery(before.CS_DATABASE_URL!, 'SELECT 1')).toBe(true);
+    } finally { delete deps.authorizer.assertProjectAvailable; }
   });
 });

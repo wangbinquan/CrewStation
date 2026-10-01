@@ -69,6 +69,8 @@ jobs:
           POSTGRES_USER: crewstation
           POSTGRES_PASSWORD: crewstation-dev
           POSTGRES_DB: crewstation
+          # 原连接退出后的预备事务仍须阻断角色回收；CI 必须实际覆盖这条路径。
+          POSTGRES_INITDB_ARGS: '--set=max_prepared_transactions=10'
         ports: ['55432:5432']
         options: >-
           --health-cmd "pg_isready -U crewstation" --health-interval 5s --health-timeout 5s --health-retries 20
