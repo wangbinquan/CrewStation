@@ -16,7 +16,7 @@ import { TopologyList } from '../../../shared/ui/topology/TopologyList';
 import { useNarrow } from '../../../shared/ui/topology/TopologyWorkspace';
 import { FULL_METRICS } from '../../../shared/ui/topology/topologyLayout';
 import { useResourceCenter } from '../model/useResourceCenter';
-import { resourceTopology, filterResourceTopology } from '../model/topology';
+import { resourceTopology, filterResourceTopology, resourceSelectionId } from '../model/topology';
 import { initialDraft, matches, parseCenterSearch, isInFlight } from '../model/workspace';
 import type { CenterSearch, ResourceDraft } from '../model/workspace';
 import { ResourceList } from '../components/ResourceList';
@@ -38,7 +38,9 @@ export function ProjectResourceCenterView({ projectId, management }: { projectId
   const snapshot = [401, 403, 404].includes(query.error?.status ?? 0) ? undefined : query.data;
   const graph = useMemo(() => snapshot ? resourceTopology(snapshot, t) : undefined, [snapshot, t]);
   const patch = (change: Partial<CenterSearch>) => { void navigate({ to: '.', search: (previous) => ({ ...previous, ...change }), replace: true, resetScroll: false }); };
-  const selected = graph?.displayed.get(search.node ?? '') ?? snapshot?.nodes.find((n) => n.id === search.node), member = snapshot?.nodes.find((n) => n.id === memberId);
+  const selectionId = graph ? resourceSelectionId(graph, search.node) : search.node;
+  const selected = graph?.displayed.get(selectionId ?? '') ?? snapshot?.nodes.find((n) => n.id === selectionId), member = snapshot?.nodes.find((n) => n.id === memberId);
+  const selectedGroup = graph?.aliases.get(selected?.id ?? '') ?? selected?.id;
   const initialRequest = snapshot?.requests.find((r) => r.id === search.request);
   const oldRequest = useApiQuery(['selected-resource-request', projectId, search.request], () => api.resourceCenter.request(projectId, search.request!), { enabled: !!search.request && !initialRequest && !!snapshot });
   const request = initialRequest ?? (search.request ? oldRequest.data : undefined);
@@ -58,10 +60,10 @@ export function ProjectResourceCenterView({ projectId, management }: { projectId
       {notice ? <p className={styles.note} role="status">{notice}</p> : null}
       {!snapshot.complete ? <details className={styles.warning}><summary>{t('resourceCenter.partial')}</summary>{snapshot.sources.filter((s) => !s.complete).map((s) => <p key={s.id}>{s.name}: {s.error}</p>)}</details> : null}
       <div className={styles.stage} role="tabpanel">
-        {view === 'topology' && !narrow ? <TopologyDiagram topology={topology} metrics={metrics} label={t('resourceCenter.title')} selectedId={search.node} onSelect={(id) => patch({ node: id })} /> : view === 'requests' ? <ResourceRequestList snapshot={snapshot} onSelect={openRequest} onLegacy={setLegacy} /> : <ResourceList nodes={visible} onSelect={(id) => patch({ node: id })} />}
+        {view === 'topology' ? narrow ? <TopologyList topology={topology} selectedId={selectedGroup} onSelect={(id) => patch({ node: id })} /> : <TopologyDiagram topology={topology} metrics={metrics} label={t('resourceCenter.title')} selectedId={selectedGroup} onSelect={(id) => patch({ node: id })} /> : view === 'requests' ? <ResourceRequestList snapshot={snapshot} onSelect={openRequest} onLegacy={setLegacy} /> : <ResourceList nodes={visible} onSelect={(id) => patch({ node: id })} />}
       </div>
       <div className={styles.footer}><div className={styles.legend}>{['configured', 'observed', 'proposed'].map((evidence) => <span key={evidence} data-evidence={evidence}><i />{t(`resourceCenter.evidence.${evidence}`)}</span>)}</div><small>{t('resourceCenter.observed')} · {new Date(snapshot.observedAt).toLocaleString()} · {t('resourceCenter.autoRefresh')}</small><details><summary>{t('resourceCenter.sources')} · {snapshot.sources.length}</summary>{snapshot.sources.map((source) => <p key={source.id}><Badge tone={source.complete ? 'success' : 'warning'}>{source.complete ? t('resourceCenter.complete') : t('resourceCenter.partialShort')}</Badge> {source.name} · {source.observedAt ? new Date(source.observedAt).toLocaleTimeString() : '—'} {source.error}</p>)}</details></div>
-      {expanded ? <Dialog title={t('resourceCenter.title')} size="fullscreen" onClose={() => setExpanded(false)}>{narrow ? <TopologyList topology={topology} onSelect={(id) => patch({ node: id })} /> : <TopologyDiagram topology={topology} metrics={metrics} label={t('resourceCenter.title')} onSelect={(id) => patch({ node: id })} />}</Dialog> : null}
+      {expanded ? <Dialog title={t('resourceCenter.title')} size="fullscreen" onClose={() => setExpanded(false)}>{narrow ? <TopologyList topology={topology} selectedId={selectedGroup} onSelect={(id) => patch({ node: id })} /> : <TopologyDiagram topology={topology} metrics={metrics} label={t('resourceCenter.title')} selectedId={selectedGroup} onSelect={(id) => patch({ node: id })} />}</Dialog> : null}
       {selected ? <ResourceDetailDialog node={selected} snapshot={snapshot} members={graph.groups.get(selected.id)} onClose={() => { setMemberId(undefined); patch({ node: undefined }); }} onMember={setMemberId} onAction={(descriptor) => openAction(selected.name, descriptor)} onRequest={openRequest} onRevokeBinding={setRevokeBinding} /> : null}
       {member ? <ResourceDetailDialog node={member} snapshot={snapshot} onClose={() => setMemberId(undefined)} onMember={setMemberId} onAction={(descriptor) => openAction(member.name, descriptor)} onRequest={openRequest} onRevokeBinding={setRevokeBinding} /> : null}
       {action && drafts[action.descriptor.id] ? <ResourceActionDialog key={action.descriptor.id} projectId={projectId} name={action.name} action={action.descriptor} draft={drafts[action.descriptor.id]!} onDraft={(draft) => updateDraft(action.descriptor.id, draft)} onClose={() => setAction(undefined)} onDone={(id) => { setDrafts((old) => { const next = { ...old }; delete next[action.descriptor.id]; return next; }); setAction(undefined); setNotice(t(id ? 'resourceCenter.submitted' : 'resourceCenter.policySaved')); if (id) openRequest(id); }} /> : null}
