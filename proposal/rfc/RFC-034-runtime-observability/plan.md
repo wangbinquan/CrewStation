@@ -8,7 +8,7 @@
 
 [开发统计实施与验证](./development-statistics.md)的35路径实现独立复核v2 PASS，真实PG/SQLite定向55/0、四项静态成功。唯一完整检查4789pass/143skip/1fail；唯一失败来自运行中并行data-control两处结构边界，原作者修正后定向29/0，完整失败回执保留，35源码首尾一致。正式候选页面两级24组合几何、精确柱数字、48行末行下钻/5403px滚动恢复及Enter/Esc算力Dialog验证通过。
 
-先精确固化不包含共享platform/wiring.ts的34个源码/测试及本RFC三文档。共享装配完整保留，等待并行网关依赖提交后再同步发布；生产producer/全入口清理仍OFF，精确CI、实际部署与真实身份/模型/联动分别接续。原绑定清理2fb06f38精确CI与部署仍有效，RFC保持In Progress。
+34个不含共享platform/wiring.ts的独立源码/测试及本RFC三文档已精确发布为 `50dbd7a7464bbdd7ca304eb82dc2c47146f068fa`，[CI 36812019676](https://github.com/wangbinquan/CrewStation/actions/runs/36812019676)六项成功；2026-10-01T04:03:20.895Z本机控制/页面八服务升级完成，storage-contract=1、数字表存在、迁移applied=0、匿名200/401。Runner默认值保留2fb06f38。共享装配完整保留，等待并行网关依赖提交后发布；生产producer/全入口清理OFF，真实身份/模型/联动尚未验收。完整回执见开发统计末节。[通用删除与未绑定后续草案](./development-removal-barriers.md)已通过草案复核，未开始实现，仍需精确路径设计门。RFC保持In Progress。
 
 ## 本次交付
 

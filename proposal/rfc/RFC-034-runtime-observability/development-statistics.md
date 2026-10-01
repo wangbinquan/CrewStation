@@ -1,10 +1,10 @@
 # RFC-034 开发来源与项目、系统消耗明细
 
-状态：35路径实现候选已通过独立完整实现复核与定向验证，发布接续。原owner/Session数字副本的内部消费、两级只读事实与正式视图已实现；共享platform装配含并行RFC-037尚未提交的依赖，先精确固化34个无此依赖的源码/测试文件，保留共享装配原样并等待其依赖完整发布。生产开发producer及全入口清理继续OFF，未绑定和通用回收入口未完成。
+状态：35路径实现候选独立完整复核PASS；其中34个独立源码/测试及本RFC三文档已精确发布为 `50dbd7a7464bbdd7ca304eb82dc2c47146f068fa`，[CI 36812019676](https://github.com/wangbinquan/CrewStation/actions/runs/36812019676)六项成功，并于2026-10-01T04:03:20.895Z完成本机八服务升级。共享platform装配仍原样暂留，依赖并行RFC-037代码发布；开发事实/consumer正式装配未接通。生产开发producer及全入口清理OFF，未绑定和通用回收入口未完成。
 
 ## 要解决的实际问题
 
-当前 RuntimeStatistics 合同的 sourceScope 是 business-tasks，读取者只装配 readBusinessObservationFacts。drizzleUsageLedger 的统计读取仍用业务专用的 identity/capture schema；每个开发数字记录的 taskId 实际是父工作区，因此不能直接把所有开发记录归给一个新任务。内部 consumer 已能核原 Session registration、owner 原受理/人民币目录、实际原生来源并将数值和估值持久落账，但生产组合尚未提供该来源。
+本批实现前，RuntimeStatistics 合同的 sourceScope 仅为 business-tasks，统计账本读取使用业务 identity/capture schema。本批已发布合同和查询实现支持 project-executions 与开发完整身份；每个开发数字记录的 taskId 实际是父工作区，明细读取据此再核对真实独立 execution/Agent/generation。内部 consumer 已能核原 Session registration、owner 原受理/人民币目录、实际原生来源并将数值和估值持久落账；当前已提交与部署的组合根仍只注入 readBusinessObservationFacts，开发事实与数值来源尚待共享装配发布。
 
 用户需在同一个项目中看到业务任务、开发 Agent 分别用了哪个算力、各消耗多少，并能进入具体执行；系统页能按项目和用途对账。不能由页面增加几行模拟值宣告采集已完成。
 
@@ -117,3 +117,13 @@ sourceKind范围在组合器调用/各owner SQL限额前应用；overview合并�
 - 使用候选正式Vite页面、隔离Chrome及严格只读HTTP夹具验证两级24组合：1440/768/390px、中英文、明暗主题，source与trend卡片间距均为标准12px，文档/内容区横向溢出为0；24个柱保留精确大整数Token，时间范围对齐，未出现CSV/更多筛选。48行开发列表末行下钻后恢复5403px原滚动、来源范围和触发焦点；Enter打开原算力贡献Dialog、168Token（24×7）与Esc焦点恢复通过，网络失败为空、无写请求，源码指纹保持。
 - 早期浏览器夹具失败保留：v1遗漏Enter字符，v2/v3快速重复页面验证未完整结束；最终v4使用完整页面加载事件、每视图独立上下文和有截止时间的CDP命令后通过。仅夹具改变，未修改产品源码。该证据不代表真实身份、模型采集或CS→AW联合验收；原生产采集仍OFF。
 - 34源码批的精确SHA CI与后续共享装配发布、实际镜像部署另记。共享文件包含的并行网关产物及其未追踪依赖保持原样；不会将未提交依赖缺失的装配纳入发布，也不将此批当成CS-R02/03/04/13或RFC整体关闭。
+
+## 2026-10-01 精确发布、CI与本机升级
+
+- 精确发布：`50dbd7a7464bbdd7ca304eb82dc2c47146f068fa`，34个独立源码/测试加3份自有RFC文档；完整共享platform/wiring.ts及其RFC-037依赖未收编，main/origin发布后0/0，暂存区空。独立发布复核v2 PASS；原完整本机4789pass/143skip/1fail及外部29/0闭环保留，不改记全绿。
+- 精确远端：[CI 36812019676](https://github.com/wangbinquan/CrewStation/actions/runs/36812019676)六项全部success，含static/unit/module/console/gate/e2e。该CI验证已提交旧组合根兼容，不表示暂留的新组合已上线。
+- 实际部署：2026-10-01T04:03:20.895Z（北京时间2026-10-01 12:03:20.895）八服务Ready=1、generation=observedGeneration；storage-contract=1，数字表存在。控制与console镜像使用该精确源码git archive，未包含共享WIP。
+- 控制镜像：`docker.io/library/cs-control-plane@sha256:f358f52646043d3ea24fa06c081f293c5dde3831924507f1e75eacf68b5e0a99`；页面镜像：`docker.io/library/cs-console@sha256:08071878a04026282ad6b27dc68f94527f418c8722126d39d542f973e5d9e11d`。Runner代码未变，实际默认值保留`registry.crewstation-system.svc.cluster.local:5000/crewstation/task-runtime@sha256:587a0766440bae22f69bd6e68e101f2348ec8bda95f8b4c3ce6ddef0fa010928`，源版本仍2fb06f38；没有替换现有Task环境。
+- 数据库：升级前0600私有备份43029911字节，SHA256 `c65b4a76c0bb978805964820dd032a9b2a567e8ead71c92578ad86ccc8270b31`；实际迁移Job UID `5819c27c-19d7-403f-af5e-89452446cb38`，Complete、applied=0、roles.initialized=0。
+- 匿名检查：2026-10-01T04:04:26.407775+00:00，console.cs.localhost/auth/login为200，未登录根为401，八服务实际镜像与保留Runner值对拍。正式候选24组合几何和system 48行返回/键盘证据仍为只读HTTP形状夹具；没有真实身份/模型或CS→AW联动验收。
+- 继续：[通用删除与未绑定屏障草案](./development-removal-barriers.md)仅经草案复核，未冻结实现allowlist。共享事实/consumer装配及生产producer仍OFF，CS-R02/03/04/13和完整RFC保持开放。
