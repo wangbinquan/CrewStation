@@ -1,0 +1,499 @@
+{
+  "recordedAt": "2026-10-01T00:21:11.988Z",
+  "status": "completed",
+  "context": "docker-desktop",
+  "namespace": "crewstation-system",
+  "baselineSourceSha": "333e631ddfaac5b34ec44ee8d7fcd2fa7de420c0",
+  "baselineCi": {
+    "runId": 36783829899,
+    "jobs": 6,
+    "conclusion": "success"
+  },
+  "baselineDeployments": [
+    {
+      "name": "console",
+      "generation": 212,
+      "observed": 212,
+      "ready": 1,
+      "image": "docker.io/library/cs-console@sha256:2a4b295bdea071b44e5120ad85fe3e2bc1d7ef02793483eb66fc05bb8106edee"
+    },
+    {
+      "name": "cs-api",
+      "generation": 206,
+      "observed": 206,
+      "ready": 1,
+      "image": "docker.io/library/cs-control-plane@sha256:22b5c24b1bb23732ec1a9bcad9324668140833a8567821bb29961aaa8f8619ed"
+    },
+    {
+      "name": "cs-auth",
+      "generation": 104,
+      "observed": 104,
+      "ready": 1,
+      "image": "docker.io/library/cs-control-plane@sha256:22b5c24b1bb23732ec1a9bcad9324668140833a8567821bb29961aaa8f8619ed"
+    },
+    {
+      "name": "cs-controller",
+      "generation": 171,
+      "observed": 171,
+      "ready": 1,
+      "image": "docker.io/library/cs-control-plane@sha256:22b5c24b1bb23732ec1a9bcad9324668140833a8567821bb29961aaa8f8619ed"
+    },
+    {
+      "name": "cs-events",
+      "generation": 74,
+      "observed": 74,
+      "ready": 1,
+      "image": "docker.io/library/cs-control-plane@sha256:22b5c24b1bb23732ec1a9bcad9324668140833a8567821bb29961aaa8f8619ed"
+    },
+    {
+      "name": "cs-session",
+      "generation": 123,
+      "observed": 123,
+      "ready": 1,
+      "image": "docker.io/library/cs-control-plane@sha256:22b5c24b1bb23732ec1a9bcad9324668140833a8567821bb29961aaa8f8619ed"
+    },
+    {
+      "name": "mcp-capabilities",
+      "generation": 70,
+      "observed": 70,
+      "ready": 1,
+      "image": "docker.io/library/cs-control-plane@sha256:22b5c24b1bb23732ec1a9bcad9324668140833a8567821bb29961aaa8f8619ed"
+    },
+    {
+      "name": "mcp-operations",
+      "generation": 70,
+      "observed": 70,
+      "ready": 1,
+      "image": "docker.io/library/cs-control-plane@sha256:22b5c24b1bb23732ec1a9bcad9324668140833a8567821bb29961aaa8f8619ed"
+    }
+  ],
+  "migrationJob": {
+    "name": "rfc037-migrate-333e631ddfaa",
+    "succeeded": 1,
+    "complete": true
+  },
+  "uiFixSourceSha": "d66371fd89195fa252c9b7e8b44de2bf9e2cd743",
+  "resolvedRootDependencies": 16,
+  "missingRootDependencies": [],
+  "realAdminChange": {
+    "id": "01a0f4aa-28c3-7000-8ea8-86ff6fc68534",
+    "state": "applied",
+    "version": 4,
+    "origin": "direct-admin",
+    "baseValues": {
+      "maxConcurrentTasks": 3
+    },
+    "requestedValues": {
+      "maxConcurrentTasks": 3
+    },
+    "approvedValues": {
+      "maxConcurrentTasks": 3
+    },
+    "attempt": 1,
+    "appliedAt": "2026-09-30T23:33:07.609Z",
+    "effect": "新执行额度已生效；已有任务继续运行，超过额度时阻止新增执行",
+    "receipt": {
+      "effect": "新执行额度已生效；已有任务继续运行，超过额度时阻止新增执行",
+      "applied": true,
+      "revision": "15a21d96c271d0813e05ef3bc387f14b549d2339386bc75a95aaa3f74dbf4e4f"
+    }
+  },
+  "workloadIdentity": {
+    "beforeCount": 4,
+    "after": [
+      {
+        "kind": "Pod",
+        "name": "rfc035-objects-0929-blue-6778c5fb78-8x4hb",
+        "uid": "4d3ff6c0-df4c-4d86-8198-d64e97880d35",
+        "images": [
+          "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+        ]
+      },
+      {
+        "kind": "Pod",
+        "name": "rfc035-objects-0929-blue-6778c5fb78-q8j9g",
+        "uid": "ab17146c-3203-4e2b-b62e-bc7dd5d9f5bb",
+        "images": [
+          "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+        ]
+      },
+      {
+        "kind": "Pod",
+        "name": "rfc035-objects-0929-green-754d8d8848-cxqfv",
+        "uid": "01c681f1-10c2-4241-8187-5113c86be21c",
+        "images": [
+          "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+        ]
+      },
+      {
+        "kind": "Pod",
+        "name": "rfc035-objects-0929-green-754d8d8848-fsbhn",
+        "uid": "9853c695-3a76-4a11-9b43-64c4a8677915",
+        "images": [
+          "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+        ]
+      }
+    ],
+    "missing": [],
+    "changed": []
+  },
+  "topologyPodMatches": [
+    {
+      "name": "rfc035-objects-0929-blue-6778c5fb78-8x4hb",
+      "uid": "4d3ff6c0-df4c-4d86-8198-d64e97880d35",
+      "matched": true
+    },
+    {
+      "name": "rfc035-objects-0929-blue-6778c5fb78-q8j9g",
+      "uid": "ab17146c-3203-4e2b-b62e-bc7dd5d9f5bb",
+      "matched": true
+    },
+    {
+      "name": "rfc035-objects-0929-green-754d8d8848-cxqfv",
+      "uid": "01c681f1-10c2-4241-8187-5113c86be21c",
+      "matched": true
+    },
+    {
+      "name": "rfc035-objects-0929-green-754d8d8848-fsbhn",
+      "uid": "9853c695-3a76-4a11-9b43-64c4a8677915",
+      "matched": true
+    }
+  ],
+  "namespaceQuotas": [
+    {
+      "name": "crewstation-project",
+      "uid": "33718e1f-37b5-480d-a3e6-efe7a1650fd3",
+      "spec": {
+        "hard": {
+          "persistentvolumeclaims": "20",
+          "pods": "30",
+          "requests.cpu": "8",
+          "requests.memory": "16Gi"
+        }
+      },
+      "status": {
+        "hard": {
+          "persistentvolumeclaims": "20",
+          "pods": "30",
+          "requests.cpu": "8",
+          "requests.memory": "16Gi"
+        },
+        "used": {
+          "persistentvolumeclaims": "0",
+          "pods": "4",
+          "requests.cpu": "200m",
+          "requests.memory": "1Gi"
+        }
+      }
+    }
+  ],
+  "realBrowser": {
+    "principal": "dev-admin",
+    "projectId": "01a0e955-7714-7000-8e27-16c2372b16a5",
+    "sourceCount": 22,
+    "ownedCount": 80,
+    "requestableCount": 0,
+    "adminListRows": 127,
+    "viewports": [
+      {
+        "page": "project",
+        "width": 390,
+        "height": 844,
+        "overflow": 0
+      },
+      {
+        "page": "project",
+        "width": 320,
+        "height": 720,
+        "overflow": 0
+      },
+      {
+        "page": "admin",
+        "width": 320,
+        "height": 720,
+        "language": "en-US",
+        "overflow": 0
+      }
+    ],
+    "svgFocusRecheck": {
+      "passed": true,
+      "sourceSha": "d66371fd89195fa252c9b7e8b44de2bf9e2cd743",
+      "recordedAt": "2026-10-01T00:17:40.441Z",
+      "pointerFocus": {
+        "dialogs": 1,
+        "name": "执行并发额度，已有能力，项目配置 · 已授权",
+        "namespace": "http://www.w3.org/2000/svg",
+        "nodeId": "allocation:01a0e955-7714-7000-8e27-16c2372b16a5:execution-quota:01a0e955-7714-7000-8e27-16c2372b16a5",
+        "overflow": 0,
+        "tag": "g",
+        "width": 1280
+      },
+      "keyboardFocus": {
+        "name": "执行并发额度，已有能力，项目配置 · 已授权",
+        "namespace": "http://www.w3.org/2000/svg",
+        "nodeId": "allocation:01a0e955-7714-7000-8e27-16c2372b16a5:execution-quota:01a0e955-7714-7000-8e27-16c2372b16a5",
+        "tag": "g",
+        "visibleDialogs": 0
+      },
+      "note": "Native dialog retained hidden after pointer close; keyboard close confirms zero visible dialogs."
+    },
+    "auditLabelRecheck": {
+      "passed": true,
+      "label": "执行并发上限",
+      "baseHeader": "申请时配置值",
+      "rawParameterAbsent": true,
+      "dialog": {
+        "bottom": 646.7890625,
+        "height": 573.5859375,
+        "left": 200,
+        "right": 1080,
+        "top": 73.203125,
+        "width": 880,
+        "x": 200,
+        "y": 73.203125
+      },
+      "width": 1280,
+      "height": 720,
+      "overflow": 0,
+      "browserWarningsAndErrors": []
+    },
+    "temporaryViewportReset": true
+  },
+  "uiFixCi": {
+    "runId": 36793848612,
+    "url": "https://github.com/wangbinquan/CrewStation/actions/runs/36793848612",
+    "sourceSha": "d66371fd89195fa252c9b7e8b44de2bf9e2cd743",
+    "conclusion": "success",
+    "jobs": [
+      {
+        "name": "unit（方法级 UT）",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/wangbinquan/CrewStation/actions/runs/36793848612/job/110152649759",
+        "startedAt": "2026-09-30T23:59:10Z",
+        "completedAt": "2026-09-30T23:59:35Z"
+      },
+      {
+        "name": "console（工作台）",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/wangbinquan/CrewStation/actions/runs/36793848612/job/110152649878",
+        "startedAt": "2026-09-30T23:59:10Z",
+        "completedAt": "2026-10-01T00:01:17Z"
+      },
+      {
+        "name": "static（结构规则 · lint · 类型）",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/wangbinquan/CrewStation/actions/runs/36793848612/job/110152649930",
+        "startedAt": "2026-09-30T23:59:10Z",
+        "completedAt": "2026-10-01T00:00:41Z"
+      },
+      {
+        "name": "module（模块级 UT）",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/wangbinquan/CrewStation/actions/runs/36793848612/job/110152649931",
+        "startedAt": "2026-09-30T23:59:10Z",
+        "completedAt": "2026-10-01T00:06:48Z"
+      },
+      {
+        "name": "e2e（实机端到端）",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/wangbinquan/CrewStation/actions/runs/36793848612/job/110152649980",
+        "startedAt": "2026-09-30T23:59:11Z",
+        "completedAt": "2026-10-01T00:08:21Z"
+      },
+      {
+        "name": "gate（汇总 · 新增代码防护）",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/wangbinquan/CrewStation/actions/runs/36793848612/job/110154727022",
+        "startedAt": "2026-10-01T00:06:51Z",
+        "completedAt": "2026-10-01T00:07:09Z"
+      }
+    ]
+  },
+  "consoleDeployment": {
+    "completedAt": "2026-10-01T00:16:21.383Z",
+    "sourceSha": "d66371fd89195fa252c9b7e8b44de2bf9e2cd743",
+    "image": "docker.io/library/cs-console@sha256:a2094cfebb47e7438531240267d7a05b8cda9bbeaf31fa7340d35854a4d82e9c",
+    "sourceImageConfigId": "sha256:20eb351b0d5aad425204824e37f0c143839266105df4aa45c6a3c2274d223a76",
+    "requiredStorageContract": 1,
+    "console": {
+      "generation": 214,
+      "observedGeneration": 214,
+      "ready": 1
+    },
+    "components": [
+      {
+        "name": "console",
+        "generation": 214,
+        "observedGeneration": 214,
+        "ready": 1,
+        "images": [
+          "docker.io/library/cs-console@sha256:a2094cfebb47e7438531240267d7a05b8cda9bbeaf31fa7340d35854a4d82e9c"
+        ]
+      },
+      {
+        "name": "cs-api",
+        "generation": 207,
+        "observedGeneration": 207,
+        "ready": 1,
+        "images": [
+          "docker.io/library/cs-control-plane@sha256:159a1469fedb96d92d22912833078a7c928f5fb1226733cfcdba9b6be07664fe"
+        ]
+      },
+      {
+        "name": "cs-auth",
+        "generation": 105,
+        "observedGeneration": 105,
+        "ready": 1,
+        "images": [
+          "docker.io/library/cs-control-plane@sha256:159a1469fedb96d92d22912833078a7c928f5fb1226733cfcdba9b6be07664fe"
+        ]
+      },
+      {
+        "name": "cs-controller",
+        "generation": 172,
+        "observedGeneration": 172,
+        "ready": 1,
+        "images": [
+          "docker.io/library/cs-control-plane@sha256:159a1469fedb96d92d22912833078a7c928f5fb1226733cfcdba9b6be07664fe"
+        ]
+      },
+      {
+        "name": "cs-events",
+        "generation": 75,
+        "observedGeneration": 75,
+        "ready": 1,
+        "images": [
+          "docker.io/library/cs-control-plane@sha256:159a1469fedb96d92d22912833078a7c928f5fb1226733cfcdba9b6be07664fe"
+        ]
+      },
+      {
+        "name": "cs-session",
+        "generation": 124,
+        "observedGeneration": 124,
+        "ready": 1,
+        "images": [
+          "docker.io/library/cs-control-plane@sha256:159a1469fedb96d92d22912833078a7c928f5fb1226733cfcdba9b6be07664fe"
+        ]
+      },
+      {
+        "name": "mcp-capabilities",
+        "generation": 71,
+        "observedGeneration": 71,
+        "ready": 1,
+        "images": [
+          "docker.io/library/cs-control-plane@sha256:159a1469fedb96d92d22912833078a7c928f5fb1226733cfcdba9b6be07664fe"
+        ]
+      },
+      {
+        "name": "mcp-operations",
+        "generation": 71,
+        "observedGeneration": 71,
+        "ready": 1,
+        "images": [
+          "docker.io/library/cs-control-plane@sha256:159a1469fedb96d92d22912833078a7c928f5fb1226733cfcdba9b6be07664fe"
+        ]
+      }
+    ],
+    "runnerImage": "registry.crewstation-system.svc.cluster.local:5000/crewstation/task-runtime@sha256:e7b0153ee23280606b90f88f6cf198543f1fb8d467e13f904c089d0f2cdd6da4",
+    "unchangedRunner": true,
+    "beforeWorkloads": [
+      {
+        "kind": "Pod",
+        "name": "rfc035-objects-0929-blue-6778c5fb78-8x4hb",
+        "uid": "4d3ff6c0-df4c-4d86-8198-d64e97880d35",
+        "images": [
+          "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+        ]
+      },
+      {
+        "kind": "Pod",
+        "name": "rfc035-objects-0929-blue-6778c5fb78-q8j9g",
+        "uid": "ab17146c-3203-4e2b-b62e-bc7dd5d9f5bb",
+        "images": [
+          "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+        ]
+      },
+      {
+        "kind": "Pod",
+        "name": "rfc035-objects-0929-green-754d8d8848-cxqfv",
+        "uid": "01c681f1-10c2-4241-8187-5113c86be21c",
+        "images": [
+          "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+        ]
+      },
+      {
+        "kind": "Pod",
+        "name": "rfc035-objects-0929-green-754d8d8848-fsbhn",
+        "uid": "9853c695-3a76-4a11-9b43-64c4a8677915",
+        "images": [
+          "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+        ]
+      }
+    ],
+    "afterWorkloads": [
+      {
+        "kind": "Pod",
+        "name": "rfc035-objects-0929-blue-6778c5fb78-8x4hb",
+        "uid": "4d3ff6c0-df4c-4d86-8198-d64e97880d35",
+        "images": [
+          "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+        ]
+      },
+      {
+        "kind": "Pod",
+        "name": "rfc035-objects-0929-blue-6778c5fb78-q8j9g",
+        "uid": "ab17146c-3203-4e2b-b62e-bc7dd5d9f5bb",
+        "images": [
+          "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+        ]
+      },
+      {
+        "kind": "Pod",
+        "name": "rfc035-objects-0929-green-754d8d8848-cxqfv",
+        "uid": "01c681f1-10c2-4241-8187-5113c86be21c",
+        "images": [
+          "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+        ]
+      },
+      {
+        "kind": "Pod",
+        "name": "rfc035-objects-0929-green-754d8d8848-fsbhn",
+        "uid": "9853c695-3a76-4a11-9b43-64c4a8677915",
+        "images": [
+          "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+        ]
+      }
+    ],
+    "missing": [],
+    "changed": []
+  },
+  "verificationBoundaries": {
+    "actualPrincipal": "existing dev-admin",
+    "actualAdminSubmission": "execution quota 3 to 3, no expansion",
+    "ownerAndDeveloperJourneys": "isolated PostgreSQL, HTTP and formal route previews",
+    "realIdentitySwitch": false,
+    "actualTheme": "light",
+    "darkTheme": "isolated preview",
+    "realValidationProjectNewWorkloads": false
+  },
+  "stableCandidateGate": {
+    "command": "bun run check",
+    "startedAt": "2026-09-30T23:42:34.015Z",
+    "completedAt": "2026-09-30T23:58:03.981Z",
+    "checkExit": 0,
+    "passed": 4694,
+    "skipped": 143,
+    "failed": 0,
+    "assertions": 30884,
+    "files": 940,
+    "candidatePaths": 8,
+    "candidateUnchanged": true,
+    "recorderError": "After saving checkExit=0, the original wrapper attempted to assign a readonly child-process exitCode. Recorder repaired without rerunning unchanged candidate."
+  }
+}

@@ -1,6 +1,6 @@
 # RFC-036 实现自查与验收
 
-状态：代码候选已完成，定向验证通过；整体门禁、精确发布、本机部署与部署后浏览器验收待完成。未经后续回执，不将本 RFC 标为 Done。
+状态：Done · 2026-10-01。主体与部署后自查修正均已发布并实际部署，精确 SHA `d66371fd` 的六项 CI 成功；管理员同页持久变更、拓扑归属、窄屏、SVG 鼠标／键盘焦点和历史配置标签复验通过。当前证据与验收范围见 [发布与部署后验收](./deployment.md)，下方保留早期候选及失败记录。
 
 ## 已落实的入口与权限
 
@@ -64,7 +64,7 @@
 - 390×844：自动回退资源清单，匹配数据资源四行完整保留，无页面横向溢出。平台既有窄屏导航占据首屏较多空间，本次不改写并行导航。
 - [数据拓扑截图](acceptance-screenshots/admin-data-topology.jpg)、[配额核对截图](acceptance-screenshots/admin-quota-confirm.jpg)是正式组件与演示数据的视觉检查，不能作为部署后真实资源验收。
 
-## 待闭环的交付
+## 早期门禁与提交记录（2026-09-30，历史状态）
 
 - 完整 `bun run check`：2026-09-30T11:27Z 冻结 292 个精确候选路径后启动一次，被并行 RFC-037 新增 `modules/cluster-control/ports/projectDeletion.ts` 与 `domain/deletion/objects.ts` 的 `@crewstation/k8s` 跨层导入违规阻断，未进入测试阶段。日志 `/private/tmp/rfc036-full-check.log`。未代改对方在制文件；阻断修正后才能获得完整门禁回执。
 - 资源中心定向静态结果：root／console 类型检查和候选 ESLint 通过，正式 console 生产构建通过。定向新增代码防护审计约 98.48%（2074／2106，无违规）；这是隔离测试合并覆盖的候选审计，最终以完整 SHA 的 hosted CI 为准。
