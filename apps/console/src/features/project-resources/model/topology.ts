@@ -5,7 +5,7 @@ import { RESOURCE_DOMAINS, resourceDomain, resourceClass } from './domains';
 import type { ResourceDomain } from './domains';
 
 const presentation: Record<ResourceDomain, { semantic: Semantic; lane: number; row: number }> = {
-  configuration: { semantic: 'platform', lane: 0, row: 0 }, services: { semantic: 'service', lane: 1, row: 0 },
+  project: { semantic: 'platform', lane: 0, row: 0 }, namespace: { semantic: 'security', lane: 0, row: 1 }, services: { semantic: 'service', lane: 1, row: 0 },
   storage: { semantic: 'data', lane: 2, row: 0 }, network: { semantic: 'gateway', lane: 1, row: 1 }, platform: { semantic: 'external', lane: 2, row: 1 },
 };
 const status = (node: ProjectResourceNode): NodeStatus => node.stale ? 'unknown' : /failed|rejected/.test(node.state) ? 'failed' : node.kind === 'request' || /pending|creating|provisioning|applying|requested/.test(node.state) ? 'pending' : /running|active/.test(node.state) ? 'running' : /released|expired|revoked|cancelled/.test(node.state) ? 'idle' : 'ready';
@@ -22,6 +22,7 @@ export function resourceGroupSummary(members: ProjectResourceNode[]) {
 /** Both generations of type bookmarks resolve to their domain. Individual bookmarks retain their exact resource. */
 export function resourceSelectionId(graph: ResourceTopology, id: string | undefined) {
   if (!id?.startsWith('group:') || graph.displayed.has(id)) return id;
+  if (id === 'group:configuration' && graph.displayed.has('group:project')) return 'group:project';
   const [, category, type] = id.split(':');
   return [...graph.groups].find(([, members]) => members.some((member) => member.category === category && resourceClass(member.resourceType) === resourceClass(type ?? '')))?.[0] ?? id;
 }
@@ -30,7 +31,7 @@ export function resourceSelectionId(graph: ResourceTopology, id: string | undefi
 export function filterResourceTopology(graph: ResourceTopology, matchingIds: Set<string>): Topology {
   const ids = new Set(graph.topology.nodes.filter((node) => matchingIds.has(node.id) || graph.groups.get(node.id)?.some((member) => matchingIds.has(member.id))).map((node) => node.id));
   const retained = new Set(ids);
-  if (graph.displayed.has('group:configuration')) retained.add('group:configuration');
+  if (graph.displayed.has('group:project')) retained.add('group:project');
   let added = true;
   while (added) {
     added = false;
@@ -55,7 +56,7 @@ export function resourceTopology(snapshot: ProjectResourceSnapshot, t: Translate
   const nodes: TopologyNode[] = [...displayed.values()].map((node) => {
     const members = groups.get(node.id)!, summary = resourceGroupSummary(members);
     return {
-    id: node.id, title: node.name, kind: 'summary', ...presentation[node.resourceType as ResourceDomain], band: 'resources',
+    id: node.id, title: node.name, kind: node.resourceType === 'namespace' ? 'component' : 'summary', ...presentation[node.resourceType as ResourceDomain], band: 'resources',
     status: summary.status, statusText: t('resourceCenter.permissionList'), subtitle: t('resourceCenter.groupSummary', { count: members.length }), counts: [[t('resourceCenter.access.owned'), String(summary.owned)], [t('resourceCenter.access.requestable'), String(summary.requestable)], [t('resourceCenter.pending'), String(summary.pendingRequestIds.length)]], abnormal: node.stale || /failed/.test(node.state),
   }; });
   const edges = [...new Map(snapshot.edges.flatMap((edge) => { const from = alias.get(edge.sourceId), to = alias.get(edge.targetId); return from && to && from !== to ? [[`${from}:${to}:${edge.relation}:${edge.state}`, { from, to, kind: relations[edge.relation]!, evidence: edge.state, label: t(`resourceCenter.relation.${edge.relation}`) }] as const] : []; })).values()];

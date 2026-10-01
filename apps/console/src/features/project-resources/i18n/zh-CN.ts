@@ -1,6 +1,7 @@
 import type { Messages } from '../../../shared/lib/i18n';
 export const messages = {
-  'resourceCenter.domain.configuration': '命名空间与项目配置', 'resourceCenter.domainHint.configuration': '命名空间、项目整体配额、日志、代码仓库与配置。',
+  'resourceCenter.domain.project': '项目管理', 'resourceCenter.domainHint.project': '项目执行并发、配置、源码仓库与日志观测。命名空间及其资源额度在独立的边界入口管理。',
+  'resourceCenter.domain.namespace': '命名空间', 'resourceCenter.domainHint.namespace': '项目运行资源的隔离与归属边界。在此查看命名空间、CPU／内存／Pod／PVC 总量约束及其实际同步状态。',
   'resourceCenter.domain.services': '服务与算力', 'resourceCenter.domainHint.services': '业务服务、开发工作区、算力规格、运行镜像与执行实例。',
   'resourceCenter.domain.storage': '存储', 'resourceCenter.domainHint.storage': '数据库、数据权限、对象存储、工作卷与存储套餐。',
   'resourceCenter.domain.network': '网络', 'resourceCenter.domainHint.network': '访问路由、网关限流、网络策略与中间件。',

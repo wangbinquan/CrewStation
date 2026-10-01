@@ -30,7 +30,7 @@ test('a domain has one stable card even for a single member or hundreds of membe
     snapshot.edges = [];
     const graph = resourceTopology(snapshot, t), layout = layoutTopology(graph.topology, FULL_METRICS);
     // 原数量阈值和环境／权限拆分令同类节点随成员规模增加，首屏不再可读。
-    expect(graph.topology.nodes.map((n) => n.id).sort()).toEqual(['group:configuration', 'group:services']);
+    expect(graph.topology.nodes.map((n) => n.id).sort()).toEqual(['group:project', 'group:services']);
     expect(graph.groups.get('group:services')).toHaveLength(count);
     expect(graph.displayed.get('group:services')!.metrics).toEqual([]);
     if (height !== undefined) expect(layout.height).toBe(height);
@@ -48,7 +48,7 @@ test('mixed permissions and environments retain member identities and directed e
   expect(card.statusText).toBe('权限列表'); expect(card.status).toBe('pending'); expect(card.lane).toBe(1);
   expect(card.counts).toEqual([['已有能力', '1'], ['可以申请', '1'], ['未完成变更', '1']]);
   expect(graph.topology.edges).toHaveLength(2);
-  expect(graph.topology.edges.map((e) => [e.from, e.to, e.evidence])).toEqual([['group:configuration', card.id, 'configured'], ['group:configuration', card.id, 'observed']]);
+  expect(graph.topology.edges.map((e) => [e.from, e.to, e.evidence])).toEqual([['group:project', card.id, 'configured'], ['group:project', card.id, 'observed']]);
   expect(JSON.stringify(snapshot)).toBe(before);
   const filtered = filterResourceTopology(graph, new Set(['available']));
   expect(filtered.nodes.some((n) => n.id === card.id)).toBe(true);

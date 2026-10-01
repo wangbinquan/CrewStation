@@ -1,6 +1,7 @@
 import type { Messages } from '../../../shared/lib/i18n';
 export const messages = {
-  'resourceCenter.domain.configuration': 'Namespace & project settings', 'resourceCenter.domainHint.configuration': 'Namespace, project quotas, logs, repository and configuration.',
+  'resourceCenter.domain.project': 'Project management', 'resourceCenter.domainHint.project': 'Project execution concurrency, configuration, source repository and observability. Namespace boundaries and their quotas have a separate entry.',
+  'resourceCenter.domain.namespace': 'Namespaces', 'resourceCenter.domainHint.namespace': 'Isolation and ownership boundaries for runtime resources. Inspect namespaces, aggregate CPU, memory, Pod and PVC constraints, and their observed synchronization state.',
   'resourceCenter.domain.services': 'Services & compute', 'resourceCenter.domainHint.services': 'Business services, workspaces, compute profiles, runtime images and executions.',
   'resourceCenter.domain.storage': 'Storage', 'resourceCenter.domainHint.storage': 'Databases, data access, object storage, working volumes and storage plans.',
   'resourceCenter.domain.network': 'Network', 'resourceCenter.domainHint.network': 'Access routes, gateway limits, network policies and middleware.',

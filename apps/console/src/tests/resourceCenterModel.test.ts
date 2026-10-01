@@ -12,8 +12,8 @@ import type { TopologyNode } from '../shared/ui/topology/topologyModel';
 test('aggregation preserves directed membership, never sums independent quota scopes, and bilingual keys match', () => {
   const snapshot = centerSnapshot(), graph = resourceTopology(snapshot, (key, values) => translate(zh, key, values));
   expect(graph.groups.size).toBe(2); expect(graph.groups.get('group:services')).toHaveLength(79);
-  expect(graph.groups.get('group:configuration')).toHaveLength(1);
-  expect(graph.topology.nodes).toHaveLength(2); expect(graph.topology.edges).toEqual([expect.objectContaining({ from: 'group:services', to: 'group:configuration', evidence: 'observed' })]);
+  expect(graph.groups.get('group:project')).toHaveLength(1);
+  expect(graph.topology.nodes).toHaveLength(2); expect(graph.topology.edges).toEqual([expect.objectContaining({ from: 'group:services', to: 'group:project', evidence: 'observed' })]);
   for (const id of graph.groups.keys()) expect(graph.displayed.get(id)!.metrics).toEqual([]);
   expect(Object.keys(zh).sort()).toEqual(Object.keys(en).sort());
   expect(matches(resourceNodeFixture('private'), { q: 'PRIVATE', category: 'execution' })).toBe(true);
@@ -28,12 +28,12 @@ test('search retains the matching member group, quota scopes and only real links
   const snapshot = centerSnapshot(); snapshot.nodes.push(resourceNodeFixture('project', { kind: 'project', category: 'foundation' }));
   const graph = resourceTopology(snapshot, (key, values) => translate(zh, key, values));
   const filtered = filterResourceTopology(graph, new Set(['node-000']));
-  expect(filtered.nodes.map((node) => node.id).sort()).toEqual(['group:configuration', 'group:services']);
-  expect(filtered.edges).toEqual([expect.objectContaining({ from: 'group:services', to: 'group:configuration', evidence: 'observed' })]);
+  expect(filtered.nodes.map((node) => node.id).sort()).toEqual(['group:project', 'group:services']);
+  expect(filtered.edges).toEqual([expect.objectContaining({ from: 'group:services', to: 'group:project', evidence: 'observed' })]);
   expect(graph.groups.get('group:services')).toHaveLength(79);
   expect(graph.displayed.get('group:services')!.metrics).toEqual([]);
   const empty = filterResourceTopology(graph, new Set());
-  expect(empty.nodes.map((node) => node.id)).toEqual(['group:configuration']); expect(empty.edges).toEqual([]);
+  expect(empty.nodes.map((node) => node.id)).toEqual(['group:project']); expect(empty.edges).toEqual([]);
   expect(empty.bands.map((band) => band.id)).toEqual(['resources']);
 });
 test('cross-lane and backward routes avoid unrelated cards and retain arrow direction', () => {
