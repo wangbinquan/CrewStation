@@ -41,6 +41,22 @@ export interface GitLabGroup {
   readonly visibility: GitLabVisibility;
 }
 
+/** 原数字 ID 与创建时间；未返回删除日期时不能推断其删除状态。 */
+export interface GitLabProjectDeletionState {
+  readonly id: number;
+  readonly pathWithNamespace: string;
+  readonly createdAt: string;
+  readonly markedForDeletionOn?: string | null;
+}
+
+/** GitLab 自报的原存储位置；这是定位事实，不能代替实际文件回收证明。 */
+export interface GitLabRepositoryStorage {
+  readonly projectId: number;
+  readonly diskPath: string;
+  readonly createdAt: string;
+  readonly repositoryStorage: string;
+}
+
 export interface GitLabCommit {
   readonly id: string;
   readonly shortId: string;
@@ -135,11 +151,11 @@ export interface CreateProjectInput {
   readonly initializeWithReadme?: boolean;
 }
 
-export interface DeleteProjectOptions {
-  readonly permanentlyRemove?: boolean;
+export type DeleteProjectOptions = { readonly permanentlyRemove?: false; readonly fullPath?: never } | {
+  readonly permanentlyRemove: true;
   /** 永久删除时必须与项目当前的 path_with_namespace 一致。 */
-  readonly fullPath?: string;
-}
+  readonly fullPath: string;
+};
 
 export interface CreateTagInput {
   readonly name: string;

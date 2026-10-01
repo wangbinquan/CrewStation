@@ -52,11 +52,18 @@ export function createTransport(options: TransportOptions): Transport {
     request: async <T>(method: HttpMethod, path: string, request: RequestOptions = {}): Promise<T> => (await raw(method, path, request)).data as T,
     requestAll: async <T>(path: string, query: Record<string, QueryValue> = {}): Promise<T[]> => {
       const items: T[] = [];
+      const pages = new Set<string>();
       let page: string | undefined = '1';
       while (page) {
+        if (!/^[1-9][0-9]*$/.test(page) || !Number.isSafeInteger(Number(page)) || pages.has(page)) throw new PlatformError('unavailable', 'GitLab 分页来源不完整', { method: 'GET', path });
+        pages.add(page);
         const { data, headers } = await raw('GET', path, { query: { ...query, per_page: PAGE_SIZE, page } });
+        if (!Array.isArray(data)) throw new PlatformError('unavailable', 'GitLab 分页内容不是数组', { method: 'GET', path });
         items.push(...(data as T[]));
-        page = headers.get('x-next-page') || undefined;
+        const cursor = headers.get('x-next-page'), next = cursor || undefined;
+        if (cursor === null && data.length >= PAGE_SIZE) throw new PlatformError('unavailable', 'GitLab 完整分页缺少下一页标记', { method: 'GET', path });
+        if (next && (!/^[1-9][0-9]*$/.test(next) || !Number.isSafeInteger(Number(next)) || Number(next) !== Number(page) + 1)) throw new PlatformError('unavailable', 'GitLab 分页来源未连续向前推进', { method: 'GET', path });
+        page = next;
       }
       return items;
     },

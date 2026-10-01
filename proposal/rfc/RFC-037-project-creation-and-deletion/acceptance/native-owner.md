@@ -30,3 +30,13 @@ RFC-037 批准范围内的 data-control 内部阶段工厂。创建继续使用�
 ## 稳定候选完整门禁
 
 本批一次完整 `bun run check` 静态四层通过，**4976 pass/143 环境 skip/1 fail**，5120 tests、973 文件、33321 断言、1146.54 秒。31 个源码/测试/配置指纹保持；本批新增和较宽原用例全部通过。唯一失败为本清单外 `runtimes/task/tests/businessExecSupervisor.test.ts:65`：shell `sleep 90` 的命令正确终态 exit 0，记录时长 89992 ms，没有满足 >=90000 ms 的断言。该文件/实现均未修改，不将本次全仓称为通过，也不重复未变化的完整候选。原日志与回执保留，按开发规则§3继续精确候选发布，并以本 SHA 全部 hosted CI 为准。
+
+## 精确发布、部署与实际 Root 验收
+
+本批精确发布 `078cafd7708e8866317e2e819347b075661d50aa`，36 个清单内路径和 Codex 署名核对，main/origin 为 0/0，并行 RFC-036 文档保持。自身 [CI 36930364149](https://github.com/wangbinquan/CrewStation/actions/runs/36930364149) 六项终态成功；不以本地外范围耗时断言替代这个精确 SHA 的结果。
+
+提交归档构建的 control-plane 实际摘要为 `0c6097286b9f080d7e80a16fd77e7bf9beb5e1c80827b200d465ce8fb214a410`，console 为 `085a0c925b118958b117ea98cd265a9ae1c81fde402f76e9de4b315662ea8094`。2026-10-01T21:57:47.621Z 八组件 generation=observedGeneration、Ready=1；先保存 0600 平台数据库快照，再执行本批迁移。0006 实际安装校验和 `780a9dfc10f0815b137053fdd7fd2d5c06069df5a1879be62acbd5634d75dc5a` 匹配。原项目对象、共享 PostgreSQL Pod/PVC/PV、只读探针及精确策略、Runner 镜像保持。
+
+实际 API 原 Pod `6eac56d3-2a68-413f-8a2f-171a5fc4aa6a` 的 ReplicaSet/Deployment UID 链及容器 imageID 已核对。2026-10-01T21:58:01.866Z，同路真实 Root 可创建内部 native owner；读取 4 条保留历史，返回 3 组本模块元数据盘点，实际 shared 准入快照匹配、重放稳定、各表完整摘要不变且不输出明文或密文。旧版本原生事实缺失明确阻断，不产生物理清理范围。前后 **52 库/64 角色全部名字及 OID 相同**，没有执行 seal、原生回调、凭据续发、生命周期修改或物理删除。完整 22 owner 注册仍未就绪，永久删除入口关闭；此结果不计 PD-22 或旧物理历史已核实。
+
+原件分别保存于 `/private/tmp/cs-rfc037-078cafd7708e-ci-terminal.json`、`-deployment-receipt.json`、`-source-probe-receipt.json`、`-native-owner-live-receipt.json`；实际前后 catalog、只读摘要及失败日志也保留。

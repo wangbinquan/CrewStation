@@ -27,7 +27,23 @@ export interface RemoteAccessToken {
   readonly token: string;
 }
 
+export interface RemoteRepositoryIdentity {
+  readonly id: string;
+  readonly pathWithNamespace: string;
+  readonly createdAt: string;
+}
+export interface RemoteRepositoryRemoval {
+  /** 只返回 API 身份；404 仍抛错，不能用它证明实际存储已回收。 */
+  read(id: string): Promise<RemoteRepositoryIdentity & { readonly markedForDeletionOn?: string | null }>;
+  storage(id: string): Promise<readonly { readonly projectId: string; readonly diskPath: string; readonly createdAt: string; readonly repositoryStorage: string }[]>;
+  credentials(id: string): Promise<readonly { readonly id: string; readonly name: string; readonly active: boolean; readonly revoked: boolean; readonly createdAt: string }[]>;
+  /** 再核对 ID/创建时间/当前路径后发请求；受理不表示物理完成。 */
+  request(identity: RemoteRepositoryIdentity, permanentlyRemove: boolean): Promise<void>;
+}
+
 export interface GitLabGateway {
+  /** 未实现的外部适配器明确不支持，正式 owner 必须阻断。 */
+  readonly removal?: RemoteRepositoryRemoval;
   findProject(pathWithNamespace: string): Promise<RemoteProject | undefined>;
   createProject(input: { groupPath: string; slug: string; defaultBranch: string }): Promise<RemoteProject>;
   listBranches(remoteProjectId: string): Promise<RemoteBranch[]>;

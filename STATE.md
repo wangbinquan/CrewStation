@@ -1,3 +1,11 @@
+## 2026-10-02 RFC-037 SCM协议候选形成，完整回收接续
+
+SCM 原数字ID/创建时间/路径、实际存储定位及全状态凭据分页协议候选形成，保持40个生产文件；较宽75/0、454断言、改动行65/65，结构/lint/类型通过。候选在实际API Pod对原远端383只执行四次GET，原身份保持；独立只读原容器/卷核对实际主仓库和Wiki，LFS/附件等未完整。11路径单次完整门禁4986/144 skip/1 fail、33406断言且指纹保持；这次遗漏隔离PG地址，默认PG未启用预备事务，唯一未改动数据库反例报55000。原失败保留，按规则§3精确发布并等配置正确的本SHA六项CI，不重复未变化全量。resources维护结束协议的并行WIP保持。正式SCM owner/全物理范围、其余owner、全部Root注册和管理员二次确认/PD全回收继续；原项目未删除、删除入口关闭，创建仍是统一弹窗。见[SCM协议回执](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/scm-removal-protocol.md)。下方历史和并行输出完整保留。
+
+## 2026-10-02 RFC-037原生owner已部署，SCM及完整回收接续
+
+078cafd7708e8866317e2e819347b075661d50aa已精确发布，CI36930364149六项成功，21:57:47Z八组件实际部署；0006安装校验和匹配，原共享PG/探针/Runner/项目保持。实际API原Pod同路Root内部native owner只读工厂验收通过：4条保留历史/3组元数据，shared快照匹配、重放与全表摘要不变，旧原生物理事实缺失明确阻断；52库/64角色全名字/OID保持。内部原范围/阶段工厂具备不等于全部22 owner已注册；SCM永久清理、其余owner、旧历史和管理员二次确认/PD全回收继续，原项目未删除、删除入口关闭。创建仍为统一弹窗。见[精确发布与实机回执](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/native-owner.md#精确发布部署与实际-root-验收)。下方历史和并行输出完整保留。
+
 ## 2026-10-02 RFC-037旧供给已实机通过，原生owner完整门禁接续
 
 cc3efde2已精确发布、CI36911308226六项成功，19:17:26Z八组件部署；实际API原Pod只读Root历史验收通过，2资源/0绑定与独立完整声明和真实shared快照一致，当前52库/64角色全名字/OID保持。原生owner内部工厂、不可变原范围/阶段回执0006、完整alias历史和公开端口组合形成候选；真实PG37专项/116较宽全通过、447/452改动行，外部依赖与确认后历史变化先红后修，新世代接管沿原范围继续。31路径单次完整门禁4976/143 skip/1 fail、33321断言且指纹保持，唯一外范围90秒耗时89992ms断言失败，原件保留；静态四层通过，按规则§3精确发布/自身CI继续；初次失败夹具已按原名字/OID清理19库/11角色，旧keeper和其他全部身份保持。独立卷在PG用例中为受控端口，不计真实卷回收。全部Root注册、旧物理历史、其余owner和二次确认/PD全回收仍未完成，删除入口关闭。见[原生owner候选](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/native-owner.md)和[旧供给实机回执](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/data-native-history.md)。下方历史和并行输出完整保留。

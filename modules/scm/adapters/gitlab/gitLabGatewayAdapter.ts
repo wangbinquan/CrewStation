@@ -1,7 +1,7 @@
 import type { GitLabBranch, GitLabClient, GitLabProject, GitLabTag } from '@crewstation/gitlab-client';
 import { GITLAB_ACCESS_LEVEL } from '@crewstation/gitlab-client';
-import { isPlatformError } from '@crewstation/kernel';
-import type { GitLabGateway, RemoteBranch, RemoteProject, RemoteTag } from '../../ports/gitLabGateway';
+import { conflict, isPlatformError } from '@crewstation/kernel';
+import type { GitLabGateway, RemoteBranch, RemoteProject, RemoteRepositoryRemoval, RemoteTag } from '../../ports/gitLabGateway';
 
 /** 会话凭据只读写仓库；开发者级别，受保护的 `v*` 标签与默认分支保护都对它生效。 */
 const SESSION_TOKEN_SCOPES = ['read_repository', 'write_repository'];
@@ -20,8 +20,22 @@ async function orUndefined<T>(promise: Promise<T>): Promise<T | undefined> {
   }
 }
 
+function removalGateway(client: GitLabClient): RemoteRepositoryRemoval {
+  return {
+    read: async (id) => { const row = await client.getProjectDeletionState(id); return { ...row, id: String(row.id) }; },
+    storage: async (id) => (await client.getProjectRepositoryStorage(id)).map((row) => ({ ...row, projectId: String(row.projectId) })),
+    credentials: async (id) => (await client.listProjectAccessTokens(id)).map((row) => ({ id: String(row.id), name: row.name, active: row.active, revoked: row.revoked, createdAt: row.createdAt })),
+    request: async (identity, permanentlyRemove) => {
+      const current = await client.getProjectDeletionState(identity.id);
+      if (String(current.id) !== identity.id || current.pathWithNamespace !== identity.pathWithNamespace || current.createdAt !== identity.createdAt) throw conflict('GitLab 原仓库身份或路径变化；禁止删除替换实例');
+      await client.deleteProject(current.id, permanentlyRemove ? { permanentlyRemove: true, fullPath: current.pathWithNamespace } : {});
+    },
+  };
+}
+
 export function gitLabGatewayAdapter(client: GitLabClient): GitLabGateway {
   return {
+    removal: removalGateway(client),
     findProject: async (path) => {
       const project = await orUndefined(client.getProject(path));
       return project ? toRemoteProject(project) : undefined;

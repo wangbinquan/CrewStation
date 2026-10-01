@@ -1,5 +1,6 @@
 import { accessTokenOperations } from './accessTokens';
 import { projectOperations } from './projects';
+import { projectDeletionOperations } from './projectDeletion';
 import { protectedTagOperations } from './protectedTags';
 import { repositoryOperations } from './repository';
 import type { TransportOptions } from './transport';
@@ -10,13 +11,14 @@ export type GitLabClientOptions = TransportOptions;
 
 export type GitLabClient =
   ReturnType<typeof projectOperations> & ReturnType<typeof repositoryOperations> & ReturnType<typeof protectedTagOperations> &
-  ReturnType<typeof accessTokenOperations> & ReturnType<typeof webhookOperations>;
+  ReturnType<typeof accessTokenOperations> & ReturnType<typeof webhookOperations> & ReturnType<typeof projectDeletionOperations>;
 
 /** 基于 fetch 的 GitLab REST v4 客户端；`fetch` 可注入以便测试。 */
 export function createGitLabClient(options: GitLabClientOptions): GitLabClient {
   const transport = createTransport(options);
   return {
     ...projectOperations(transport),
+    ...projectDeletionOperations(transport),
     ...repositoryOperations(transport),
     ...protectedTagOperations(transport),
     ...accessTokenOperations(transport),

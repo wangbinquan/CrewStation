@@ -1,5 +1,6 @@
 import type { CreateProjectInput, DeleteProjectOptions, GitLabGroup, GitLabProject, GitLabProjectRef } from './models';
 import type { Transport } from './transport';
+import { PlatformError } from '@crewstation/kernel';
 import { encodeRef } from './transport';
 
 interface RawProject {
@@ -35,6 +36,7 @@ export function projectOperations(transport: Transport) {
      * `permanentlyRemove` 对已标记删除的项目立即清除，GitLab 要求同时给出其当前 `fullPath` 以防误删。
      */
     deleteProject: async (id: GitLabProjectRef, options: DeleteProjectOptions = {}): Promise<void> => {
+      if (options.permanentlyRemove && (!/^[1-9][0-9]*$/.test(String(id)) || !Number.isSafeInteger(Number(id)) || typeof options.fullPath !== 'string' || !options.fullPath || options.fullPath.length > 1024 || /[\x00-\x1f\x7f]/.test(options.fullPath))) throw new PlatformError('validation', 'GitLab 永久删除必须固定原数字 ID 和当前完整路径');
       const query = options.permanentlyRemove ? { permanently_remove: true, full_path: options.fullPath } : {};
       await transport.request<unknown>('DELETE', `/projects/${encodeRef(id)}`, { query });
     },
