@@ -1,6 +1,8 @@
-# 独立原生存储来源候选
+# 独立原生存储来源候选与部署
 
 2026-10-01 工作树候选，尚未提交或部署。它是已批准原生来源协议的只读部分，不代表完整 data-control owner、永久删除或 PD 实机回收已完成。
+
+后续状态：该候选已精确发布为 `e9eb97b218d275f6c949513c82d8ca2413d22639`，该 SHA 的 [CI 36845033387](https://github.com/wangbinquan/CrewStation/actions/runs/36845033387) 六项终态成功，并在 2026-10-01T10:18:06.514Z 完成八组件和只读来源探针部署。实际 API 与控制器的公开内部来源端口已联合核验原 SQL/K8s/HTTP 来源；首次调用失败也保留在下方，不覆盖早期候选、门禁失败和旧协议 404 历史。完整正式 owner 和项目永久删除仍未完成。
 
 ## 已实现的行为
 
@@ -43,3 +45,25 @@ data-control 当前 38 个生产 TS/1644 行，platform 59 个生产 TS/2268 行
 并行迁移已由原 owner 入锁，四项类型错误也由其修正。随后本批新修订候选的完整 check 第二轮通过结构、全 lint、后端与 console 类型，完整用例已出现另一任务的 developmentWorkloadAdmission 断言失败（queued 实得 cleaning）；继续等这次完整运行结束，不取消、不修正对方文件、不因其或 HEAD 前进重跑相同候选。16 个源码指纹保持；精确候选检查和发布仍按本批清单执行，整仓失败不计为通过。完整日志 full-check-2.log。
 
 完整第二轮已结束：**4861 pass／143 skip／6 fail，5010 tests、966 文件、32234 断言、1159.41 秒**。一项为上述 developmentWorkloadAdmission，另五项为并行原创建回放用例的超时；不把它们改掉或提交进本批。16 个源码/测试/配置指纹与冻结时完全相同，仅追加四份本任务文档的验证回执。以 HEAD 4e6b1a15 的全部原 blob 和本批精确 16 路径做内存候选编译，后端与 console 都为 0 diagnostics（candidate-types-3.log），未新建 checkout、alternate index 或裁掉共享树内容。按精确清单发布、等待精确 SHA 的 hosted CI 和正常探针部署，不为这些无关在制变化重跑等价全量。
+
+## 精确发布与实际部署
+
+20 个精确文件已提交、推送并核对署名、空索引和 main/origin 同步；没有收进开发准入、用量或观测界面的并行在制品。精确 SHA 的 static、unit、module、console、gate、e2e 全部成功，私有 CI 回执 `cs-rfc037-e9eb97b218d2-ci.json`。上面的本机六项失败仍是失败，hosted CI 的成功不改写本机历史。
+
+仅以已提交归档构建镜像，不用额外开发 checkout。默认 buildx metadata 写入受限目录的首轮失败保留；用独立 `/private/tmp` BUILDX_CONFIG 后正常构建。control/console 的配置 ID 分别为 `9d932f99887d22d1d24f310c35c2c87140a7f4fa47d2ffa0631ca86f0616f7dc`／`1411d713f57675b7861e825dfaa73304df236bcda31eddca9e148a020fa5e489`；真正部署的 manifest digest 分别为 `04fed72557216ad2f12d23f0a0d0af4d975120afb22353917c2603e004b0aa46`／`43cdc6a91b2fe164de66b92015689abe2b8a51c3105d7b77eae8326cb5ff6cb9`，不将配置 ID 与部署 digest 混用。
+
+首次部署在写入任何集群变更前，被 NetworkPolicy 的空 egress 数组序列化差异阻断；实际 API 省略 `egress: []`，UID、resourceVersion 和其余完整 spec 仍是原值。私有前置核验按空数组同义规范化后重试成功，未放宽 UID/CAS 或其余策略。8 个应用 Deployment 的 generation=observedGeneration、Ready=1，来源探针 DaemonSet UID `a1ff0009-3b4b-4df9-b79f-df8d884a6897` generation 8、Ready=1。原只读/security/mount 配置保持；新探针 UID `baa72ace-196a-4415-9b1c-cd1dcb74e04b` 在原节点，以同一 control digest 运行。
+
+NetworkPolicy 保持原 UID `7a06a3f8-e684-4856-93b0-48c15c2bdc05`，实际 ingress 只允许本 namespace 中精确 cs-api/cs-controller 标签到 TCP 8095，Egress 隔离且无放行项。API 没有被任何出站 NetworkPolicy 选中，无须修改出站策略。部署前后的原 22 Namespace、48 Pod/PVC、19 PV 没有缺失，共享 PostgreSQL 的 Pod/容器/PVC/PV/Node/Service 身份全部保持，当前 Runner `587a0766440bae22f69bd6e68e101f2348ec8bda95f8b4c3ce6ddef0fa010928` 保持。备份、迁移、镜像及精简部署回执分别保存在私有 e9eb97b218d2 前缀目录和 JSON。
+
+## 实际 SQL、独立 K8s 与 HTTP 联验
+
+2026-10-01T10:22:07.049Z 的首次 cs-api 调用返回「独立原生卷来源探针暂不可用」，退出 1；原 `cs-api-source-live.jsonl` 保留。这次没有记录 HTTP 状态，不能将其断言为忙时 409，也不能将失败写成成功。随后在同一实际 API Pod 上，用已安装的真实适配器保留 fetch 响应并正常返回给原调用，三次独立 /source 均为 200／601 bytes；2026-10-01T10:30:38.721Z 完整来源核验成功，见 `source-http-diagnostic-1.jsonl`。首次失败的确切原因仍未证明；正式 owner 必须把临时不可用作为等待/重试，不能产生清理成功回执。
+
+2026-10-01T10:35:30.022Z／10:35:32.190Z，实际 cs-api UID `9af51878-03ff-4e5f-87e3-465bf927d899` 与 cs-controller UID `93171770-a0b6-4221-8dee-e8f465b734b0` 各自通过真正 Root 的公开 `nativePostgresSource.capture/verify/capture`。原 NativeDdlConnection、完整 K8s 身份映射、认证后的已部署 HTTP 来源以及实际 callback 退出全部运行；两者得到同一独立身份 `37a5d248a52b478038a570883375b439cdb6a4829bc3648c284ef46e3b47095f`。原 PostgreSQL Pod `e1c096f1-223a-4a78-a67c-d5b66345bcb0`、PVC `1cefe909-de62-4307-b517-14aab56ac809`、PV `93d700f2-130d-4517-a8be-f031ec9409a5` 和 Node `1d907504-da49-4ad5-bcf1-05bf3de4139d` 一致。root/volume/pgdata/pg_control epoch 与 08:32 原只读探针观测也一致，未把仅 SQL 指纹当作独立存储身份。
+
+私有回执：`cs-rfc037-e9eb97b218d2-{cs-api,cs-controller}-source-live-2.jsonl`、deployment-receipt.json、source-probe-receipt.json；初次失败原件另存，没有覆盖。验证只做来源/原目录/原凭据读取及既有 callback 最小在途/退出事实，没有 DROP、CREATE、口令变更或共享卷写入。创建弹窗源码未变；本批 Chrome 连接失败，没有记新的浏览器、窄屏或网络验收通过。先前 557cb50c 的实际统一弹窗和域名/模板/焦点证据保持。
+
+2026-10-01T10:42:34.929Z，在原实际 API Pod 上再次运行既有原生 SELECT 回调：独立提交的原 PID/四键/SQL 来源在途事实由 running 转为 finished，原保护 finalizer 存在，旧生产凭据 SELECT 1 成功。10:42:35.118Z 原库 `cs_rfc037_creation_proof` 的原 OID `276598`、SQL 来源及物理目录仍 present；只读前后 48 个项目原生库清单完全一致。回执 `native-{admission,catalog}-preservation.jsonl`，不把这次保留验证称为任何资源回收。
+
+下一批须提供 resources 的全部历史 native 记录端口；当前 listLive 有上限，压缩记录会清除子身份，不能据此证明无旧库。独立存储身份尚未持久绑定所有旧/新 DDL，完整 data-control owner、其余内容 owner、管理员二次确认和 PD 实际回收继续。原专用项目/数据库保留，永久删除入口关闭。

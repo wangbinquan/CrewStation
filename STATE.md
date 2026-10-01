@@ -6,6 +6,8 @@
 
 ## 2026-09-30 RFC-037 项目创建弹窗与彻底删除（实施中）
 
+2026-10-01 独立原生存储来源批已精确发布 e9eb97b218d275f6c949513c82d8ca2413d22639，CI 36845033387 六项成功。本机 10:18:06Z 八组件与原节点只读探针 Ready；原共享 PG、22 Namespace／48 Pod和PVC／19 PV 与当前 Runner 保持。首次 API 来源请求暂不可用保留失败原件，具体原因未证明；诊断三次 HTTP 200，实际 API/控制器的公开 Root SQL/K8s/HTTP 联验在 10:35 各自通过，同一独立来源/原目录 epoch，原项目没有清理。见[来源部署验收](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/native-storage-source.md)。Chrome 本批连接失败，没有计新界面验收。接续全历史端口、独立来源持久意图和正式 owner；管理员永久删除入口仍关闭，下方历史与并行输出保持。
+
 2026-10-01 独立原生卷只读来源形成在制候选：受限 /source 元数据 epoch、实际 SQL endpoint/完整表空间到 EndpointSlice/Pod/PVC/PV/原节点/只读探针的绑定与组合根内部端口已落实，完整正式 owner 尚未接齐。修正实机 inet::text 带 /32 的地址反例后，真实文件系统/隔离 PG 与来源组合 60／0、388 断言；改动覆盖 168／168。原真实探针 stdin 读取 epoch 成功，真正原 native 连接/K8s 联验抵达旧探针并按缺失 HTTP 协议返回 404，不冒充部署完成。16 源码/测试/配置指纹保持；完整 check 静态四层通过，4861／143 skip／6 fail、5010 tests、966 文件、32234 断言、1159.41 秒。六项均属另一任务的开发准入/创建回放在制用例，不称整仓通过；精确提交树两侧类型通过。见[来源候选验收](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/native-storage-source.md)。最新部署仍为 b6999edf，回执文档 4e6b1a15 六项 CI 已成功；删除入口关闭，原项目保留，下方全部输出保持。
 
 2026-10-01 原生写入屏障批已精确发布 b6999edf15ec81a43d42bd59c3fb80218b204af8，CI 36832635556 六项成功，本机 2026-10-01T08:05:21.813Z 八组件 Ready=1；data_control/0004 实际应用、运行源码校验和核对一致。原 22 Namespace／48 Pod及PVC／19 PV、共享 PostgreSQL 全身份和部署前当前 Runner 587a0766 保持。部署后在真正原 cs-api 上核对 native SELECT 的独立在途事实、实际退出、原 Pod finalizer及旧生产凭据查询；原验收库 OID 276598/目录保持。本批 Chrome 连接失败，新的界面复测没有记通过；上批创建弹窗证据保持。见[本批部署与实际调用](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/native-writers-deployment.md)。独立卷来源、正式 owner、其余内容清理、管理员二次确认与完整实际回收仍继续；永久删除入口关闭，专用项目保留。下方候选、失败历史与所有并行输出完整保留。
