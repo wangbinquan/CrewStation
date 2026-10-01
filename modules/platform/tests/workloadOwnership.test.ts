@@ -5,7 +5,7 @@ import { createFakeK8sClient } from '@crewstation/k8s';
 import { precondition } from '@crewstation/kernel';
 import type { ResolvedService } from '@crewstation/module-project';
 import type { EnvironmentDto } from '@crewstation/module-task-runtime';
-import { nativeWorkloadOwnership } from '../adapters/k8s/workloadOwnership';
+import { nativeWorkloadOwnership, originalGatewayPodProject } from '../adapters/k8s/workloadOwnership';
 
 async function fixture(kind: 'service' | 'dev-session' | 'business-task' = 'service') {
   const projectId = ProjectIdSchema.parse(Bun.randomUUIDv7()), serviceId = ServiceIdSchema.parse(Bun.randomUUIDv7()), releaseId = ReleaseIdSchema.parse(Bun.randomUUIDv7()), taskId = TaskIdSchema.parse(Bun.randomUUIDv7());
@@ -86,5 +86,37 @@ test('升级前 release/task 标签只经原 ID 别名解析，不能用同名�
     expect(await normalized.resolve(f.workload)).toEqual(f.scope);
     const absent = nativeWorkloadOwnership(f.k8s, () => f.project, () => undefined, () => undefined, async () => undefined);
     expect(await absent.resolve(f.workload)).toBeUndefined();
+  }
+});
+test('网关历史发布沿革在删除期间仍可盘点，原 UUID／UID／命名空间不符或来源消失时不借同名根认领', async () => {
+  const f = await fixture(), source = { releaseId: f.releaseId, podUid: 'original-pod', ip: '10.1.2.3', physicalSlot: 'blue' as const, ready: false };
+  const record = { project: 'source', service: 'source', namespace: 'cs-source', podName: f.pod.metadata.name, workload: 'service', podUid: 'original-pod', source };
+  f.state.admission = 'closed';
+  expect(await originalGatewayPodProject(record, () => f.project, () => f.release, () => f.tasks)).toBe(f.scope.projectId);
+  for (const patch of [{ podUid: 'replacement' }, { namespace: 'replacement' }, { project: 'replacement' }, { workload: 'platform' }, { source: undefined }, { source: { ...source, releaseId: ReleaseIdSchema.parse(Bun.randomUUIDv7()) } }])
+    expect(await originalGatewayPodProject({ ...record, ...patch }, () => f.project, () => f.release, () => f.tasks)).toBeUndefined();
+  f.state.service = { ...f.state.service!, projectId: ProjectIdSchema.parse(Bun.randomUUIDv7()) };
+  expect(await originalGatewayPodProject(record, () => f.project, () => f.release, () => f.tasks)).toBeUndefined();
+  expect(await originalGatewayPodProject(record, () => f.project, () => undefined, () => f.tasks)).toBeUndefined();
+});
+
+test('已退出或暂停的原开发／业务任务仍归原项目，不能将历史归属用作退出证明；未知 task、子执行 UID 和新根不借名认领', async () => {
+  for (const kind of ['dev-session', 'business-task'] as const) {
+    const f = await fixture(kind), env = f.state.env!;
+    const record = { project: 'source', service: 'source', namespace: 'cs-source', podName: f.pod.metadata.name, workload: kind, taskId: f.taskId, podUid: 'original-pod',
+      developmentSource: { taskId: f.taskId, podUid: 'original-pod', podName: f.pod.metadata.name, ip: '10.1.2.3', ready: false } };
+    for (const state of ['released', 'paused', 'failed'] as const) {
+      f.state.env = { ...env, state };
+      expect(await originalGatewayPodProject(record, () => f.project, () => f.release, () => f.tasks)).toBe(f.scope.projectId);
+    }
+    for (const patch of [{ taskId: undefined }, { taskId: TaskIdSchema.parse(Bun.randomUUIDv7()) }, { podUid: 'replacement' }, { podName: 'replacement' }, { namespace: 'replacement' }])
+      expect(await originalGatewayPodProject({ ...record, ...patch }, () => f.project, () => f.release, () => f.tasks)).toBeUndefined();
+    f.state.env = { ...env, native: { purpose: 'agent', parentTaskId: f.taskId, agentId: 'agent', runnerId: 'runner', state: 'running', podUid: 'replacement', profile: { name: 'test', cpu: '1', memory: '1Gi', storage: '1Gi' } } };
+    expect(await originalGatewayPodProject(record, () => f.project, () => f.release, () => f.tasks)).toBeUndefined();
+    f.state.env = env;
+    const legacy = { ...record, taskId: 'original-task-alias' };
+    expect(await originalGatewayPodProject(legacy, () => f.project, () => f.release, () => f.tasks)).toBeUndefined();
+    expect(await originalGatewayPodProject(legacy, () => f.project, () => f.release, () => f.tasks, async (requested, key) => { expect(requested).toBe('task'); expect(key).toBe('original-task-alias'); return f.taskId; })).toBe(f.scope.projectId);
+    f.state.env = undefined; expect(await originalGatewayPodProject(record, () => f.project, () => f.release, () => f.tasks)).toBeUndefined();
   }
 });

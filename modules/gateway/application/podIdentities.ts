@@ -66,6 +66,7 @@ export function podIdentityUseCases(deps: GatewayUseCaseDeps) {
     lookupByIp: async (ip: string): Promise<WorkloadIdentity | undefined> => {
       const record = await deps.pods.byIp(ip);
       if (!record || record.deletedAt) return undefined;
+      if (deps.admission && !await deps.admission.podAvailable(record)) return undefined;
       let prodPhysical: string | undefined;
       if (record.workload === 'service' && record.physicalSlot) {
         const svc = (await deps.services.listServices()).find((s) => s.identity === `${record.project}/${record.service}`);

@@ -11,7 +11,7 @@ import type { Database, MigrationSet } from '@crewstation/persistence';
 import { readMigrationDir } from '@crewstation/persistence';
 import type { Hono } from 'hono';
 import { drizzleUnitOfWork } from './adapters/persistence/drizzleUnitOfWork';
-import { apiCatalogDeletionRepository } from './adapters/persistence/deletion/repository';
+import { apiCatalogDeletionRepository, originalOperationProject } from './adapters/persistence/deletion/repository';
 import type { ApiCatalogModuleApi } from './api/moduleApi';
 import { grantUseCases } from './application/decideRequest';
 import { apiCatalogDeletionOwner } from './application/projectDeletion';
@@ -73,6 +73,7 @@ export function createApiCatalogModule(deps: ApiCatalogModuleDeps): ApiCatalogMo
   };
   const api: ApiCatalogModuleApi = {
     name: 'api-catalog',
+    originalOperationProject: (id) => originalOperationProject(deps.db, id),
     ...(deps.projects.assertProjectDeletionGrant ? { deletionOwner: apiCatalogDeletionOwner(apiCatalogDeletionRepository(deps.db, deps.projects.assertProjectDeletionGrant), deps.projects.assertProjectDeletionGrant) } : {}),
     isAdmin: (userId) => deps.projects.isAdmin(userId),
     ...catalogQueryUseCases(useCaseDeps),

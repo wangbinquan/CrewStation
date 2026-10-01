@@ -1,4 +1,4 @@
-import type { ProjectDeletionContext } from '@crewstation/contracts';
+import type { ProjectDeletionContext, ProjectId } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
 import type { Database } from '@crewstation/persistence';
 import { sql } from 'drizzle-orm';
@@ -6,6 +6,13 @@ import type { ApiCatalogDeletionRepository } from '../../../ports/deletion';
 import { inspect, registered } from './inspection';
 import { assertSealed, lock, seedServiceIdentities } from './fence';
 import { disable, purge } from './content';
+
+export async function originalOperationProject(db: Database, id: string): Promise<ProjectId | undefined> {
+  const rows = await db.execute<{ project_id: ProjectId }>(sql`SELECT DISTINCT project_id FROM api_catalog.deletion_entities WHERE kind='operation'
+    AND (entity_id=${id} OR entity_id IN (SELECT id FROM api_catalog.resource_identity_aliases WHERE kind='api-operation' AND key=${JSON.stringify([id])}))`);
+  if (rows.length > 1) throw precondition('原 API 操作别名的项目归属不唯一');
+  return rows[0]?.project_id;
+}
 
 export function apiCatalogDeletionRepository(db: Database, assertGrant: (context: ProjectDeletionContext) => Promise<void>): ApiCatalogDeletionRepository {
   return {

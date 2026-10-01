@@ -1,11 +1,33 @@
 import { ReleaseIdSchema, ServiceIdSchema, TaskIdSchema } from '@crewstation/contracts';
 import type { ProjectId, ServiceId, WorkloadIdentity } from '@crewstation/contracts';
 import type { K8sClient, K8sObject } from '@crewstation/k8s';
-import type { OriginalWorkloadProject, OriginalWorkloadRelease, OriginalWorkloadTasks } from '../../ports/workloadOwnership';
+import type { GatewayHistoryPod, OriginalWorkloadProject, OriginalWorkloadRelease, OriginalWorkloadTasks } from '../../ports/workloadOwnership';
 
 interface Pod extends K8sObject { status?: { podIP?: string; phase?: string } }
 type Scope = { projectId: ProjectId; serviceId: ServiceId };
 type Normalize = (kind: 'release' | 'task', value: string) => Promise<string | undefined>;
+
+/** 历史索引按原发布/任务 UUID 归属；已退出和暂停仍可读，不能据此推断实际容器退出。 */
+export async function originalGatewayPodProject(record: GatewayHistoryPod, project: () => OriginalWorkloadProject,
+  release: () => OriginalWorkloadRelease | undefined, tasks: () => OriginalWorkloadTasks | undefined, normalize?: Normalize): Promise<ProjectId | undefined> {
+  let scope: Scope | undefined;
+  if (record.workload === 'service') {
+    const id = ReleaseIdSchema.safeParse(record.source?.releaseId);
+    if (!id.success || record.podUid && record.source?.podUid !== record.podUid) return undefined;
+    scope = await release()?.sourceOwnership(id.data);
+  } else if (record.workload === 'dev-session' || record.workload === 'business-task') {
+    const raw = record.taskId, id = TaskIdSchema.safeParse(raw && (TaskIdSchema.safeParse(raw).success ? raw : await normalize?.('task', raw)));
+    if (!id.success || record.developmentSource && (record.developmentSource.taskId !== id.data || record.developmentSource.podName !== record.podName
+      || record.podUid && record.developmentSource.podUid !== record.podUid)) return undefined;
+    const env = await tasks()?.getEnvironment(id.data), service = ServiceIdSchema.safeParse(env?.serviceId);
+    if (!env || !service.success || env.podName !== record.podName || env.kind !== (record.workload === 'business-task' ? 'business' : 'dev-session')
+      || env.native?.podUid && record.podUid && env.native.podUid !== record.podUid) return undefined;
+    scope = { projectId: env.projectId, serviceId: service.data };
+  }
+  if (!scope) return undefined;
+  const service = await project().resolveServiceById(scope.serviceId);
+  return service && service.projectId === scope.projectId && service.namespace === record.namespace && service.identity === `${record.project}/${record.service}` ? scope.projectId : undefined;
+}
 
 /** 原 release/task UUID 取得归属，再核对实际 Pod；当前 slug 目录不能替换原来源。 */
 export function nativeWorkloadOwnership(k8s: K8sClient, project: () => OriginalWorkloadProject,

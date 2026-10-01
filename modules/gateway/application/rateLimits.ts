@@ -46,8 +46,10 @@ export function rateLimitUseCases(deps: GatewayUseCaseDeps) {
     if (!only) { await ledger.declare(platformRateLimitPolicy(limits.platformApi, deps.settings.systemNamespace)); declared += 1; }
     for (const service of await deps.services.listServices()) {
       if (only && service.projectId !== only) continue;
+      if (deps.admission && !await deps.admission.available(service.projectId)) continue;
       const own = await override(service.projectId);
-      await ledger.declare(projectRateLimitPolicy({ projectId: service.projectId, namespace: service.namespace }, effectiveProjectLimits(limits, own.value), own.value !== undefined));
+      const declare = async () => { await ledger.declare(projectRateLimitPolicy({ projectId: service.projectId, namespace: service.namespace }, effectiveProjectLimits(limits, own.value), own.value !== undefined)); };
+      if (deps.admission) await deps.admission.withEffects(service, 'rate-limit', declare); else await declare();
       declared += 1;
     }
     return declared;

@@ -9,3 +9,8 @@ export function identityTombstoneWorker(purge: () => Promise<number>, logger: Lo
     if (purged) logger.info('pod identity tombstones purged', { purged });
   }, (error) => logger.warn('pod identity tombstone purge failed', { error: String(error) }), everyMs);
 }
+
+/** 原回调停止恢复独立于连接、事件租约及普通身份墓碑保留期。 */
+export function gatewayProcessRecoveryWorker(recover: () => Promise<void>, logger: Logger, everyMs = 5_000): PeriodicJob {
+  return periodicJob(recover, () => logger.warn('original gateway process recovery unavailable'), everyMs);
+}

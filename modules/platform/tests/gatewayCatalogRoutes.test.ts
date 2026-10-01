@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { Actor, Manifest, ProjectId, ReleaseId, ServiceId, WorkloadIdentity } from '@crewstation/contracts';
 import { DomainTopic, ManifestSchema } from '@crewstation/contracts';
 import { publishDomainEvent } from '@crewstation/eventbus';
-import { createFakeK8sClient } from '@crewstation/k8s';
+import { createFakeK8sClient, Resources } from '@crewstation/k8s';
 import { newId, noopLogger } from '@crewstation/kernel';
 import { runMigrations } from '@crewstation/persistence';
 import { loadPlatformSettings } from '@crewstation/settings';
@@ -19,6 +19,15 @@ let target: { projectId: ProjectId; serviceId: ServiceId };
 const k8s = createFakeK8sClient();
 const service = { command: ['bun', 'src/main.ts'], port: 3000, servicePlanId: '01a0bf5d-8f4b-7000-9e4b-b54e91ee9d10' };
 const document = { openapi: '3.0.3', info: { title: 'Proxy', version: '1' }, paths: { '/items': { get: {} } } };
+
+/** 真实组合根需要原进程身份；此状态是适配器夹具，不代表真实容器停止验收。 */
+async function platformProcess() {
+  const uid = Bun.randomUUIDv7(), nodeUid = Bun.randomUUIDv7();
+  await k8s.apply({ apiVersion: 'v1', kind: 'Node', metadata: { name: 'routing-node', uid: nodeUid }, status: { conditions: [{ type: 'Ready', status: 'True' }], nodeInfo: { kubeletVersion: 'v1.34.0' } } });
+  await k8s.apply({ apiVersion: 'coordination.k8s.io/v1', kind: 'Lease', metadata: { name: 'routing-node', namespace: 'kube-node-lease', ownerReferences: [{ apiVersion: 'v1', kind: 'Node', name: 'routing-node', uid: nodeUid }] }, spec: { holderIdentity: 'routing-node', renewTime: new Date().toISOString() } });
+  await k8s.apply({ apiVersion: 'v1', kind: 'Pod', metadata: { name: 'routing-controller', namespace: 'crewstation-system', uid, resourceVersion: '1', labels: { 'app.kubernetes.io/name': 'cs-controller', 'app.kubernetes.io/part-of': 'crewstation' } }, spec: { nodeName: 'routing-node', containers: [{ name: 'cs-controller' }] }, status: { phase: 'Running', containerStatuses: [{ name: 'cs-controller', containerID: 'containerd://routing-original', state: { running: {} } }] } });
+  return uid;
+}
 const worker = (exposes: boolean): Manifest => ManifestSchema.parse({
   apiVersion: 'crewstation/v2', kind: 'DigitalWorker', spec: { service, apis: exposes ? { exposes: { openapi: './openapi.yaml' } } : {} },
 });
@@ -30,6 +39,7 @@ beforeAll(async () => {
   if (!available) return;
   tdb = await createTestDatabase();
   const settings = loadPlatformSettings({
+    CS_PLATFORM_POD_UID: await platformProcess(),
     CS_DATABASE_URL: tdb.url, CS_SECRET_KEY: Buffer.alloc(32, 1).toString('base64'),
     CS_ADMIN_EMAILS: 'routing@example.com', CS_GITLAB_URL: 'http://127.0.0.1:9',
   });
@@ -198,4 +208,16 @@ describe.skipIf(!available)('平台装配的目录与网关路由', () => {
       k8s.apply = apply;
     }
   });
+});
+test.skipIf(!available)('平台装配的网关在原进程被同名新 UID 替换时拒绝副作用，不改变既有路由或回调事实', async () => {
+  const pod = (await k8s.get(Resources.Pod!, 'routing-controller', 'crewstation-system'))!;
+  const before = await platform.modules.resources.api.list({ projectId: target.projectId, includeStopped: true });
+  const { sql } = await import('drizzle-orm');
+  const work = [...await tdb.db.execute(sql`SELECT id,state FROM gateway.deletion_work ORDER BY id`)];
+  await k8s.mergePatch(Resources.Pod!, 'routing-controller', 'crewstation-system', { metadata: { uid: Bun.randomUUIDv7() } });
+  try {
+    await expect(platform.modules.gateway.api.reconcileService(target.serviceId)).rejects.toMatchObject({ kind: 'precondition' });
+    expect(await platform.modules.resources.api.list({ projectId: target.projectId, includeStopped: true })).toEqual(before);
+    expect([...await tdb.db.execute(sql`SELECT id,state FROM gateway.deletion_work ORDER BY id`)]).toEqual(work);
+  } finally { await k8s.apply(pod); }
 });

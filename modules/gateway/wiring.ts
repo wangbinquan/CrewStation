@@ -1,12 +1,12 @@
 import { join } from 'node:path';
-import type { ProjectId, ServiceId, UserId } from '@crewstation/contracts';
+import type { ProjectDeletionContext, ProjectId, ServiceId, UserId } from '@crewstation/contracts';
 import { DomainTopic, TaskIdSchema } from '@crewstation/contracts';
 import type { EventConsumer } from '@crewstation/eventbus';
 import { createEventConsumer } from '@crewstation/eventbus';
 import type { AppEnv } from '@crewstation/http';
 import type { K8sClient } from '@crewstation/k8s';
 import type { Clock, Logger } from '@crewstation/kernel';
-import { noopLogger, systemClock } from '@crewstation/kernel';
+import { noopLogger, precondition, systemClock } from '@crewstation/kernel';
 import type { Database, MigrationSet, ResourceIdentityDirectory } from '@crewstation/persistence';
 import { readMigrationDir } from '@crewstation/persistence';
 import type { Hono } from 'hono';
@@ -14,6 +14,8 @@ import { traefikApplier } from './adapters/k8s/traefikApplier';
 import { drizzleRateLimitRepository } from './adapters/persistence/drizzleRateLimits';
 import { drizzleAllowlistRepository, drizzlePodIdentityRepository, drizzleRouteRepository } from './adapters/persistence/drizzleRepositories';
 import { drizzleMaintenanceUnitOfWork } from './adapters/persistence/drizzleMaintenance';
+import { gatewayDeletionRepository } from './adapters/persistence/projectDeletion';
+import { gatewayDeletionOwner } from './application/projectDeletion';
 import type { GatewayModuleApi } from './api/moduleApi';
 import { allowlistUseCases } from './application/allowlist';
 import type { GatewayUseCaseDeps } from './application/dependencies';
@@ -32,12 +34,16 @@ import { explainUnavailable } from './application/unavailable';
 import type { GrantSource, HostNaming, ProjectAccess, ServiceDirectory, SlotRoles, UserDirectory } from './ports/directories';
 import type { GatewayApplier, GatewaySettings } from './ports/gatewayApply';
 import { allowlistCheckWorker } from './workers/allowlistCheck';
-import { identityTombstoneWorker } from './workers/identityTombstones';
+import { gatewayProcessRecoveryWorker, identityTombstoneWorker } from './workers/identityTombstones';
+import type { GatewayOriginalDirectory, GatewayProcessOwners } from './ports/repositories';
 import { rateLimitLedgerResyncWorker } from './workers/rateLimitLedgerResync';
 import { routeLedgerResyncWorker } from './workers/routeLedgerResync';
 import type { LedgerReader, RouteLedger } from './ports/ledger';
 
 export interface GatewayModuleDeps {
+  originals?: GatewayOriginalDirectory;
+  processes?: GatewayProcessOwners;
+  projects?: { assertProjectAvailable(id: ProjectId): Promise<void>; assertProjectDeletionGrant(context: ProjectDeletionContext): Promise<void>; available?(id: ProjectId): Promise<boolean>; availableMany?(ids: readonly ProjectId[]): Promise<readonly ProjectId[]> };
   identities?: ResourceIdentityDirectory;
   db: Database;
   k8s: K8sClient;
@@ -74,12 +80,26 @@ export const gatewayMigrations: MigrationSet = {
   files: readMigrationDir(join(import.meta.dir, 'adapters', 'persistence', 'migrations')),
 };
 
+function originalsOf(deps: GatewayModuleDeps): GatewayOriginalDirectory {
+  if (deps.originals) return deps.originals;
+  if (deps.projects) throw precondition('正式网关原身份目录尚未装配');
+  const service = async (key: string) => await deps.services.getService(key as ServiceId) ?? await deps.services.resolveIdentity?.(key) ?? (await deps.services.listServices()).find((s) => s.identity === key);
+  return { service, pod: async (record) => (await service(`${record.project}/${record.service}`))?.projectId,
+    operation: async (key) => {
+      if (deps.grants.originalOperationProject) return deps.grants.originalOperationProject(key);
+      const route = (await deps.grants.grantedOperations('none/none')).operationRoutes.find((r) => r.id === key);
+      return route ? (await deps.services.listServices()).find((s) => s.serviceName === route.proxy)?.projectId : undefined;
+    } };
+}
+
 export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
   const logger = deps.logger ?? noopLogger;
+  const deletion = gatewayDeletionRepository(deps.db, { originals: originalsOf(deps), assertGrant: deps.projects?.assertProjectDeletionGrant, assertAvailable: deps.projects?.assertProjectAvailable, available: deps.projects?.available, availableMany: deps.projects?.availableMany, processes: deps.processes });
   const useCaseDeps: GatewayUseCaseDeps = {
+    admission: deletion,
     normalizeTaskId: async (value) => TaskIdSchema.safeParse(value).success ? value : deps.identities?.resolve('task', [value]),
-    allowlists: drizzleAllowlistRepository(deps.db),
-    pods: drizzlePodIdentityRepository(deps.db),
+    allowlists: drizzleAllowlistRepository(deps.db, deletion),
+    pods: drizzlePodIdentityRepository(deps.db, deletion),
     routes: drizzleRouteRepository(deps.db),
     rateLimits: drizzleRateLimitRepository(deps.db),
     maintenanceUow: drizzleMaintenanceUnitOfWork(deps.db),
@@ -101,6 +121,7 @@ export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
   const allowlist = allowlistUseCases(useCaseDeps, maintenance.serviceCallBlock);
   const pods = podIdentityUseCases(useCaseDeps);
   const api: GatewayModuleApi = {
+    ...(deps.projects ? { deletionOwner: gatewayDeletionOwner(deletion, deps.projects.assertProjectDeletionGrant) } : {}),
     name: 'gateway', ...routes, ...allowlist, evaluate: allowlist.evaluate, lookupByIp: pods.lookupByIp, purgeIdentityTombstones: pods.purgeTombstones, ...maintenance, ...limits, ...resourceRateLimitUseCases(useCaseDeps, deps.isAdmin),
     checkAllowlist: () => checkAllowlist(useCaseDeps, allowlist.verifyAllowlist),
     syncObservedPod: (pod, gone) => pods.syncPod(observedPodOf(pod, gone)),
@@ -131,6 +152,7 @@ export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
       ...(deps.explainer ? [unavailableRoutes(explainUnavailable({ ledgerReader: deps.explainer.reader, services: deps.services }), deps.explainer.page)] : []),
     ],
     workers: [
+      gatewayProcessRecoveryWorker(deletion.recover, logger),
       identityTombstoneWorker(pods.purgeTombstones, logger), allowlistCheckWorker(api.checkAllowlist, logger),
       ...(deps.ledger ? [routeLedgerResyncWorker(routes.resyncRouteLedger, logger), rateLimitLedgerResyncWorker(limits.resyncRateLimitLedger, logger)] : []),
     ],

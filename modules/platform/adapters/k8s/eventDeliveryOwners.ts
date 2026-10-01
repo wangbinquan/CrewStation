@@ -25,6 +25,11 @@ async function list(k8s: K8sClient, namespace: string): Promise<K8sObject[]> {
 }
 /** 原容器退出和原节点的新鲜物理来源；全 Pod 退出后才移除本 owner 的保护。 */
 export function eventDeliveryOwners(k8s: K8sClient, namespace: string, currentPodUid?: string) {
+  return projectCallbackOwners(k8s, namespace, currentPodUid, EVENT_DELIVERY_FINALIZER);
+}
+
+/** 每个内容 owner 的原回调使用独立保护，停止证明不跨 owner 冒用。 */
+export function projectCallbackOwners(k8s: K8sClient, namespace: string, currentPodUid: string | undefined, finalizer: 'crewstation.io/events-delivery-stop' | 'crewstation.io/gateway-project-stop') {
   return {
     protectCurrent: async (): Promise<Process> => {
       if (!currentPodUid) throw precondition('当前投递进程缺少原 Pod UID');
@@ -33,24 +38,24 @@ export function eventDeliveryOwners(k8s: K8sClient, namespace: string, currentPo
       const declared = (pod?.['spec'] as { containers?: Array<{ name: string }> } | undefined)?.containers;
       if (!pod || pod.metadata.deletionTimestamp || !pod.metadata.resourceVersion || !container?.containerID || !container.state?.running || !node
         || declared?.filter((c) => c.name === application(pod)).length !== 1) throw precondition('原投递容器或节点身份不可验证');
-      if (!pod.metadata.finalizers?.includes(EVENT_DELIVERY_FINALIZER)) await k8s.jsonPatch(Resources.Pod!,pod.metadata.name,namespace,[
+      if (!pod.metadata.finalizers?.includes(finalizer)) await k8s.jsonPatch(Resources.Pod!,pod.metadata.name,namespace,[
         { op: 'test',path: '/metadata/uid',value: currentPodUid },{ op: 'test',path: '/metadata/resourceVersion',value: pod.metadata.resourceVersion },
-        { op: pod.metadata.finalizers ? 'replace' : 'add',path: '/metadata/finalizers',value: [...pod.metadata.finalizers ?? [],EVENT_DELIVERY_FINALIZER] },
+        { op: pod.metadata.finalizers ? 'replace' : 'add',path: '/metadata/finalizers',value: [...pod.metadata.finalizers ?? [],finalizer] },
       ]);
       return { podUid: currentPodUid,containerId: container.containerID,nodeUid: node.uid,nodeName: node.name };
     },
     sweep: async (accept: Acceptance) => {
       for (const pod of await list(k8s,namespace)) {
-        if (!pod.metadata.uid || !pod.metadata.resourceVersion || !pod.metadata.finalizers?.includes(EVENT_DELIVERY_FINALIZER)) continue;
+        if (!pod.metadata.uid || !pod.metadata.resourceVersion || !pod.metadata.finalizers?.includes(finalizer)) continue;
         const node = await freshPlatformNode(k8s,pod),container = hostContainer(pod);
         if (node && container) for (const ended of [container.lastState?.terminated,container.state?.terminated]) {
           if (!validPlatformTermination(ended)) continue;
           const process = { podUid: pod.metadata.uid,containerId: ended.containerID,nodeUid: node.uid,nodeName: node.name };
           await accept.stopped(process,jsonHash({ process,resourceVersion: pod.metadata.resourceVersion,ended }));
         }
-        if (!await protectedPlatformPodStopped(k8s,pod,EVENT_DELIVERY_FINALIZER) || !await accept.releasable(pod.metadata.uid)) continue;
+        if (!await protectedPlatformPodStopped(k8s,pod,finalizer) || !await accept.releasable(pod.metadata.uid)) continue;
         await k8s.jsonPatch(Resources.Pod!,pod.metadata.name,namespace,[{ op: 'test',path: '/metadata/uid',value: pod.metadata.uid },{ op: 'test',path: '/metadata/resourceVersion',value: pod.metadata.resourceVersion },
-          { op: 'replace',path: '/metadata/finalizers',value: pod.metadata.finalizers.filter((f) => f !== EVENT_DELIVERY_FINALIZER) }]);
+          { op: 'replace',path: '/metadata/finalizers',value: pod.metadata.finalizers.filter((f) => f !== finalizer) }]);
       }
     },
   };

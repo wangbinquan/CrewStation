@@ -1,10 +1,40 @@
-import type { AllowlistDocument, DomainPayload, DomainTopicName, MaintenanceEventKind, MaintenanceSwitches, RouteEntry, ServiceId, UserId } from '@crewstation/contracts';
+import type { AllowlistDocument, DomainPayload, DomainTopicName, MaintenanceEventKind, MaintenanceSwitches, ProjectDeletionContext, ProjectDeletionInventory, ProjectDeletionTarget, ProjectId, RouteEntry, ServiceId, UserId } from '@crewstation/contracts';
 import type { Maintenance } from '../domain/maintenance';
 import type { PodIdentityRecord } from '../domain/podIdentity';
+import type { DirectoryService } from './directories';
+
+export interface AllowlistOwnership { readonly kind: 'caller' | 'operation'; readonly key: string; readonly projectId: ProjectId }
+export interface GatewayOriginalDirectory {
+  service(key: string): Promise<DirectoryService | undefined>;
+  operation(key: string): Promise<ProjectId | undefined>;
+  pod(record: PodIdentityRecord): Promise<ProjectId | undefined>;
+}
+export interface GatewayProcess { readonly podUid: string; readonly containerId: string; readonly nodeUid: string; readonly nodeName: string }
+export interface GatewayProcessOwners {
+  protectCurrent(): Promise<GatewayProcess>;
+  sweep(accept: { stopped(process: GatewayProcess, digest: string): Promise<void>; releasable(uid: string): Promise<boolean> }): Promise<void>;
+}
+export interface GatewayProjectAdmission {
+  withEffects<T>(service: DirectoryService, kind: string, work: () => Promise<T>): Promise<T>;
+  available(projectId: ProjectId): Promise<boolean>;
+  callerAvailable(identity: string, documentVersion: number): Promise<boolean>;
+  podAvailable(record: PodIdentityRecord): Promise<boolean>;
+  rememberPod(record: Omit<PodIdentityRecord, 'version'>): Promise<void>;
+}
+export interface GatewayDeletionRepository extends GatewayProjectAdmission {
+  inspect(target: ProjectDeletionTarget): Promise<ProjectDeletionInventory>;
+  seal(context: ProjectDeletionContext): Promise<'sealed' | 'changed' | 'waiting'>;
+  assertSealed(context: ProjectDeletionContext): Promise<void>;
+  purge(context: ProjectDeletionContext): Promise<void>;
+  recover(): Promise<void>;
+  view(doc: AllowlistDocument): Promise<AllowlistDocument>;
+  documentOwners(doc: AllowlistDocument, supplied?: readonly AllowlistOwnership[]): Promise<AllowlistOwnership[]>;
+}
 
 export interface AllowlistRepository {
   latest(): Promise<AllowlistDocument | undefined>;
-  save(doc: AllowlistDocument): Promise<void>;
+  save(doc: AllowlistDocument, ownership?: readonly AllowlistOwnership[]): Promise<void>;
+  view?(doc: AllowlistDocument): Promise<AllowlistDocument>;
 }
 
 export interface PodIdentityRepository {

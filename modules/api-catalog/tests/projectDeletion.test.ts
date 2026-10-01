@@ -16,6 +16,13 @@ describe.skipIf(!available)('API 登记、授权与申请的项目清理（真�
     expect(report.resources.every((r) => r.count === 1)).toBe(true); expect(report.references).toHaveLength(1);
     expect(JSON.stringify(report)).not.toContain('erase-owned'); expect(JSON.stringify(report)).not.toContain('retain-incoming-reason');
     expect([...(await f.db.db.execute(sql`SELECT document FROM api_catalog.proxies WHERE id=${f.ids.proxy}`))]).toEqual([{ document: { private: 'erase-owned' } }]);
+    const alias = 'catalog-delete:GET:/items';
+    await f.db.db.execute(sql`INSERT INTO api_catalog.resource_identity_aliases(kind,key,id) VALUES ('api-operation',${JSON.stringify([alias])},${f.ids.operation})`);
+    expect(await f.catalog.api.originalOperationProject(f.ids.operation)).toBe(f.own.id);
+    expect(await f.catalog.api.originalOperationProject(alias)).toBe(f.own.id);
+    expect(await f.catalog.api.originalOperationProject('unknown-original-operation')).toBeUndefined();
+    await f.db.db.execute(sql`INSERT INTO api_catalog.resource_identity_aliases(kind,key,id) VALUES ('api-operation',${JSON.stringify([f.ids.operation])},${f.ids.otherOperation})`);
+    await expect(f.catalog.api.originalOperationProject(f.ids.operation)).rejects.toMatchObject({ kind: 'precondition' });
   });
   test('seal 立即移出可调用目录；迟到登记、审批、间接写和跨项目搬移均由数据库阻断', async () => {
     f = await apiCatalogDeletionFixture(); const started = await f.begin();
@@ -46,6 +53,8 @@ describe.skipIf(!available)('API 登记、授权与申请的项目清理（真�
       await f.project.api.recordProjectDeletionReceipt(started.lease, participant, phase, step.evidence);
     }
     expect((await f.project.api.completeProjectDeletion(started.lease)).state).toBe('succeeded');
+    expect(await f.catalog.api.originalOperationProject(f.ids.operation)).toBe(f.own.id);
+    expect(await f.catalog.api.originalOperationProject(f.ids.otherOperation)).toBe(f.other.id);
     expect((await f.catalog.api.deletionOwner!.inspect(started.context.target)).resources.every((r) => r.count === 0)).toBe(true);
     expect([...(await f.db.db.execute(sql`SELECT reason,state FROM api_catalog.requests WHERE id=${f.ids.incoming}`))]).toEqual([{ reason: 'retain-incoming-reason', state: 'rejected' }]);
     expect([...(await f.db.db.execute(sql`SELECT state FROM api_catalog.grants WHERE service_id=${f.other.serviceId} AND operation_id=${f.ids.operation}`))]).toEqual([{ state: 'revoked' }]);

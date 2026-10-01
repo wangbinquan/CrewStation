@@ -1,23 +1,26 @@
 import type { AllowlistDocument, RouteEntry, WorkloadKind } from '@crewstation/contracts';
-import type { Executor } from '@crewstation/persistence';
+import type { Database, Executor } from '@crewstation/persistence';
 import { and, desc, eq, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 import type { PodIdentityRecord } from '../../domain/podIdentity';
 import type { AllowlistRepository, PodIdentityRepository, RouteRepository } from '../../ports/repositories';
 import { allowlists, podIdentities, routes } from './tables';
+import type { GatewayDeletionRepository, GatewayProjectAdmission } from '../../ports/repositories';
+import { saveGatewayDocument } from './projectDeletion';
 
 const json = <T>(v: unknown): T => (typeof v === 'string' ? JSON.parse(v) : v) as T;
 
-export function drizzleAllowlistRepository(db: Executor): AllowlistRepository {
+export function drizzleAllowlistRepository(db: Database, deletion?: GatewayDeletionRepository): AllowlistRepository {
   return {
     latest: async () => {
       const row = (await db.select().from(allowlists).orderBy(desc(allowlists.version)).limit(1))[0];
       return row ? json<AllowlistDocument>(row.document) : undefined;
     },
-    save: async (doc) => { await db.insert(allowlists).values({ version: doc.version, document: doc, generatedAt: new Date(doc.generatedAt) }); },
+    save: async (doc, owners) => { if (deletion) await saveGatewayDocument(db, deletion, doc, owners); else await db.insert(allowlists).values({ version: doc.version, document: doc, generatedAt: new Date(doc.generatedAt) }); },
+    ...(deletion ? { view: deletion.view } : {}),
   };
 }
 
-export function drizzlePodIdentityRepository(db: Executor): PodIdentityRepository {
+export function drizzlePodIdentityRepository(db: Executor, admission?: GatewayProjectAdmission): PodIdentityRepository {
   const toRecord = (row: typeof podIdentities.$inferSelect): PodIdentityRecord => ({
     ...(row.podUid ? { podUid: row.podUid } : {}),
     ...(row.source ? { source: json<NonNullable<PodIdentityRecord['source']>>(row.source) } : {}),
@@ -28,6 +31,7 @@ export function drizzlePodIdentityRepository(db: Executor): PodIdentityRepositor
   });
   return {
     upsert: async (r) => {
+      await admission?.rememberPod(r);
       const values = { namespace: r.namespace, podName: r.podName, podUid: r.podUid ?? null, ip: r.ip, project: r.project, service: r.service, workload: r.workload, physicalSlot: r.physicalSlot ?? null, taskId: r.taskId ?? null, source: r.source ?? null, developmentSource: r.developmentSource ?? null, version: 1, updatedAt: r.updatedAt, deletedAt: null };
       const rows = await db.insert(podIdentities).values(values)
         .onConflictDoUpdate({ target: [podIdentities.namespace, podIdentities.podName], set: { ...values, version: sql`${podIdentities.version} + 1` } })
@@ -37,7 +41,7 @@ export function drizzlePodIdentityRepository(db: Executor): PodIdentityRepositor
     pruneStale: async (before, at) => (await db.update(podIdentities).set({ deletedAt: at, updatedAt: at })
       .where(and(isNull(podIdentities.deletedAt), lt(podIdentities.updatedAt, before))).returning({ podName: podIdentities.podName })).length,
     purgeTombstones: async (before) => (await db.delete(podIdentities)
-      .where(and(isNotNull(podIdentities.deletedAt), lt(podIdentities.deletedAt, before))).returning({ podName: podIdentities.podName })).length,
+      .where(and(isNotNull(podIdentities.deletedAt), lt(podIdentities.deletedAt, before), sql`NOT EXISTS(SELECT 1 FROM gateway.deletion_fences f WHERE f.operation_id IS NOT NULL AND f.project_id=gateway.content_owner('pod_identities',to_jsonb(${sql.identifier('pod_identities')})))`)).returning({ podName: podIdentities.podName })).length,
     markDeleted: async (podName, namespace, at, podUid) => {
       await db.update(podIdentities).set({ deletedAt: at, updatedAt: at }).where(and(eq(podIdentities.namespace, namespace), eq(podIdentities.podName, podName), podUid ? sql`(coalesce(${podIdentities.podUid},${podIdentities.source}->>'podUid',${podIdentities.developmentSource}->>'podUid') IS NULL OR coalesce(${podIdentities.podUid},${podIdentities.source}->>'podUid',${podIdentities.developmentSource}->>'podUid')=${podUid})` : undefined));
     },
@@ -53,7 +57,7 @@ export function drizzleRouteRepository(db: Executor): RouteRepository {
   return {
     saveForService: async (serviceId, serviceName, entries) => {
       const values = { serviceId, serviceName, routes: entries, updatedAt: new Date() };
-      await db.insert(routes).values(values).onConflictDoUpdate({ target: routes.serviceId, set: values });
+      await db.transaction(async (tx) => { await tx.insert(routes).values(values).onConflictDoUpdate({ target: routes.serviceId, set: values }); });
     },
     listAll: async () => (await db.select().from(routes).orderBy(routes.serviceName)).map((r) => ({ serviceId: r.serviceId, serviceName: r.serviceName, routes: json<RouteEntry[]>(r.routes) })),
   };

@@ -22,6 +22,8 @@ export interface DirectoryService {
 export interface ServiceDirectory {
   listServices(): Promise<DirectoryService[]>;
   getService(serviceId: ServiceId): Promise<DirectoryService | undefined>;
+  resolveIdentity?(identity: string): Promise<DirectoryService | undefined>;
+  resolveProjectSlug?(slug: string): Promise<DirectoryService | undefined>;
 }
 
 /** 由 release 模块提供：两个物理槽的当前角色；preview 访问记录（RFC-021 的空闲自动下线计时）。 */
@@ -44,6 +46,7 @@ export interface UserDirectory {
 
 /** 由 api-catalog 模块提供：调用方已获授权的操作键、默认开放集合、已登记的 proxy 名。 */
 export interface GrantSource {
+  originalOperationProject?(id: string): Promise<ProjectId | undefined>;
   grantedOperations(callerIdentity: string): Promise<{ operations: string[]; defaultOpen: string[]; operationRoutes: OperationRoute[] }>;
   listCallers(): Promise<string[]>;
   proxyNameOf(serviceId: ServiceId): Promise<string | undefined>;

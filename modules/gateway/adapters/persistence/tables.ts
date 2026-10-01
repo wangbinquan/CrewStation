@@ -1,7 +1,7 @@
-import { integer, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
+import { integer, pgSchema, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
 import { jsonDocument } from '@crewstation/persistence';
 import type { DevelopmentSourceBinding, ServiceSourceBinding } from '@crewstation/contracts';
-import { gatewaySchema } from './schema';
+const gatewaySchema = pgSchema('gateway');
 
 export const allowlists = gatewaySchema.table('allowlists', {
   version: integer('version').primaryKey(),
@@ -59,3 +59,5 @@ export const rateLimits = gatewaySchema.table('rate_limits', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
   updatedBy: text('updated_by').notNull(),
 });
+
+export const rateLimitReceipts = gatewaySchema.table('rate_limit_receipts', { operationId: text('operation_id').primaryKey(), projectId: text('project_id').notNull(), body: jsonDocument('body').$type<{ hash: string; revision: string; effect: string; applied: boolean }>().notNull() });

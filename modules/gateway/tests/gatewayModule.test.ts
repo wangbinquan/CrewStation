@@ -9,6 +9,7 @@ import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import type { GatewayModule } from '../wiring';
 import { createGatewayModule, gatewayMigrations } from '../wiring';
+import { gatewayDeletionRepository, saveGatewayDocument } from '../adapters/persistence/projectDeletion';
 
 const available = await testDatabaseAvailable();
 let tdb: TestDatabase;
@@ -25,6 +26,13 @@ const services = [
 const ingressRoutesOf = (namespace: string): string[] =>
   [...k8s.objects.values()].filter((o) => o.kind === 'IngressRoute' && o.metadata.namespace === namespace).map((o) => o.metadata.name).sort();
 let prodPhysical: 'blue' | 'green' = 'blue';
+
+// 原服务目录只用于该模块旧数据夹具；正式装配必须提供原发布／任务沿革。
+const testAdmission = () => gatewayDeletionRepository(tdb.db, { originals: {
+  service: async (key) => services.find((s) => s.serviceId === key || s.identity === key),
+  operation: async () => services.find((s) => s.serviceId === issuesId)?.projectId,
+  pod: async (record) => services.find((s) => s.identity === `${record.project}/${record.service}`)?.projectId,
+} });
 
 describe.skipIf(!available)('RFC-027 可信服务 Pod 发布身份', () => {
   test('业务和平台工作负载也持久保存原 Pod UID，旧同名删除事件不能撤销替换实例', async () => {
@@ -187,7 +195,7 @@ describe.skipIf(!available)('gateway module', () => {
     const { allowlists } = await import('../adapters/persistence/tables');
     // 形状取自本机升级前的真实文档：没有 identityVersion 与 operationRoutes，默认开放项还是操作键而不是资源 ID。
     const legacy = { version: 40, generatedAt: '2026-09-20T12:53:55.831Z', defaultOpen: ['issues:GET:/v1/issues/{id}'], maxStaleSeconds: 300, entries: [{ caller: 'demo/demo', operations: [], platformApi: true, platformHosts: ['platformApi', 'mcpCapabilities', 'mcpOperations'] }] };
-    await tdb.db.insert(allowlists).values({ version: legacy.version, document: legacy as unknown as AllowlistDocument, generatedAt: new Date(legacy.generatedAt) });
+    await saveGatewayDocument(tdb.db, testAdmission(), legacy as unknown as AllowlistDocument);
     // 管理页的读取是纯读取：旧文档照实报告为「没有可用的放行表」，不因为有人打开页面就写库。
     const [first, second] = [newGateway(), newGateway()];
     expect(await first.api.currentAllowlist()).toBeUndefined();
@@ -241,7 +249,7 @@ describe.skipIf(!available)('gateway module', () => {
 
   test('Pod 身份索引：按 IP 反查，物理槽映射为角色，删除后不可查', async () => {
     const { drizzlePodIdentityRepository } = await import('../adapters/persistence/drizzleRepositories');
-    const repo = drizzlePodIdentityRepository(tdb.db);
+    const repo = drizzlePodIdentityRepository(tdb.db, testAdmission());
     expect(await gateway.api.lookupByIp('10.244.0.9')).toBeUndefined();
     await repo.upsert({ ip: '10.244.0.9', podName: 'demo-green-abc', namespace: 'cs-demo', project: 'demo', service: 'demo', workload: 'service', physicalSlot: 'green', updatedAt: new Date() });
     expect(await gateway.api.lookupByIp('10.244.0.9')).toMatchObject({ identity: 'demo/demo', kind: 'service', slot: 'prod' });
@@ -256,7 +264,7 @@ describe.skipIf(!available)('gateway module', () => {
   test('身份索引墓碑：标为删除超过 7 天的行删掉，7 天之内的墓碑与在册的行不动', async () => {
     const { drizzlePodIdentityRepository } = await import('../adapters/persistence/drizzleRepositories');
     const { podIdentities } = await import('../adapters/persistence/tables');
-    const repo = drizzlePodIdentityRepository(tdb.db);
+    const repo = drizzlePodIdentityRepository(tdb.db, testAdmission());
     const day = 24 * 3_600_000, base = { namespace: 'cs-tomb', project: 'demo', service: 'demo', workload: 'service' as const, updatedAt: new Date() };
     for (const [podName, ip] of [['tomb-old', '10.244.9.1'], ['tomb-recent', '10.244.9.2'], ['alive', '10.244.9.3']] as const) await repo.upsert({ ...base, podName, ip });
     await repo.markDeleted('tomb-old', 'cs-tomb', new Date(Date.now() - 8 * day));

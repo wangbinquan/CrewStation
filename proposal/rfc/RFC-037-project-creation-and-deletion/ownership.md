@@ -111,3 +111,5 @@ events 已发布部署，精确 SHA／六项 CI／运行时源字段和原资源
 events 不再以可复用 slug 推断项目归属，旧最小 slug 记录保留但不能拦截新 UUID 的生产方。原 producer/type/event/subscription/delivery 与 project/service ID 不可改写，未知归属拒绝；旧内容恢复和同名新根的合法生产分别验证。gateway 为全部已观测工作负载保存原 Pod UID，旧服务／开发无损回填，旧业务从实际 Pod 重列，原删除事件不能移除新 UID。identity/platform 在固定事件受众验签后核对原 release/task 及实际 Pod，再核对原项目准入；HTTP 读取正文前固定原调用者，v1 迟到正文不能重新按编码授权给新 UUID。
 
 候选完整 check 4694 pass／143 skip／0 fail、46 内容指纹保持，原失败与修复、模块层／真实 PG／签名与 FakeK8s 证据边界见[来源验收](acceptance/original-event-source.md)。来源准入不能代替消费者停止、原卷与外部仓库／镜像回收，完整永久删除继续。
+
+原事件来源批 `25d0f545` 已精确发布、六项 CI 成功并于 2026-10-01T00:26:27.670Z 实际部署；controller 原 Pod UID 索引先核对 35 项，再升级 auth/events，原 22 Namespace／48 Pod与PVC／19 PV 保持。真实服务域两版入口和缺失／伪造来源拒绝已核对，详见[部署回执](acceptance/original-source-deployment.md)。这是来源身份校验，不能据此退额或报告原生消费者、存储及项目永久删除完成。

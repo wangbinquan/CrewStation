@@ -7,6 +7,8 @@ import type { DataControlModuleApi } from './api/moduleApi';
 import { secretboxCipher } from './adapters/crypto/secretboxCipher';
 import { drizzleCredentialStore } from './adapters/persistence/credentialStore';
 import { postgresDataPlane } from './adapters/postgres/postgresDataPlane';
+import { postgresDatabaseReclamation } from './adapters/postgres/databaseReclamation';
+import type { DatabaseReclamationReader } from './api/databaseReclamation';
 import { stageCredentialRotation, finishCredentialRotation } from './application/rotateCredential';
 import { credentialOf, provisionDatabase } from './application/provisionDatabase';
 import type { DataObservationStats } from './application/observeDataPlane';
@@ -30,6 +32,7 @@ export interface DataControlModuleDeps {
   /** 平台数据库集群的管理连接；给了 plane（用例）就不用。 */
   readonly adminUrl?: string;
   readonly plane?: DataPlaneReader & DataPlaneWriter;
+  readonly databaseReclamation?: DatabaseReclamationReader;
   readonly logger?: Logger;
   readonly clock?: Clock;
   readonly observer?: DataPlaneObserverOptions;
@@ -57,6 +60,7 @@ export function createDataControlModule(deps: DataControlModuleDeps): DataContro
   const plane = deps.plane ?? (deps.adminUrl ? postgresDataPlane(deps.adminUrl, deps.clock ?? systemClock) : undefined);
   if (!plane) throw new Error('data-control 需要数据面的管理连接（adminUrl）或 plane');
   const stats = newDataObservationStats();
+  const databaseReclamation = deps.databaseReclamation ?? (deps.adminUrl ? postgresDatabaseReclamation(deps.adminUrl, deps.clock ?? systemClock) : undefined);
   // 口令（I28）：生成、加密存下都在 data-control；没给平台库或密钥时只观测、不建库。
   const vault = deps.db && deps.secretKeyBase64 ? { store: drizzleCredentialStore(deps.db), cipher: secretboxCipher(deps.secretKeyBase64) } : undefined;
   const apply = vault ? (snapshot: Parameters<typeof provisionDatabase>[1], record: Parameters<typeof provisionDatabase>[2]) => deps.db!.transaction((tx) => provisionDatabase({ ledger: deps.ledger, plane, stats, logger, cipher: vault.cipher, store: drizzleCredentialStore(tx) }, snapshot, record)) : undefined;
@@ -67,11 +71,12 @@ export function createDataControlModule(deps: DataControlModuleDeps): DataContro
   };
   const api: DataControlModuleApi = {
     name: 'data-control', credentialOf: async (resourceId) => (vault ? credentialOf(vault, resourceId) : undefined),
+    ...(databaseReclamation ? { databaseReclamation } : {}),
     stageRotation: (id, transaction) => stageCredentialRotation({ ledger: deps.ledger, ...rotationVault(transaction) }, id),
     finishRotation: (id, transaction) => finishCredentialRotation({ plane, ...rotationVault(transaction) }, id),
     ...(vault ? { objects: createObjectPlane(deps.db!, vault.cipher) } : {}),
   };
-  return { api, migrations: dataControlMigrations, observer, stats: () => ({ ...stats }) };
+  return { api, migrations: dataControlMigrations, observer: { start: observer.start, stop: async () => { try { await observer.stop(); } finally { await databaseReclamation?.close(); } } }, stats: () => ({ ...stats }) };
 }
 
 function createObjectPlane(db: Database, cipher: ReturnType<typeof secretboxCipher>) {

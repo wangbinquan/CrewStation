@@ -30,13 +30,18 @@ function maintenanceCache(deps: GatewayUseCaseDeps) {
   let active: { at: number; entries: ActiveEntry[] } | undefined;
   let directory: { at: number; bySlug: Map<string, DirectoryService> } | undefined;
   return {
-    invalidate: () => { active = undefined; },
+    invalidate: () => { active = undefined; directory = undefined; },
     active: async (): Promise<ActiveEntry[]> => {
-      if (active && Date.now() - active.at < ACTIVE_CACHE_MS) return active.entries;
+      if (active && Date.now() - active.at < ACTIVE_CACHE_MS) {
+        const entries = [];
+        for (const entry of active.entries) if (!deps.admission || await deps.admission.available(entry.service.projectId)) entries.push(entry);
+        active = { ...active, entries }; return entries;
+      }
       const entries: ActiveEntry[] = [];
       for (const maintenance of await deps.maintenanceUow.read.maintenance.listActive()) {
         const service = await deps.services.getService(maintenance.serviceId);
         if (!service || service.archived) continue;
+        if (deps.admission && !await deps.admission.available(service.projectId)) continue;
         const proxyName = await deps.grants.proxyNameOf(maintenance.serviceId);
         entries.push({ maintenance, service, ...(proxyName ? { proxyName } : {}) });
       }
@@ -47,7 +52,12 @@ function maintenanceCache(deps: GatewayUseCaseDeps) {
       // 新建的项目不在旧目录里：查不到时最多每秒刷新一次，其余时候按 30 秒缓存。
       const stale = !directory || Date.now() - directory.at > DIRECTORY_CACHE_MS || (!directory.bySlug.has(slug) && Date.now() - directory.at > 1_000);
       if (stale) directory = { at: Date.now(), bySlug: new Map((await deps.services.listServices()).map((s) => [s.projectSlug, s])) };
-      return directory?.bySlug.get(slug);
+      const hit = directory?.bySlug.get(slug);
+      if (hit && deps.admission && !await deps.admission.available(hit.projectId)) {
+        directory = { at: Date.now(), bySlug: new Map((await deps.services.listServices()).map((s) => [s.projectSlug, s])) };
+        return directory.bySlug.get(slug);
+      }
+      return hit;
     },
   };
 }
@@ -60,6 +70,7 @@ function maintenanceCommands(deps: GatewayUseCaseDeps, cache: Cache) {
   const resolve = async (serviceId: ServiceId): Promise<DirectoryService> => {
     const svc = await deps.services.getService(serviceId);
     if (!svc || svc.archived) throw notFound('服务', serviceId);
+    if (deps.admission && !await deps.admission.available(svc.projectId)) throw notFound('服务', serviceId);
     return svc;
   };
   const toDto = async (m: Maintenance): Promise<MaintenanceDto> => {
@@ -116,6 +127,12 @@ function maintenanceQueries(deps: GatewayUseCaseDeps, cache: Cache) {
   const byService = async (serviceId: ServiceId) => (await cache.active()).find((e) => e.maintenance.serviceId === serviceId)?.maintenance;
   return {
     userEntry: async (userId: UserId, projectSlug: string, slot: 'prod' | 'preview'): Promise<EntryVerdict> => {
+      if (deps.services.resolveProjectSlug) {
+        const current = await deps.services.resolveProjectSlug(projectSlug);
+        if (!current || deps.admission && !await deps.admission.available(current.projectId)) throw notFound('项目', projectSlug);
+      }
+      const original = await cache.serviceBySlug(projectSlug);
+      if (original && deps.admission && !await deps.admission.available(original.projectId)) throw notFound('项目', original.projectId);
       if (slot === 'prod') {
         const hit = (await cache.active()).find((e) => e.service.projectSlug === projectSlug);
         const m = hit?.maintenance;

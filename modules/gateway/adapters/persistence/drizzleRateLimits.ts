@@ -1,11 +1,15 @@
 import type { UserId } from '@crewstation/contracts';
 import { conflict } from '@crewstation/kernel';
-import { coordinateRateLimits } from './rateLimitCoordination';
-import { rateLimitReceipts } from './rateLimitReceiptTable';
-import type { Executor } from '@crewstation/persistence';
-import { and, eq } from 'drizzle-orm';
+import type { Executor, Transaction } from '@crewstation/persistence';
+import { and, eq, sql } from 'drizzle-orm';
 import type { RateLimitRepository, RateLimitRow } from '../../ports/repositories';
-import { rateLimits } from './tables';
+import { rateLimitReceipts, rateLimits } from './tables';
+
+const coordinateRateLimits = <T>(db: Executor, work: (tx: Transaction) => Promise<T>) => db.transaction(async (tx) => {
+  const rows = await tx.execute<{ acquired: boolean }>(sql`SELECT pg_try_advisory_xact_lock(hashtextextended('gateway-rate-limits', 0)) AS acquired`);
+  if (!rows[0]?.acquired) throw conflict('网关限流正在更新，请重试');
+  return work(tx);
+});
 
 const toRow = (row: typeof rateLimits.$inferSelect): RateLimitRow => ({ scope: row.scope, body: row.body, revision: row.revision, updatedAt: row.updatedAt, updatedBy: row.updatedBy as UserId });
 

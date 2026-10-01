@@ -3,6 +3,10 @@
 > 状态：In Progress · 2026-09-30 · 完整方案已获作者批准；下文为实施合同，完成情况与证据见计划，不代表已经全部实现。
 > 配套：[产品提案](./proposal.md) · [实施计划](./plan.md)
 
+网关原身份、共享历史文档、缓存和已开始原生回调的落位与反例见[网关 owner 细化](gateway-owner.md)，属于下文已批准的完整清理合同。
+
+PostgreSQL 的原 OID／实际目录核对见[数据库物理来源](database-physics.md)，非事务原库隔离与恢复步骤见[原生执行设计](database-operations.md)。它们沿 data-control 的现有 L2 边界补充设计 §6.2，不开放按名字删除的捷径。后续模块增长的结构盘点与候选拆分见 [ADR-0012](../../../docs/adr/0012-project-resource-owner-growth.md)，尚未实施新模块／层或 schema 转移。
+
 ## 1. 边界与现有约束
 
 使用现有模块，不新增模块或调整 layer。模块只操作自己的 PostgreSQL schema，经公开 API 与反转端口协作；不在 `platform` 写跨模块删除 SQL。已有 `resources` 台账、`cluster-control` 的 UID 调和、`data-control` 数据面与队列／outbox 是执行基础，不能由前端或一个 `kubectl delete namespace` 替代。

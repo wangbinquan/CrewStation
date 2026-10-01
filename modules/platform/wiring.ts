@@ -4,14 +4,16 @@ import { projectResourceState } from './adapters/k8s/projectResourceState';
 import { projectResourceSources } from './application/resource-center/projectSources';
 import { createResourceAccessModule } from '@crewstation/module-resource-access';
 import { clusterOperationPorts } from './application/cluster/operations';
+import { developmentObservationSource } from './application/developmentObservationPorts';
+import { runtimeFactSources } from './application/runtimeFactSources';
 import { businessObservationAdmission, developmentObservationAdmission, observationNames, observationPorts, observationUsageSource } from './application/observationPorts';
 import { executionWriterObserver, migrationWriterObserver, legacyOwnerObserver } from './adapters/executionWriters';
 import { webhookAwareAllowlist } from './application/webhookIngress';
 import { objectStorageSources } from './application/objectStorageSources';
-import { nativeWorkloadOwnership } from './adapters/k8s/workloadOwnership';
+import { nativeWorkloadOwnership, originalGatewayPodProject } from './adapters/k8s/workloadOwnership';
 import { assertStorageConsumers } from './adapters/k8s/storageContract'; import { objectTransferOwners } from './adapters/k8s/objectTransferOwners';
 import { releaseImagePorts } from './application/releaseImagePorts';
-import { eventDeliveryOwners } from './adapters/k8s/eventDeliveryOwners';
+import { eventDeliveryOwners, projectCallbackOwners } from './adapters/k8s/eventDeliveryOwners';
 import { imageValidationPorts } from './application/imageValidationPorts';
 import { businessExecutionPorts, executionHandoffPorts } from './application/businessExecutionPorts';
 import { developmentImagePorts, imageOwnerPorts } from './application/developmentImagePorts';
@@ -26,7 +28,7 @@ import { createClusterManagementModule } from '@crewstation/module-cluster-manag
 import { createClusterControlModule, type ClusterControlModuleApi, type SlotSpec } from '@crewstation/module-cluster-control';
 import { createResourcesModule, type ResourcesModuleApi } from '@crewstation/module-resources';
 import { installedSystemComponents } from './domain/systemComponents';
-import { BUILTIN_RESOURCES, type Actor, type ComputeProfileSelector, type ComputeUsage, type ProjectId, type ServiceId, type TaskId, type UserId } from '@crewstation/contracts';
+import { BUILTIN_RESOURCES, ServiceIdSchema, type Actor, type ComputeProfileSelector, type ComputeUsage, type ProjectId, type ServiceId, type TaskId, type UserId } from '@crewstation/contracts';
 import { eventbusMigrations, type EventConsumer } from '@crewstation/eventbus';
 import { secretObject, type K8sClient } from '@crewstation/k8s';
 import { forbidden, precondition, type Logger } from '@crewstation/kernel';
@@ -37,7 +39,7 @@ import { createCapabilitiesModule } from '@crewstation/module-capabilities';
 import { createConfigModule } from '@crewstation/module-config';
 import { createDataModule, objectPlanAllocationRevision, objectSpaceAllocationRevision } from '@crewstation/module-data';
 import { createDataControlModule, type DataControlModuleApi } from '@crewstation/module-data-control';
-import { createDevSessionModule } from '@crewstation/module-dev-session';
+import { createDevSessionModule, readDevelopmentObservationFacts } from '@crewstation/module-dev-session';
 import { createEventsModule, type EventsModuleApi } from '@crewstation/module-events';
 import { createGatewayModule, gatewayAllocationRevision, projectRateLimitValues, UNAVAILABLE_PATH, type GatewayModuleApi } from '@crewstation/module-gateway';
 import { createIdentityModule } from '@crewstation/module-identity';
@@ -240,17 +242,26 @@ function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeC
   const gateway = createGatewayModule({
     identities: deps.identities,
     db, k8s, hosts, logger, isAdmin: (id) => isAdmin(id),
+    projects: { assertProjectAvailable: project.api.assertProjectAvailable, assertProjectDeletionGrant: project.api.assertProjectDeletionGrant, availableMany: project.api.availableProjectIds },
+    processes: projectCallbackOwners(deps.k8s, settings.systemNamespace, settings.platformPodUid, 'crewstation.io/gateway-project-stop'),
+    originals: {
+      service: async (key) => { const id = ServiceIdSchema.safeParse(key).success ? key : key.includes('/') ? undefined : await deps.identities?.resolve('service', [key]); const source = id ? await resolveById(id as ServiceId) : await project.api.resolveServiceIdentity(key); return source ? directoryService(source) : undefined; },
+      operation: apiCatalog.api.originalOperationProject,
+      pod: (record) => originalGatewayPodProject(record, () => project.api, () => release.api, () => late.taskRuntime, (kind, key) => deps.identities?.resolve(kind, [key]) ?? Promise.resolve(undefined)),
+    },
     // RFC-025 第三期后半：服务的路由投影成 route 记录（IngressRoute 仍由 gateway 建删）。
     ledger: resources.api.owner('gateway'),
     services: {
       listServices,
       getService: async (id) => { const s = await resolveById(id); return s ? directoryService(s) : undefined; },
+      resolveIdentity: async (key) => { const source = await project.api.resolveServiceIdentity(key); return source ? directoryService(source) : undefined; },
+      resolveProjectSlug: async (slug) => { const source = await project.api.resolveServiceOfSlug(slug); return source ? directoryService(source) : undefined; },
       serviceIdOfProject: async (projectId) => (await project.api.resolveServiceOfProject(projectId))?.serviceId,
     },
     slots: { slotRoles: release.api.slotRoles, notePreviewAccess: release.api.notePreviewAccess },
     // RFC-025 D13、I26 裁定：说明页由 cs-api 按台账渲染（路由记录与目标槽记录），页面与维护页同源。
     explainer: { reader: { get: (id) => resources.api.get(id), claimOf: (child) => resources.api.claimOf(child) }, page: (entry, context) => core.identity.api.unavailablePage(entry, context) },
-    grants: { grantedOperations: apiCatalog.api.grantedOperations, listCallers: async () => [], proxyNameOf: apiCatalog.api.activeProxyNameOf },
+    grants: { originalOperationProject: apiCatalog.api.originalOperationProject, grantedOperations: apiCatalog.api.grantedOperations, listCallers: async () => [], proxyNameOf: apiCatalog.api.activeProxyNameOf },
     access: {
       authorize: project.api.authorize,
       // 维护中放行的是来验证的成员；「用户」角色和其他人一样看维护页（2026-09-24）。
@@ -375,7 +386,8 @@ function composeAggregates(deps: PlatformModuleDeps, late: Late, core: ReturnTyp
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, apiCatalog, isAdmin } = core;
   const serviceOfProject = project.api.resolveServiceOfProject;
-  const observability = createObservabilityModule({ runtimeTasks: readBusinessObservationFacts, runtimeNames: observationNames({ projects: project.api, profiles: core.agentRuntime.api }), usageSource: observationUsageSource(runtime.businessTask.api.v3, runtime.session.api), ...observationPorts(runtime.businessTask.api.v3, project.api, core.agentRuntime.api, resources.api),
+  const observability = createObservabilityModule({ runtimeTasks: runtimeFactSources({ business: readBusinessObservationFacts, development: readDevelopmentObservationFacts }),
+    ...(runtime.devSession.api.developmentUsage ? { developmentUsageSource: developmentObservationSource(runtime.devSession.api.developmentUsage, runtime.session.api) } : {}), runtimeNames: observationNames({ projects: project.api, profiles: core.agentRuntime.api }), usageSource: observationUsageSource(runtime.businessTask.api.v3, runtime.session.api), ...observationPorts(runtime.businessTask.api.v3, project.api, core.agentRuntime.api, resources.api),
     db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, services: { resolveServiceOfProject: serviceOfProject }, slots: delivery.release.api,
     // 调用链（Design §14）：每个来源按项目读取，跨模块接口仅在组合根装配。
     traces: {

@@ -96,6 +96,10 @@ export interface ProjectModuleApi extends ProjectDeletionApi {
   setProjectState(projectId: ProjectId, state: ProjectState, message?: string): Promise<ProjectDto>;
   getService(actor: Actor, serviceId: ServiceId): Promise<ServiceDto>;
   resolveServiceIdentity(identity: string): Promise<ResolvedService | undefined>;
+  /** 域名标识的当前根；含归档/删除中的项目，避免网关用在册清单猜测。 */
+  resolveServiceOfSlug(slug: string): Promise<ResolvedService | undefined>;
+  /** 按原 UUID 批量读取准入，缺失或正在删除的根不返回。 */
+  availableProjectIds(ids: readonly ProjectId[]): Promise<readonly ProjectId[]>;
   /** 无 actor 的内部解析，供网关、发布、任务等模块经端口使用。 */
   resolveServiceById(serviceId: ServiceId): Promise<ResolvedService | undefined>;
   resolveServiceOfProject(projectId: ProjectId): Promise<ResolvedService | undefined>;

@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { createFakeK8sClient, Resources } from '@crewstation/k8s';
-import { EVENT_DELIVERY_FINALIZER, eventDeliveryOwners } from './eventDeliveryOwners';
+import { EVENT_DELIVERY_FINALIZER, eventDeliveryOwners, projectCallbackOwners } from './eventDeliveryOwners';
 
 async function fixture() {
   const k8s = createFakeK8sClient(),podUid = Bun.randomUUIDv7(),nodeUid = Bun.randomUUIDv7();
@@ -80,4 +80,32 @@ test('全量分页之后才保护当前实例，重复游标／读取失败和�
   await expect(eventDeliveryOwners({ ...f.k8s,listPage: async () => { throw new Error('source-unavailable'); } },'system',f.podUid).protectCurrent()).rejects.toThrow('source-unavailable');
   await f.k8s.mergePatch(Resources.Pod!,'sender','system',{ spec: { containers: [{ name: 'other' }] } });
   await expect(f.owners.protectCurrent()).rejects.toThrow();
+});
+test('API 承载的网关回调与事件回调使用独立保护；排空一个 owner 不解除另一个及外部 finalizer', async () => {
+  const f = await fixture(), gatewayFinalizer = 'crewstation.io/gateway-project-stop' as const;
+  await f.k8s.mergePatch(Resources.Pod!, 'sender', 'system', { metadata: { labels: { 'app.kubernetes.io/name': 'cs-api' } },
+    spec: { containers: [{ name: 'cs-api' }] }, status: { containerStatuses: [{ name: 'cs-api', containerID: 'containerd://original', state: { running: {} } }] } });
+  const gateway = projectCallbackOwners(f.k8s, 'system', f.podUid, gatewayFinalizer);
+  expect(await gateway.protectCurrent()).toEqual({ podUid: f.podUid, containerId: 'containerd://original', nodeUid: f.nodeUid, nodeName: 'node' });
+  await f.owners.protectCurrent();
+  expect((await f.k8s.get(Resources.Pod!, 'sender', 'system'))?.metadata.finalizers).toEqual(['another/guard', gatewayFinalizer, EVENT_DELIVERY_FINALIZER]);
+  await f.k8s.mergePatch(Resources.Pod!, 'sender', 'system', { metadata: { deletionTimestamp: new Date().toISOString() }, status: { phase: 'Succeeded',
+    containerStatuses: [{ name: 'cs-api', containerID: f.terminal.containerID, state: { terminated: f.terminal } }] } });
+  const seen: object[] = [];
+  await gateway.sweep({ stopped: async (process) => { seen.push(process); }, releasable: async () => true });
+  expect(seen).toEqual([{ podUid: f.podUid, containerId: 'containerd://original', nodeUid: f.nodeUid, nodeName: 'node' }]);
+  expect((await f.k8s.get(Resources.Pod!, 'sender', 'system'))?.metadata.finalizers).toEqual(['another/guard', EVENT_DELIVERY_FINALIZER]);
+  await f.owners.sweep({ stopped: async () => {}, releasable: async () => true });
+  expect((await f.k8s.get(Resources.Pod!, 'sender', 'system'))?.metadata.finalizers).toEqual(['another/guard']);
+});
+
+test('网关原回调保护同样拒绝缺失 UID、读取故障和未实际退出，不从 Pod 消失补造停止回执', async () => {
+  const f = await fixture(), finalizer = 'crewstation.io/gateway-project-stop' as const;
+  await expect(projectCallbackOwners(f.k8s, 'system', undefined, finalizer).protectCurrent()).rejects.toThrow();
+  const gateway = projectCallbackOwners(f.k8s, 'system', f.podUid, finalizer); await gateway.protectCurrent();
+  let stopped = 0; const accept = { stopped: async () => { stopped += 1; }, releasable: async () => true };
+  await gateway.sweep(accept); expect(stopped).toBe(0);
+  expect((await f.k8s.get(Resources.Pod!, 'sender', 'system'))?.metadata.finalizers).toContain(finalizer);
+  await expect(projectCallbackOwners({ ...f.k8s, listPage: async () => { throw new Error('source-unavailable'); } }, 'system', f.podUid, finalizer).sweep(accept)).rejects.toThrow('source-unavailable');
+  await f.k8s.delete(Resources.Pod!, 'sender', 'system'); await gateway.sweep(accept); expect(stopped).toBe(0);
 });

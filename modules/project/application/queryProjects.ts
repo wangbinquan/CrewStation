@@ -53,6 +53,12 @@ export function queryProjectUseCases(deps: ProjectUseCaseDeps) {
       const service = await uow.read.services.getByIdentity(identity);
       return service ? resolved(service, await uow.read.projects.getById(service.projectId)) : undefined;
     },
+    resolveServiceOfSlug: async (slug: string) => {
+      const project = await uow.read.projects.getBySlug(slug);
+      const service = project ? await uow.read.services.getByProject(project.id) : undefined;
+      return service ? resolved(service, project) : undefined;
+    },
+    availableProjectIds: async (ids: readonly ProjectId[]) => (await uow.read.projects.listByIds(ids)).filter((p) => p.state !== 'deleting').map((p) => p.id),
     resolveServiceById: async (serviceId: ServiceId) => {
       const service = await uow.read.services.getById(serviceId);
       return service ? resolved(service, await uow.read.projects.getById(service.projectId)) : undefined;

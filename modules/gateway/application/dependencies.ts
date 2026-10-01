@@ -2,9 +2,10 @@ import type { Clock, Logger } from '@crewstation/kernel';
 import type { GrantSource, HostNaming, ProjectAccess, ServiceDirectory, SlotRoles, UserDirectory } from '../ports/directories';
 import type { GatewayApplier, GatewaySettings } from '../ports/gatewayApply';
 import type { RouteLedger } from '../ports/ledger';
-import type { AllowlistRepository, MaintenanceUnitOfWork, PodIdentityRepository, RateLimitRepository, RouteRepository } from '../ports/repositories';
+import type { AllowlistRepository, GatewayProjectAdmission, MaintenanceUnitOfWork, PodIdentityRepository, RateLimitRepository, RouteRepository } from '../ports/repositories';
 
 export interface GatewayUseCaseDeps {
+  admission?: GatewayProjectAdmission;
   normalizeTaskId?: (value: string) => Promise<string | undefined>;
   allowlists: AllowlistRepository;
   pods: PodIdentityRepository;

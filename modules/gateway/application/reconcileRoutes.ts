@@ -4,6 +4,7 @@ import type { RoutedService, SystemMiddlewares } from '../domain/routeProjection
 import { projectRoute, routeRef, SERVICE_ROUTE_KINDS } from '../domain/routeProjection';
 import { planServiceRoutes } from '../domain/routePlan';
 import type { RouteLedger } from '../ports/ledger';
+import type { DirectoryService } from '../ports/directories';
 import type { GatewayUseCaseDeps } from './dependencies';
 
 const RETIRED = { code: 'route-retired', message: '服务已归档或不再需要这条路由' };
@@ -40,23 +41,24 @@ export interface ProjectLedgerHooks {
 }
 type ServiceProjectId = RoutedService['projectId'];
 
-/** 路由生成是幂等的：任何触发（建项目、切流、发布登记）都重算该服务的全部路由再 apply。 */
-export function routeUseCases(deps: GatewayUseCaseDeps, project?: ProjectLedgerHooks) {
-  const names = {
+function routeNames(deps: GatewayUseCaseDeps) {
+  return {
     systemNamespace: deps.settings.systemNamespace,
     userAuthMiddleware: deps.settings.userAuthMiddleware,
     serviceAuthMiddleware: deps.settings.serviceAuthMiddleware,
     dropIdentityHeadersMiddleware: deps.settings.dropIdentityHeadersMiddleware,
     rateLimits: Boolean(deps.ledger),
   };
+}
+
+/** 路由生成是幂等的：任何触发（建项目、切流、发布登记）都重算该服务的全部路由再 apply。 */
+export function routeUseCases(deps: GatewayUseCaseDeps, project?: ProjectLedgerHooks) {
+  const names = routeNames(deps);
   const system: SystemMiddlewares = { names: new Set([names.userAuthMiddleware, names.serviceAuthMiddleware, names.dropIdentityHeadersMiddleware]), namespace: names.systemNamespace };
   // previous：补投影时网关存的上一版计划，没变就不记日志（每 5 分钟每个服务一行没有信息量）。
-  const reconcile = async (serviceId: ServiceId, previous?: readonly RouteEntry[]): Promise<RouteEntry[]> => {
-    const svc = await deps.services.getService(serviceId);
-    // 已归档的服务解析得到、但不再生成路由：解析范围放宽是为了删得掉它，不是为了让它复活。
-    if (!svc || svc.archived) return [];
-    const roles = (await deps.slots.slotRoles(serviceId)) ?? { prod: 'blue' as const, preview: 'green' as const };
-    const proxyName = await deps.grants.proxyNameOf(serviceId);
+  const apply = async (svc: DirectoryService, previous?: readonly RouteEntry[]): Promise<RouteEntry[]> => {
+    const roles = (await deps.slots.slotRoles(svc.serviceId)) ?? { prod: 'blue' as const, preview: 'green' as const };
+    const proxyName = await deps.grants.proxyNameOf(svc.serviceId);
     const routes = planServiceRoutes({
       projectSlug: svc.projectSlug, serviceName: svc.serviceName, namespace: svc.namespace,
       prodPhysical: roles.prod, previewPhysical: roles.preview,
@@ -74,6 +76,11 @@ export function routeUseCases(deps: GatewayUseCaseDeps, project?: ProjectLedgerH
     if (!previous || jsonHash(previous) !== jsonHash(routes)) deps.logger.info('routes reconciled', { service: svc.identity, routes: routes.length });
     return routes;
   };
+  const reconcile = async (serviceId: ServiceId, previous?: readonly RouteEntry[]): Promise<RouteEntry[]> => {
+    const svc = await deps.services.getService(serviceId);
+    if (!svc || svc.archived) return [];
+    return deps.admission ? deps.admission.withEffects(svc, 'routes', () => apply(svc, previous)) : apply(svc, previous);
+  };
   const reconcileService = (serviceId: ServiceId): Promise<RouteEntry[]> => reconcile(serviceId);
   return {
     reconcileService,
@@ -81,6 +88,7 @@ export function routeUseCases(deps: GatewayUseCaseDeps, project?: ProjectLedgerH
       if (!deps.applier.observeRoutes) return false;
       const service = await deps.services.getService(serviceId), roles = await deps.slots.slotRoles(serviceId);
       if (!service || service.archived || roles?.prod !== physical) return false;
+      if (deps.admission && !await deps.admission.available(service.projectId)) return false;
       const stored = (await deps.routes.listAll()).find((entry) => entry.serviceId === serviceId)?.routes ?? [];
       const production = stored.filter((entry) => entry.kind !== 'preview');
       if (!production.some((entry) => entry.kind === 'prod') || !production.some((entry) => entry.kind === 'service')) return false;
@@ -95,12 +103,12 @@ export function routeUseCases(deps: GatewayUseCaseDeps, project?: ProjectLedgerH
     removeService: async (serviceId: ServiceId): Promise<void> => {
       const svc = await deps.services.getService(serviceId);
       if (!svc) return;
-      if (!deps.ledger) await deps.applier.removeRoutes(svc.serviceName, svc.namespace);
-      await deps.routes.saveForService(svc.serviceId, svc.serviceName, []);
-      if (deps.ledger) {
-        await declareRoutes(deps.ledger, system, svc, []);
-        await project?.release(svc.projectId);
-      }
+      const remove = async () => {
+        if (!deps.ledger) await deps.applier.removeRoutes(svc.serviceName, svc.namespace);
+        await deps.routes.saveForService(svc.serviceId, svc.serviceName, []);
+        if (deps.ledger) { await declareRoutes(deps.ledger, system, svc, []); await project?.release(svc.projectId); }
+      };
+      if (deps.admission) await deps.admission.withEffects(svc, 'remove-routes', remove); else await remove();
     },
     /**
      * 路由的台账补投影（RFC-025 第三期后半）：逐个服务按当前计划重算再声明，漏写的（台账暂时不可用）与计划的变化
@@ -114,7 +122,10 @@ export function routeUseCases(deps: GatewayUseCaseDeps, project?: ProjectLedgerH
         const svc = await deps.services.getService(entry.serviceId as ServiceId);
         if (!svc) continue;
         try {
-          if (svc.archived) await declareRoutes(ledger, system, svc, []);
+          if (svc.archived) {
+            const retire = () => declareRoutes(ledger, system, svc, []);
+            if (deps.admission) await deps.admission.withEffects(svc, 'retire-route-projection', retire); else await retire();
+          }
           else await reconcile(svc.serviceId, entry.routes);
           synced += 1;
         } catch (error) {
