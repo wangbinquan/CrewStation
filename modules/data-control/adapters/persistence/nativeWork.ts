@@ -140,7 +140,6 @@ function journalRecord(value: unknown): NativePostgresJournalRecord {
 }
 async function readJournal(db: Database, projectId: ProjectId) {
   return db.transaction(async (tx) => {
-    await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`);
     const records: NativePostgresJournalRecord[] = [];
     let cursor: string | undefined;
     for (;;) {
@@ -150,5 +149,5 @@ async function readJournal(db: Database, projectId: ProjectId) {
       cursor = records.at(-1)!.workId;
     }
     return { retainedRecordsComplete: true as const, records, revision: jsonHash({ projectId, records }) };
-  });
+  }, { isolationLevel: 'repeatable read', accessMode: 'read only' });
 }

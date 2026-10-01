@@ -1,3 +1,7 @@
+## 2026-10-02 RFC-037 journal实际部署及准入内快照修复
+
+66556eec已精确发布、CI36885290493六项成功；15:59:42Z八组件Ready=1，0005实际安装且校验和匹配。原48库/48角色/专用项目/共享PG卷/探针gen8/Runner保持。真实Root两次来源HTTP200、前后原卷身份独立保留，但回调内公开journal读取因准入前置SELECT后的SET TRANSACTION报25001失败，不计完整通过。journal与resources历史两条真实PG反例先红，BEGIN配置修正后23／0；稳定候选单次完整检查4911／143环境skip／0、32780断言，四源码/测试指纹保持、改动行2／2；精确发布/CI/部署和同路Root复验继续。正式owner、全部资源回收、管理员二次确认及PD01–23仍未完成，删除入口关闭。详见[RFC037 journal回执](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/native-identity-journal.md#2026-10-02-精确发布实际部署与准入内快照回归)。下方历史和并行状态完整保留。
+
 ## 2026-10-01 RFC-036 项目资源中心完成并部署
 
 资源中心双端正式页、11 类资源申请／管理员同页直接调整和审批、持久生效观测及精确拓扑已上库并随 `333e631d` 实际部署，精确 CI 36783829899 六项成功。原缺失 16 个根依赖已全部提交，组合回归 11 pass／0 fail；早期连接池耗尽与门禁失败保留在[验收与自查](proposal/rfc/RFC-036-project-resource-workspace/acceptance.md)。使用既有管理员会话，实际项目两端、22 来源、80 项已有能力、127 行末行弹窗、390／320px、中英文、旧入口跳转与 4 个 Pod UID 已核验。管理员在本页提交执行额度 3→3，记录 `01a0f4aa-28c3-7000-8ea8-86ff6fc68534` 已实际 applied、持久回执 applied=true，原 4 Pod UID／镜像保持；不把此验收称为实际扩容或真实身份切换。

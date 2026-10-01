@@ -41,3 +41,19 @@
 候选 3 完整静态四层通过、4908／143 skip／1 fail、5052 tests、968 文件、32772 断言、1184.91 秒。HTTP 原断言在 15 秒预算内全部完成；另一条同名 UID／物理存储两项目完整编排命中默认 5 秒超时。首次只调整 HTTP 预算不完整，现统一四条同样走全部阶段的 PG 编排用例为 15 秒，原断言全部保留；快速盘点拒绝保持默认、101 操作恢复保留原 30 秒。生产代码与候选 2 完全一致；仅同一测试文件的预算变化。候选 4 冻结 12 路径并继续其一次完整门禁，前两次超时结果不称通过。
 
 最终候选 4 完整 `bun run check` 已通过：静态四层成功，4909 pass／143 环境 skip／0 fail、5052 tests、968 文件、32770 断言、1077.53 秒。12 个冻结源码／测试／锁指纹全部保持，生产候选与修订 2 一致。精确改动行 81／82（98.78%）、无未加载生产文件；后续仅回填本回执，不重复同内容全量。精确提交／CI／本机迁移部署与真实 Root 联验继续，完整永久删除入口仍关闭。
+
+
+## 2026-10-02 精确发布、实际部署与准入内快照回归
+
+身份 journal 已精确发布为 `66556eecaf8ecf37ed396ba3c86a1d4a6832b342`；[CI 36885290493](https://github.com/wangbinquan/CrewStation/actions/runs/36885290493) 六项终态 success。2026-10-01T15:59:42.373Z 八组件 Ready=1 且 generation=observedGeneration，控制面 manifest `sha256:dd7f25790c06ce6045a33be92dc5f25829ed9c488a15879f47510f5bbf5d4c1f`、console `sha256:54566480c4e93ed7a9a66d89253c92f3b7d1402552c1c63890f929f62f051c25`。实际安装 0005 校验和等于已发布迁移；203 项锁中的其他迁移未改。初次临时部署脚本将不相关的 Agent 用量包纳入探针差异检查，故在任何部署写入前拒绝；核对实际入口 apps/cs-storage-probe、filesystem-metrics、Zod 依赖锁与部署配置均不变后，修正脚本校验范围。原拒绝日志保留。
+
+实际 API Pod `8b0f5bf2-bde5-4512-b7d6-a536fb1ddc5d` 的镜像／containerID 已独立核对；使用安装代码和真实组合根运行原专用项目的 native SELECT。两次实际 `/source` HTTP 200，已独立保留真实前后原卷摘要 `37a5d248a52b478038a570883375b439cdb6a4829bc3648c284ef46e3b47095f` 和原库 OID，失败回调实际退出为 finished。公开 journal 在该回调内部读取失败：准入上下文先向独立 UOW 注入 SELECT，随后 SET TRANSACTION ISOLATION LEVEL 被 PostgreSQL 以 25001 拒绝。这个真实 Root 验收没有通过，不能用原始表记录或另一次适配器成功替代。原探针 UID／generation=8／策略、共享 PG 原四键／PVC／PV、原项目对象与 Runner 摘要保持；原 48 库／48 角色全名字及 OID 前后完全相同。
+
+在两个真实 PG 端口加入同上下文反例：journal 的原 native 回调内读取，以及 resources 原保留历史的共享准入内读取。先确认 21 pass／2 fail，两个错误均是原 SET TRANSACTION 时序；改为通过事务配置在 BEGIN 时固定 repeatable read/read only，保留原一致快照及只读语义。两个已有跨页并发测试的事务代理同步透传配置，继续核对真实独立提交，而不放宽原断言。修订后 23 pass／0 fail、105 断言。稳定修复候选完整门禁、精确发布／CI／部署和同一实际 Root 复验继续。
+
+私有回执均位于 `/private/tmp/cs-rfc037-66556eecaf8e-` 前缀：deployment-receipt、source-probe-receipt、applied-journal-migration、cs-api-observer-before、cs-api-native-journal-live、failed-callback-retained-facts、native-catalog-before/after。反例与修订定向日志为 `/private/tmp/cs-rfc037-admitted-snapshot-red.log` 和 `...-targeted.log`。原专用项目仍保留，永久删除入口继续关闭；正式 owner 和 PD01–23 的全回收范围没有完成。
+
+
+准入内快照修复的单次稳定完整 `bun run check` 通过：结构/lint/两侧类型成功，4911 pass／143 环境 skip／0 fail、5054 tests、968 文件、32780 断言、893.21 秒；四个冻结源码/测试指纹全部保持。官方改动行核对 2／2（100%）、两个生产文件加载、无违规。只补本回执后精确发布，同内容不重复全量；日志 `...-admitted-snapshot-full-check.log`、`...-admitted-snapshot-coverage-audit.json`。精确 CI、部署和真实 Root 复验尚待执行。
+
+正式 owner 接线的隔离 PG 核对另发现需要处理的边界：同一真实 native 回调先 CREATE 角色、随后项目准入关闭，下一条调用方查询正确拒绝，但后置只读 catalog 采集也被同一业务准入拒绝，故实际已提交 OID没有 after 记录。原回调仍 finished，不能据此称完整物理排空；证据 `...-native-closing-observation-proof.json`，只使用原隔离测试实例并清理自建角色。后续应将实际持锁的只读后置观测和调用方写入许可分开，主准入连接失效时仍保留缺口并走正式 drain，不补造旧事实。这不属于本次 BEGIN 时序修复，不将该边界称为通过。

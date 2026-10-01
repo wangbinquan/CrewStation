@@ -53,7 +53,6 @@ function nativeHistoryRecord(row: NativeRow, children: NativeChildRow[], gaps: N
 
 export function readNativePostgresHistory(db: Database, projectId: ProjectId): Promise<NativePostgresHistory> {
   return db.transaction(async (tx) => {
-    await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`);
     const records: NativePostgresHistoryRecord[] = [], gaps: NativePostgresHistory['gaps'][number][] = [];
     let after: string | undefined;
     for (;;) {
@@ -73,5 +72,5 @@ export function readNativePostgresHistory(db: Database, projectId: ProjectId): P
       after = rows.at(-1)!.id;
     }
     return { retainedRecordsComplete: true, records, gaps, revision: jsonHash({ projectId, records, gaps }) };
-  });
+  }, { isolationLevel: 'repeatable read', accessMode: 'read only' });
 }

@@ -157,7 +157,7 @@ test.skipIf(!available)('原生身份公开端口：完整分页保留旧记录�
   let interleaved = false;
   const db = new Proxy(f.database.db, { get(target, key, receiver) {
     if (key !== 'transaction') return Reflect.get(target, key, receiver);
-    return (work: Parameters<typeof target.transaction>[0]) => target.transaction(async (tx) => work(new Proxy(tx, { get(current, field, currentReceiver) {
+    return (work: Parameters<typeof target.transaction>[0], config?: Parameters<typeof target.transaction>[1]) => target.transaction(async (tx) => work(new Proxy(tx, { get(current, field, currentReceiver) {
       if (field !== 'execute') return Reflect.get(current, field, currentReceiver);
       return async (...args: Parameters<typeof current.execute>) => {
         const rows = await current.execute(...args);
@@ -171,7 +171,7 @@ test.skipIf(!available)('原生身份公开端口：完整分页保留旧记录�
         }
         return rows;
       };
-    } })));
+    } })), config);
   } });
   const snapshot = await nativePostgresWork({ db, adminUrl }).journal.read(f.origin.projectId);
   expect(interleaved).toBe(true); expect(snapshot).toEqual(before);
@@ -181,6 +181,20 @@ test.skipIf(!available)('原生身份公开端口：完整分页保留旧记录�
   await f.database.handle.close();
   await expect(f.work.journal.read(f.origin.projectId)).rejects.toBeDefined();
 }));
+
+test.skipIf(!available)('原生身份公开端口：真实回调内读取独立快照，准入注入不能使隔离设置迟到', () => fixture(async (f) => {
+  // 实际 API 曾在此路径先注入准入 SELECT，再 SET TRANSACTION，被 PostgreSQL 拒绝。
+  await f.work.native.run(f.origin, [f.role], async (connection) => {
+    const [session] = await connection.query<{ pid: number }[]>('SELECT pg_backend_pid() AS pid');
+    const report = await f.work.journal.read(f.origin.projectId);
+    expect(report.retainedRecordsComplete).toBe(true);
+    expect(report.records).toHaveLength(1);
+    expect(report.records[0]).toMatchObject({ state: 'running', nativeSession: { pid: session!.pid }, before: { catalog: [], storage }, after: null });
+    const [answer] = await connection.query<{ one: number }[]>('SELECT 1 AS one');
+    expect(answer?.one).toBe(1);
+  });
+  expect((await f.work.journal.read(f.origin.projectId)).records[0]).toMatchObject({ state: 'finished', after: { catalog: [], storage } });
+}, observedSource()));
 
 test.skipIf(!available)('原生身份公开端口：模块组合导出原项目完整记录；来源缺失、空范围不冒充物理完成', () => fixture(async (f) => {
   const control = createDataControlModule({ db: f.database.db, adminUrl, nativePostgresSource: observedSource(), ledger: { get: async () => undefined, listLive: async () => [], latestChange: async () => 0, changesSince: async () => [], observe: async () => ({ status: 'unchanged' }) } });

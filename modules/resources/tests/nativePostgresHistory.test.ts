@@ -3,6 +3,7 @@ import { newResourceId } from '@crewstation/kernel';
 import type { TestDatabase } from '@crewstation/testkit';
 import { testDatabaseAvailable } from '@crewstation/testkit';
 import { sql } from 'drizzle-orm';
+import { withSharedDatabaseAdmission } from '@crewstation/persistence';
 import { createResourcesModule } from '..';
 import { deletionFixture } from './deletionFixture';
 import { OTHER_PROJECT, PROJECT } from './fixtures';
@@ -105,7 +106,7 @@ describe.skipIf(!available)('原生 PostgreSQL 的完整保留台账与身份缺
     const db = new Proxy(database.db, {
       get(target, key, receiver) {
         if (key !== 'transaction') return Reflect.get(target, key, receiver);
-        return (work: Parameters<typeof target.transaction>[0]) => target.transaction(async (tx) => work(new Proxy(tx, {
+        return (work: Parameters<typeof target.transaction>[0], config?: Parameters<typeof target.transaction>[1]) => target.transaction(async (tx) => work(new Proxy(tx, {
           get(current, field, currentReceiver) {
             if (field !== 'execute') return Reflect.get(current, field, currentReceiver);
             return async (...args: Parameters<typeof current.execute>) => {
@@ -119,7 +120,7 @@ describe.skipIf(!available)('原生 PostgreSQL 的完整保留台账与身份缺
               return rows;
             };
           },
-        })));
+        })), config);
       },
     });
     const module = createResourcesModule({ db, quotas: { limitFor: async () => 10 }, authorizer: { projectAccess: async () => ({ operate: true }) }, isAdmin: async () => true });
@@ -128,6 +129,16 @@ describe.skipIf(!available)('原生 PostgreSQL 的完整保留台账与身份缺
     const after = await fixture.module.api.projectDeletion.nativePostgresHistory(PROJECT);
     expect(before.records).toHaveLength(501); expect(after.records).toHaveLength(502); expect(after.revision).not.toBe(before.revision);
     expect(after.records.find((row) => row.id === seed.id)?.observed[0]?.uid).toBe('42001');
+  });
+  test('实际共享准入内读取完整保留历史，不因事务前置 SQL 破坏只读快照', async () => {
+    const fixture = await deletionFixture(); database = fixture.database;
+    const record = await fixture.module.api.owner('data').declare({ kind: 'database', ref: 'admitted-history', projectId: PROJECT, spec: { children: [{ kind: 'PostgresDatabase', name: 'cs_admitted_history' }] } });
+    const before = await fixture.module.api.projectDeletion.nativePostgresHistory(PROJECT);
+    // 与真实 native 回调相同的准入上下文会向每个独立 UOW 注入实际持锁者。
+    const admitted = await withSharedDatabaseAdmission(database.db, 'data-control.project-admission:' + PROJECT, () => fixture.module.api.projectDeletion.nativePostgresHistory(PROJECT));
+    expect(admitted).toEqual(before);
+    expect(admitted.records).toHaveLength(1);
+    expect(admitted.records[0]?.id).toBe(record.id);
   });
   test('历史里的不可解读 JSON、空原名字和未知 OID 均保留明确阻塞原因', async () => {
     const fixture = await deletionFixture(); database = fixture.database;
