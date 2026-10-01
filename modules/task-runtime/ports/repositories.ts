@@ -5,6 +5,8 @@ export interface EnvironmentRepository {
   insert(env: TaskEnvironment): Promise<void>;
   update(env: TaskEnvironment): Promise<void>;
   getById(id: TaskId): Promise<TaskEnvironment | undefined>;
+  /** All lifecycle states; at most two physical matches, so callers reject ambiguity. */
+  findByPhysicalPod(namespace: string, podName: string): Promise<TaskEnvironment[]>;
   /** 事务里锁住这一行再读：与并发的环境更新串行（台账补投影用，RFC-025）。 */
   getForUpdate(id: TaskId): Promise<TaskEnvironment | undefined>;
   listByProject(projectId: ProjectId, states?: EnvironmentState[], page?: { after?: string; limit: number }): Promise<TaskEnvironment[]>;

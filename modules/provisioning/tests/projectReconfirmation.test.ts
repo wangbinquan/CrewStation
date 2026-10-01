@@ -19,6 +19,7 @@ async function pause() {
   return { ...started, context, lease: claimed.lease };
 }
 describe.skipIf(!available)('封闭期间的重新确认（真实 PG，外部对象为编排替身）', () => {
+  // 完整 owner 清理包含数百次真实 PG 事务，与 projectDeletion 同类流程采用 15 秒预算；不改变任何证明断言。
   test('普通继续不更新摘要；新确认保留原操作及已封闭证明，原许可失效，所有确认可跨删根重放', async () => {
     const started = await pause(), before = await f.api.readProjectDeletion(f.admin, started.operation.id);
     expect((await f.controller.retry(f.admin, started.operation.id)).confirmationDigest).toBe(before.confirmationDigest);
@@ -39,7 +40,7 @@ describe.skipIf(!available)('封闭期间的重新确认（真实 PG，外部对
     expect(await f.controller.accept(f.admin, started.value.id, started.request)).toEqual(done);
     expect(await f.controller.reconfirm(f.admin, renewed.id, input)).toEqual(done);
     expect(await f.database.db.execute(`SELECT id FROM project.deletion_plans WHERE project_id='${started.value.id}'`)).toHaveLength(0);
-  });
+  }, 15_000);
   test('真实管理员与严格 delete 确认；HTTP 新路由有成功、拒绝、位置与 no-store 证据', async () => {
     const started = await pause(), base = `/v1/project-deletions/${started.operation.id}`;
     for (const suffix of ['/reconfirmation-plans', '/reconfirm']) {

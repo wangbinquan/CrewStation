@@ -1,7 +1,7 @@
 import type { RuntimeImageHistoryRead, RuntimeImageHistoryItem } from '@crewstation/contracts';
 import type { ResourceWorkload, ResourceWorkloadPage } from '@crewstation/contracts';
 import type { BusinessStorageFinalization, DevelopmentSourceBinding, WorkloadStopBarrier } from '@crewstation/contracts';
-import type { DevelopmentCleanupSelection } from './developmentCleanup';
+import type { DevelopmentCleanupSelection, DevelopmentRemovalDecision, DevelopmentRemovalTarget } from './developmentCleanup';
 import type { BusinessRecoveryScope, BusinessWorkspaceProof, RebuildBusinessWorkspaceInput, RestartBusinessWorkspaceInput } from './businessRecovery';
 import type { BusinessSessionStorage, DevelopmentUsageStorage, DevelopmentUsageLayoutLookup } from '@crewstation/contracts';
 import type { RuntimeImageProbeInput, RuntimeImageProbeResult, RuntimeInitializationStatus, RuntimeImageExecutionSnapshot, Actor, ProjectId, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
@@ -137,6 +137,7 @@ export interface TaskRuntimeModuleApi {
   listClusterTasks(): Promise<Array<{ taskId: string; projectId: string; namespace: string; podName: string; podUid?: string; pvcName: string; pvcUid?: string; kind: string; state: string; purpose?: string; parentTaskId?: string; agentId?: string; terminalId?: string; profile: string; profileRevision?: number; profileTestId?: string; revision: string; volumeMode: string }>>;
   /** Read-only actual persisted child layout; no physical-stop or cleanup permission. */
   lookupDevelopmentUsageLayout(taskId: TaskId): Promise<DevelopmentUsageLayoutLookup>;
+  inspectDevelopmentRemoval(target: DevelopmentRemovalTarget): Promise<DevelopmentRemovalDecision>;
   resolveDevelopmentObjectSource(source: DevelopmentSourceBinding): Promise<{ projectId: ProjectId; serviceId: ServiceId; planId: string } | undefined>;
   createEnvironment(input: CreateEnvironmentInput): Promise<EnvironmentDto>;
   createNativeExecution(input: CreateNativeExecutionInput): Promise<EnvironmentDto>;

@@ -1,3 +1,4 @@
+import { DEVELOPMENT_REMOVAL_ANNOTATION } from '@crewstation/contracts';
 import type { DevelopmentAdmissionReceipt, DevelopmentAdmissionState, WorkloadStartPermit } from '@crewstation/contracts';
 import { DevelopmentAdmissionReceiptSchema, DevelopmentAdmissionStateSchema, DevelopmentRemovalProtectionSchema, DevelopmentUsageStorageSchema, WorkloadConsumerSchema } from '@crewstation/contracts';
 import type { K8sClient, K8sObject } from '@crewstation/k8s';
@@ -40,6 +41,7 @@ export async function activateDevelopmentWorkload(k8s: K8sClient, pod: WorkloadP
   return receipts.create(seed, async () => {
     const values = { podUid: permit.podUid, nodeUid: permit.nodeUid, consumerId: seed.consumer.id, volumeUid: seed.consumer.volumeUid };
     const desired = { ...secretObject({ name, namespace: pod.namespace, stringData: values, labels: { [LABELS.task]: pod.taskId } }), immutable: true };
+    desired.metadata.annotations = { ...desired.metadata.annotations, [DEVELOPMENT_REMOVAL_ANNOTATION]: '1' };
     return receiptOf(await k8s.create(desired), seed);
   }, async () => !!await k8s.get(Resources.Secret!, name, pod.namespace));
 }

@@ -1,8 +1,10 @@
+import { inspectClusterDevelopmentRemoval } from '../developmentGuard';
+import type { DevelopmentRemovalQuery, RemovalOutcome } from '../../../ports/cluster';
 import type { WorkloadConsumer, WorkloadStopProof } from '@crewstation/contracts';
 import { WORKLOAD_CONSUMER_ANNOTATION, WORKLOAD_STOP_FINALIZER } from '@crewstation/contracts';
 import type { K8sClient, K8sObject } from '@crewstation/k8s';
 import { Resources } from '@crewstation/k8s';
-import { conflict } from '@crewstation/kernel';
+import { conflict, isPlatformError } from '@crewstation/kernel';
 import { classifyWorkloadStop } from '../../../domain/workloadStop';
 import type { StopNodeEvidence, WorkloadStopObservation } from '../../../domain/workloadStop';
 
@@ -26,16 +28,27 @@ export async function observeWorkloadStop(k8s: K8sClient, consumer: WorkloadCons
   return classifyWorkloadStop(consumer, pod, node, now);
 }
 /** Only after the proof store ACK: remove our own finalizer with live UID/resourceVersion CAS. */
-export async function releaseWorkloadStop(k8s: K8sClient, proof: WorkloadStopProof): Promise<void> {
+export async function releaseWorkloadStop(k8s: K8sClient, proof: WorkloadStopProof, developmentRemoval?: DevelopmentRemovalQuery, resourceVersion?: string): Promise<RemovalOutcome> {
   const { namespace, podName } = proof.consumer;
   const current = await k8s.get(Resources.Pod!, podName, namespace, AbortSignal.timeout(15_000));
   if (!current) return;
+  if (resourceVersion !== undefined && current.metadata.resourceVersion !== resourceVersion) return { kind: 'waiting', reason: 'development-removal-version-changed' };
   if (current.metadata.uid !== proof.podUid || current.metadata.annotations?.[WORKLOAD_CONSUMER_ANNOTATION] !== proof.consumer.id) throw conflict('停止证明对应的 Pod 已被替换');
   const nodeName = (current['spec'] as { nodeName?: string } | undefined)?.nodeName ?? null;
   if (nodeName !== proof.nodeName) throw conflict('停止证明后的 Pod 节点身份变化');
   if (!current.metadata.deletionTimestamp || !current.metadata.finalizers?.includes(WORKLOAD_STOP_FINALIZER)) return;
-  await k8s.jsonPatch(Resources.Pod!, podName, namespace, [
-    { op: 'test', path: '/metadata/uid', value: proof.podUid }, { op: 'test', path: '/metadata/resourceVersion', value: current.metadata.resourceVersion },
-    { op: 'replace', path: '/metadata/finalizers', value: current.metadata.finalizers.filter((entry) => entry !== WORKLOAD_STOP_FINALIZER) },
-  ]);
+  const decision = await inspectClusterDevelopmentRemoval(k8s, developmentRemoval, { kind: 'Pod', namespace, name: podName, uid: proof.podUid, resourceVersion: resourceVersion ?? current.metadata.resourceVersion }, 'stop-finalizer');
+  if (decision.kind === 'waiting') return decision;
+  if (decision.kind === 'absent') return;
+  const version = decision.kind === 'permitted' ? decision.resourceVersion : resourceVersion ?? current.metadata.resourceVersion;
+  if (version !== current.metadata.resourceVersion) return { kind: 'waiting', reason: 'development-removal-version-changed' };
+  try {
+    await k8s.jsonPatch(Resources.Pod!, podName, namespace, [
+      { op: 'test', path: '/metadata/uid', value: proof.podUid }, { op: 'test', path: '/metadata/resourceVersion', value: version },
+      { op: 'replace', path: '/metadata/finalizers', value: current.metadata.finalizers.filter((entry) => entry !== WORKLOAD_STOP_FINALIZER) },
+    ]);
+  } catch (error) {
+    if ((decision.kind === 'permitted' || resourceVersion !== undefined) && isPlatformError(error) && error.kind === 'conflict') return { kind: 'waiting', reason: 'development-removal-version-changed' };
+    throw error;
+  }
 }

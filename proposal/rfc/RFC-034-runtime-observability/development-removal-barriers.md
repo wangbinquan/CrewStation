@@ -1,8 +1,10 @@
 # RFC-034 开发采集的通用删除与未绑定退出屏障
 
-状态：下一阶段草案的独立只读设计复核 v2 已 PASS，尚无任何实施批次的精确源码 allowlist，未开始本草案的实现。原绑定清理已部署；开发明细 35 路径与完整组合根已在 `557cb50c5b6800771a5d016526d7a4d49d61eb77` 完整部署八组件 Ready，consumer 与两级事实已接通；回执提交 `1d896ab777b9dbe133a4db79f98d585fb5600831` 六项 CI 成功。生产开发 producer 仍 OFF；本草案 PASS 不构成通用删除、未绑定和全 writer 封口的实现或验收结论。
+状态：原准入回执第一片已发布部署；通用删除第二片实施 v2 / 测试修订 v3 独立 PASS，规范完整 `bun run check` 4,956 pass / 143 环境 skip / 0 fail，33,168 断言，候选与参考指纹稳定。原规范 v2 的 2 fail 保留，修订后新候选单次 gate 通过；当前精确发布、远端自身 CI 与本机升级待做。父操作、未绑定、全部 writer 封口、未知回执与真实开发采集仍待，生产 producer OFF；不关闭 CS-R02 或整体 RFC。
 
 ## 必须解决的问题
+
+下表保留设计起点的入口盘点；通用 remove / Controller finalizer 第二片的当前实现与检查见 [实际守卫记录](./development-generic-removal.md)，其他入口仍按各自屏障推进。
 
 Token 数值保存在执行容器内的独立日志中。取消或清理不能先删除唯一可读副本，再把无数据记成零。正常数字出口、显式缺口与物理停止是三类独立证据。
 
@@ -73,3 +75,47 @@ Resources 的到期/压缩过程先在锁外取得单调 owner 状态或请求�
 ## 原准入回执第一步已部署的状态补正（2026-10-01）
 
 上文“43 路径尚未实现”属于设计阶段历史。[原准入回执实际发布与部署](./development-admission-receipts.md#原准入回执第一步的实际发布与部署2026-10-01)已核对：42 个源码 / 测试 / 迁移及登记随 `542d9882` 的 70 路径发布，两个独立实现门 PASS、自身六项 CI success、八组件部署完成；后继 `85ee9254` 平台自测投影修复已通过自身 CI / 实机部署，本批 42 文件未变。该步骤不包含本草案的通用删除、全部 writer seal、未绑定或跨进程 unknown receipt，下一实施批仍必须冻结精确 allowlist 并独立设计复核，producer OFF。
+
+## 通用删除第二片的精确候选（2026-10-02）
+
+[通用删除守卫设计](./development-generic-removal.md)已冻结物理名称定向查询、原终态 token hash 的私有 seal、Pod / 两类 Secret 数字及物理条件、通用 remove 与 Controller finalizer 两个实际边界，以及逐对象 waiting / CAS / 测试计划。下一片精确 allowlist 和参考指纹由私有候选清单记录；独立设计门尚待完成，没有本片源码变更。原准入回执第一片完成状态不变，父操作 / namespace / 全 writer seal / 未绑定 / unknown-tail 仍后续，producer OFF。
+
+第二片设计 v1 独立 FAIL 的 marker 兼容 P2 已在 [v2 精确设计](./development-generic-removal.md#v1-设计失败与-v2-修订)限定实际创建渲染并补旧无标记回归；44 路径 v2 冻结待独立设计门，未据此开始源码或宣告通过。
+
+## 2026-10-02 通用删除第二片实现候选
+
+[精确设计](./development-generic-removal.md) v2 已独立 PASS，44 路径内实现只读原物理查询、数字与材料联合校验、原终态 seal 和默认／注入 writer 共同守卫。Failed／Paused／absent、orphan 及 Controller finalizer 的 waiting 均向上传递，既不计回收成功，也不阻塞其他对象。0018 非唯一物理名称索引使用官方生成器单路径登记，旧迁移与并行源码保持。
+
+新增 finalizer 等待和真正 JSON Patch 版本竞争回归均先红后绿，16／0；改后 20／0 的真实 PG 物理查询包含两种创建模式、第一片历史无标记对象、坏选择、原材料冲突、实际压缩后查找和 token 旋转。既有实际 SQLite→Session PG→Dev owner→Task 作业→Controller 全链及新增四种选择组合在初轮全部成功，初轮唯一测试失败为非选择 Secret 的空 UID 夹具，原件保留并修正。原 job lease 接管两条启用新选择后2／0，没有生成终态 seal 或提前释放额度。类型、精确 lint 和无例外架构检查通过；没有把针对性通过冒充完整 check 或生产开发采集。
+
+当前等待独立实现门和单次完整门禁，随后精确发布、CI、本机部署。生产 producer OFF，直接删除／父与 namespace／未绑定／全 writer seal／跨进程未知回执仍未完成，本片不关闭 CS-R02 或完整 RFC。上一批实际业务 24,423 Token／¥0.026922 与 AW 47,524 Token／¥0.096392 的分类核对继续保持，正式数字页面验收尚待当前锁屏解除。
+
+## 2026-10-02 注入实际 writer 的实施复核失败
+
+通用删除第二片实施 v1 独立 FAIL：注入未配置 query 的实际 Kubernetes factory 丢掉外层原许可 RV，旧无 marker 对象存在 UID-only 旁路，新 marker 正向则永久等待。原失败回执保留。修订限定已有 44 路径，使用 adapter 私有且按六元组绑定、调用期间有效的原 query scope，内层重新查原 Task owner并保留 DELETE / finalizer 的同一 RV；[v3 精确设计](./development-generic-removal.md#注入实际-factory-的修订设计-v3)待独立设计门，源码修订尚未开始。一次完整门禁、发布、精确 CI 和本机部署继续待做，生产 producer OFF。
+
+## 2026-10-02 通用删除修订定向验证
+
+注入实际 writer 的精确修订设计 v3 独立 PASS；原实施 v1 FAIL 保留。真实 nested factory 新反例修复前 2 pass / 11 fail，最终 Controller 36 pass / 0 fail、227 断言；真正隔离 PG / SQLite / 原 Task 数字链 23 pass / 0 fail、213 断言，精确 ESLint / 后端 types / arch 无违规。实施 v2 冻结待独立实现门和稳定候选一次规范完整 gate；尚未记发布、CI、本机升级或真实开发采集完成，producer OFF。详见 [修订证据](./development-generic-removal.md#修订设计-v3-与实施-v2-的定向证据)。
+
+## 规范完整门禁 v2 的原始失败及小范围修订设计
+
+实际 `bun run check` 已完整结束：结构、lint、后端与工作台类型通过；4,945 pass / 143 环境 skip / 2 fail，33,097 断言。全部 44 候选路径和 65 参考指纹前后稳定，生产 producer OFF。原失败回执与完整日志保留，不能用定向重跑替代其失败结论。
+
+两个失败文件均与当时已提交 HEAD 相同，没有把它们归因于并行在制品：`projectReconfirmation.test.ts` 的全流程重新确认、全部 owner 清理和删根后重放用例超出默认 5 秒；`referencePanel.test.tsx` 的申请用例在目录读取完成前直接访问 `list().querySelectorAll`，列表为 null。真实删除夹具只装配 Project / Identity / EventBus 与有状态外部替身，不调用本批通用物理 writer；参考面板为真实工作台路由加 fetch 夹具，本片无 console 生产改动。一次定向诊断 7 / 0 和 6 / 0 只是缩小故障条件，原全量 FAIL 保持。
+
+后续仅增加两个精确测试路径，原 44 变为 46：全流程真实 PG 重确认用例采用相邻 `projectDeletion.test.ts` 同类全部 owner 清理的 15 秒单用例时限，保留所有权限、原封闭证明、失效许可、终态和删根重放断言，不修改生产 deadline、不增加 retry / skip。参考面板申请用例等待既有 `listReady()` 的真实列表完成；该用例用可释放的目录读取 gate，确保渲染刚返回时尚无列表，再异步释放，锁定等待而非依赖固定睡眠。旧立即 DOM 读取必须在此 gate 下变红，修复后对原弹窗、取消、侧栏形态、行内不展开断言保持。
+
+独立修订设计通过后改这两个测试；定向红绿及原 guard / PG 全链结果分别留存，再冻结新候选作独立实现复核。因为原规范 gate 已失败且该候选测试内容实际改变，新候选允许一次 `bun run check`；不因 unrelated main 推进重跑，也不删除或改名原 FAIL。发布仍须精确 allowlist / 独立实现 / 成功本机 gate / 自身远端 CI，之后才升级本机。该修订不改变 Task/Controller 产品语义，不关闭 CS-R02、producer 或完整 RFC。
+
+### 测试修订实施与候选 v3
+
+修订设计 v4 独立 PASS，原源码／迁移 41 路径保持实施 v2 指纹。受控目录场景进一步确认：平台 `/business-tasks` 可先显示，申请 `/invoices` 尚未返回，因此 `listReady` 在申请用例必须等待指定目标行，其他用例的默认平台行条件保持。反例不带目标行等待为 5 pass / 1 fail，实际 rowOf(undefined) 变红；补指定等待后两个文件 13 pass / 0 fail、117 断言，精确 ESLint 无输出。最初“目录未就绪意味着列表容器必为 null”的夹具假设被撤销，那个失败和被停止的递归 DOM 输出诊断留存，不作为有效红绿证据。
+
+PG 仅完整重确认清理用例明确 15 秒，与相邻全部 owner 清理预算一致，所有功能断言保持；UI 的读 gate 通过 finally 释放，不增加固定睡眠、retry 或 skip。46 路径候选 v3 将复用已通过的 41 路径独立源审与真实 PG／Controller 回归，只新增复核两个测试与文档证据。原规范 gate v2 仍 FAIL，待新候选独立实现与一次规范 gate，未发布、未部署、producer OFF。
+
+### 新候选规范 gate 与精确发布准备
+
+测试修订的独立实现 v3 PASS；实际规范 `bun run check` 2026-10-01 18:59:53Z 至 19:15:57Z 完整完成，4,956 pass / 143 环境 skip / 0 fail、33,168 断言、5,099 用例／971 文件。结构、lint、后端／工作台类型及完整用例均成功，候选 46 路径与 72 参考的字节前后相同。143 skip 为本机缺少外部实机依赖，不能据此宣称这些路径已实采验收；远端六层自身 CI 仍待。原 4,945／143／2 fail 的规范 v2 和有效页面红例保持原结论。
+
+检查期间其他会话正常提交与本片没有路径交集的数据控制修订，本片源内容和直接依赖未变；依共享候选验证规则复用本次成功门，不因为新 main 再跑全量。发布候选只包含 46 allowlist 中 44 个实际改动文件，三个文档在成功 gate 后只补当前证据；不收编并行 Data 或 RFC-036 架构设计输出。生产 producer OFF，父生命周期／全 writer seal／未绑定／unknown-tail／开发实采均不在这一步的完成声明中。

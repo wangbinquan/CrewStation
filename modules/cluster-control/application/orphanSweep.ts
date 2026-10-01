@@ -1,7 +1,7 @@
 import type { Clock, Logger } from '@crewstation/kernel';
 import type { ObservedObject } from '../domain/observation';
 import { lastWrittenAt, referencedSecrets } from '../domain/secretReferences';
-import type { ClusterWriter, ManagedObjectFeed, ObservedKind } from '../ports/cluster';
+import type { ClusterRemovalTarget, ClusterWriter, ManagedObjectFeed, ObservedKind } from '../ports/cluster';
 import type { LedgerObservations, LegacyOwners } from '../ports/ledger';
 import type { ObservationStats } from './observeChange';
 
@@ -27,6 +27,7 @@ export interface SweepDeps {
 export interface SweepResult {
   removed: number;
   volumes: number;
+  waiting?: number;
 }
 
 const identityOf = (object: ObservedObject) => ({ kind: object.kind, ...(object.metadata.namespace ? { namespace: object.metadata.namespace } : {}), name: object.metadata.name, ...(object.metadata.uid ? { uid: object.metadata.uid } : {}) });
@@ -52,6 +53,18 @@ const ageOk = (deps: SweepDeps, object: ObservedObject): boolean => {
 
 type Fields = Readonly<Record<string, unknown>>;
 const isFields = (value: unknown): value is Fields => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+async function removeOrWait(deps: SweepDeps, result: SweepResult, target: ClusterRemovalTarget, fields: Fields): Promise<void> {
+  const removed = await deps.cluster.remove(target);
+  if (removed?.kind === 'waiting') {
+    result.waiting = (result.waiting ?? 0) + 1;
+    deps.logger.info('resource orphan removal waiting', { ...fields, reason: removed.reason });
+    return;
+  }
+  result.removed += 1;
+  deps.stats.removed += 1;
+  deps.logger.info('resource orphan removed', fields);
+}
 
 /** 观测缓存里所有 IngressRoute 引用的中间件（`命名空间/名字`；没写命名空间的是路由自己的命名空间）。 */
 function referencedMiddlewares(feed: ManagedObjectFeed): Set<string> {
@@ -79,10 +92,7 @@ async function sweepMiddlewares(deps: SweepDeps, result: SweepResult): Promise<v
     const namespace = object.metadata.namespace ?? '';
     if (!object.metadata.uid || object.metadata.deletionTimestamp || object.metadata.labels?.[TASK_LABEL] || namespace === deps.systemNamespace || !namespace) continue;
     if (!ageOk(deps, object) || referenced.has(`${namespace}/${object.metadata.name}`) || (await deps.ledger.claimOf(identityOf(object)))) continue;
-    await deps.cluster.remove({ kind: 'Middleware', namespace, name: object.metadata.name, uid: object.metadata.uid });
-    result.removed += 1;
-    deps.stats.removed += 1;
-    deps.logger.info('resource orphan removed', { kind: 'Middleware', namespace, name: object.metadata.name, reason: 'unreferenced' });
+    await removeOrWait(deps, result, { kind: 'Middleware', namespace, name: object.metadata.name, uid: object.metadata.uid }, { kind: 'Middleware', namespace, name: object.metadata.name, reason: 'unreferenced' });
   }
 }
 
@@ -97,10 +107,7 @@ async function sweepSecrets(deps: SweepDeps, result: SweepResult): Promise<void>
     const namespace = object.metadata.namespace ?? '', written = lastWrittenAt(object);
     if (!object.metadata.uid || object.metadata.deletionTimestamp || object.metadata.labels?.[TASK_LABEL] || namespace === deps.systemNamespace || !namespace) continue;
     if (Number.isNaN(written) || deps.clock.now().getTime() - written < deps.minAgeMs || referenced.has(`${namespace}/${object.metadata.name}`) || (await deps.ledger.claimOf(identityOf(object)))) continue;
-    await deps.cluster.remove({ kind: 'Secret', namespace, name: object.metadata.name, uid: object.metadata.uid });
-    result.removed += 1;
-    deps.stats.removed += 1;
-    deps.logger.info('resource orphan removed', { kind: 'Secret', namespace, name: object.metadata.name, reason: 'unreferenced' });
+    await removeOrWait(deps, result, { kind: 'Secret', namespace, name: object.metadata.name, uid: object.metadata.uid }, { kind: 'Secret', namespace, name: object.metadata.name, reason: 'unreferenced' });
   }
 }
 
@@ -137,10 +144,7 @@ export async function sweepOrphans(deps: SweepDeps): Promise<SweepResult> {
         deps.logger.info('resource orphan volume registered', { namespace: identity.namespace, name: identity.name, taskId });
         continue;
       }
-      await deps.cluster.remove({ kind, ...(identity.namespace ? { namespace: identity.namespace } : {}), name: identity.name, uid: object.metadata.uid! });
-      result.removed += 1;
-      deps.stats.removed += 1;
-      deps.logger.info('resource orphan removed', { kind, namespace: identity.namespace, name: identity.name, taskId });
+      await removeOrWait(deps, result, { kind, ...(identity.namespace ? { namespace: identity.namespace } : {}), name: identity.name, uid: object.metadata.uid! }, { kind, namespace: identity.namespace, name: identity.name, taskId });
     }
   }
   await sweepMiddlewares(deps, result);

@@ -85,8 +85,8 @@ function numericCopy(f: DevelopmentCleanupFixture, journal: DevelopmentUsageJour
   return { control, calls, port, send, get session() { return session; }, get store() { return store; },
     restart: () => { session = factory(); store = drizzleDevelopmentUsageStore(f.tdb.db); } };
 }
-export async function developmentCleanupChain(mode: 'ledger' | 'native' = 'ledger', count = 3) {
-  const f = await developmentCleanupFixture(mode, false);
+export async function developmentCleanupChain(mode: 'ledger' | 'native' = 'ledger', count = 3, receiptProtection = false, historicalUnmarked = false) {
+  const f = await developmentCleanupFixture(mode, false, receiptProtection, historicalUnmarked);
   await runMigrations(f.tdb.db, [devSessionMigrations, sessionMigrations]);
   const original = await originalOwner(f), directory = await mkdtemp(join(tmpdir(), 'cs-development-cleanup-'));
   const journal = new DevelopmentUsageJournal(directory, { projectId: f.env.projectId, workspaceTaskId: f.parent.id, runtimeTaskId: f.env.id, podUid: f.env.native!.podUid! }, crypto.randomUUID());

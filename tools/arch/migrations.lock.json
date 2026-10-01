@@ -198,6 +198,7 @@
     "modules/task-runtime/adapters/persistence/migrations/0015_blocked_admissions.sql": "656114056bb766d02374037459cf37583df4ef05dbd69e3e3580ccbf43e8945f",
     "modules/task-runtime/adapters/persistence/migrations/0016_profile_test_admission_repair.sql": "9ad3bb8be2649e15e0e90f98d7e32d99406f5d532937aa8c8218717bd4c76b2d",
     "modules/task-runtime/adapters/persistence/migrations/0017_archive_executions.sql": "f1ebfd733a9f7e2b89a4ea1601db200d8492c57e4b7be479118ef51123f14b79",
+    "modules/task-runtime/adapters/persistence/migrations/0018_physical_environment_lookup.sql": "429c62863820eed180d37e7fe8324dbe815edd15d4238fe09e80743f706f78fa",
     "packages/eventbus/migrations/0001_domain_events.sql": "7ccc2ba8096db7efc7e2fa9c1818cac4042cafe73698a5bbee9652a3054225bc",
     "packages/eventbus/migrations/0002_resource_identity.sql": "b8c9081ea799d5d31a8d2a99324453003022d4d306a558b5776de0dee10b5957",
     "packages/eventbus/migrations/0003_resource_identity.identity.json": "8bfabfeaed4d5a6312b3bde66810ab01e9945b85a4e3220b55fd45107971651d",

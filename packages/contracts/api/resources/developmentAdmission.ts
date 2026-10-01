@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { WorkloadConsumerSchema, WorkloadStartPermitSchema } from './workloadSafety';
 
+// Recognition only: emitted on newly created objects, never a deletion permission.
+export const DEVELOPMENT_REMOVAL_ANNOTATION = 'crewstation.io/development-removal-protection';
+
 /** Private selection on a newly admitted independent development Agent; never a legacy upgrade. */
 export const DevelopmentRemovalProtectionSchema = z.strictObject({ version: z.literal(1) });
 export type DevelopmentRemovalProtection = z.infer<typeof DevelopmentRemovalProtectionSchema>;

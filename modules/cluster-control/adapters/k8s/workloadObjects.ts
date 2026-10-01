@@ -1,3 +1,4 @@
+import { DEVELOPMENT_REMOVAL_ANNOTATION } from '@crewstation/contracts';
 import type { K8sObject } from '@crewstation/k8s';
 import { LABELS, pvcObject, secretObject, taskPodObject, taskPreviewObjects } from '@crewstation/k8s';
 import type { VolumeRender, WorkloadPodRender, WorkloadPreviewRender } from '../../domain/workloadRender';
@@ -17,6 +18,7 @@ export function workloadPodObject(pod: WorkloadPodRender): K8sObject {
     ...(pod.nodeName ? { nodeName: pod.nodeName } : {}), ...(pod.labels ? { labels: pod.labels } : {}),
   });
   if (pod.annotations) object.metadata.annotations = { ...object.metadata.annotations, ...pod.annotations };
+  if (pod.developmentRemovalProtection !== undefined) object.metadata.annotations = { ...object.metadata.annotations, [DEVELOPMENT_REMOVAL_ANNOTATION]: '1' };
   return protectWorkloadPod(object, pod);
 }
 
@@ -24,6 +26,7 @@ export function workloadPodObject(pod: WorkloadPodRender): K8sObject {
 export function runnerSecretObject(pod: WorkloadPodRender, values: Readonly<Record<string, string>>): K8sObject {
   const secret = { ...secretObject({ name: pod.secret, namespace: pod.namespace, stringData: { ...values }, labels: { ...pod.labels, [LABELS.task]: pod.taskId } }), immutable: true } as K8sObject;
   if (pod.annotations) secret.metadata.annotations = { ...pod.annotations };
+  if (pod.developmentRemovalProtection !== undefined) secret.metadata.annotations = { ...secret.metadata.annotations, [DEVELOPMENT_REMOVAL_ANNOTATION]: '1' };
   return secret;
 }
 

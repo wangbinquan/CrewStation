@@ -1,4 +1,6 @@
 import { cleanupDevelopmentExecution } from './developmentCleanup';
+import { inspectDevelopmentRemoval } from './developmentRemoval';
+import { DEVELOPMENT_REMOVAL_ANNOTATION } from '@crewstation/contracts';
 import { isDeepStrictEqual } from 'node:util';
 import type { K8sClient, K8sObject, ResourceRef } from '@crewstation/k8s';
 import { LABELS, Resources, resourcesMatch, secretObject } from '@crewstation/k8s';
@@ -33,7 +35,7 @@ async function createOrRead<T extends K8sObject>(k8s: K8sClient, ref: ResourceRe
   if (found) return found;
   try {
     const object = await create();
-    object.metadata.annotations = { ...object.metadata.annotations, [intentKey]: intent(env) };
+    object.metadata.annotations = { ...object.metadata.annotations, [intentKey]: intent(env), ...(env.render?.developmentRemovalProtection !== undefined ? { [DEVELOPMENT_REMOVAL_ANNOTATION]: '1' } : {}) };
     return await k8s.create(object);
   }
   catch (error) {
@@ -87,6 +89,7 @@ function verifyDevelopmentStorage(pod: K8sObject, env: TaskEnvironment): void {
 export function kubernetesNativeExecutions(k8s: K8sClient, workerUid: number, safety?: Pick<WorkloadSafetyPort, 'register'>): NativeExecutionCluster {
   return {
     cleanupDevelopment: (env, guard) => cleanupDevelopmentExecution(k8s, env, guard),
+    inspectDevelopmentRemoval: (env, target, stopped) => inspectDevelopmentRemoval(k8s, env, target, stopped),
     inspectWorkspace: (parent) => inspectWorkspace(k8s, parent),
     prepare: async (env, values) => {
       const protection = await registerDevelopmentExecution(env, safety);

@@ -135,22 +135,22 @@ describe.skipIf(!available)('RFC-034 bound development native cleanup', () => {
     expect(await f.resources.api.occupancy(f.env.projectId)).toBe(2);
   });
   test('job takeover during Secret I/O cannot authorize the stale worker final quota transaction', async () => {
-    f = await developmentCleanupFixture(); await startStop(); const permit = (await f.load(f.env.id)).native!.developmentCleanup;
+    f = await developmentCleanupFixture('ledger', true, true); await startStop(); const permit = (await f.load(f.env.id)).native!.developmentCleanup;
     f.physical.state.beforeSecretDelete = async () => {
       f.physical.state.beforeSecretDelete = undefined;
       await f.tdb.db.execute(sql`UPDATE platform_infra.jobs SET lease_until = clock_timestamp() - interval '1 second' WHERE kind = ${NATIVE_EXECUTION_JOB_KIND} AND state = 'running'`);
       const [next] = await claimJobs(f.tdb.db, [NATIVE_EXECUTION_JOB_KIND], 'cleanup-final-takeover', 120, 1); expect(next?.fencingToken).toBeGreaterThan(2);
     };
-    await f.runNative(); expect((await f.load(f.env.id)).native?.state).toBe('cleaning');
+    await f.runNative(); expect((await f.load(f.env.id)).native?.state).toBe('cleaning'); expect((await f.load(f.env.id)).native?.developmentRemovalSeal).toBeUndefined();
     expect((await f.load(f.env.id)).native?.developmentCleanup).toEqual(permit); expect(await f.resources.api.occupancy(f.env.projectId)).toBe(2);
   });
   test('actual job takeover before digital commit rejects an old worker despite its optimistic heartbeat', async () => {
-    f = await developmentCleanupFixture();
+    f = await developmentCleanupFixture('ledger', true, true);
     f.control.onAdvance = async () => {
       await f.tdb.db.execute(sql`UPDATE platform_infra.jobs SET lease_until = clock_timestamp() - interval '1 second' WHERE kind = ${NATIVE_EXECUTION_JOB_KIND} AND state = 'running'`);
       const [next] = await claimJobs(f.tdb.db, [NATIVE_EXECUTION_JOB_KIND], 'cleanup-takeover', 120, 1); expect(next?.fencingToken).toBe(2);
     };
-    await f.runNative(); expect((await f.load(f.env.id)).native?.developmentCleanup).toBeUndefined(); expect(f.physical.state.deleteRequests).toEqual([]); expect(await f.resources.api.occupancy(f.env.projectId)).toBe(2);
+    await f.runNative(); expect((await f.load(f.env.id)).native?.developmentCleanup).toBeUndefined(); expect((await f.load(f.env.id)).native?.developmentRemovalSeal).toBeUndefined(); expect(f.physical.state.deleteRequests).toEqual([]); expect(await f.resources.api.occupancy(f.env.projectId)).toBe(2);
   });
   test('missing, malformed or wrong consumer/node physical proofs never mean stopped for development', async () => {
     f = await developmentCleanupFixture();

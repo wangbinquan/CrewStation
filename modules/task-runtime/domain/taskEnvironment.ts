@@ -42,6 +42,8 @@ export interface NativeExecution {
   readonly preparedAt?: string;
   /** Durable numeric exit only; physical stop and final reclaim remain independently required. */
   readonly developmentCleanup?: DevelopmentCleanupEvidence;
+  /** Atomic final receipt; private original hash is never returned by removal queries. */
+  readonly developmentRemovalSeal?: { readonly version: 1; readonly originalRunnerTokenHash: string; readonly selectionHash: string };
 }
 
 /**

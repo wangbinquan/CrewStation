@@ -1,4 +1,4 @@
-export type { DevelopmentCleanupEvidence, DevelopmentCleanupParticipant, DevelopmentCleanupSelection } from './api/developmentCleanup';
+export type { DevelopmentCleanupEvidence, DevelopmentCleanupParticipant, DevelopmentCleanupSelection, DevelopmentRemovalTarget, DevelopmentRemovalDecision } from './api/developmentCleanup';
 export type { CreateEnvironmentInput, CreateNativeExecutionInput, EnvironmentDto, EnvironmentState, ReleaseReason, TaskRuntimeModuleApi, TraceEnvironmentDto, TraceKeyDto, TraceKeyPage } from './api/moduleApi';
 export { createTaskRuntimeModule, taskRuntimeMigrations } from './wiring';
 export type { TaskRuntimeModule, TaskRuntimeModuleDeps } from './wiring';

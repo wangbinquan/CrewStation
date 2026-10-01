@@ -1,3 +1,4 @@
+import { developmentRemovalLookup } from './application/development/removalLookup';
 import { developmentCleanupSelection } from './domain/development/cleanupSelection';
 import type { DevelopmentCleanupParticipant } from './ports/developmentCleanup';
 import { developmentUsageLayoutLookup } from './application/development/layoutLookup';
@@ -172,6 +173,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     reconcileRebuild: reconcileRebuildUseCase(recoveryDeps),
     listClusterTasks: queries.listClusterTasks,
     lookupDevelopmentUsageLayout: developmentUsageLayoutLookup(useCaseDeps),
+    inspectDevelopmentRemoval: developmentRemovalLookup(executionDeps),
     inspectDevelopmentCleanupSelection: async (taskId) => { const env = await useCaseDeps.uow.read.environments.getById(taskId); return env ? developmentCleanupSelection(env) : undefined; },
     resourceWorkloads: queries.resourceWorkloads,
     resourceWorkload: queries.resourceWorkload,

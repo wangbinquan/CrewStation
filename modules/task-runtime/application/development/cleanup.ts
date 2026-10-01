@@ -1,4 +1,5 @@
 import { jsonHash, precondition } from '@crewstation/kernel';
+import { createDevelopmentRemovalSeal } from '../../domain/development/removalEvidence';
 import { developmentCleanupSelection } from '../../domain/development/cleanupSelection';
 import { requireDevelopmentCleanupEvidence } from '../../domain/development/cleanupEvidence';
 import type { DevelopmentCleanupSelection } from '../../domain/development/cleanupEvidence';
@@ -63,7 +64,7 @@ export async function cleanupDevelopmentWorkload(deps: Deps, original: TaskEnvir
     const n = env.native!, now = deps.clock.now();
     if (jsonHash(requireDevelopmentCleanupEvidence(n.developmentCleanup, selection)) !== jsonHash(evidence)) throw precondition('最终释放的原数字许可已冲突');
     await scope.environments.update({ ...env, state: n.failureReason ? 'failed' : 'released', connected: false, updatedAt: now,
-      runnerTokenHash: hashRunnerToken(newRunnerToken()), native: { ...n, state: 'finished' }, message: n.failureReason ?? '此 Agent 的原执行环境已回收，工作树保持' });
+      runnerTokenHash: hashRunnerToken(newRunnerToken()), native: { ...n, state: 'finished', ...(env.render?.developmentRemovalProtection !== undefined ? { developmentRemovalSeal: createDevelopmentRemovalSeal(env) } : {}) }, message: n.failureReason ?? '此 Agent 的原执行环境已回收，工作树保持' });
     if (occupiesQuota(env.state)) await scope.quota.release(env);
   });
 }

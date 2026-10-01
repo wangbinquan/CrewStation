@@ -27,6 +27,27 @@ describe.skipIf(!available)('RFC-034 actual bound development digital and physic
       expect(JSON.stringify(completed.native?.developmentCleanup)).not.toContain('owner-private-prompt');
     }, 15000);
   }
+  for (const mode of ['ledger', 'native'] as const) for (const historical of [false, true]) {
+    test(mode + (historical ? ' historical unmarked' : ' new marker') + ': generic deletion waits for actual SQLite to Session PG before accepting the original object', async () => {
+      f = await developmentCleanupChain(mode, 3, true, historical);
+      const target = { kind: 'Pod' as const, namespace: f.env.namespace, name: f.env.podName, uid: f.env.native!.podUid!, operation: 'delete' as const };
+      f.copy.control.copy = false; await f.runNative();
+      expect(await f.runtime.api.inspectDevelopmentRemoval(target)).toMatchObject({ kind: 'waiting' });
+      expect(f.physical.state.deleteRequests).toEqual([]);
+      expect(await f.copy.session.api.getDevelopmentUsage(f.env.id, f.registration.key)).toMatchObject({ persistedThrough: 0, closure: null });
+      f.copy.control.copy = true; await f.runNative();
+      expect(await f.copy.session.api.getDevelopmentUsage(f.env.id, f.registration.key)).toMatchObject({ persistedThrough: 3, runnerAcknowledgedThrough: 3 });
+      expect(await f.runtime.api.inspectDevelopmentRemoval(target)).toMatchObject({ kind: 'permitted' });
+      const runner = (await f.k8s.get(Resources.Secret!, f.env.podName + '-runner', f.env.namespace))!;
+      expect(await f.runtime.api.inspectDevelopmentRemoval({ ...target, kind: 'Secret', name: runner.metadata.name, uid: runner.metadata.uid! })).toMatchObject({ kind: 'waiting' });
+      const removed = f.wait('finalizer-removed'), controller = f.controller(); controller.observer.start();
+      await removed; await controller.reconciled(); await controller.observer.stop();
+      expect(await f.runtime.api.inspectDevelopmentRemoval({ ...target, kind: 'Secret', name: runner.metadata.name, uid: runner.metadata.uid! })).toMatchObject({ kind: 'permitted' });
+      await f.runNative(); await f.settle();
+      expect((await f.load(f.env.id)).native?.developmentRemovalSeal).toMatchObject({ originalRunnerTokenHash: f.env.runnerTokenHash });
+      expect(await f.resources.api.occupancy(f.env.projectId)).toBe(1);
+    }, 15000);
+  }
   test('uncopied final numeric tail holds original credentials and occupied quota, then resumes without replacing the owner', async () => {
     f = await developmentCleanupChain(); f.copy.control.copy = false;
     await f.runNative(); const pending = await f.load(f.env.id);

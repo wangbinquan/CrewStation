@@ -40,7 +40,7 @@ test('有会话时参考面板与其他工具并列；事件主题的链接指�
 
 const list = () => document.querySelector<HTMLElement>('[role="group"][aria-label="接口列表"]')!;
 /** 平台接口来自另一份读取（能力说明），可能比目录晚到几拍。 */
-async function listReady() { for (let attempt = 0; attempt < 10 && !document.querySelector('[role="group"][aria-label="接口列表"]')?.textContent?.includes('/business-tasks'); attempt++) await page!.settle(); }
+async function listReady(path = '/business-tasks') { for (let attempt = 0; attempt < 10 && !document.querySelector('[role="group"][aria-label="接口列表"]')?.textContent?.includes(path); attempt++) await page!.settle(); expect(Boolean(list()?.textContent?.includes(path))).toBe(true); }
 const rowOf = (path: string) => [...list().querySelectorAll<HTMLLIElement>('li')].find((row) => row.textContent?.includes(path))!;
 const groupTitles = (root: Element) => [...root.querySelectorAll('h3')].map((node) => node.firstElementChild?.textContent);
 async function type(node: HTMLInputElement | HTMLSelectElement, value: string) {
@@ -77,14 +77,28 @@ test('点路径在行下展开调用地址（代码里就写这个），平台�
 });
 
 test('侧栏里「申请」打开申请弹窗、不在行下展开，取消关窗；不跳到放大形态', async () => {
-  const f = projectResourcesFixture(); f.state.role = 'owner'; page = await renderApp(`/projects/${id}/dev-session?view=reference`);
-  const request = [...rowOf('/invoices').querySelectorAll('button')].find((node) => node.textContent === '申请')!;
-  expect(request.getAttribute('aria-label')).toBe('申请定向开放 GET /invoices');
-  await act(async () => request.click()); await page.settle();
-  // 2026-09-23 起申请表单在弹窗里：行下不再展开表单，弹窗写清申请的是哪个操作。
-  expect(rowOf('/invoices').querySelectorAll('textarea').length).toBe(0);
-  expect(document.querySelector('dialog[open]')?.textContent).toContain('GET /invoices'); expect(panel().dataset.mode).toBe('side');
-  await page.click('取消'); expect(document.querySelectorAll('dialog').length).toBe(0);
+  const f = projectResourcesFixture(); f.state.role = 'owner';
+  const fixtureFetch = globalThis.fetch;
+  let releaseCatalog!: () => void;
+  const catalogReady = new Promise<void>((resolve) => { releaseCatalog = resolve; });
+  globalThis.fetch = (async (raw, init) => {
+    if (new URL(String(raw), 'http://localhost').pathname === '/v1/catalog/operations') await catalogReady;
+    return fixtureFetch(raw, init);
+  }) as typeof fetch;
+  try {
+    page = await renderApp(`/projects/${id}/dev-session?view=reference`);
+    // 平台接口可先显示，但目录中的申请行仍未到：等待实际目标行，不能只等 /business-tasks。
+    expect(Boolean(document.querySelector('[role="group"][aria-label="接口列表"]')?.textContent?.includes('/invoices'))).toBe(false);
+    setTimeout(releaseCatalog, 0);
+    await listReady('/invoices');
+    const request = [...rowOf('/invoices').querySelectorAll('button')].find((node) => node.textContent === '申请')!;
+    expect(request.getAttribute('aria-label')).toBe('申请定向开放 GET /invoices');
+    await act(async () => request.click()); await page.settle();
+    // 2026-09-23 起申请表单在弹窗里：行下不再展开表单，弹窗写清申请的是哪个操作。
+    expect(rowOf('/invoices').querySelectorAll('textarea').length).toBe(0);
+    expect(document.querySelector('dialog[open]')?.textContent).toContain('GET /invoices'); expect(panel().dataset.mode).toBe('side');
+    await page.click('取消'); expect(document.querySelectorAll('dialog').length).toBe(0);
+  } finally { releaseCatalog(); }
 });
 
 test('接收事件：已订阅在上；可订阅的按生产方、事件族归并，点一个类型复制可直接粘进 crewstation.yaml 的订阅片段', async () => {

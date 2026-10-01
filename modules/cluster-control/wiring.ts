@@ -19,6 +19,7 @@ import type { Explainer } from './application/routeExplainer';
 import { routeTargets } from './application/routeExplainer';
 import { adoptionRoutes } from './http/adoptionRoutes';
 import type { ClusterWriter, ManagedObjectFeed, ManagedObjectReader, ObjectChange, ObservedKind, PodSubscriber } from './ports/cluster';
+import { guardedClusterWriter } from './adapters/k8s/developmentGuard';
 import type { JobOwners, LedgerObservations, LegacyOwners, SlotOwners, WorkloadOwners } from './ports/ledger';
 import { slotRenderOf } from './domain/slotRender';
 import type { LedgerReconcilerOptions, ReplicaLeases } from './workers/ledgerReconciler';
@@ -85,7 +86,7 @@ export function createClusterControlModule(deps: ClusterControlModuleDeps): Clus
   const reader = deps.reader ?? managedObjectReader(deps.k8s);
   const feed = deps.feed ?? managedObjectFeed(deps.k8s, { logger });
   const stats = newObservationStats();
-  const cluster = deps.cluster ?? kubernetesClusterWriter(deps.k8s, { systemNamespace: deps.systemNamespace, probeToken: '', probeRoot: '', probePort: 8095, ...deps.volumeProbe });
+  const cluster = deps.cluster ? guardedClusterWriter(deps.cluster, deps.k8s, deps.workloads?.inspectDevelopmentRemoval) : kubernetesClusterWriter(deps.k8s, { systemNamespace: deps.systemNamespace, probeToken: '', probeRoot: '', probePort: 8095, ...deps.volumeProbe }, deps.workloads?.inspectDevelopmentRemoval);
   const api: ClusterControlModuleApi = {
     name: 'cluster-control',
     projectDeletionOwner: (admission) => clusterProjectDeletionOwner(clusterDeletionSource(deps.k8s, deps.ledger, deps.systemNamespace, admission), admission),

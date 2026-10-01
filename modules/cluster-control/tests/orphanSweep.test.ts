@@ -118,6 +118,26 @@ describe.skipIf(!available)('孤儿回收（RFC-025 设计 §6.4、D8）', () =>
     expect(removed.filter((entry) => entry.startsWith('Secret/') && !entry.includes('-runner'))).toEqual(['Secret/git-cred-old']);
   });
 
+  // RFC-034: a refused numeric deletion is pending, not removed; independent old orphans still progress.
+  test('waiting Pod and unlabelled Secret do not count as removed or starve later orphan objects', async () => {
+    const scoped = [object('Pod', 'digital-pending', RELEASED), object('Pod', 'legacy-independent', RELEASED),
+      object('Secret', 'digital-pending-admission', undefined), object('Secret', 'legacy-unlabelled', undefined)];
+    const calls: string[] = [], messages: string[] = [];
+    const d = deps();
+    const run = () => sweepOrphans({ ...d, feed: { ...feed, list: (kind) => scoped.filter((entry) => entry.kind === kind) },
+      logger: { ...noopLogger, info: (message) => { messages.push(message); } },
+      cluster: { ...d.cluster, remove: async (target) => {
+        calls.push(target.name);
+        if (target.name.startsWith('digital-pending')) return { kind: 'waiting', reason: 'development-removal-evidence-pending' };
+      } },
+    });
+    expect(await run()).toEqual({ removed: 2, volumes: 0, waiting: 2 });
+    expect(d.stats.removed).toBe(2);
+    expect(calls).toEqual(scoped.map((entry) => entry.metadata.name));
+    expect(messages.filter((message) => message === 'resource orphan removed')).toHaveLength(2);
+    expect(messages.filter((message) => message === 'resource orphan removal waiting')).toHaveLength(2);
+  });
+
   test('节奏：同步后先等一阵再做第一轮，此后按周期；失败只记告警；停止时等本轮跑完', async () => {
     let calls = 0;
     const seen: string[] = [];

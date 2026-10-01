@@ -29,3 +29,10 @@ export interface DevelopmentCleanupEvidence {
 }
 export type DevelopmentCleanupResult = { readonly kind: 'waiting'; readonly reason: string } | { readonly kind: 'permitted'; readonly evidence: DevelopmentCleanupEvidence };
 export interface DevelopmentCleanupParticipant { advance(input: DevelopmentCleanupSelection): Promise<DevelopmentCleanupResult> }
+/** Owner-internal physical query. No credentials or digital evidence leave Task. */
+export interface DevelopmentRemovalTarget {
+  readonly kind: 'Pod' | 'Secret'; readonly namespace: string; readonly name: string; readonly uid: string;
+  readonly operation: 'delete' | 'stop-finalizer';
+}
+export type DevelopmentRemovalDecision = { readonly kind: 'unselected' } | { readonly kind: 'absent' }
+  | { readonly kind: 'waiting'; readonly reason: string } | { readonly kind: 'permitted'; readonly resourceVersion: string };

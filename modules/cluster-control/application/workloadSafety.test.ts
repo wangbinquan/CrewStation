@@ -63,3 +63,16 @@ test('durably closed, never-admitted consumers need no fabricated Pod proof', as
   await reconcileWorkloadSafety(f.deps, f.record, f.enqueue);
   expect(f.calls).toEqual(['condition:true']);
 });
+
+// RFC-034: physical stop alone cannot close the Controller finalizer while the digital copy waits.
+test('a digital finalizer refusal stays unknown and retries without discarding the saved physical proof', async () => {
+  const f = fixture(); f.behavior.saved = f.proof;
+  f.deps.cluster.releaseWorkloadStop = async () => { f.calls.push('finalizer-waiting'); return { kind: 'waiting', reason: 'development-removal-evidence-pending' }; };
+  await reconcileWorkloadSafety(f.deps, f.record, f.enqueue);
+  expect(f.calls).toEqual(['close', 'finalizer-waiting', 'condition:unknown', 'retry']);
+  expect(f.behavior.saved).toBe(f.proof);
+  f.calls.length = 0;
+  f.deps.cluster.releaseWorkloadStop = async () => { f.calls.push('finalizer'); };
+  await reconcileWorkloadSafety(f.deps, f.record, f.enqueue);
+  expect(f.calls).toEqual(['close', 'finalizer', 'condition:true']);
+});

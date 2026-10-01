@@ -43,7 +43,11 @@ async function proveConsumer(deps: WorkloadSafetyDeps, record: LedgerRecordView,
     proof = await safety.recordStop(observed.proof);
   }
   if (pod && pod.metadata.uid !== proof.podUid) throw new Error('消费者 Pod 已换成其他实例，拒绝复用旧停止证明');
-  await deps.cluster.releaseWorkloadStop(proof);
+  const released = await deps.cluster.releaseWorkloadStop(proof);
+  if (released?.kind === 'waiting') {
+    if (record.spec['workloadConsumerId'] === id) await deps.ledger.observeConditions(record.id, [{ type: 'WorkloadStopped', status: 'unknown', reason: released.reason, message: '原开发数字采集尚未确认，保留停止保护并等待重试' }]);
+    return false;
+  }
   if (record.spec['workloadConsumerId'] === id) await deps.ledger.observeConditions(record.id, [{ type: 'WorkloadStopped', status: 'true', reason: id }]);
   return true;
 }

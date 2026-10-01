@@ -18,7 +18,7 @@ const runnerName = (env: TaskEnvironment) => env.podName + '-runner';
 function value(secret: Secret, key: string): string | undefined {
   return secret.stringData?.[key] ?? (secret.data?.[key] ? Buffer.from(secret.data[key]!, 'base64').toString('utf8') : undefined);
 }
-function originalSecret(secret: Secret, env: TaskEnvironment, stop: DevelopmentPhysicalStopEvidence, admission: boolean, historicalUid?: string): string {
+export function originalSecret(secret: Secret, env: TaskEnvironment, stop: DevelopmentPhysicalStopEvidence, admission: boolean, historicalUid?: string): string {
   const uid = secret.metadata.uid;
   if (!uid || !secret.immutable || secret.metadata.namespace !== env.namespace || secret.metadata.name !== (admission ? env.podName + '-admission' : runnerName(env))
     || secret.metadata.labels?.[LABELS.task] !== env.id) throw precondition('原开发凭据的不可变归属已变化');
@@ -36,7 +36,7 @@ function originalSecret(secret: Secret, env: TaskEnvironment, stop: DevelopmentP
 function expectedPod(env: TaskEnvironment): K8sObject {
   return taskPodObject({ env, image: env.native!.image, envVars: {}, envSecretName: runnerName(env), resources: env.native!.profile, nodeName: env.native!.nodeName }, env.render!.workerUid);
 }
-function admittedSpec(object: K8sObject, env: TaskEnvironment): void {
+export function admittedSpec(object: K8sObject, env: TaskEnvironment): void {
   verifyDevelopmentCleanupExecution(object, developmentPod(env));
   const desired = structuredClone(expectedPod(env).spec) as Spec, live = object.spec as Spec;
   if (live.ephemeralContainers?.length) throw precondition('原开发 Pod 的受理容器集合已变化');
@@ -52,7 +52,7 @@ function admittedSpec(object: K8sObject, env: TaskEnvironment): void {
   }
   if (!k8sObjectCovers(live, desired)) throw precondition('原开发 Pod 的完整受理规格已变化');
 }
-function allOriginalContainers(env: TaskEnvironment, stopped: DevelopmentPhysicalStopEvidence): void {
+export function allOriginalContainers(env: TaskEnvironment, stopped: DevelopmentPhysicalStopEvidence): void {
   const spec = expectedPod(env).spec as Spec;
   for (const [kind, containers] of [['init', spec.initContainers], ['container', spec.containers]] as const) {
     if (containers.some((container) => !stopped.stopProof.containers.some((proof) => proof.kind === kind && proof.name === container.name))) throw precondition('原开发 Pod 的全部容器停止证明尚未齐全');

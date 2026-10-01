@@ -57,6 +57,9 @@ export interface ManagedObjectReader {
  * 调和器对集群的写：删除一律带 UID 前置条件，同名的新对象不会被误删。建与改先接路由（不含凭据，第三期后半）；
  * 任务容器与服务槽随凭据的裁定（I25）再移交。
  */
+export type { DevelopmentRemovalTarget, DevelopmentRemovalDecision, DevelopmentRemovalQuery } from './ledger';
+export type RemovalOutcome = void | { readonly kind: 'waiting'; readonly reason: string };
+export interface ClusterRemovalTarget { readonly kind: ObservedKind; readonly namespace?: string; readonly name: string; readonly uid: string; readonly resourceVersion?: string }
 export interface ClusterWriter {
   inspectTaskClaim?(namespace: string, name: string): Promise<{ namespace: string; name: string; uid: string } | undefined>;
   inspectTaskVolume?(namespace: string, name: string, now: Date): Promise<TaskVolumeTarget | undefined>;
@@ -67,11 +70,11 @@ export interface ClusterWriter {
   pendingDevelopmentAdmissionReceipts?(): readonly DevelopmentAdmissionReceipt[];
   acknowledgeDevelopmentAdmissionReceipt?(receipt: DevelopmentAdmissionReceipt): void;
   observeWorkloadStop?(consumer: WorkloadConsumer, now: Date): Promise<WorkloadStopObservation>;
-  releaseWorkloadStop?(proof: WorkloadStopProof): Promise<void>;
+  releaseWorkloadStop?(proof: WorkloadStopProof, resourceVersion?: string): Promise<RemovalOutcome>;
   inspectNamespaceRetirement?(name: string, intent: NamespaceRetirement, systemNamespace: string, signal?: AbortSignal): Promise<void>;
   removeRetiredNamespace?(name: string, intent: NamespaceRetirement, systemNamespace: string, signal?: AbortSignal): Promise<void>;
   rebuild?(render: WorkloadRender, intent: RebuildRender, signal?: AbortSignal): RebuildRendering;
-  remove(target: { readonly kind: ObservedKind; readonly namespace?: string; readonly name: string; readonly uid: string }): Promise<void>;
+  remove(target: ClusterRemovalTarget): Promise<RemovalOutcome>;
   /** 按路由期望渲染 IngressRoute，与观测缓存里的对象（current）比对：缺了或不一致才 apply。 */
   applyRoute(route: RouteRender, current: ObservedObject | undefined): Promise<'applied' | 'unchanged'>;
   /** 按限流策略渲染 Middleware（带所属记录的资源 ID 标签），同样缺了或不一致才 apply。 */

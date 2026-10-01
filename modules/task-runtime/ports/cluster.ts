@@ -1,6 +1,15 @@
-import type { DevelopmentCleanupGuard } from './developmentCleanup';
+import type { DevelopmentCleanupGuard, DevelopmentPhysicalStopEvidence } from './developmentCleanup';
 import type { StartupObservation } from '../domain/podStartup';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
+
+/** Owner-internal physical query. No credentials or digital evidence leave Task. */
+export interface DevelopmentRemovalTarget {
+  readonly kind: 'Pod' | 'Secret'; readonly namespace: string; readonly name: string; readonly uid: string;
+  readonly operation: 'delete' | 'stop-finalizer';
+}
+export type DevelopmentRemovalDecision = { readonly kind: 'unselected' } | { readonly kind: 'absent' }
+  | { readonly kind: 'waiting'; readonly reason: string } | { readonly kind: 'permitted'; readonly resourceVersion: string };
+
 
 /** 开发会话的源码检出：init 容器按分支克隆进工作卷，凭据只进 init 容器。 */
 export interface TaskSourceCheckout {
@@ -31,6 +40,7 @@ export interface NativeExecutionCluster {
   prepare(env: TaskEnvironment, values: () => Promise<Record<string, string>>): Promise<{ podUid: string; secretUid: string; token: string }>;
   cleanup(env: TaskEnvironment): Promise<void>;
   cleanupDevelopment?(env: TaskEnvironment, guard: DevelopmentCleanupGuard): Promise<void>;
+  inspectDevelopmentRemoval?(env: TaskEnvironment, target: DevelopmentRemovalTarget, stopped?: DevelopmentPhysicalStopEvidence): Promise<DevelopmentRemovalDecision>;
 }
 
 export type PodPhase = 'Pending' | 'Running' | 'Succeeded' | 'Failed' | 'Unknown' | 'Missing';

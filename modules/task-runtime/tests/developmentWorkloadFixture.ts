@@ -1,5 +1,5 @@
 import type { TaskId, TaskProfileDto } from '@crewstation/contracts';
-import { ProjectIdSchema, ServiceIdSchema, TaskIdSchema } from '@crewstation/contracts';
+import { DEVELOPMENT_REMOVAL_ANNOTATION, ProjectIdSchema, ServiceIdSchema, TaskIdSchema } from '@crewstation/contracts';
 import { eventbusMigrations } from '@crewstation/eventbus';
 import { newId, noopLogger } from '@crewstation/kernel';
 import { createFakeK8sClient, Resources } from '@crewstation/k8s';
@@ -54,11 +54,12 @@ async function originalWorkspace(base: Base, deps: Parameters<typeof createTaskR
   return { parent, parentPod, parentToken: token, pvc, prime };
 }
 type Faults = { bind: boolean; grant: boolean; activation: boolean };
-function controlledCluster(base: Base, calls: string[], faults: Faults, emit: (event: string) => void) {
+function controlledCluster(base: Base, calls: string[], faults: Faults, emit: (event: string) => void, historicalUnmarked: boolean) {
   const rawCreate = base.k8s.create.bind(base.k8s), rawGet = base.k8s.get.bind(base.k8s);
   base.k8s.get = async <T extends K8sObject>(...args: Parameters<typeof rawGet>) => { calls.push('get:' + args[1]); const object = await rawGet<T>(...args); emit('read:' + args[1]); return object; };
   base.k8s.create = async (input) => {
     const object = structuredClone(input);
+    if (historicalUnmarked && object.metadata.annotations) delete object.metadata.annotations[DEVELOPMENT_REMOVAL_ANNOTATION];
     if (object.kind === 'Pod' && object.metadata.labels?.['crewstation.io/workspace-task']) {
       const spec = object.spec as { nodeName?: string; containers: Array<{ env?: Array<{ valueFrom?: { fieldRef?: { apiVersion?: string } } }> }>; initContainers?: Array<{ env?: Array<{ valueFrom?: { fieldRef?: { apiVersion?: string } } }> }> };
       spec.nodeName = 'worker-one'; Object.assign(object, { status: { phase: 'Pending' } });
@@ -76,11 +77,11 @@ function workloadController(base: Base, runtime: () => ReturnType<typeof createT
     ledger: { ...base.resources.api, workloadSafety: safety, listLive: () => base.resources.api.list({}), children: (parentId) => base.resources.api.list({ parentId, includeStopped: true }), adoptOrphanVolume: async () => {} },
     legacy: { resolveTaskId: async () => undefined, task: async () => undefined },
     feed: { start: () => {}, stop: async () => {}, synced: async () => {}, cached: (kind, ns, name) => objects().find((o) => o.kind === kind && o.metadata.namespace === ns && o.metadata.name === name), list: (kind) => objects().filter((o) => o.kind === kind) },
-    workloads: { runnerValues: (id) => runtime().api.runnerValues(TaskIdSchema.parse(id)), checkoutValues: (id) => runtime().api.checkoutValues(TaskIdSchema.parse(id)),
+    workloads: { inspectDevelopmentRemoval: (target) => runtime().api.inspectDevelopmentRemoval(target), runnerValues: (id) => runtime().api.runnerValues(TaskIdSchema.parse(id)), checkoutValues: (id) => runtime().api.checkoutValues(TaskIdSchema.parse(id)),
       bindWorkload: async (id, podUid, secretUid) => { if (faults.bind) { emit('binding-failed'); throw new Error('bind commit lost'); } await runtime().api.bindWorkload(TaskIdSchema.parse(id), podUid, secretUid); emit('bound'); },
       workloadUnavailable: (id, code) => runtime().api.workloadUnavailable(TaskIdSchema.parse(id), code) } });
 }
-export async function developmentWorkloadFixture(creation: 'ledger' | 'native' = 'ledger', observed = true) {
+export async function developmentWorkloadFixture(creation: 'ledger' | 'native' = 'ledger', observed = true, historicalUnmarked = false) {
   const base = await developmentDatabase(), calls: string[] = [], faults: Faults = { bind: false, grant: false, activation: false }, deps = runtimeDeps(base, calls);
   const workspace = await originalWorkspace(base, deps), { parent, prime } = workspace;
   if (observed) await prime();
@@ -94,7 +95,7 @@ export async function developmentWorkloadFixture(creation: 'ledger' | 'native' =
     const done = () => { clearTimeout(timer); timers.delete(timer); resolve(); };
     listeners.set(event, [...listeners.get(event) ?? [], done]);
   });
-  controlledCluster(base, calls, faults, emit);
+  controlledCluster(base, calls, faults, emit, historicalUnmarked);
   const safety = { ...base.resources.api.workloadSafety, register: async (consumer: Parameters<typeof base.resources.api.workloadSafety.register>[0]) => {
     calls.push('register'); const value = await base.resources.api.workloadSafety.register(consumer); emit('registered'); return value;
   }, grantStart: async (id: string, permit: Parameters<typeof base.resources.api.workloadSafety.grantStart>[1]) => {
