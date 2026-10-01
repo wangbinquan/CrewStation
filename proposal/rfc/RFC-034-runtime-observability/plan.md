@@ -8,7 +8,7 @@
 
 [开发统计实施与验证](./development-statistics.md)的35路径实现独立复核v2 PASS，真实PG/SQLite定向55/0、四项静态成功。唯一完整检查4789pass/143skip/1fail；唯一失败来自运行中并行data-control两处结构边界，原作者修正后定向29/0，完整失败回执保留，35源码首尾一致。正式候选页面两级24组合几何、精确柱数字、48行末行下钻/5403px滚动恢复及Enter/Esc算力Dialog验证通过。
 
-34个不含共享platform/wiring.ts的独立源码/测试及本RFC三文档已精确发布为 `50dbd7a7464bbdd7ca304eb82dc2c47146f068fa`，[CI 36812019676](https://github.com/wangbinquan/CrewStation/actions/runs/36812019676)六项成功；2026-10-01T04:03:20.895Z本机控制/页面八服务升级完成，storage-contract=1、数字表存在、迁移applied=0、匿名200/401。Runner默认值保留2fb06f38。共享装配完整保留，等待并行网关依赖提交后发布；生产producer/全入口清理OFF，真实身份/模型/联动尚未验收。完整回执见开发统计末节。[通用删除与未绑定后续草案](./development-removal-barriers.md)已通过草案复核，未开始实现，仍需精确路径设计门。RFC保持In Progress。
+34条独立源码先发布于 `50dbd7a7`，完整共享装配与依赖已由原会话在 `65545ab4` 提交，包含全部并行输出。文档后继 `557cb50c5b6800771a5d016526d7a4d49d61eb77` 的 [CI 36813933923](https://github.com/wangbinquan/CrewStation/actions/runs/36813933923) 六项成功；2026-10-01T04:32:58.487Z 本机八服务同 SHA 升级完成，默认 Runner 保留 2fb06f38。首次 CAS 中断/迁移 applied=1 与随后完整部署分开记录，实际八组件、OCI 来源、数字表及匿名 200/401 已独立核验，详见[完整装配回执](./development-statistics.md#2026-10-01-完整共享装配发布与实际升级)。开发事实/数值 consumer 已装配，生产 producer/全入口清理 OFF，真实身份/模型/联动尚未验收。[通用删除与未绑定后续草案](./development-removal-barriers.md) 只通过草案复核，未开始实现，仍需精确路径设计门。RFC 保持 In Progress。
 
 ## 本次交付
 

@@ -1,10 +1,10 @@
 # RFC-034 开发来源与项目、系统消耗明细
 
-状态：35路径实现候选独立完整复核PASS；其中34个独立源码/测试及本RFC三文档已精确发布为 `50dbd7a7464bbdd7ca304eb82dc2c47146f068fa`，[CI 36812019676](https://github.com/wangbinquan/CrewStation/actions/runs/36812019676)六项成功，并于2026-10-01T04:03:20.895Z完成本机八服务升级。共享platform装配仍原样暂留，依赖并行RFC-037代码发布；开发事实/consumer正式装配未接通。生产开发producer及全入口清理OFF，未绑定和通用回收入口未完成。
+状态：35个源码/测试路径已全部发布，原实现复核 PASS 和内容指纹保持。34条独立源码先发布于 `50dbd7a7`；完整共享装配与其网关依赖由原会话完整发布于 `65545ab4`，没有剥离并行输出。文档后继 `557cb50c5b6800771a5d016526d7a4d49d61eb77` 的 [CI 36813933923](https://github.com/wangbinquan/CrewStation/actions/runs/36813933923) 六项成功，2026-10-01T04:32:58.487Z 本机八服务完成升级；开发事实查询及 Session 数值 consumer 已装配。生产开发 producer 与全入口清理仍 OFF；未绑定、通用回收、CLI、算力测试和真实身份/模型/联动尚未完成。
 
 ## 要解决的实际问题
 
-本批实现前，RuntimeStatistics 合同的 sourceScope 仅为 business-tasks，统计账本读取使用业务 identity/capture schema。本批已发布合同和查询实现支持 project-executions 与开发完整身份；每个开发数字记录的 taskId 实际是父工作区，明细读取据此再核对真实独立 execution/Agent/generation。内部 consumer 已能核原 Session registration、owner 原受理/人民币目录、实际原生来源并将数值和估值持久落账；当前已提交与部署的组合根仍只注入 readBusinessObservationFacts，开发事实与数值来源尚待共享装配发布。
+本批实现前，RuntimeStatistics 合同的 sourceScope 仅为 business-tasks，统计账本读取使用业务 identity/capture schema。本批已发布合同和查询实现支持 project-executions 与开发完整身份；每个开发数字记录的 taskId 实际是父工作区，明细读取据此再核对真实独立 execution/Agent/generation。内部 consumer 已能核原 Session registration、owner 原受理/人民币目录、实际原生来源并将数值和估值持久落账；当前已提交与部署的组合根在同一 executor 快照注入业务与开发 owner 事实，并装配 Session 原数字 consumer；生产 producer 仍未启用，没有据此声称已产生真实开发 Token。
 
 用户需在同一个项目中看到业务任务、开发 Agent 分别用了哪个算力、各消耗多少，并能进入具体执行；系统页能按项目和用途对账。不能由页面增加几行模拟值宣告采集已完成。
 
@@ -127,3 +127,13 @@ sourceKind范围在组合器调用/各owner SQL限额前应用；overview合并�
 - 数据库：升级前0600私有备份43029911字节，SHA256 `c65b4a76c0bb978805964820dd032a9b2a567e8ead71c92578ad86ccc8270b31`；实际迁移Job UID `5819c27c-19d7-403f-af5e-89452446cb38`，Complete、applied=0、roles.initialized=0。
 - 匿名检查：2026-10-01T04:04:26.407775+00:00，console.cs.localhost/auth/login为200，未登录根为401，八服务实际镜像与保留Runner值对拍。正式候选24组合几何和system 48行返回/键盘证据仍为只读HTTP形状夹具；没有真实身份/模型或CS→AW联动验收。
 - 继续：[通用删除与未绑定屏障草案](./development-removal-barriers.md)仅经草案复核，未冻结实现allowlist。共享事实/consumer装配及生产producer仍OFF，CS-R02/03/04/13和完整RFC保持开放。
+
+## 2026-10-01 完整共享装配发布与实际升级
+
+- 组合根：原会话在 `65545ab44dddf09edb358cd0f7af5060cb5ae3f9` 完整提交 platform/wiring.ts 与全部网关依赖，包含本会话已复核的开发事实/数值 consumer 接线，并明确保留并行输出。原 35 条源码逐个与实现 PASS、工作树和 `557cb50c` 提交树对拍，全部一致；沿用单次完整检查与外部结构定向闭环，没有重复完整门禁。
+- 精确远端：文档后继 `557cb50c5b6800771a5d016526d7a4d49d61eb77` 的 [CI 36813933923](https://github.com/wangbinquan/CrewStation/actions/runs/36813933923) static/unit/module/console/gate/e2e 六项全部 completed/success。本节是完整组合回执；上一节 `50dbd7a7` 仅独立源码/页面的历史边界保留。
+- 部署过程：本会话先完成私有备份和迁移，Session/API/Auth 换镜像后，下一组件 resourceVersion 与捕获值不同，CAS 阻止覆盖并中断。没有回滚、删除并行部署或并发重试。原会话随后使用相同 `557cb50c` 的两镜像完成八组件升级，完成时间 `2026-10-01T04:32:58.487Z`；本会话独立读取实际 Deployment、OCI 内容、ConfigMap 与数字表核验成功，原项目对象/Namespace/PV UID 无缺失。不能把中断的首次尝试写成成功。
+- 实际镜像：console `docker.io/library/cs-console@sha256:9096366dd272ba413a7dbc8016b6762d9f2910eb4a36f12315e346a4f1071bb1`；control-plane `docker.io/library/cs-control-plane@sha256:8b58a290e9bd5dd96dd3771d89c429f5ab3a736655d1790efb82e74b7e73a46f`，两者实际 OCI revision 都为完整 `557cb50c`。八服务 Ready=1 且 generation=observedGeneration，storage-contract=1，owner/Session 数字表存在。实际默认 Runner 保留 `registry.crewstation-system.svc.cluster.local:5000/crewstation/task-runtime@sha256:587a0766440bae22f69bd6e68e101f2348ec8bda95f8b4c3ce6ddef0fa010928`，来源仍 `2fb06f38`。
+- 数据库：首次部署私有 0600 备份 42854692 字节，SHA256 `f766c27c178b6d142904c398d8b4cb76ef5fb7135ab89a45a6f2e9ee10548037`；首次迁移 Job UID `15a259ad-6f32-4452-a7a3-b8ee3d93af5e` Complete、实际 applied=1（gateway/0011_project_deletion_fences.sql），roles.initialized=0。并行完成部署的迁移 Job UID `c9db12cc-9760-4b78-8b08-cc4d5fcef92e` 另行 Complete；同 UID 的实际日志 applied=0、roles.initialized=0。首次 applied=1 与第二次 applied=0 分别保留。
+- 只读验收：`2026-10-01T04:34:51.903628+00:00`，实际八组件与两个来源摘要对拍；console.cs.localhost/auth/login=200、未登录根=401。生产 producer/全入口 cleanup 仍未注入，真实身份/模型、真实开发数字和 CS→AW 联动没有验收。正式候选浏览器证据仍是 HTTP 形状夹具；项目长列表/键盘未另行实测。
+- 后续：CS-R05 的两级模块、页面、完整查询/消费装配已发布、精确 CI 通过并部署，真实采集仍依赖 CS-R02/03/04；CS-R13 与两个完整 RFC 继续 In Progress。通用删除/未绑定草案仍只通过草案复核，精确实现设计门尚待。

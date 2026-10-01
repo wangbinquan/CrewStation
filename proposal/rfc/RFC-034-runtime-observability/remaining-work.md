@@ -6,17 +6,17 @@
 
 [两级开发明细](./development-statistics.md)的35路径实现已通过独立完整复核：同快照原owner事实、Session PG数字消费、来源范围/预算隔离、原算力逐对象摘要和两级正式页面。定向55/0、四项静态成功；完整4789/143skip/1fail仅为并行data-control结构违规，原作者修正后定向29/0，35源码未变。实际页面的24组合、标准12px间隔、大整数柱数字、48行末行返回/原滚动焦点及键盘Dialog通过；仅HTTP形状夹具，没有真实身份/模型。
 
-34个独立源码/测试已随 `50dbd7a7464bbdd7ca304eb82dc2c47146f068fa` 精确发布，[CI 36812019676](https://github.com/wangbinquan/CrewStation/actions/runs/36812019676)六项成功并完成本机八服务升级。共享platform/wiring.ts含并行RFC-037未提交依赖，完整保留并等待依赖发布；开发事实/consumer正式装配仍未接通。生产producer/全入口清理OFF，CS-R02/03/04/13保持未完成。[通用删除与未绑定后续草案](./development-removal-barriers.md)已落档并经草案复核，不等于实现设计门通过。
+34条独立源码先发布于 `50dbd7a7`，第35条共享 platform/wiring.ts 和完整网关依赖由原会话完整发布于 `65545ab4`；本会话输出与并行输出均保留。文档后继 `557cb50c5b6800771a5d016526d7a4d49d61eb77` 的 [CI 36813933923](https://github.com/wangbinquan/CrewStation/actions/runs/36813933923) 六项成功，并于 2026-10-01T04:32:58.487Z 完成本机八服务升级，实际 OCI 来源已独立核对。开发事实查询和 Session 数字 consumer 已正式装配；生产 producer/全入口清理 OFF，CS-R02/03/04/13 仍未完成。[通用删除与未绑定后续草案](./development-removal-barriers.md) 已经草案复核，不等于精确实现设计门通过。
 
 ## 当前已实现与实际部署
 
-当前本机控制服务与页面源码版本：`50dbd7a7464bbdd7ca304eb82dc2c47146f068fa`，2026-10-01T04:03:20.895Z部署完成；[精确CI 36812019676](https://github.com/wangbinquan/CrewStation/actions/runs/36812019676)六项成功。八服务Ready=1、代次一致、storage-contract=1、数字表存在，迁移Complete/applied=0，两个新镜像与实际来源对拍。Runner默认镜像与代码保留原2fb06f38，不替换已有环境。2026-10-01T04:04:26.407775+00:00公开登录HTTP200、未登录根HTTP401。原bound清理及两级明细模块/页面已部署；开发事实/consumer组合根、producer与全入口清理尚未接通。
+当前本机控制服务与页面源码版本：`557cb50c5b6800771a5d016526d7a4d49d61eb77`，2026-10-01T04:32:58.487Z 部署完成；[精确 CI 36813933923](https://github.com/wangbinquan/CrewStation/actions/runs/36813933923) 六项成功。八服务 Ready=1、代次一致、storage-contract=1、数字表存在；首次迁移实际 applied=1、随后并行同 SHA 部署迁移也 Complete，过程与中断历史见[完整装配回执](./development-statistics.md#2026-10-01-完整共享装配发布与实际升级)。默认 Runner 与已有执行保持 `2fb06f38` 原摘要。2026-10-01T04:34:51.903628+00:00 匿名登录=200、未登录根=401；没有真实身份切换或模型验收。开发 owner 事实/Session consumer 已接通，生产 producer、全入口清理、CLI 与算力测试仍未接通。
 
 前一完整三镜像批次：`2fb06f388fc3bfc10ae7c34b5603a8711a5d45af`，2026-10-01T01:40:44.408Z部署，[精确CI 36801111766](https://github.com/wangbinquan/CrewStation/actions/runs/36801111766)六项成功。原回执保留于[绑定清理](./development-cleanup.md)，不能用本次UI/模块部署关闭未绑定/通用入口或真实模型验收。
 
 正式项目/系统统计已有业务任务、Agent/尝试、四桶 Token、人民币估值、基础泳道、算力贡献下钻和采集质量；项目与算力显示名称，保留稳定 ID/受理修订。已有价格配置与冻结目录、OpenCode 根/子树采集、原归属修订和原价补算；资源/容量和当前服务槽/平台 Pod 健康已有入口。
 
-页面修正、实际 Token 柱形数字、时间按钮对齐、项目/算力名称和取消 CSV 已在本机部署。已部署的 `50dbd7a7` 及当前已提交的组合根仍仅返回 `business-tasks`。本批合同已新增 `project-executions` 能力，但开发事实与数字 consumer 的组合根装配尚未发布；合同能力和夹具验证不能当成生产开发 Token 已接通。
+页面修正、实际 Token 柱形数字、时间按钮对齐、项目/算力名称和取消 CSV 已部署。历史独立源码批 `50dbd7a7` 当时的组合根仅注入业务事实；当前 `557cb50c` 已部署同快照业务/开发事实和原 Session 数值 consumer，合同支持 `business-tasks` 与 `project-executions`。生产开发 producer 与全入口 cleanup 仍未启用，开发显示 production-disabled；完整查询/消费接线和夹具验证不能当成真实开发 Token、CLI 或算力测试已采集。
 
 | 批次 | 已有证据 | 尚缺的关闭条件 |
 | --- | --- | --- |
@@ -30,9 +30,9 @@
 | 原键持久停止（已推送/CI成功/本机部署，生产不调用） | 独立限定实现门PASS；相关47/0与完整4307/142skip/0、23路径指纹一致 | bebb3d9b精确发布、六项CI成功及八组件本机部署；仍需实际原生来源、owner全派发/删除屏障、consumer/两级事实UI |
 | 实际原生来源第一批（已推送/CI成功/本机部署，生产不调用） | 严格可选能力与Hook前选择、实际环境/文件身份、同轮模型、独立begin/finish和journal，最终30源码/测试独立门PASS；相关77/0、合同族34/0及精确lint通过 | d01ba8223的六项CI全部success，本机八组件Ready；本机全量被并行迁移阻断的记录保留。owner挂载/派发/完整删除屏障、consumer原价历史归属、两级事实/UI及实际验收继续 |
 
-内部持久consumer、原键派发、持久结束与Session独立登记查询均已精确发布并部署；原965b45e8、646da1e9、94378917及05d4ca01均为远端祖先。实际布局808c5af0、普通启动屏障7682fff3及原选择派发恢复3480032c也已分别通过自身六项CI，并随3480032c进入实际镜像。各批原门禁失败及比例闭环历史完整保留。生产source尚未注入，两级开发事实/UI、owner派发/所有删除排空仍须接通，CS-R02不关闭。详见各专题与[当前部署回执](./development-protection.md#2026-10-01-精确发布ci与本机部署)。
+内部持久consumer、原键派发、持久结束与Session独立登记查询均已精确发布并部署；原965b45e8、646da1e9、94378917及05d4ca01均为远端祖先。实际布局808c5af0、普通启动屏障7682fff3及原选择派发恢复3480032c也已分别通过自身六项CI，并随3480032c进入实际镜像。各批原门禁失败及比例闭环历史完整保留。生产 producer 仍未启用；两级开发事实/UI 与消费已由后续完整装配接通，owner 全派发/所有删除排空仍待完成，CS-R02 不关闭。详见各专题与[当前部署回执](./development-protection.md#2026-10-01-精确发布ci与本机部署)。
 
-源码锚点：[本批统计合同](../../../packages/contracts/api/observability/runtimeStatistics.ts) 支持 `business-tasks` 与 `project-executions`，cohort 字段仍为 `started`；业务样本按任务启动时间、开发样本按原受理时间进入范围。[platform 装配](../../../modules/platform/wiring.ts) 的已提交版本仅注入业务事实/数值来源，工作树完整在制版本已接入两类事实与可选开发 consumer，但包含并行网关未提交依赖，暂留且不在本批提交内。当前控制/页面部署为前述 `50dbd7a7`，Runner仍保留 `2fb06f38`。[平台健康说明](../../../apps/console/src/features/observability/i18n/zh-CN.ts) 仍明确应用级指标尚未采集。
+源码锚点：[本批统计合同](../../../packages/contracts/api/observability/runtimeStatistics.ts) 支持 `business-tasks` 与 `project-executions`，cohort 字段仍为 `started`；业务样本按任务启动时间、开发样本按原受理时间进入范围。[platform 装配](../../../modules/platform/wiring.ts) 的完整已提交/部署版本在同一快照注入业务和开发事实，提供可选 Session 开发数值 consumer；其生产 producer/全入口 cleanup 仍未注入。当前控制/页面部署为前述 `557cb50c`，Runner 保留 `2fb06f38`。[平台健康说明](../../../apps/console/src/features/observability/i18n/zh-CN.ts) 仍明确应用级指标尚未采集。
 
 ## 执行顺序与依赖
 
@@ -80,7 +80,7 @@ CS-R01 的失败若不影响开发设计，可以并行推进文档与其他非�
 - 依赖：Runner 数字能力及 agent-runtime 的真实受理事实，旧测试没有来源时不补历史零。
 - 退出证据：失败/取消测试也保留消耗，重复回执不重计、零/未知/未定价区分，项目接口不可见平台内部金额。
 
-### CS-R05 项目→来源→算力→执行明细〔独立源码已发布/CI通过/已部署，完整装配待完成；T4～6/T9、PO-01/02/03/11〕
+### CS-R05 项目→来源→算力→执行明细〔模块/完整装配已发布、CI通过、已部署；实采与联动未验收；T4～6/T9、PO-01/02/03/11〕
 
 - dev-session/task-runtime 各自提供有界事实查询，通过 platform 在同一快照装配；observability 不联查其他 owner 的私表。
 - 开发执行按受理时间进入样本，不能因为父工作区很早创建就漏掉今日消耗。详情 ID 用真实独立环境，读账本时按父工作区再按完整执行身份过滤。
