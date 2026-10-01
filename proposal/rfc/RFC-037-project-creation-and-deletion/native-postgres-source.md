@@ -24,6 +24,8 @@ data-control L2 接收只读 NativePostgresSource 反转端口，由组合根装
 
 resources 经公开端口提供全部历史 database/data-binding 原记录与子身份；data 提供旧资源/临时角色/已加密 DSN 的原归属。不能用 capped listLive 或跨 schema SQL 清理旧资源。data-control 自己管理原归属、口令/pending rotation、原 callback、最小 OID/来源/隔离意图和清理回执。
 
+原生历史端口先落实保留台账层：同一只读 repeatable-read 快照内，以原主键续页读尽全部原项目记录及原子对象，不用 OFFSET、listLive 或条数上限。包含停止、失败、压缩和仍在途的 database/data-binding，以及其他种类里意外出现的原生子对象。retainedRecordsComplete 只表示保留台账已读完，不表示全部原生 OID/来源历史完整。records 保留当前声明与原观测 UID；gaps 明确指出压缩清空、旧版本正文未保存、异常声明/归属，正式 owner 必须补齐独立持久事实才能移除缺口。当前 changes 仅保存计数和时钟，不能据此恢复丢失的旧 OID 或暗示清理成功。
+
 seal 在独占原项目准入内关闭所有供给/口令/轮换入口并核对完整范围；drain 同时等待实际 callback 和原生名字锁。purge 根据已确认原 OID 删除原库/角色，保护未知消费者、外部对象及其他项目成员关系；数据库和角色的依赖须按完整集合调度，不能因临时写角色拥有本项目表而形成“先删角色、再删库”的永久等待。正常 DROP 原库会一并清理库内依赖，随后再次普通 DROP 原角色；不转移或删除其他数据库对象。
 
 只有原库全部目录实际归零、原角色及依赖归零、原 callback 排空、全部来源稳定，才能清除口令等内容并给出正式证明。原最小清理意图保留到根 verify；共享 PostgreSQL Pod、PVC/PV、系统角色和其他库保持。

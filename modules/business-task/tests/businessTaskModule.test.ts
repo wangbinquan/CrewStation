@@ -2,12 +2,15 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { ProfileRevisionRef, ProjectId, ReleaseId, RunnerCommand, RunnerEvent, ServiceActor, ServiceId, TaskId } from '@crewstation/contracts';
 import { BUILTIN_RESOURCES, ClusterOperationSchema, ClusterResourceSchema, LaunchSpecSchema } from '@crewstation/contracts';
 import { eventbusMigrations } from '@crewstation/eventbus';
-import { newResourceId, forbidden, precondition, quotaExceeded, validation } from '@crewstation/kernel';
+import { newResourceId, forbidden, precondition, quotaExceeded, validation, noopLogger, systemClock } from '@crewstation/kernel';
 import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import type { ComputeCatalog, EnvironmentView } from '../ports/runtime';
 import type { BusinessTaskModule } from '../wiring';
 import { businessTaskMigrations, createBusinessTaskModule } from '../wiring';
+import { drizzleUnitOfWork } from '../adapters/persistence/drizzleUnitOfWork';
+import { subtaskRefresh } from '../application/subtaskRefresh';
+import { sql } from 'drizzle-orm';
 
 const fixtureIds = new Map<string, string>();
 const fixtureResource = (key: string) => { if (!fixtureIds.has(key)) fixtureIds.set(key, newResourceId()); return fixtureIds.get(key)!; };
@@ -203,6 +206,45 @@ describe.skipIf(!available)('business-task module', () => {
       expect(await eventually(() => bt.api.subtaskOutput(caller, task.id, command.id), (output) => output !== '')).toBe('done\n');
       expect(await bt.api.getSubtask(caller, task.id, command.id)).toMatchObject({ state: 'succeeded', exitCode: 0 });
     } finally { execControls.hold = undefined; }
+  });
+
+  test('旧 running 快照迟到收尾不能抹掉已提交输出或重复终结事件', async () => {
+    let release!: () => void;
+    execControls.hold = new Promise<void>((resolve) => { release = resolve; });
+    try {
+      const task = await bt.api.createTask(caller, { labels: {} });
+      const command = await bt.api.submitSubtask(caller, task.id, { kind: 'command', name: 'stale-read', command: ['bun', 'test'], timeoutSeconds: 60 });
+      const uow = drizzleUnitOfWork(tdb.db), stale = await uow.read.subtasks.getById(command.id);
+      expect(stale?.state).toBe('running'); expect(stale?.output).toBeUndefined();
+      release();
+      expect((await eventually(() => uow.read.subtasks.getById(command.id), (run) => run?.output === 'done\n'))?.output).toBe('done\n');
+      const refresh = subtaskRefresh({ ...moduleDeps, uow, clock: systemClock, logger: noopLogger });
+      const refreshed = await refresh.refresh(stale!);
+      const stored = await uow.read.subtasks.getById(command.id);
+      const events = await tdb.db.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM platform_infra.domain_events WHERE topic='business-task.subtask-finished' AND payload->>'subtaskId'=${command.id}`);
+      expect({ returned: refreshed.output, stored: stored?.output, events: events[0]?.n }).toEqual({ returned: 'done\n', stored: 'done\n', events: 1 });
+      expect(await bt.api.subtaskOutput(caller, task.id, command.id)).toBe('done\n');
+    } finally { release(); execControls.hold = undefined; }
+  });
+
+  test('两个实际事务按同一退出事件并发收尾只提交一次终结，迟到结果仍能补齐输出', async () => {
+    let release!: () => void;
+    execControls.hold = new Promise<void>((resolve) => { release = resolve; });
+    try {
+      const task = await bt.api.createTask(caller, { labels: {} });
+      const command = await bt.api.submitSubtask(caller, task.id, { kind: 'command', name: 'concurrent-finish', command: ['bun', 'test'], timeoutSeconds: 60 });
+      const uow = drizzleUnitOfWork(tdb.db), stale = (await uow.read.subtasks.getById(command.id))!;
+      const exited = (event: RunnerEvent) => event.kind === 'execExited' && event.execId === stale.runnerRef;
+      expect((await eventually(() => moduleDeps.runner.listEvents(task.id, { kinds: ['execExited'], limit: 5000 }), (list) => list.some((entry) => exited(entry.event)))).some((entry) => exited(entry.event))).toBe(true);
+      const deps = { ...moduleDeps, uow, clock: systemClock, logger: noopLogger };
+      const finishes = await Promise.all([subtaskRefresh(deps).refresh(stale), subtaskRefresh(deps).refresh(stale)]);
+      expect(finishes.map((run) => run.state)).toEqual(['succeeded', 'succeeded']);
+      expect(finishes[0]?.endedAt).toEqual(finishes[1]?.endedAt);
+      release();
+      expect((await eventually(() => uow.read.subtasks.getById(command.id), (run) => run?.output === 'done\n'))?.output).toBe('done\n');
+      const events = await tdb.db.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM platform_infra.domain_events WHERE topic='business-task.subtask-finished' AND payload->>'subtaskId'=${command.id}`);
+      expect(events[0]?.n).toBe(1);
+    } finally { release(); execControls.hold = undefined; }
   });
 
   test('容器未连接时子任务留在 pending，TaskRunner 连上后补发', async () => {

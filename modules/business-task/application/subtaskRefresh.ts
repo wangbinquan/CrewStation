@@ -1,11 +1,22 @@
 import type { AgentEvent, RunnerEvent } from '@crewstation/contracts';
 import { DomainTopic } from '@crewstation/contracts';
-import { isPlatformError } from '@crewstation/kernel';
+import { isPlatformError, notFound } from '@crewstation/kernel';
 import type { SubtaskRun } from '../domain/subtaskRun';
 import { isTerminal, outcomeOfContract, runnerTaskOf, transition } from '../domain/subtaskRun';
 import type { BusinessTaskUseCaseDeps } from './dependencies';
 
 type AgentRunnerEvent = Extract<RunnerEvent, { kind: 'agent' }>;
+
+async function rememberExecutionRelease(uow: BusinessTaskUseCaseDeps['uow'], run: SubtaskRun): Promise<SubtaskRun> {
+  return uow.run(async (scope) => {
+    const current = await scope.subtasks.getById(run.id, { forUpdate: true });
+    if (!current) throw notFound('子任务', run.id);
+    if (!current.execution || current.execution.released || current.execution.taskId !== run.execution!.taskId) return current;
+    const released: SubtaskRun = { ...current, execution: { ...current.execution, released: true } };
+    await scope.subtasks.update(released);
+    return released;
+  });
+}
 
 /** 从 TaskRunner 的持久事件推进子任务状态；契约在 Agent 结束后由 TaskRunner 校验（AT-26）。`awaiting`：本进程还在等结果的 exec（见 subtaskLaunch）。 */
 export function subtaskRefresh(deps: BusinessTaskUseCaseDeps, awaiting: ReadonlySet<string> = new Set()) {
@@ -18,20 +29,30 @@ export function subtaskRefresh(deps: BusinessTaskUseCaseDeps, awaiting: Readonly
     catch (error) {
       if (!isPlatformError(error) || error.kind !== 'not_found') { logger.warn('subtask execution release will retry', { subtaskId: run.id, error: String(error) }); return run; }
     }
-    const released: SubtaskRun = { ...run, execution: { ...run.execution, released: true } };
-    await uow.run((scope) => scope.subtasks.update(released));
-    return released;
+    return rememberExecutionRelease(uow, run);
   };
 
   const finish = async (run: SubtaskRun, next: SubtaskRun): Promise<SubtaskRun> => {
-    await uow.run(async (scope) => {
+    const saved = await uow.run(async (scope) => {
+      const current = await scope.subtasks.getById(run.id, { forUpdate: true });
+      if (!current) throw notFound('子任务', run.id);
+      // 读 running 后实际结果可能先提交。终态由原行决定，旧快照不得清空输出或再发终结事件。
+      if (isTerminal(current)) {
+        if (current.kind === 'command' && current.state === next.state && current.output === undefined && next.output !== undefined && current.exitCode === next.exitCode) {
+          const completed = { ...current, output: next.output };
+          await scope.subtasks.update(completed);
+          return completed;
+        }
+        return current;
+      }
       await scope.subtasks.update(next);
       if (isTerminal(next)) {
         const task = await scope.tasks.getById(run.taskId);
         await scope.events.publish(DomainTopic.subtaskFinished, { occurredAt: clock.now().toISOString(), ...(task ? { traceId: task.traceId } : {}), taskId: run.taskId, subtaskId: run.id, state: next.state as 'succeeded' | 'failed' | 'cancelled', attempt: next.attempt });
       }
+      return next;
     });
-    return isTerminal(next) ? releaseExecution(next) : next;
+    return isTerminal(saved) ? releaseExecution(saved) : saved;
   };
 
   const verify = async (run: SubtaskRun, patch: Partial<SubtaskRun>): Promise<SubtaskRun> => {

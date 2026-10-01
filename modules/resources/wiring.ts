@@ -25,6 +25,7 @@ import { workloadSafetyRepository } from './adapters/persistence/safety/reposito
 import { taskVolumeRepository } from './adapters/persistence/safety/volumes';
 import { commitRecord } from './application/commit';
 import { resourceProjectDeletionOwner } from './application/deletion/owner';
+import { readNativePostgresHistory } from './adapters/persistence/deletion/inventory';
 import { assertClusterDeletionAdmission, resourceDeletionRepository, sealClusterDeletionAdmission } from './adapters/persistence/deletion/repository';
 import { resourceDeletionWriteError } from './adapters/persistence/deletion/errors';
 import { ownsDeletionVolume } from './adapters/persistence/deletion/volumeIdentity';
@@ -84,6 +85,7 @@ export function createResourcesModule(deps: ResourcesModuleDeps): ResourcesModul
   const api: ResourcesModuleApi = {
     name: 'resources',
     projectDeletion: {
+      nativePostgresHistory: (id) => readNativePostgresHistory(deps.db, id),
       volumeReclamation: (assertGrant) => projectVolumeReclamationStore(deps.db, assertGrant),
       podStopReceipts: (assertGrant) => projectPodStopReceipts(deps.db, assertGrant),
       ownsVolume: (id, volume) => ownsDeletionVolume(deps.db, id, volume),

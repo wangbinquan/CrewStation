@@ -68,7 +68,11 @@ export function drizzleSubtaskRepository(db: Executor): SubtaskRepository {
     },
     insert: async (s) => { await db.insert(subtasks).values(toRow(s)); },
     update: async (s) => { await db.update(subtasks).set(toRow(s)).where(eq(subtasks.id, s.id)); },
-    getById: async (id) => { const row = (await db.select().from(subtasks).where(eq(subtasks.id, id)))[0]; return row ? toRun(row) : undefined; },
+    getById: async (id, options) => {
+      const query = db.select().from(subtasks).where(eq(subtasks.id, id)).limit(1);
+      const row = (await (options?.forUpdate ? query.for('update') : query))[0];
+      return row ? toRun(row) : undefined;
+    },
     listByTask: async (taskId) => (await db.select().from(subtasks).where(eq(subtasks.taskId, taskId)).orderBy(subtasks.createdAt)).map(toRun),
     listByTasks: async (taskIds) => (await inChunks(taskIds, (chunk) => db.select().from(subtasks).where(inArray(subtasks.taskId, chunk)))).map(toRun)
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id)),

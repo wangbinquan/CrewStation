@@ -17,7 +17,7 @@ export interface SubtaskRepository {
   reserveRetry(run: SubtaskRun): Promise<{ run: SubtaskRun; created: boolean }>;
   insert(run: SubtaskRun): Promise<void>;
   update(run: SubtaskRun): Promise<void>;
-  getById(id: SubtaskId): Promise<SubtaskRun | undefined>;
+  getById(id: SubtaskId, options?: { readonly forUpdate?: boolean }): Promise<SubtaskRun | undefined>;
   listByTask(taskId: TaskId): Promise<SubtaskRun[]>;
   /** 一批任务的全部子任务（含每次重试），按创建时间正序。 */
   listByTasks(taskIds: readonly TaskId[]): Promise<SubtaskRun[]>;

@@ -5,6 +5,6 @@ export type {
 } from './api/types';
 export { createResourcesModule, resourcesMigrations } from './wiring';
 export type { ResourcesModule, ResourcesModuleDeps } from './wiring';
-export type { ResourceDeletionPhysics, ResourceProjectDeletion } from './api/projectDeletion';
+export type { NativePostgresChild, NativePostgresHistory, NativePostgresHistoryRecord, ResourceDeletionPhysics, ResourceProjectDeletion } from './api/projectDeletion';
 export type { ProjectPodStopReceipt, ProjectPodStopReceipts } from './api/deletionPods';
 export type { ProjectVolumeReclaimReceipt, ProjectVolumeReclamationStore } from './api/deletionVolumes';

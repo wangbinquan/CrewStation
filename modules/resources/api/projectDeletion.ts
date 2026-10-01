@@ -13,6 +13,8 @@ export interface ResourceDeletionPhysics {
   verify(context: ProjectDeletionContext): Promise<ProjectDeletionStepResult>;
 }
 export interface ResourceProjectDeletion {
+  /** 读尽同一快照内的保留台账；历史身份缺口不表示原实体已消失。 */
+  nativePostgresHistory(projectId: ProjectId): Promise<NativePostgresHistory>;
   volumeReclamation(assertGrant: (context: ProjectDeletionContext) => Promise<void>): ProjectVolumeReclamationStore;
   podStopReceipts(assertGrant: (context: ProjectDeletionContext) => Promise<void>): ProjectPodStopReceipts;
   ownsVolume(projectId: ProjectId, volume: { name: string; uid: string; claim?: { namespace: string; uid: string } }): Promise<boolean>;
@@ -20,4 +22,30 @@ export interface ResourceProjectDeletion {
   sealClusterAdmission(context: ProjectDeletionContext, assertGrant: (context: ProjectDeletionContext) => Promise<void>): Promise<void>;
   assertClusterAdmission(context: ProjectDeletionContext, assertGrant: (context: ProjectDeletionContext) => Promise<void>): Promise<void>;
   withAdmission(projectId: ProjectId, work: () => Promise<void>): Promise<boolean>;
+}
+
+export interface NativePostgresChild {
+  readonly kind: 'PostgresDatabase' | 'PostgresRole';
+  readonly name: string;
+  readonly namespace?: string;
+}
+export interface NativePostgresHistoryRecord {
+  readonly id: string;
+  readonly kind: string;
+  readonly owner: { readonly module: string; readonly ref: string };
+  readonly desired: string;
+  readonly phase: string;
+  readonly version: number;
+  readonly generation: number;
+  readonly compacted: boolean;
+  readonly spec: unknown;
+  readonly declared: readonly NativePostgresChild[];
+  readonly observed: readonly (NativePostgresChild & { readonly uid?: string; readonly expected: boolean })[];
+}
+export interface NativePostgresHistory {
+  readonly retainedRecordsComplete: true;
+  readonly revision: string;
+  readonly records: readonly NativePostgresHistoryRecord[];
+  /** 不由保留台账断言原生实体历史完整；须由原生独立持久事实补齐。 */
+  readonly gaps: readonly { readonly resourceId: string; readonly code: 'native-identity-compacted' | 'native-revisions-unavailable' | 'native-declaration-invalid' | 'native-owner-unknown'; readonly message: string }[];
 }

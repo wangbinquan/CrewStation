@@ -26,7 +26,7 @@ export function subtaskLaunch(deps: BusinessTaskUseCaseDeps, awaiting: Set<strin
     const output = `${r.stdout}${r.stderr ? `\n[stderr]\n${r.stderr}` : ''}`.slice(0, settings.outputLimitBytes);
     if (isTerminal(current)) {
       // 另一个进程（多副本，或等结果的进程重启过）已按退出事件收尾，那条路径拿不到输出：同一退出码时补上输出，不改状态。
-      if (current.kind === 'command' && current.output === undefined && current.exitCode === exitCode) await uow.run((scope) => scope.subtasks.update({ ...current, output }));
+      if (current.kind === 'command' && current.output === undefined && current.exitCode === exitCode) await finish(current, { ...current, output });
       return;
     }
     await finish(current, transition(current, exitCode === 0 ? 'succeeded' : 'failed', clock.now(), { exitCode, output, ...(exitCode === 0 ? {} : { error: `命令退出码 ${exitCode}` }) }));
