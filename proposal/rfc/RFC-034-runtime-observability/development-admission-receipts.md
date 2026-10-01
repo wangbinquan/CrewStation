@@ -1,6 +1,6 @@
 # RFC-034 新选择的原准入 Secret UID 回执
 
-状态：CS-R02 第一步设计 v1 独立 FAIL，唯一 P2 是已知创建 UID 的 PG 保存失败后会被 Controller 早退跳过。v2 补充同 creator 的有界原回执与关闭前重投入口，独立设计门已 PASS；尚无本批源码改动。原绑定清理、开发明细 consumer 与两级事实已在完整 557cb50c 部署；生产开发 producer 继续 OFF。本步骤不完成通用删除、全 writer seal、未绑定或 unknown-tail 出口。
+状态：CS-R02 原准入 Secret UID 回执第一步已实现、推送、精确 CI 通过并部署，完整回执见本文末节。v1 设计 FAIL 的 P2 与后续修正历史保留；生产开发 producer 继续 OFF。本步骤不完成跨进程 unknown receipt、通用删除、全 writer seal、未绑定或 unknown-tail 出口。
 
 ## 要求与当前基线
 
@@ -52,3 +52,14 @@ Controller 在首次创建到回执落盘之间发生准入关闭，仍保存原
 共享迁移锁现已随该并行提交发布，工作树字节与 HEAD 相等（SHA256 `0b043aeb87d0e08ba9cfbd70c0f25e5a42e166f1f040971bc809676d68d98c2c`），原 owner 发布前提已满足。后续只用官方精确路径登记本步骤的 migration，并保留已有条目；本次文档提交不包含锁、共享 STATE/RFC 索引或其他 RFC 在制品。
 
 PASS 仅准入限定 43 路径的下一步实现。它不代表实现门、定向回归、稳定候选完整检查、精确 SHA CI、本机部署或生产开启；开发 producer 仍 OFF，CS-R02 与两个 RFC 保持 In Progress。
+
+
+## 原准入回执第一步的实际发布与部署（2026-10-01）
+
+此前“尚无源码改动”属于设计阶段历史，现按实际源码、提交和部署补正，不重新实施已发布部分。42 个源码 / 测试 / 迁移路径及迁移登记已随分类 Token 组合提交 `542d98820606c4dbecbe07fe40aa9758c8d74c99` 的 70 路径发布；本批 42 文件当前字节与该提交一致，原 `0008_development_admission_receipts.sql` 在该提交的迁移锁中。并行 data-control 新迁移由其作者管理，不随本回执收编。
+
+原准入实现最终独立 PASS（回执 `observability-cs-admission-implementation-review-final.json`，SHA256 `10d8bede8e5a7eb99327f461c8411e2182e8cb7ef811805a2578151090ad7637`）；70 路径组合修订独立 PASS（SHA256 `a949ce909f5a77317a3e28794b4f18693bab0cf3f1cf83e5de07be06f7c62047`）。同候选规范完整检查 4,886 pass / 143 skip / 0 fail / 0 error、32,692 断言、967 文件，70 路径和四个参考首尾一致；类型与原始失败历史详见 [分类验证回执](./token-classification.md#首轮完整门禁与修正)。不重复运行已经通过且未改变的源码完整门禁。
+
+[该提交自身 CI 36861417182](https://github.com/wangbinquan/CrewStation/actions/runs/36861417182) 的 static、unit、module、console、e2e、gate 六项均正常 completed / success。2026-10-01T12:42:37.894Z 已本机部署，八组件 Ready=1、generation=observedGeneration，storage-contract=1；该次部署的节点镜像 OCI revision 独立核对为完整 `542d9882` 提交；后续平台自测修复已于 14:42:26.034Z 升级至 `85ee9254`，本批 42 个源码 / 测试字节保持。迁移完成、数字表存在，原平台默认 Runner 与现存工作负载保持。
+
+已落实本步骤的新显式选择、Resources 首次原意图/nullable UID 固定、Controller 同 creator 有界实际回执与原 record 补交、CAS 后 ACK / pending IDs resync，以及 Task 新选清理的原 UID 核对。它们没有生产 caller 开启许可。跨进程原响应未知、全 writer/在途创建 seal、全部删除/重建/未绑定出口和真实开发生产采集仍待后续屏障；生产 producer OFF，CS-R02 和两个 RFC 不关闭。实际业务模型分类及人民币复验分别留回执，不能代替本步骤或完整开发矩阵的真实验收。

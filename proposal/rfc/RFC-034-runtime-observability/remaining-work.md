@@ -10,13 +10,15 @@
 
 ## 当前已实现与实际部署
 
-当前本机控制服务与页面源码版本：`557cb50c5b6800771a5d016526d7a4d49d61eb77`，2026-10-01T04:32:58.487Z 部署完成；[精确 CI 36813933923](https://github.com/wangbinquan/CrewStation/actions/runs/36813933923) 六项成功。八服务 Ready=1、代次一致、storage-contract=1、数字表存在；首次迁移实际 applied=1、随后并行同 SHA 部署迁移也 Complete，过程与中断历史见[完整装配回执](./development-statistics.md#2026-10-01-完整共享装配发布与实际升级)。默认 Runner 与已有执行保持 `2fb06f38` 原摘要。2026-10-01T04:34:51.903628+00:00 匿名登录=200、未登录根=401；没有真实身份切换或模型验收。开发 owner 事实/Session consumer 已接通，生产 producer、全入口清理、CLI 与算力测试仍未接通。
+当前本机控制服务与页面源码版本：`85ee9254a175848d65105d16327e00afbc47cc08`，2026-10-01T14:42:26.034Z 部署完成；[本提交 CI 36875167666](https://github.com/wangbinquan/CrewStation/actions/runs/36875167666) 六项成功。八组件 Ready=1、generation=observedGeneration、实际 Pod imageID / 节点 OCI 来源均已独立核对；迁移 applied=0、storage-contract=1。默认 Runner 保持 `sha256:587a0766440bae22f69bd6e68e101f2348ec8bda95f8b4c3ce6ddef0fa010928`，既有执行不重建。专用修订 4 的三次真实业务模型与命令基线已通过分类 Token / 人民币 / 时间对账，见 [真实分类验收](./live-classification-acceptance.md)；真实页面复验待 Mac 解锁。开发 producer、全入口清理、CLI 与平台自测数字归因仍未接通，不把业务实采当开发验收。
+
+历史完整装配版本：`557cb50c5b6800771a5d016526d7a4d49d61eb77`，2026-10-01T04:32:58.487Z 部署完成；[精确 CI 36813933923](https://github.com/wangbinquan/CrewStation/actions/runs/36813933923) 六项成功。八服务 Ready=1、代次一致、storage-contract=1、数字表存在；首次迁移实际 applied=1、随后并行同 SHA 部署迁移也 Complete，过程与中断历史见[完整装配回执](./development-statistics.md#2026-10-01-完整共享装配发布与实际升级)。默认 Runner 与已有执行保持 `2fb06f38` 原摘要。2026-10-01T04:34:51.903628+00:00 匿名登录=200、未登录根=401；没有真实身份切换或模型验收。开发 owner 事实/Session consumer 已接通，生产 producer、全入口清理、CLI 与算力测试仍未接通。
 
 前一完整三镜像批次：`2fb06f388fc3bfc10ae7c34b5603a8711a5d45af`，2026-10-01T01:40:44.408Z部署，[精确CI 36801111766](https://github.com/wangbinquan/CrewStation/actions/runs/36801111766)六项成功。原回执保留于[绑定清理](./development-cleanup.md)，不能用本次UI/模块部署关闭未绑定/通用入口或真实模型验收。
 
 正式项目/系统统计已有业务任务、Agent/尝试、四桶 Token、人民币估值、基础泳道、算力贡献下钻和采集质量；项目与算力显示名称，保留稳定 ID/受理修订。已有价格配置与冻结目录、OpenCode 根/子树采集、原归属修订和原价补算；资源/容量和当前服务槽/平台 Pod 健康已有入口。
 
-页面修正、实际 Token 柱形数字、时间按钮对齐、项目/算力名称和取消 CSV 已部署。历史独立源码批 `50dbd7a7` 当时的组合根仅注入业务事实；当前 `557cb50c` 已部署同快照业务/开发事实和原 Session 数值 consumer，合同支持 `business-tasks` 与 `project-executions`。生产开发 producer 与全入口 cleanup 仍未启用，开发显示 production-disabled；完整查询/消费接线和夹具验证不能当成真实开发 Token、CLI 或算力测试已采集。
+页面修正、实际 Token 柱形数字、时间按钮对齐、项目/算力名称和取消 CSV 已部署。历史独立源码批 `50dbd7a7` 当时的组合根仅注入业务事实；后继 `557cb50c` 已部署同快照业务/开发事实和原 Session 数值 consumer，该装配保留于当前 `85ee9254`，合同支持 `business-tasks` 与 `project-executions`。生产开发 producer 与全入口 cleanup 仍未启用，开发显示 production-disabled；完整查询/消费接线和夹具验证不能当成真实开发 Token、CLI 或算力测试已采集。
 
 | 批次 | 已有证据 | 尚缺的关闭条件 |
 | --- | --- | --- |
@@ -505,3 +507,14 @@ v1 实现独立复核发现显式 JSON 空值被误认缺省的 P2，原 FAIL �
 ### 平台自测受理修复的发布候选（2026-10-01）
 
 v2 独立完整实现 PASS，规范共享完整检查 exit=0，4,905 pass / 143 skip / 0 fail、32,761 断言；本批五个源码 / 测试首尾保持，等价完整门禁只运行一次。仅追加历史回执后按七个自有路径准备发布，原 v1 FAIL 和红回归保留。精确 hosted CI、实际本机部署、标准新自测以及三类真实任务原生数字与人民币对账尚未计完成，详见 [规范门禁终态](./profile-test-admission.md#v2-独立实现与规范完整门禁终态2026-10-01)。生产开发采集仍 OFF，CS-R02 / 04 / 13 及两个 RFC 继续。
+
+
+### 已发布准入回执第一步的状态补正（2026-10-01）
+
+[原准入回执实际发布与部署](./development-admission-receipts.md#原准入回执第一步的实际发布与部署2026-10-01)已补正过期的设计状态：限定 43 路径（42 源码 / 测试 / 迁移及迁移登记）随 70 路径 `542d9882` 推送、自身六项 CI success、本机八组件部署完成；两个独立实现门 PASS，完整 4,886 / 143skip / 0fail，42 文件仍与发布提交一致。没有重新编写或重复全量检查已完成源码。跨进程 unknown receipt、全 writer seal、全部通用出口及生产开启仍未完成，CS-R02 与两个 RFC 继续；后续真实分类任务、人民币对账与平台自测受理修复的验收各自记录。
+
+### 平台自测修复与分类人民币真实任务验收（2026-10-01）
+
+平台自测投影修复 `85ee9254a175848d65105d16327e00afbc47cc08` 自身 [CI 36875167666](https://github.com/wangbinquan/CrewStation/actions/runs/36875167666) 六项 success，并于 14:42:26.034Z 完成八组件本机升级；标准人工自测实际创建 Pod 和模型轮次通过。首轮整体 passed 但 systemPrompt=false / 业务 412 的真实历史保留，第二次同修订 / 同镜像标准自测才证明该能力，未手改 flag。
+
+[实采验收](./live-classification-acceptance.md)已完成单 Agent / 两次串行 Agent / 命令基线及原 Pod 数字对账：四桶 5,917 / 17,728 / 0 / 778，总 24,423、验收人民币 ¥0.026922；任务、尝试、Agent、算力、项目、系统、趋势与时间均一致，父任务 closed / quotaHeld=false。项目费用维持隐藏。页面验收因再次锁屏等待解锁，实际业务通过不替代 headless / CLI / 平台用途采集或 AW 托管联动。生产开发 producer OFF，CS-R02 / 03 / 04 / 13 与两个 RFC 继续。

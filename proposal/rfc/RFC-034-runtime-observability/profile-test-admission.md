@@ -57,3 +57,9 @@ v2 独立实现复核 PASS，原 P2 已关闭、无新增阻断；7 候选、20 
 同候选的规范共享 `bun run check` 于 `2026-10-01T14:05:47.403690Z` 终态 exit=0：结构、全仓 lint、后端及 console 类型均通过；4,905 pass / 143 环境 skip / 0 fail、32,761 断言，5,048 tests / 968 files。完整 1,021.970 秒，测试 970.26 秒。本批五个源码 / 测试在门禁开始前已定稿且完成后指纹保持；三个回归文件实际执行。复用该等价检查，未重复运行全量。回执 `observability-cs-profile-test-admission-full-v2.json`，规范日志 SHA256 `66fec994d45bf5374d3c2492cbc7ffd90ff896b95cfa84a7b07a81fa4cce2265`；仅保留命令退出元数据，私有数据库材料不入库。
 
 追加本节回执不改变已经检查的源码。精确七路径提交 / hosted 六项 CI、本机升级、标准新手动自测与真实分类数字 / 人民币验收继续；143 跳过不作为实际模型或部署验收，生产开发 producer 仍 OFF，CS-R02 / 04 / 13 及两 RFC 不关闭。
+
+## 精确发布、本机部署与标准自测终态（2026-10-01）
+
+七路径修复 `85ee9254a175848d65105d16327e00afbc47cc08` 已精确提交推送，独立发布复核 PASS；[本提交 CI 36875167666](https://github.com/wangbinquan/CrewStation/actions/runs/36875167666) 六项 completed / success。本机于 14:42:26.034Z 完成八组件 Ready / generation=observedGeneration 升级，控制面与 console OCI 来源已核对，迁移 applied=0、storage-contract=1；平台默认 Runner 与既有执行保持。
+
+新的标准人工自测已能实际创建平台 Pod、运行固定 CLI 与模型并正常结束。第一次整体 passed / systemPrompt=false 的真实结果和后续 412 保留；仅一次新标准人工复验在同 revision=4 / 同内容 hash / 同镜像下得到 systemPrompt=true。没有手改能力、删除失败或重新执行旧幂等请求。随后三次真实模型、命令基线与原 Pod 数字 / CNY / 时间完整对账，见 [真实分类验收](./live-classification-acceptance.md)。本投影缺陷已修复与实机复验，不把它等同平台自测用量已归因或开发采集完成。

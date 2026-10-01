@@ -69,3 +69,7 @@ Resources 的到期/压缩过程先在锁外取得单调 owner 状态或请求�
 ### 原准入回执第一步 v2 设计门（2026-10-01）
 
 [限定回执设计](./development-admission-receipts.md#v2-独立设计复核与共享前置条件2026-10-01)独立复核 PASS；原 v1 已知 UID 在 PG 失败后被关闭早退跳过的 P2 已在设计层闭合，原 FAIL 保留。共享 migration lock 已由并行 owner 随 `b6999edf` 发布；四份观测设计可独立提交，不收编共享登记或并行源码。43 路径实现、完整验证和部署仍未完成，producer OFF；全部 writer seal、通用删除、未绑定与跨进程 unknown receipt 继续，不能据此关闭 CS-R02。
+
+## 原准入回执第一步已部署的状态补正（2026-10-01）
+
+上文“43 路径尚未实现”属于设计阶段历史。[原准入回执实际发布与部署](./development-admission-receipts.md#原准入回执第一步的实际发布与部署2026-10-01)已核对：42 个源码 / 测试 / 迁移及登记随 `542d9882` 的 70 路径发布，两个独立实现门 PASS、自身六项 CI success、八组件部署完成；后继 `85ee9254` 平台自测投影修复已通过自身 CI / 实机部署，本批 42 文件未变。该步骤不包含本草案的通用删除、全部 writer seal、未绑定或跨进程 unknown receipt，下一实施批仍必须冻结精确 allowlist 并独立设计复核，producer OFF。
