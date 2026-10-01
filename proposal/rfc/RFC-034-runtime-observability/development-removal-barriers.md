@@ -1,6 +1,6 @@
 # RFC-034 开发采集的通用删除与未绑定退出屏障
 
-状态：原准入回执第一片已发布部署；通用删除第二片实施 v2 / 测试修订 v3 独立 PASS，规范完整 `bun run check` 4,956 pass / 143 环境 skip / 0 fail，33,168 断言，候选与参考指纹稳定。原规范 v2 的 2 fail 保留，修订后新候选单次 gate 通过；当前精确发布、远端自身 CI 与本机升级待做。父操作、未绑定、全部 writer 封口、未知回执与真实开发采集仍待，生产 producer OFF；不关闭 CS-R02 或整体 RFC。
+状态：原准入回执第一片已发布部署；通用删除第二片实施 v2 / 测试修订 v3 独立 PASS，规范完整 `bun run check` 4,956 pass / 143 环境 skip / 0 fail，33,168 断言，候选与参考指纹稳定。原规范 v2 的 2 fail 保留，修订后新候选单次 gate 通过；已精确发布 c6860345，自身远端 CI 六项成功并于 2026-10-01T19:37:47.267Z 完成本机八组件升级。父操作、未绑定、全部 writer 封口、未知回执与真实开发采集仍待，生产 producer OFF；不关闭 CS-R02 或整体 RFC。
 
 ## 必须解决的问题
 
@@ -119,3 +119,13 @@ PG 仅完整重确认清理用例明确 15 秒，与相邻全部 owner 清理预
 测试修订的独立实现 v3 PASS；实际规范 `bun run check` 2026-10-01 18:59:53Z 至 19:15:57Z 完整完成，4,956 pass / 143 环境 skip / 0 fail、33,168 断言、5,099 用例／971 文件。结构、lint、后端／工作台类型及完整用例均成功，候选 46 路径与 72 参考的字节前后相同。143 skip 为本机缺少外部实机依赖，不能据此宣称这些路径已实采验收；远端六层自身 CI 仍待。原 4,945／143／2 fail 的规范 v2 和有效页面红例保持原结论。
 
 检查期间其他会话正常提交与本片没有路径交集的数据控制修订，本片源内容和直接依赖未变；依共享候选验证规则复用本次成功门，不因为新 main 再跑全量。发布候选只包含 46 allowlist 中 44 个实际改动文件，三个文档在成功 gate 后只补当前证据；不收编并行 Data 或 RFC-036 架构设计输出。生产 producer OFF，父生命周期／全 writer seal／未绑定／unknown-tail／开发实采均不在这一步的完成声明中。
+
+## 通用删除候选的精确发布、CI 与本机部署（2026-10-02）
+
+第二片源码及两项实际门禁修订已精确发布为 `c68603457dc6ccc24b6ef8a023daf6b4e735d944`；44 个改动路径与审查 allowlist 一致，提交与远端相同，索引为空。原规范 gate v2 的 2 fail 与无效 fixture 尝试仍保留；修订源码 v3 的一次完整 `bun run check` 为 4,956 pass / 143 环境 skip / 0 fail、33,168 断言，候选与参考字节一致，未重复运行相同候选。
+
+[自身精确 CI 36913569021](https://github.com/wangbinquan/CrewStation/actions/runs/36913569021) 已 completed/success，static、unit、module、console、实际 E2E 和汇总 gate 六项全部 success。构建只通过该提交的 Git archive 输入两张平台镜像，未包含共享 RFC-036 在制文件，也未重建或切换当前 Runner。
+
+本机于 `2026-10-01T19:37:47.267Z` 完成迁移及八组件升级。`task_runtime/0018_physical_environment_lookup.sql` 实际应用一次；storage-contract=1，业务/开发数值表均存在。console、cs-api、cs-auth、cs-controller、cs-events、cs-session、mcp-capabilities、mcp-operations 均 generation=observedGeneration、Ready=1，镜像与本次冻结目标一致。部署前后默认 Task Runner 仍为 `sha256:587a0766440bae22f69bd6e68e101f2348ec8bda95f8b4c3ce6ddef0fa010928`；生产开发采集 OFF，原会话及专用验证档位未替换。
+
+私有完整回执：`observability-cs-generic-removal-ci-receipt.json`、`observability-cs-generic-removal-deployment-receipt.json`。部署只证明本片已在本机生效，不代替实际父重建/保留期/全部 writer、未绑定/未知尾部或真实开发模型验收。实际统计页面的复验仍待浏览器会话可用；新内置浏览器请求正常进入登录页，未擅自切换角色。CS-R02、CS-R13 和整体 RFC 均保持未完成。
