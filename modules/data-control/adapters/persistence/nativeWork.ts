@@ -6,6 +6,7 @@ import { sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { NativeDdlConnection, NativePostgresOrigin, NativePostgresProcess, NativePostgresProcesses, NativePostgresWork } from '../../api/databaseRemoval';
 import type { NativePostgresCatalogIdentity, NativePostgresJournalRecord, NativePostgresSource, NativePostgresStorageSource } from '../../api/storageSource';
+import { NativePostgresStorageSourceSchema as storageSchema } from '../../api/storageSource';
 import { withNativePostgresNames } from '../postgres/nativeNames';
 
 export const nativeAdmissionKey = (id: string) => 'data-control.project-admission:' + id;
@@ -79,19 +80,14 @@ export function nativePostgresWork(input: { db: Database; adminUrl: string; avai
     const [row] = await db.execute<{ project_id: ProjectId }>(sql`SELECT project_id FROM data_control.deletion_entities WHERE resource_id=${id}`);
     return row ? { projectId: row.project_id, resourceId: id } : undefined;
   };
-  return { native, withResource, recover, originOf, journal: { read: (projectId: ProjectId) => readJournal(db, projectId) }, sweep: () => input.processes?.sweep({ stopped: recover, releasable: async (uid) => {
+  return { native, withResource, recover, originOf, journal: { read: (projectId: ProjectId) => db.transaction((tx) => readNativeJournalSnapshot(tx, projectId), { isolationLevel: 'repeatable read', accessMode: 'read only' }) }, sweep: () => input.processes?.sweep({ stopped: recover, releasable: async (uid) => {
     const [row] = await db.execute<{ pending: boolean }>(sql`SELECT EXISTS(SELECT 1 FROM data_control.deletion_work WHERE pod_uid=${uid} AND state='running') AS pending`);
     return row?.pending === false;
   } }) ?? Promise.resolve() };
 }
 
 type CatalogIdentity = NativePostgresCatalogIdentity;
-const hash = z.string().regex(/^[a-f0-9]{64}$/), identity = z.string().min(1), absolute = z.string().refine((path) => path.startsWith('/') && !path.split('/').includes('..'));
-const volumeSchema = z.object({ pvcUid: identity, pvUid: identity, nodeUid: identity, mountPath: absolute, providerPath: absolute, rootEpoch: hash, volumeEpoch: hash, entries: z.array(z.object({ key: identity, relativePath: identity.refine((path) => !path.startsWith('/') && !path.split('/').includes('..')), kind: z.enum(['file', 'directory']), identity: hash })).min(1) });
-const storageSchema = z.object({ identity: hash, serviceUid: identity, server: z.object({ podUid: identity, containerId: identity, nodeUid: identity, address: identity }), volumes: z.array(volumeSchema).min(1), observedAt: z.iso.datetime() }).refine((source) => {
-  const entries = source.volumes.flatMap((volume) => volume.entries);
-  return new Set(entries.map((entry) => entry.key)).size === entries.length && entries.some((entry) => entry.key === 'pgdata' && entry.kind === 'directory') && entries.some((entry) => entry.key === 'control' && entry.kind === 'file') && source.volumes.every((volume) => volume.nodeUid === source.server.nodeUid);
-});
+const hash = z.string().regex(/^[a-f0-9]{64}$/), identity = z.string().min(1);
 async function captureStorage(source: NativePostgresSource | undefined, connection: NativeDdlConnection, allowUnsupported = true): Promise<NativePostgresStorageSource | null> {
   if (!source) return null;
   const deadline = Date.now() + 60_000;
@@ -143,8 +139,7 @@ function journalRecord(value: unknown): NativePostgresJournalRecord {
   }
   return { workId: row.work_id, resourceId: row.resource_id, projectId: row.project_id as ProjectId, names: row.names, state: row.state, journalVersion: row.journal_version, nativeSession: row.native_pid === null ? null : { pid: row.native_pid, started: row.native_started!, sourceIdentity: row.source_identity! }, process: row.pod_uid === null ? null : { podUid: row.pod_uid, containerId: row.container_id!, nodeUid: row.node_uid!, nodeName: row.node_name! }, proofDigest: row.proof_digest, before: row.catalog_before === null ? null : { catalog: row.catalog_before, storage: row.storage_before }, after: row.catalog_after === null ? null : { catalog: row.catalog_after, storage: row.storage_after } };
 }
-async function readJournal(db: Database, projectId: ProjectId) {
-  return db.transaction(async (tx) => {
+export async function readNativeJournalSnapshot(tx: Executor, projectId: ProjectId) {
     const records: NativePostgresJournalRecord[] = [];
     let cursor: string | undefined;
     for (;;) {
@@ -154,5 +149,4 @@ async function readJournal(db: Database, projectId: ProjectId) {
       cursor = records.at(-1)!.workId;
     }
     return { retainedRecordsComplete: true as const, records, revision: jsonHash({ projectId, records }) };
-  }, { isolationLevel: 'repeatable read', accessMode: 'read only' });
 }

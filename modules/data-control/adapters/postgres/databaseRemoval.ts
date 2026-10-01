@@ -30,11 +30,11 @@ async function consumers(connection: NativeDdlConnection, row: CatalogRow) {
   if (!result || typeof result.present !== 'boolean') throw precondition('原数据库消费者观测不完整');
   return result.present;
 }
-async function sourceMatches(reader: DatabaseReclamationReader, original: OriginalPostgresDatabase, row: CatalogRow) {
+async function sourceMatches(reader: Pick<DatabaseReclamationReader, 'capture' | 'verify'>, original: OriginalPostgresDatabase, row: CatalogRow) {
   const captured = await reader.capture({ name: row.name, oid: row.oid });
   if (captured.source !== original.source || original.directories.some((directory) => !captured.directories.some((current) => jsonHash(current) === jsonHash(directory)))) throw precondition('原数据库物理来源已变化');
 }
-async function quarantine(connection: NativeDdlConnection, context: ProjectDeletionContext, original: OriginalPostgresDatabase, reader: DatabaseReclamationReader, grant: () => Promise<void>) {
+async function quarantine(connection: NativeDdlConnection, context: ProjectDeletionContext, original: OriginalPostgresDatabase, reader: Pick<DatabaseReclamationReader, 'capture' | 'verify'>, grant: () => Promise<void>) {
   const name = quarantineName(context, original), expectedMarker = marker(context, original);
   await connection.query('BEGIN');
   try {
@@ -66,25 +66,29 @@ function checkedContext(raw: ProjectDeletionContext, original: OriginalPostgresD
 }
 
 /** No HTTP entry or complete deletion owner is registered by this primitive. Normal DROP, never FORCE. */
-export function postgresDatabaseRemoval(adminUrl: string, reader: DatabaseReclamationReader, assertGrant: (context: ProjectDeletionContext) => Promise<void>): DatabaseRemoval {
+export function postgresDatabaseRemoval(adminUrl: string, reader: DatabaseReclamationReader, assertGrant: (context: ProjectDeletionContext) => Promise<void>, verifySource?: (connection: NativeDdlConnection) => Promise<void>): DatabaseRemoval {
   return { remove: async (raw, original): Promise<PostgresDatabaseRemoval> => {
     const context = checkedContext(raw, original), grant = () => assertGrant(context);
     await grant();
     return withNativePostgresNames(adminUrl, [original.name, quarantineName(context, original)], async (connection) => {
       await grant();
-      const proof = await reader.verify(original);
+      await verifySource?.(connection);
+      const activeReader = verifySource ? reader.using?.(connection) : reader;
+      if (!activeReader) throw precondition('正式数据库回收缺少原 native backend 绑定');
+      const proof = await activeReader.verify(original);
       if (proof.kind === 'gone') { await grant(); return { kind: 'gone', proof }; }
-      const prepared = await quarantine(connection, context, original, reader, grant);
+      const checkedGrant = async () => { await grant(); await verifySource?.(connection); };
+      const prepared = await quarantine(connection, context, original, activeReader, checkedGrant);
       if (prepared.waiting) return { kind: 'waiting', reason: 'native-consumers' };
       const row = checkedRow(await catalog(connection, original, prepared.name), original, prepared.name, marker(context, original));
       if (row) {
         if (row.name !== prepared.name) throw precondition('原数据库没有完成本操作隔离');
-        await sourceMatches(reader, original, row);
-        await grant(); await connection.assertHeld();
+        await sourceMatches(activeReader, original, row);
+        await checkedGrant(); await connection.assertHeld();
         await connection.query('DROP DATABASE ' + quoted(prepared.name));
       }
-      const final = await reader.verify(original);
-      await grant();
+      const final = await activeReader.verify(original);
+      await checkedGrant();
       if (final.kind === 'replaced') throw precondition('原数据库名字或 OID 已替换，不能把新库当作清理完成');
       return final.kind === 'gone' ? { kind: 'gone', proof: final } : { kind: 'waiting', reason: 'original-files' };
     });

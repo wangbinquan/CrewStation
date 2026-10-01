@@ -1,3 +1,7 @@
+## 2026-10-02 RFC-037旧供给已实机通过，原生owner完整门禁接续
+
+cc3efde2已精确发布、CI36911308226六项成功，19:17:26Z八组件部署；实际API原Pod只读Root历史验收通过，2资源/0绑定与独立完整声明和真实shared快照一致，当前52库/64角色全名字/OID保持。原生owner内部工厂、不可变原范围/阶段回执0006、完整alias历史和公开端口组合形成候选；真实PG37专项/116较宽全通过、447/452改动行，外部依赖与确认后历史变化先红后修，新世代接管沿原范围继续。31路径单次完整门禁4976/143 skip/1 fail、33321断言且指纹保持，唯一外范围90秒耗时89992ms断言失败，原件保留；静态四层通过，按规则§3精确发布/自身CI继续；初次失败夹具已按原名字/OID清理19库/11角色，旧keeper和其他全部身份保持。独立卷在PG用例中为受控端口，不计真实卷回收。全部Root注册、旧物理历史、其余owner和二次确认/PD全回收仍未完成，删除入口关闭。见[原生owner候选](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/native-owner.md)和[旧供给实机回执](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/data-native-history.md)。下方历史和并行输出完整保留。
+
 ## 2026-10-02 RFC-037停止观测已实机通过，旧供给历史端口接续
 
 45753bb8已精确发布、CI36900606880六项成功；17:52:20Z八组件部署。同路真实API Root公开journal/前后独立事实/原Pod保护/旧凭据SELECT通过，实际来源16次409后两次200，原48库/48角色全名字/OID及共享设施保持。data的旧资源/绑定/DSN完整只读端口在既有生产文件内实现；13专项和51较宽通过，改动行75/75及提交树两侧类型通过；最终全量4954/143 skip/2 fail，六指纹保持，失败在外范围接口参考/发布加载用例，原失败保留。按规则§3精确发布/CI/部署继续。正式native owner、其余全部清理与管理员二次确认/PD全回收未完成，入口关闭。见[journal回执](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/native-identity-journal.md)及[旧供给历史](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/data-native-history.md)。下方历史和并行输出完整保留。

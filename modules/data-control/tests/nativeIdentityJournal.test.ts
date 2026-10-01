@@ -127,7 +127,7 @@ test.skipIf(!available)('原生身份：首次未知而后置可观测只记录�
 }, observedSource((count) => { if (count === 1) throw precondition('unregistered initial source', { code: 'native_postgres_source_unsupported' }); return storage; })));
 
 test.skipIf(!available)('原生身份：迁移保留旧回调所有原字段，缺失历史不能凭当前 SQL 补造', async () => {
-  const old = await createTestDatabase([{ ...dataControlMigrations, files: dataControlMigrations.files.filter((file) => file.name !== '0005_native_identity_journal.sql') }]);
+  const old = await createTestDatabase([{ ...dataControlMigrations, files: dataControlMigrations.files.filter((file) => file.name < '0005_native_identity_journal.sql') }]);
   const origin = { projectId: Bun.randomUUIDv7() as ProjectId, resourceId: Bun.randomUUIDv7() }, name = 'cs_journal_upgrade';
   try {
     const work = nativePostgresWork({ db: old.db, adminUrl });
@@ -136,7 +136,7 @@ test.skipIf(!available)('原生身份：迁移保留旧回调所有原字段，�
       await old.db.transaction((tx) => tx.execute("INSERT INTO data_control.deletion_work(work_id,resource_id,project_id,backend_pid,names) VALUES ('original-work','" + origin.resourceId + "','" + origin.projectId + "'," + backend!.pid + ",'[\"" + name + "\"]'::jsonb)"));
     });
     const before = await old.db.execute<Record<string, unknown>>('SELECT * FROM data_control.deletion_work');
-    expect(await runMigrations(old.db, [dataControlMigrations])).toEqual(['data_control/0005_native_identity_journal.sql']);
+    expect(await runMigrations(old.db, [dataControlMigrations])).toEqual(['data_control/0005_native_identity_journal.sql', 'data_control/0006_project_native_deletion.sql']);
     const [after] = await old.db.execute<Record<string, unknown>>('SELECT * FROM data_control.deletion_work');
     const { catalog_before, catalog_after, storage_before, storage_after, journal_version, ...original } = after!;
     expect(original).toEqual(before[0]!);

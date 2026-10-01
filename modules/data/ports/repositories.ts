@@ -38,5 +38,6 @@ export interface NativePostgresHistoryStore {
   read(projectId: ProjectId): Promise<{
     resources: readonly (NativePostgresHistoryRow & { readonly kind: string; readonly env: string; readonly objectName: string })[];
     bindings: readonly (NativePostgresHistoryRow & { readonly taskId: string; readonly legacyResourceId: string | null; readonly mode: string; readonly roleName: string | null; readonly expiresAt: Date | null })[];
+    aliases: readonly { readonly kind: string; readonly key: string; readonly id: string }[];
   }>;
 }

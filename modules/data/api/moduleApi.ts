@@ -63,5 +63,6 @@ export interface DataNativePostgresHistory {
   readonly revision: string;
   readonly resources: readonly (DataNativePostgresRecord & { readonly kind: string; readonly env: string; readonly objectName: string })[];
   readonly bindings: readonly (DataNativePostgresRecord & { readonly taskId: string; readonly legacyResourceId: string | null; readonly mode: string; readonly roleName: string | null; readonly expiresAt: string | null })[];
-  readonly gaps: readonly { readonly source: 'resource' | 'binding'; readonly id: string; readonly code: 'legacy-row-invalid' | 'legacy-name-invalid' | 'legacy-dsn-unreadable' | 'legacy-dsn-invalid' | 'legacy-dsn-conflict'; readonly message: string }[];
+  readonly aliases: readonly { readonly kind: 'data-resource' | 'data-binding' | 'unknown'; readonly id: string; readonly keys: readonly string[]; readonly valid: boolean }[];
+  readonly gaps: readonly { readonly source: 'resource' | 'binding' | 'alias'; readonly id: string; readonly code: 'legacy-row-invalid' | 'legacy-name-invalid' | 'legacy-dsn-unreadable' | 'legacy-dsn-invalid' | 'legacy-dsn-conflict' | 'legacy-alias-invalid'; readonly message: string }[];
 }

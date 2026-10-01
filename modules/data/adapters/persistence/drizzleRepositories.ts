@@ -65,6 +65,15 @@ async function nativeHistoryPages<T extends { id: string } & Record<string, unkn
     cursor = rows[rows.length - 1]!.id;
   }
 }
+async function nativeAliasPages(tx: Transaction, projectId: ProjectId): Promise<NativeSnapshot['aliases']> {
+  const out: NativeSnapshot['aliases'][number][] = []; let cursor: { kind: string; key: string } | undefined;
+  for (;;) {
+    const rows = await tx.execute<NativeSnapshot['aliases'][number]>(sql`SELECT kind,key,id FROM data.resource_identity_aliases WHERE id IN (SELECT id FROM data.resources WHERE project_id=${projectId} UNION SELECT id FROM data.task_bindings WHERE project_id=${projectId}) ${cursor ? sql`AND (kind,key)>(${cursor.kind},${cursor.key})` : sql``} ORDER BY kind,key LIMIT 500`);
+    out.push(...rows);
+    if (rows.length < 500) return out;
+    cursor = rows.at(-1)!;
+  }
+}
 
 /** BEGIN options precede contextual admission SQL; no SET TRANSACTION after a SELECT. */
 export function drizzleNativePostgresHistory(db: Database): NativePostgresHistoryStore {
@@ -75,6 +84,7 @@ export function drizzleNativePostgresHistory(db: Database): NativePostgresHistor
     return {
       resources: resourceRows.map((row) => ({ ...row, createdAt: new Date(row.createdAt), updatedAt: new Date(row.updatedAt) })),
       bindings: bindingRows.map((row) => ({ ...row, createdAt: new Date(row.createdAt), updatedAt: new Date(row.updatedAt), expiresAt: row.expiresAt === null ? null : new Date(row.expiresAt!) })),
+      aliases: await nativeAliasPages(tx, projectId),
     };
   }, { isolationLevel: 'repeatable read', accessMode: 'read only' }) };
 }

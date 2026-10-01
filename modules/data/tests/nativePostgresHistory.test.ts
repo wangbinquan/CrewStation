@@ -77,6 +77,29 @@ describe.skipIf(!available)('data retained native PostgreSQL history', () => {
     expect(history.gaps).toEqual([]);
   });
 
+  test('身份目录旧键与两表在同一快照内读尽，不丢第二页，也不认领其他项目别名', async () => {
+    const { db, module } = await fixture();
+    const own = await resource(db.db, { box: null }), other = await resource(db.db, { projectId: OTHER, box: null }), oldBinding = await binding(db.db, { box: null });
+    await db.db.execute(sql`INSERT INTO data.resource_identity_aliases(kind,key,id) SELECT 'data-resource',jsonb_build_array('old-resource-' || n)::text,${own} FROM generate_series(1,1001) n`);
+    await db.db.execute(sql`INSERT INTO data.resource_identity_aliases(kind,key,id) VALUES ('data-binding',${JSON.stringify(['old-binding'])},${oldBinding}),('data-resource',${JSON.stringify(['foreign-resource'])},${other})`);
+    const history = await module().api.nativePostgresHistory!.read(PROJECT);
+    expect(history.aliases).toHaveLength(1002); expect(history.aliases.every((row) => row.valid)).toBe(true);
+    expect(history.aliases.some((row) => row.keys[0] === 'foreign-resource')).toBe(false);
+    expect(history.aliases.find((row) => row.kind === 'data-binding')?.keys).toEqual(['old-binding']);
+    expect(new Set(history.aliases.flatMap((row) => row.keys)).size).toBe(1002);
+    await db.db.execute(sql`INSERT INTO data.resource_identity_aliases(kind,key,id) VALUES ('data-resource',${JSON.stringify(['late-alias'])},${own})`);
+    expect((await module().api.nativePostgresHistory!.read(PROJECT)).revision).not.toBe(history.revision);
+  });
+
+  test('损坏或跨种类别名保留明确缺口，不输出不可解读的原文', async () => {
+    const { db, module } = await fixture(); const own = await resource(db.db, { box: null });
+    await db.db.execute(sql`INSERT INTO data.resource_identity_aliases(kind,key,id) VALUES ('data-resource','not-json',${own}),('data-binding',${JSON.stringify(['wrong-kind'])},${own}),('unsupported',${JSON.stringify(['unknown-kind'])},${own}),('data-resource',${JSON.stringify([DSN])},${own})`);
+    const history = await module().api.nativePostgresHistory!.read(PROJECT);
+    expect(history.aliases).toHaveLength(4); expect(history.aliases.every((row) => !row.valid && row.keys.length === 0)).toBe(true);
+    expect(history.gaps).toHaveLength(4); expect(history.gaps.every((gap) => gap.code === 'legacy-alias-invalid')).toBe(true);
+    expect(JSON.stringify(history)).not.toContain(DSN); expect(JSON.stringify(history)).not.toContain('not-json');
+  });
+
   test('1001 个资源与 1001 个历史绑定全部读尽，摘要固定原项目且密码密文变化能使摘要失效', async () => {
     const { db, module } = await fixture();
     const seed = await resource(db.db, { box: null }), bind = await binding(db.db, { box: null });

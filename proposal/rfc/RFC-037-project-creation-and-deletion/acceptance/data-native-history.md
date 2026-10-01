@@ -24,3 +24,12 @@
 最终冻结候选的后端类型通过；提交内容的虚拟 HEAD+精确六路径检查后端/console均0诊断。最终单次完整 `bun run check` 静态四层通过，测试为4954 pass/143环境skip/2 fail、5099 tests、971文件、33154断言、1215.94秒，六个源码/测试指纹保持。两项失败为接口参考面板申请行未到及发布页在读取中就断言；接口测试文件在门禁期间由并行任务修改，所有 console 文件均不属于本发布清单。两文件单独诊断19 pass/0、201断言，当前参考用例含原owner的新等待，故这个诊断不覆盖或替代原全量失败。未更改/提交其在制文件，不再重复未变化的全量；按开发规则§3精确发布并等待自己的 hosted 六项CI。
 
 官方改动行算法核对75/75（100%），所有有运行逻辑的改动文件加载，0覆盖违规；原日志与候选类型/覆盖JSON保留。正式 owner还需核对身份alias registry和旧孤立凭据的原归属，不靠角色同名认领；本端口只声明 resources/task_bindings 两张保留表读取完整。精确CI/部署/实际Root只读验收待接续，永久删除仍关闭。
+
+
+## cc3efde2 精确发布与安装 Root 只读验收
+
+本批精确发布 `cc3efde22fbd4223065861ea55942cc97936db4a`，CI `36911308226` 六项终态成功。2026-10-01T19:17:26.610Z 八组件 Ready=1；实际控制面镜像 manifest `3be0783c238d68cc87a04ac42c1fd1de3d99c79d08526cb3f15da58fdabaf323`、console `9e6711015677fb279d5e421dc8f0d9db7d7c5378ded80f982ed624bb64967032`。原共享 PostgreSQL/卷、只读探针和策略、原项目及 Runner 保持。
+
+真实 API 原 Pod UID `711891d9-9d6a-4ebb-ae66-ba5f278e0f9b` 的安装 Root 只读验收通过：完整读取 2 条原资源、0 绑定，与独立完整 ID/声明、密文摘要及真实 shared 准入快照一致，回放稳定、无秘密输出。实际 Deployment selector 与 Pod→ReplicaSet→Deployment UID 链核对后执行；最初猜测 `app=cs-api` 的预检零 Pod 失败保留，未执行业务写入。当前全部 **52 库/64 角色**名字与 OID 前后一致；未执行建库、删除、续发凭据或项目状态变化。
+
+回执 `/private/tmp/cs-rfc037-cc3efde22fbd-data-native-history-live-receipt.json`、原 catalog、observer 来源和真实 Root 日志保留。这里证明保留记录读取完整，不能证明旧物理历史完整或永久回收。接续候选把 identity alias registry 纳入同一快照，并通过公开端口组合 resources 和 data-control；见 [原生 owner 候选](native-owner.md)。删除入口仍关闭。

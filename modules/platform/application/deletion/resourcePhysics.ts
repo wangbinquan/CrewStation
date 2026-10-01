@@ -1,6 +1,7 @@
 import type { ProjectDeletionContext, ProjectDeletionInventory, ProjectDeletionStepResult, ProjectDeletionTarget } from '@crewstation/contracts';
 import { ProjectDeletionInventorySchema, ProjectDeletionStepResultSchema } from '@crewstation/contracts';
 import { jsonHash, precondition } from '@crewstation/kernel';
+import type { NativeDeletionHistoryInputs, NativeDeletionHistoryPort } from '../../ports/projectResourceSources';
 
 interface PhysicalSource {
   inspect(target: ProjectDeletionTarget): Promise<ProjectDeletionInventory>;
@@ -30,4 +31,44 @@ export function projectResourcePhysics(pods: PhysicalSource & { stop(context: Pr
     prove: (context: ProjectDeletionContext) => combined(context, [() => pods.verify(context), () => volumes.prove(context)]),
     verify: (context: ProjectDeletionContext) => combined(context, [() => pods.verify(context), () => volumes.verify(context)]),
   };
+}
+
+/** Read-only inversion: no table access across owners, credential issuance or platform availability check. */
+export function nativeDeletionRetainedHistory(data: NativeDeletionHistoryInputs['data'], resources: NativeDeletionHistoryInputs['resources'], adminUrl: string): NativeDeletionHistoryPort {
+  const endpoint = new URL(adminUrl), nativeName = /^cs_[a-z0-9_]{1,60}$/;
+  return { read: async (projectId) => {
+    if (!data.nativePostgresHistory) throw precondition('缺少 data 原生保留历史端口');
+    const [legacy, ledger] = await Promise.all([data.nativePostgresHistory.read(projectId), resources.projectDeletion.nativePostgresHistory(projectId)]);
+    if (legacy.projectId !== projectId || !legacy.retainedRecordsComplete || !ledger.retainedRecordsComplete) throw precondition('原生保留历史来源或完整读取标志不符');
+    const blockers: ProjectDeletionInventory['blockers'] = [...legacy.gaps.map((gap) => ({ participant: 'data-control' as const, code: gap.code, message: gap.message, resourceId: gap.id })), ...ledger.gaps.map((gap) => ({ participant: 'data-control' as const, code: gap.code, message: gap.message, resourceId: gap.resourceId }))];
+    const records: Awaited<ReturnType<NativeDeletionHistoryPort['read']>>['records'][number][] = [];
+    const aliases = (id: string) => legacy.aliases.filter((alias) => alias.id === id && alias.valid).flatMap((alias) => alias.keys);
+    const addName = (names: Awaited<ReturnType<NativeDeletionHistoryPort['read']>>['records'][number]['names'][number][], kind: 'database' | 'role', name: string, id: string, oid?: string) => {
+      if (!nativeName.test(name)) { blockers.push({ participant: 'data-control', code: 'native-name-unregistered', message: '旧原生名字不属于已登记的平台命名范围，需先核实来源', resourceId: id }); return; }
+      names.push({ kind, name, ...(oid !== undefined ? { oid } : {}) });
+    };
+    const addDsn = (names: Awaited<ReturnType<NativeDeletionHistoryPort['read']>>['records'][number]['names'][number][], dsn: (typeof legacy.resources)[number]['dsn'], id: string) => {
+      if (!dsn.origin) return;
+      if (dsn.origin.hostname !== endpoint.hostname || dsn.origin.port !== Number(endpoint.port || '5432')) { blockers.push({ participant: 'data-control', code: 'legacy-endpoint-unverified', message: '旧连接串指向另一原生端点，不能凭名字接管当前数据库', resourceId: id }); return; }
+      addName(names, 'database', dsn.origin.database, id); addName(names, 'role', dsn.origin.role, id);
+    };
+    for (const row of legacy.resources) {
+      if (row.kind !== 'postgres') continue;
+      const names: (typeof records)[number]['names'][number][] = []; addName(names, 'database', row.objectName, row.id); addDsn(names, row.dsn, row.id);
+      records.push({ resourceId: row.id, aliases: aliases(row.id), names });
+    }
+    for (const row of legacy.bindings) {
+      const names: (typeof records)[number]['names'][number][] = [];
+      if (row.roleName && !(row.mode === 'development' && row.roleName === 'development')) addName(names, 'role', row.roleName, row.id);
+      addDsn(names, row.dsn, row.id);
+      records.push({ resourceId: row.id, aliases: [...aliases(row.id), ...(row.legacyResourceId ? [row.legacyResourceId] : [])], names });
+    }
+    for (const row of ledger.records) {
+      const names: (typeof records)[number]['names'][number][] = [];
+      for (const child of row.declared) addName(names, child.kind === 'PostgresDatabase' ? 'database' : 'role', child.name, row.id);
+      for (const child of row.observed) addName(names, child.kind === 'PostgresDatabase' ? 'database' : 'role', child.name, row.id, child.uid);
+      records.push({ resourceId: row.id, aliases: row.owner.ref && row.owner.ref !== row.id ? [row.owner.ref] : [], names });
+    }
+    return { complete: blockers.length === 0, revision: jsonHash({ projectId, data: legacy.revision, resources: ledger.revision }), records, blockers, references: [] };
+  } };
 }

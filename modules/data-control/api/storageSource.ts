@@ -1,5 +1,20 @@
 import type { ProjectId } from '@crewstation/contracts';
 import type { NativeDdlConnection, NativePostgresProcess } from './databaseRemoval';
+import { z } from 'zod';
+
+const sourceHash = z.string().regex(/^[a-f0-9]{64}$/), sourceIdentity = z.string().min(1);
+const absoluteSourcePath = z.string().refine((path) => path.startsWith('/') && !path.split('/').includes('..'));
+/** A single whitelist for independent probes, retained journals and immutable purge scopes. */
+export const NativePostgresStorageSourceSchema = z.object({
+  identity: sourceHash, serviceUid: sourceIdentity,
+  server: z.object({ podUid: sourceIdentity, containerId: sourceIdentity, nodeUid: sourceIdentity, address: sourceIdentity }),
+  volumes: z.array(z.object({ pvcUid: sourceIdentity, pvUid: sourceIdentity, nodeUid: sourceIdentity, mountPath: absoluteSourcePath, providerPath: absoluteSourcePath, rootEpoch: sourceHash, volumeEpoch: sourceHash,
+    entries: z.array(z.object({ key: sourceIdentity, relativePath: sourceIdentity.refine((path) => !path.startsWith('/') && !path.split('/').includes('..')), kind: z.enum(['file', 'directory']), identity: sourceHash })).min(1) })).min(1),
+  observedAt: z.iso.datetime(),
+}).refine((source) => {
+  const entries = source.volumes.flatMap((volume) => volume.entries);
+  return new Set(entries.map((entry) => entry.key)).size === entries.length && entries.some((entry) => entry.key === 'pgdata' && entry.kind === 'directory') && entries.some((entry) => entry.key === 'control' && entry.kind === 'file') && source.volumes.every((volume) => volume.nodeUid === source.server.nodeUid);
+});
 
 export interface NativePostgresVolumeSource {
   readonly pvcUid: string; readonly pvUid: string; readonly nodeUid: string;

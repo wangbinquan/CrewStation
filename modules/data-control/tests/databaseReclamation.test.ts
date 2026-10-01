@@ -60,7 +60,8 @@ describe.skipIf(!available)('RFC-037 PostgreSQL：原 OID 的真实 catalog 与�
   }
 
   test('base 原目录与 OID 实际在；DROP 后 catalog 与文件都归零，其他库原 OID 和目录保持', () => withDatabase(async (target) => {
-    const original = await reader.capture(target);
+    const withExtra = { ...target, unrelatedSecret: 'fixture-secret-must-not-be-retained' }, original = await reader.capture(withExtra);
+    expect(JSON.stringify(original)).not.toContain('unrelatedSecret'); expect(JSON.stringify(original)).not.toContain('fixture-secret-must-not-be-retained');
     expect(original.directories).toContainEqual({ tablespaceOid: null, root: 'base' });
     expect(original.source).toMatch(/^[a-f0-9]{64}$/);
     expect(JSON.stringify(original)).not.toContain(new URL(adminUrl).password);

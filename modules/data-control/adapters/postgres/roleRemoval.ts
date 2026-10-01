@@ -2,8 +2,7 @@ import type { ProjectDeletionContext } from '@crewstation/contracts';
 import { ProjectDeletionContextSchema } from '@crewstation/contracts';
 import { jsonHash, precondition } from '@crewstation/kernel';
 import type { NativeDdlConnection, OriginalPostgresRole, PostgresRoleRemoval, RoleRemoval } from '../../api/databaseRemoval';
-import { postgresServerSource } from './databaseReclamation';
-import { withNativePostgresNames } from './nativeNames';
+import { postgresServerSource, withNativePostgresNames } from './nativeNames';
 
 type Role = { name: string; oid: string };
 const identity = (role: Omit<OriginalPostgresRole, 'identity'>) => jsonHash({ name: role.name, oid: role.oid, source: role.source });
@@ -44,7 +43,7 @@ async function remaining(connection: NativeDdlConnection, original: OriginalPost
 }
 
 /** Original-role transaction with normal DROP; active sessions and foreign dependencies are preserved. */
-export function postgresRoleRemoval(adminUrl: string, assertGrant: (context: ProjectDeletionContext) => Promise<void>): RoleRemoval {
+export function postgresRoleRemoval(adminUrl: string, assertGrant: (context: ProjectDeletionContext) => Promise<void>, verifySource?: (connection: NativeDdlConnection) => Promise<void>): RoleRemoval {
   const url = new URL(adminUrl), endpoint = JSON.stringify([url.protocol, url.hostname, url.port || '5432']);
   const source = (connection: NativeDdlConnection) => postgresServerSource((text) => connection.query<{ system_identifier: string; pg_control_version: number; catalog_version_no: number; directory: string }[]>(text), endpoint);
   return {
@@ -60,19 +59,19 @@ export function postgresRoleRemoval(adminUrl: string, assertGrant: (context: Pro
     remove: async (raw, original, peers): Promise<PostgresRoleRemoval> => {
       const context = permit(raw, original, peers); await assertGrant(context);
       return withNativePostgresNames(adminUrl, peers.map((p) => p.name), async (connection) => {
-        await assertGrant(context); await connection.query('BEGIN');
+        await assertGrant(context); await verifySource?.(connection); await connection.query('BEGIN');
         try {
           await connection.query('LOCK TABLE pg_catalog.pg_authid,pg_catalog.pg_auth_members,pg_catalog.pg_shdepend IN SHARE ROW EXCLUSIVE MODE');
-          await assertGrant(context); await connection.assertHeld();
+          await assertGrant(context); await verifySource?.(connection); await connection.assertHeld();
           if (await source(connection) !== original.source) throw precondition('原角色服务器来源变化');
           for (const peer of peers) matched(await catalog(connection, peer), peer);
           const exists = matched(await catalog(connection, original), original), reason = await remaining(connection, original, peers);
           if (reason) { await connection.query('ROLLBACK'); return { kind: 'waiting', reason }; }
           if (exists) await connection.query('DROP ROLE "' + original.name + '"');
           if (matched(await catalog(connection, original), original) || await remaining(connection, original, peers)) throw precondition('原角色删除后仍有消费者或依赖');
-          await assertGrant(context); await connection.query('COMMIT');
+          await assertGrant(context); await verifySource?.(connection); await connection.query('COMMIT');
           if (await source(connection) !== original.source || matched(await catalog(connection, original), original) || await remaining(connection, original, peers)) throw precondition('原角色提交后来源未归零');
-          await assertGrant(context);
+          await assertGrant(context); await verifySource?.(connection);
           return { kind: 'gone', identity: original.identity, digest: jsonHash({ identity: original.identity, source: original.source, consumers: 0, dependencies: 0 }) };
         } catch (error) { try { await connection.query('ROLLBACK'); } catch { /* Native original connection may have stopped. */ } throw error; }
       });

@@ -30,6 +30,9 @@ import { objectEndpointUseCases } from './application/objectEndpoints';
 import { objectTransferMetrics } from './application/objectMetrics';
 import { prepareObjectCredentialRotation } from './application/objectCredentialRotation';
 import { prepareObjectRestore } from './application/objectRestore';
+import { nativeDeletionRepository } from './adapters/persistence/projectDeletion';
+import { nativePostgresDeletionOwner } from './application/projectDeletion';
+import { postgresNativeDeletionPhysics } from './adapters/postgres/databaseReclamation';
 
 /** 装配期注入：台账入口由组合根从 resources 接上；数据面用与 data 供给同一个管理连接。 */
 export interface DataControlModuleDeps {
@@ -107,6 +110,11 @@ export function createDataControlModule(deps: DataControlModuleDeps): DataContro
     } } } : {}),
     ...(databaseReclamation ? { databaseReclamation } : {}),
     ...(deps.nativePostgresSource ? { nativePostgresSource: deps.nativePostgresSource } : {}),
+    ...(deps.db && deps.adminUrl && deps.nativePostgresSource && databaseReclamation?.using ? { projectDeletion: { owner: ({ history, assertGrant }: Parameters<NonNullable<DataControlModuleApi['projectDeletion']>['owner']>[0]) => {
+      const repository = nativeDeletionRepository(deps.db!, assertGrant);
+      const physics = postgresNativeDeletionPhysics({ adminUrl: deps.adminUrl!, source: deps.nativePostgresSource!, reader: databaseReclamation, assertGrant: async (context) => { await assertGrant(context); await repository.assert(context); } });
+      return nativePostgresDeletionOwner({ history, repository, physics, assertGrant });
+    } } } : {}),
     stageRotation: async (id, transaction) => forResource(await originOf(id), async (guard) => { if (guard) await markNativeCredentialTransaction(transaction as Executor, guard); return stageCredentialRotation({ ledger: deps.ledger, ...rotationVault(transaction) }, id); }),
     finishRotation: async (id, transaction) => forResource(await originOf(id), async (guard) => { if (guard) await markNativeCredentialTransaction(transaction as Executor, guard); return finishCredentialRotation({ ledger: deps.ledger, plane, ...rotationVault(transaction) }, id); }),
     ...(vault ? { objects: createObjectPlane(deps.db!, vault.cipher) } : {}),

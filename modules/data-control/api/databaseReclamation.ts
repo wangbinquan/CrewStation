@@ -1,4 +1,10 @@
 /** Public native PostgreSQL locations only; no database contents or administrator credentials. */
+import type postgres from 'postgres';
+
+export interface NativeDdlConnection {
+  query<T extends postgres.Row[] = postgres.Row[]>(text: string, parameters?: readonly (string | number | boolean | null)[]): Promise<T>;
+  assertHeld(): Promise<void>;
+}
 export interface PostgresDatabaseDirectory {
   readonly tablespaceOid: string | null;
   readonly root: string;
@@ -20,4 +26,6 @@ export interface DatabaseReclamationReader {
   capture(target: { readonly name: string; readonly oid: string }): Promise<OriginalPostgresDatabase>;
   verify(original: OriginalPostgresDatabase): Promise<PostgresDatabaseReclamation>;
   close(): Promise<void>;
+  /** Formal purge pins every catalog/filesystem query to the actual original native backend. */
+  using?(connection: NativeDdlConnection): Pick<DatabaseReclamationReader, 'capture' | 'verify'>;
 }

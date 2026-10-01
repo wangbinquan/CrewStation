@@ -142,7 +142,18 @@ export function nativePostgresHistoryUseCases(store: NativePostgresHistoryStore,
       legacyDsnGaps(gaps, 'binding', row.id, dsn);
       bindings.push({ ...common(row), taskId: row.taskId, legacyResourceId: row.legacyResourceId, mode: row.mode, roleName: row.roleName, expiresAt: row.expiresAt?.toISOString() ?? null, dsn });
     }
-    const revision = nativeHistoryDigest(JSON.stringify({ version: 1, projectId, resources, bindings, gaps }));
-    return { projectId, retainedRecordsComplete: true, revision, resources, bindings, gaps };
+    const aliases = nativeAliases(snapshot.aliases, resources, bindings, gaps);
+    const revision = nativeHistoryDigest(JSON.stringify({ version: 2, projectId, resources, bindings, aliases, gaps }));
+    return { projectId, retainedRecordsComplete: true, revision, resources, bindings, aliases, gaps };
   } };
+}
+function nativeAliases(rows: Awaited<ReturnType<NativePostgresHistoryStore['read']>>['aliases'], resources: DataNativePostgresHistory['resources'], bindings: DataNativePostgresHistory['bindings'], gaps: NativeHistoryGaps): DataNativePostgresHistory['aliases'] {
+  const resourceIds = new Set(resources.map((row) => row.id)), bindingIds = new Set(bindings.map((row) => row.id));
+  return rows.map((row) => {
+    const kind = row.kind === 'data-resource' || row.kind === 'data-binding' ? row.kind : 'unknown';
+    let keys: unknown; try { keys = JSON.parse(row.key); } catch { keys = null; }
+    const valid = kind !== 'unknown' && (kind === 'data-resource' ? resourceIds : bindingIds).has(row.id) && Array.isArray(keys) && keys.length === 1 && typeof keys[0] === 'string' && keys[0].length > 0 && keys[0].length <= 512 && !keys[0].includes('://');
+    if (!valid) gaps.push({ source: 'alias', id: row.id, code: 'legacy-alias-invalid', message: '保留身份别名的种类、原键或本项目归属不能完整解读' });
+    return { kind, id: row.id, valid, keys: valid ? keys as string[] : [] };
+  });
 }

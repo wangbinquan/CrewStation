@@ -1,6 +1,6 @@
 import type { ProjectDeletionContext, ProjectId } from '@crewstation/contracts';
-import type postgres from 'postgres';
-import type { OriginalPostgresDatabase, PostgresDatabaseReclamation } from './databaseReclamation';
+import type { NativeDdlConnection, OriginalPostgresDatabase, PostgresDatabaseReclamation } from './databaseReclamation';
+export type { NativeDdlConnection } from './databaseReclamation';
 
 export type PostgresDatabaseRemoval =
   | { readonly kind: 'waiting'; readonly reason: 'native-consumers' | 'original-files' }
@@ -13,10 +13,6 @@ export interface DatabaseRemoval {
 
 /** Internal original-session DDL port; the composition root supplies project ownership. */
 export interface NativePostgresOrigin { readonly projectId: ProjectId; readonly resourceId: string }
-export interface NativeDdlConnection {
-  query<T extends postgres.Row[] = postgres.Row[]>(text: string, parameters?: readonly (string | number | boolean | null)[]): Promise<T>;
-  assertHeld(): Promise<void>;
-}
 export interface NativePostgresWork {
   run<T>(origin: NativePostgresOrigin, names: readonly string[], effect: (connection: NativeDdlConnection) => Promise<T>): Promise<T>;
   /** Optional on a lock-only fixture; production composition persists encrypted credentials first. */
