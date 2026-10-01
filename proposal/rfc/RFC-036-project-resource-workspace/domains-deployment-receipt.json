@@ -1,0 +1,251 @@
+{
+  "completedAt": "2026-10-01T02:42:09.800Z",
+  "sourceSha": "a500a3e0fb897b10909258bd3356414601df25b5",
+  "ciRun": 36806105699,
+  "ciUrl": "https://github.com/wangbinquan/CrewStation/actions/runs/36806105699",
+  "image": "docker.io/library/cs-console@sha256:e33c14928b5f069e8224f95d98a7e760cf4c9c04c4a25c90ed2e3c06b452216f",
+  "sourceImageConfigId": "sha256:8940710d381ef2aafcbadccfa9e638d129bb9777c4d3eea4751a73d4b7747a8d",
+  "requiredStorageContract": 1,
+  "console": {
+    "generation": 218,
+    "observedGeneration": 218,
+    "ready": 1
+  },
+  "beforeComponents": [
+    {
+      "name": "console",
+      "uid": "c4874a0e-6415-4c2b-b141-74ac25ea10ed",
+      "generation": 217,
+      "observedGeneration": 217,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-console@sha256:5521687c6d52d0b420fcf0ac9acc63bbd5f60c763ac1b8b197d3d2f6db69dcec"
+      ]
+    },
+    {
+      "name": "cs-api",
+      "uid": "b29a07a4-f251-46d4-8b67-d6c456c85749",
+      "generation": 209,
+      "observedGeneration": 209,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:0af73210f463a7fa02f0bbe4f1b81255c9466227bc3c66a7f267dc8fcc16fb93"
+      ]
+    },
+    {
+      "name": "cs-auth",
+      "uid": "a9682e05-2aee-4b76-9842-223da720574e",
+      "generation": 107,
+      "observedGeneration": 107,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:0af73210f463a7fa02f0bbe4f1b81255c9466227bc3c66a7f267dc8fcc16fb93"
+      ]
+    },
+    {
+      "name": "cs-controller",
+      "uid": "5107f19e-22d5-4d7b-8850-78204f329e82",
+      "generation": 174,
+      "observedGeneration": 174,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:0af73210f463a7fa02f0bbe4f1b81255c9466227bc3c66a7f267dc8fcc16fb93"
+      ]
+    },
+    {
+      "name": "cs-events",
+      "uid": "483d82fb-89c0-41df-b03e-9b025822fe1a",
+      "generation": 77,
+      "observedGeneration": 77,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:0af73210f463a7fa02f0bbe4f1b81255c9466227bc3c66a7f267dc8fcc16fb93"
+      ]
+    },
+    {
+      "name": "cs-session",
+      "uid": "68a3334b-917a-43b7-808e-e3d366fdc2ef",
+      "generation": 126,
+      "observedGeneration": 126,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:0af73210f463a7fa02f0bbe4f1b81255c9466227bc3c66a7f267dc8fcc16fb93"
+      ]
+    },
+    {
+      "name": "mcp-capabilities",
+      "uid": "c53a1d73-3ec1-4848-a370-6c4579f31edc",
+      "generation": 73,
+      "observedGeneration": 73,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:0af73210f463a7fa02f0bbe4f1b81255c9466227bc3c66a7f267dc8fcc16fb93"
+      ]
+    },
+    {
+      "name": "mcp-operations",
+      "uid": "e979a774-d521-4031-a3fa-af9c7dafb80a",
+      "generation": 73,
+      "observedGeneration": 73,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:0af73210f463a7fa02f0bbe4f1b81255c9466227bc3c66a7f267dc8fcc16fb93"
+      ]
+    }
+  ],
+  "components": [
+    {
+      "name": "console",
+      "uid": "c4874a0e-6415-4c2b-b141-74ac25ea10ed",
+      "generation": 218,
+      "observedGeneration": 218,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-console@sha256:e33c14928b5f069e8224f95d98a7e760cf4c9c04c4a25c90ed2e3c06b452216f"
+      ]
+    },
+    {
+      "name": "cs-api",
+      "uid": "b29a07a4-f251-46d4-8b67-d6c456c85749",
+      "generation": 209,
+      "observedGeneration": 209,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:0af73210f463a7fa02f0bbe4f1b81255c9466227bc3c66a7f267dc8fcc16fb93"
+      ]
+    },
+    {
+      "name": "cs-auth",
+      "uid": "a9682e05-2aee-4b76-9842-223da720574e",
+      "generation": 107,
+      "observedGeneration": 107,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:0af73210f463a7fa02f0bbe4f1b81255c9466227bc3c66a7f267dc8fcc16fb93"
+      ]
+    },
+    {
+      "name": "cs-controller",
+      "uid": "5107f19e-22d5-4d7b-8850-78204f329e82",
+      "generation": 174,
+      "observedGeneration": 174,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:0af73210f463a7fa02f0bbe4f1b81255c9466227bc3c66a7f267dc8fcc16fb93"
+      ]
+    },
+    {
+      "name": "cs-events",
+      "uid": "483d82fb-89c0-41df-b03e-9b025822fe1a",
+      "generation": 77,
+      "observedGeneration": 77,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:0af73210f463a7fa02f0bbe4f1b81255c9466227bc3c66a7f267dc8fcc16fb93"
+      ]
+    },
+    {
+      "name": "cs-session",
+      "uid": "68a3334b-917a-43b7-808e-e3d366fdc2ef",
+      "generation": 126,
+      "observedGeneration": 126,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:0af73210f463a7fa02f0bbe4f1b81255c9466227bc3c66a7f267dc8fcc16fb93"
+      ]
+    },
+    {
+      "name": "mcp-capabilities",
+      "uid": "c53a1d73-3ec1-4848-a370-6c4579f31edc",
+      "generation": 73,
+      "observedGeneration": 73,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:0af73210f463a7fa02f0bbe4f1b81255c9466227bc3c66a7f267dc8fcc16fb93"
+      ]
+    },
+    {
+      "name": "mcp-operations",
+      "uid": "e979a774-d521-4031-a3fa-af9c7dafb80a",
+      "generation": 73,
+      "observedGeneration": 73,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:0af73210f463a7fa02f0bbe4f1b81255c9466227bc3c66a7f267dc8fcc16fb93"
+      ]
+    }
+  ],
+  "unchangedOtherComponents": true,
+  "unchangedRunner": true,
+  "runnerImage": "registry.crewstation-system.svc.cluster.local:5000/crewstation/task-runtime@sha256:587a0766440bae22f69bd6e68e101f2348ec8bda95f8b4c3ce6ddef0fa010928",
+  "beforeWorkloads": [
+    {
+      "kind": "Pod",
+      "name": "rfc035-objects-0929-blue-6778c5fb78-8x4hb",
+      "uid": "4d3ff6c0-df4c-4d86-8198-d64e97880d35",
+      "images": [
+        "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+      ]
+    },
+    {
+      "kind": "Pod",
+      "name": "rfc035-objects-0929-blue-6778c5fb78-q8j9g",
+      "uid": "ab17146c-3203-4e2b-b62e-bc7dd5d9f5bb",
+      "images": [
+        "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+      ]
+    },
+    {
+      "kind": "Pod",
+      "name": "rfc035-objects-0929-green-754d8d8848-cxqfv",
+      "uid": "01c681f1-10c2-4241-8187-5113c86be21c",
+      "images": [
+        "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+      ]
+    },
+    {
+      "kind": "Pod",
+      "name": "rfc035-objects-0929-green-754d8d8848-fsbhn",
+      "uid": "9853c695-3a76-4a11-9b43-64c4a8677915",
+      "images": [
+        "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+      ]
+    }
+  ],
+  "afterWorkloads": [
+    {
+      "kind": "Pod",
+      "name": "rfc035-objects-0929-blue-6778c5fb78-8x4hb",
+      "uid": "4d3ff6c0-df4c-4d86-8198-d64e97880d35",
+      "images": [
+        "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+      ]
+    },
+    {
+      "kind": "Pod",
+      "name": "rfc035-objects-0929-blue-6778c5fb78-q8j9g",
+      "uid": "ab17146c-3203-4e2b-b62e-bc7dd5d9f5bb",
+      "images": [
+        "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+      ]
+    },
+    {
+      "kind": "Pod",
+      "name": "rfc035-objects-0929-green-754d8d8848-cxqfv",
+      "uid": "01c681f1-10c2-4241-8187-5113c86be21c",
+      "images": [
+        "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+      ]
+    },
+    {
+      "kind": "Pod",
+      "name": "rfc035-objects-0929-green-754d8d8848-fsbhn",
+      "uid": "9853c695-3a76-4a11-9b43-64c4a8677915",
+      "images": [
+        "registry.crewstation-system.svc.cluster.local:5000/rfc035-objects-0929@sha256:a54e94e19957ad93cb69048ef3ac8f4bef62a759d7517ffe8fb5164bfe1be744"
+      ]
+    }
+  ],
+  "missing": [],
+  "changed": []
+}
