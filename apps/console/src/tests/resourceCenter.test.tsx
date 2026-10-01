@@ -17,10 +17,10 @@ test('category filter compacts the topology while preserving project and real ow
   page = await renderApp(`${centerPath}?category=data`);
   const diagram = document.querySelector('svg[aria-label="项目资源中心"]')!;
   // 原筛选仅降低透明度，仍留下完整图的高度，导致匹配资源可能远离当前视口。
-  expect([...diagram.querySelectorAll('[data-node-id]')].map((n) => n.getAttribute('data-node-id')).sort()).toEqual(['group:data:database', 'group:service:compute-profile', 'project']);
-  expect(diagram.querySelectorAll('[data-evidence]')).toHaveLength(2);
+  expect([...diagram.querySelectorAll('[data-node-id]')].map((n) => n.getAttribute('data-node-id')).sort()).toEqual(['group:configuration', 'group:services', 'group:storage']);
+  expect(diagram.querySelectorAll('[data-evidence]')).toHaveLength(3);
   await page.click('放大拓扑');
-  expect([...dialog().querySelectorAll('[data-node-id]')].map((n) => n.getAttribute('data-node-id')).sort()).toEqual(['group:data:database', 'group:service:compute-profile', 'project']);
+  expect([...dialog().querySelectorAll('[data-node-id]')].map((n) => n.getAttribute('data-node-id')).sort()).toEqual(['group:configuration', 'group:services', 'group:storage']);
   expect(f.writes).toHaveLength(0);
 });
 

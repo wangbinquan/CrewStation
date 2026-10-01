@@ -15,14 +15,14 @@ afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = original
 const dialog = () => [...document.querySelectorAll<HTMLDialogElement>('dialog[open]')].at(-1)!;
 async function escape() { await act(async () => dialog().dispatchEvent(new Event('cancel', { cancelable: true }))); await page!.settle(); }
 async function openGroup() {
-  const trigger = document.querySelector<SVGSVGElement>('[data-node-id="group:execution:compute-profile"]');
+  const trigger = document.querySelector<SVGSVGElement>('[data-node-id="group:services"]');
   expect(Boolean(trigger)).toBe(true);
   await act(async () => { trigger!.focus(); trigger!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); });
   await page!.settle();
   return trigger!;
 }
 
-test('every resource type has one stable card even for a single member or hundreds of members', () => {
+test('a domain has one stable card even for a single member or hundreds of members', () => {
   let height: number | undefined;
   for (const count of [1, 2, 4, 400]) {
     const snapshot = centerSnapshot();
@@ -30,9 +30,9 @@ test('every resource type has one stable card even for a single member or hundre
     snapshot.edges = [];
     const graph = resourceTopology(snapshot, t), layout = layoutTopology(graph.topology, FULL_METRICS);
     // 原数量阈值和环境／权限拆分令同类节点随成员规模增加，首屏不再可读。
-    expect(graph.topology.nodes.map((n) => n.id).sort()).toEqual(['group:execution:compute-profile', 'project']);
-    expect(graph.groups.get('group:execution:compute-profile')).toHaveLength(count);
-    expect(graph.displayed.get('group:execution:compute-profile')!.metrics).toEqual([]);
+    expect(graph.topology.nodes.map((n) => n.id).sort()).toEqual(['group:configuration', 'group:services']);
+    expect(graph.groups.get('group:services')).toHaveLength(count);
+    expect(graph.displayed.get('group:services')!.metrics).toEqual([]);
     if (height !== undefined) expect(layout.height).toBe(height);
     height = layout.height;
   }
@@ -43,26 +43,26 @@ test('mixed permissions and environments retain member identities and directed e
   snapshot.nodes = [root, resourceNodeFixture('owned', { environment: 'production', pendingRequestIds: ['request-1'] }), resourceNodeFixture('available', { kind: 'catalog', environment: 'development', access: 'requestable' }), resourceNodeFixture('pending', { kind: 'request', resourceId: 'request-1', access: 'pending', pendingRequestIds: ['request-1'], state: 'pending' }), resourceNodeFixture('private', { access: 'unavailable' })];
   snapshot.edges = ['owned', 'available'].map((id) => ({ id, sourceId: root.id, targetId: id, relation: 'grants' as const, state: 'configured' as const, label: '授权' }));
   snapshot.edges.push({ id: 'observation', sourceId: root.id, targetId: 'owned', relation: 'grants', state: 'observed', label: '授权' });
-  const before = JSON.stringify(snapshot), graph = resourceTopology(snapshot, t), card = graph.topology.nodes.find((n) => n.id === 'group:execution:compute-profile')!;
+  const before = JSON.stringify(snapshot), graph = resourceTopology(snapshot, t), card = graph.topology.nodes.find((n) => n.id === 'group:services')!;
   expect(graph.groups.get(card.id)!.map((n) => n.id)).toEqual(['owned', 'available', 'pending', 'private']);
   expect(card.statusText).toBe('权限列表'); expect(card.status).toBe('pending'); expect(card.lane).toBe(1);
   expect(card.counts).toEqual([['已有能力', '1'], ['可以申请', '1'], ['未完成变更', '1']]);
   expect(graph.topology.edges).toHaveLength(2);
-  expect(graph.topology.edges.map((e) => [e.from, e.to, e.evidence])).toEqual([['project', card.id, 'configured'], ['project', card.id, 'observed']]);
+  expect(graph.topology.edges.map((e) => [e.from, e.to, e.evidence])).toEqual([['group:configuration', card.id, 'configured'], ['group:configuration', card.id, 'observed']]);
   expect(JSON.stringify(snapshot)).toBe(before);
   const filtered = filterResourceTopology(graph, new Set(['available']));
   expect(filtered.nodes.some((n) => n.id === card.id)).toBe(true);
 });
 
-test('ledger and observed aliases share a type card without combining distinct quota scopes or business and Kubernetes services', () => {
+test('ledger, observations and services share domain cards while retaining independent quota scopes and original identities', () => {
   const snapshot = centerSnapshot();
   snapshot.nodes = [resourceNodeFixture('grant', { category: 'data', resourceType: 'database', metrics: [{ key: 'storage', label: '空间', unit: 'GiB', scopeId: 'database:grant', limit: 8, used: 2, reserved: 0, requestedLimit: null, limitKind: 'value', observedAt: snapshot.observedAt }] }), resourceNodeFixture('observed', { category: 'data', resourceType: 'PostgresDatabase', kind: 'resource', source: 'observed', environment: 'production' }), resourceNodeFixture('business-service', { category: 'service', resourceType: 'service' }), resourceNodeFixture('k8s-service', { category: 'service', resourceType: 'Service', kind: 'resource' })];
   snapshot.edges = [{ id: 'internal', sourceId: 'grant', targetId: 'observed', relation: 'owns', state: 'observed', label: '数据库实体' }];
   const graph = resourceTopology(snapshot, t);
-  expect(graph.topology.nodes.map((n) => n.id).sort()).toEqual(['group:data:database', 'group:service:Service', 'group:service:service']);
-  expect(graph.groups.get('group:data:database')!.map((n) => n.id)).toEqual(['grant', 'observed']);
-  expect(graph.groups.get('group:data:database')![0]!.metrics[0]).toMatchObject({ scopeId: 'database:grant', limit: 8 });
-  expect(graph.displayed.get('group:data:database')!.metrics).toEqual([]); expect(graph.topology.edges).toEqual([]);
+  expect(graph.topology.nodes.map((n) => n.id).sort()).toEqual(['group:services', 'group:storage']);
+  expect(graph.groups.get('group:storage')!.map((n) => n.id)).toEqual(['grant', 'observed']);
+  expect(graph.groups.get('group:storage')![0]!.metrics[0]).toMatchObject({ scopeId: 'database:grant', limit: 8 });
+  expect(graph.displayed.get('group:storage')!.metrics).toEqual([]); expect(graph.topology.edges).toEqual([]);
   expect(snapshot.edges).toHaveLength(1);
 });
 
@@ -117,7 +117,7 @@ test('narrow topology keeps grouped permissions instead of expanding every resou
     const stage = document.querySelector('[role="tabpanel"]')!;
     // 窄屏不能把已聚合类型重新展开成几十行，须复用同一组及其权限入口。
     expect(stage.querySelector('table') === null).toBe(true); expect(stage.querySelectorAll('button')).toHaveLength(2);
-    await page.click('算力档位 · 79');
+    await page.click('服务与算力');
     expect(dialog().textContent).toContain('资源权限'); expect(dialog().textContent).toContain('仅查看');
     expect(f.writes).toHaveLength(0);
   } finally { window.matchMedia = originalMatchMedia; }

@@ -1,16 +1,17 @@
 import type { ProjectResourceNode, ResourceActionDescriptor, ResourceField, ResourceQuotaMetric, ResourceValues } from '@crewstation/contracts';
 import type { Translate } from '../../../shared/lib/useT';
+import { normalizeResourceDomain, resourceDomain } from './domains';
 
 export type CenterView = 'topology' | 'list' | 'requests';
 export interface CenterSearch { view?: CenterView; category?: string; access?: string; q?: string; node?: string; request?: string }
 export function parseCenterSearch(raw: Record<string, unknown>): CenterSearch {
   const text = (key: string, max = 240) => typeof raw[key] === 'string' ? String(raw[key]).slice(0, max) : undefined;
   return { view: ['topology', 'list', 'requests'].includes(String(raw['view'])) ? raw['view'] as CenterView : undefined,
-    category: ['service', 'execution', 'data', 'integration', 'foundation'].includes(String(raw['category'])) ? text('category') : undefined,
+    category: normalizeResourceDomain(String(raw['category'])),
     access: ['owned', 'requestable', 'pending', 'unavailable'].includes(String(raw['access'])) ? text('access') : undefined, q: text('q', 120), node: text('node', 500), request: text('request') };
 }
 export function matches(node: ProjectResourceNode, search: CenterSearch): boolean {
-  return (!search.category || node.category === search.category) && (!search.access || (search.access === 'pending' ? node.pendingRequestIds.length > 0 || node.access === 'pending' : node.access === search.access))
+  return (!search.category || resourceDomain(node) === normalizeResourceDomain(search.category)) && (!search.access || (search.access === 'pending' ? node.pendingRequestIds.length > 0 || node.access === 'pending' : node.access === search.access))
     && (!search.q || `${node.name} ${node.description} ${node.resourceId ?? ''} ${node.resourceType}`.toLocaleLowerCase().includes(search.q.toLocaleLowerCase()));
 }
 export const isInFlight = (state: string) => ['pending', 'approved', 'applying', 'needs-review', 'apply-failed', 'requested'].includes(state);

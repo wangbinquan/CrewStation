@@ -1,14 +1,15 @@
 import type { ProjectResourceNode, ProjectResourceSnapshot } from '@crewstation/contracts';
 import type { Translate } from '../../../shared/lib/useT';
 import type { NodeStatus, Semantic, Topology, TopologyNode, EdgeKind } from '../../../shared/ui/topology/topologyModel';
-import { numberText, metricLabel, metricLimit, label } from './workspace';
+import { RESOURCE_DOMAINS, resourceDomain, resourceClass } from './domains';
+import type { ResourceDomain } from './domains';
 
-const categories = ['foundation', 'service', 'execution', 'data', 'integration'] as const;
-const semantics: Record<string, Semantic> = { foundation: 'platform', service: 'service', execution: 'development', data: 'data', integration: 'external' };
+const presentation: Record<ResourceDomain, { semantic: Semantic; lane: number; row: number }> = {
+  configuration: { semantic: 'platform', lane: 0, row: 0 }, services: { semantic: 'service', lane: 1, row: 0 },
+  storage: { semantic: 'data', lane: 2, row: 0 }, network: { semantic: 'gateway', lane: 1, row: 1 }, platform: { semantic: 'external', lane: 2, row: 1 },
+};
 const status = (node: ProjectResourceNode): NodeStatus => node.stale ? 'unknown' : /failed|rejected/.test(node.state) ? 'failed' : node.kind === 'request' || /pending|creating|provisioning|applying|requested/.test(node.state) ? 'pending' : /running|active/.test(node.state) ? 'running' : /released|expired|revoked|cancelled/.test(node.state) ? 'idle' : 'ready';
 const relations: Record<string, EdgeKind> = { owns: 'owns', 'consumes-quota': 'uses', uses: 'uses', mounts: 'mounts', calls: 'dial', pushes: 'push', grants: 'binds', changes: 'control' };
-const resourceClasses: Record<string, string> = { Namespace: 'namespace', PostgresDatabase: 'database', PostgresRole: 'database-role', ResourceQuota: 'namespace-quota', IngressRoute: 'route', NetworkPolicy: 'network-policy', 'network-policy-set': 'network-policy', 'rate-limit-policy': 'gateway-limit' };
-const resourceClass = (type: string) => resourceClasses[type] ?? type;
 export interface ResourceTopology { topology: Topology; groups: Map<string, ProjectResourceNode[]>; displayed: Map<string, ProjectResourceNode>; aliases: Map<string, string> }
 
 export function resourceGroupSummary(members: ProjectResourceNode[]) {
@@ -18,21 +19,18 @@ export function resourceGroupSummary(members: ProjectResourceNode[]) {
     status: (['failed', 'unknown', 'pending', 'running', 'ready', 'idle'] as const).find((value) => states.has(value)) ?? 'ready' };
 }
 
-/** Older environment/access group bookmarks resolve to the new type card. Individual bookmarks retain their exact resource. */
+/** Both generations of type bookmarks resolve to their domain. Individual bookmarks retain their exact resource. */
 export function resourceSelectionId(graph: ResourceTopology, id: string | undefined) {
   if (!id?.startsWith('group:') || graph.displayed.has(id)) return id;
-  const [, category, type] = id.split(':'), canonical = `group:${category}:${resourceClass(type ?? '')}`;
-  if (graph.displayed.has(canonical)) return canonical;
-  return [...graph.groups.keys()].sort((a, b) => b.length - a.length).find((key) => id.startsWith(`${key}:`)) ?? id;
+  const [, category, type] = id.split(':');
+  return [...graph.groups].find(([, members]) => members.some((member) => member.category === category && resourceClass(member.resourceType) === resourceClass(type ?? '')))?.[0] ?? id;
 }
-
-const resourceLane = (node: ProjectResourceNode) => node.kind === 'project' ? 0 : node.kind === 'request' ? 3 : node.kind === 'allocation' || node.kind === 'catalog' ? 1 : 2;
 
 /** Keep matching groups and their real ownership ancestors; never invent a link to the project root. */
 export function filterResourceTopology(graph: ResourceTopology, matchingIds: Set<string>): Topology {
   const ids = new Set(graph.topology.nodes.filter((node) => matchingIds.has(node.id) || graph.groups.get(node.id)?.some((member) => matchingIds.has(member.id))).map((node) => node.id));
   const retained = new Set(ids);
-  for (const node of graph.displayed.values()) if (node.kind === 'project') retained.add(node.id);
+  if (graph.displayed.has('group:configuration')) retained.add('group:configuration');
   let added = true;
   while (added) {
     added = false;
@@ -44,23 +42,22 @@ export function filterResourceTopology(graph: ResourceTopology, matchingIds: Set
 
 /** Aggregate identities only. Every visible edge retains its real direction; quotas from distinct scopes are never added. */
 export function resourceTopology(snapshot: ProjectResourceSnapshot, t: Translate): ResourceTopology {
-  const buckets = new Map<string, ProjectResourceNode[]>(), displayed = new Map<string, ProjectResourceNode>(), groups = new Map<string, ProjectResourceNode[]>(), alias = new Map<string, string>();
+  const buckets = new Map<ResourceDomain, ProjectResourceNode[]>(), displayed = new Map<string, ProjectResourceNode>(), groups = new Map<string, ProjectResourceNode[]>(), alias = new Map<string, string>();
   for (const node of snapshot.nodes) {
-    if (node.kind === 'project') { displayed.set(node.id, node); alias.set(node.id, node.id); continue; }
-    const key = `${node.category}:${resourceClass(node.resourceType)}`, rows = buckets.get(key) ?? []; rows.push(node); buckets.set(key, rows);
+    const key = resourceDomain(node), rows = buckets.get(key) ?? []; rows.push(node); buckets.set(key, rows);
   }
-  for (const [key, nodes] of buckets) {
-    const first = nodes[0]!, id = `group:${key}`, summary = resourceGroupSummary(nodes), resourceType = resourceClass(first.resourceType); groups.set(id, nodes);
-    displayed.set(id, { ...first, id, resourceType, kind: 'group', resourceId: null, ownerId: null, environment: 'project', name: `${label(t, `type.${resourceType}`, resourceType)} · ${nodes.length}`, description: t('resourceCenter.groupHint'), memberIds: nodes.map((n) => n.id), metrics: [], facts: [], actions: [], pendingRequestIds: summary.pendingRequestIds, stale: nodes.some((n) => n.stale), state: summary.status, stateText: t('resourceCenter.permissionList') });
+  for (const key of RESOURCE_DOMAINS) {
+    const nodes = buckets.get(key); if (!nodes?.length) continue;
+    const first = nodes[0]!, id = `group:${key}`, summary = resourceGroupSummary(nodes); groups.set(id, nodes);
+    displayed.set(id, { ...first, id, resourceType: key, kind: 'group', resourceId: null, ownerId: null, environment: 'project', name: t(`resourceCenter.domain.${key}`), description: `${t(`resourceCenter.domainHint.${key}`)} ${t('resourceCenter.groupHint')}`, memberIds: nodes.map((n) => n.id), metrics: [], facts: [], actions: [], pendingRequestIds: summary.pendingRequestIds, stale: nodes.some((n) => n.stale), state: summary.status, stateText: t('resourceCenter.permissionList') });
     for (const node of nodes) alias.set(node.id, id);
   }
-  const nodes: TopologyNode[] = [...displayed.values()].sort((a, b) => a.id.localeCompare(b.id)).map((node) => {
-    const members = groups.get(node.id), summary = members ? resourceGroupSummary(members) : undefined;
+  const nodes: TopologyNode[] = [...displayed.values()].map((node) => {
+    const members = groups.get(node.id)!, summary = resourceGroupSummary(members);
     return {
-    id: node.id, title: node.name, kind: node.kind === 'group' ? 'summary' : node.kind === 'request' ? 'job' : /database|postgres/.test(node.resourceType) ? 'database' : node.resourceType === 'object-space' ? 'object-space' : /volume|pvc/.test(node.resourceType) ? 'volume' : /pod/.test(node.resourceType) ? 'pod' : /task|workload/.test(node.resourceType) ? 'workload' : 'component',
-    semantic: semantics[node.category]!, lane: members ? Math.min(...members.map(resourceLane)) : resourceLane(node), band: node.kind === 'project' ? 'project' : node.category,
-    status: summary?.status ?? status(node), statusText: summary ? t('resourceCenter.permissionList') : t(`resourceCenter.access.${node.access}`), subtitle: summary ? t('resourceCenter.groupSummary', { count: node.memberIds.length }) : `${t(`resourceCenter.source.${node.source}`)} · ${node.stateText}`, counts: summary ? [[t('resourceCenter.access.owned'), String(summary.owned)], [t('resourceCenter.access.requestable'), String(summary.requestable)], [t('resourceCenter.pending'), String(summary.pendingRequestIds.length)]] : node.metrics.slice(0, 2).map((metric) => [metricLabel(metric, t), `${metric.used === null ? '' : `${numberText(metric.used)} / `}${metricLimit(metric, t)}`] as const), meta: [node.stateText], abnormal: node.stale || /failed/.test(node.state),
+    id: node.id, title: node.name, kind: 'summary', ...presentation[node.resourceType as ResourceDomain], band: 'resources',
+    status: summary.status, statusText: t('resourceCenter.permissionList'), subtitle: t('resourceCenter.groupSummary', { count: members.length }), counts: [[t('resourceCenter.access.owned'), String(summary.owned)], [t('resourceCenter.access.requestable'), String(summary.requestable)], [t('resourceCenter.pending'), String(summary.pendingRequestIds.length)]], abnormal: node.stale || /failed/.test(node.state),
   }; });
   const edges = [...new Map(snapshot.edges.flatMap((edge) => { const from = alias.get(edge.sourceId), to = alias.get(edge.targetId); return from && to && from !== to ? [[`${from}:${to}:${edge.relation}:${edge.state}`, { from, to, kind: relations[edge.relation]!, evidence: edge.state, label: t(`resourceCenter.relation.${edge.relation}`) }] as const] : []; })).values()];
-  return { topology: { id: `project-resources:${snapshot.projectId}`, title: t('resourceCenter.title'), lanes: ['project', 'capability', 'instance', 'change'].map((v) => t(`resourceCenter.lane.${v}`)), bands: [{ id: 'project', title: snapshot.projectName, semantic: 'platform' }, ...categories.filter((id) => nodes.some((n) => n.band === id)).map((id) => ({ id, title: t(`resourceCenter.category.${id}`), semantic: semantics[id]! }))], nodes, edges, observedAt: snapshot.observedAt, complete: snapshot.complete }, displayed, groups, aliases: alias };
+  return { topology: { id: `project-resources:${snapshot.projectId}`, title: t('resourceCenter.title'), lanes: ['', '', ''], bands: [{ id: 'resources', title: '', semantic: 'platform' }], nodes, edges, observedAt: snapshot.observedAt, complete: snapshot.complete }, displayed, groups, aliases: alias };
 }
