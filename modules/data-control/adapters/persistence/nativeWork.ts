@@ -54,7 +54,11 @@ export function nativePostgresWork(input: { db: Database; adminUrl: string; avai
         const checked: NativeDdlConnection = { assertHeld: async () => { await admitted(); await connection.assertHeld(); }, query: async (text, parameters) => {
           await admitted(); await connection.assertHeld(); return connection.query(text, parameters);
         } };
-        return journaledEffect(db, workId, names, checked, input.source, effect);
+        const observation: NativeDdlConnection = { assertHeld: async () => {
+          assertSharedDatabaseAdmissionActive(db, nativeAdmissionKey(origin.projectId));
+          await guard.execute(sql`SELECT 1`); await connection.assertHeld();
+        }, query: async (text, parameters) => { await observation.assertHeld(); return connection.query(text, parameters); } };
+        return journaledEffect(db, workId, names, checked, observation, input.source, effect);
       });
     } finally {
       await db.transaction(async (tx) => {
@@ -115,14 +119,15 @@ async function commitJournal(db: Database, workId: string, side: 'before' | 'aft
   });
 }
 /** Each real callback retains both sides, including partially committed DDL that then throws. */
-async function journaledEffect<T>(db: Database, workId: string, names: readonly string[], connection: NativeDdlConnection, source: NativePostgresSource | undefined, effect: (connection: NativeDdlConnection) => Promise<T>): Promise<T> {
+async function journaledEffect<T>(db: Database, workId: string, names: readonly string[], connection: NativeDdlConnection, observation: NativeDdlConnection, source: NativePostgresSource | undefined, effect: (connection: NativeDdlConnection) => Promise<T>): Promise<T> {
   const before = await captureStorage(source, connection);
   await commitJournal(db, workId, 'before', await catalog(connection, names), before);
   try { return await effect(connection); }
   finally {
-    const identities = await catalog(connection, names);
+    // Closing business admission rejects further caller DDL, not observation under the original native lock.
+    const identities = await catalog(observation, names);
     let after: NativePostgresStorageSource | null = null;
-    try { after = await captureStorage(source, connection, before === null); }
+    try { after = await captureStorage(source, observation, before === null); }
     finally { await commitJournal(db, workId, 'after', identities, after); }
     if (before && after?.identity !== before.identity) throw conflict('原生 PostgreSQL 原卷或数据目录已替换', { code: 'native_postgres_source_changed' });
   }

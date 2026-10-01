@@ -26,7 +26,7 @@ async function setup(source?: NativePostgresSource) {
   const rows = () => database.db.execute<JournalRow>('SELECT * FROM data_control.deletion_work ORDER BY work_id');
   return { database, admin, origin, name, role, work, rows };
 }
-function observedSource(onCapture: (count: number) => NativePostgresStorageSource = () => storage): NativePostgresSource {
+function observedSource(onCapture: (count: number) => NativePostgresStorageSource | Promise<NativePostgresStorageSource> = () => storage): NativePostgresSource {
   let captures = 0;
   return { capture: async (connection) => { await connection.assertHeld(); return onCapture(++captures); }, verify: async () => { throw new Error('journal must retain the actual post-capture, rather than discard it in verify'); } };
 }
@@ -180,6 +180,28 @@ test.skipIf(!available)('原生身份公开端口：完整分页保留旧记录�
   expect(after.records.find((record) => record.workId === 'legacy-00501')!.state).toBe('finished');
   await f.database.handle.close();
   await expect(f.work.journal.read(f.origin.projectId)).rejects.toBeDefined();
+}));
+
+test.skipIf(!available)('原生身份：项目关闭拒绝继续 DDL，原锁下的后置只读事实仍保存已提交 OID', () => fixture(async (f) => {
+  let admitted = true;
+  const source = observedSource(async (count) => {
+    if (count === 2) {
+      const [work] = await f.database.db.execute<{ backend_pid: number }>('SELECT backend_pid FROM data_control.deletion_work');
+      const [actual] = await f.admin.unsafe<{ query: string; state: string }[]>('SELECT query,state FROM pg_stat_activity WHERE pid=$1', [work!.backend_pid]);
+      expect(actual).toMatchObject({ query: 'SELECT 1', state: 'idle in transaction' });
+    }
+    return storage;
+  });
+  const work = nativePostgresWork({ db: f.database.db, adminUrl, source, available: async () => { if (!admitted) throw precondition('project admission closed'); } });
+  // 原生 CREATE 已提交后接受删除，写入许可关闭不能同时丢掉原回调的后置事实。
+  await expect(work.native.run(f.origin, [f.role], async (connection) => {
+    await connection.query('CREATE ROLE "' + f.role + '" NOLOGIN');
+    admitted = false;
+    await connection.query('DROP ROLE "' + f.role + '"');
+  })).rejects.toThrow('project admission closed');
+  const [role] = await f.admin.unsafe<{ oid: string }[]>('SELECT oid::text FROM pg_roles WHERE rolname=$1', [f.role]);
+  expect(role?.oid).toBeDefined();
+  expect((await f.rows())[0]).toMatchObject({ state: 'finished', catalog_before: [], catalog_after: [{ kind: 'role', name: f.role, oid: role!.oid }], storage_before: storage, storage_after: storage });
 }));
 
 test.skipIf(!available)('原生身份公开端口：真实回调内读取独立快照，准入注入不能使隔离设置迟到', () => fixture(async (f) => {

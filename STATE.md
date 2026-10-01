@@ -1,3 +1,7 @@
+## 2026-10-02 RFC-037准入快照已部署实机通过，停止观测候选接续
+
+1c17f893已精确发布、CI36892472830六项成功，16:58:57Z八组件Ready=1；原探针/策略/共享PG卷/原项目/Runner保持。新API原Pod的同路Root联验通过：回调内公开journal读取、前后原来源两次HTTP200、独立事实匹配、原Pod保护与旧生产凭据SELECT；48库/48角色全名字/OID保持。首个监视器网络EOF及之前真实25001失败保留，未重跑CI或覆盖失败。停止后后置身份采集的PG反例先红后修：写入仍拒绝，实际原shared backend及名字锁下只读观测保留已提交OID；24／0、115断言及lint通过；单次完整检查被并行task-runtime/cluster-control三项结构违规阻断，两指纹保持，后端类型/较宽95／3Garage skip／0/供给轮换4／0及改动行8／8通过。按开发规则§3精确发布并等本SHA CI/部署，未动外来源码。正式owner、原生物理drain/purge/verify、其余全部清理和管理员二次确认及PD全回收未完成，入口关闭。见[journal验收](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/native-identity-journal.md)。下方历史及并行输出完整保留。
+
 ## 2026-10-02 RFC-037 journal实际部署及准入内快照修复
 
 66556eec已精确发布、CI36885290493六项成功；15:59:42Z八组件Ready=1，0005实际安装且校验和匹配。原48库/48角色/专用项目/共享PG卷/探针gen8/Runner保持。真实Root两次来源HTTP200、前后原卷身份独立保留，但回调内公开journal读取因准入前置SELECT后的SET TRANSACTION报25001失败，不计完整通过。journal与resources历史两条真实PG反例先红，BEGIN配置修正后23／0；稳定候选单次完整检查4911／143环境skip／0、32780断言，四源码/测试指纹保持、改动行2／2；精确发布/CI/部署和同路Root复验继续。正式owner、全部资源回收、管理员二次确认及PD01–23仍未完成，删除入口关闭。详见[RFC037 journal回执](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/native-identity-journal.md#2026-10-02-精确发布实际部署与准入内快照回归)。下方历史和并行状态完整保留。

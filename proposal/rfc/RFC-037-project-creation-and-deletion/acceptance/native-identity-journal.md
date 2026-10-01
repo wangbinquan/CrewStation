@@ -57,3 +57,21 @@
 准入内快照修复的单次稳定完整 `bun run check` 通过：结构/lint/两侧类型成功，4911 pass／143 环境 skip／0 fail、5054 tests、968 文件、32780 断言、893.21 秒；四个冻结源码/测试指纹全部保持。官方改动行核对 2／2（100%）、两个生产文件加载、无违规。只补本回执后精确发布，同内容不重复全量；日志 `...-admitted-snapshot-full-check.log`、`...-admitted-snapshot-coverage-audit.json`。精确 CI、部署和真实 Root 复验尚待执行。
 
 正式 owner 接线的隔离 PG 核对另发现需要处理的边界：同一真实 native 回调先 CREATE 角色、随后项目准入关闭，下一条调用方查询正确拒绝，但后置只读 catalog 采集也被同一业务准入拒绝，故实际已提交 OID没有 after 记录。原回调仍 finished，不能据此称完整物理排空；证据 `...-native-closing-observation-proof.json`，只使用原隔离测试实例并清理自建角色。后续应将实际持锁的只读后置观测和调用方写入许可分开，主准入连接失效时仍保留缺口并走正式 drain，不补造旧事实。这不属于本次 BEGIN 时序修复，不将该边界称为通过。
+
+
+## 2026-10-02 准入快照精确发布、部署与同路实机复验
+
+BEGIN 时序修复已精确发布 `1c17f893f644c6ec08f70e5350f94fe327177a7a`，八路径清单与署名及发布前后 main/origin 同步已核对；[CI 36892472830](https://github.com/wangbinquan/CrewStation/actions/runs/36892472830) 六项终态 success。首个监视器因 GitHub jobs 请求 unexpected EOF 退出，API 当时仍 in_progress，未误报 CI 失败、未重跑 CI；续接同一 run 后正常成功。2026-10-01T16:58:57.279Z 八组件 Ready=1，控制面 manifest `sha256:98c3b6b04fc77943b83804160d7e4abdb00130f63801f9c10d421a7d1b1dde1e`、console `sha256:647dc2b1fb8bd57404ad7fb299e292b64caf93c506cdc462de9c60c1e8c96135`；源自提交归档，非当前工作树。探针/策略/原共享 PG/PVC/PV/项目对象/Runner 原身份保持。
+
+实际 API Pod `a935e97e-4ab2-42a4-af8b-8bc95d571558` 安装代码的同一真实组合路径复验通过。原 native 回调内公开 journal 可读 running、SQL 原 OID 和独立来源；真实 SELECT 完成后 finished，前后原来源均为 `37a5d248a52b478038a570883375b439cdb6a4829bc3648c284ef46e3b47095f`，实际来源端点两次 HTTP200。公开端口与独立持久表逐字段语义相等、原 Pod 保护和旧生产凭据 SELECT 通过。最小 workId `01a0f86c-1450-7000-9732-260a14bb7860`；原48库/48角色全名字/OID前后完全相同。未执行真实 CREATE/DROP、口令改写或原项目删除。私有 `...-1c17f893f644-native-journal-live-receipt.json` 及前后 catalog 保留。JSONB 键顺序和端口字段顺序在比对时使用完整语义规范化，不删字段；首个失败回执继续保留。
+
+本复验仅关闭准入内快照与实际前后 journal 链路。旧原生历史缺口、正式 owner 的 all-name drain/purge/verify、平台存储变更、对象/源码等其余 owner、管理员二次确认及 PD 全回收仍未完成，删除入口继续关闭。创建仍为已发布、部署和浏览器核对的统一弹窗；本批未新增界面源码或浏览器验收。
+
+## 停止时后置身份候选
+
+上述独占 PG 关闭反例已转为仓库回归：真实 CREATE ROLE 后关闭项目准入，后续 DROP 必须拒绝且原角色仍存在，后置实际 OID/独立来源仍保存。首轮16／1确认丢失 after；实现后24 pass／0、115断言（journal/nativeWork两文件），原主准入断线与实际名字锁/回调恢复反例仍通过。来源在此使用明确端口替身，不冒称真实共享集群关闭了项目。
+
+调用方连接继续逐语句核对业务准入；后置观测使用同一原生连接/原名字锁，并核对原 shared 准入仍实际有效，以只读 SELECT 1 维持原 metadata backend 活性，不续建或替换准入。回归独立读取 pg_stat_activity，确认后置来源采集期间原 backend 的实际只读查询及 idle-in-transaction 状态。主准入/原锁已失效时仍拒绝，不通过当前新连接补造事实。仅拆分观测与写入许可；新增迁移/正式 owner/产品入口没有由本候选完成。精确lint通过，稳定单次完整检查及发布/CI/部署继续。
+
+
+停止时后置身份稳定候选的单次完整 `bun run check` 在 arch 阶段被并行在制源码阻断：task-runtime/ports/cluster.ts 的 ports→api 引用、task-runtime 四文件环和 cluster-control 两文件环，共3项；本批两源码/测试指纹保持，未动这些外来路径，也不把这次完整检查称通过。按开发规则§3处理共享树在制阻断：本批精确lint、完整后端类型通过；较宽 data-control/实际来源组合95 pass／3 Garage环境skip／0、98 tests、17文件、540断言，数据供给/HTTP口令轮换4／0、23断言，精确24／0、115断言保持。官方改动行8／8、无未加载生产文件或违规。完整日志、类型、覆盖与指纹均为 `/private/tmp/cs-rfc037-native-closing-observation-` 前缀；本候选无新迁移/契约变更。精确发布后须等该提交树六项CI，不以旧1c17f893的成功替代；正式owner与全部回收继续。
