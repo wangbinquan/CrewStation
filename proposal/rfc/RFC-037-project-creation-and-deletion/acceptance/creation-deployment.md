@@ -41,6 +41,18 @@
 
 ## 截图
 
+### 2026-10-02 已部署弹窗复测
+
+本次通过既有公司身份入口登录原验收 `dev-admin` 管理员，未切换到其他角色。当前 `console` Deployment Ready=1，镜像为 `docker.io/library/cs-console@sha256:64bdb18f6afe8b3aeefe5cd85d91ae4e9909b9a2fa7304bf2eaffe06e93bf637`，与8f699d69部署回执对应。
+
+筛选 `rfc037` 后只见原验收项目。在原列表点击「新建项目」打开真实 `dialog[open]`，URL保留 `/projects?q=rfc037`；界面清楚显示名称／域名标识用途、规则与正式／待验证地址。只填写本轮复核草稿 `rfc037-ui-recheck`，实际服务器预览为 `rfc037-ui-recheck.cs.localhost` 和 `preview.rfc037-ui-recheck.cs.localhost`。切换「业务执行示例」立即显示后台任务、异步命令、版本交接的具体说明。
+
+桌面1280×720的弹窗880×688、位置200/16；390×844的弹窗358×812、位置16/16；320×720的弹窗288×688、位置16/16。三者页面及弹窗均无横向溢出，底部创建／取消／清空在视口内。320px正文有570px可视高度、1190px实际内容高度，实际内部滚动后模板及下一步说明可见。
+
+Esc关闭后只有原项目一行、筛选仍为`rfc037`，焦点回到「新建项目」。重开保留名称、标识及所选模板；清空只清本次自建草稿且不关闭弹窗，恢复初始空值／基础应用，再Esc关闭。临时视口已reset。本轮未点击创建／删除，没有新增验收资源；未采集网络轨迹，不声称HTTP零写证明。永久删除入口尚未开放，本次不是PD-22回收验收。
+
+私有截图`/private/tmp/cs-rfc037-creation-recheck-20261002-wide.jpg`与`...-geometry.json`保存布局和实际操作回执。最初全表面浏览器发现超时，按已知工作台URL选择现有IAB成功；超时不计通过。
+
 ![已部署的桌面创建弹窗](./screenshots/deployed-creation-desktop.png)
 
 ![手机创建弹窗](./screenshots/deployed-creation-mobile.png)

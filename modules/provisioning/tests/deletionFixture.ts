@@ -25,7 +25,7 @@ export async function deletionFixture() {
   const api = project.api;
   const intents: ProjectDeletionIntents = {
     scope: api.deletionScope, prepare: api.prepareDeletionPlan, accept: api.acceptProjectDeletion, replay: api.replayProjectDeletion,
-    read: api.readProjectDeletion, retry: api.retryProjectDeletion, claim: api.claimProjectDeletion, renew: api.renewProjectDeletion,
+    read: api.readProjectDeletion, find: api.findProjectDeletion, retry: api.retryProjectDeletion, claim: api.claimProjectDeletion, renew: api.renewProjectDeletion,
     prepareReconfirmation: api.prepareProjectDeletionReconfirmation, replayReconfirmation: api.replayProjectDeletionReconfirmation, reconfirm: api.reconfirmProjectDeletion,
     defer: api.deferProjectDeletion, receipt: api.recordProjectDeletionReceipt, block: api.blockProjectDeletion,
     complete: api.completeProjectDeletion, pending: api.listPendingProjectDeletions,

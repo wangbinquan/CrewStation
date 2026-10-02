@@ -1,4 +1,4 @@
-import { AcceptProjectDeletionSchema, ProjectIdSchema, ResourceIdSchema } from '@crewstation/contracts';
+import { AcceptProjectDeletionSchema, ProjectDeletionLookupSchema, ProjectIdSchema, ResourceIdSchema } from '@crewstation/contracts';
 import type { Actor, UserId } from '@crewstation/contracts';
 import { actorFrom, parseBody, parseParams } from '@crewstation/http';
 import type { AppEnv } from '@crewstation/http';
@@ -25,6 +25,10 @@ export function projectDeletionRoutes(api: ProjectDeletionController, isAdmin: (
   });
   r.get('/v1/project-deletions/:operationId', async (c) => {
     const user = await actor(c); return c.json(await api.read(user, parseParams(c, operationParams).operationId));
+  });
+  r.get('/v1/projects/:projectId/deletion-operation', async (c) => {
+    const user = await actor(c), { projectId } = parseParams(c, projectParams);
+    return c.json(ProjectDeletionLookupSchema.parse({ projectId, operation: await api.find(user, projectId) ?? null }));
   });
   r.post('/v1/project-deletions/:operationId/retry', async (c) => {
     const user = await actor(c); await parseBody(c, z.object({}).strict());

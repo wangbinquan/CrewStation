@@ -17,5 +17,10 @@ export const ProjectDeletionOperationSchema = z.object({
     confirmedBy: UserIdSchema, confirmedAt: z.iso.datetime() }).strict()).optional(),
 }).strict().refine((operation) => !operation.confirmations || (operation.confirmations.length > 0 &&
   operation.confirmations.at(-1)!.digest === operation.confirmationDigest && new Set(operation.confirmations.map((c) => c.requestKey)).size === operation.confirmations.length), '确认历史须保持唯一请求键和当前摘要');
+/** 只读查询持久删除意图；项目根已清理后仍可核对原操作，不创建新的盘点或请求。 */
+export const ProjectDeletionLookupSchema = z.object({
+  projectId: ProjectIdSchema, operation: ProjectDeletionOperationSchema.nullable(),
+}).strict().refine((result) => !result.operation || result.operation.project.id === result.projectId, '查询结果必须属于原项目');
 export type ProjectDeletionPlan = z.infer<typeof ProjectDeletionPlanSchema>;
 export type ProjectDeletionOperation = z.infer<typeof ProjectDeletionOperationSchema>;
+export type ProjectDeletionLookup = z.infer<typeof ProjectDeletionLookupSchema>;

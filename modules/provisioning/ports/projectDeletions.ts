@@ -8,6 +8,7 @@ export interface ProjectDeletionIntents {
   accept(actor: Actor, id: ProjectId, input: AcceptProjectDeletion, inventory: readonly ProjectDeletionInventory[]): Promise<ProjectDeletionOperation>;
   replay(actor: Actor, id: ProjectId, input: AcceptProjectDeletion): Promise<ProjectDeletionOperation | undefined>;
   read(actor: Actor, id: string): Promise<ProjectDeletionOperation>;
+  find(actor: Actor, id: ProjectId): Promise<ProjectDeletionOperation | undefined>;
   retry(actor: Actor, id: string): Promise<ProjectDeletionOperation>;
   prepareReconfirmation(actor: Actor, id: string, inventory: readonly ProjectDeletionInventory[]): Promise<ProjectDeletionPlan>;
   replayReconfirmation(actor: Actor, id: string, input: AcceptProjectDeletion): Promise<ProjectDeletionOperation | undefined>;

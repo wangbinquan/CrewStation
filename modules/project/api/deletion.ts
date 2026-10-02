@@ -11,6 +11,7 @@ export interface ProjectDeletionApi {
   acceptProjectDeletion(actor: Actor, projectId: ProjectId, input: AcceptProjectDeletion, inventory: readonly ProjectDeletionInventory[]): Promise<ProjectDeletionOperation>;
   replayProjectDeletion(actor: Actor, projectId: ProjectId, input: AcceptProjectDeletion): Promise<ProjectDeletionOperation | undefined>;
   readProjectDeletion(actor: Actor, operationId: string): Promise<ProjectDeletionOperation>;
+  findProjectDeletion(actor: Actor, projectId: ProjectId): Promise<ProjectDeletionOperation | undefined>;
   retryProjectDeletion(actor: Actor, operationId: string): Promise<ProjectDeletionOperation>;
   prepareProjectDeletionReconfirmation(actor: Actor, operationId: string, inventory: readonly ProjectDeletionInventory[]): Promise<ProjectDeletionPlan>;
   replayProjectDeletionReconfirmation(actor: Actor, operationId: string, input: AcceptProjectDeletion): Promise<ProjectDeletionOperation | undefined>;

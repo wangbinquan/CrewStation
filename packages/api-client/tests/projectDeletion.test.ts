@@ -54,3 +54,18 @@ test('重新盘点不能接受首次计划或另一个原操作的材料', async
     await expect(client.projectDeletions.prepareReconfirmation(operationId)).rejects.toThrow('重新确认计划未绑定请求的原删除操作');
   }
 });
+test('原项目回执查询使用只读路由，明确区分空操作、原操作和错项目响应', async () => {
+  const calls: Array<{ path: string; method: string; body: unknown }> = [];
+  let result: unknown = { projectId, operation: null };
+  const client = createApiClient({ fetch: async (raw, init) => {
+    calls.push({ path: new URL(String(raw), 'https://test.invalid').pathname, method: init!.method!, body: init!.body });
+    return Response.json(result);
+  } });
+  expect(await client.projectDeletions.find(projectId)).toBeUndefined();
+  result = { projectId, operation }; expect(await client.projectDeletions.find(projectId)).toEqual(operation);
+  for (const invalid of [{ projectId: operationId, operation: null }, { projectId, operation: { ...operation, project: { ...operation.project, id: operationId } } }, operation]) {
+    result = invalid; await expect(client.projectDeletions.find(projectId)).rejects.toThrow();
+  }
+  expect(calls).toHaveLength(5);
+  for (const call of calls) expect(call).toEqual({ path: `/v1/projects/${projectId}/deletion-operation`, method: 'GET', body: undefined });
+});

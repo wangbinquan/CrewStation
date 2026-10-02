@@ -22,6 +22,7 @@ export function projectDeletionController(deps: DeletionControllerDeps): Project
       await bestEffortQueue(operation.id); return operation;
     },
     read: async (actor, id) => { await admin(actor); return deps.intents.read(actor, id); },
+    find: async (actor, id) => { await admin(actor); return deps.intents.find(actor, id); },
     retry: async (actor, id) => { await admin(actor); const operation = await deps.intents.retry(actor, id); if (operation.state === 'accepted') await bestEffortQueue(id); return operation; },
     prepareReconfirmation: async (actor, id) => {
       await admin(actor); const operation = await deps.intents.read(actor, id);

@@ -43,6 +43,7 @@ export function deletionIntentUseCases(deps: ProjectUseCaseDeps) {
       await scope.events.publish(DomainTopic.projectDeletionRequested, { projectId: id, operationId: operation.id, occurredAt: now.toISOString() }); return operation;
     })),
     readProjectDeletion: (actor: Actor, id: string) => adminDeletionWork(deps, actor, async () => (await loadDeletion(deps.uow.read, id)).operation),
+    findProjectDeletion: (actor: Actor, id: ProjectId) => adminDeletionWork(deps, actor, async () => (await deps.uow.read.deletions.findOperation(id))?.operation),
     replayProjectDeletion: (actor: Actor, id: ProjectId, raw: AcceptProjectDeletion) => adminDeletionWork(deps, actor, async () => {
       const input = AcceptProjectDeletionSchema.parse(raw), previous = await deps.uow.read.deletions.findRequest(input.requestKey);
       if (!previous) {
