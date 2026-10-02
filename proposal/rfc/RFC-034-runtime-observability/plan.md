@@ -825,3 +825,14 @@ CS-R02 的全 writer／inflight 封口、未绑定／未知尾部、开发 produ
 本批包括观测 12 路径、明确交接的 runtime-environment 25 路径、release 34 路径和最后提交的共享迁移锁 1 路径；platform 镜像来源 fixture 包含原 owner 的并行纠正，整份保留。两个新迁移 runtime-environment/0007 与 release/0009 的 SQL 和原 214 条锁记录保持，当前锁共 216 条。检查后只更新这四份观测回执文档，全部生产/测试/迁移内容不变，同内容不重复完整检查。
 
 精确远端提交、该 SHA 的六项 CI、本机镜像/迁移/八组件部署待完成。开发 producer 保持 OFF；全 writer/inflight、未绑定/unknown-tail、真实开发/CLI/平台用途、AW 联合对拍、全部分析和规模验收继续，两个 RFC 保持 In Progress。143 跳过项不计为通过，本机仍为 37e1f5aa 的既有部署与原固定 Runner。
+
+
+### 2026-10-03 联合发布、精确 CI 与本机部署回执
+
+观测 11 路径提交 `a6021a8832b963e8fe0dfe367c9fefa1257b9b51` 已包含在联合远端提交 `463f24d85b0e6edfc8fbf984758be3f2c585d400`，本地 main/origin/main 已核为一致。依交接顺序，owner 提交另外 61 路径，包含完整共享迁移锁、runtime/release 输出与保留并行纠正的 platform 镜像来源 fixture；没有移除其他会话的在制品。72 路径联合完整检查 5,325 pass／143 skip／0 fail 与 SOURCE v35 PASS 的生产、测试、迁移内容保持，本文只补回执，不重跑同内容完整门。
+
+[精确 CI37060038342](https://github.com/wangbinquan/CrewStation/actions/runs/37060038342) 于 2026-10-02T20:31:05Z 全部终态成功：static、unit、module、console、gate、e2e 六项均 success。本机于 2026-10-02T20:34:54.250Z 完成此 SHA 的部署，八组件保留原 Deployment UID、generation=observedGeneration、Ready=1。已只读复核节点实际 OCI manifest/config 字节及摘要：control-plane `sha256:495313d740dee1a76bbdd0adaec0b0aca8e81110bb188ac3d5b540487955301f`、console `sha256:9fcfd35062a78d2f4e75e812df5fceb7f732912c4925a289d4587a93d21eaec2` 的 revision 均为上述完整源码 SHA。
+
+迁移 Job `rfc037-migrate-463f24d85b0e` 完成，release/0009 与 runtime-environment/0007 已安装且 SQL checksum 匹配。原固定 Runner `sha256:587a0766440bae22f69bd6e68e101f2348ec8bda95f8b4c3ce6ddef0fa010928` 保持，实际 OCI storage-contract=1；原 PostgreSQL Pod/PVC/PV、数据库/角色、项目 Namespace/PV/PVC/Task Pod 和本机 native 容器身份、PID、启动时间及重启数保持，缺失列表为空。
+
+私有证据：`observability-cs-463f24d85b0e-joint-ci-receipt-v1.json`、`cs-rfc037-463f24d85b0e-runtime-release-v1-deployment-receipt.json`、`observability-cs-463f24d85b0e-joint-live-deployment-verification-v1.json`。此回执只关闭该片的发布/部署步骤：没有创建新模型任务、没有切换真实身份。开发 producer 保持 OFF；全 writer/inflight、unbound/unknown-tail、真实开发/CLI/平台用途、AW 联合对拍、调用片段及全部统计退出条件继续，两 RFC 仍 In Progress；143 skip 不计通过。
