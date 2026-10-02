@@ -95,6 +95,8 @@ export interface ResourceReport {
 }
 
 export interface ResourceWriter {
+  /** Call last within the owning transaction; this adds no resource or project lock after return. */
+  flushDeferredChanges?(): Promise<void>;
   declare(input: ResourceDeclaration): Promise<LedgerRecord>;
   /** 工作区的预览入口拆为其子路由；同事务转移唯一认领和观测，与调和租约互斥。 */
   splitChildren(sourceId: string, input: ResourceDeclaration): Promise<LedgerRecord>;

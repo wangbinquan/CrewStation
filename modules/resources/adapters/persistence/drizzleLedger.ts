@@ -8,6 +8,7 @@ import { resourceDeletionWriteError } from './deletion/errors';
 
 export function drizzleChangeLog(db: Executor): ChangeLog {
   return {
+    flushDeferred: async () => { await db.execute(sql`SET CONSTRAINTS resources.changes_stamp IMMEDIATE`); },
     append: async (entry) => { await db.insert(changes).values({ projectId: entry.projectId ?? null, resourceId: entry.resourceId, version: entry.version, change: entry.change }); },
     since: async (seq, limit, projectId) => (await db.select().from(changes)
       .where(and(gt(changes.seq, seq), projectId ? eq(changes.projectId, projectId) : undefined))

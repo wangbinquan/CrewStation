@@ -106,6 +106,8 @@ export interface BusinessWorkspaceLifecycle {
 }
 
 export interface TaskEnvironment {
+  /** Private admission seal: malformed explicit presence is never a legacy parent. */
+  readonly parentEnding?: unknown;
   readonly businessWorkspace?: BusinessWorkspaceLifecycle;
   readonly runtimeInitialization?: RuntimeInitializationStatus;
   readonly admissionFingerprint?: string;

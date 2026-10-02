@@ -5,6 +5,7 @@ import { createApp } from '@crewstation/http';
 import { createFakeK8sClient, Resources } from '@crewstation/k8s';
 import { noopLogger } from '@crewstation/kernel';
 import { runMigrations } from '@crewstation/persistence';
+import { sql } from 'drizzle-orm';
 import { loadPlatformSettings } from '@crewstation/settings';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import type { TestDatabase } from '@crewstation/testkit';
@@ -79,7 +80,12 @@ describe.skipIf(!available)('cluster HTTP through actual platform composition', 
     expect((await request(`/operations/${del.operationId}`)).status).toBe(200); expect((await request('/operations')).status).toBe(200);
     // Regression: inventory must include the next DB page, including archived projects and released task instances.
     await database.handle.client`INSERT INTO project.projects SELECT (jsonb_populate_record(NULL::project.projects, to_jsonb(p) || jsonb_build_object('id', 'prj_' || lpad(to_hex(n), 32, '0'), 'slug', 'batch-' || n, 'namespace', 'cs-batch-' || n, 'state', 'archived'))).* FROM project.projects p CROSS JOIN generate_series(1, 505) n WHERE p.id = ${p.id}`;
-    await database.handle.client`INSERT INTO task_runtime.environments SELECT (jsonb_populate_record(NULL::task_runtime.environments, to_jsonb(e) || jsonb_build_object('id', 'tsk_' || lpad(to_hex(n), 32, '0'), 'pod_name', 'batch-' || n)) ).* FROM task_runtime.environments e CROSS JOIN generate_series(1, 505) n WHERE e.id = ${task.id}`;
+    const fields = await database.db.execute<{ column_name: string }>(sql`SELECT column_name FROM information_schema.columns
+      WHERE table_schema='task_runtime' AND table_name='environments' AND is_generated='NEVER' ORDER BY ordinal_position`);
+    const insert = sql.join(fields.map((c) => sql.identifier(c.column_name)), sql`, `), selected = sql.join(fields.map((c) => sql`copy.${sql.identifier(c.column_name)}`), sql`, `);
+    await database.db.execute(sql`INSERT INTO task_runtime.environments (${insert}) SELECT ${selected} FROM task_runtime.environments e
+      CROSS JOIN generate_series(1,505) n CROSS JOIN LATERAL jsonb_populate_record(NULL::task_runtime.environments,
+        to_jsonb(e)||jsonb_build_object('id','tsk_'||lpad(to_hex(n),32,'0'),'pod_name','batch-'||n)) copy WHERE e.id=${task.id}`);
     const directory = await project.api.listClusterProjects(), executions = await tasks.api.listClusterTasks();
     expect(directory).toHaveLength(506); expect(directory.filter((p) => p.state === 'archived')).toHaveLength(505); expect(executions).toHaveLength(506);
     expect(new Set(executions.map((t) => t.taskId)).size).toBe(506); expect(executions.every((t) => !('runnerTokenHash' in t))).toBe(true);

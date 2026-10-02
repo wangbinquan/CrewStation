@@ -52,6 +52,8 @@ export interface ChangeEntry {
 }
 
 export interface ChangeLog {
+  /** End all deferred commit-order waits before the caller checks its own final lease. */
+  flushDeferred?(): Promise<void>;
   /** 序号在提交时按提交顺序盖上（迁移里的延迟触发器），调用方拿不到也不需要。 */
   append(entry: Omit<ChangeEntry, 'seq' | 'at'>): Promise<void>;
   /** seq 之后已提交的变更，按 seq 升序；projectId 给了就只要这个项目的。 */

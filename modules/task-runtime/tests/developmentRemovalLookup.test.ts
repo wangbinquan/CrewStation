@@ -72,7 +72,11 @@ describe.skipIf(!available)('RFC-034 original physical deletion lookup', () => {
     expect(await query(target('Pod'))).toEqual({ kind: 'unselected' });
     await f.uow.run((scope) => scope.environments.update(original));
     await f.runNative(); expect(await query(target('Pod'))).toMatchObject({ kind: 'permitted' });
-    await f.tdb.db.execute(sql`INSERT INTO task_runtime.environments SELECT (jsonb_populate_record(NULL::task_runtime.environments, to_jsonb(e) || jsonb_build_object('id', ${crypto.randomUUID()}::text))).* FROM task_runtime.environments e WHERE id = ${f.env.id}`);
+    const fields = await f.tdb.db.execute<{ column_name: string }>(sql`SELECT column_name FROM information_schema.columns
+      WHERE table_schema='task_runtime' AND table_name='environments' AND is_generated='NEVER' ORDER BY ordinal_position`);
+    const insert = sql.join(fields.map((c) => sql.identifier(c.column_name)), sql`, `), selected = sql.join(fields.map((c) => sql`copy.${sql.identifier(c.column_name)}`), sql`, `);
+    await f.tdb.db.execute(sql`INSERT INTO task_runtime.environments (${insert}) SELECT ${selected} FROM task_runtime.environments e
+      CROSS JOIN LATERAL jsonb_populate_record(NULL::task_runtime.environments,to_jsonb(e)||jsonb_build_object('id',${crypto.randomUUID()}::text)) copy WHERE e.id=${f.env.id}`);
     expect(await query(target('Pod'))).toMatchObject({ kind: 'waiting' });
   });
   test('closed admissions, historical receipt and live reads cannot be replaced with cached absence or a query failure', async () => {

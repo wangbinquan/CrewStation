@@ -6,11 +6,13 @@ import type { AdmissionRepository, EnvironmentRepository } from '../../ports/rep
 import { environmentTraceQueries } from './environmentTraceQueries';
 import { maintenanceEnvironmentReader } from './maintenanceEnvironments';
 import { admissions, environments } from './tables';
+import { readParentEndingJson, writeParentEndingJson } from './parentEndingJson';
 
 const json = <T>(v: unknown): T => (typeof v === 'string' ? JSON.parse(v) : v) as T;
 
 export function drizzleEnvironmentRepository(db: Executor): EnvironmentRepository {
   const toEnv = (r: typeof environments.$inferSelect): TaskEnvironment => ({
+    ...(r.parentEndingPresent ? { parentEnding: readParentEndingJson(r.parentEnding, r.parentEndingKind) } : {}),
     ...(r.businessWorkspace ? { businessWorkspace: json<TaskEnvironment['businessWorkspace']>(r.businessWorkspace) } : {}),
     ...(r.runtimeInitialization ? { runtimeInitialization: json<TaskEnvironment['runtimeInitialization']>(r.runtimeInitialization) } : {}),
     ...(r.admissionFingerprint ? { admissionFingerprint: r.admissionFingerprint } : {}),
@@ -23,7 +25,7 @@ export function drizzleEnvironmentRepository(db: Executor): EnvironmentRepositor
     ...(r.native ? { native: json<TaskEnvironment['native']>(r.native) } : {}), ...(r.release ? { release: json<TaskEnvironment['release']>(r.release) } : {}), ...(r.runnerRejection ? { runnerRejection: json<TaskEnvironment['runnerRejection']>(r.runnerRejection) } : {}),
     ...(r.startup ? { startup: json<TaskEnvironment['startup']>(r.startup) } : {}), ...(r.render ? { render: json<TaskEnvironment['render']>(r.render) } : {}),
   });
-  const toRow = (e: TaskEnvironment): typeof environments.$inferInsert => ({ ...e, businessWorkspace: e.businessWorkspace ?? null, runtimeInitialization: e.runtimeInitialization ?? null, podUid: e.podUid ?? null, branch: e.branch ?? null, preview: e.preview ?? null, createdBy: e.createdBy ?? null, message: e.message ?? null, rebuildId: e.rebuildId ?? null, native: e.native ?? null, release: e.release ?? null, runnerRejection: e.runnerRejection ?? null, startup: e.startup ?? null, render: e.render ?? null });
+  const toRow = (e: TaskEnvironment): typeof environments.$inferInsert => ({ ...e, parentEnding: writeParentEndingJson(e, 'parentEnding'), businessWorkspace: e.businessWorkspace ?? null, runtimeInitialization: e.runtimeInitialization ?? null, podUid: e.podUid ?? null, branch: e.branch ?? null, preview: e.preview ?? null, createdBy: e.createdBy ?? null, message: e.message ?? null, rebuildId: e.rebuildId ?? null, native: e.native ?? null, release: e.release ?? null, runnerRejection: e.runnerRejection ?? null, startup: e.startup ?? null, render: e.render ?? null });
   return {
     insert: async (e) => { await db.insert(environments).values(toRow(e)); },
     update: async (e) => { await db.update(environments).set(toRow(e)).where(eq(environments.id, e.id)); },

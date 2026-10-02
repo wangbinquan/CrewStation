@@ -2,6 +2,7 @@ import type { Logger } from '@crewstation/kernel';
 import type { Executor } from '@crewstation/persistence';
 import type { ProjectedRecord } from '../../domain/ledgerProjection';
 import { projectEnvironment, runnerCondition } from '../../domain/ledgerProjection';
+import { hasDevelopmentParentEnding } from '../../domain/development/parentEnding';
 import type { TaskEnvironment, WorkloadRender } from '../../domain/taskEnvironment';
 import type { EnvironmentLedger, LedgerRecordRef, LedgerWriter } from '../../ports/ledger';
 import type { EnvironmentRepository } from '../../ports/repositories';
@@ -45,7 +46,7 @@ export async function syncEnvironmentLedger(executor: Executor, ledger: Environm
     });
   } catch (error) {
     // RFC-027 的额度释放依赖清理确认条件，投影失败必须与环境状态一起回滚。
-    if (env.render?.businessStorage || env.render?.developmentUsageProtection !== undefined) throw error;
+    if (env.render?.businessStorage || env.render?.developmentUsageProtection !== undefined || hasDevelopmentParentEnding(env)) throw error;
     logger.warn('resource ledger projection failed', { taskId: env.id, error: error instanceof Error ? error.message : String(error) });
   }
 }

@@ -1,6 +1,6 @@
 import type { ResourceKind, ResourceReason } from '@crewstation/contracts';
 import type { Clock } from '@crewstation/kernel';
-import { conflict, forbidden, jsonHash, newResourceId, notFound, quotaExceeded, validation } from '@crewstation/kernel';
+import { conflict, forbidden, jsonHash, newResourceId, notFound, precondition, quotaExceeded, validation } from '@crewstation/kernel';
 import type { ResourceDeclaration, ResourceReport, ResourceWriter } from '../api/types';
 import { mergeConditions, ownerConditionViolation } from '../domain/conditions';
 import { kindRule, KIND_RULES } from '../domain/kinds';
@@ -122,6 +122,10 @@ async function reportIn(scope: LedgerScope, module: string, id: string, report: 
 /** 绑定所属模块与一个写入范围（自己的事务或调用方的事务）的写入口。 */
 export function ownerWriter(module: string, run: <T>(fn: (scope: LedgerScope) => Promise<T>) => Promise<T>, limits: QuotaLimits, clock: Clock): ResourceWriter {
   return {
+    flushDeferredChanges: () => run(async (scope) => {
+      if (!scope.changes.flushDeferred) throw precondition('台账提交边界尚未装配');
+      await scope.changes.flushDeferred();
+    }),
     declare: (input) => run((scope) => declareIn(scope, module, input, clock.now())),
     splitChildren: (sourceId, input) => run((scope) => splitChildrenIn(scope, module, sourceId, input, clock.now(), () => declareIn(scope, module, input, clock.now()))),
     admit: (input) => run((scope) => admitIn(scope, module, input, limits, clock.now())),

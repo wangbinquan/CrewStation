@@ -22,10 +22,14 @@ describe.skipIf(!available)('complete maintenance legacy selection check (real P
     const { developmentUsageProtection: _usage, developmentUsageStorage: _storage, ...legacyInput } = f.request();
     await f.runtime.api.createNativeExecution(legacyInput);
     const ids = Array.from({ length: 26 }, () => ({ id: Bun.randomUUIDv7(), agent: Bun.randomUUIDv7(), runner: crypto.randomUUID() }));
-    await f.tdb.db.execute(sql`INSERT INTO task_runtime.environments SELECT (jsonb_populate_record(NULL::task_runtime.environments,
-      to_jsonb(e)||jsonb_build_object('id',item->>'id','pod_name','legacy-clone-'||(item->>'id'),
-        'native',e.native||jsonb_build_object('agentId',item->>'agent','runnerId',item->>'runner')))).*
-      FROM task_runtime.environments e CROSS JOIN jsonb_array_elements(${JSON.stringify(ids)}::jsonb) item WHERE e.id=${legacyInput.id}`);
+    const fields = await f.tdb.db.execute<{ column_name: string }>(sql`SELECT column_name FROM information_schema.columns
+      WHERE table_schema='task_runtime' AND table_name='environments' AND is_generated='NEVER' ORDER BY ordinal_position`);
+    const insert = sql.join(fields.map((c) => sql.identifier(c.column_name)), sql`, `), selected = sql.join(fields.map((c) => sql`copy.${sql.identifier(c.column_name)}`), sql`, `);
+    await f.tdb.db.execute(sql`INSERT INTO task_runtime.environments (${insert}) SELECT ${selected}
+      FROM task_runtime.environments e CROSS JOIN jsonb_array_elements(${JSON.stringify(ids)}::jsonb) item
+      CROSS JOIN LATERAL jsonb_populate_record(NULL::task_runtime.environments,
+        to_jsonb(e)||jsonb_build_object('id',item->>'id','pod_name','legacy-clone-'||(item->>'id'),
+          'native',e.native||jsonb_build_object('agentId',item->>'agent','runnerId',item->>'runner'))) copy WHERE e.id=${legacyInput.id}`);
     expect(await hasSelected(f.parent.id)).toBe(false);
     const [count] = await f.tdb.db.execute(sql`SELECT count(*)::int AS n FROM task_runtime.environments WHERE native->>'parentTaskId'=${f.parent.id}`);
     expect(count!.n).toBe(27);

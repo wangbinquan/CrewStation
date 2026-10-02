@@ -1,9 +1,14 @@
 import { boolean, integer, text, timestamp } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { jsonDocument } from '@crewstation/persistence';
 import type { TaskEnvironment } from '../../domain/taskEnvironment';
 import { taskRuntimeSchema } from './schema';
+import { parentEndingDocument } from './parentEndingJson';
 
 export const environments = taskRuntimeSchema.table('environments', {
+  parentEnding: parentEndingDocument('parent_ending'),
+  parentEndingPresent: boolean('parent_ending_present').generatedAlwaysAs(sql`parent_ending IS NOT NULL`),
+  parentEndingKind: text('parent_ending_kind').generatedAlwaysAs(sql`jsonb_typeof(parent_ending)`),
   businessWorkspace: jsonDocument('business_workspace').$type<TaskEnvironment['businessWorkspace']>(),
   runtimeInitialization: jsonDocument('runtime_initialization').$type<TaskEnvironment['runtimeInitialization']>(),
   admissionFingerprint: text('admission_fingerprint'),

@@ -3,6 +3,7 @@ import type { TaskEnvironment } from '../domain/taskEnvironment';
 import type { LedgerRecordRef } from './ledger';
 import type { AdmissionRepository, EnvironmentRepository } from './repositories';
 import type { RebuildQueue, RebuildRepository } from './rebuilds';
+import type { DevelopmentParentEndingScope } from './developmentParentEndingScope';
 
 export interface DomainEventPublisher {
   publish<T extends DomainTopicName>(topic: T, payload: DomainPayload<T>): Promise<void>;
@@ -24,6 +25,7 @@ export interface TaskQuota {
 export interface NativeExecutionJobLease { readonly jobId: number; readonly fencingToken: number }
 
 export interface RepositoryScope {
+  readonly parentEnding?: DevelopmentParentEndingScope;
   readonly nativeLease?: { requireCurrent(identity: NativeExecutionJobLease, taskId: TaskId): Promise<void> };
   readonly environments: EnvironmentRepository;
   /** 项目行锁（串行化同一项目的创建、释放、恢复）与旧的额度计数器；额度经 quota。 */

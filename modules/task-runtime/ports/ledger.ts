@@ -38,6 +38,8 @@ export interface LedgerDeclaration {
 
 /** 资源中心（RFC-025）的写入口：task-runtime 写期望与领域条件，实况由资源中心写。 */
 export interface LedgerWriter {
+  /** Flush commit-order waits after every projection write, before the final Task job deadline check. */
+  flushDeferredChanges?(): Promise<void>;
   declare(input: LedgerDeclaration): Promise<LedgerRecordRef>;
   splitChildren?(sourceId: string, input: LedgerDeclaration): Promise<LedgerRecordRef>;
   /** 受理：占额度的种类在项目锁下按台账数额度，够才声明，不够抛 quota_exceeded（设计 §3、D31）。 */
