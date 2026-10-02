@@ -4,6 +4,7 @@ import { PlatformError } from '@crewstation/kernel';
 import { encodeRef } from './transport';
 
 interface RawProject {
+  created_at?: string;
   id: number; name: string; path: string; path_with_namespace: string; default_branch: string | null;
   http_url_to_repo: string; ssh_url_to_repo: string; web_url: string; visibility: GitLabProject['visibility'];
   empty_repo?: boolean; namespace: { id: number };
@@ -12,6 +13,7 @@ interface RawGroup { id: number; name: string; path: string; full_path: string; 
 
 export function toProject(raw: RawProject): GitLabProject {
   return {
+    ...(raw.created_at !== undefined ? { createdAt: raw.created_at } : {}),
     id: raw.id, name: raw.name, path: raw.path, pathWithNamespace: raw.path_with_namespace, namespaceId: raw.namespace.id,
     defaultBranch: raw.default_branch ?? null, httpUrlToRepo: raw.http_url_to_repo, sshUrlToRepo: raw.ssh_url_to_repo,
     webUrl: raw.web_url, visibility: raw.visibility, emptyRepo: raw.empty_repo ?? false,

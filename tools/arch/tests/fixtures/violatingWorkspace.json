@@ -37,5 +37,7 @@
  "modules/high/adapters/persistence/migrations/0004_fresh.sql": "CREATE TABLE high.fresh (id text);\n",
  "tools/arch/migrations.lock.json": "{\"files\": {\"modules/high/adapters/persistence/migrations/0001_create_schema.sql\": \"0000000000000000000000000000000000000000000000000000000000000000\", \"modules/high/adapters/persistence/migrations/0002_gone.sql\": \"1111111111111111111111111111111111111111111111111111111111111111\", \"modules/high/adapters/persistence/migrations/0003_locked.sql\": \"d3a956c9675fa4eea47bb65ea8ca5f8b552ce032c99898d8f523fb5ab6e7d18d\"}}",
  "modules/low/tests/legacy.spec.ts": "import { test } from 'bun:test';\ntest('别的命名', () => {});\n",
- "integrations/sample/src/old_test.ts": "import { test } from 'bun:test';\ntest('别的命名', () => {});\n"
+ "integrations/sample/src/old_test.ts": "import { test } from 'bun:test';\ntest('别的命名', () => {});\n",
+ "modules/low/adapters/persistence/migrations/0004_alias_rows.sql": "CREATE FUNCTION low.alias_rows() RETURNS trigger LANGUAGE plpgsql AS $$ DECLARE callback low.items; BEGIN SELECT c.id INTO callback FROM low.items c JOIN low.refs b ON c.id=b.id; IF callback.state IS NULL THEN RETURN NEW; END IF; RETURN OLD; END $$;",
+ "modules/low/adapters/persistence/migrations/0005_alias_foreign.sql": "CREATE FUNCTION low.alias_foreign() RETURNS trigger LANGUAGE plpgsql AS $$ DECLARE callback low.items; foreign_row high.secret; BEGIN SELECT c.id FROM low.items c; SELECT callback.state FROM callback.foreign; PERFORM c.erase(); RETURN NEW; END $$; SELECT callback.state;"
 }

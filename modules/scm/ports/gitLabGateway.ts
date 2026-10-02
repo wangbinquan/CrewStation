@@ -1,6 +1,7 @@
 /** 本模块需要的远端仓库能力子集；GitLab 的作用域、访问级别等细节在 adapters/gitlab 内决定。 */
 export interface RemoteProject {
   readonly id: string;
+  readonly createdAt?: string;
   readonly pathWithNamespace: string;
   readonly defaultBranch: string | undefined;
   /** GitLab 自报的项目网页地址（按它的 external_url）：给浏览器打开用，克隆与推送不用它。 */
@@ -23,6 +24,8 @@ export interface RemoteTag {
 
 export interface RemoteAccessToken {
   readonly id: string;
+  readonly createdAt?: string;
+  readonly userId?: string;
   /** 明文只在这里出现一次。 */
   readonly token: string;
 }

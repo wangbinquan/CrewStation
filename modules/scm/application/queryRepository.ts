@@ -1,9 +1,10 @@
 import type { Actor, BranchDto, RepositoryBindingDto, ServiceId, TagDto } from '@crewstation/contracts';
 import type { ListBranchesOptions } from '../api/moduleApi';
 import type { RepositoryBinding } from '../domain/repositoryBinding';
-import type { ScmUseCaseDeps } from './dependencies';
-import { loadBinding, loadReadyBinding } from './loadBinding';
-import { bindingToDto, tagToDto } from './toDto';
+import type { ScmUseCaseDeps } from '../ports/useCaseDependencies';
+import { notFound, precondition } from '@crewstation/kernel';
+import type { RemoteTag } from '../ports/gitLabGateway';
+import type { UnitOfWork } from '../ports/unitOfWork';
 
 /**
  * 网页地址列加入之前建的绑定没有 webUrl：第一次被读到时向 GitLab 查一次并存下，之后不再查（2026-09-23 作者裁定）。
@@ -11,11 +12,31 @@ import { bindingToDto, tagToDto } from './toDto';
  */
 async function withWebUrl({ uow, gitlab }: ScmUseCaseDeps, binding: RepositoryBinding): Promise<RepositoryBinding> {
   if (binding.webUrl !== undefined || binding.state !== 'ready') return binding;
-  const remote = await gitlab.findProject(binding.pathWithNamespace).catch(() => undefined);
-  if (remote?.id !== binding.remoteProjectId) return binding;
-  const filled: RepositoryBinding = { ...binding, webUrl: remote.webUrl };
-  await uow.run((scope) => scope.bindings.upsert(filled));
-  return filled;
+  const write = async () => {
+    const remote = await gitlab.findProject(binding.pathWithNamespace).catch(() => undefined);
+    if (remote?.id !== binding.remoteProjectId) return binding;
+    const filled: RepositoryBinding = { ...binding, webUrl: remote.webUrl };
+    await uow.run((scope) => scope.bindings.upsert(filled)); return filled;
+  };
+  return uow.writes ? uow.writes.withAdmission(binding.projectId, binding.serviceId, 'repository-url', write) : write();
+}
+
+export async function loadBinding(uow: UnitOfWork, serviceId: ServiceId): Promise<RepositoryBinding> {
+  const binding = await uow.read.bindings.getByServiceId(serviceId);
+  if (!binding) throw notFound('仓库绑定', serviceId);
+  return binding;
+}
+export async function loadReadyBinding(uow: UnitOfWork, serviceId: ServiceId): Promise<RepositoryBinding> {
+  const binding = await loadBinding(uow, serviceId);
+  if (binding.state !== 'ready') throw precondition(`仓库 ${binding.pathWithNamespace} 尚未就绪（${binding.state}）`, { state: binding.state, ...(binding.message ? { message: binding.message } : {}) });
+  return binding;
+}
+export function bindingToDto(binding: RepositoryBinding): RepositoryBindingDto {
+  return { serviceId: binding.serviceId, provider: binding.provider, remoteProjectId: binding.remoteProjectId, pathWithNamespace: binding.pathWithNamespace, httpUrl: binding.httpUrl,
+    ...(binding.webUrl ? { webUrl: binding.webUrl } : {}), defaultBranch: binding.defaultBranch, state: binding.state, ...(binding.message ? { message: binding.message } : {}), createdAt: binding.createdAt.toISOString() };
+}
+export function tagToDto(tag: RemoteTag): TagDto {
+  return { name: tag.name, commitSha: tag.commitSha, createdAt: tag.createdAt, protected: tag.protected };
 }
 
 export function queryRepositoryUseCases(deps: ScmUseCaseDeps) {

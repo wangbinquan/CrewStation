@@ -13,6 +13,9 @@ test.skipIf(!available)('formal root exposes the read-only original storage port
   const settings = loadPlatformSettings({ CS_DATABASE_URL: db.url, CS_SECRET_KEY: Buffer.alloc(32, 1).toString('base64'), CS_GITLAB_URL: 'http://127.0.0.1:9' });
   const platform = createPlatformModule({ db: db.db, k8s: createFakeK8sClient(), settings, logger: noopLogger, instance: 'test.native-storage-source' });
   try {
+    // SCM stop observation must run in the formal controller even without a new credential call.
+    expect(platform.api.background.controller).toContain(platform.modules.scm.observer);
+    expect(platform.api.background.api).not.toContain(platform.modules.scm.observer);
     const source: NativePostgresSource | undefined = platform.modules.dataControl.api.nativePostgresSource;
     expect(source).toBeDefined(); let queries = 0;
     const connection = { query: async <T extends Record<string, unknown>[]>(): Promise<T> => { queries += 1; throw new Error('No native SQL is authorized without an independent observer'); }, assertHeld: async () => {} };

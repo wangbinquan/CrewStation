@@ -1,5 +1,5 @@
 import type {
-  Actor, BranchDto, CreateReleaseTagRequest, ManifestUpgradePreview, ProjectId, ProjectTemplateDto, ReleaseTagDto, RepositoryBindingDto, ServiceId, SessionCredentialDto, TagDto, UserId,
+  Actor, BranchDto, CreateReleaseTagRequest, ManifestUpgradePreview, ProjectDeletionContext, ProjectId, ProjectTemplateDto, ReleaseTagDto, RepositoryBindingDto, ServiceId, SessionCredentialDto, TagDto, UserId,
 } from '@crewstation/contracts';
 
 export interface EnsureRepositoryInput {
@@ -19,6 +19,12 @@ export type ActorResolver = (userId: UserId) => Promise<Actor>;
 /** scm 模块对外能力；不带 actor 的方法只供平台内部（控制面、其他模块）调用。 */
 export interface ScmModuleApi {
   readonly name: 'scm';
+  /** Internal retained facts; admission closure and callback exit alone do not prove provider/storage reclamation. */
+  readonly repositoryWrites?: {
+    history(projectId: ProjectId): Promise<ScmRepositoryWriteHistory>;
+    close(context: ProjectDeletionContext): Promise<void>;
+    recover(context: ProjectDeletionContext): Promise<void>;
+  };
   listTemplates(actor: Actor): Promise<ProjectTemplateDto[]>;
   previewManifestUpgrade(actor: Actor, serviceId: ServiceId, content: string): Promise<ManifestUpgradePreview>;
   /** 幂等建仓：已有绑定直接返回；远端路径被占且不属于本服务时抛 conflict，绝不接管（R32）。 */
@@ -40,4 +46,22 @@ export interface ScmModuleApi {
   revokeExpiredCredentials(): Promise<number>;
   /** 发布流程：把开发容器工作目录里的分支以平台身份推到远端。 */
   pushBranch(serviceId: ServiceId, workdir: string, branch: string): Promise<{ commitSha: string }>;
+}
+
+export interface ScmRepositoryWriteHistory {
+  readonly revision: string; readonly metadataComplete: boolean;
+  readonly bindings: readonly { serviceId: ServiceId; remoteProjectId: string; pathWithNamespace: string; bindingCreatedAt: string }[];
+  readonly credentials: readonly { id: string; serviceId: ServiceId; remoteTokenId: string }[];
+  readonly origins: readonly { serviceId: ServiceId; remoteProjectId: string; pathWithNamespace: string; createdAt: string | null; source: 'legacy-binding' | 'callback-result' }[];
+  readonly records: readonly {
+    readonly id: string; readonly serviceId: ServiceId; readonly kind: string; readonly state: 'running' | 'exited'; readonly remoteProjectId: string | null;
+    readonly backendPid: number; readonly callbackPid: number; readonly callbackStartedAt: string;
+    readonly process: { readonly podUid: string; readonly containerId: string; readonly nodeUid: string; readonly nodeName: string } | null;
+    readonly result: 'succeeded' | 'failed' | 'interrupted' | null; readonly exitDigest: string | null;
+    readonly effects: readonly { readonly intentId: string; readonly kind: 'repository' | 'credential'; readonly stage: 'intent' | 'returned';
+      readonly remoteProjectId?: string; readonly remoteTokenId?: string; readonly path?: string; readonly credentialId?: string; readonly createdAt?: string; readonly userId?: string }[];
+  }[];
+  readonly identities: readonly { kind: 'service' | 'credential'; id: string; serviceId: string }[];
+  readonly unresolvedEffects: readonly { workId: string; intentId: string }[];
+  readonly unownedCredentialIds: readonly string[];
 }

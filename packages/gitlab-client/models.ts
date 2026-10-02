@@ -20,6 +20,7 @@ export type GitLabAccessLevel = (typeof GITLAB_ACCESS_LEVEL)[keyof typeof GITLAB
 
 export interface GitLabProject {
   readonly id: number;
+  readonly createdAt?: string;
   readonly name: string;
   readonly path: string;
   readonly pathWithNamespace: string;

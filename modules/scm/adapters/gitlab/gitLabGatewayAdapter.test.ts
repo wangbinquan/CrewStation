@@ -26,6 +26,18 @@ test('远端不存在时 findProject 返回 undefined；其他错误照样抛出
   await expect(gitLabGatewayAdapter(stubClient(async () => { throw new PlatformError('unavailable', 'GitLab 不可达'); })).findProject('crewstation/demo')).rejects.toMatchObject({ kind: 'unavailable' });
 });
 
+test('返回原创建时间与令牌机器人 ID，缺失字段保持未知；外部结果仍不含多余数据', async () => {
+  const createdAt = '2026-09-30T16:00:35.872Z';
+  const client = createGitLabClient({ baseUrl: 'https://gitlab.test', token: 'platform', fetch: (async (input) => {
+    if (String(input).includes('/access_tokens')) return Response.json({ id: 7, token: 'one-time', created_at: createdAt, user_id: 99 });
+    return Response.json({ id: 42, name: 'demo', path: 'demo', path_with_namespace: 'crewstation/demo', created_at: createdAt,
+      namespace: { id: 7 }, default_branch: 'main', web_url: 'https://gitlab.test/crewstation/demo', visibility: 'private' });
+  }) as typeof fetch });
+  const gateway = gitLabGatewayAdapter(client);
+  expect((await gateway.findProject('42'))?.createdAt).toBe(createdAt);
+  expect(await gateway.createAccessToken('42', { name: 'proof', expiresOn: '2026-10-02' })).toEqual({ id: '7', token: 'one-time', createdAt, userId: '99' });
+});
+
 test('构建令牌只有 read_repository 与 reporter 权限，开发会话原有读写权限保留', async () => {
   const bodies: Array<Record<string, unknown>> = [];
   const client = createGitLabClient({ baseUrl: 'https://gitlab.test', token: 'platform', fetch: (async (_url, init) => {

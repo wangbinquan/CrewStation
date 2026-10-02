@@ -54,6 +54,16 @@ describe('module-template', () => {
 });
 
 describe('persistence-ownership', () => {
+  test('裸表别名和本 schema 复合行变量不是外部 schema', () => {
+    expect(messagesOf(persistenceOwnership(ws), 'modules/low/adapters/persistence/migrations/0004_alias_rows.sql')).toEqual([]);
+  });
+  test('行变量不能用于关系或函数位置，也不放行外部复合类型', () => {
+    const messages = messagesOf(persistenceOwnership(ws), 'modules/low/adapters/persistence/migrations/0005_alias_foreign.sql');
+    expect(messages.some((m) => m.includes('callback.foreign'))).toBe(true);
+    expect(messages.some((m) => m.includes('c.erase'))).toBe(true);
+    expect(messages.some((m) => m.includes('high.secret'))).toBe(true);
+    expect(messages.some((m) => m.includes('callback.state'))).toBe(true);
+  });
   test('只能使用本模块 schema', () => {
     expect(messagesOf(persistenceOwnership(ws), 'modules/low/adapters/persistence/repo.ts').join()).toContain("pgSchema('low')");
   });

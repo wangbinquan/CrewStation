@@ -31,3 +31,14 @@
 本批一次 `bun run check` 静态四层成功，**4986 pass/144 环境 skip/1 fail**，5131 tests、975 文件、33406 断言、1136.39 秒；11 个源码/测试指纹保持。全部 SDK/SCM 新旧用例及创建弹窗回归通过。唯一失败位于未改动的 `modules/data-control/tests/nativeProjectDeletion.test.ts` 预备事务反例：这次命令没有沿用既有隔离 PG 地址，默认实例 `max_prepared_transactions=0`，在执行 PREPARE 时返回 55000；它不是本批 SCM 协议失败，不将本次全仓称为通过。原日志 `/private/tmp/cs-rfc037-scm-protocol-full-check.log` 与回执保留，不改测试/断言、不跳过预备事务检查、不重复未变化全量。GitHub module 作业已配置 `POSTGRES_INITDB_ARGS=--set=max_prepared_transactions=10`；按规则§3精确发布并等待本 SHA 全部 hosted CI。
 
 门禁期间 resources 维护结束协议出现并行在制文件，未改动或提交这些输出；本批没有迁移或业务契约锁变更。默认 PG 上的原生用例仍按各自实际夹具正常收尾，不清理其他项目、容器或共享设施。
+
+
+## 精确发布、部署与实际安装协议
+
+本批 16 路径精确发布为 `8f699d69e238a810ad51bf13afc3ac14b8736684`；[CI 36936928742](https://github.com/wangbinquan/CrewStation/actions/runs/36936928742) 的 static、unit、module、console、gate、e2e 六项终态成功。module 使用已启用预备事务的 PG，原本机完整检查的 55000 失败仍保留，不将其改称本地全绿。
+
+2026-10-01T23:01:38.088Z 以该提交归档镜像完成八组件部署，generation=observedGeneration 且各 Ready=1：controller189、session142、api223、auth121、events91、mcp-capabilities87、mcp-operations87、console232。实际导入控制面摘要 `ad5646f5ed28e4f8e4af97b4892d86280e63634376996e72e90a5cc986a5aa96`、console 摘要 `64bdb18f6afe8b3aeefe5cd85d91ae4e9909b9a2fa7304bf2eaffe06e93bf637`。原共享 PG／PVC／PV、只读来源探针与精确策略、项目对象和 Runner 均按部署前来源核对。
+
+2026-10-01T23:02:37.485Z 在实际 API 原 Pod `70dfe39a-e76f-4681-b70d-eb7494dedbc1` 运行已安装的 SDK 与 GitLab 适配器；通过原 Pod→ReplicaSet→Deployment UID 及实际 imageID 核对来源。四次 GET 全部 200，仓库383 的数字ID／路径／创建时间前后相同，实际单对象存储返回被规范为数组，全状态凭据包含原513（active=false、revoked=false）。禁止非 GET，无令牌明文或密文输出；主平台52库／64角色全部名字和 OID 前后相同。
+
+私有原始回执：`/private/tmp/cs-rfc037-8f699d69e238-ci-terminal.json`、`-deployment-receipt.json`、`-scm-installed-live-receipt.json` 及前后观察者／目录回执，均保留原输出。这是实际安装协议验收；正式 SCM owner、原消费者和全部物理范围仍需实现，不计彻底回收。原项目仍存在、永久删除入口关闭。

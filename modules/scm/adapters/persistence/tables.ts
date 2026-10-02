@@ -1,5 +1,7 @@
-import { text, timestamp } from 'drizzle-orm/pg-core';
-import { scmSchema } from './schema';
+import { pgSchema, text, timestamp } from 'drizzle-orm/pg-core';
+
+/** All SCM persistence shares this schema. */
+export const scmSchema = pgSchema('scm');
 
 export const repositoryBindings = scmSchema.table('repository_bindings', {
   serviceId: text('service_id').primaryKey(),

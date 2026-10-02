@@ -6,8 +6,9 @@ import type { RepositoryBinding } from '../domain/repositoryBinding';
 import { newBinding, repositoryHttpUrl, repositoryPath, transition } from '../domain/repositoryBinding';
 import { RELEASE_TAG_PROTECTION_PATTERN } from '../domain/tagNaming';
 import type { RemoteProject } from '../ports/gitLabGateway';
-import type { ScmUseCaseDeps } from './dependencies';
-import { bindingToDto } from './toDto';
+import type { ScmUseCaseDeps } from '../ports/useCaseDependencies';
+import { scmExternalEffect } from './projectAdmission';
+import { bindingToDto } from './queryRepository';
 
 const MAX_MESSAGE_LENGTH = 1000;
 
@@ -19,14 +20,16 @@ const MAX_MESSAGE_LENGTH = 1000;
  */
 export function ensureRepositoryUseCase(deps: ScmUseCaseDeps) {
   const { uow, gitlab, settings, clock } = deps;
-  return async (serviceId: ServiceId, projectId: ProjectId, input: EnsureRepositoryInput): Promise<RepositoryBindingDto> => {
+  const ensure = async (serviceId: ServiceId, projectId: ProjectId, input: EnsureRepositoryInput): Promise<RepositoryBindingDto> => {
     const existing = await uow.read.bindings.getByServiceId(serviceId);
     if (existing && existing.state !== 'failed') return bindingToDto(existing);
     const path = repositoryPath(settings.groupPath, input.slug);
     const owner = await uow.read.bindings.getByPath(path);
     if (owner && owner.serviceId !== serviceId) throw conflict(`仓库 ${path} 已绑定到服务 ${owner.serviceId}`, { pathWithNamespace: path });
     const remote = await claimRemote(deps, path, existing, serviceId);
-    const project = remote ?? await gitlab.createProject({ groupPath: settings.groupPath, slug: input.slug, defaultBranch: settings.defaultBranch });
+    const project = remote ?? await scmExternalEffect(deps, { kind: 'repository', path },
+      () => gitlab.createProject({ groupPath: settings.groupPath, slug: input.slug, defaultBranch: settings.defaultBranch }),
+      (created) => ({ remoteProjectId: created.id, path: created.pathWithNamespace, ...(created.createdAt ? { createdAt: created.createdAt } : {}) }));
     const httpUrl = repositoryHttpUrl(settings.baseUrl, path), webUrl = project.webUrl;
     const now = clock.now();
     let binding: RepositoryBinding = existing
@@ -44,6 +47,8 @@ export function ensureRepositoryUseCase(deps: ScmUseCaseDeps) {
     await uow.run((scope) => scope.bindings.upsert(binding));
     return bindingToDto(binding);
   };
+  return (serviceId: ServiceId, projectId: ProjectId, input: EnsureRepositoryInput) => uow.writes
+    ? uow.writes.withAdmission(projectId, serviceId, 'ensure-repository', () => ensure(serviceId, projectId, input)) : ensure(serviceId, projectId, input);
 }
 
 /** 远端已有同路径项目时，只有它正是本服务上次失败尝试建出的那个才可以继续使用。 */

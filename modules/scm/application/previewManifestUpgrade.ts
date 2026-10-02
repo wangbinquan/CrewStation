@@ -1,7 +1,7 @@
 import type { Actor, ServiceId } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
-import type { ScmUseCaseDeps } from './dependencies';
-import { loadBinding } from './loadBinding';
+import type { ScmUseCaseDeps } from '../ports/useCaseDependencies';
+import { loadBinding } from './queryRepository';
 
 export function previewManifestUpgradeUseCase(deps: ScmUseCaseDeps) {
   return async (actor: Actor, serviceId: ServiceId, content: string) => {

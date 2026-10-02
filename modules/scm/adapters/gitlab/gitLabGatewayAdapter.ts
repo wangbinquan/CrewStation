@@ -6,7 +6,7 @@ import type { GitLabGateway, RemoteBranch, RemoteProject, RemoteRepositoryRemova
 /** 会话凭据只读写仓库；开发者级别，受保护的 `v*` 标签与默认分支保护都对它生效。 */
 const SESSION_TOKEN_SCOPES = ['read_repository', 'write_repository'];
 
-const toRemoteProject = (p: GitLabProject): RemoteProject => ({ id: String(p.id), pathWithNamespace: p.pathWithNamespace, defaultBranch: p.defaultBranch ?? undefined, webUrl: p.webUrl });
+const toRemoteProject = (p: GitLabProject): RemoteProject => ({ id: String(p.id), ...(p.createdAt ? { createdAt: p.createdAt } : {}), pathWithNamespace: p.pathWithNamespace, defaultBranch: p.defaultBranch ?? undefined, webUrl: p.webUrl });
 const toRemoteBranch = (b: GitLabBranch): RemoteBranch => ({ name: b.name, headSha: b.commit.id, isDefault: b.default });
 /** GitLab 的时间带本地时区偏移，统一成 UTC ISO 以满足 DTO 的 `z.iso.datetime()`。 */
 const toRemoteTag = (t: GitLabTag): RemoteTag => ({ name: t.name, commitSha: t.commit.id, createdAt: new Date(t.commit.committedDate).toISOString(), protected: t.protected });
@@ -65,7 +65,7 @@ export function gitLabGatewayAdapter(client: GitLabClient): GitLabGateway {
     countCommitsBehind: async (id, { from, to }) => (await orUndefined(client.compare(id, from, to)))?.commitCount,
     createAccessToken: async (id, { name, expiresOn, readOnly }) => {
       const created = await client.createProjectAccessToken(id, { name, scopes: readOnly ? ['read_repository'] : SESSION_TOKEN_SCOPES, expiresAt: expiresOn, accessLevel: readOnly ? GITLAB_ACCESS_LEVEL.reporter : GITLAB_ACCESS_LEVEL.developer });
-      return { id: String(created.id), token: created.token };
+      return { id: String(created.id), token: created.token, ...(typeof created.createdAt === 'string' ? { createdAt: created.createdAt } : {}), ...(Number.isSafeInteger(created.userId) && created.userId > 0 ? { userId: String(created.userId) } : {}) };
     },
     revokeAccessToken: async (id, tokenId) => { await orUndefined(client.revokeProjectAccessToken(id, Number(tokenId))); },
   };

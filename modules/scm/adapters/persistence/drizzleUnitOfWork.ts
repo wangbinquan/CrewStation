@@ -1,5 +1,6 @@
 import type { Database, Executor } from '@crewstation/persistence';
 import type { RepositoryScope, UnitOfWork } from '../../ports/unitOfWork';
+import type { RepositoryWrites } from '../../ports/repositoryWrites';
 import { drizzleRepositoryBindingRepository, drizzleSessionCredentialRepository } from './drizzleScmRepositories';
 
 export function scopeOver(executor: Executor): RepositoryScope {
@@ -9,9 +10,10 @@ export function scopeOver(executor: Executor): RepositoryScope {
   };
 }
 
-export function drizzleUnitOfWork(db: Database): UnitOfWork {
+export function drizzleUnitOfWork(db: Database, writes?: RepositoryWrites): UnitOfWork {
   return {
+    ...(writes ? { writes } : {}),
     read: scopeOver(db),
-    run: (fn) => db.transaction((tx) => fn(scopeOver(tx))),
+    run: (fn) => { writes?.assertOriginalActive(); return db.transaction((tx) => fn(scopeOver(tx))); },
   };
 }

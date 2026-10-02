@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import type { Actor, ProjectId, ServiceId, UserId } from '@crewstation/contracts';
 import { forbidden } from '@crewstation/kernel';
 import { createReleaseTagUseCase } from '../application/createReleaseTag';
-import type { ScmUseCaseDeps } from '../application/dependencies';
+import type { ScmUseCaseDeps } from '../ports/useCaseDependencies';
 import { ensureRepositoryUseCase } from '../application/ensureRepository';
 import { pushBranchUseCase } from '../application/pushBranch';
 import { queryRepositoryUseCases } from '../application/queryRepository';
