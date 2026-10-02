@@ -34,6 +34,7 @@ export class ProjectDeletionSession {
     } catch { this.state = { loading: false, pending: true, error: 'invalid-retained-request' }; }
   }
   getSnapshot = (): DeletionSessionState => this.state;
+  hasRetainedRequest = (): boolean => this.pending !== undefined;
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   private update(value: Partial<DeletionSessionState>): void { this.state = { ...this.state, ...value }; for (const listener of this.listeners) listener(); }
   private original(raw: ProjectDeletionOperation): ProjectDeletionOperation {

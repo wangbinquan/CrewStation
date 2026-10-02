@@ -1,10 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 import type { Actor, ProjectId, ServiceId, UserId } from '@crewstation/contracts';
 import { forbidden } from '@crewstation/kernel';
-import { createReleaseTagUseCase } from '../application/createReleaseTag';
+import { createReleaseTagUseCase, pushBranchUseCase } from '../application/repositoryMutations';
 import type { ScmUseCaseDeps } from '../ports/useCaseDependencies';
 import { ensureRepositoryUseCase } from '../application/ensureRepository';
-import { pushBranchUseCase } from '../application/pushBranch';
 import { queryRepositoryUseCases } from '../application/queryRepository';
 import { sessionCredentialUseCases } from '../application/sessionCredentials';
 import { hashToken } from '../domain/sessionCredential';

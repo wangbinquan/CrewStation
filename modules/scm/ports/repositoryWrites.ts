@@ -17,7 +17,7 @@ export interface ScmWriteRecord {
   readonly exitDigest: string | null; readonly effects: readonly ScmExternalEffect[];
 }
 export interface ScmWriteHistory {
-  readonly revision: string; readonly metadataComplete: boolean;
+  readonly revision: string; readonly metadataComplete: boolean; readonly metadataCount: number;
   readonly bindings: readonly { serviceId: ServiceId; remoteProjectId: string; pathWithNamespace: string; bindingCreatedAt: string }[];
   readonly credentials: readonly { id: string; serviceId: ServiceId; remoteTokenId: string }[];
   readonly origins: readonly { serviceId: ServiceId; remoteProjectId: string; pathWithNamespace: string; createdAt: string | null; source: 'legacy-binding' | 'callback-result' }[];
@@ -25,13 +25,14 @@ export interface ScmWriteHistory {
   readonly identities: readonly { kind: 'service' | 'credential'; id: string; serviceId: string }[];
   readonly unresolvedEffects: readonly { workId: string; intentId: string }[];
   readonly unownedCredentialIds: readonly string[];
+  readonly foreignRepositoryReferences: readonly { remoteProjectId: string; projectId: ProjectId }[];
 }
 export interface RepositoryWrites {
   assertOriginalActive(): void;
   observe(): Promise<void>;
   withAdmission<T>(projectId: ProjectId, serviceId: ServiceId, kind: ScmWriteKind, work: () => Promise<T>): Promise<T>;
   record(effect: ScmExternalEffect): Promise<void>;
-  history(projectId: ProjectId): Promise<ScmWriteHistory>;
+  history(projectId: ProjectId, originalRepositories?: readonly string[]): Promise<ScmWriteHistory>;
   /** Closing admission alone is not a successful owner phase or physical proof. */
   close(context: ProjectDeletionContext): Promise<void>;
   recover(context: ProjectDeletionContext): Promise<void>;

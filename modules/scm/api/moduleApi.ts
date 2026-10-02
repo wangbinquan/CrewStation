@@ -1,5 +1,5 @@
 import type {
-  Actor, BranchDto, CreateReleaseTagRequest, ManifestUpgradePreview, ProjectDeletionContext, ProjectId, ProjectTemplateDto, ReleaseTagDto, RepositoryBindingDto, ServiceId, SessionCredentialDto, TagDto, UserId,
+  Actor, BranchDto, CreateReleaseTagRequest, ManifestUpgradePreview, ProjectDeletionContext, ProjectDeletionOwner, ProjectId, ProjectTemplateDto, ReleaseTagDto, RepositoryBindingDto, ServiceId, SessionCredentialDto, TagDto, UserId,
 } from '@crewstation/contracts';
 
 export interface EnsureRepositoryInput {
@@ -19,9 +19,11 @@ export type ActorResolver = (userId: UserId) => Promise<Actor>;
 /** scm 模块对外能力；不带 actor 的方法只供平台内部（控制面、其他模块）调用。 */
 export interface ScmModuleApi {
   readonly name: 'scm';
+  /** Internal owner, present only with a complete independent native/storage source and controller grant. */
+  readonly deletionOwner?: ProjectDeletionOwner;
   /** Internal retained facts; admission closure and callback exit alone do not prove provider/storage reclamation. */
   readonly repositoryWrites?: {
-    history(projectId: ProjectId): Promise<ScmRepositoryWriteHistory>;
+    history(projectId: ProjectId, originalRepositories?: readonly string[]): Promise<ScmRepositoryWriteHistory>;
     close(context: ProjectDeletionContext): Promise<void>;
     recover(context: ProjectDeletionContext): Promise<void>;
   };
@@ -49,7 +51,7 @@ export interface ScmModuleApi {
 }
 
 export interface ScmRepositoryWriteHistory {
-  readonly revision: string; readonly metadataComplete: boolean;
+  readonly revision: string; readonly metadataComplete: boolean; readonly metadataCount: number;
   readonly bindings: readonly { serviceId: ServiceId; remoteProjectId: string; pathWithNamespace: string; bindingCreatedAt: string }[];
   readonly credentials: readonly { id: string; serviceId: ServiceId; remoteTokenId: string }[];
   readonly origins: readonly { serviceId: ServiceId; remoteProjectId: string; pathWithNamespace: string; createdAt: string | null; source: 'legacy-binding' | 'callback-result' }[];
@@ -64,4 +66,5 @@ export interface ScmRepositoryWriteHistory {
   readonly identities: readonly { kind: 'service' | 'credential'; id: string; serviceId: string }[];
   readonly unresolvedEffects: readonly { workId: string; intentId: string }[];
   readonly unownedCredentialIds: readonly string[];
+  readonly foreignRepositoryReferences: readonly { remoteProjectId: string; projectId: ProjectId }[];
 }

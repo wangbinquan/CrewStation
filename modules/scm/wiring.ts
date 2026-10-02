@@ -13,22 +13,22 @@ import { bunGitRunner } from './adapters/git/bunGitRunner';
 import { gitLabGatewayAdapter } from './adapters/gitlab/gitLabGatewayAdapter';
 import { drizzleUnitOfWork } from './adapters/persistence/drizzleUnitOfWork';
 import { legacyManifestUpgrade } from './adapters/persistence/legacyManifestUpgrade';
-import { scmRepositoryWrites } from './adapters/persistence/repositoryAdmission';
+import { scmDeletionRepository, scmRepositoryWrites } from './adapters/persistence/repositoryAdmission';
 import type { ActorResolver, ScmModuleApi } from './api/moduleApi';
-import { createReleaseTagUseCase } from './application/createReleaseTag';
+import { createReleaseTagUseCase, pushBranchUseCase } from './application/repositoryMutations';
 import type { ScmUseCaseDeps } from './ports/useCaseDependencies';
 import { ensureRepositoryUseCase } from './application/ensureRepository';
-import { pushBranchUseCase } from './application/pushBranch';
 import { queryRepositoryUseCases } from './application/queryRepository';
 import { listTemplatesUseCase } from './application/listTemplates';
 import { previewManifestUpgradeUseCase } from './application/previewManifestUpgrade';
 import { sessionCredentialUseCases } from './application/sessionCredentials';
-import { buildSourceUseCases } from './application/buildSources';
 import { scmCallbackObserver } from './application/projectAdmission';
+import { scmProjectDeletionOwner } from './application/projectDeletion';
 import { repositoryRoutes } from './http/repositoryRoutes';
 import type { TemplateResourceBindings } from './ports/templateSource';
 import type { ScmSettings } from './ports/scmSettings';
 import type { ScmCallbackProcesses } from './ports/repositoryWrites';
+import type { ScmDeletionPhysics } from './ports/projectDeletion';
 
 const DEFAULT_BOT_EMAIL = 'bot@crewstation.local';
 
@@ -38,6 +38,8 @@ export interface ScmModuleDeps {
   db: Database;
   project: Pick<ProjectModuleApi, 'authorize' | 'isAdmin'> & Partial<Pick<ProjectModuleApi, 'assertProjectAvailable' | 'assertProjectDeletionGrant'>>;
   processes?: ScmCallbackProcesses;
+  /** Original native/storage source; absent or incomplete sources keep permanent deletion unavailable. */
+  deletionPhysics?: ScmDeletionPhysics;
   settings: ScmSettings;
   /** 业务项目模板所在目录；默认仓库根 `templates/`。 */
   templatesRoot?: string;
@@ -83,6 +85,8 @@ export function createScmModule(deps: ScmModuleDeps): ScmModule {
   };
   const api: ScmModuleApi = {
     name: 'scm',
+    ...(deps.deletionPhysics && deps.project.assertProjectDeletionGrant ? { deletionOwner: scmProjectDeletionOwner({ writes,
+      repository: scmDeletionRepository({ db: deps.db, assertGrant: deps.project.assertProjectDeletionGrant }), physics: deps.deletionPhysics, assertGrant: deps.project.assertProjectDeletionGrant }) } : {}),
     repositoryWrites: { history: writes.history, close: writes.close, recover: writes.recover },
     listTemplates: listTemplatesUseCase(useCaseDeps.templates),
     previewManifestUpgrade: previewManifestUpgradeUseCase(useCaseDeps),
@@ -90,7 +94,6 @@ export function createScmModule(deps: ScmModuleDeps): ScmModule {
     ...queryRepositoryUseCases(useCaseDeps),
     createReleaseTag: createReleaseTagUseCase(useCaseDeps),
     ...sessionCredentialUseCases(useCaseDeps),
-    ...buildSourceUseCases(useCaseDeps),
     pushBranch: pushBranchUseCase(useCaseDeps),
   };
   const resolveActor: ActorResolver = async (userId) => ({ userId, isAdmin: await deps.project.isAdmin(userId) });

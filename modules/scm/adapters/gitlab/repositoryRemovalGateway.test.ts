@@ -5,11 +5,12 @@ import { gitLabGatewayAdapter } from './gitLabGatewayAdapter';
 const createdAt = '2026-09-30T16:00:35.872Z';
 const original = { id: '383', pathWithNamespace: 'crewstation/example', createdAt };
 function fixture() {
-  let project = { id: 383, path_with_namespace: original.pathWithNamespace, created_at: createdAt }, status = 200;
+  let project = { id: 383, path_with_namespace: original.pathWithNamespace, created_at: createdAt, archived: false }, status = 200;
   const requests: { path: string; method: string; search: URLSearchParams }[] = [];
   const client = createGitLabClient({ baseUrl: 'http://gitlab.test', token: 'glpat-owned-private', fetch: (async (input, init) => {
     const url = new URL(String(input)), method = init?.method ?? 'GET'; requests.push({ path: url.pathname, method, search: url.searchParams });
     if (status !== 200) return Response.json({ message: 'source unavailable' }, { status });
+    if (url.pathname.endsWith('/archive') && method === 'POST') { project = { ...project, archived: true }; return Response.json(project); }
     if (method === 'DELETE') return new Response(null, { status: 202 });
     if (url.pathname.endsWith('/storage')) return Response.json({ project_id: 383, disk_path: '@hashed/48/b3/original', created_at: createdAt, repository_storage: 'default' });
     if (url.pathname.endsWith('/access_tokens')) return Response.json([{ id: 513, name: 'cs-build-original', scopes: ['read_repository'], access_level: 20, active: false, revoked: false, created_at: createdAt, expires_at: '2026-10-01', user_id: 9, token: 'never-return' }]);
@@ -55,5 +56,28 @@ describe('SCM original repository removal adapter', () => {
       await expect(f.gateway.request(original, true)).rejects.toMatchObject({ kind });
       expect(f.requests.every((r) => r.method === 'GET')).toBe(true);
     }
+  });
+
+  test('archival keeps the original identity and replays with no additional mutation', async () => {
+    const f = fixture();
+    expect(await f.gateway.archive!(original)).toEqual({ ...original, archived: true });
+    expect(await f.gateway.archive!(original)).toEqual({ ...original, archived: true });
+    expect(f.requests.filter((request) => request.method === 'POST')).toHaveLength(1);
+    expect(f.requests.find((request) => request.method === 'POST')?.path).toBe('/api/v4/projects/383/archive');
+    expect(f.requests.every((request) => request.method !== 'DELETE')).toBe(true);
+  });
+
+  test('archival rejects malformed, replaced and unavailable origins without POST', async () => {
+    for (const replacement of [{ id: 384 }, { created_at: '2026-10-02T00:00:00Z' }, { path_with_namespace: 'crewstation/other' }]) {
+      const f = fixture(); f.replace(replacement);
+      await expect(f.gateway.archive!(original)).rejects.toThrow();
+      expect(f.requests.map((request) => request.method)).toEqual(['GET']);
+    }
+    const malformed = fixture();
+    await expect(malformed.gateway.archive!({ ...original, id: '0x17f' })).rejects.toMatchObject({ kind: 'validation' });
+    expect(malformed.requests).toHaveLength(0);
+    const forbidden = fixture(); forbidden.fail(403);
+    await expect(forbidden.gateway.archive!(original)).rejects.toMatchObject({ kind: 'forbidden' });
+    expect(forbidden.requests.map((request) => request.method)).toEqual(['GET']);
   });
 });

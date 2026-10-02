@@ -1,8 +1,8 @@
-import type { Actor, BranchDto, RepositoryBindingDto, ServiceId, TagDto } from '@crewstation/contracts';
+import type { Actor, BranchDto, ProjectId, RepositoryBindingDto, ServiceId, TagDto } from '@crewstation/contracts';
 import type { ListBranchesOptions } from '../api/moduleApi';
 import type { RepositoryBinding } from '../domain/repositoryBinding';
 import type { ScmUseCaseDeps } from '../ports/useCaseDependencies';
-import { notFound, precondition } from '@crewstation/kernel';
+import { notFound, precondition, validation } from '@crewstation/kernel';
 import type { RemoteTag } from '../ports/gitLabGateway';
 import type { UnitOfWork } from '../ports/unitOfWork';
 
@@ -49,6 +49,15 @@ export function queryRepositoryUseCases(deps: ScmUseCaseDeps) {
   const behind = async (remoteProjectId: string, headSha: string, slotSha: string | undefined): Promise<number | null> =>
     slotSha === undefined ? null : (await gitlab.countCommitsBehind(remoteProjectId, { from: headSha, to: slotSha })) ?? null;
   return {
+    resolveBuildSource: async (actor: Actor, projectId: ProjectId, bindingId: ServiceId, ref: string) => {
+      await authorizer.authorize(actor, projectId, 'develop');
+      const binding = await loadReadyBinding(uow, bindingId);
+      if (binding.projectId !== projectId) throw notFound('项目源码绑定', bindingId);
+      if (!ref || ref.length > 256 || /[\x00-\x20\x7f]/.test(ref)) throw validation('源码引用不合法');
+      const commitSha = await gitlab.resolveCommit(binding.remoteProjectId, ref);
+      if (!commitSha || !/^[0-9a-f]{40,64}$/.test(commitSha)) throw notFound('源码提交', ref);
+      return { commitSha, httpUrl: binding.httpUrl, tree: await gitlab.listTree(binding.remoteProjectId, commitSha) };
+    },
     getBinding: async (actor: Actor, serviceId: ServiceId): Promise<RepositoryBindingDto> => bindingToDto(await withWebUrl(deps, await viewable(actor, serviceId, false))),
     /** 内部读取（无 actor）：release 取标签处的 Manifest 与 OpenAPI，dev-session 取分支处的预览配置。 */
     readFile: async (serviceId: ServiceId, ref: string, path: string): Promise<string | undefined> => gitlab.readFile((await loadReadyBinding(uow, serviceId)).remoteProjectId, path, ref),

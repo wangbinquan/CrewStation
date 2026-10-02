@@ -1,5 +1,6 @@
 import type { CreateReleaseTagRequest, ReleaseTagDto, ServiceId } from '@crewstation/contracts';
 import { conflict, notFound, validation } from '@crewstation/kernel';
+import { PLATFORM_PUSH_USERNAME, withCredential } from '../domain/remoteUrl';
 import { latestReleaseTag, nextTag } from '../domain/tagNaming';
 import type { ScmUseCaseDeps } from '../ports/useCaseDependencies';
 import { withScmServiceWrite } from './projectAdmission';
@@ -20,5 +21,14 @@ export function createReleaseTagUseCase(deps: ScmUseCaseDeps) {
     if (input.expectedCommitSha && input.expectedCommitSha !== branch.headSha) throw conflict('远端分支已变化，请重新确认发布来源', { branch: input.branch, expected: input.expectedCommitSha, actual: branch.headSha });
     const created = await gitlab.createTag(binding.remoteProjectId, { name, ref: branch.headSha, message: `CrewStation release ${name}` });
     return { tag: created.name, commitSha: created.commitSha };
+  });
+}
+
+/** 平台在发布前把开发容器的当前分支推到远端。 */
+export function pushBranchUseCase(deps: ScmUseCaseDeps) {
+  const { uow, git, settings } = deps;
+  return (serviceId: ServiceId, workdir: string, branch: string): Promise<{ commitSha: string }> => withScmServiceWrite(deps, serviceId, 'push-branch', async () => {
+    const binding = await loadReadyBinding(uow, serviceId);
+    return git.pushBranch({ workdir, remoteUrlWithCredential: withCredential(binding.httpUrl, PLATFORM_PUSH_USERNAME, settings.platformToken), branch });
   });
 }

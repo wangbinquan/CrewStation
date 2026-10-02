@@ -1,5 +1,5 @@
 import { PlatformError } from '@crewstation/kernel';
-import type { GitLabProjectDeletionState, GitLabRepositoryStorage } from './models';
+import type { GitLabProjectArchivalState, GitLabProjectDeletionState, GitLabRepositoryStorage } from './models';
 import type { Transport } from './transport';
 import { encodeRef } from './transport';
 
@@ -28,8 +28,34 @@ function storage(raw: unknown, id: number): GitLabRepositoryStorage {
   return { projectId: id, diskPath: row.disk_path, createdAt: row.created_at, repositoryStorage: row.repository_storage };
 }
 
+function archival(raw: unknown, id: number): GitLabProjectArchivalState {
+  const row = record(raw);
+  if (typeof row.archived !== 'boolean') throw invalid();
+  return { ...state(row, id), archived: row.archived };
+}
+function assertOriginal(current: GitLabProjectDeletionState, expected: GitLabProjectDeletionState) {
+  if (current.id !== expected.id || current.createdAt !== expected.createdAt || current.pathWithNamespace !== expected.pathWithNamespace) {
+    throw new PlatformError('conflict', 'GitLab 原项目身份或路径变化；禁止归档替换实例');
+  }
+}
+
 export function projectDeletionOperations(transport: Transport) {
   return {
+    getProjectArchivalState: async (id: number | string): Promise<GitLabProjectArchivalState> => {
+      const original = originalId(id); return archival(await transport.request<unknown>('GET', `/projects/${encodeRef(original)}`), original);
+    },
+    /** 原身份复核后归档；失回执重放读取原状态，不把归档 ACK 当作排空证明。 */
+    archiveProject: async (expected: GitLabProjectDeletionState): Promise<GitLabProjectArchivalState> => {
+      const id = originalId(expected.id);
+      if (!relativePath(expected.pathWithNamespace) || !timestamp(expected.createdAt)) throw new PlatformError('validation', 'GitLab 归档必须固定原创建时间和完整路径');
+      const path = `/projects/${encodeRef(id)}`, current = archival(await transport.request<unknown>('GET', path), id);
+      assertOriginal(current, expected);
+      if (current.archived) return current;
+      const result = archival(await transport.request<unknown>('POST', `${path}/archive`), id);
+      assertOriginal(result, expected);
+      if (!result.archived) throw invalid();
+      return result;
+    },
     getProjectDeletionState: async (id: number | string): Promise<GitLabProjectDeletionState> => {
       const original = originalId(id); return state(await transport.request<unknown>('GET', `/projects/${encodeRef(original)}`), original);
     },

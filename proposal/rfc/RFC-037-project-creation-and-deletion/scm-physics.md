@@ -1,6 +1,6 @@
 # SCM 独立来源与正式 owner 接续
 
-本文件接续已批准设计 §6.2。准入和副作用 journal 已形成候选，正式 owner 与下列独立来源尚未实施／验收，不据此开放管理员永久删除。
+本文件接续已批准设计 §6.2。准入和副作用 journal 已部署，正式 owner 与不可变范围／阶段存储形成[未发布候选](acceptance/scm-owner.md)；下列实际独立来源仍未接线／验收，不据此开放管理员永久删除。
 
 ## 原安装与只读事实
 
@@ -38,3 +38,7 @@ Rails 仓库配置没有本地 `path`；原 `gitaly_address` 实际指向该容�
 证据原件为私有 `cs-rfc037-scm-original-trace-footprint-2-stdout.jsonl`、`...-gitaly-roots.json`、`...-mount-consumers.json`、`...-filesystem-2-stdout.jsonl`。文件观察首次缺少 Ruby `time` 标准库而失败，补齐后仅关闭这项原型执行错误；前述消费者权限缺口和正式 source／owner 仍未关闭。
 
 后续 `filesystem-metrics` 消费者读取原语另形成未导出／未接线候选：按实际设备／inode 读取可见 PID 命名空间内每个线程的 FD、maps、cwd、root 与 exe，并核对 boot ID、PID 命名空间、进程／线程集合和 start tick。权限／格式／身份变化返回明确 blocker，取消保持可观察，不输出路径、内容、进程名、参数或环境。6／0、25 断言覆盖非 leader 独立 FD、已关闭 FD 的映射、不可读线程与错误来源；合并改动行门禁通过。这是本地夹具层原语，不具备全部原 GitLab 命名空间／物理根／生产者闭合证明；原安装的 7855 条 EACCES 仍未关闭，不能计原消费者实际停止或 PD-15／22 完成。
+
+### 原容器既有运行时探测
+
+2026-10-02 只读核对原GitLab容器6c4126f06a4baee9e51f6699cd45de7f8d8c69b2ebc51d200072765a0d5d7bb0仍运行，StartedAt为2026-09-21T04:17:30.022274546Z，镜像24e30def586d87987fd23d5d3b454ed6c0bfb1248a604b59ce975e88c6b33d3d。已有embedded/node与/usr/bin/node均不可用，已发布的全线程Node消费者原语不能直接在这个原容器执行。未安装运行时、未创建替代验证容器、未重启或修改原容器。旧Ruby盘点只枚举进程领导者描述符且保留7855权限错误，不能当成全线程完整来源；需要继续接实际原来源的线程、映射及权限证明，不能用新原语用例通过关闭实机缺口。

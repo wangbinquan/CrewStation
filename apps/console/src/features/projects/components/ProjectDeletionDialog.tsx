@@ -18,16 +18,18 @@ export interface ProjectDeletionDialogProps {
   plan?: ProjectDeletionPlan;
   operation?: ProjectDeletionOperation;
   loading?: boolean;
+  pending?: boolean;
   error?: string;
-  onRefresh(): void;
-  /** Caller retains the server plan/request key and handles read/replay; the view never starts a new operation on a refresh. */
+  /** Caller retains the server plan/request key; automatic progress reads never start a deletion. */
   onConfirm(plan: ProjectDeletionPlan): Promise<void>;
   onRetry?(): void;
+  onRecover?(): void;
+  onReview?(): void;
   onClose(): void;
 }
 
 /** Two shared modal layers; mounted only by the administrator flow after all backend owners are available. */
-export function ProjectDeletionDialog({ project, plan, operation, loading = false, error, onRefresh, onConfirm, onRetry, onClose }: ProjectDeletionDialogProps): ReactElement {
+export function ProjectDeletionDialog({ project, plan, operation, loading = false, pending = false, error, onConfirm, onRetry, onRecover, onReview, onClose }: ProjectDeletionDialogProps): ReactElement {
   const t = useT(), inFlight = useRef(false), active = useRef(true);
   const [confirmation, setConfirmation] = useState<string>(), [busy, setBusy] = useState(false), [localError, setLocalError] = useState<string>();
   const [now, refreshTime] = useState(() => Date.now());
@@ -37,29 +39,38 @@ export function ProjectDeletionDialog({ project, plan, operation, loading = fals
     const timer = setTimeout(() => refreshTime(Date.now()), Math.min(2_147_483_647, Math.max(0, Date.parse(plan.expiresAt) - Date.now())));
     return () => clearTimeout(timer);
   }, [plan]);
-  const ready = !loading && deletionPlanReady(plan, project.id, now);
+  const reviewing = !operation || !!plan;
+  const sameOperation = operation ? operation.state === 'needs-attention' && plan?.operationId === operation.id && plan.supersedes === operation.confirmationDigest : !plan?.operationId;
+  const ready = !loading && !pending && sameOperation && deletionPlanReady(plan, project.id, now);
   const target = operation?.project ?? plan?.target ?? project;
   const confirm = async () => {
-    if (inFlight.current || !plan || confirmation !== plan.id || !deletionPlanReady(plan, project.id)) return;
+    if (inFlight.current || loading || pending || !sameOperation || !plan || confirmation !== plan.id || !deletionPlanReady(plan, project.id)) return;
     inFlight.current = true; setBusy(true); setLocalError(undefined);
     try { await onConfirm(plan); }
     catch { if (active.current) setLocalError(t('projects.delete.failed')); }
     finally { inFlight.current = false; if (active.current) setBusy(false); }
   };
   return <>
-    <Dialog title={t(operation ? 'projects.delete.progressTitle' : 'projects.delete.reviewTitle')} size="large" busy={busy} onClose={onClose}
-      footer={<ActionRow>{!operation ? <><Button variant="danger" disabled={!ready || busy} onClick={() => { if (deletionPlanReady(plan, project.id)) setConfirmation(plan!.id); }}>{t('projects.delete.next')}</Button><Button variant="secondary" disabled={loading || busy} onClick={onRefresh}>{t('projects.delete.refresh')}</Button></> : operation.canRetry && onRetry ? <Button variant="primary" disabled={loading || busy} onClick={onRetry}>{t('projects.delete.retry')}</Button> : null}<Button variant="ghost" disabled={busy} onClick={onClose}>{t('projects.delete.close')}</Button></ActionRow>}>
+    <Dialog title={t(reviewing && !pending ? 'projects.delete.reviewTitle' : 'projects.delete.progressTitle')} size="large" busy={busy || loading} onClose={onClose}
+      footer={<ActionRow>
+        {pending ? onRecover ? <Button variant="primary" disabled={loading || busy} onClick={onRecover}>{t('projects.delete.recover')}</Button> : null
+          : reviewing ? <><Button variant="danger" disabled={!ready || busy} onClick={() => { if (ready && deletionPlanReady(plan, project.id)) setConfirmation(plan!.id); }}>{t('projects.delete.next')}</Button>{onReview ? <Button variant="secondary" disabled={loading || busy} onClick={onReview}>{t('projects.delete.refresh')}</Button> : null}</>
+          : <>{operation?.canRetry && onRetry ? <Button variant="primary" disabled={loading || busy} onClick={onRetry}>{t('projects.delete.retry')}</Button> : null}{operation?.state === 'needs-attention' && onReview ? <Button variant="secondary" disabled={loading || busy} onClick={onReview}>{t('projects.delete.reconfirm')}</Button> : null}</>}
+        <Button variant="ghost" disabled={busy || loading} onClick={onClose}>{t('projects.delete.close')}</Button>
+      </ActionRow>}>
       <Stack><DefinitionList layout="grid" items={[{ label: t('projects.delete.project'), value: target.name }, { label: t('projects.delete.slug'), value: target.slug }]} />
-        {operation ? <DeletionProgress operation={operation} /> : <>
+        {operation ? <DeletionProgress operation={operation} /> : null}
+        {pending ? <ActionNote tone="neutral">{t(onRecover ? 'projects.delete.unknown' : 'projects.delete.unverified')}</ActionNote> : null}
+        {reviewing && !pending ? <>
           <ActionNote tone="neutral">{t('projects.delete.consequence')}</ActionNote>
           {loading ? <ActionNote tone="neutral">{t('projects.delete.loading')}</ActionNote> : plan ? <DeletionInventory plan={plan} /> : null}
           {plan && !ready && !loading ? <ActionNote tone="error">{t(Date.parse(plan.expiresAt) <= now ? 'projects.delete.expired' : 'projects.delete.blocked')}</ActionNote> : null}
           <ActionNote tone="neutral">{t('projects.delete.shared')}</ActionNote>
-        </>}
+        </> : null}
         {error || localError ? <ActionNote tone="error">{error ?? localError}</ActionNote> : null}
       </Stack>
     </Dialog>
-    {!operation && plan && confirmation === plan.id ? <ConfirmDialog title={t('projects.delete.confirmTitle')} question={t('projects.delete.confirmQuestion', { name: target.name, slug: target.slug })}
+    {reviewing && !pending && plan && confirmation === plan.id ? <ConfirmDialog title={t('projects.delete.confirmTitle')} question={t('projects.delete.confirmQuestion', { name: target.name, slug: target.slug })}
       confirmWord="delete" confirmLabel={t('projects.delete.confirmTitle')} cancelLabel={t('projects.delete.back')} busy={busy} busyLabel={t('projects.delete.accepting')} confirmDisabled={!ready}
       onCancel={() => setConfirmation(undefined)} onConfirm={() => { void confirm(); }}>
       <p>{t('projects.delete.consequence')}</p><p>{t('projects.delete.irreversible')}</p>

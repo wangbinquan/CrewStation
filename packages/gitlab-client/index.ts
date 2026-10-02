@@ -6,6 +6,6 @@ export type { GitLabErrorContext } from './errors';
 export { GITLAB_ACCESS_LEVEL } from './models';
 export type {
   AddWebhookInput, CreateProjectAccessTokenInput, CreateProjectInput, CreateTagInput, DeleteProjectOptions, GitLabAccessLevel, GitLabAccessToken, GitLabBranch,
-  GitLabCommit, GitLabCompareResult, GitLabCreatedAccessToken, GitLabGroup, GitLabProject, GitLabProjectDeletionState, GitLabProjectRef, GitLabProtectedTag, GitLabRepositoryStorage,
+  GitLabCommit, GitLabCompareResult, GitLabCreatedAccessToken, GitLabGroup, GitLabProject, GitLabProjectArchivalState, GitLabProjectDeletionState, GitLabProjectRef, GitLabProtectedTag, GitLabRepositoryStorage,
   GitLabProtectedTagAccess, GitLabTag, GitLabTreeEntry, GitLabVisibility, GitLabWebhook, GitLabWebhookEvent, ProtectTagInput, RepositoryTreeOptions,
 } from './models';

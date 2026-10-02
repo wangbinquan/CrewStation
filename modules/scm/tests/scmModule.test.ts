@@ -43,7 +43,7 @@ afterAll(async () => { await tdb?.drop(); });
 describe.skipIf(!available)('scm module', () => {
   test('迁移建出 scm schema 的业务表与身份映射表；建仓后绑定落库、可读回且幂等', async () => {
     const tables = (await tdb.db.execute(`SELECT table_name FROM information_schema.tables WHERE table_schema = 'scm' ORDER BY table_name`)) as unknown as Array<{ table_name: string }>;
-    expect(tables.map((t) => t.table_name)).toEqual(['deletion_fences', 'deletion_identities', 'deletion_repository_origins', 'deletion_work', 'repository_bindings', 'resource_identity_aliases', 'session_credentials']);
+    expect(tables.map((t) => t.table_name)).toEqual(['deletion_fences', 'deletion_identities', 'deletion_repository_origins', 'deletion_scopes', 'deletion_work', 'repository_bindings', 'resource_identity_aliases', 'session_credentials']);
     const dto = await scm.api.ensureRepository(serviceId, projectId, { slug: 'demo', templateId: '01a0bf5d-8f4b-7002-9560-94caf593fb19' });
     expect(RepositoryBindingDtoSchema.parse(dto)).toMatchObject({ state: 'ready', pathWithNamespace: 'crewstation/demo', remoteProjectId: '100' });
     expect(await scm.api.getBinding(owner, serviceId)).toEqual(dto);

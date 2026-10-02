@@ -50,6 +50,11 @@ export interface GitLabProjectDeletionState {
   readonly markedForDeletionOn?: string | null;
 }
 
+/** 原生归档是写入准入状态，不是消费者停止或存储回收证明。 */
+export interface GitLabProjectArchivalState extends GitLabProjectDeletionState {
+  readonly archived: boolean;
+}
+
 /** GitLab 自报的原存储位置；这是定位事实，不能代替实际文件回收证明。 */
 export interface GitLabRepositoryStorage {
   readonly projectId: number;

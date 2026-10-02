@@ -36,3 +36,13 @@
 共享迁移锁包含另一会话的 resources/0009 与本批 SCM/0005、0006。用户明确授权跨会话协调，双方保留完整共享锁和对方未提交源文件；全部相关依赖就绪、在短临界区串行精确提交后才推送。未执行本批部署或真实永久删除；原项目和全部共享设施保持。
 
 2026-10-02 共同唯一完整门禁实际通过：**5071 pass／143 skip／0 fail，34004 断言、991 文件、938.51 秒**。104 个联合候选路径首尾一致，既有隔离 PG 身份保持、预备事务能力为 10；原 SCM 47 与后续 15 路径内容均在此快照中。原件 `observability-cs-maintenance-joint-full-check-v1.json/log` 保留。观测源码 SOURCE v3 PASS 的范围包含此前失败的资源维护登记与接线，不扩大为完整 producer／父结束链路验收。共享 Root 与完整锁已由另一会话 44 路径 commit-only `374602d8916ec9edfaa1427d8beda153199f858d` 保留全量提交；本任务剩余源依赖串行精确提交后累计推送，等待最终累计 SHA 的 CI 与部署。未挂载删除视图与正式物理清理的剩余边界不变。
+
+## 累计精确发布、部署与真实原回调验收
+
+另一会话 `374602d8916ec9edfaa1427d8beda153199f858d`（44 路径）、本任务 `34d19685ef9852524213ad996ad9d46bb222e954`（52 路径，含四删除）、后续独立 `f78c27ad377d583d407d9ca531b9c776d1266339`（17 路径）累计精确推送。113 个核验路径和全部迁移锁依赖都在最终提交树；main 与 origin 一致，暂存区空。没有提交另一会话后来新增的父结束存储五路径，没有更改 SCM 0005／0006 校验和。
+
+最终 SHA 的 [CI 36961250201](https://github.com/wangbinquan/CrewStation/actions/runs/36961250201) 六项全部终态成功。从此精确提交树构建镜像，不包含未提交工作；**2026-10-02T04:00:27.743Z** 八组件滚动部署完成，原存储探针／策略、Runner、共享 PostgreSQL Pod／PVC／PV／节点／Service 与原项目 Namespace／Pod／PVC／PV 的身份保留。
+
+实际 API Pod **2cb2ecab-32d0-47fb-84c3-90a38ea8386a** 内加载部署后的 Root／SDK，原 383 身份、SCM 两条迁移校验和和旧来源未知时间核对通过；只签发本用例五分钟 build 凭据再撤销，普通元数据之前的 intent／returned 及真实 PID、Pod、容器、节点、退出摘要留痕通过，两条新回调历史只读重复稳定且无明文／密文。既有 GitLab 令牌保持，全部 **52 库／64 角色** 名字与 OID 前后完全相同；原项目对象保持。本次凭据已撤销，回调与副作用历史留作后续正式 owner 的原范围，不伪装成已回收全部 SCM 资源。
+
+私有原件为 `cs-rfc037-coordinated-push-receipt.json`、`cs-rfc037-f78c27ad377d-ci-terminal.json`、`...-deployment-receipt.json`、`...-scm-writes-installed-live-receipt.json`。正式 SCM owner／全部独立物理来源、剩余 owner、Root／API／UI 与原项目永久回收尚未完成，产品永久删除入口仍关闭。

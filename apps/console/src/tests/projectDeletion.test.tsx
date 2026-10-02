@@ -45,7 +45,7 @@ test('长列表末行两层统一弹窗：不先删除，Esc 只退回盘点，�
     const [open, setOpen] = useState(false);
     return <><input aria-label="列表筛选" defaultValue="待验项目" />{Array.from({ length: 70 }, (_, i) => <p key={i}>项目 {i}</p>)}
       <button onClick={() => setOpen(true)}>删除末行项目</button>
-      {open ? <ProjectDeletionDialog project={project} plan={plan} onRefresh={() => {}} onClose={() => setOpen(false)} onConfirm={async () => { accepted++; }} /> : null}</>;
+      {open ? <ProjectDeletionDialog project={project} plan={plan} onReview={() => {}} onClose={() => setOpen(false)} onConfirm={async () => { accepted++; }} /> : null}</>;
   }
   page = await renderElement(<List />, messages); page.host.scrollTop = 700;
   const trigger = page.button('删除末行项目'); trigger.focus(); await page.click('删除末行项目');
@@ -64,7 +64,7 @@ test('长列表末行两层统一弹窗：不先删除，Esc 只退回盘点，�
 test('受理期间锁定两层、取消及重复提交；响应失败继续使用原计划', async () => {
   const plan = deletionPlan(); const accepted: string[] = []; let finish!: () => void;
   let hold = new Promise<void>((resolve) => { finish = resolve; });
-  page = await renderElement(<ProjectDeletionDialog project={project} plan={plan} onRefresh={() => {}} onClose={() => { throw new Error('closed while busy'); }}
+  page = await renderElement(<ProjectDeletionDialog project={project} plan={plan} onReview={() => {}} onClose={() => { throw new Error('closed while busy'); }}
     onConfirm={async (selected) => { accepted.push(selected.id); await hold; throw new Error('private backend error'); }} />, messages);
   await page.click('继续删除…'); await typeConfirmWord(' DELETE '); await page.click('永久删除项目');
   expect(accepted).toEqual([plan.id]); expect(openDialog().querySelector<HTMLInputElement>('input')?.disabled).toBe(true);
@@ -77,7 +77,7 @@ test('受理期间锁定两层、取消及重复提交；响应失败继续使�
 
 test('盘点在第二层打开后过期，会锁住已输入的确认词且不提交', async () => {
   const plan = deletionPlan(new Date(Date.now() + 250).toISOString()); let accepted = 0;
-  page = await renderElement(<ProjectDeletionDialog project={project} plan={plan} onRefresh={() => {}} onClose={() => {}} onConfirm={async () => { accepted++; }} />, messages);
+  page = await renderElement(<ProjectDeletionDialog project={project} plan={plan} onReview={() => {}} onClose={() => {}} onConfirm={async () => { accepted++; }} />, messages);
   await page.click('继续删除…'); await typeConfirmWord('delete'); expect(dialogConfirmButton().disabled).toBe(false);
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 300)); });
   expect(dialogConfirmButton().disabled).toBe(true); await act(async () => { openDialog().querySelector('form')!.requestSubmit(); }); expect(accepted).toBe(0);
@@ -86,11 +86,11 @@ test('盘点在第二层打开后过期，会锁住已输入的确认词且不�
 test('不完整盘点显示引用与阻塞，进度来自真实操作且仅阻塞时允许继续', async () => {
   const plan = deletionPlan(); plan.participants[0]!.references.push({ kind: 'consumer', id: 'shared', description: '另一项目引用源码' });
   plan.blockers.push({ participant: 'scm', code: 'source-unreadable', message: '源码来源暂时不可读' });
-  page = await renderElement(<ProjectDeletionDialog project={project} plan={plan} onRefresh={() => {}} onClose={() => {}} onConfirm={async () => { throw new Error('must not submit'); }} />, messages);
+  page = await renderElement(<ProjectDeletionDialog project={project} plan={plan} onReview={() => {}} onClose={() => {}} onConfirm={async () => { throw new Error('must not submit'); }} />, messages);
   expect(page.button('继续删除…').disabled).toBe(true); expect(page.text()).toContain('另一项目引用源码'); expect(page.text()).toContain('源码来源暂时不可读');
   page.unmount(); let retries = 0; const operation = deletionOperation('needs-attention');
-  page = await renderElement(<ProjectDeletionDialog project={project} operation={operation} onRetry={() => { retries++; }} onRefresh={() => {}} onClose={() => {}} onConfirm={async () => {}} />, messages);
+  page = await renderElement(<ProjectDeletionDialog project={project} operation={operation} onRetry={() => { retries++; }} onReview={() => {}} onClose={() => {}} onConfirm={async () => {}} />, messages);
   expect(page.text()).toContain(operation.id); expect(page.text()).toContain('停止运行并排空使用'); await page.click('继续清理'); expect(retries).toBe(1);
-  page.unmount(); page = await renderElement(<ProjectDeletionDialog project={project} operation={deletionOperation('succeeded')} onRefresh={() => {}} onClose={() => {}} onConfirm={async () => {}} />, messages);
+  page.unmount(); page = await renderElement(<ProjectDeletionDialog project={project} operation={deletionOperation('succeeded')} onReview={() => {}} onClose={() => {}} onConfirm={async () => {}} />, messages);
   expect(page.text()).toContain('独占资源已回收'); expect(page.host.querySelectorAll('button').length).toBe(2);
 });

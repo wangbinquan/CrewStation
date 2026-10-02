@@ -2,11 +2,12 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import type { ProjectDeletionContext, ProjectId, ServiceId } from '@crewstation/contracts';
 import { ProjectDeletionContextSchema } from '@crewstation/contracts';
 import { jsonHash, newResourceId, precondition } from '@crewstation/kernel';
-import type { Database, Executor } from '@crewstation/persistence';
+import type { Database, Executor, Transaction } from '@crewstation/persistence';
 import { assertSharedDatabaseAdmissionActive, withExclusiveDatabaseAdmission, withSharedDatabaseAdmission } from '@crewstation/persistence';
 import { sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { RepositoryWrites, ScmCallbackProcess, ScmCallbackProcesses, ScmExternalEffect, ScmWriteHistory, ScmWriteKind, ScmWriteRecord } from '../../ports/repositoryWrites';
+import type { ScmDeletionRepository, ScmDeletionScope, ScmDeletionStored } from '../../ports/projectDeletion';
 
 const key = (id: string) => `scm.project-admission:${id}`;
 const scopes = new AsyncLocalStorage<{ database: Database; id: string; projectId: ProjectId; serviceId: ServiceId; backendPid: number; active: boolean }>();
@@ -65,10 +66,10 @@ async function record(db: Database, raw: ScmExternalEffect) {
     if (effect.kind === 'repository' && effect.stage === 'returned') await tx.execute(sql`INSERT INTO scm.deletion_repository_origins VALUES (${scope.projectId},${scope.serviceId},${effect.remoteProjectId!},${effect.path!},${effect.createdAt ?? null},'callback-result',${scope.id}) ON CONFLICT DO NOTHING`);
   });
 }
-async function history(db: Database, projectId: ProjectId): Promise<ScmWriteHistory> {
+async function history(db: Database, projectId: ProjectId, originalRepositories: readonly string[] = []): Promise<ScmWriteHistory> {
   return db.transaction(async (tx) => {
     const tables = await tx.execute<{ table_name: string }>(sql`SELECT table_name FROM information_schema.tables WHERE table_schema='scm' ORDER BY table_name`);
-    if (tables.some((r) => !['repository_bindings', 'session_credentials', 'resource_identity_aliases', 'deletion_fences', 'deletion_identities', 'deletion_work', 'deletion_repository_origins'].includes(r.table_name))) throw precondition('SCM 存在未登记的内容表');
+    if (tables.some((r) => !['repository_bindings', 'session_credentials', 'resource_identity_aliases', 'deletion_fences', 'deletion_identities', 'deletion_work', 'deletion_repository_origins', 'deletion_scopes'].includes(r.table_name))) throw precondition('SCM 存在未登记的内容表');
     const bindings = await tx.execute<{ row: Record<string, unknown> }>(sql`SELECT to_jsonb(b) AS row FROM scm.repository_bindings b WHERE project_id=${projectId} ORDER BY service_id`);
     const credentials = await tx.execute<{ row: Record<string, unknown> }>(sql`SELECT to_jsonb(c) AS row FROM scm.session_credentials c WHERE service_id IN (SELECT id FROM scm.deletion_identities WHERE kind='service' AND project_id=${projectId}) ORDER BY id`);
     const records = (await tx.execute<WorkRow>(sql`SELECT * FROM scm.deletion_work WHERE project_id=${projectId} ORDER BY id`)).map((r): ScmWriteRecord => ({ id: r.id, serviceId: r.service_id, kind: writeKindSchema.parse(r.kind), state: r.state, remoteProjectId: r.remote_project_id, backendPid: r.backend_pid,
@@ -76,8 +77,15 @@ async function history(db: Database, projectId: ProjectId): Promise<ScmWriteHist
     const identities = await tx.execute<ScmWriteHistory['identities'][number]>(sql`SELECT kind,id,service_id AS "serviceId" FROM scm.deletion_identities WHERE project_id=${projectId} ORDER BY kind,id`);
     const aliases = await tx.execute(sql`SELECT * FROM scm.resource_identity_aliases WHERE id=${projectId} OR id IN (SELECT id FROM scm.deletion_identities WHERE project_id=${projectId}) ORDER BY kind,key`);
     const origins = await tx.execute<ScmWriteHistory['origins'][number]>(sql`SELECT service_id AS "serviceId",remote_project_id AS "remoteProjectId",path_with_namespace AS "pathWithNamespace",remote_created_at AS "createdAt",source FROM scm.deletion_repository_origins WHERE project_id=${projectId} ORDER BY service_id,remote_project_id`);
+    const selected = [...new Set([...originalRepositories.map((id) => remoteId.parse(id)), ...origins.map((entry) => entry.remoteProjectId), ...bindings.map(({ row }) => String(row['remote_project_id']))])];
+    const foreign = await tx.execute<ScmWriteHistory['foreignRepositoryReferences'][number]>(sql`WITH candidates AS (
+      SELECT remote_project_id,project_id FROM scm.repository_bindings UNION SELECT remote_project_id,project_id FROM scm.deletion_repository_origins
+      UNION SELECT e->>'remoteProjectId' AS remote_project_id,project_id FROM scm.deletion_work CROSS JOIN LATERAL jsonb_array_elements(effects) e)
+      SELECT DISTINCT remote_project_id AS "remoteProjectId",project_id AS "projectId" FROM candidates WHERE project_id<>${projectId}
+        AND remote_project_id IN (SELECT jsonb_array_elements_text(${JSON.stringify(selected)}::jsonb)) ORDER BY remote_project_id,project_id`);
     const unowned = await tx.execute<{ id: string }>(sql`SELECT id FROM scm.session_credentials c WHERE NOT EXISTS(SELECT 1 FROM scm.deletion_identities WHERE kind='service' AND id=c.service_id) ORDER BY id`);
-    return { revision: jsonHash({ bindings, credentials, records, identities, aliases, origins, unowned }), metadataComplete: unowned.length === 0, origins,
+    return { revision: jsonHash({ bindings, credentials, records, identities, aliases, origins, unowned, foreign }), metadataComplete: unowned.length === 0, foreignRepositoryReferences: foreign,
+      metadataCount: bindings.length + credentials.length + records.length + identities.length + aliases.length + origins.length, origins,
       bindings: bindings.map(({ row: r }) => ({ serviceId: r['service_id'] as ServiceId, remoteProjectId: String(r['remote_project_id']), pathWithNamespace: String(r['path_with_namespace']), bindingCreatedAt: new Date(String(r['created_at'])).toISOString() })),
       credentials: credentials.map(({ row: r }) => ({ id: String(r['id']), serviceId: r['service_id'] as ServiceId, remoteTokenId: String(r['remote_token_id']) })), records, identities,
       unresolvedEffects: records.flatMap((r) => r.effects.filter((e) => e.stage === 'intent' && !r.effects.some((other) => other.stage === 'returned' && other.intentId === e.intentId)).map((e) => ({ workId: r.id, intentId: e.intentId }))), unownedCredentialIds: unowned.map((r) => r.id) };
@@ -92,10 +100,11 @@ async function close(input: Input, raw: ProjectDeletionContext) {
   const context = await grant(input, raw, 'seal');
   await withExclusiveDatabaseAdmission(input.db, key(context.target.id), async (tx) => {
     await input.assertGrant!(context);
+    await markDeletion(tx, context);
     await tx.execute(sql`INSERT INTO scm.deletion_fences(project_id) VALUES(${context.target.id}) ON CONFLICT DO NOTHING`);
-    const [row] = await tx.execute<{ operation_id: string | null; generation: number }>(sql`SELECT * FROM scm.deletion_fences WHERE project_id=${context.target.id} FOR UPDATE`);
-    if (!row || row.operation_id && row.operation_id !== context.operationId || row.generation > context.generation) throw precondition('原 SCM 清理操作或世代不匹配');
-    await tx.execute(sql`UPDATE scm.deletion_fences SET operation_id=${context.operationId},generation=${context.generation} WHERE project_id=${context.target.id}`);
+    const [row] = await tx.execute<{ operation_id: string | null; generation: number; confirmed_revision: string | null; completed_digest: string | null }>(sql`SELECT * FROM scm.deletion_fences WHERE project_id=${context.target.id} FOR UPDATE`);
+    if (!row || row.completed_digest || row.operation_id && (row.operation_id !== context.operationId || row.generation === context.generation && row.confirmed_revision !== context.confirmed.revision) || row.generation > context.generation) throw precondition('原 SCM 清理操作、世代或确认摘要不匹配');
+    await tx.execute(sql`UPDATE scm.deletion_fences SET operation_id=${context.operationId},generation=${context.generation},confirmed_revision=${context.confirmed.revision} WHERE project_id=${context.target.id}`);
     await input.assertGrant!(context);
   });
 }
@@ -145,11 +154,98 @@ export function scmRepositoryWrites(input: Input): RepositoryWrites {
         finally { try { await finish(input.db, id, backendPid, result); } finally { scope.active = false; } }
       });
     });
-  }, record: (effect) => record(input.db, effect), history: (id) => history(input.db, id), close: (context) => close(input, context), observe: () => observe(input),
+  }, record: (effect) => record(input.db, effect), history: (id, originals) => history(input.db, id, originals), close: (context) => close(input, context), observe: () => observe(input),
   recover: async (raw) => {
     const context = await grant(input, raw, 'stop');
     const [fence] = await input.db.execute<{ operation_id: string; generation: number }>(sql`SELECT operation_id,generation FROM scm.deletion_fences WHERE project_id=${context.target.id}`);
     if (fence?.operation_id !== context.operationId || fence.generation > context.generation) throw precondition('原 SCM 准入尚未关闭');
     await observe(input, context);
   } };
+}
+
+type DeletionFence = { operation_id: string; generation: number; confirmed_revision: string; completed_digest: string | null; completed_count: string | number };
+type DeletionScopeRow = { original: ScmDeletionScope; stop_digest: string | null; purge_digest: string | null; prove_digest: string | null; metadata_purged: boolean };
+async function markDeletion(tx: Executor, context: ProjectDeletionContext) {
+  await tx.execute(sql`SELECT set_config('crewstation.scm_deletion',${context.operationId},true),set_config('crewstation.scm_deletion_phase',${context.phase},true),set_config('crewstation.scm_deletion_generation',${String(context.generation)},true)`);
+}
+async function deletionFence(tx: Executor, context: ProjectDeletionContext) {
+  const [row] = await tx.execute<DeletionFence>(sql`SELECT operation_id,generation,confirmed_revision,completed_digest,completed_count FROM scm.deletion_fences WHERE project_id=${context.target.id} FOR UPDATE`);
+  if (!row || row.operation_id !== context.operationId || row.generation > context.generation || row.confirmed_revision !== context.confirmed.revision) throw precondition('SCM 固定原操作、世代或确认摘要不符');
+  if (row.generation < context.generation && !row.completed_digest) await tx.execute(sql`UPDATE scm.deletion_fences SET generation=${context.generation} WHERE project_id=${context.target.id}`);
+  return row;
+}
+async function deletionScope(tx: Executor, context: ProjectDeletionContext) {
+  const [row] = await tx.execute<DeletionScopeRow>(sql`SELECT original,stop_digest,purge_digest,prove_digest,metadata_purged FROM scm.deletion_scopes WHERE project_id=${context.target.id} AND operation_id=${context.operationId} FOR UPDATE`);
+  return row;
+}
+const originalKeys = (scope: ScmDeletionScope) => [...scope.plan.serviceIds, ...scope.plan.credentialIds, scope.plan.projectId];
+const selectedKeys = (values: readonly string[]) => sql`SELECT jsonb_array_elements_text(${JSON.stringify(values)}::jsonb)`;
+async function emptyContent(tx: Executor, scope: ScmDeletionScope) {
+  const tables = await tx.execute<{ table_name: string }>(sql`SELECT table_name FROM information_schema.tables WHERE table_schema='scm' ORDER BY table_name`);
+  if (tables.some((row) => !['repository_bindings', 'session_credentials', 'resource_identity_aliases', 'deletion_fences', 'deletion_identities', 'deletion_work', 'deletion_repository_origins', 'deletion_scopes'].includes(row.table_name))) throw precondition('SCM 出现未登记的内容表，不能宣称清空');
+  const [row] = await tx.execute<{ present: boolean }>(sql`SELECT
+    EXISTS(SELECT 1 FROM scm.repository_bindings WHERE project_id=${scope.plan.projectId} OR service_id IN (${selectedKeys(scope.plan.serviceIds)}))
+    OR EXISTS(SELECT 1 FROM scm.session_credentials WHERE service_id IN (${selectedKeys(scope.plan.serviceIds)}) OR id IN (${selectedKeys(scope.plan.credentialIds)}))
+    OR EXISTS(SELECT 1 FROM scm.deletion_identities WHERE project_id=${scope.plan.projectId} OR id IN (${selectedKeys(originalKeys(scope))}))
+    OR EXISTS(SELECT 1 FROM scm.deletion_work WHERE project_id=${scope.plan.projectId})
+    OR EXISTS(SELECT 1 FROM scm.deletion_repository_origins WHERE project_id=${scope.plan.projectId})
+    OR EXISTS(SELECT 1 FROM scm.resource_identity_aliases WHERE id IN (${selectedKeys(originalKeys(scope))})) AS present`);
+  return row?.present === false;
+}
+async function purgeScmMetadata(tx: Transaction, context: ProjectDeletionContext) {
+  if (context.phase !== 'metadata') throw precondition('SCM 项目内容只能在 metadata 清理');
+  const row = await deletionScope(tx, context);
+  if (!row?.stop_digest || !row.purge_digest || !row.prove_digest) throw precondition('SCM 原资源尚未排空、回收并独立复核');
+  const [pending] = await tx.execute<{ present: boolean }>(sql`SELECT EXISTS(SELECT 1 FROM scm.deletion_work WHERE project_id=${context.target.id} AND state<>'exited') AS present`);
+  if (pending?.present !== false) throw precondition('SCM 原回调仍活动，不能删除原事实');
+  await tx.execute(sql`UPDATE scm.deletion_fences SET scope_verified=true WHERE project_id=${context.target.id}`);
+  await tx.execute(sql`DELETE FROM scm.session_credentials WHERE service_id IN (${selectedKeys(row.original.plan.serviceIds)}) OR id IN (${selectedKeys(row.original.plan.credentialIds)})`);
+  await tx.execute(sql`DELETE FROM scm.resource_identity_aliases WHERE id IN (${selectedKeys(originalKeys(row.original))})`);
+  await tx.execute(sql`DELETE FROM scm.repository_bindings WHERE project_id=${context.target.id}`);
+  await tx.execute(sql`DELETE FROM scm.deletion_repository_origins WHERE project_id=${context.target.id}`);
+  await tx.execute(sql`DELETE FROM scm.deletion_work WHERE project_id=${context.target.id}`);
+  await tx.execute(sql`DELETE FROM scm.deletion_identities WHERE project_id=${context.target.id}`);
+  if (!await emptyContent(tx, row.original)) throw precondition('SCM 原项目内容、凭据或别名仍有残留');
+  await tx.execute(sql`UPDATE scm.deletion_scopes SET metadata_purged=true WHERE project_id=${context.target.id}`);
+}
+async function completeScmDeletion(tx: Transaction, context: ProjectDeletionContext, digest: string, count: number) {
+  if (context.phase !== 'verify' || !/^[a-f0-9]{64}$/.test(digest) || !Number.isSafeInteger(count) || count < 0) throw precondition('SCM 最终复核材料不合法');
+  const row = await deletionScope(tx, context);
+  if (!row?.metadata_purged || !await emptyContent(tx, row.original)) throw precondition('SCM 内容尚未完整清空，不能退为最小墓碑');
+  await tx.execute(sql`UPDATE scm.deletion_fences SET completed_digest=${digest},completed_count=${count} WHERE project_id=${context.target.id}`);
+  await tx.execute(sql`DELETE FROM scm.deletion_scopes WHERE project_id=${context.target.id}`);
+}
+
+export function scmDeletionRepository(input: Input): ScmDeletionRepository {
+  const admitted = <T>(raw: ProjectDeletionContext, work: (tx: Transaction, owned: DeletionFence) => Promise<T>) => {
+    const context = ProjectDeletionContextSchema.parse(raw);
+    if (!input.assertGrant || context.confirmed.participant !== 'scm') throw precondition('缺少原 SCM 清理许可');
+    return withExclusiveDatabaseAdmission(input.db, key(context.target.id), async (tx) => {
+      await input.assertGrant!(context); await markDeletion(tx, context);
+      const owned = await deletionFence(tx, context), result = await work(tx, owned);
+      await input.assertGrant!(context); return result;
+    });
+  };
+  return {
+    retained: async (projectId) => (await input.db.execute<{ original: ScmDeletionScope }>(sql`SELECT original FROM scm.deletion_scopes WHERE project_id=${projectId}`))[0]?.original ?? null,
+    load: (context) => admitted(context, async (tx, owned): Promise<ScmDeletionStored> => {
+      const row = await deletionScope(tx, context), count = Number(owned.completed_count);
+      if (!Number.isSafeInteger(count) || count < 0) throw precondition('SCM 完成墓碑计数不合法');
+      return { scope: row?.original ?? null, proofs: { ...(row?.stop_digest ? { stop: row.stop_digest } : {}), ...(row?.purge_digest ? { purge: row.purge_digest } : {}), ...(row?.prove_digest ? { prove: row.prove_digest } : {}) }, metadataPurged: row?.metadata_purged ?? false, completed: owned.completed_digest ? { digest: owned.completed_digest, count } : null };
+    }),
+    bind: (context, scope) => admitted(context, async (tx) => {
+      if (context.phase !== 'seal' || scope.plan.projectId !== context.target.id) throw precondition('SCM 原范围只能在 seal 绑定本项目');
+      const previous = await deletionScope(tx, context);
+      if (previous && jsonHash(previous.original) !== jsonHash(scope)) throw precondition('已固定的 SCM 原物理范围不可替换');
+      if (!previous) await tx.execute(sql`INSERT INTO scm.deletion_scopes(project_id,operation_id,original) VALUES(${context.target.id},${context.operationId},${JSON.stringify(scope)}::jsonb)`);
+    }),
+    record: (context, digest) => admitted(context, async (tx) => {
+      if (!['stop', 'purge', 'prove'].includes(context.phase) || !/^[a-f0-9]{64}$/.test(digest)) throw precondition('SCM 阶段证明不合法');
+      if (!await deletionScope(tx, context)) throw precondition('SCM 原物理范围尚未固定');
+      const column = context.phase + '_digest';
+      await tx.execute(sql`UPDATE scm.deletion_scopes SET ${sql.identifier(column)}=coalesce(${sql.identifier(column)},${digest}) WHERE project_id=${context.target.id}`);
+    }),
+    purgeMetadata: (context) => admitted(context, (tx) => purgeScmMetadata(tx, context)),
+    complete: (context, digest, count) => admitted(context, (tx) => completeScmDeletion(tx, context, digest, count)),
+  };
 }

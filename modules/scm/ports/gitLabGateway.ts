@@ -40,6 +40,8 @@ export interface RemoteRepositoryRemoval {
   read(id: string): Promise<RemoteRepositoryIdentity & { readonly markedForDeletionOn?: string | null }>;
   storage(id: string): Promise<readonly { readonly projectId: string; readonly diskPath: string; readonly createdAt: string; readonly repositoryStorage: string }[]>;
   credentials(id: string): Promise<readonly { readonly id: string; readonly name: string; readonly active: boolean; readonly revoked: boolean; readonly createdAt: string }[]>;
+  /** 可选的原生封写能力；归档回执不能替代原生产者与文件消费者停止证明。 */
+  archive?(identity: RemoteRepositoryIdentity): Promise<RemoteRepositoryIdentity & { readonly archived: boolean }>;
   /** 再核对 ID/创建时间/当前路径后发请求；受理不表示物理完成。 */
   request(identity: RemoteRepositoryIdentity, permanentlyRemove: boolean): Promise<void>;
 }

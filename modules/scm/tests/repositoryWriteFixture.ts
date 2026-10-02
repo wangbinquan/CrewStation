@@ -3,18 +3,20 @@ import { jsonHash, newResourceId, precondition } from '@crewstation/kernel';
 import { createTestDatabase } from '@crewstation/testkit';
 import { createScmModule, scmMigrations } from '../wiring';
 import { TEST_SETTINGS, fakeGit, fakeGitLab, fakeScratch, fakeTemplates, mutableClock } from './fakeAdapters';
+import type { ScmDeletionPhysics } from '../ports/projectDeletion';
 
-export async function repositoryWriteFixture(legacy = false) {
-  const migrations = legacy ? { ...scmMigrations, files: scmMigrations.files.filter((f) => !/^000[56]_/.test(f.name)) } : scmMigrations;
+export async function repositoryWriteFixture(legacy = false, deletionPhysics?: ScmDeletionPhysics) {
+  const migrations = legacy ? { ...scmMigrations, files: scmMigrations.files.filter((f) => !/^000[567]_/.test(f.name)) } : scmMigrations;
   const database = await createTestDatabase([migrations]), gitlab = fakeGitLab(), git = fakeGit(gitlab), clock = mutableClock();
   const projectId = newResourceId() as ProjectId, serviceId = newResourceId() as ServiceId, operationId = newResourceId();
   const process = { podUid: newResourceId(), containerId: 'containerd://' + 'a'.repeat(64), nodeUid: newResourceId(), nodeName: 'original-node' };
-  let stopped = false, grants = 0;
+  let stopped = false, grants = 0, grantActive = true;
   const grant = async (context: ProjectDeletionContext) => {
     grants++;
-    if (context.target.id !== projectId || context.operationId !== operationId) throw precondition('原项目许可不匹配');
+    if (!grantActive || context.target.id !== projectId || context.operationId !== operationId) throw precondition('原项目许可不匹配');
   };
   const scm = createScmModule({ db: database.db, settings: TEST_SETTINGS, clock,
+    ...(deletionPhysics ? { deletionPhysics } : {}),
     project: { authorize: async () => 'owner' as const, isAdmin: async () => false, assertProjectAvailable: async () => undefined, assertProjectDeletionGrant: grant },
     processes: { protectCurrent: async () => process, sweep: async (accept) => { if (stopped) await accept.stopped(process, jsonHash({ process, stopped: true })); } },
     overrides: { gitlab: gitlab.gateway, git: git.runner, templates: fakeTemplates().source, scratch: fakeScratch().dirs },
@@ -28,7 +30,7 @@ export async function repositoryWriteFixture(legacy = false) {
     return scm.api.repositoryWrites;
   };
   const ensure = () => scm.api.ensureRepository(serviceId, projectId, { slug: 'write-proof', templateId: '01a0bf5d-8f4b-7002-9560-94caf593fb19' });
-  return { database, scm, gitlab, git, clock, projectId, serviceId, process, context, writes, ensure, grants: () => grants, stopProcess: () => { stopped = true; } };
+  return { database, scm, gitlab, git, clock, projectId, serviceId, process, context, writes, ensure, grants: () => grants, stopProcess: () => { stopped = true; }, revokeGrant: () => { grantActive = false; } };
 }
 
 export function deferred() {

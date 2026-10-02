@@ -25,6 +25,11 @@ function removalGateway(client: GitLabClient): RemoteRepositoryRemoval {
     read: async (id) => { const row = await client.getProjectDeletionState(id); return { ...row, id: String(row.id) }; },
     storage: async (id) => (await client.getProjectRepositoryStorage(id)).map((row) => ({ ...row, projectId: String(row.projectId) })),
     credentials: async (id) => (await client.listProjectAccessTokens(id)).map((row) => ({ id: String(row.id), name: row.name, active: row.active, revoked: row.revoked, createdAt: row.createdAt })),
+    archive: async (identity) => {
+      const current = await client.getProjectArchivalState(identity.id);
+      if (String(current.id) !== identity.id || current.createdAt !== identity.createdAt || current.pathWithNamespace !== identity.pathWithNamespace) throw conflict('GitLab 原仓库身份或路径变化；禁止归档替换实例');
+      const result = await client.archiveProject(current); return { ...result, id: String(result.id) };
+    },
     request: async (identity, permanentlyRemove) => {
       const current = await client.getProjectDeletionState(identity.id);
       if (String(current.id) !== identity.id || current.pathWithNamespace !== identity.pathWithNamespace || current.createdAt !== identity.createdAt) throw conflict('GitLab 原仓库身份或路径变化；禁止删除替换实例');
