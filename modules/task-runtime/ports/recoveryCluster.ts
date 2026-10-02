@@ -3,7 +3,7 @@ import type { EnvironmentRebuild } from '../domain/environmentRebuild';
 import type { PodPhase, TaskPodSpec } from './cluster';
 
 export interface RecoveryResources {
-  pod: { uid: string; phase: PodPhase; deleting: boolean } | null;
+  pod: { uid: string; phase: PodPhase; deleting: boolean; nodeName?: string } | null;
   volume: { uid: string; phase: string; deleting: boolean; belongsToTask: boolean; capacity?: string } | null;
 }
 

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import type { SubtaskId, TaskId, TraceId } from '@crewstation/contracts';
 import type { TraceParts } from './traceAssembly';
 import { assembleChain, groupTraceParts, latestAttempts, summarizeTrace, tracePosition, traceStatus } from './traceAssembly';
-import type { TraceBusinessTaskPart, TraceDeliveryPart, TraceEnvironmentPart, TraceSubtaskPart } from './traceParts';
+import type { TraceBusinessTaskPart, TraceDeliveryPart, TraceEnvironmentPart, TraceSubtaskPart } from "./traceAssembly";
 
 const T = 'a'.repeat(32) as TraceId;
 const t = (minute: number) => new Date(Date.UTC(2026, 8, 23, 10, minute)).toISOString();

@@ -1,4 +1,4 @@
-import type { Actor, ClusterLedger, ClusterResource } from '@crewstation/contracts';
+import { type Actor, type ClusterLedger, type ClusterResource, ResourceIdSchema } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
 import { claimKey, withLedger } from '../domain/ledgerOverlay';
 import type { ClusterDeps } from './dependencies';
@@ -28,4 +28,15 @@ export async function inspectionOverlay(deps: Pick<ClusterDeps, 'ledger'>, actor
   let claims;
   try { claims = await claimsFor(deps, actor, [row]); } catch (error) { throw precondition(`无法核对资源中心的记录：${String(error)}`); }
   return withLedger(row, claims.get(claimKey(row)));
+}
+
+/** Kubernetes labels remain physical evidence; platform navigation uses canonical resource IDs. */
+export async function resourceReferences(deps: Pick<ClusterDeps, 'resolveReleaseId'>, rows: ClusterResource[]): Promise<ClusterResource[]> {
+  return Promise.all(rows.map(async (row) => {
+    if (!row.releaseId || ResourceIdSchema.safeParse(row.releaseId).success) return row;
+    const id = await deps.resolveReleaseId?.(row.releaseId);
+    if (id) return { ...row, releaseId: ResourceIdSchema.parse(id) };
+    const { releaseId: _legacy, ...rest } = row;
+    return { ...rest, facts: { ...row.facts, identityReason: '发布记录已不可用，保留原 Kubernetes 标签' } };
+  }));
 }

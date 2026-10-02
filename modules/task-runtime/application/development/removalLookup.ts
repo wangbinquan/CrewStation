@@ -6,13 +6,15 @@ import { developmentWorkloadProtection } from '../../domain/development/protecti
 import type { NativeExecutionCluster } from '../../ports/cluster';
 import type { TaskRuntimeUseCaseDeps } from '../dependencies';
 import { developmentAdmissionSecretUid, developmentPhysicalStop } from './workloadStop';
+import { indexedDevelopmentParentRemoval } from './parent/removal';
+import { hasDevelopmentParentEnding } from '../../domain/development/parentEnding';
 
 type Deps = TaskRuntimeUseCaseDeps & { nativeCluster: NativeExecutionCluster };
 const waiting = (): DevelopmentRemovalDecision => ({ kind: 'waiting', reason: 'development-removal-evidence-pending' });
 function physicalPodName(target: DevelopmentRemovalTarget): string | undefined {
   if (target.kind === 'Pod') return target.name;
-  const suffix = ['-runner', '-admission'].find((value) => target.name.endsWith(value));
-  return suffix ? target.name.slice(0, -suffix.length) : undefined;
+  return target.name.replace(/-(?:runner|admission|checkout)(?:-[1-9][0-9]*)?$/, '') !== target.name
+    ? target.name.replace(/-(?:runner|admission|checkout)(?:-[1-9][0-9]*)?$/, '') : undefined;
 }
 /** Read only original Task/Resources facts. No directory scan, digital advance or lifecycle mutation. */
 export function developmentRemovalLookup(deps: Deps) {
@@ -20,12 +22,19 @@ export function developmentRemovalLookup(deps: Deps) {
     try {
       if (!target.namespace || !target.name || !target.uid || !['Pod', 'Secret'].includes(target.kind)
         || !['delete', 'stop-finalizer'].includes(target.operation) || target.kind !== 'Pod' && target.operation !== 'delete') return waiting();
+      const indexedParent = await indexedDevelopmentParentRemoval(deps, target);
+      if (indexedParent) return indexedParent;
       const podName = physicalPodName(target);
       if (!podName) return { kind: 'unselected' };
       const matches = await deps.uow.read.environments.findByPhysicalPod(target.namespace, podName);
       if (!matches.length) return { kind: 'unselected' };
       if (matches.length !== 1) return waiting();
       const env = matches[0]!;
+      // Native executions own only these literal Secret names; parent checkout aliases remain indexed above.
+      if (env.native && target.kind === 'Secret' && target.name !== env.podName + '-runner' && target.name !== env.podName + '-admission') return { kind: 'unselected' };
+      const rebuild = !env.native && env.rebuildId ? await deps.uow.read.rebuilds.get(env.rebuildId) : undefined;
+      if (!env.native && (hasDevelopmentParentEnding(env) || !!env.render?.rebuild && Object.hasOwn(env.render.rebuild, 'developmentParentSelection')
+        || !!rebuild && Object.hasOwn(rebuild, 'developmentParentBinding'))) return waiting();
       // Presence, never truthiness: malformed explicit selections cannot fall back to legacy.
       if (env.render?.developmentRemovalProtection === undefined) return { kind: 'unselected' };
       const { original } = requireDevelopmentRemovalEvidence(env), protection = developmentWorkloadProtection(original)!;

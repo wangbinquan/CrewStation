@@ -3,6 +3,8 @@ import { LABELS } from '@crewstation/k8s';
 import { precondition } from '@crewstation/kernel';
 import { rebuildLabelsMatch } from '../../domain/physicalIdentity';
 import type { EnvironmentRebuild } from '../../domain/environmentRebuild';
+import { taskRemovalVersion } from './taskRemovalGuard';
+import type { TaskDevelopmentRemovalQuery } from './taskRemovalGuard';
 
 export const rebuildLabel = 'crewstation.io/rebuild';
 export function assertRebuildObject(object: K8sObject, record: EnvironmentRebuild, expectedUid?: string): string {
@@ -14,10 +16,12 @@ export function assertRebuildObject(object: K8sObject, record: EnvironmentRebuil
 }
 
 /** 只清理当前恢复请求创建的实例；删除未完成时继续补偿，不释放准入。 */
-export async function removeRebuildObject(k8s: K8sClient, ref: ResourceRef, name: string, record: EnvironmentRebuild, expectedUid?: string): Promise<void> {
+export async function removeRebuildObject(k8s: K8sClient, ref: ResourceRef, name: string, record: EnvironmentRebuild, expectedUid?: string, developmentRemoval?: TaskDevelopmentRemovalQuery): Promise<void> {
   const object = await k8s.get(ref, name, record.namespace);
   if (!object) return;
   const uid = assertRebuildObject(object, record, expectedUid);
-  if (!object.metadata.deletionTimestamp) await k8s.delete(ref, name, record.namespace, { gracePeriodSeconds: 30, preconditions: { uid } });
+  const version = await taskRemovalVersion(k8s, ref.kind as 'Pod' | 'Secret', object, developmentRemoval);
+  if (version === undefined) return;
+  if (!object.metadata.deletionTimestamp) await k8s.delete(ref, name, record.namespace, { gracePeriodSeconds: 30, preconditions: { uid, resourceVersion: version } });
   if (await k8s.get(ref, name, record.namespace)) throw precondition('正在清理本次恢复创建的容器，请稍后查看');
 }

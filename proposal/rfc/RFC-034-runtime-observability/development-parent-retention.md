@@ -231,3 +231,72 @@ SOURCE v2 独立复核保留 FAIL 一项 P2：实际 jsonDocument.fromDriver 可
 只改同一 reader 的同 SELECT，保留 render/native 原 jsonb_typeof 与 IS NOT NULL。present 仅接受原 SQL object 且驱动值为非 null 非 array object；SQL NULL 要求 flag=false、kind=null、value=null；不二次 parse、不改共享 jsonDocument 或普通 Task mapper。`{}`/`[]`/`null`/`false`/对象样式字符串和精确原 render 字符串全部拒绝，复原真正 SQL object 后合法历史维护继续。最终 24 pass / 0 fail / 253 assertions（6 文件），lint、arch、typecheck 通过，源当前新增行 coverage 单独核对；联合完整门禁、SOURCE v3、远端CI和部署仍待完成。
 
 正式 Mac 已可读；既有业务任务页面重新核对项目名称、算力名称、四类 Token、人民币估值、任务整体/单 Agent、真实泳道与紧凑返回控制。CS 系统已部署 c6860345 的验收范围总量 24423=5917+17728+0+778，¥0.026922；双 Agent 两轮28.0/29.4秒，累计/活跃并集57.4秒、任务起止1.6分钟。项目费用未开放仍显示说明而非零。截图为 native 实屏，只作视觉核对，不冒称 DOM 数值几何；本批维护兼容修订仍未部署，不开启生产开发采集。
+
+
+## 2026-10-02 原父结束与实际重建联动候选
+
+本批为在制源码，生产开发 producer OFF；task-runtime/0020 仅在原验收 PostgreSQL 的独立测试数据库执行，尚未应用到本机平台。当前正式平台为 `e40330cde9e337a4f1d0617a98bfb2ebd2357384`，[精确 CI36975154942](https://github.com/wangbinquan/CrewStation/actions/runs/36975154942) 六项成功，2026-10-02T06:59:37.926Z 八服务 Ready；本批 SOURCE、一次联合完整门禁、精确提交/CI和新部署分别等待，不复用旧完整门禁为新源码背书。
+
+实际 API 受理冻结所有原 accepted 子执行（包含已 finished 的受保护执行），父任务保留原 state、connected、hash、Pod UID、PVC UID、nullable 原 render/start；新受理和在途配置/绑定提交在原 Project 事务重查封存身份。固定成员使用有界游标，单页等待不占住后续成员；恢复扫描在两类持久游标间轮换，共用总预算 25，耗尽作业以原键重新投递，不以队列等待伪造退出或消耗模型重试。
+
+原父结束由真实队列驱动，独立 Controller 的原 Start ACK、全部 normal/init/ephemeral 容器 Stop ACK、原 Pod 与 owned Secret 的实际 UID 消失均先于完成；Task/固定成员/资源投影/事件 SQL 在真实作业最终提交 fence 后一起生效。释放、保留期和失败补偿使用同一来源；ReleasePending 完成后明确清除，Resources 的实际停止观察再释放配额，不用 Task 逻辑终态代替资源终态。
+
+原父重建 queued 意图保持私有，实际 REBUILD worker 在 ledger/旧环境早返回之前核证原完成来源与恢复 claim。完成后才发布新 Task/render/hash/Pod 名称；新 Secret/Pod UID 和预览各 SQL 段重读原绑定，所有物理/凭据/heartbeat I/O 在 Project 事务之外。迟到准备不能把 ready 降回 starting；Runner 就绪严格核原 source/claim，显式坏绑定不降级为旧逻辑。新容器失败必须有自己新 epoch 的独立 Stop/UID 消失证明，旧父 proof 不能复用；完成补偿后另一个真实 REBUILD 作业才发布保卷恢复。
+
+原 PostgreSQL 与真实 API/挂载 worker/Controller 的定向证据：原封存/最终租约/维护/存储 23 pass、285 断言；父独立物理结束 3 pass、33 断言；直接执行与 ledger 重建 2 pass、58 断言；恢复双族公平扫描 2 pass、57 断言；新 epoch 补偿与完成占位 2 pass、58 断言；迟到外部准备与非法就绪绑定 2 pass、23 断言。假 Kubernetes 仅模拟 API、调度、finalizer 和 ACK 丢失，独立 Controller 的 Start/Stop 凭据在真实 PG 写入；数字 child participant 是明确标记的受控回归，不能当成生产模型采集。早期超时、错误参数绑定、缺假调度节点与错误夹具断言日志保持，未削弱产品断言。整批当前内容的组合定向门禁与 SOURCE 复核尚待。
+
+全 writer、未绑定容器与 unknown-tail 的剩余链路、开发 producer 真正启用及实际开发模型验收仍未完成；CS-R02/R03/R04/R13 与两个 RFC 不关闭。
+
+
+### 2026-10-02 SOURCE v10 失败与四项修订设计
+
+83 个实际源码/文档路径的当前候选合并定向验证为34 pass / 0 fail / 516断言、10文件，原55334 PostgreSQL容器与83指纹稳定；新的backend类型与架构检查通过。这些结果没有覆盖随后独立源码复核发现的边界。SOURCE v10为FAIL，回执 `observability-cs-parent-current-source-review-v10.json` SHA256 `988a470dae108719f09d8d4a1284cc263108208f80edf089ca01ecb09eb75b2c` 保留，不以窄测试绿代替实施门。
+
+四项P2是：无render的owner重建丢失原SQL记录后Runner可误写running，以及初始化成功最后事务未重核原绑定；自然Stop proof先到会跳过原Pod DELETE而永久等待；owner新epoch的Resources投影失败被旧保存点兼容吞掉；已发布活跃selected rebuild的真实作业dead后缺持久补投来源。新增真实PG缺记录反例原0 pass / 2 fail保留，其中native实际返回true，ledger已严格抛错，不能混称两模式均错误放行。
+
+限定v11修订设计覆盖所有最终就绪写点、独立Stop与DELETE推进、同Executor严格原来源投影以及总预算25的三家族持久恢复；复用已批准v6/v7，不为owner补造render，不改已发布0019迁移。设计独立门与实现/完整联合检查/精确上库CI/本机部署仍待完成，生产开发producer OFF，全writer、未绑定来源、unknown-tail和真实开发模型验收继续未完成。
+
+### 2026-10-02 四项修订实现与真实回归接续
+
+v11 限定 DESIGN 已 PASS，回执 `/private/tmp/observability-cs-parent-source-corrections-design-review-v11.json`，SHA256 `fdb510982a912b97ad688805a1f1016edfda66d5e048e7f842e56e205333924d`。原 v10 SOURCE FAIL／四项 P2 完整保留；本实现新增最终 Runner/初始化原 SQL 来源核对，自然停止后的原 UID 删除接续，同 Executor selected owner/ledger 严格投影，以及不改既有迁移的 v2 三家族持久恢复游标。completed claim 与 pending ending 先在同事务暂存发布来源，再受理额度／投影；任何失败使全部相关 Task/ending/claim/record/Resources 写回滚，不产生独立提前发布。
+
+首轮 targeted-v11 的 16 pass／0 fail、298 断言，随后 targeted-v13 的 6 pass／0 fail、142 断言分别指纹稳定且原55334容器身份保持。新增真实 Runner 初始化反例、自然 Succeeded Controller proof 后继续 DELETE、selected Resources declare 失败回滚，以及两个原完成来源的实际 REBUILD job 五次最终租约失败至 dead 后、工厂重建与原 request 补投。合成81条扫描候选只算存储公平回归，不算物理／模型证据。targeted-v12 的4 pass／2 fail和旧架构／类型失败保留：旧故障注入被正常 heartbeat续约，已改到真实同 Executor flush 后最终时钟核验，未削弱断言。纯 domain 不再反向导入 ports，后端类型与架构现已通过。
+
+这些是四项修订的针对性证据，全部新版候选合并回归、独立 SOURCE、与已交接 owner 候选的单次联合完整门禁仍继续；不复用e403旧完整门禁。尚未发布本源码波次／部署新迁移；producer继续OFF，完整 writer、unbound、unknown-tail、后续观测验收和两RFC整体仍未完成。
+
+
+## 2026-10-02 旧失败工作区恢复受理的兼容回归
+
+v15 的 89 路径完整独立 SOURCE 为 FAIL，原四项 P2 已针对原反例闭合，但发现新的旧未选中 failed 恢复回归：正式 Resources 投影在 quota.acquire(next) 时按新 rebuildId 读取原记录，该记录尚未 insert。回执 `observability-cs-parent-corrected-source-review-v15.json` SHA256 `35d9641db5bdbb8cc284cef90052010d288ca7d2e656cd4e0fa9a4b164de5483` 保留。现有四个重建套件在原 PostgreSQL 实例复现为 15 pass / 4 fail / 119 断言；4 个 ledgerRebuild 受理均被同一 missing-record 检查拒绝，源码与实例身份稳定。
+
+v16 最小修复 DESIGN 独立 PASS，回执 `observability-cs-legacy-rebuild-admission-design-review-v16.json` SHA256 `e969858acaa817019142adb714ecd166a8a58d36370e4524c70c181289c519ad`。当前候选将同一原 Project 锁/UOW Executor 事务的 rebuilds.insert 放在 failed 配额重新受理前；仍由原事务回滚 record、Task、Resources 与作业，不放松 selected 的 missing-record、坏 binding 或来源核验。测试 fixture 另加 ownerWithLedger 选择，默认与原 ledger 选择不变；新回归覆盖 owner 创建实际接 Resources ledger、ledger 创建的成功受理、零额度拒绝、同 requestId 恢复及幂等。
+
+这些回归已写入但本候选尚待执行，修正后完整 SOURCE、单次联合整仓门禁、精确上库 CI、本机部署仍继续。producer OFF，全 writer、unbound、unknown-tail 与真实开发模型验收未完成；不能把本设计门或旧 45 项窄回归写成完整 RFC 完工。
+
+
+### 最终联合定向回归（v18）
+
+当前 91 文件候选的原父结束、实际恢复接续、原四项 SOURCE 修订及旧 failed 两创建模式受理/回滚已合并通过：68 pass / 0 fail / 957 断言，19 文件，102.12 秒；91 个内容指纹与原55334 PostgreSQL 容器身份稳定。两模式验证真实 Resources occupancy=0 后的零额度拒绝、record/Task/hash/Resources/Jobs 回滚、原 Pod/PVC 不变及同 requestId 后续成功/重放只占一次。
+
+首次新增回归有两处测试预期错误：持久 creation 默认值是 owner，队列列名是 state；v17 的 19 pass / 4 fail / 179 断言回执完整保留，随后按实际 schema 校正，未放松生产检查、额度或回滚断言。原 v15 的实际缺记录红测与独立 FAIL 也保留。正式 changed-line 保护判定当前为 1,314 / 1,393（94.3287867911%），violations 为空；限定 lint、backend 类型及架构检查通过。
+
+最终完整 SOURCE、已交接 owner 的联合单次 check、精确远端 CI 与本机部署尚待完成。这些数字是实际模块/PG/Jobs/Resources/Controller 加受控 Kubernetes 与数字参与者的回归，不是实际开发模型或完整 RFC 验收；producer 仍 OFF，完整 writer/unbound/unknown-tail 继续。
+
+
+### 2026-10-02 原父结束整仓回归的兼容修订
+
+最终 v19 的完整 91 路径 SOURCE 独立 PASS（a703670027ce88ca0e9fbdad949ab08840b59fd63f3cce3a8b6094dccc872248）保留；第一次 root91 + 已交接 owner108 的 joint199 整仓 `check` 实际为 5,178 pass / 143 skip / 5 fail / 35,587 断言，候选和原 PostgreSQL ID 稳定。五个现有回归分别是普通 UID 替换错误分类、删除中的原 Pod 提前返回、异步父维护错误绕过 waiting catch、native 非所属 checkout Secret、父保卷重建后旧 CLI 回连。该完整失败不改写为通过。
+
+v21 最小修订 DESIGN 独立 PASS（f99e2300e3020e9f630757a33e824276e4831d7486762acc36cf5586eed19e98）：保持原 UID/RV/query 和独立 Stop 校验，删除中的对象仍提交条件 DELETE；只 await 原父检查和精确过滤 native Secret 名。只有父 UID 实际换代后的已绑定 running 旧 CLI，经过原 Project 锁、原令牌和原 child/parent SQL maintenance 核验，才可诊断早返回，只写 connected/lastActivityAt/updatedAt。首握手、Agent、坏原始 JSON/显式选择、未绑定、expected witness 和所有默认物理 writer 保持严格检查；原 rejection、hash、render、UID、额度及 rebuild readiness 不改变。
+
+25 个成功套件（含原五个失败套件）已通过 106 项；新旧 CLI 套件初次 16 项因测试夹具误从公开 EnvironmentDto 取 namespace 而提前失败，该红测保留。改为原父持久 namespace 后只重跑这一套，16 pass / 0 fail / 59 断言；全部生产源码与其他成功套件逐字不变，合成证据覆盖 26 文件的 122 个成功用例、共 1,370 断言，不能写成一次原始 122/0 运行。新增删除中原对象覆盖 retained finalizer、ACK 丢失、UID/RV 竞争及 protected waiting；CLI 覆盖诊断保留、原父未变的旧握手、首启动/Agent/未绑定、实际 PG 坏 render/selection 与默认 witness 拒绝。限定 lint、backend 类型和结构通过。
+
+93 路径最终 SOURCE、root93+owner108 的新单次 joint201 全量门、精确远端 CI 与本机部署继续。producer OFF，完整 writer/inflight、unbound、unknown-tail 及真实开发/CLI/平台用途和后续观测验收仍未闭合；CS-R02 与两 RFC 保持 In Progress。
+
+### 2026-10-02 joint201 完整候选门禁通过
+
+v24 的 93 路径完整 SOURCE 独立 PASS（e8197b8451542d3b696819ab06b66e02f1bc396fb1c1948f01e3b01c63fcc3d5）。随后 root93 + 已协调交接 owner108 的 joint201，在原 PostgreSQL 验收容器、prepared transactions=10 下完成一次完整 `bun run check`：5,207 pass / 143 skip / 0 fail / 35,690 断言，5,350 用例、1,016 文件；总门禁 1,181.17 秒，测试 1,126.62 秒。201 路径首尾逐字稳定，原数据库 ID 未变；原 v19 完整失败与 v22 的失败夹具记录仍保留。
+
+发布前 `git diff --cached --check` 只发现本人两个文件的三个空白问题：parentRebuildPublication.ts 的多余 EOF 空行，以及 developmentParentRebuildWorker.test.ts 两条调用语句后的空格。只修正这三处外部空白，并补入本记录；没有改语句、字面量、断言、测试输入或运行门槛。复核这些限定差异后复用已完成的功能门禁，不重新启动整仓测试。此前暂存区 201 路径是本次失败发布流程精确建立的快照，未收编其他暂存内容；再次发布前会校验完整路径、候选字节与独立审查。
+
+这里只记录本机候选验证结果。精确远端 CI、基于已提交树的本机镜像构建与部署仍待完成；CS-R02 的完整 writer/inflight、unbound、unknown-tail、真实开发/CLI/平台用途及后续观测验收继续，producer OFF，两 RFC 保持 In Progress。

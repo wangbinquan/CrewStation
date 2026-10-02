@@ -1,3 +1,5 @@
+import { requireCurrentParentRebuild } from './development/parent/binding';
+import { assertDevelopmentWriter, wakeRelatedDevelopmentParentEnding } from './development/parent/admission';
 import { withInitializationDeadline } from '../domain/initializationDeadline';
 import { inspectBusinessWorkspace } from './business/workspace';
 import type { TaskId } from '@crewstation/contracts';
@@ -22,8 +24,22 @@ export function runnerLifecycle(deps: TaskRuntimeUseCaseDeps) {
         const env = await scope.environments.getById(taskId);
         if (!env || env.businessWorkspace?.phase === 'pausing' || !['creating', 'running'].includes(env.state) || !tokenMatches(token, env.runnerTokenHash)) return false;
         if (env.native && !['starting', 'running'].includes(env.native.state)) return false;
+        if (await wakeRelatedDevelopmentParentEnding(scope, env)) {
+          // Only the original authenticated connection continues diagnostics; no fresh UID, start, state or rebuild-ready is published.
+          if (env.native && !env.native.podUid) return false;
+          const at = deps.clock.now();
+          await scope.environments.update({ ...env, connected: true, lastActivityAt: at, updatedAt: at });
+          return true;
+        }
+        const writer = await assertDevelopmentWriter(scope, env, undefined, 'existing-legacy-connection');
+        if (writer?.diagnosticConnection) {
+          const at = deps.clock.now();
+          await scope.environments.update({ ...env, connected: true, lastActivityAt: at, updatedAt: at });
+          return true;
+        }
         const record = env.rebuildId ? await scope.rebuilds.get(env.rebuildId) : undefined;
-        if (record && !['starting', 'ready'].includes(record.state)) return false;
+        if (env.rebuildId && !record || record && !['starting', 'ready'].includes(record.state)) return false;
+        if (await requireCurrentParentRebuild(scope, env, record) && (!record?.podUid || !record.secretUid || record.podUid !== env.podUid)) return false;
         const instance = !env.native && !env.podUid ? await deps.cluster.podPhase(env) : undefined;
         const workspace = env.render?.businessStorage && !env.native ? await inspectBusinessWorkspace(deps, env) : undefined;
         const storage = workspace ? { businessWorkspace: { ...workspace, phase: 'ready' as const } } : {};

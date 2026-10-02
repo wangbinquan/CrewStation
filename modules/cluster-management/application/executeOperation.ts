@@ -1,14 +1,20 @@
-import { resourceReferences } from './resourceReferences';
+import { resourceReferences } from './ledgerOverlay';
 import type { Actor, ClusterOperation, ClusterResource, UserId } from '@crewstation/contracts';
 import { isPlatformError, precondition } from '@crewstation/kernel';
-import { objectRecord } from '../domain/inventory';
+import { objectRecord } from '../domain/observations';
 import { projectResources } from '../domain/projection';
 import type { ClusterDeps } from './dependencies';
 import { liveInspection, sameInspection } from './operations';
 import { requireAdmin } from './queries';
 const terminal = new Set(['succeeded', 'failed', 'needs-attention']);
 export async function executeOperation(deps: ClusterDeps, id: string, fence: number, heartbeat: () => Promise<boolean>, resumeCount = 0): Promise<void> {
-  let op = await deps.repository.operation(id); if (!op || terminal.has(op.phase) || (op.resumeCount ?? 0) !== resumeCount) return;
+  const op = await deps.repository.operation(id); if (!op || terminal.has(op.phase) || (op.resumeCount ?? 0) !== resumeCount) return;
+  const execute = () => executeAdmitted(deps, op, fence, heartbeat, resumeCount);
+  if (op.target.ownership.scope === 'project' && deps.projectAdmission) return deps.projectAdmission.withAdmission(op.target.ownership.projectId, id, execute);
+  return execute();
+}
+async function executeAdmitted(deps: ClusterDeps, initial: ClusterOperation, fence: number, heartbeat: () => Promise<boolean>, resumeCount: number): Promise<void> {
+  let op = initial;
   fence += resumeCount * 1_000_000;
   const actor: Actor = { userId: op.actorId as UserId, isAdmin: true };
   const save = async (patch: Partial<ClusterOperation>) => { if (!await heartbeat()) throw precondition('工作器租约已转移'); const now = deps.clock.now(); op = { ...op!, ...patch, updatedAt: now.toISOString(), durationMs: now.getTime() - Date.parse(op!.createdAt), ...(patch.phase && terminal.has(patch.phase) ? { finishedAt: now.toISOString() } : {}) }; if (!await deps.repository.update(op, fence)) throw precondition('工作器记录已被接管'); };
@@ -22,6 +28,7 @@ export async function executeOperation(deps: ClusterDeps, id: string, fence: num
         if (op.phase === 'queued') sameInspection(saved.inspection, await liveInspection(deps, actor, op.target, op.params));
         // Domain commands persist their own idempotent intent; native writes use the same marker and UID CAS on recovery.
         await save({ phase: 'executing', reason: '正在执行' });
+        if (op.target.ownership.scope === 'project') deps.projectAdmission?.assertActive();
         if (domain) { const result = await deps.domains.execute(actor, op, saved.inspection); await save({ domainOperationId: result.operationId }); }
         else { await deps.cluster.apply(op.target, op.params, op.operationId); }
       }

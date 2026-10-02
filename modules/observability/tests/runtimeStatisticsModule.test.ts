@@ -7,7 +7,7 @@ import { fixedClock, newResourceId } from '@crewstation/kernel';
 import { createTestDatabase, testDatabaseAvailable, type TestDatabase } from '@crewstation/testkit';
 import { sql, eq } from 'drizzle-orm';
 import { createObservabilityModule, observabilityMigrations } from '../wiring';
-import { costVisibility } from '../adapters/persistence/tokenPriceTables';
+import { costVisibility } from "../adapters/persistence/tables";
 const available = await testDatabaseAvailable(); let tdb: TestDatabase;
 afterEach(async () => { await tdb?.drop(); });
 async function fixture() {

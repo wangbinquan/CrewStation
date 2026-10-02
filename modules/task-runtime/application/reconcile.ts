@@ -1,3 +1,5 @@
+import { wakeRelatedDevelopmentParentEnding } from './development/parent/admission';
+import { hasDevelopmentParentEnding } from '../domain/development/parentEnding';
 import { finishBusinessPause } from './business/workspace';
 import type { EnvironmentRebuild } from '../domain/environmentRebuild';
 import { CONTAINER_START_FAILURES, IMAGE_PULL_FAILURES, RUNNER_UNAVAILABLE_HINT, advanceStartup, runningStage } from '../domain/podStartup';
@@ -16,7 +18,7 @@ export function reconcileUseCase(deps: TaskRuntimeUseCaseDeps, lifecycle: Lifecy
   return async (): Promise<number> => {
     let changed = 0;
     // 作业崩溃或补偿重试耗尽后仍有持久化意图：去重补投，不丢失恢复。
-    for (const record of await deps.uow.read.rebuilds.pending()) if (record.creation !== 'ledger') await deps.uow.read.rebuildQueue.enqueue(record.id);
+    for (const record of await deps.uow.read.rebuilds.pending()) if (record.creation !== 'ledger' && !Object.hasOwn(record, 'developmentParentBinding')) await deps.uow.read.rebuildQueue.enqueue(record.id);
     for (const env of await deps.uow.read.environments.pendingExecutions()) await deps.uow.read.nativeQueue.enqueue(env.id);
     for (const env of await deps.uow.read.environments.listByStates(['creating', 'running'])) {
       if (env.businessWorkspace?.phase === 'pausing') { await finishBusinessPause(deps, env).catch((error: unknown) => deps.logger.warn('business workspace cleanup pending', { taskId: env.id, error: String(error) })); changed += 1; continue; }
@@ -58,6 +60,7 @@ async function recordObservation(deps: TaskRuntimeUseCaseDeps, env: TaskEnvironm
     // 在最新记录上再推导一次：同时发生的连上、判定失败或重建不被旧读数覆盖。
     const current = await scope.environments.getById(env.id);
     if (!current?.startup || current.podName !== env.podName) return false;
+    if (await wakeRelatedDevelopmentParentEnding(scope, current)) return false;
     const next = advanceStartup(current.startup, observation);
     if (JSON.stringify(next) === JSON.stringify(current.startup)) return false;
     await scope.environments.update({ ...current, startup: next });
@@ -67,6 +70,10 @@ async function recordObservation(deps: TaskRuntimeUseCaseDeps, env: TaskEnvironm
 
 /** 排队或清理中的执行环境、排队或替换中的重建由各自的作业处理，不在这里看 Pod。 */
 async function judgeable(deps: TaskRuntimeUseCaseDeps, env: TaskEnvironment): Promise<{ rebuild?: EnvironmentRebuild } | undefined> {
+  if (hasDevelopmentParentEnding(env)) {
+    await deps.uow.run(async (scope) => { await scope.admissions.lock(env.projectId); const current = await scope.environments.getById(env.id); if (current) await wakeRelatedDevelopmentParentEnding(scope, current); });
+    return undefined;
+  }
   if (env.businessWorkspace?.phase === 'pausing') return undefined;
   if (env.native?.state === 'queued' || env.native?.state === 'cleaning') return undefined;
   const rebuild = env.rebuildId ? await deps.uow.read.rebuilds.get(env.rebuildId) : undefined;

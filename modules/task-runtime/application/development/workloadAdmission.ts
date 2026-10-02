@@ -1,3 +1,4 @@
+import { assertDevelopmentParentAdmission } from '../../domain/development/parentEnding';
 import { DevelopmentUsageStorageSchema, DevelopmentRemovalProtectionSchema, DevelopmentAdmissionStateSchema, WorkloadConsumerSchema, ResourceIdSchema } from '@crewstation/contracts';
 import { conflict, isPlatformError, jsonHash, precondition } from '@crewstation/kernel';
 import type { CreateNativeExecutionInput } from '../../api/moduleApi';
@@ -35,6 +36,7 @@ export function assertDevelopmentAdmission(deps: Deps, input: CreateNativeExecut
 }
 function requireParent(parent: TaskEnvironment | undefined): asserts parent is TaskEnvironment {
   if (!parent || parent.native || parent.kind !== 'dev-session' || parent.state !== 'running' || !parent.connected) throw precondition('原开发工作区已经断开或释放，此 Agent 未启动');
+  assertDevelopmentParentAdmission(parent);
 }
 export function developmentParentWitness(parent: TaskEnvironment): string {
   return jsonHash({ id: parent.id, projectId: parent.projectId, serviceId: parent.serviceId, kind: parent.kind, state: parent.state, connected: parent.connected,

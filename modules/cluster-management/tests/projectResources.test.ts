@@ -10,7 +10,7 @@ import { createApp } from '@crewstation/http';
 import { clusterManagementMigrations, createClusterManagementModule } from '../index';
 import type { ClusterManagementModule } from '../index';
 import { projectResourcesIn } from '../application/queries';
-import type { InventorySnapshot } from '../domain/inventory';
+import type { InventorySnapshot } from '../domain/observations';
 import { admin, facts, catalog, object, query } from './inventoryFixture';
 
 // RFC-019：项目成员经 develop 动作读本项目的受管资源；测试员 403、非成员与不存在的项目 404（授权处的约定），管理动作一律清空。

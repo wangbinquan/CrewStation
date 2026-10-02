@@ -1,7 +1,7 @@
-import { storageFacts } from './storageTopology';
+import { storageFacts } from './storageUsage';
 import type { ClusterContainer } from '@crewstation/contracts';
-import type { ResourceObject } from './inventory';
-import { objectArray, objectRecord, stringRecord } from './inventory';
+import type { ResourceObject } from './observations';
+import { objectArray, objectRecord, stringRecord } from './observations';
 
 export function containerDetails(obj: ResourceObject): ClusterContainer[] {
   const spec = objectRecord(obj.spec), status = objectRecord(obj.status);

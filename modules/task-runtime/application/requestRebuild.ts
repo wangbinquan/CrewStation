@@ -1,5 +1,8 @@
 import type { DevSessionRebuildDto, ProjectId, RebuildDevSessionRequest, TaskId } from '@crewstation/contracts';
 import { RebuildDevSessionRequestSchema } from '@crewstation/contracts';
+import { requestDevelopmentParentRebuild } from './development/parent/rebuildRequest';
+import { selectedDevelopmentParent } from './development/parent/request';
+import { currentDevelopmentParentRebuild } from './development/parent/binding';
 import { scheduleExecutionCleanup } from './nativeExecution';
 import { conflict, newResourceId, precondition } from '@crewstation/kernel';
 import type { EnvironmentRebuild } from '../domain/environmentRebuild';
@@ -12,9 +15,7 @@ import { transition } from '../domain/taskEnvironment';
 import type { RebuildDependencies } from './rebuildInspection';
 import { recoverableDevSession, inspectRebuild, validateRebuild } from './rebuildInspection';
 
-export function rebuildUseCases(deps: RebuildDependencies) {
-  const requestRebuild = async (projectId: ProjectId, raw: RebuildDevSessionRequest): Promise<DevSessionRebuildDto> => {
-    const input = RebuildDevSessionRequestSchema.parse(raw);
+async function requestLegacyRebuild(deps: RebuildDependencies, projectId: ProjectId, input: RebuildDevSessionRequest): Promise<DevSessionRebuildDto> {
     return deps.uow.run(async (scope) => {
       await scope.admissions.lock(projectId);
       const previous = await scope.rebuilds.findRequest(projectId, input.requestId);
@@ -23,6 +24,7 @@ export function rebuildUseCases(deps: RebuildDependencies) {
         return rebuildToDto(previous);
       }
       const env = await recoverableDevSession(scope, projectId, input.reason === 'administrator-restart');
+      if (await selectedDevelopmentParent(scope, env)) throw conflict('原工作区新增保护执行，请重新检查恢复');
       await validateRebuild(deps, env, input);
       const children = (await scope.environments.listChildren(env.id)).filter((child) => child.native?.state !== 'finished');
       if (input.reason === 'administrator-restart') for (const child of children) await scheduleExecutionCleanup(scope, child, deps.clock.now(), '管理员重启工作区，结束本次执行');
@@ -49,19 +51,32 @@ export function rebuildUseCases(deps: RebuildDependencies) {
         startup: initialStartup(now, { rebuild: true }) };
       // 仅前面核验过的协议拒绝环境沿用原占额进入恢复，不开放通用 running → creating 转移。
       const next = env.state === 'failed' ? transition(env, 'creating', now, patch) : { ...env, ...patch, state: 'creating' as const, updatedAt: now };
+      // 同一事务的额度投影要读取原恢复记录；后续额度或环境写入失败会连同记录回滚。
+      await scope.rebuilds.insert(record);
       // 失败的会话不占额度，重建要重新受理；受理的是重建之后的样子（新 Pod、重建中）。
       if (env.state === 'failed') await scope.quota.acquire(next, limit, '项目并发任务配额已满，工作卷保持不变');
-      await scope.rebuilds.insert(record);
       await scope.environments.update(next);
       if (record.creation !== 'ledger') await scope.rebuildQueue.enqueue(record.id);
       return rebuildToDto(record);
     });
+}
+
+export function rebuildUseCases(deps: RebuildDependencies) {
+  const requestRebuild = async (projectId: ProjectId, raw: RebuildDevSessionRequest): Promise<DevSessionRebuildDto> => {
+    const input = RebuildDevSessionRequestSchema.parse(raw);
+    const previous = await deps.uow.read.rebuilds.findRequest(projectId, input.requestId);
+    if (previous) {
+      if (JSON.stringify(previous.input) !== JSON.stringify(input)) throw conflict('该恢复请求编号已用于另一份确认内容');
+      return rebuildToDto(previous);
+    }
+    const original = await recoverableDevSession(deps.uow.read, projectId, input.reason === 'administrator-restart');
+    return await selectedDevelopmentParent(deps.uow.read, original) ? requestDevelopmentParentRebuild(deps, projectId, input) : requestLegacyRebuild(deps, projectId, input);
   };
   return {
     inspectRebuild: (projectId: ProjectId, administrator = false) => inspectRebuild(deps, projectId, administrator), requestRebuild,
     getRebuild: async (taskId: TaskId): Promise<DevSessionRebuildDto | undefined> => {
       const env = await deps.uow.read.environments.getById(taskId);
-      const record = env?.rebuildId ? await deps.uow.read.rebuilds.get(env.rebuildId) : undefined;
+      const record = env ? await currentDevelopmentParentRebuild(deps.uow.read, env) ?? (env.rebuildId ? await deps.uow.read.rebuilds.get(env.rebuildId) : undefined) : undefined;
       return record ? rebuildToDto(record) : undefined;
     },
   };

@@ -5,14 +5,16 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { EnvironmentRebuild } from '../../domain/environmentRebuild';
 import type { RebuildRepository } from '../../ports/rebuilds';
 import { environmentRebuilds } from './rebuildTables';
+import { readParentEndingJson, writeParentEndingJson } from './parentEndingJson';
 
 export function drizzleRebuildRepository(db: Executor): RebuildRepository {
-  const row = (record: EnvironmentRebuild): typeof environmentRebuilds.$inferInsert => ({ ...record, nodeName: record.nodeName ?? null, podUid: record.podUid ?? null, secretUid: record.secretUid ?? null, message: record.message ?? null, failureReason: record.failureReason ?? null });
+  const row = (record: EnvironmentRebuild): typeof environmentRebuilds.$inferInsert => ({ ...record, developmentParentBinding: writeParentEndingJson(record, 'developmentParentBinding'), nodeName: record.nodeName ?? null, podUid: record.podUid ?? null, secretUid: record.secretUid ?? null, message: record.message ?? null, failureReason: record.failureReason ?? null });
   const fromRow = (item: typeof environmentRebuilds.$inferSelect): EnvironmentRebuild => {
-    const { podUid, secretUid, message, failureReason, nodeName, legacyCluster, ...rest } = item;
+    const { podUid, secretUid, message, failureReason, nodeName, legacyCluster, developmentParentBinding, developmentParentBindingPresent, developmentParentBindingKind, ...rest } = item;
     return { ...rest, taskId: item.taskId as TaskId, projectId: item.projectId as ProjectId, state: item.state as EnvironmentRebuild['state'],
       input: RebuildDevSessionRequestSchema.parse(typeof item.input === 'string' ? JSON.parse(item.input) : item.input),
       ...(legacyCluster ? { legacyCluster } : {}),
+      ...(developmentParentBindingPresent ? { developmentParentBinding: readParentEndingJson(developmentParentBinding, developmentParentBindingKind) } : {}),
       ...(podUid ? { podUid } : {}), ...(secretUid ? { secretUid } : {}), ...(message ? { message } : {}), ...(failureReason ? { failureReason } : {}), ...(nodeName ? { nodeName } : {}) };
   };
   return {

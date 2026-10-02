@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { RunnerEvent } from '@crewstation/contracts';
-import { toTraceEvent, TRACE_TEXT_LIMIT } from './traceEvents';
+import { toTraceEvent, TRACE_TEXT_LIMIT } from "./traceAssembly";
 
 const at = '2026-09-23T10:00:00.000Z';
 const stored = (event: RunnerEvent, seq = 3) => ({ seq, at, event });

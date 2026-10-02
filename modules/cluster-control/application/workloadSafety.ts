@@ -1,4 +1,4 @@
-import { WORKLOAD_CONSUMER_ANNOTATION } from '@crewstation/contracts';
+import { DevelopmentParentEndingProjectionSchema, WORKLOAD_CONSUMER_ANNOTATION } from '@crewstation/contracts';
 import type { Clock, Logger } from '@crewstation/kernel';
 import type { ObservedObject } from '../domain/observation';
 import type { LedgerObservations, LedgerRecordView } from '../ports/ledger';
@@ -16,7 +16,13 @@ export interface WorkloadSafetyDeps {
 async function proveConsumer(deps: WorkloadSafetyDeps, record: LedgerRecordView, id: string, pod: ObservedObject | undefined): Promise<boolean> {
   const safety = deps.ledger.workloadSafety;
   if (!safety || !deps.cluster.observeWorkloadStop || !deps.cluster.releaseWorkloadStop) throw new Error('工作卷停止证明能力未装配');
+  const parent = Object.hasOwn(record.spec, 'developmentParentEnding') ? DevelopmentParentEndingProjectionSchema.parse(record.spec['developmentParentEnding']) : undefined;
+  if (parent && (!('consumer' in parent) || parent.consumer.id !== id)) throw new Error('原父观察投影与消费者不符');
+  if (parent?.phase === 'prepared') return false; // Keep Start admission open until the original observation ACK is stored.
+  const selectedCurrent = record.spec['workloadConsumerId'] === id || !!parent;
   let current = await safety.get(id);
+  if (parent && (!current?.startPermit || !['stop-intent', 'proved', 'complete'].includes(parent.phase))) throw new Error('原父观察缺少原 Start ACK 或停止意图');
+  if (current?.consumer.purpose === 'development' && (!parent || !current.startPermit)) throw new Error('原父观察不能降级为无写者证明');
   if (!current) {
     const intent = workloadRenderOf(record.id, record.spec)?.pod;
     if (intent?.consumer?.id === id && safety.closeAdmission) await safety.closeAdmission({ consumer: intent.consumer, resourceId: record.id, namespace: intent.namespace, podName: intent.name });
@@ -37,7 +43,7 @@ async function proveConsumer(deps: WorkloadSafetyDeps, record: LedgerRecordView,
       if (observed.code === 'pod_missing_without_stop_proof' && !current.startPermit) {
         await deps.ledger.observeConditions(record.id, [{ type: 'WorkloadStopped', status: 'true', reason: id }]); return true;
       }
-      if (record.spec['workloadConsumerId'] === id) await deps.ledger.observeConditions(record.id, [{ type: 'WorkloadStopped', status: 'unknown', reason: observed.code, message: '尚未取得全部容器的停止证明，保留工作卷和并发占用' }]);
+      if (selectedCurrent) await deps.ledger.observeConditions(record.id, [{ type: 'WorkloadStopped', status: 'unknown', reason: observed.code, message: '尚未取得全部容器的停止证明，保留工作卷和并发占用' }]);
       return false;
     }
     proof = await safety.recordStop(observed.proof);
@@ -45,10 +51,10 @@ async function proveConsumer(deps: WorkloadSafetyDeps, record: LedgerRecordView,
   if (pod && pod.metadata.uid !== proof.podUid) throw new Error('消费者 Pod 已换成其他实例，拒绝复用旧停止证明');
   const released = await deps.cluster.releaseWorkloadStop(proof);
   if (released?.kind === 'waiting') {
-    if (record.spec['workloadConsumerId'] === id) await deps.ledger.observeConditions(record.id, [{ type: 'WorkloadStopped', status: 'unknown', reason: released.reason, message: '原开发数字采集尚未确认，保留停止保护并等待重试' }]);
+    if (selectedCurrent) await deps.ledger.observeConditions(record.id, [{ type: 'WorkloadStopped', status: 'unknown', reason: released.reason, message: '原开发数字采集尚未确认，保留停止保护并等待重试' }]);
     return false;
   }
-  if (record.spec['workloadConsumerId'] === id) await deps.ledger.observeConditions(record.id, [{ type: 'WorkloadStopped', status: 'true', reason: id }]);
+  if (selectedCurrent) await deps.ledger.observeConditions(record.id, [{ type: 'WorkloadStopped', status: 'true', reason: id }]);
   return true;
 }
 

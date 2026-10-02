@@ -4,8 +4,8 @@ import { Resources } from '@crewstation/k8s';
 import type { ClusterResource } from '@crewstation/contracts';
 import type { ClusterReader } from '../../ports/cluster';
 import { configRevision } from '../../domain/projection';
-import { objectArray, objectRecord } from '../../domain/inventory';
-import type { ResourceObject } from '../../domain/inventory';
+import { objectArray, objectRecord } from '../../domain/observations';
+import type { ResourceObject } from '../../domain/observations';
 const restartKey = 'crewstation.io/cluster-operation';
 const refFor = (r: ClusterResource): ResourceRef => Resources[r.kind]!;
 export function kubernetesClusterReader(k8s: K8sClient, physicalOperationId: (id: string) => Promise<string> = async (id) => id): ClusterReader {

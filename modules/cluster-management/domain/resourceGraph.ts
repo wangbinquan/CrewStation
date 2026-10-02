@@ -1,7 +1,7 @@
-import { boundClaim } from './storageTopology';
+import { boundClaim } from './storageUsage';
 import type { ClusterOwnership } from '@crewstation/contracts';
-import type { InventoryFacts, ResourceObject, SystemComponent } from './inventory';
-import { objectArray, objectRecord, resourceKey } from './inventory';
+import type { InventoryFacts, ResourceObject, SystemComponent } from './observations';
+import { objectArray, objectRecord, resourceKey } from './observations';
 
 export function referencesOf(obj: ResourceObject): string[] {
   const ns = obj.metadata.namespace ?? '', spec = objectRecord(obj.spec);

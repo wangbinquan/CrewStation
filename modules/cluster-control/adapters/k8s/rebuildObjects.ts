@@ -5,6 +5,8 @@ import type { RebuildRender } from '../../domain/rebuildRender';
 import type { WorkloadRender } from '../../domain/workloadRender';
 import type { RebuildRendering } from '../../ports/ledger';
 import { objectCovered } from './coverage';
+import { inspectClusterDevelopmentRemoval } from './developmentGuard';
+import type { DevelopmentRemovalQuery } from '../../ports/cluster';
 import { runnerSecretObject, workloadPodObject, workloadPreviewObjects } from './workloadObjects';
 
 type Secret = K8sObject & { data?: Record<string, string>; stringData?: Record<string, string>; immutable?: boolean };
@@ -31,7 +33,7 @@ function podMatches(found: K8sObject, render: WorkloadRender): boolean {
 }
 
 /** 每次创建都直读卷 UID；没有创建或删除 PVC 的路径。 */
-export function rebuildObjects(k8s: K8sClient, render: WorkloadRender, rebuild: RebuildRender, signal?: AbortSignal): RebuildRendering {
+export function rebuildObjects(k8s: K8sClient, render: WorkloadRender, rebuild: RebuildRender, signal?: AbortSignal, developmentRemoval?: DevelopmentRemovalQuery): RebuildRendering {
   const { pod } = render;
   const volume = async () => {
     signal?.throwIfAborted();
@@ -81,7 +83,11 @@ export function rebuildObjects(k8s: K8sClient, render: WorkloadRender, rebuild: 
         if (!found) continue;
         const uid = identity(found, render, rebuild, expectedUid);
         signal?.throwIfAborted();
-        if (!found.metadata.deletionTimestamp) await k8s.delete(Resources[kind]!, name, pod.namespace, { gracePeriodSeconds: 30, preconditions: { uid } });
+        const decision = await inspectClusterDevelopmentRemoval(k8s, developmentRemoval, { kind, namespace: pod.namespace, name, uid, resourceVersion: found.metadata.resourceVersion }, 'delete');
+        if (decision.kind === 'waiting') throw precondition('原恢复对象的数字或物理退出尚未确认');
+        if (decision.kind === 'absent') continue;
+        const resourceVersion = decision.kind === 'permitted' ? decision.resourceVersion : found.metadata.resourceVersion;
+        if (!found.metadata.deletionTimestamp) await k8s.delete(Resources[kind]!, name, pod.namespace, { gracePeriodSeconds: 30, preconditions: { uid, resourceVersion } });
         if (await k8s.get(Resources[kind]!, name, pod.namespace)) throw new Error('等待本次恢复对象回收完成');
       }
     },

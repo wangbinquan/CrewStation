@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { activePod, addDemand, combine, decimalValue, emptyDemand, normalized, podDemand, quantity } from './resourceDemand';
-import type { ResourceObject } from './inventory';
+import type { ResourceObject } from './observations';
 const pod = (spec: Record<string, unknown>, status: Record<string, unknown> = {}): ResourceObject => ({ apiVersion: 'v1', kind: 'Pod', metadata: { name: 'p' }, spec, status });
 const container = (name: string, cpu: string, extra = {}) => ({ name, resources: { requests: { cpu }, limits: { cpu: '8' } }, ...extra });
 describe('exact Kubernetes resource demand', () => {

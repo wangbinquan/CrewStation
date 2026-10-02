@@ -5,7 +5,7 @@ import { createApp } from '@crewstation/http';
 import { createFakeK8sClient } from '@crewstation/k8s';
 import { forbidden } from '@crewstation/kernel';
 import type { Database } from '@crewstation/persistence';
-import type { TraceEnvironmentPart } from '../domain/traceParts';
+import type { TraceEnvironmentPart } from "../domain/traceAssembly";
 import { createObservabilityModule } from '../wiring';
 
 const project = '01a0bf5d-8f4b-7d01-82e1-9a99060b1192' as ProjectId;

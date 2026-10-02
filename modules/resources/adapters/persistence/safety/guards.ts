@@ -1,3 +1,4 @@
+import { assertDevelopmentParentConsumer } from './developmentParentEnding';
 import { eq, sql } from 'drizzle-orm';
 import type { Executor } from '@crewstation/persistence';
 import type { WorkloadConsumer, WorkloadStartPermit } from '@crewstation/contracts';
@@ -19,6 +20,12 @@ export async function assertConsumerOwner(tx: Executor, consumer: WorkloadConsum
   // Task seals its projection under this same parent row lock; hold admission through commit.
   const records = drizzleRecordRepository(tx), parent = await records.get(consumer.taskId, { forUpdate: true });
   const record = consumer.resourceId === consumer.taskId ? parent : await records.get(consumer.resourceId);
+  if (parent && Object.hasOwn(parent.spec, 'developmentParentEnding')) {
+    const volume = await records.getByOwner({ module: 'task-runtime', ref: consumer.taskId + '/work' }, 'volume');
+    assertDevelopmentParentConsumer(record, parent, volume, consumer, permit);
+    return;
+  }
+  if (consumer.purpose === 'development') throw precondition('原父观察封存材料尚未受理', { code: 'workload_admission_closed' });
   if (needsDevelopmentOwnerCheck(record, parent, consumer)) {
     const volume = await records.getByOwner({ module: 'task-runtime', ref: consumer.taskId + '/work' }, 'volume');
     assertDevelopmentConsumerOwner(record, parent, volume, consumer, permit); return;

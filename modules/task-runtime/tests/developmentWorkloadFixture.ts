@@ -79,7 +79,8 @@ function workloadController(base: Base, runtime: () => ReturnType<typeof createT
     feed: { start: () => {}, stop: async () => {}, synced: async () => {}, cached: (kind, ns, name) => objects().find((o) => o.kind === kind && o.metadata.namespace === ns && o.metadata.name === name), list: (kind) => objects().filter((o) => o.kind === kind) },
     workloads: { inspectDevelopmentRemoval: (target) => runtime().api.inspectDevelopmentRemoval(target), runnerValues: (id) => runtime().api.runnerValues(TaskIdSchema.parse(id)), checkoutValues: (id) => runtime().api.checkoutValues(TaskIdSchema.parse(id)),
       bindWorkload: async (id, podUid, secretUid) => { if (faults.bind) { emit('binding-failed'); throw new Error('bind commit lost'); } await runtime().api.bindWorkload(TaskIdSchema.parse(id), podUid, secretUid); emit('bound'); },
-      workloadUnavailable: (id, code) => runtime().api.workloadUnavailable(TaskIdSchema.parse(id), code) } });
+      workloadUnavailable: (id, code) => runtime().api.workloadUnavailable(TaskIdSchema.parse(id), code),
+      reconcileRebuild: async (id, rebuildId, ops, heartbeat) => { await runtime().api.reconcileRebuild(TaskIdSchema.parse(id), rebuildId, ops, heartbeat); emit('rebuild-reconciled'); } } });
 }
 export async function developmentWorkloadFixture(creation: 'ledger' | 'native' = 'ledger', observed = true, historicalUnmarked = false) {
   const base = await developmentDatabase(), calls: string[] = [], faults: Faults = { bind: false, grant: false, activation: false }, deps = runtimeDeps(base, calls);

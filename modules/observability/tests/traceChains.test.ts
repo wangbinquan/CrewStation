@@ -3,8 +3,8 @@ import type { Actor, ProjectId, RunnerEvent, TaskId, TraceListQuery, TraceSummar
 import { TraceListQuerySchema } from '@crewstation/contracts';
 import { forbidden } from '@crewstation/kernel';
 import { traceChainUseCases } from '../application/traceChains';
-import type { TraceBusinessTaskPart, TraceDeliveryPart, TraceEnvironmentPart, TraceKey, TraceStoredEvent } from '../domain/traceParts';
-import type { TraceChainSources, TraceKeyPage } from '../ports/traceSources';
+import type { TraceBusinessTaskPart, TraceDeliveryPart, TraceEnvironmentPart, TraceKey, TraceStoredEvent } from "../domain/traceAssembly";
+import type { TraceChainSources, TraceKeyPage } from "../ports/sources";
 
 const project = '01a0bf5d-8f4b-7c01-82e1-9a99060b1192' as ProjectId, other = '01a0bf5d-8f4b-7c02-82e1-9a99060b1192' as ProjectId;
 const actor: Actor = { userId: '01a0bf5d-8f4b-7c03-867c-efd7527b386b' as UserId, isAdmin: false };

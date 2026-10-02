@@ -1,3 +1,4 @@
+import { assertDevelopmentWriter } from './development/parent/admission';
 import { inspectBusinessWorkspace } from './business/workspace';
 import type { TaskId } from '@crewstation/contracts';
 import { notFound, precondition } from '@crewstation/kernel';
@@ -33,6 +34,7 @@ export function workloadRenderUseCases(deps: TaskRuntimeUseCaseDeps) {
     runnerValues: async (taskId: TaskId): Promise<Record<string, string>> => {
       const env = await current(taskId);
       if (!wantsProvisioning(env)) throw precondition('这个环境眼下不需要建出容器', { taskId, state: env.state });
+      const parentWitness = await assertDevelopmentWriter(deps.uow.read, env);
       if (env.native) await requireRunningWorkspace(deps, env);
       if (env.businessWorkspace) await inspectBusinessWorkspace(deps, env);
       // 档位测试（I25 第四步）是平台任务，不属于任何服务。
@@ -45,6 +47,7 @@ export function workloadRenderUseCases(deps: TaskRuntimeUseCaseDeps) {
         await scope.admissions.lock(env.projectId);
         const latest = await scope.environments.getById(taskId);
         if (!latest || !wantsProvisioning(latest) || latest.render?.start !== env.render?.start) throw precondition('环境已经变化，不再建出这次的容器', { taskId });
+        await assertDevelopmentWriter(scope, latest, parentWitness);
         await scope.environments.update({ ...latest, runnerTokenHash: hashRunnerToken(token) });
       });
       return values;
@@ -53,10 +56,19 @@ export function workloadRenderUseCases(deps: TaskRuntimeUseCaseDeps) {
       const env = await current(taskId);
       const credential = deps.checkout?.credentialFor;
       if (!wantsProvisioning(env) || !env.render?.checkout || env.render.checkout.credentialSecretName || !credential) throw precondition('这个环境眼下不需要检出凭据', { taskId, state: env.state });
-      return credential(env.serviceId);
+      const parentWitness = await assertDevelopmentWriter(deps.uow.read, env);
+      const values = await credential(env.serviceId);
+      await deps.uow.run(async (scope) => {
+        await scope.admissions.lock(env.projectId);
+        const latest = await scope.environments.getById(taskId);
+        if (!latest || !wantsProvisioning(latest) || latest.render?.start !== env.render?.start) throw precondition('原检出启动已经变化');
+        await assertDevelopmentWriter(scope, latest, parentWitness);
+      });
+      return values;
     },
     bindWorkload: async (taskId: TaskId, podUid: string, secretUid?: string): Promise<void> => {
       const env = await current(taskId);
+      const parentWitness = await assertDevelopmentWriter(deps.uow.read, env);
       if (env.render?.objectInputsGeneration && !env.native) {
         if (!deps.sources.bindTaskInputs || !env.render.workloadConsumerId) throw precondition('任务输入 Pod 绑定能力不可用');
         await deps.sources.bindTaskInputs(env.render.workloadConsumerId, podUid);
@@ -65,6 +77,8 @@ export function workloadRenderUseCases(deps: TaskRuntimeUseCaseDeps) {
         await scope.admissions.lock(env.projectId);
         const latest = await scope.environments.getById(taskId);
         if (!latest || !wantsProvisioning(latest)) return;
+        if (latest.render?.start !== env.render?.start || latest.podName !== env.podName || latest.runnerTokenHash !== env.runnerTokenHash) throw precondition('原 Pod 绑定启动已经变化');
+        await assertDevelopmentWriter(scope, latest, parentWitness);
         await scope.environments.update(bound(deps, latest, podUid, secretUid));
       });
     },

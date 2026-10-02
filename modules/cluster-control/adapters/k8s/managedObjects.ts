@@ -81,7 +81,7 @@ export function kubernetesClusterWriter(k8s: K8sClient, volumeProbe?: VolumeProb
     releaseWorkloadStop: (proof, version) => releaseWorkloadStop(k8s, proof, developmentRemoval, version),
     inspectNamespaceRetirement: async (name, intent, systemNamespace, signal) => { await inspectNamespaceRetirement(k8s, name, intent, systemNamespace, signal); },
     removeRetiredNamespace: (name, intent, systemNamespace, signal) => removeRetiredNamespace(k8s, name, intent, systemNamespace, signal),
-    rebuild: (render, intent, signal) => rebuildObjects(k8s, render, intent, signal),
+    rebuild: (render, intent, signal) => rebuildObjects(k8s, render, intent, signal, developmentRemoval),
     remove: async (target) => {
       const { kind, namespace, name, uid } = target;
       const result = await inspectClusterDevelopmentRemoval(k8s, developmentRemoval, target, 'delete');

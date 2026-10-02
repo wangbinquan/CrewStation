@@ -6,7 +6,7 @@ import { fixedClock, jsonHash } from '@crewstation/kernel';
 import { createTestDatabase, testDatabaseAvailable, type TestDatabase } from '@crewstation/testkit';
 import { drizzleExecutionPricing, drizzleTokenPriceStore } from '../adapters/persistence/drizzleTokenPricing';
 import { drizzleExecutionValuations, drizzleUsageLedger } from '../adapters/persistence/drizzleUsageLedger';
-import { nativeCaptures } from '../adapters/persistence/usageLedgerTables';
+import { nativeCaptures } from "../adapters/persistence/tables";
 import { executionValuations } from '../application/executionValuations';
 import { tokenPricingUseCases } from '../application/tokenPricing';
 import { usageIngestion } from '../application/usageIngestion';

@@ -1,11 +1,11 @@
 import { expect, test } from 'bun:test';
 import { ClusterCapacitySchema, ClusterNodeSchema, ClusterUsageSchema, ClusterHistoryQuerySchema } from '@crewstation/contracts';
 import { observeMetrics } from '../application/observeMetrics';
-import { observeStorage } from '../application/observeStorage';
+import { observeStorage } from '../application/observeMetrics';
 import { currentObservation, metricQueries, renderMetrics } from '../application/metricQueries';
 import { historyExpressions, historyWindow } from '../domain/history';
 import { localStorageTarget, storageProjection } from '../domain/storageUsage';
-import { objectRecord } from '../domain/inventory';
+import { objectRecord } from '../domain/observations';
 import { metricsFixture, metricsTicket } from './metricsFixture';
 import { admin, object } from './inventoryFixture';
 const signal = () => new AbortController().signal;

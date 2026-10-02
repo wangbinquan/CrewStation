@@ -6,6 +6,7 @@ import type { EnvironmentRebuild } from '../../domain/environmentRebuild';
 import { podNameFor } from '../../domain/taskEnvironment';
 import { rebuildIntent } from '../../domain/physicalIdentity';
 import type { RebuildProvisioner } from '../../ports/recoveryCluster';
+import type { TaskDevelopmentRemovalQuery } from './taskRemovalGuard';
 import { assertRebuildObject, rebuildLabel, removeRebuildObject } from './rebuildObjects';
 import { ensureTaskPreview, taskPodObject } from './taskObjects';
 
@@ -38,7 +39,7 @@ function validatePod(pod: K8sObject, record: EnvironmentRebuild): string {
   return uid;
 }
 
-export function kubernetesRebuildProvisioner(k8s: K8sClient, workerUid: number): RebuildProvisioner {
+export function kubernetesRebuildProvisioner(k8s: K8sClient, workerUid: number, developmentRemoval?: TaskDevelopmentRemovalQuery): RebuildProvisioner {
   return {
     prepareSecret: async (record, values) => {
       const secret = await readOrCreateSecret(k8s, record, values);
@@ -66,8 +67,8 @@ export function kubernetesRebuildProvisioner(k8s: K8sClient, workerUid: number):
       await ensureTaskPreview(k8s, { ...spec, env: { ...spec.env, podName: podNameFor(record.taskId) } });
     },
     cleanup: async (record) => {
-      await removeRebuildObject(k8s, Resources.Pod!, record.podName, record, record.podUid);
-      await removeRebuildObject(k8s, Resources.Secret!, record.secretName, record, record.secretUid);
+      await removeRebuildObject(k8s, Resources.Pod!, record.podName, record, record.podUid, developmentRemoval);
+      await removeRebuildObject(k8s, Resources.Secret!, record.secretName, record, record.secretUid, developmentRemoval);
     },
   };
 }

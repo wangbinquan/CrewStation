@@ -1,9 +1,14 @@
-import { integer, text, timestamp } from 'drizzle-orm/pg-core';
+import { boolean, integer, text, timestamp } from 'drizzle-orm/pg-core';
 import { jsonDocument } from '@crewstation/persistence';
 import type { EnvironmentRebuild } from '../../domain/environmentRebuild';
 import { taskRuntimeSchema } from './schema';
+import { sql } from 'drizzle-orm';
+import { parentEndingDocument } from './parentEndingJson';
 
 export const environmentRebuilds = taskRuntimeSchema.table('environment_rebuilds', {
+  developmentParentBinding: parentEndingDocument('development_parent_binding'),
+  developmentParentBindingPresent: boolean('development_parent_binding_present').generatedAlwaysAs(sql`development_parent_binding IS NOT NULL`),
+  developmentParentBindingKind: text('development_parent_binding_kind').generatedAlwaysAs(sql`jsonb_typeof(development_parent_binding)`),
   legacyCluster: jsonDocument('legacy_cluster').$type<EnvironmentRebuild['legacyCluster']>(),
   id: text('id').primaryKey(), taskId: text('task_id').notNull(), projectId: text('project_id').notNull(),
   input: jsonDocument('input').notNull(), namespace: text('namespace').notNull(),

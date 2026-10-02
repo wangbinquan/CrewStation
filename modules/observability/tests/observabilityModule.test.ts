@@ -7,7 +7,7 @@ import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import { healthOf } from '../domain/health';
 import { slotOfAlert } from '../domain/alertRules';
-import type { TraceEnvironmentPart } from '../domain/traceParts';
+import type { TraceEnvironmentPart } from "../domain/traceAssembly";
 import type { ObservabilityModule } from '../wiring';
 import { createObservabilityModule, observabilityMigrations } from '../wiring';
 

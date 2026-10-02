@@ -1,6 +1,6 @@
 import type { Actor, ClusterFilter, ClusterProjectCounts, ClusterResource, ClusterSummary, ProjectClusterResources } from '@crewstation/contracts';
 import { conflict, forbidden, notFound, PlatformError, validation } from '@crewstation/kernel';
-import type { InventorySnapshot } from '../domain/inventory';
+import type { InventorySnapshot } from '../domain/observations';
 import { digest } from '../domain/projection';
 import type { ClusterDeps } from './dependencies';
 export async function requireAdmin(deps: ClusterDeps, actor: Actor): Promise<void> { if (!actor.isAdmin || !await deps.isAdmin(actor.userId)) throw forbidden('集群管理仅限平台管理员'); }

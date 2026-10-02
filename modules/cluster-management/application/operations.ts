@@ -1,9 +1,9 @@
-import { resourceReferences } from './resourceReferences';
+import { resourceReferences } from './ledgerOverlay';
 import { randomUUID } from 'node:crypto';
 import type { Actor, ClusterInspection, ClusterInspectRequest, ClusterOperationRequest, ClusterResource } from '@crewstation/contracts';
 import { conflict, newResourceId, notFound, precondition, validation } from '@crewstation/kernel';
-import type { ResourceObject } from '../domain/inventory';
-import { collectedKinds } from '../domain/inventory';
+import type { ResourceObject } from '../domain/observations';
+import { collectedKinds } from '../domain/observations';
 import { digest, projectResources } from '../domain/projection';
 import type { ClusterDeps } from './dependencies';
 import { readSnapshot, requireAdmin, resourceIn, relatedResources } from './queries';

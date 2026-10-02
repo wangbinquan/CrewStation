@@ -1,4 +1,10 @@
 import { TaskIdSchema } from '@crewstation/contracts';
+import { sealedDevelopmentParentProjection } from '../../../domain/development/parentProjection';
+import { readDevelopmentParentEnding } from '../../../domain/development/parentEnding';
+import { systemClock } from '@crewstation/kernel';
+import { completedDevelopmentParent, observeCompletedDevelopmentParent } from './completed';
+import { wakeDevelopmentParentEnding } from './admission';
+import { admitDevelopmentParentEnding, prepareDevelopmentParentEnding, selectedDevelopmentParent } from './request';
 import { jsonHash } from '@crewstation/kernel';
 import type { ResourceEndingDecision, ResourceEndingSnapshot, ResourceEndingStep } from '../../../api/resourceEnding';
 import { terminalDevelopmentMaintenanceOriginal } from '../../../domain/development/removalEvidence';
@@ -9,7 +15,7 @@ import type { TaskRuntimeUseCaseDeps } from '../../dependencies';
 import { developmentPhysicalStop } from '../workloadStop';
 
 type Preview = (env: TaskEnvironment) => Promise<WorkloadRender['previewRoute']>;
-type OwnerDeps = Pick<TaskRuntimeUseCaseDeps, 'uow' | 'workloadSafety'>;
+type OwnerDeps = Pick<TaskRuntimeUseCaseDeps, 'uow' | 'workloadSafety'> & Partial<Pick<TaskRuntimeUseCaseDeps, 'clock' | 'developmentParentInspector' | 'developmentParentPhysical'>>;
 const waiting = (): ResourceEndingDecision => ({ status: 'waiting', reason: 'original-development-ending-pending' });
 function selected(env: TaskEnvironment): boolean {
   return Object.hasOwn(env, 'parentEnding') || !!env.native && Object.hasOwn(env.native, 'developmentCleanup')
@@ -33,7 +39,10 @@ async function capture(deps: OwnerDeps, snapshot: ResourceEndingSnapshot, previe
   if (source?.status !== 'present' || !belongs(snapshot, source.environment)) return undefined;
   const original = source.environment, hash = materialHash(original);
   // The formal preview resolver may query a Service; it runs before acquiring any Task project lock.
-  const projection = projectEnvironment(original, await preview?.(original) ?? original.render?.previewRoute);
+  const pointer = readDevelopmentParentEnding(original), ending = pointer ? await deps.uow.read.parentEnding?.endings.get(pointer.endingId) : undefined;
+  const plain = projectEnvironment(original, pointer ? original.render?.previewRoute : await preview?.(original) ?? original.render?.previewRoute);
+  const projection = ending ? sealedDevelopmentParentProjection(plain, original, ending) : plain;
+  if (pointer && !ending) return undefined;
   return deps.uow.run(async (scope) => {
     await scope.admissions.lock(original.projectId);
     const view = await scope.environments.getMaintenanceView?.(taskId);
@@ -42,19 +51,41 @@ async function capture(deps: OwnerDeps, snapshot: ResourceEndingSnapshot, previe
       .find((row) => row?.kind === snapshot.kind && row.ref === snapshot.owner.ref && (row.projectId ?? null) === snapshot.projectId);
     if (!record || record.id && record.id !== snapshot.id
       || jsonHash({ children: record.children, ...(record.reclaim ? { reclaim: record.reclaim } : {}), ...record.render }) !== snapshot.specHash) return undefined;
-    const isSelected = selected(env);
-    if (!isSelected && (!scope.environments.hasProtectedDevelopmentChildren
-      || await scope.environments.hasProtectedDevelopmentChildren(env.id))) return undefined;
+    const isSelected = selected(env) || await selectedDevelopmentParent(scope, env);
+    if (!isSelected && !scope.environments.hasProtectedDevelopmentChildren) return undefined;
     return { env, selected: isSelected, hash };
   });
 }
-/** First owner integration: complete original Agent compaction; parent ending/retention is still pending. */
+async function parentDecision(deps: OwnerDeps, before: NonNullable<Awaited<ReturnType<typeof capture>>>, snapshot: ResourceEndingSnapshot, preview?: Preview) {
+  const pointer = readDevelopmentParentEnding(before.env);
+  if (pointer?.phase === 'complete') {
+    const ending = await deps.uow.read.parentEnding?.endings.get(pointer.endingId);
+    if (!ending) return waiting();
+    const source = await completedDevelopmentParent(deps.uow.read, before.env, ending);
+    await observeCompletedDevelopmentParent(deps, source);
+    const after = await capture(deps, snapshot, preview);
+    return after?.selected && after.hash === before.hash ? { status: 'permitted' as const, snapshot } : waiting();
+  }
+  const prepared = await prepareDevelopmentParentEnding(deps, before.env);
+  if (!prepared) return waiting();
+  await deps.uow.run(async (scope) => {
+    await scope.admissions.lock(before.env.projectId);
+    const current = await scope.environments.getForUpdate(before.env.id);
+    if (!current || materialHash(current) !== before.hash) return;
+    if (await wakeDevelopmentParentEnding(scope, current)) return;
+    await admitDevelopmentParentEnding(scope, prepared, 'retention', { resourceId: snapshot.id, kind: snapshot.kind,
+      generation: snapshot.generation, specHash: snapshot.specHash, retainUntil: snapshot.retainUntil }, (deps.clock ?? systemClock).now());
+  });
+  return waiting();
+}
+/** Original parent retention is queued before any Resources CAS; only actual completed numeric/physical sources permit retirement. */
 export function resourceEndingHandler(deps: OwnerDeps, preview?: Preview) {
   return async (step: ResourceEndingStep, snapshot: ResourceEndingSnapshot): Promise<ResourceEndingDecision> => {
     try {
       const before = await capture(deps, snapshot, preview);
       if (!before) return waiting();
       if (!before.selected) return { status: 'unselected' };
+      if (before.env.kind === 'dev-session' && !before.env.native) return await parentDecision(deps, before, snapshot, preview);
       if (step !== 'compaction' || snapshot.kind !== 'agent-execution' || Object.hasOwn(before.env, 'parentEnding')) return waiting();
       const original = terminalDevelopmentMaintenanceOriginal(before.env);
       // Resources proof reads happen only after releasing the Task project transaction.

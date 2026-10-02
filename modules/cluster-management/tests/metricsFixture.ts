@@ -2,7 +2,7 @@ import { newResourceId } from '@crewstation/kernel';
 import type { ClusterHistoryResource } from '@crewstation/contracts';
 import type { MetricsDeps } from '../application/observeMetrics';
 import type { MetricsObservation, MetricsTopology, StorageResult } from '../domain/observations';
-import type { InventorySnapshot, ResourceObject } from '../domain/inventory';
+import type { InventorySnapshot, ResourceObject } from '../domain/observations';
 import type { ClusterRepository } from '../ports/repository';
 import { projectResources } from '../domain/projection';
 import { object, facts, catalog, resourceIds } from './inventoryFixture';

@@ -89,7 +89,7 @@ export interface WorkloadRender {
    */
   readonly execution?: { readonly workspacePod: string; readonly creator?: 'native' };
   /** 保卷重建：确认的卷实例与不可变请求摘要；不创建卷、不重新检出。 */
-  readonly rebuild?: { readonly id: string; readonly volumeUid: string; readonly intent: string; readonly nodeName?: string };
+  readonly rebuild?: { readonly id: string; readonly volumeUid: string; readonly intent: string; readonly nodeName?: string; readonly developmentParentSelection?: unknown };
 }
 
 export interface RunnerRejection {

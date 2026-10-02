@@ -1,8 +1,8 @@
-import { resourceReferences } from './resourceReferences';
-import { newResourceId } from '@crewstation/kernel';
+import { resourceReferences } from './ledgerOverlay';
+import { newResourceId, precondition } from '@crewstation/kernel';
 import type { ClusterSource } from '@crewstation/contracts';
-import type { InventorySnapshot, ResourceObject } from '../domain/inventory';
-import { collectedKinds } from '../domain/inventory';
+import type { InventorySnapshot, ResourceObject } from '../domain/observations';
+import { collectedKinds } from '../domain/observations';
 import { projectResources } from '../domain/projection';
 import type { ClusterDeps } from './dependencies';
 
@@ -35,5 +35,7 @@ export async function collectSnapshot(deps: ClusterDeps, signal: AbortSignal): P
   if (!facts.complete) sources.push({ key: 'platform-metadata', kind: 'Platform', namespace: '', batchId: '', resourceVersion: '', state: 'error', count: 0, reason: facts.reason ?? '平台资料读取失败' });
   const snapshot = { id: newResourceId(), startedAt, finishedAt: deps.clock.now().toISOString(), facts, sources: sources.sort((a, b) => a.key.localeCompare(b.key)), resources };
   await deps.repository.saveSnapshot(snapshot);
-  return snapshot;
+  const saved = await deps.repository.snapshot(snapshot.id);
+  if (!saved) throw precondition('刚完成的集群快照已经过期，请读取最新盘点');
+  return saved;
 }

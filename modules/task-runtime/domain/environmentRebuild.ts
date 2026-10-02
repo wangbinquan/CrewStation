@@ -7,6 +7,8 @@ export interface LegacyRebuildClusterIdentity {
 
 /** 恢复意图不携带凭据；新 Runner Secret 由集群适配器幂等准备。 */
 export interface EnvironmentRebuild {
+  /** Private original-ending binding; malformed explicit presence never becomes legacy. */
+  readonly developmentParentBinding?: unknown;
   readonly legacyCluster?: LegacyRebuildClusterIdentity;
   readonly creation?: 'owner' | 'ledger';
   readonly attempts?: number;

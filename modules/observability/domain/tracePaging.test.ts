@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { compareTracePositions, decodeTraceCursor, encodeTraceCursor, scannedFloor, windowStart, withinScannedRange } from './tracePaging';
-import type { TraceKey } from './traceParts';
+import { compareTracePositions, decodeTraceCursor, encodeTraceCursor, scannedFloor, windowStart, withinScannedRange } from "./traceAssembly";
+import type { TraceKey } from "./traceAssembly";
 
 const trace = (n: number) => n.toString(16).padStart(32, '0');
 const key = (n: number, at: string): TraceKey => ({ traceId: trace(n), firstAt: at, lastAt: at, active: false });

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { resolveCapability } from '@crewstation/testkit';
 import { ClusterHistoryQuerySchema } from '@crewstation/contracts';
 import { prometheusHistoryReader } from '../adapters/http/prometheus';
-import { queryHistory } from '../application/historyQueries';
+import { queryHistory } from '../application/metricQueries';
 import { metricsFixture } from './metricsFixture';
 
 const prometheus = process.env.CS_TEST_PROMETHEUS_BIN ?? Bun.which('prometheus'), promtool = process.env.CS_TEST_PROMTOOL_BIN ?? Bun.which('promtool');

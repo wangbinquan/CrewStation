@@ -3,7 +3,7 @@ import { createWorker } from '@crewstation/queue';
 import type { CollectorKind } from '../ports/metrics';
 import type { MetricsDeps } from '../application/observeMetrics';
 import { observeMetrics } from '../application/observeMetrics';
-import { observeStorage } from '../application/observeStorage';
+import { observeStorage } from '../application/observeMetrics';
 import { METRICS_JOB, STORAGE_JOB } from '../ports/metrics';
 
 export function metricsWorkers(deps: MetricsDeps, db: Parameters<typeof createWorker>[0]['db'], instance: string, logger: Logger, measure: Parameters<typeof observeStorage>[3]) {

@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { DEVELOPMENT_REMOVAL_ANNOTATION } from '@crewstation/contracts';
+import { DEVELOPMENT_PARENT_ENDING_ANNOTATION, DEVELOPMENT_REMOVAL_ANNOTATION, ResourceIdSchema } from '@crewstation/contracts';
 import type { K8sClient } from '@crewstation/k8s';
 import { Resources } from '@crewstation/k8s';
 import { isPlatformError } from '@crewstation/kernel';
@@ -35,12 +35,13 @@ export async function inspectClusterDevelopmentRemoval(k8s: K8sClient, query: De
   if (!target.namespace) return waiting('development-removal-namespace-missing');
   try {
     const object = await k8s.get(Resources[target.kind]!, target.name, target.namespace, AbortSignal.timeout(15_000));
-    const marker = object?.metadata.annotations?.[DEVELOPMENT_REMOVAL_ANNOTATION];
+    const marker = object?.metadata.annotations?.[DEVELOPMENT_REMOVAL_ANNOTATION], parentMarker = object?.metadata.annotations?.[DEVELOPMENT_PARENT_ENDING_ANNOTATION];
+    if (parentMarker !== undefined && !ResourceIdSchema.safeParse(parentMarker).success) return waiting('development-parent-marker-conflict');
     if (marker !== undefined && marker !== '1') return waiting('development-removal-marker-conflict');
     const owner = query ?? scopedOwnerQuery(target, operation);
-    if (!owner) return marker === undefined ? { kind: 'unselected' } : waiting('development-removal-owner-unavailable');
+    if (!owner) return marker === undefined && parentMarker === undefined ? { kind: 'unselected' } : waiting('development-removal-owner-unavailable');
     const result = await owner({ kind: target.kind, namespace: target.namespace, name: target.name, uid: target.uid, operation });
-    if (result.kind === 'unselected' && marker !== undefined) return waiting('development-removal-original-missing');
+    if (result.kind === 'unselected' && (marker !== undefined || parentMarker !== undefined)) return waiting('development-removal-original-missing');
     if (result.kind === 'permitted') {
       if (!result.resourceVersion || target.resourceVersion !== undefined && result.resourceVersion !== target.resourceVersion) return waiting('development-removal-version-changed');
       return result;

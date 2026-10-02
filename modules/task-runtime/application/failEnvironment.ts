@@ -1,3 +1,6 @@
+import { precondition } from '@crewstation/kernel';
+import { wakeDevelopmentParentEnding } from './development/parent/admission';
+import { admitDevelopmentParentEnding, prepareDevelopmentParentEnding, selectedDevelopmentParent } from './development/parent/request';
 import type { StartupErrorCode, TaskId } from '@crewstation/contracts';
 import { maskDiagnosticsText } from '../domain/diagnosticsText';
 import { CHECKOUT_CONTAINER, advanceStartup, defaultFailureCode, failStartup, failureCode, runningStage, startupLogLines } from '../domain/podStartup';
@@ -22,6 +25,7 @@ export function failEnvironment(deps: TaskRuntimeUseCaseDeps) {
   return async (taskId: TaskId, message: string, expectedPodName?: string, expectedState?: EnvironmentState, code?: StartupErrorCode): Promise<void> => {
     const original = await deps.uow.read.environments.getById(taskId);
     if (!original) return;
+    const prepared = !original.native ? await prepareDevelopmentParentEnding(deps, original) : undefined;
     // 先按 Pod 自己记的时间把启动进度推到出事的那一段（例如检出在一秒内就失败了），再留下那一段相关容器的日志：
     // 执行环境判失败后立即回收，Pod 删掉就读不到了，所以都在进事务之前做。
     const observation = original.startup?.state === 'running' ? (await deps.cluster.observeStartup(original, { events: false }).catch(() => undefined))?.observation : undefined;
@@ -32,6 +36,12 @@ export function failEnvironment(deps: TaskRuntimeUseCaseDeps) {
       const current = await scope.environments.getById(taskId);
       if (!current || ['released', 'failed', 'releasing'].includes(current.state) || (expectedPodName && expectedPodName !== current.podName)) return;
       if (expectedState && current.state !== expectedState) return;
+      if (await wakeDevelopmentParentEnding(scope, current)) return;
+      if (await selectedDevelopmentParent(scope, current)) {
+        if (!prepared) throw precondition('原工作区新增受保护执行，请重新核对原父结束');
+        await admitDevelopmentParentEnding(scope, prepared, 'compensation', { cause: 'environment-failed', message, expectedPodName: expectedPodName ?? null, expectedState: expectedState ?? null, code: code ?? null }, deps.clock.now());
+        return;
+      }
       const now = deps.clock.now();
       const startup = advance(current);
       const env = startup ? { ...current, startup: failStartup(startup, now.toISOString(), { code: failureCode(startup, code ?? defaultFailureCode(startup)), message }, logTail) } : current;

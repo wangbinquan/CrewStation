@@ -1,8 +1,5 @@
 import type { ClusterResource, ClusterUsage } from '@crewstation/contracts';
-import type { MetricsTopology } from './observations';
-import type { StorageResult, StorageTarget } from './observations';
-import type { ResourceObject } from './inventory';
-import { objectArray, objectRecord } from './inventory';
+import { type MetricsTopology, type StorageResult, type StorageTarget, type ResourceObject, objectArray, objectRecord } from './observations';
 import { emptyDemand, normalized } from './resourceDemand';
 import { freshness, gauge, missingMetric } from './metricValues';
 
@@ -56,4 +53,30 @@ export function storageProjection(pvc: ResourceObject, resource: ClusterResource
   });
   const usage: ClusterUsage = { resourceId: resource.resourceId, uid: resource.uid, kind: 'PersistentVolumeClaim', namespace: resource.namespace, name: resource.name, scope: resource.ownership.scope, ...(resource.ownership.scope === 'project' ? { projectId: resource.ownership.projectId } : {}), node: target?.node, phase: String(status.phase ?? 'Unknown'), demand: { ...emptyDemand(), errors }, metrics: { volumeUsed: metric, storageRequested: gauge('storageRequested', normalized(objectRecord(spec.resources).requests).storage, new Date(now).toISOString(), 'kubernetes-pvc', now), storageCapacity: gauge('storageCapacity', normalized(status.capacity).storage, new Date(now).toISOString(), 'kubernetes-pvc', now) }, containers: [], storage: { requested: normalized(objectRecord(spec.resources).requests, errors).storage, capacity: normalized(status.capacity, errors).storage, storageClass: String(spec.storageClassName ?? ''), accessModes: Array.isArray(spec.accessModes) ? spec.accessModes.map(String) : [], volumeMode: String(spec.volumeMode ?? 'Filesystem'), mounts, hardQuota: false, volumeName: String(spec.volumeName ?? ''), source: target ? 'local-path (allocated blocks; declaration is not a hard quota)' : 'driver-reported (quota enforcement not verified)' } };
   return { usage, ...(target && metric.source !== 'kubelet-summary-volume' ? { target } : {}) };
+}
+
+/** A PV belongs to a managed claim only when both directions and the claim UID agree. */
+export function boundClaim(volume: ResourceObject, objects: ReadonlyMap<string, ResourceObject>): ResourceObject | undefined {
+  const ref = objectRecord(objectRecord(volume.spec).claimRef);
+  const claim = objects.get(`${String(ref.namespace)}/PersistentVolumeClaim/${String(ref.name)}`);
+  return claim && typeof ref.uid === 'string' && claim.metadata.uid === ref.uid && objectRecord(claim.spec).volumeName === volume.metadata.name ? claim : undefined;
+}
+
+/** Whitelist mount metadata; never project volume sources, credentials or host paths. */
+export function storageMounts(obj: ResourceObject): NonNullable<ClusterResource['mounts']> {
+  const spec = objectRecord(obj.spec), template = obj.kind === 'CronJob' ? objectRecord(objectRecord(spec.jobTemplate).spec) : spec;
+  const pod = obj.kind === 'Pod' ? spec : objectRecord(objectRecord(template.template).spec);
+  const claims = new Map(objectArray(pod.volumes).map((v) => [v.name, objectRecord(v.persistentVolumeClaim).claimName]));
+  return ['containers', 'initContainers'].flatMap((key) => objectArray(pod[key]).flatMap((c) => objectArray(c.volumeMounts).flatMap((m) => {
+    const claimName = claims.get(m.name);
+    return typeof claimName === 'string' && typeof m.mountPath === 'string' ? [{ claimName, container: String(c.name), mountPath: m.mountPath, readOnly: m.readOnly === true, init: key === 'initContainers', ...(typeof m.subPath === 'string' ? { subPath: m.subPath } : {}), ...(typeof m.subPathExpr === 'string' ? { subPathExpr: m.subPathExpr } : {}) }] : [];
+  })));
+}
+
+export function storageFacts(obj: ResourceObject): Record<string, string> {
+  const spec = objectRecord(obj.spec);
+  if (obj.kind === 'PersistentVolumeClaim') return { volumeName: String(spec.volumeName ?? ''), accessModes: Array.isArray(spec.accessModes) ? spec.accessModes.join(', ') : '' };
+  if (obj.kind !== 'PersistentVolume') return {};
+  const ref = objectRecord(spec.claimRef);
+  return { capacity: JSON.stringify(objectRecord(spec.capacity)), storageClass: String(spec.storageClassName ?? 'default'), reclaimPolicy: String(spec.persistentVolumeReclaimPolicy ?? ''), claimUid: String(ref.uid ?? ''), claim: `${String(ref.namespace ?? '')}/${String(ref.name ?? '')}` };
 }

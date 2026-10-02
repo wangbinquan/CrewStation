@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { Actor, TaskId } from '@crewstation/contracts';
-import { ClusterInspectionSchema, ClusterOperationSchema, ClusterPageSchema, IDENTITY_HEADERS } from '@crewstation/contracts';
+import { BUILTIN_RESOURCES, ClusterInspectionSchema, ClusterOperationSchema, ClusterPageSchema, IDENTITY_HEADERS } from '@crewstation/contracts';
 import { createApp } from '@crewstation/http';
 import { createFakeK8sClient, Resources } from '@crewstation/k8s';
-import { noopLogger } from '@crewstation/kernel';
+import { newResourceId, noopLogger } from '@crewstation/kernel';
 import { runMigrations } from '@crewstation/persistence';
 import { sql } from 'drizzle-orm';
 import { loadPlatformSettings } from '@crewstation/settings';
@@ -108,6 +108,17 @@ describe.skipIf(!available)('cluster HTTP through actual platform composition', 
     expect(await agentRuntime.api.getTest(admin, 'cluster-test', testId as never)).toMatchObject({ state: 'unknown', outcome: 'environment-lost' });
     expect(await taskRuntime.api.getEnvironment(taskId)).toMatchObject({ state: 'released' });
     expect(await k8s.get(Resources.Pod!, podName, namespace)).toBeUndefined();
+  });
+
+  test('the original Pod setting composes the cluster owner with the public identity and grant APIs while the full deletion route stays unavailable', async () => {
+    expect(platform.modules.cluster.api.deletionOwner).toBeUndefined();
+    const settings = loadPlatformSettings({ CS_DATABASE_URL: database.url, CS_SECRET_KEY: Buffer.alloc(32, 3).toString('base64'), CS_GITLAB_URL: 'http://127.0.0.1:9', CS_WORKLOAD_CREATION: 'owner', CS_DATA_PROVISIONING: 'data', CS_PLATFORM_POD_UID: crypto.randomUUID() });
+    const root = createPlatformModule({ db: database.db, settings, k8s, logger: noopLogger, instance: 'test.cluster-deletion-owner' });
+    const project = await root.modules.project.api.createProject(admin, { name: 'Cluster metadata', slug: 'cluster-metadata', kind: 'DigitalWorker', template: BUILTIN_RESOURCES.minimalTemplate });
+    const target = await root.modules.project.api.deletionScope(project.id), owner = root.modules.cluster.api.deletionOwner!;
+    const confirmed = await owner.inspect(target); expect(confirmed).toMatchObject({ participant: 'cluster-management', complete: true, resources: [] });
+    await expect(owner.run({ operationId: newResourceId(), generation: 1, phase: 'seal', target, confirmed })).rejects.toThrow();
+    expect((await app.request(`/v1/projects/${project.id}/deletion-plans`, { method: 'POST', headers: { [IDENTITY_HEADERS.userId]: admin.userId } })).status).toBe(404);
   });
 
 });

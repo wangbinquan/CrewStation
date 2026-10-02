@@ -2,7 +2,7 @@ import type { ClusterCoverage, ClusterMetric, ClusterMetricName, ClusterMetrics 
 import { metricUnits } from './observations';
 import type { CounterSample } from './observations';
 import { decimalValue, quantity } from './resourceDemand';
-import { objectArray, objectRecord } from './inventory';
+import { objectArray, objectRecord } from './observations';
 
 export const missingMetric = (name: ClusterMetricName, source: string, reason: string, state: ClusterMetric['state'] = 'unavailable'): ClusterMetric => ({ unit: metricUnits[name], state, source, reason, reasonCode: state });
 export function freshness(metric: ClusterMetric, now: number, ttl = 45_000): ClusterMetric {

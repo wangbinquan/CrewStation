@@ -5,7 +5,8 @@ import { enqueueJob } from '@crewstation/queue';
 import type { ClusterHistoryResource } from '@crewstation/contracts';
 import type { CollectorKind, CollectorTicket, MetricsRepository } from '../../ports/metrics';
 import type { MetricsObservation } from '../../domain/observations';
-import { metricCollectors, metricHistory, metricObservations, metricStorage } from './metricsTables';
+import { metricCollectors, metricHistory, metricObservations, metricStorage } from './tables';
+import { prepareClusterContent } from './projectDeletion';
 
 import { METRICS_JOB, STORAGE_JOB } from '../../ports/metrics';
 const ticketWhere = (kind: CollectorKind, ticket: CollectorTicket) => and(eq(metricCollectors.kind, kind), eq(metricCollectors.requestId, ticket.requestId), eq(metricCollectors.fence, ticket.fence));
@@ -22,10 +23,12 @@ async function updateIdentities(tx: Transaction, observation: MetricsObservation
     const body: ClusterHistoryResource = { ...i, firstSeen: before?.firstSeen ?? i.firstSeen, versions: versions.filter((v) => !v.to || Date.parse(v.to) > Date.parse(observation.at) - 8 * 86_400_000) };
     return { id: i.resourceId, lastSeen: new Date(i.lastSeen), body };
   });
-  for (let offset = 0; offset < values.length; offset += 500) await tx.insert(metricHistory).values(values.slice(offset, offset + 500)).onConflictDoUpdate({ target: metricHistory.id, set: { lastSeen: sql`excluded.last_seen`, body: sql`excluded.body` } });
-  if (observation.identitiesComplete) for (const row of old.filter((r) => !seen.has(r.id) && !r.body.deleted)) {
-    const versions = row.body.versions.map((v) => v.to ? v : { ...v, to: observation.at });
-    await tx.update(metricHistory).set({ body: { ...row.body, deleted: true, versions } }).where(eq(metricHistory.id, row.id));
+  const identities = (await prepareClusterContent(tx, 'metric_observations', { ...observation, identities: values.map((value) => value.body) }))!.identities;
+  const cleaned = identities.map((body) => ({ id: body.resourceId, lastSeen: new Date(body.lastSeen), body }));
+  for (let offset = 0; offset < cleaned.length; offset += 500) await tx.insert(metricHistory).values(cleaned.slice(offset, offset + 500)).onConflictDoUpdate({ target: metricHistory.id, set: { lastSeen: sql`excluded.last_seen`, body: sql`excluded.body` } });
+  if (observation.identitiesComplete) {
+    const missing = old.filter((r) => !seen.has(r.id) && !r.body.deleted).map((row) => ({ ...row.body, deleted: true, versions: row.body.versions.map((v) => v.to ? v : { ...v, to: observation.at }) }));
+    for (const body of (await prepareClusterContent(tx, 'metric_observations', { ...observation, identities: missing }))!.identities) await tx.update(metricHistory).set({ body }).where(eq(metricHistory.id, body.resourceId));
   }
   await tx.delete(metricHistory).where(lt(metricHistory.lastSeen, new Date(Date.parse(observation.at) - 8 * 86_400_000)));
 }
@@ -43,6 +46,7 @@ export function drizzleMetricsRepository(db: Database): MetricsRepository {
     latest: async () => (await db.select().from(metricObservations).orderBy(desc(metricObservations.createdAt)).limit(1))[0]?.body,
     observation: async (id) => (await db.select().from(metricObservations).where(eq(metricObservations.id, id)))[0]?.body,
     save: async (value, ticket) => db.transaction(async (tx) => {
+      value = (await prepareClusterContent(tx, 'metric_observations', value))!;
       if (!await owns(tx, 'metrics', ticket)) return false;
       const last = (await tx.select().from(metricObservations).orderBy(desc(metricObservations.createdAt)).limit(1))[0];
       if (last && last.createdAt.getTime() >= Date.parse(value.at)) return false;
@@ -52,6 +56,7 @@ export function drizzleMetricsRepository(db: Database): MetricsRepository {
     }),
     storage: async () => (await db.select().from(metricStorage).where(eq(metricStorage.id, 'current')))[0]?.body ?? [],
     saveStorage: async (body, at, ticket) => db.transaction(async (tx) => {
+      body = (await prepareClusterContent(tx, 'metric_storage', body))!;
       if (!await owns(tx, 'storage', ticket)) return false;
       const old = (await tx.select().from(metricStorage).where(eq(metricStorage.id, 'current')))[0];
       if (old && old.updatedAt.getTime() >= Date.parse(at)) return false;

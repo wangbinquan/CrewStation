@@ -3,7 +3,7 @@ import { createFakeK8sClient, Resources } from '@crewstation/k8s';
 import { kubernetesMetricsReader } from '../adapters/k8s/metricsReader';
 import { measureStorageTargets } from '../adapters/http/storageProbe';
 import { prometheusHistoryReader } from '../adapters/http/prometheus';
-import { queryHistory, historyResources } from '../application/historyQueries';
+import { queryHistory, historyResources } from '../application/metricQueries';
 import { observeMetrics } from '../application/observeMetrics';
 import { ClusterHistoryQuerySchema } from '@crewstation/contracts';
 import { metricsFixture, metricsTicket } from './metricsFixture';

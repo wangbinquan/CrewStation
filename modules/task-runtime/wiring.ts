@@ -47,6 +47,11 @@ import { reconcileRebuildUseCase } from './application/reconcileRebuild';
 import { rebuildUseCases } from './application/requestRebuild';
 import { rebuildWorker } from './workers/rebuildWorker';
 import { nativeExecutionWorker } from './workers/nativeExecutionWorker';
+import { developmentParentEndingWorker } from './workers/developmentParentEndingWorker';
+import { developmentParentRecoveryWorker } from './workers/developmentParentRecoveryWorker';
+import { kubernetesDevelopmentParentPhysical } from './adapters/k8s/parentEnding/physical';
+import type { TaskDevelopmentRemovalQuery } from './adapters/k8s/taskRemovalGuard';
+import type { DevelopmentParentPhysical } from './ports/developmentParentPhysical';
 import { createNativeExecutionUseCase } from './application/nativeExecution';
 import { resolveDevelopmentObjectSource } from './application/development/objectStorage';
 import { createTestEnvironmentUseCase } from './application/testEnvironment';
@@ -63,6 +68,7 @@ import { ledgerResyncWorker } from './workers/ledgerResyncWorker';
 import type { EnvironmentSources, ProfileCatalog, ProjectAuthorizer, QuotaSource, ServiceResolver, SourceCheckoutSource, TaskRuntimeSettings, TestRunner } from './ports/platform';
 
 export interface TaskRuntimeModuleDeps {
+  developmentParentPhysical?: DevelopmentParentPhysical;
   developmentCleanup?: DevelopmentCleanupParticipant;
   archive?: { credentials: ArchiveCredentials; apiUrl: string };
   workloadSafety?: WorkloadSafetyPort;
@@ -120,13 +126,14 @@ function ledgerProjectionFor(deps: TaskRuntimeModuleDeps): Parameters<typeof dri
     } } : {}) } : undefined;
 }
 
-function taskRuntimeUseCaseDeps(deps: TaskRuntimeModuleDeps): TaskRuntimeUseCaseDeps {
+function taskRuntimeUseCaseDeps(deps: TaskRuntimeModuleDeps, developmentRemoval: TaskDevelopmentRemovalQuery): TaskRuntimeUseCaseDeps {
   return {
     developmentCleanup: deps.developmentCleanup, workloadSafety: deps.workloadSafety, taskVolumes: deps.taskVolumes,
     ...(deps.ledger && deps.creation === 'ledger' ? { unprovisionedStorage: unprovisionedStorage(deps.db, deps.ledger) } : {}),
     uow: drizzleUnitOfWork(deps.db, ledgerProjectionFor(deps)),
-    cluster: deps.cluster ?? kubernetesTaskCluster(deps.k8s, deps.settings.workerUid),
-    businessStorageInspector: kubernetesTaskRecoveryCluster(deps.k8s),
+    cluster: deps.cluster ?? kubernetesTaskCluster(deps.k8s, deps.settings.workerUid, developmentRemoval),
+    businessStorageInspector: kubernetesTaskRecoveryCluster(deps.k8s, developmentRemoval),
+    developmentParentInspector: kubernetesTaskRecoveryCluster(deps.k8s, developmentRemoval),
     authorizer: deps.authorizer,
     quotas: deps.quotas,
     profiles: deps.profiles,
@@ -142,16 +149,24 @@ function taskRuntimeUseCaseDeps(deps: TaskRuntimeModuleDeps): TaskRuntimeUseCase
   };
 }
 
+function taskRuntimeParticipants(deps: TaskRuntimeModuleDeps) {
+  const forward: TaskDevelopmentRemovalQuery = (target) => query ? query(target) : Promise.resolve({ kind: 'waiting', reason: '原开发删除来源尚未装配' });
+  const useCaseDeps = taskRuntimeUseCaseDeps(deps, forward);
+  useCaseDeps.developmentParentPhysical = deps.developmentParentPhysical ?? kubernetesDevelopmentParentPhysical(deps.k8s, forward);
+  const executionDeps = { ...useCaseDeps, nativeCluster: kubernetesNativeExecutions(deps.k8s, deps.settings.workerUid, deps.workloadSafety) };
+  const query = developmentRemovalLookup(executionDeps);
+  const recoveryDeps = { ...useCaseDeps, recoveryCluster: kubernetesTaskRecoveryCluster(deps.k8s, forward), provisioner: kubernetesRebuildProvisioner(deps.k8s, deps.settings.workerUid, forward) };
+  return { useCaseDeps, executionDeps, recoveryDeps };
+}
+
 export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntimeModule {
-  const useCaseDeps = taskRuntimeUseCaseDeps(deps);
+  const { useCaseDeps, executionDeps, recoveryDeps } = taskRuntimeParticipants(deps);
   const create = createEnvironmentUseCase(useCaseDeps);
   const archives = deps.archive && deps.ledger && deps.creation === 'ledger' ? archiveExecution({ runtime: useCaseDeps, store: archiveExecutionStore(deps.db, deps.ledger), ...deps.archive }) : undefined;
   const lifecycle = lifecycleUseCases(useCaseDeps);
   const queries = environmentQueries(useCaseDeps);
   const reconcile = reconcileUseCase(useCaseDeps, lifecycle);
   const observeStartup = observeStartupUseCase(useCaseDeps, lifecycle);
-  const recoveryDeps = { ...useCaseDeps, recoveryCluster: kubernetesTaskRecoveryCluster(deps.k8s), provisioner: kubernetesRebuildProvisioner(deps.k8s, deps.settings.workerUid) };
-  const executionDeps = { ...useCaseDeps, nativeCluster: kubernetesNativeExecutions(deps.k8s, deps.settings.workerUid, deps.workloadSafety) };
   const createNative = createNativeExecutionUseCase(executionDeps);
   const rebuild = rebuildUseCases(recoveryDeps);
   const createTestEnvironment = createTestEnvironmentUseCase(useCaseDeps);
@@ -213,6 +228,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     api,
     http: [environmentRoutes(api, deps.isAdmin)],
     workers: [rebuildWorker(deps.db, recoveryDeps), nativeExecutionWorker(deps.db, executionDeps), ...periodicWorkers(useCaseDeps.logger, reconcile, observeStartup), ...(archives ? [archiveExecutionWorker(archives.reconcile, useCaseDeps.logger)] : []),
+      developmentParentEndingWorker(deps.db, useCaseDeps), developmentParentRecoveryWorker(useCaseDeps),
       ...(ledger ? [ledgerResyncWorker(() => resyncLedger(useCaseDeps.uow, ledger, useCaseDeps.logger, useCaseDeps.clock), useCaseDeps.logger)] : [])],
     migrations: taskRuntimeMigrations,
   };

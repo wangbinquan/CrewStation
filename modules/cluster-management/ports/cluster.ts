@@ -1,5 +1,5 @@
 import type { ClusterEvents, ClusterLedger, ClusterLogs, ClusterLogsQuery, ClusterResource, ClusterInspectRequest, ClusterInspection, ClusterOperation, Actor } from '@crewstation/contracts';
-import type { InventoryFacts, ResourceObject } from '../domain/inventory';
+import type { InventoryFacts, ResourceObject } from '../domain/observations';
 export interface ClusterReader {
   collect(kind: string, namespace: string | undefined, selector: string | undefined, signal: AbortSignal): Promise<{ objects: ResourceObject[]; resourceVersion: string }>;
   get(resource: ClusterResource): Promise<ResourceObject | undefined>;

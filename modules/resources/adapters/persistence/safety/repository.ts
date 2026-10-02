@@ -80,6 +80,8 @@ export function workloadSafetyRepository(db: Database): WorkloadSafety {
       return mutate(proof.consumer.id, async (tx, row) => {
         if (jsonHash(proof.consumer) !== jsonHash(row.consumer)) throw conflict('停止证明不属于此工作卷消费者');
         const permit = row.startPermit;
+        if (row.consumer.purpose === 'development' && (!permit || !row.admissionClosed || proof.type !== 'kubelet-terminated'))
+          throw precondition('原父停止证明需要实际 Start ACK 与已关闭准入');
         if (permit && (permit.podUid !== proof.podUid || permit.nodeName !== proof.nodeName || permit.nodeUid !== proof.nodeUid)) throw conflict('停止证明不对应获准运行的 Pod 与节点');
         const previous = (await tx.select().from(stopProofs).where(eq(stopProofs.consumerId, row.id)))[0]?.record;
         if (previous) { if (previous.podUid !== proof.podUid) throw conflict('消费者停止证明不可替换'); return previous; }

@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { projectResources } from '../domain/projection';
 import { catalog, facts, object, resourceIds } from './inventoryFixture';
-import type { ResourceObject } from '../domain/inventory';
+import type { ResourceObject } from '../domain/observations';
 const rows = (items: ResourceObject[]) => projectResources(items, facts, 'crewstation-system', catalog, '2026-09-28T00:00:00Z', resourceIds(items));
 const pvc = object('PersistentVolumeClaim', 'retained', 'cs-demo', { volumeName: 'pv-work', storageClassName: 'local-path' });
 const pv = object('PersistentVolume', 'pv-work', '', { claimRef: { namespace: 'cs-demo', name: 'retained', uid: pvc.metadata.uid }, capacity: { storage: '10Gi' }, hostPath: { path: '/private/host' }, csi: { secret: 'never-show' } });

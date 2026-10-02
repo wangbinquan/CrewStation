@@ -1,8 +1,5 @@
-import type { ProjectRuntimeStatistics, RuntimeStatisticsQuery, RuntimeTaskObservation, SystemRuntimeStatistics } from '@crewstation/contracts';
-import type { ExecutionCostVisibilityDto, ExecutionObservationV2Page, ExecutionObservationPage, ExecutionObservationQuery, SetExecutionCostVisibility, UsageValuation, UsageExecutionIdentity, UsageRecord } from '@crewstation/contracts';
-import type { Actor, AlertDto, HealthDto, LogEntryDto, LogQuery, ProjectId, TaskId, TraceChainDto, TraceEventDto, TraceEventsQuery, TraceId, TraceListQuery, TraceSummaryDto } from '@crewstation/contracts';
-
-import type { TokenPricingApi } from './tokenPricingApi';
+import type { ProjectRuntimeStatistics, RuntimeStatisticsQuery, RuntimeTaskObservation, SystemRuntimeStatistics, ExecutionCostVisibilityDto, ExecutionObservationV2Page, ExecutionObservationPage, ExecutionObservationQuery, SetExecutionCostVisibility, UsageValuation, UsageExecutionIdentity, UsageRecord, Actor, AlertDto, HealthDto, LogEntryDto, LogQuery, ProjectId, TaskId, TraceChainDto, TraceEventDto, TraceEventsQuery, TraceId, TraceListQuery, TraceSummaryDto, SaveTokenPrice, TokenPriceHistory, TokenPricePageQuery, TokenPriceProfile, TokenPriceVersion } from "@crewstation/contracts";
+import type { ProjectDeletionOwner } from '@crewstation/contracts';
 
 /** Public input/output values are independent of persistence ports. Wiring checks their structural compatibility. */
 export interface ExecutionPriceInput {
@@ -22,6 +19,7 @@ export interface ExecutionObservationCaller { identity: string; token?: string }
 
 export interface ObservabilityModuleApi extends TokenPricingApi {
   readonly name: 'observability';
+  readonly deletionOwner?: ProjectDeletionOwner;
   projectRuntimeStatistics(actor: Actor, projectId: ProjectId, query: RuntimeStatisticsQuery): Promise<ProjectRuntimeStatistics>;
   systemRuntimeStatistics(actor: Actor, query: RuntimeStatisticsQuery): Promise<SystemRuntimeStatistics>;
   projectRuntimeTask(actor: Actor, projectId: ProjectId, taskId: TaskId): Promise<RuntimeTaskObservation>;
@@ -48,4 +46,10 @@ export interface ObservabilityModuleApi extends TokenPricingApi {
   listTraceEvents(actor: Actor, projectId: ProjectId, traceId: TraceId, taskId: TaskId, query: TraceEventsQuery): Promise<{ items: TraceEventDto[]; nextCursor?: string }>;
   /** 巡检一个项目的两槽健康态并触发／恢复告警。 */
   sweepProject(projectId: ProjectId): Promise<number>;
+}
+
+export interface TokenPricingApi {
+  pricingProfiles(actor: Actor): Promise<{ items: TokenPriceProfile[] }>;
+  priceHistory(actor: Actor, profileId: string, query: TokenPricePageQuery): Promise<TokenPriceHistory>;
+  savePrice(actor: Actor, profileId: string, input: SaveTokenPrice): Promise<TokenPriceVersion>;
 }

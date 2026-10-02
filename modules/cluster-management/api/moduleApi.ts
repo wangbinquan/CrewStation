@@ -1,6 +1,7 @@
-import type { Actor, ClusterFilter, ClusterSummary, ClusterPage, ClusterDetail, ClusterEvents, ClusterLogs, ClusterLogsQuery, ClusterInspectRequest, ClusterInspection, ClusterOperation, ClusterOperationRequest, ClusterOperationQuery, ProjectClusterResources } from '@crewstation/contracts';
+import type { Actor, ClusterFilter, ClusterSummary, ClusterPage, ClusterDetail, ClusterEvents, ClusterLogs, ClusterLogsQuery, ClusterInspectRequest, ClusterInspection, ClusterOperation, ClusterOperationRequest, ClusterOperationQuery, ProjectClusterResources, ProjectDeletionOwner } from '@crewstation/contracts';
 export interface ClusterManagementModuleApi {
   readonly name: 'cluster-management';
+  readonly deletionOwner?: ProjectDeletionOwner;
   summary(actor: Actor, query: ClusterFilter): Promise<ClusterSummary>;
   resources(actor: Actor, query: ClusterFilter): Promise<ClusterPage>;
   /** 项目成员（develop 动作）读本项目的受管资源，没有管理动作（RFC-019）。 */

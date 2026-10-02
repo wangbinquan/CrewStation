@@ -1,6 +1,6 @@
 import type { DevelopmentUsageKey, DevelopmentUsagePage, DevelopmentUsageRegistration, DevelopmentRunnerUsageCapture } from '@crewstation/contracts';
 import type { DevelopmentNativeContext, DevelopmentNativeSelection } from '../domain/developmentNative';
-import type { DevelopmentModelEvidence } from '../domain/developmentModelEvidence';
+import type { DevelopmentModelEvidence } from "../domain/developmentNative";
 import type { AcceptedExecutionPrice } from './tokenPricing';
 import type { UsageLedgerTransaction, UsageTaskScope, UsageMeasurementRef } from './usageLedger';
 

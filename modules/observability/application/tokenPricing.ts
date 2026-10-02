@@ -2,7 +2,7 @@ import type { Actor, SaveTokenPrice, TokenPriceVersion } from '@crewstation/cont
 import { SaveTokenPriceSchema } from '@crewstation/contracts';
 import { conflict, forbidden, newResourceId, notFound, validation } from '@crewstation/kernel';
 import type { Clock } from '@crewstation/kernel';
-import type { TokenPricingApi } from '../api/tokenPricingApi';
+import type { TokenPricingApi } from "../api/moduleApi";
 import type { PricingProfileDirectory, TokenPriceStore } from '../ports/tokenPricing';
 
 export interface TokenPricingDeps {

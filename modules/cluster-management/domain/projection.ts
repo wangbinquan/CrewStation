@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import type { ClusterPurpose, ClusterResource } from '@crewstation/contracts';
-import type { InventoryFacts, ResourceObject, SystemComponent } from './inventory';
-import { networkKinds, objectRecord, workloadKinds } from './inventory';
-import { storageMounts } from './storageTopology';
+import type { InventoryFacts, ResourceObject, SystemComponent } from './observations';
+import { networkKinds, objectRecord, workloadKinds } from './observations';
+import { storageMounts } from './storageUsage';
 import { resourceGraph, referencesOf } from './resourceGraph';
 import { containerDetails, resourceStatus, visibleFacts } from './resourceStatus';
 import { resourceCapabilities } from './resourceCapabilities';

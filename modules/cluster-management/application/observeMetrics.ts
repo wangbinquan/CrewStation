@@ -1,13 +1,11 @@
-import type { Clock } from '@crewstation/kernel';
-import { newResourceId, PlatformError } from '@crewstation/kernel';
+import { type Clock, newResourceId, PlatformError } from '@crewstation/kernel';
 import type { ClusterHistoryResource, ClusterMetrics } from '@crewstation/contracts';
 import type { CollectorTicket, MetricsOptions, MetricsReader, MetricsRepository, NodeSample } from '../ports/metrics';
 import type { ClusterRepository } from '../ports/repository';
-import type { MetricsObservation } from '../domain/observations';
-import { objectArray, objectRecord } from '../domain/inventory';
+import { type MetricsObservation, objectArray, objectRecord, type StorageResult, type StorageTarget } from '../domain/observations';
 import { capacityProjection, nodeProjection, podProjection } from '../domain/capacity';
 import { diskStats } from '../domain/metricValues';
-import { storageProjection } from '../domain/storageUsage';
+import { storageProjection, localStorageTarget } from '../domain/storageUsage';
 
 export interface MetricsDeps { repository: MetricsRepository; inventory: ClusterRepository; reader: MetricsReader; clock: Clock; options: MetricsOptions }
 const failedMetrics = (metrics: ClusterMetrics, reason: string): ClusterMetrics => Object.fromEntries(Object.entries(metrics).map(([key, value]) => [key, { ...value, state: 'error', reason, reasonCode: 'source-failed' }]));
@@ -66,4 +64,26 @@ export async function observeMetrics(deps: MetricsDeps, ticket: CollectorTicket,
   const observation: MetricsObservation = { id, at, inventorySnapshotId: inventory.id, nodes, usages, counters, storageTargets, identities: [], identitiesComplete: inventory.facts.complete && inventory.sources.every((s) => s.state === 'complete'), capacity: capacityProjection(id, inventory.id, nodes, topology.pods, usages, now, errors) };
   observation.identities = identitiesFor(observation); signal.throwIfAborted();
   return deps.repository.save(observation, ticket);
+}
+
+const sameTarget = (a: StorageTarget, b: StorageTarget | undefined) => !!b && a.uid === b.uid && a.volumeUid === b.volumeUid && a.node === b.node && a.relativePath === b.relativePath && a.address === b.address;
+export async function observeStorage(deps: MetricsDeps, ticket: CollectorTicket, signal: AbortSignal, measure: (targets: StorageTarget[], options: MetricsOptions, signal: AbortSignal) => Promise<StorageResult[]>): Promise<boolean> {
+  const observation = await deps.repository.latest(); if (!observation) return false;
+  const topology = await deps.reader.topology(signal);
+  const targets = observation.storageTargets.filter((t) => {
+    const pvc = topology.pvcs.find((p) => p.metadata.uid === t.uid);
+    return pvc && sameTarget(t, localStorageTarget(pvc, t.resourceId, topology, deps.options.probeRoot));
+  });
+  const nodes = [...new Set(targets.map((t) => t.node))];
+  const batches = await boundedMap(nodes, 4, async (node) => {
+    const group = targets.filter((t) => t.node === node), results: StorageResult[] = [];
+    for (let i = 0; i < group.length; i += 64) { signal.throwIfAborted(); results.push(...await measure(group.slice(i, i + 64), deps.options, signal)); }
+    return results;
+  });
+  const current = await deps.reader.topology(signal), currentInventory = await deps.inventory.latest();
+  const valid = batches.flat().filter((r) => {
+    const target = targets.find((t) => t.uid === r.uid), pvc = current.pvcs.find((p) => p.metadata.uid === r.uid);
+    return target && pvc && currentInventory?.resources.some((resource) => resource.uid === r.uid) && sameTarget(target, localStorageTarget(pvc, target.resourceId, current, deps.options.probeRoot));
+  });
+  signal.throwIfAborted(); return deps.repository.saveStorage(valid, deps.clock.now().toISOString(), ticket);
 }

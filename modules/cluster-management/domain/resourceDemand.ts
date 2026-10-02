@@ -1,6 +1,6 @@
 import type { ClusterDemand } from '@crewstation/contracts';
-import { objectArray, objectRecord, stringRecord } from './inventory';
-import type { ResourceObject } from './inventory';
+import { objectArray, objectRecord, stringRecord } from './observations';
+import type { ResourceObject } from './observations';
 
 const SCALE = 1_000_000_000n;
 const decimal: Record<string, number> = { n: -9, u: -6, m: -3, '': 0, k: 3, K: 3, M: 6, G: 9, T: 12, P: 15, E: 18 };

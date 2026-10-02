@@ -30,10 +30,15 @@ import { logsAndHealthUseCases } from './application/logsAndHealth';
 import { traceChainUseCases } from './application/traceChains';
 import { observabilityRoutes } from './http/observabilityRoutes';
 import type { ClusterObserver, ProjectAuthorizer, ServiceResolver, SlotRecords, SlotRoles } from './ports/sources';
-import type { TraceChainSources } from './ports/traceSources';
+import type { TraceChainSources } from "./ports/sources";
+import type { ObservabilityDeletionTasks, ObservabilityProjectDirectory } from './ports/projectDeletion';
+import type { ProjectDeletionContext } from '@crewstation/contracts';
+import { observabilityDeletionRepository } from './adapters/persistence/projectDeletion';
+import { observabilityDeletionOwner } from './application/projectDeletion';
 
 export interface ObservabilityModuleDeps {
   db: Database;
+  deletion?: { identities: ObservabilityProjectDirectory; tasks?: ObservabilityDeletionTasks; assertGrant(context: ProjectDeletionContext): Promise<void> };
   runtimeNames?: () => Promise<{ projects: Record<string, string>; profiles: Record<string, string> }>;
   runtimeTasks?: (executor: Executor, query: RuntimeFactQuery) => Promise<RuntimeFactPage>;
   pricingProfiles?: PricingProfileDirectory;
@@ -108,6 +113,7 @@ export function createObservabilityModule(deps: ObservabilityModuleDeps): Observ
     },
   } });
   const api: ObservabilityModuleApi = { ...runtimeStatistics,
+    ...(deps.deletion ? { deletionOwner: observabilityDeletionOwner(observabilityDeletionRepository({ db: deps.db, ...deps.deletion })) } : {}),
     name: 'observability', reconcileExecutionUsage: reconcileUsage, valueExecutionUsage: valueUsage,
     acceptExecutionPrice: (input) => executionPricing.accept(input, useCaseDeps.clock.now()), ...observations, ingestExecutionUsage: usageIngestion(ledger), ...logsAndHealthUseCases(useCaseDeps), ...alerting,
     ...tokenPricingUseCases({ store: drizzleTokenPriceStore(deps.db), profiles: deps.pricingProfiles ?? { list: async () => [] }, clock: useCaseDeps.clock }),

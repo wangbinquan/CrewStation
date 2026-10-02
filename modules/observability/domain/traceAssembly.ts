@@ -1,8 +1,4 @@
-import type {
-  EventId, SubtaskId, TaskId, TraceChainDto, TraceExecutionDto, TraceId, TraceSource, TraceStatus, TraceSubtaskDto, TraceSummaryDto, TraceTaskDto, UserId,
-} from '@crewstation/contracts';
-import type { TracePosition } from './tracePaging';
-import type { TraceBusinessTaskPart, TraceDeliveryPart, TraceEnvironmentPart, TraceEventSummary, TraceSubtaskPart } from './traceParts';
+import type { EventId, SubtaskId, TaskId, TraceChainDto, TraceExecutionDto, TraceId, TraceSource, TraceStatus, TraceSubtaskDto, TraceSummaryDto, TraceTaskDto, UserId, BusinessTaskState, DeliveryState, RunnerEvent, SubtaskMode, SubtaskState, TraceTaskState, TraceEventDto } from "@crewstation/contracts";
 
 /** 一条链在本项目里的全部部件；各数组按创建时间正序。 */
 export interface TraceParts {
@@ -159,4 +155,164 @@ function traceSubtask(s: TraceSubtaskPart): TraceSubtaskDto {
     ...(s.agentProfileName ? { agentProfileName: s.agentProfileName } : {}), ...(s.sessionId ? { sessionId: s.sessionId } : {}), ...(s.error ? { error: s.error } : {}),
     createdAt: s.createdAt, ...(s.endedAt ? { endedAt: s.endedAt } : {}), ...(s.executionTaskId ? { executionTaskId: s.executionTaskId as TaskId } : {}),
   };
+}
+
+/** 调用链的原始部件（Design §14）：各模块按项目、按 traceId 交来的记录；组装与判定都在本目录的纯函数里。 */
+
+/** 按 traceId 分组的时间键：firstAt 为毫秒精度的开始时间，active 表示这一部分还在进行。 */
+export interface TraceKey { readonly traceId: string; readonly firstAt: string; readonly lastAt: string; readonly active: boolean }
+/** 链上的任务环境：开发会话、业务任务，以及挂在它们下面的 Agent 执行（native）。 */
+export interface TraceEnvironmentPart {
+  readonly id: TaskId;
+  readonly traceId: string;
+  readonly kind: 'dev-session' | 'business' | 'profile-test';
+  readonly state: TraceTaskState;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly lastActivityAt: string;
+  readonly createdBy?: string;
+  readonly branch?: string;
+  readonly message?: string;
+  readonly native?: {
+    readonly purpose: 'cli' | 'agent' | 'subtask';
+    readonly parentTaskId: TaskId;
+    readonly agentId: string;
+    readonly state: 'queued' | 'starting' | 'running' | 'cleaning' | 'finished';
+    readonly profile: { readonly name: string };
+    readonly failureReason?: string;
+  };
+}
+
+export interface TraceDeliveryPart {
+  readonly id: string;
+  readonly eventId: string;
+  readonly eventType: string;
+  readonly traceId: string;
+  readonly state: DeliveryState;
+  readonly attempts: number;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly deliveredAt?: string;
+  readonly nextAttemptAt?: string;
+  readonly lastError?: string;
+}
+
+export interface TraceSubtaskPart {
+  readonly id: SubtaskId;
+  readonly taskId: TaskId;
+  readonly name: string;
+  readonly kind: 'agent' | 'command';
+  readonly mode?: SubtaskMode;
+  readonly state: SubtaskState;
+  readonly attempt: number;
+  readonly retryOf?: SubtaskId;
+  readonly agentProfileName?: string;
+  readonly sessionId?: string;
+  readonly error?: string;
+  readonly createdAt: string;
+  readonly endedAt?: string;
+  readonly executionTaskId?: TaskId;
+}
+
+export interface TraceBusinessTaskPart {
+  readonly id: TaskId;
+  readonly traceId: string;
+  readonly state: BusinessTaskState;
+  readonly callerIdentity: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly closedAt?: string;
+  readonly subtasks: readonly TraceSubtaskPart[];
+}
+
+/** 一个执行环境的事件汇总：指定种类的条数、出现过的原生会话 ID 与 Agent 协议。 */
+export interface TraceEventSummary { readonly taskId: TaskId; readonly events: number; readonly sessionIds: readonly string[]; readonly protocol?: string }
+export interface TraceStoredEvent { readonly seq: number; readonly at: string; readonly event: RunnerEvent }
+
+/** 一条链在列表里的位置：开始时间（毫秒精度 ISO）＋ traceId；traceId 唯一，所以位置也唯一。 */
+export interface TracePosition { readonly at: string; readonly traceId: string }
+
+export const encodeTraceCursor = (position: TracePosition): string => `${position.at}~${position.traceId}`;
+
+/** 游标的格式已由契约校验（`TRACE_CURSOR_PATTERN`）。 */
+export function decodeTraceCursor(cursor: string): TracePosition {
+  const [at = '', traceId = ''] = cursor.split('~');
+  return { at, traceId };
+}
+
+/** 列表顺序：开始时间新的在前，同一毫秒按 traceId 倒序。返回负数表示 a 排在 b 前面。 */
+export function compareTracePositions(a: TracePosition, b: TracePosition): number {
+  if (a.at !== b.at) return a.at < b.at ? 1 : -1;
+  return a.traceId === b.traceId ? 0 : a.traceId < b.traceId ? 1 : -1;
+}
+
+/**
+ * 多个来源各自按「本来源里的开始时间」倒序给出一页时间键，合并后按整条链最早的开始时间排序。
+ * 某个来源给满了 limit 条，它最后一条之后的键这一轮没看到；一条链的最早开始时间又可能落在另一个来源里。
+ * 只有不晚于所有给满来源最后一条的位置（取其中最靠前的那个）才保证这一轮已完整看到——返回这个下界；
+ * 所有来源都没给满时返回 undefined，表示已经看到底。
+ */
+export function scannedFloor(batches: readonly (readonly TraceKey[])[], limit: number): TracePosition | undefined {
+  let floor: TracePosition | undefined;
+  for (const batch of batches) {
+    const last = batch.at(-1);
+    if (batch.length < limit || !last) continue;
+    const position = { at: last.firstAt, traceId: last.traceId };
+    if (!floor || compareTracePositions(position, floor) < 0) floor = position;
+  }
+  return floor;
+}
+
+/** 位置落在 (cursor, floor] 之间：比游标更早（游标本身是上一页最后一条），且不早于这一轮的下界。 */
+export function withinScannedRange(position: TracePosition, cursor: TracePosition | undefined, floor: TracePosition | undefined): boolean {
+  return (!cursor || compareTracePositions(position, cursor) > 0) && (!floor || compareTracePositions(position, floor) <= 0);
+}
+
+const WINDOW_MS = { '1h': 3_600_000, '24h': 86_400_000, '7d': 604_800_000 } as const;
+
+/** 时间范围按「有活动」算的起点；「全部」没有起点。 */
+export function windowStart(window: '1h' | '24h' | '7d' | 'all', now: Date): string | undefined {
+  return window === 'all' ? undefined : new Date(now.getTime() - WINDOW_MS[window]).toISOString();
+}
+
+/**
+ * 回放里逐条查看的事件种类：Agent 事件、启动前步骤、CLI 活动信号、终端关闭。平台自己执行的命令（execExited，
+ * 工作台读分支、读文件时产生，一个会话可达数万条）、终端输出与文件变化不列。
+ */
+export const TRACE_EVENT_KINDS: RunnerEvent['kind'][] = ['agent', 'beforeStart', 'nativeActivity', 'terminalClosed'];
+
+/** Agent 文字截到这个长度；完整输出在业务子任务的产物或 CLI 自己的会话里。 */
+export const TRACE_TEXT_LIMIT = 2000;
+
+const clip = (text: string) => (text.length > TRACE_TEXT_LIMIT ? `${text.slice(0, TRACE_TEXT_LIMIT)}…` : text);
+
+/**
+ * 把一条运行事件映射成回放条目；不在 TRACE_EVENT_KINDS 里的返回 undefined。
+ * Design §14.2「默认不保留模型内部推理内容」：思考事件只留类型，不带文字。
+ */
+export function toTraceEvent(stored: TraceStoredEvent): TraceEventDto | undefined {
+  const { seq, at, event } = stored;
+  switch (event.kind) {
+    case 'agent': {
+      const a = event.event, text = a.type === 'thinking' ? undefined : a.text ?? a.result?.summary;
+      return {
+        seq, at: a.at, kind: 'agent', type: a.type, ...(text ? { text: clip(text) } : {}),
+        ...(a.tool ? { tool: { name: a.tool.name, ...(a.tool.isError === undefined ? {} : { isError: a.tool.isError }) } } : {}),
+        ...(a.status ? { status: a.status } : {}), ...(a.error ? { error: a.error.message } : {}), ...(a.sessionId ? { sessionId: a.sessionId } : {}),
+        ...(a.result?.exitCode === undefined ? {} : { exitCode: a.result.exitCode }),
+      };
+    }
+    case 'beforeStart': {
+      const x = event.execution, step = x.steps.find((s) => s.stepId === (x.error?.stepId ?? x.currentStepId)) ?? x.steps.find((s) => s.state === 'failed');
+      return { seq, at, kind: 'before-start', status: x.state, ...(step ? { text: step.name } : {}), ...(x.error ? { error: x.error.message } : {}) };
+    }
+    case 'nativeActivity': {
+      const signal = event.activity.signal;
+      return { seq, at: signal.occurredAt, kind: 'activity', status: signal.kind, ...(signal.nativeSessionId ? { sessionId: signal.nativeSessionId } : {}) };
+    }
+    case 'terminalClosed':
+      return { seq, at, kind: 'terminal-closed', exitCode: event.exitCode };
+    default:
+      return undefined;
+  }
 }

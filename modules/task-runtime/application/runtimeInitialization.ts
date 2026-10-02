@@ -1,3 +1,6 @@
+import { requireCurrentParentRebuild } from './development/parent/binding';
+import { wakeRelatedDevelopmentParentEnding, assertDevelopmentWriter } from './development/parent/admission';
+import { admitDevelopmentParentEnding, prepareDevelopmentParentEnding, selectedDevelopmentParent } from './development/parent/request';
 import type { RuntimeInitializationStatus } from '@crewstation/contracts';
 import { RuntimeInitializationStatusSchema } from '@crewstation/contracts';
 import { newResourceId } from '@crewstation/kernel';
@@ -11,6 +14,14 @@ const terminalFailure = (state: string) => ['failed', 'cancelled', 'unknown'].in
 /** 连接只表示协议可用。用途初始化通过以后才放行任务、Agent 与重建 ready。 */
 export async function reconcileRuntimeInitialization(deps: TaskRuntimeUseCaseDeps, env: TaskEnvironment): Promise<boolean> {
   if (!env.render?.runtimeImage || env.state !== 'creating') return false;
+  const admission = await deps.uow.run(async (scope) => {
+    await scope.admissions.lock(env.projectId);
+    const current = await scope.environments.getById(env.id);
+    if (!current) return { sealed: false, witness: undefined };
+    if (await wakeRelatedDevelopmentParentEnding(scope, current)) return { sealed: true, witness: undefined };
+    return { sealed: false, witness: await assertDevelopmentWriter(scope, current) };
+  });
+  if (admission.sealed) return true;
   const timeout = initializationTimeout(env, deps.clock.now());
   let status = timeout ? unavailable(timeout) : env.runtimeInitialization;
   if (!status || !terminalFailure(status.state)) {
@@ -19,17 +30,28 @@ export async function reconcileRuntimeInitialization(deps: TaskRuntimeUseCaseDep
     if (!status) return false;
   }
   const observation = status;
+  const prepared = !env.native && terminalFailure(observation.state) ? await prepareDevelopmentParentEnding(deps, env) : undefined;
+  const parentWitness = admission.witness;
   return deps.uow.run(async (scope) => {
     await scope.admissions.lock(env.projectId);
     const current = await scope.environments.getById(env.id);
     if (!current || current.state !== 'creating' || current.podName !== env.podName || current.runnerTokenHash !== env.runnerTokenHash || current.render?.start !== env.render?.start) return false;
+    if (await wakeRelatedDevelopmentParentEnding(scope, current)) return true;
+    if (terminalFailure(observation.state) && await selectedDevelopmentParent(scope, current)) {
+      if (!prepared) return false; // A protected child was admitted during the external read: retry preparation outside this lock.
+      await admitDevelopmentParentEnding(scope, prepared, 'compensation', { cause: 'runtime-initialization', observation }, deps.clock.now());
+      return true;
+    }
+    await assertDevelopmentWriter(scope, current, parentWitness);
     // Runner 可能刚在连接期限内受理，已开始独立初始化预算；旧读取不能把它误判超时。
     if (timeout && !initializationTimeout(current, deps.clock.now())) return false;
     if (!terminalFailure(observation.state) && !current.connected) return false;
     const now = deps.clock.now(), observed = { ...current, runtimeInitialization: observation };
     if (observation.state === 'succeeded') {
-      await scope.environments.update(transition(observed, 'running', now, { message: '运行环境初始化完成', ...(current.native ? { native: { ...current.native, state: 'running' } } : {}) }));
       const rebuild = current.rebuildId ? await scope.rebuilds.get(current.rebuildId) : undefined;
+      if (current.rebuildId && !rebuild || rebuild && !['starting', 'ready'].includes(rebuild.state)) return false;
+      if (await requireCurrentParentRebuild(scope, current, rebuild) && (!rebuild?.podUid || !rebuild.secretUid || rebuild.podUid !== current.podUid)) return false;
+      await scope.environments.update(transition(observed, 'running', now, { message: '运行环境初始化完成', ...(current.native ? { native: { ...current.native, state: 'running' } } : {}) }));
       if (rebuild?.state === 'starting') await scope.rebuilds.update({ ...rebuild, state: 'ready', updatedAt: now, message: '原工作树已恢复，运行环境初始化完成' });
       return true;
     }

@@ -4,7 +4,7 @@ import type { AlertCandidate } from '../domain/alertRules';
 import { alertsFromHealth, resolvedKeysForHealthy } from '../domain/alertRules';
 import type { ObservabilityUseCaseDeps } from './dependencies';
 import { alertToDto } from '../ports/repositories';
-import { slotHealthReader } from './slotHealth';
+import { slotHealthReader } from "./logsAndHealth";
 
 /** 告警：健康态巡检触发与自动恢复，只在工作台告警页查看；首版不做告警通知（D61）。 */
 export function alertingUseCases(deps: ObservabilityUseCaseDeps) {

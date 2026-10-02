@@ -9,11 +9,12 @@ import { developmentCaptureSourceId, developmentNativePrefix, developmentNativeS
 import { persistDevelopmentModel, readDevelopmentModel } from './developmentUsageModels';
 import type { Database, Executor } from '@crewstation/persistence';
 import type { ExecutionValuationRequest, ExecutionValuationStore, UsageMeasurementRef, UsageLedgerStore, UsageTaskScope } from '../../ports/usageLedger';
-import { costVisibility } from './tokenPriceTables';
+import { costVisibility } from "./tables";
 import type { RuntimeStatisticsSnapshot } from '../../ports/usageLedger';
 import { usageChangesWithCaptures, usageSnapshotWithCaptures, usageSnapshot, captureIncompleteAt } from './usageSnapshot';
 import { nativeCaptureId, nativeRecordId, nativeStepKey, nativeMeasurementFingerprint, compareNativeBaseline, nativeCaptureSummary, nativeRepairCandidate, nativeStepFingerprint, reconcileNativeRepairModel, projectNativeRepair, rebuildUsageProjection, type UsageEvidence, type NativeCaptureDocument } from '../../domain/usageProjection';
-import { nativeCaptures, nativeCaptureHistory, nativeSteps, nativeBaselines, nativeRepairs, executionValuations, executionValuationReceipts, usageChanges, usageEvents, usageEvidence, usageHeads, usagePages, usageProjections, usageSources } from './usageLedgerTables';
+import { nativeCaptures, nativeCaptureHistory, nativeSteps, nativeBaselines, nativeRepairs, executionValuations, executionValuationReceipts, usageChanges, usageEvents, usageEvidence, usageHeads, usagePages, usageProjections, usageSources } from "./tables";
+import { admitObservationWrite } from './projectDeletion';
 
 const taskKeyOf = (scope: UsageTaskScope) => jsonHash({ projectId: scope.projectId, taskId: scope.taskId });
 const meterKeyOf = (value: UsageMeasurementRef) => jsonHash({ identity: value.identity, sourceId: value.sourceId, recordId: value.recordId });
@@ -93,6 +94,7 @@ async function reprojectNativeMeter(db: Executor, taskKey: string, key: string, 
 
 function ledgerChange<T>(db: Database, scope: UsageTaskScope, sourceId: string, work: (tx: DevelopmentUsageTransaction) => Promise<T>) {
   return db.transaction(async (tx) => {
+    await admitObservationWrite(tx, scope.projectId);
     const taskKey = taskKeyOf(scope);
     await tx.insert(usageHeads).values({ taskKey, projectId: scope.projectId, taskId: scope.taskId, sequence: 0 }).onConflictDoNothing();
     const [head] = await tx.select().from(usageHeads).where(eq(usageHeads.taskKey, taskKey)).for('update');
@@ -100,11 +102,20 @@ function ledgerChange<T>(db: Database, scope: UsageTaskScope, sourceId: string, 
     return work(transaction(tx, taskKey, sourceId, head!.sequence));
   });
 }
+function snapshotChange<T>(db: Database, scope: UsageTaskScope, work: (tx: Executor, taskKey: string) => Promise<T>) {
+  return db.transaction(async (tx) => {
+    await admitObservationWrite(tx, scope.projectId);
+    const taskKey = taskKeyOf(scope);
+    // A zero-usage snapshot still needs its original task/project ownership for permanent cleanup.
+    await tx.insert(usageHeads).values({ taskKey, projectId: scope.projectId, taskId: scope.taskId, sequence: 0 }).onConflictDoNothing();
+    return work(tx, taskKey);
+  });
+}
 export function drizzleUsageLedger(db: Database): UsageLedgerStore & DevelopmentUsageLedgerStore {
   return {
     changesWithCaptures: (scope, after, limit) => usageChangesWithCaptures(db, taskKeyOf(scope), after, limit),
-    snapshotWithCaptures: (scope, query, now, visibilityRevision) => usageSnapshotWithCaptures(db, taskKeyOf(scope), query, now, visibilityRevision),
-    snapshot: (scope, query, now, visibilityRevision) => usageSnapshot(db, taskKeyOf(scope), query, now, visibilityRevision),
+    snapshotWithCaptures: (scope, query, now, visibilityRevision) => snapshotChange(db, scope, (tx, key) => usageSnapshotWithCaptures(tx, key, query, now, visibilityRevision)),
+    snapshot: (scope, query, now, visibilityRevision) => snapshotChange(db, scope, (tx, key) => usageSnapshot(tx, key, query, now, visibilityRevision)),
     cursor: (scope, sourceId) => sourceCursor(db, taskKeyOf(scope), sourceId),
     // Both participants serialize on the same task head and commit one watermark.
     change: (scope, sourceId, work) => ledgerChange(db, scope, sourceId, work),
@@ -155,6 +166,7 @@ export function drizzleExecutionValuations(db: Database): ExecutionValuationStor
         .orderBy(asc(nativeRepairs.meterKey)).limit(limit);
     },
     commit: (input, fingerprint, basisFingerprint, draft) => db.transaction(async (tx) => {
+      await admitObservationWrite(tx, input.measurement.identity.projectId);
       const taskKey = taskKeyOf(input.measurement.identity);
       const [head] = await tx.select().from(usageHeads).where(eq(usageHeads.taskKey, taskKey)).for('update');
       const prior = await valuationReceipt(tx, taskKey, input.requestKey);

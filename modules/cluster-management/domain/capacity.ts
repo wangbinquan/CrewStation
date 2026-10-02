@@ -1,6 +1,6 @@
 import type { ClusterCapacity, ClusterMetricName, ClusterMetrics, ClusterDemand, ClusterNode, ClusterResource, ClusterUsage, ClusterUsageSummary } from '@crewstation/contracts';
-import type { ResourceObject } from './inventory';
-import { objectArray, objectRecord, stringRecord } from './inventory';
+import type { ResourceObject } from './observations';
+import { objectArray, objectRecord, stringRecord } from './observations';
 import { activePod, addDemand, combine, emptyDemand, normalized, podDemand } from './resourceDemand';
 import { aggregateMetrics, computeStats, gauge, missingMetric, networkStats } from './metricValues';
 import type { SampleContext } from './metricValues';

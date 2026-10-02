@@ -1,7 +1,7 @@
 import type { K8sClient } from '@crewstation/k8s';
 import { Resources, parseMetricsJson } from '@crewstation/k8s';
 import type { MetricsReader } from '../../ports/metrics';
-import type { ResourceObject } from '../../domain/inventory';
+import type { ResourceObject } from '../../domain/observations';
 
 async function listAll(k8s: K8sClient, kind: string, signal: AbortSignal): Promise<ResourceObject[]> {
   for (let attempt = 0; attempt < 2; attempt++) {

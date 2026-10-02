@@ -5,7 +5,7 @@ import type { ProjectId, ServiceId, TaskId } from '../../ids';
 export const WORKLOAD_STOP_FINALIZER = 'crewstation.io/workload-stop-proof';
 export const WORKLOAD_CONSUMER_ANNOTATION = 'crewstation.io/workload-consumer';
 export const WorkloadConsumerIntentSchema = z.strictObject({
-  id: ResourceIdSchema, taskId: TaskIdSchema, revision: z.number().int().positive(), purpose: z.enum(['business', 'agent', 'archive']),
+  id: ResourceIdSchema, taskId: TaskIdSchema, revision: z.number().int().positive(), purpose: z.enum(['business', 'agent', 'archive', 'development']),
   finalization: z.strictObject({ operationId: ResourceIdSchema, revision: z.number().int().positive() }).nullable(),
 }).refine((input) => (input.purpose === 'archive') === (input.finalization !== null), '归档消费者必须绑定终结操作');
 export type WorkloadConsumerIntent = z.infer<typeof WorkloadConsumerIntentSchema>;
@@ -14,7 +14,7 @@ export type WorkloadAdmissionIdentity = z.infer<typeof WorkloadAdmissionIdentity
 export const WorkloadConsumerSchema = z.strictObject({
   id: ResourceIdSchema, resourceId: ResourceIdSchema, taskId: TaskIdSchema, revision: z.number().int().positive(),
   namespace: z.string().min(1).max(253), podName: z.string().min(1).max(253), volumeUid: z.uuid(),
-  purpose: z.enum(['business', 'agent', 'archive']),
+  purpose: z.enum(['business', 'agent', 'archive', 'development']),
   finalization: z.strictObject({ operationId: ResourceIdSchema, revision: z.number().int().positive() }).nullable(),
 }).refine((input) => (input.purpose === 'archive') === (input.finalization !== null), '归档消费者必须绑定终结操作');
 export const WorkloadStartPermitSchema = z.strictObject({ podUid: z.uuid(), nodeName: z.string().min(1), nodeUid: z.uuid(), grantedAt: z.iso.datetime() });

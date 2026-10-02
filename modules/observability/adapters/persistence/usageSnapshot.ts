@@ -1,13 +1,13 @@
 import { and, asc, desc, eq, gt, lte, sql } from 'drizzle-orm';
 import { conflict, gone, newResourceId, notFound, validation } from '@crewstation/kernel';
-import type { Database, Executor } from '@crewstation/persistence';
+import type { Executor } from '@crewstation/persistence';
 import { ExecutionCaptureObservationSchema, ExecutionObservationV2Schema, type UsageNativeCapture, type UsageExecutionIdentity } from '@crewstation/contracts';
 import { nativeCaptureId } from '../../domain/usageProjection';
 import type { UsageSyncChanges, UsageSyncSnapshot, UsageSnapshot, UsageSnapshotQuery } from '../../ports/usageLedger';
-import { nativeCaptureHistory, usageChanges, usageHeads, usageSnapshots } from './usageLedgerTables';
+import { nativeCaptureHistory, usageChanges, usageHeads, usageSnapshots } from "./tables";
 
 const lifetimeMs = 30 * 60 * 1000;
-async function snapshotRecord(db: Database, taskKey: string, snapshotId: string | undefined, now: number, visibilityRevision: number, version: 1 | 2 = 1) {
+async function snapshotRecord(db: Executor, taskKey: string, snapshotId: string | undefined, now: number, visibilityRevision: number, version: 1 | 2 = 1) {
   if (snapshotId !== undefined && snapshotId.startsWith('v2:') !== (version === 2)) throw validation('快照版本与请求版本不一致');
   if (snapshotId !== undefined) {
     const row = (await db.select().from(usageSnapshots).where(and(eq(usageSnapshots.id, snapshotId), eq(usageSnapshots.taskKey, taskKey))).limit(1))[0];
@@ -24,7 +24,7 @@ async function snapshotRecord(db: Database, taskKey: string, snapshotId: string 
 
 /** Read each meter's last committed version at the persisted snapshot boundary.
  * Later corrections and newly-created meters cannot drift into subsequent pages. */
-export async function usageSnapshot(db: Database, taskKey: string, query: UsageSnapshotQuery, now: number, visibilityRevision: number): Promise<UsageSnapshot> {
+export async function usageSnapshot(db: Executor, taskKey: string, query: UsageSnapshotQuery, now: number, visibilityRevision: number): Promise<UsageSnapshot> {
   if (!Number.isSafeInteger(visibilityRevision) || visibilityRevision < 0 || !Number.isSafeInteger(now) || now < 0 || now > Number.MAX_SAFE_INTEGER - lifetimeMs) throw new RangeError('Invalid usage snapshot clock or visibility');
   if (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > 500 ||
     (query.snapshotId === undefined) !== (query.cursor === undefined) ||
@@ -64,7 +64,7 @@ function captureObservation(row: { sequence: number; document: UsageNativeCaptur
 
 /** Both histories share the task sequence. Merge before limiting and only advance
  * to the last returned sequence, so a dense source cannot hide the other one. */
-export async function usageChangesWithCaptures(db: Database, taskKey: string, after: number, limit: number): Promise<UsageSyncChanges> {
+export async function usageChangesWithCaptures(db: Executor, taskKey: string, after: number, limit: number): Promise<UsageSyncChanges> {
   if (!Number.isSafeInteger(after) || after < 0 || !Number.isInteger(limit) || limit < 1 || limit > 500) throw new RangeError('Invalid usage changes page');
   const head = (await db.select().from(usageHeads).where(eq(usageHeads.taskKey, taskKey)).limit(1))[0]?.sequence ?? 0;
   if (after > head) throw validation('Usage cursor is ahead of committed evidence', { reason: 'cursor-ahead' });
@@ -80,7 +80,7 @@ export async function usageChangesWithCaptures(db: Database, taskKey: string, af
 }
 
 /** Versioned cursor and snapshot IDs keep old readers from consuming half a v2 snapshot. */
-export async function usageSnapshotWithCaptures(db: Database, taskKey: string, query: UsageSnapshotQuery, now: number, visibilityRevision: number): Promise<UsageSyncSnapshot> {
+export async function usageSnapshotWithCaptures(db: Executor, taskKey: string, query: UsageSnapshotQuery, now: number, visibilityRevision: number): Promise<UsageSyncSnapshot> {
   if (!Number.isSafeInteger(visibilityRevision) || visibilityRevision < 0 || !Number.isSafeInteger(now) || now < 0 || now > Number.MAX_SAFE_INTEGER - lifetimeMs) throw new RangeError('Invalid usage snapshot clock or visibility');
   if (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > 500 ||
     (query.snapshotId === undefined) !== (query.cursor === undefined) ||

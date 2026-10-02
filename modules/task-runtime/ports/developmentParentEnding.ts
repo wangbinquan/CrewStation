@@ -64,6 +64,8 @@ export interface DevelopmentParentEndingRepository {
 export interface DevelopmentParentEndingChildren {
   page(endingId: string, afterId?: string): Promise<DevelopmentParentEndingChild[]>;
   remaining(endingId: string): Promise<number>;
+  liveUnfinished(endingId: string): Promise<number>;
+  summary(endingId: string): Promise<{ readonly count: number; readonly closed: number; readonly digest: string }>;
   close(endingId: string, childId: TaskId, closure: Readonly<Record<string, unknown>>): Promise<boolean>;
 }
 export interface DevelopmentParentEndingObjects {

@@ -1,6 +1,6 @@
 import type { HistoryReader, PrometheusMatrix } from '../../ports/metrics';
 import { boundedMetricsText } from '@crewstation/k8s';
-import { objectArray, objectRecord, stringRecord } from '../../domain/inventory';
+import { objectArray, objectRecord, stringRecord } from '../../domain/observations';
 
 export function prometheusHistoryReader(url: string, token: string, fetcher: typeof fetch = fetch): HistoryReader {
   return { range: async (query, start, end, step, signal) => {

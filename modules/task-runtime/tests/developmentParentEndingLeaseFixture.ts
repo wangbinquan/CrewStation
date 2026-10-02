@@ -47,9 +47,9 @@ export async function developmentParentEndingLeaseFixture(mode: 'ending' | 'rebu
   };
   const write = async (scope: RepositoryScope) => {
     const parent = (await scope.environments.getForUpdate(f.parent.id))!;
-    await scope.environments.update({ ...parent, message: 'signed storage transaction', parentEnding: { version: 1, endingId: ending.id, epochHash: ending.epochHash, phase: 'children' } });
     await scope.parentEnding!.endings.progress(ending.id, 'admission-sealed', { phase: 'children', status: 'pending', afterChildId: null,
       progress: { storageOnly: true }, completionWitness: null, message: null, retryAt: new Date() }, new Date());
+    await scope.environments.update({ ...parent, message: 'signed storage transaction', parentEnding: { version: 1, endingId: ending.id, epochHash: ending.epochHash, phase: 'children' } });
     await scope.parentEnding!.claims.insert(f.claim(ending.id));
     await scope.events.publish(DomainTopic.taskReleased, { occurredAt: new Date().toISOString(), traceId: f.parent.traceId,
       projectId: f.projectId, taskId: f.parent.id, kind: f.parent.kind, reason: 'user' });

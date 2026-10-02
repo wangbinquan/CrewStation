@@ -3,6 +3,7 @@ import type { DevelopmentParentEndingRepository, DevelopmentParentEndingChildren
 export interface DevelopmentParentEndingJobLease { readonly jobId: number; readonly fencingToken: number }
 /** Only a real UnitOfWork transaction can retain either authorization until final commit. */
 export interface DevelopmentParentEndingScope {
+  readonly recovery: { refill(cutoff: Date, limit?: number): Promise<number> };
   readonly endings: DevelopmentParentEndingRepository;
   readonly children: DevelopmentParentEndingChildren;
   readonly objects: DevelopmentParentEndingObjects;

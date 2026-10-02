@@ -9,7 +9,7 @@ import { drizzleExecutionPricing, drizzleTokenPriceStore } from '../adapters/per
 import { executionValuations, valueRunnerUsagePage } from '../application/executionValuations';
 import { tokenPricingUseCases } from '../application/tokenPricing';
 import { drizzleExecutionValuations, drizzleUsageLedger } from '../adapters/persistence/drizzleUsageLedger';
-import { nativeCaptures, nativeSteps } from '../adapters/persistence/usageLedgerTables';
+import { nativeCaptures, nativeSteps } from "../adapters/persistence/tables";
 import { runnerUsageReconciliation, usageIngestion } from '../application/usageIngestion';
 import { nativeCaptureId, nativeRecordId } from '../domain/usageProjection';
 import type { UsageLedgerStore, UsageSourcePage, RunnerUsageSource } from '../ports/usageLedger';

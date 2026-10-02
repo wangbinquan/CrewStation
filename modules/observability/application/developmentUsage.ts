@@ -2,7 +2,7 @@ import { DevelopmentUsagePageSchema, DevelopmentUsageRegistrationSchema, UsageRe
   type DevelopmentUsagePage, type DevelopmentUsageRegistration } from '@crewstation/contracts';
 import { conflict, jsonHash, precondition, validation, type Logger } from '@crewstation/kernel';
 import { developmentCaptureSourceId, developmentStreamId, type DevelopmentNativeContext } from '../domain/developmentNative';
-import { sameDevelopmentRegistration, type DevelopmentModelEvidence } from '../domain/developmentModelEvidence';
+import { sameDevelopmentRegistration, type DevelopmentModelEvidence } from "../domain/developmentNative";
 import { rebuildUsageProjection } from '../domain/usageProjection';
 import type { DevelopmentUsageLedgerStore, DevelopmentUsageSource, DevelopmentUsageResolved } from '../ports/developmentUsage';
 import type { AcceptedExecutionPrice, ExecutionPriceStore } from '../ports/tokenPricing';

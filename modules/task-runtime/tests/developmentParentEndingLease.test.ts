@@ -98,7 +98,7 @@ describe.skipIf(!available)('parent ending final transaction queue deadline (rea
         await s.events.publish(DomainTopic.taskReleased, { occurredAt: new Date().toISOString(), traceId: parent.traceId,
           projectId: f.projectId, taskId: parent.id, kind: parent.kind, reason: 'user' });
         await s.environments.update({ ...parent, message: 'must roll back', parentEnding: pointer });
-      })).rejects.toThrow('original parent projection failed');
+      })).rejects.toThrow(pointer === valid ? 'original parent projection failed' : '原开发父任务结束身份无效');
       expect(await f.snapshot()).toEqual(before);
     }
   });

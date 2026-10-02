@@ -1,5 +1,6 @@
 import type { DevSessionRebuildInspection, ProjectId, RebuildDevSessionRequest } from '@crewstation/contracts';
 import { conflict, precondition } from '@crewstation/kernel';
+import { currentDevelopmentParentRebuild } from './development/parent/binding';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
 import { rebuildIsActive } from '../domain/environmentRebuild';
 import type { RecoveryResources, TaskRecoveryCluster } from '../ports/recoveryCluster';
@@ -22,7 +23,7 @@ export async function recoverableDevSession(scope: RepositoryScope, projectId: P
   if (!env || !rebuildReason(env, administrator)) throw precondition('当前没有可恢复的失败或协议不兼容开发会话，请刷新会话状态');
   // 失败保留期已满（D9）：资源中心已受理回收它的容器与路由，不能再恢复（补投影随后把它记为已释放）。
   if (env.state === 'failed' && (await scope.ledger?.workload(env))?.desired === 'absent') throw precondition('这个失败会话已过 72 小时保留期，平台正在回收它的容器与路由，不能再恢复；工作卷留作待回收');
-  const previous = env.rebuildId ? await scope.rebuilds.get(env.rebuildId) : undefined;
+  const previous = await currentDevelopmentParentRebuild(scope, env) ?? (env.rebuildId ? await scope.rebuilds.get(env.rebuildId) : undefined);
   if (previous && rebuildIsActive(previous)) throw precondition('当前恢复仍在进行中，请等待结果');
   return env;
 }

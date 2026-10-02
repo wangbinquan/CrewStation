@@ -2,11 +2,11 @@ import type { Actor, ProjectId, TaskId, TraceChainDto, TraceEventDto, TraceEvent
 import type { Clock } from '@crewstation/kernel';
 import { notFound } from '@crewstation/kernel';
 import { assembleChain, groupTraceParts, summarizeTrace } from '../domain/traceAssembly';
-import { toTraceEvent, TRACE_EVENT_KINDS } from '../domain/traceEvents';
-import type { TracePosition } from '../domain/tracePaging';
-import { compareTracePositions, decodeTraceCursor, encodeTraceCursor, scannedFloor, windowStart, withinScannedRange } from '../domain/tracePaging';
+import { toTraceEvent, TRACE_EVENT_KINDS } from "../domain/traceAssembly";
+import type { TracePosition } from "../domain/traceAssembly";
+import { compareTracePositions, decodeTraceCursor, encodeTraceCursor, scannedFloor, windowStart, withinScannedRange } from "../domain/traceAssembly";
 import type { ProjectAuthorizer } from '../ports/sources';
-import type { TraceChainSources } from '../ports/traceSources';
+import type { TraceChainSources } from "../ports/sources";
 
 export interface TraceChainDeps {
   readonly authorizer: ProjectAuthorizer;

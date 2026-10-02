@@ -107,7 +107,7 @@ test('API 承载的网关、数据库、SCM 与事件回调使用独立保护；
   expect((await f.k8s.get(Resources.Pod!, 'sender', 'system'))?.metadata.finalizers).toEqual(['another/guard']);
 });
 
-for (const finalizer of ['crewstation.io/gateway-project-stop', 'crewstation.io/data-control-native-stop', 'crewstation.io/scm-project-stop'] as const) test(`${finalizer} 拒绝缺失 UID、读取故障和未实际退出，不从 Pod 消失补造停止回执`, async () => {
+for (const finalizer of ['crewstation.io/gateway-project-stop', 'crewstation.io/data-control-native-stop', 'crewstation.io/scm-project-stop', 'crewstation.io/cluster-project-stop'] as const) test(`${finalizer} 拒绝缺失 UID、读取故障和未实际退出，不从 Pod 消失补造停止回执`, async () => {
   const f = await fixture();
   await expect(projectCallbackOwners(f.k8s, 'system', undefined, finalizer).protectCurrent()).rejects.toThrow();
   const gateway = projectCallbackOwners(f.k8s, 'system', f.podUid, finalizer); await gateway.protectCurrent();

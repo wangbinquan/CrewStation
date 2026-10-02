@@ -1,9 +1,9 @@
 import { and, eq } from 'drizzle-orm';
 import type { Executor } from '@crewstation/persistence';
 import { conflict } from '@crewstation/kernel';
-import { developmentMeterKey, developmentModelFingerprint, type DevelopmentModelEvidence } from '../../domain/developmentModelEvidence';
+import { developmentMeterKey, developmentModelFingerprint, type DevelopmentModelEvidence } from "../../domain/developmentNative";
 import type { UsageMeasurementRef } from '../../ports/usageLedger';
-import { developmentModelEvidence } from './developmentUsageTables';
+import { developmentModelEvidence } from "./tables";
 
 export async function readDevelopmentModel(db: Executor, ref: UsageMeasurementRef, revision: number): Promise<DevelopmentModelEvidence | undefined> {
   return (await db.select().from(developmentModelEvidence).where(and(eq(developmentModelEvidence.meterKey, developmentMeterKey(ref)),

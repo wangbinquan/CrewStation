@@ -1,5 +1,5 @@
-import type { DevelopmentUsageRegistration, DevelopmentNativeSource, NativeUsageProof } from '@crewstation/contracts';
-import { conflict, jsonHash } from '@crewstation/kernel';
+import type { DevelopmentUsageRegistration, DevelopmentNativeSource, NativeUsageProof, RunnerUsageMeasurement, UsageExecutionIdentity } from "@crewstation/contracts";
+import { conflict, jsonHash } from "@crewstation/kernel";
 
 export interface DevelopmentNativeSelection { version: 1; expectedNamespace: string }
 export interface DevelopmentNativeContext {
@@ -67,4 +67,21 @@ export function developmentNativePrefix(captureId: string, state: DevelopmentNat
     ? 'development-store:' + jsonHash({ namespace: state.selection.expectedNamespace, podUid: state.registration.podUid,
       sourceEpoch: store.sourceEpoch, actualPathDigest: store.actualPathDigest, fileIdentityDigest: store.fileIdentityDigest }) + ':'
     : 'development-pending:' + captureId + ':';
+}
+
+export interface DevelopmentModelEvidence {
+  meter: { identity: UsageExecutionIdentity; sourceId: string; recordId: string };
+  revision: number; streamSourceId: string; sequence: number; index: number;
+  turn: string | null; turnIndex: number | null; measurementFingerprint: string;
+  actualModel: RunnerUsageMeasurement['actualModel']; modelRef: string | null;
+}
+export const developmentMeterKey = (meter: DevelopmentModelEvidence['meter']) => jsonHash(meter);
+export function sameDevelopmentRegistration(a: DevelopmentUsageRegistration, b: DevelopmentUsageRegistration): boolean {
+  return jsonHash(a) === jsonHash(b);
+}
+/** The first page locator is retained even if identical native evidence repeats later. */
+export function developmentModelFingerprint(value: DevelopmentModelEvidence): string {
+  return jsonHash({ meter: value.meter, revision: value.revision, streamSourceId: value.streamSourceId,
+    turn: value.turn, turnIndex: value.turnIndex, measurementFingerprint: value.measurementFingerprint,
+    actualModel: value.actualModel, modelRef: value.modelRef });
 }

@@ -2,14 +2,14 @@ import { publishDomainEvent } from '@crewstation/eventbus';
 import type { Logger } from '@crewstation/kernel';
 import { isPlatformError, noopLogger, precondition, quotaExceeded } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
-import { enqueueJob, lockJobLease } from '@crewstation/queue';
+import { enqueueJob } from '@crewstation/queue';
 import { REBUILD_JOB_KIND } from '../../ports/rebuilds';
 import { NATIVE_EXECUTION_JOB_KIND } from '../../ports/repositories';
 import type { AdmissionRepository } from '../../ports/repositories';
 import type { RepositoryScope, TaskQuota, UnitOfWork } from '../../ports/unitOfWork';
 import { drizzleAdmissionRepository, drizzleEnvironmentRepository } from './drizzleRepositories';
 import { drizzleRebuildRepository } from './drizzleRebuildRepository';
-import { drizzleDevelopmentParentEndingScope } from './developmentParentEndingScope';
+import { authorizeTaskJob, drizzleDevelopmentParentEndingScope } from './developmentParentEndingScope';
 import type { ParentEndingCommitCheck } from './developmentParentEndingScope';
 import { admitEnvironment, findWorkloadRecord, ledgerEnvironmentRepository, syncEnvironmentLedger } from './ledgerProjection';
 import type { EnvironmentLedger } from '../../ports/ledger';
@@ -52,7 +52,7 @@ export function scopeOver(executor: Executor, projection?: LedgerProjection, com
     ...(sync && projection ? { ledger: { sync, workload: (env: TaskEnvironment) => findWorkloadRecord(executor, projection.ledger, env) } } : {}),
     admissions,
     parentEnding: drizzleDevelopmentParentEndingScope(executor, commitChecks),
-    nativeLease: { requireCurrent: async (identity, taskId) => { if (!await lockJobLease(executor, identity.jobId, identity.fencingToken, { kind: NATIVE_EXECUTION_JOB_KIND, payload: { taskId } })) throw precondition('开发执行作业租约已失效', { code: 'execution_lease_lost' }); } },
+    nativeLease: { requireCurrent: (identity, taskId) => authorizeTaskJob(executor, commitChecks, identity, NATIVE_EXECUTION_JOB_KIND, { taskId }, 'execution_lease_lost') },
     quota: taskQuota(executor, admissions, projection),
     rebuilds: drizzleRebuildRepository(executor),
     rebuildQueue: { enqueue: async (requestId) => { await enqueueJob(executor, REBUILD_JOB_KIND, { requestId }, { dedupKey: requestId, maxAttempts: 5 }); } },

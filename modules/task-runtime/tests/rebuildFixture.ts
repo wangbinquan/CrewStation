@@ -9,8 +9,8 @@ import { sql } from 'drizzle-orm';
 import { createTaskRuntimeModule, taskRuntimeMigrations } from '../wiring';
 import { drizzleUnitOfWork } from '../adapters/persistence/drizzleUnitOfWork';
 
-export async function rebuildFixture(options: { ledger?: boolean; running?: boolean; kind?: 'dev-session' | 'business'; assignedProfile?: string } = {}) {
-  const tdb = await createTestDatabase([eventbusMigrations, queueMigrations, taskRuntimeMigrations, ...(options.ledger ? [resourcesMigrations] : [])]);
+export async function rebuildFixture(options: { ledger?: boolean; ownerWithLedger?: boolean; running?: boolean; kind?: 'dev-session' | 'business'; assignedProfile?: string } = {}) {
+  const tdb = await createTestDatabase([eventbusMigrations, queueMigrations, taskRuntimeMigrations, ...(options.ledger || options.ownerWithLedger ? [resourcesMigrations] : [])]);
   const k8s = createFakeK8sClient();
   const projectId = '01a0bf5d-8f4b-7fc7-8b88-18362617594b' as ProjectId, serviceId = '01a0bf5d-8f4b-77df-8856-e078a980dc2f' as ServiceId;
   let time = Date.parse('2026-09-15T10:00:00Z');
@@ -34,10 +34,10 @@ export async function rebuildFixture(options: { ledger?: boolean; running?: bool
   await k8s.mergePatch(Resources.PersistentVolumeClaim!, env.pvcName, env.namespace, { status: { phase: 'Bound', capacity: { storage: '10Gi' } } });
   if (options.running) await runtime.api.onRunnerConnected(env.id, token);
   else await runtime.api.markFailed(env.id, 'OOMKilled');
-  const resources = options.ledger ? createResourcesModule({ db: tdb.db, quotas: { limitFor: async () => state.quota }, authorizer: { projectAccess: async () => ({ operate: true }) }, isAdmin: async () => true }) : undefined;
+  const resources = options.ledger || options.ownerWithLedger ? createResourcesModule({ db: tdb.db, quotas: { limitFor: async () => state.quota }, authorizer: { projectAccess: async () => ({ operate: true }) }, isAdmin: async () => true }) : undefined;
   if (resources) {
     const owner = resources.api.owner('task-runtime');
-    runtime = createTaskRuntimeModule({ ...deps, creation: 'ledger', ledger: { within: (tx) => owner.within(tx as object), live: async () => (await resources.api.list({})).filter((r) => r.owner.module === 'task-runtime'), occupancy: resources.api.occupancy } });
+    runtime = createTaskRuntimeModule({ ...deps, ...(options.ledger ? { creation: 'ledger' as const } : {}), ledger: { within: (tx) => owner.within(tx as object), live: async () => (await resources.api.list({})).filter((r) => r.owner.module === 'task-runtime'), occupancy: resources.api.occupancy } });
     const resync = runtime.workers.at(-1)!; resync.start(); await resync.stop();
   }
   const request = async (): Promise<RebuildDevSessionRequest> => {

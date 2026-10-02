@@ -8,7 +8,8 @@ import { and, desc, eq, inArray, isNull, lt, lte } from 'drizzle-orm';
 import type { SaveTokenPrice, ProjectId, ExecutionCostVisibilityDto } from '@crewstation/contracts';
 import type { Database, Executor } from '@crewstation/persistence';
 import type { TokenPriceScope, TokenPriceStore, TokenPriceSelection } from '../../ports/tokenPricing';
-import { acceptedExecutionPrices, costVisibility, costVisibilityReceipts, tokenPriceHeads, tokenPrices } from './tokenPriceTables';
+import { acceptedExecutionPrices, costVisibility, costVisibilityReceipts, tokenPriceHeads, tokenPrices } from "./tables";
+import { admitObservationWrite } from './projectDeletion';
 
 function matching(profileId: string, input: Pick<SaveTokenPrice, 'profileRevision' | 'protocol' | 'provider' | 'model' | 'condition'>) {
   return and(eq(tokenPrices.profileId, profileId), eq(tokenPrices.profileRevision, input.profileRevision),
@@ -63,6 +64,7 @@ export function drizzleCostVisibility(db: Database): ExecutionCostVisibilityStor
     save: async (projectId, raw, now) => {
       const input = SetExecutionCostVisibilitySchema.parse(raw), fingerprint = jsonHash(input);
       return db.transaction(async (tx) => {
+        await admitObservationWrite(tx, projectId);
         await tx.insert(costVisibility).values({ projectId, revision: 0, document: hidden(projectId) }).onConflictDoNothing();
         const [head] = await tx.select().from(costVisibility).where(eq(costVisibility.projectId, projectId)).for('update');
         const receipt = (await tx.select().from(costVisibilityReceipts).where(and(eq(costVisibilityReceipts.projectId, projectId), eq(costVisibilityReceipts.requestKey, input.requestKey))).limit(1))[0];
@@ -94,6 +96,7 @@ async function acceptPrice(db: Database, raw: ExecutionPriceInput, now: Date): P
   if (!parsed.success || !Number.isFinite(now.getTime())) throw validation('执行计价快照无效');
   const input = parsed.data, fingerprint = jsonHash(input);
   return db.transaction(async (tx) => {
+    await admitObservationWrite(tx, input.identity.projectId);
     const existing = await acceptedPrice(tx, input.identity);
     if (existing) {
       if (existing.fingerprint !== fingerprint) throw conflict('执行已固定其他计价档位');

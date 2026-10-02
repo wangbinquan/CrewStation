@@ -5,7 +5,7 @@ import { actorFrom, parseBody, parseParams, parseQuery } from '@crewstation/http
 import type { Context } from 'hono';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import type { TokenPricingApi } from '../api/tokenPricingApi';
+import type { TokenPricingApi } from "../api/moduleApi";
 
 export function tokenPricingRoutes(api: TokenPricingApi, isAdmin: (id: UserId) => Promise<boolean>): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();

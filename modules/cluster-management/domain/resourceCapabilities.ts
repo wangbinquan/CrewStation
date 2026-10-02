@@ -1,6 +1,6 @@
 import type { ClusterActionCapability, ClusterResource } from '@crewstation/contracts';
-import type { InventoryFacts, ResourceObject, SystemComponent } from './inventory';
-import { objectRecord, resourceKey } from './inventory';
+import type { InventoryFacts, ResourceObject, SystemComponent } from './observations';
+import { objectRecord, resourceKey } from './observations';
 import { referencesOf } from './resourceGraph';
 
 export function resourceCapabilities(row: ClusterResource, facts: InventoryFacts, system: SystemComponent | undefined, objects: ResourceObject[]): ClusterActionCapability[] {
