@@ -5,6 +5,8 @@ export interface EnvironmentRepository {
   insert(env: TaskEnvironment): Promise<void>;
   update(env: TaskEnvironment): Promise<void>;
   getById(id: TaskId): Promise<TaskEnvironment | undefined>;
+  /** SQL presence and JSON type are observed before applying legacy truthiness mappers. */
+  getMaintenanceView?(id: TaskId): Promise<{ status: 'malformed' } | { status: 'present'; environment: TaskEnvironment } | undefined>;
   /** All lifecycle states; at most two physical matches, so callers reject ambiguity. */
   findByPhysicalPod(namespace: string, podName: string): Promise<TaskEnvironment[]>;
   /** 事务里锁住这一行再读：与并发的环境更新串行（台账补投影用，RFC-025）。 */
@@ -18,6 +20,8 @@ export interface EnvironmentRepository {
   /** 这些链在本项目里的全部环境（含各个 Agent 执行），按创建时间正序；不跨项目。 */
   listByProjectTraces(projectId: ProjectId, traceIds: readonly string[]): Promise<TaskEnvironment[]>;
   listChildren(parentTaskId: TaskId): Promise<TaskEnvironment[]>;
+  /** Complete existential check, including terminal/malformed children; never filter a prefix. */
+  hasProtectedDevelopmentChildren?(parentTaskId: TaskId): Promise<boolean>;
   /** RFC-022：启动进度仍在进行中的环境，按 id 翻页。 */
   listStarting(page: { after?: string; limit: number }): Promise<TaskEnvironment[]>;
   pendingExecutions(): Promise<TaskEnvironment[]>;

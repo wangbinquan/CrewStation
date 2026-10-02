@@ -1,7 +1,8 @@
 import { z } from 'zod';
+import { DevelopmentRemovalProtectionSchema } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
 import { developmentCleanupSelection } from './cleanupSelection';
-import { requireDevelopmentCleanupEvidence } from './cleanupEvidence';
+import { DevelopmentCleanupEvidenceSchema, DevelopmentCleanupSelectionSchema, requireDevelopmentCleanupEvidence } from './cleanupEvidence';
 import { developmentWorkloadProtection } from './protection';
 import type { TaskEnvironment } from '../taskEnvironment';
 
@@ -30,4 +31,23 @@ export function requireDevelopmentRemovalEvidence(env: TaskEnvironment) {
 export function createDevelopmentRemovalSeal(env: TaskEnvironment): DevelopmentRemovalSeal {
   const { selection } = requireDevelopmentRemovalEvidence(env);
   return DevelopmentRemovalSealSchema.parse({ version: 1, originalRunnerTokenHash: env.runnerTokenHash, selectionHash: selection.selectionHash });
+}
+
+/** Preserve the already persisted usage-v1 terminal proof without inventing its old token. */
+export function terminalDevelopmentMaintenanceOriginal(env: TaskEnvironment): TaskEnvironment {
+  const n = env.native;
+  if (!n || n.state !== 'finished' || !['released', 'failed'].includes(env.state)) throw precondition('原开发执行尚未终结');
+  if (env.render && Object.hasOwn(env.render, 'developmentRemovalProtection')) {
+    DevelopmentRemovalProtectionSchema.parse(env.render.developmentRemovalProtection);
+    return requireDevelopmentRemovalEvidence(env).original;
+  }
+  const protection = developmentWorkloadProtection(env);
+  if (!protection || !n.podUid || !n.computeProfile) throw precondition('原开发终态缺工作卷保护');
+  const evidence = DevelopmentCleanupEvidenceSchema.parse(n.developmentCleanup);
+  requireDevelopmentCleanupEvidence(evidence, DevelopmentCleanupSelectionSchema.parse({ ...evidence.selection,
+    identity: { sourceKind: 'development-agent', projectId: env.projectId, taskId: n.parentTaskId,
+      agentId: n.agentId, executionId: env.id, executionGeneration: 1 },
+    profileId: n.computeProfile.profileId, profileRevision: n.computeProfile.revision, podUid: n.podUid,
+    consumerId: protection.consumer.id, renderStart: env.render!.start }));
+  return env;
 }

@@ -53,7 +53,7 @@ function assertOriginalWorkspace(parent: LedgerRecord, volume: LedgerRecord | un
 
 /** Reads only resources-owned records under the original storage-task transaction lock. */
 export function assertDevelopmentConsumerOwner(record: LedgerRecord | undefined, parent: LedgerRecord | undefined, volume: LedgerRecord | undefined, consumer: WorkloadConsumer, permit?: Omit<WorkloadStartPermit, 'grantedAt'>): void {
-  if (!record || !parent || blocked(record) || blocked(parent)) throw precondition('开发执行资源已不可准入', { code: 'workload_admission_closed' });
+  if (!record || !parent || blocked(record) || blocked(parent) || Object.prototype.hasOwnProperty.call(parent.spec, 'developmentParentEnding')) throw precondition('开发执行资源已不可准入', { code: 'workload_admission_closed' });
   if (parent.kind !== 'dev-workspace' || record.kind !== 'agent-execution' || record.purpose !== 'development-agent' || consumer.purpose !== 'agent' || consumer.finalization !== null
     || record.owner.module !== 'task-runtime' || parent.owner.module !== 'task-runtime' || record.owner.ref !== record.id || parent.owner.ref !== parent.id
     || !parent.projectId || record.projectId !== parent.projectId || record.parentId !== parent.id || record.id === parent.id) throw conflict('开发工作卷消费者归属不匹配');

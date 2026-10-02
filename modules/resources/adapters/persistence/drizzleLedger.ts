@@ -1,6 +1,7 @@
 import type { Database, Executor } from '@crewstation/persistence';
 import { and, asc, eq, gt, isNotNull, lt, sql } from 'drizzle-orm';
 import type { ChangeEntry, ChangeLog, LeaseStore, LedgerScope, LedgerUnitOfWork, ProjectLocks } from '../../ports/repositories';
+import { drizzleMaintenanceSweeps } from './maintenanceSweeps';
 import { drizzleRecordRepository } from './drizzleRecords';
 import { changes, leases, projectLocks } from './tables';
 import { resourceDeletionWriteError } from './deletion/errors';
@@ -45,7 +46,7 @@ export function drizzleProjectLocks(db: Executor): ProjectLocks {
 }
 
 export function ledgerScopeOver(executor: Executor): LedgerScope {
-  return { records: drizzleRecordRepository(executor), changes: drizzleChangeLog(executor), leases: drizzleLeaseStore(executor), locks: drizzleProjectLocks(executor) };
+  return { records: drizzleRecordRepository(executor), changes: drizzleChangeLog(executor), leases: drizzleLeaseStore(executor), sweeps: drizzleMaintenanceSweeps(executor), locks: drizzleProjectLocks(executor) };
 }
 
 /** 台账的事务单元；within 加入调用方（所属模块）已开的事务。 */

@@ -572,3 +572,44 @@ PG 仅完整重确认清理用例明确 15 秒，与相邻全部 owner 清理预
 本机于 `2026-10-01T19:37:47.267Z` 完成迁移及八组件升级。`task_runtime/0018_physical_environment_lookup.sql` 实际应用一次；storage-contract=1，业务/开发数值表均存在。console、cs-api、cs-auth、cs-controller、cs-events、cs-session、mcp-capabilities、mcp-operations 均 generation=observedGeneration、Ready=1，镜像与本次冻结目标一致。部署前后默认 Task Runner 仍为 `sha256:587a0766440bae22f69bd6e68e101f2348ec8bda95f8b4c3ce6ddef0fa010928`；生产开发采集 OFF，原会话及专用验证档位未替换。
 
 私有完整回执：`observability-cs-generic-removal-ci-receipt.json`、`observability-cs-generic-removal-deployment-receipt.json`。部署只证明本片已在本机生效，不代替实际父重建/保留期/全部 writer、未绑定/未知尾部或真实开发模型验收。实际统计页面的复验仍待浏览器会话可用；新内置浏览器请求正常进入登录页，未擅自切换角色。CS-R02、CS-R13 和整体 RFC 均保持未完成。
+
+
+## 2026-10-02 父任务结束与维护实施接续
+
+完整 v6 设计已落于[原开发父任务结束与资源维护](./development-parent-retention.md)，其历史独立设计失败与修订仍保留。当前先完成 Resources 中性维护与共同准入锁子集：实际 maintenance 首轮独立源码 FAIL 的延迟提交锁反例已红绿复现，修正版 43/0；原父准入竞争反例修正版 25/0，兼容历史 consumer。20 路径独立源审 v2 已 PASS，尚未取得本批完整 CS 门禁、发布、CI 或部署证据。
+
+Task 固定全体成员、父 seal 原子投影、真正 ending/rebuild 作业 fence、原 Pod/Secrets/all-container proof、completed compensation 凭据承接与请求占位继续按该设计实施。生产开发 producer OFF，父生命周期这片也不代替全 writer/inflight、未绑定与 unknown-tail 后续门。正式业务四桶/CNY 原验收和前批通用删除的 CI/部署证据继续保留；RFC-034 与 CS-R02/R13 均未关闭。
+
+
+## 2026-10-02 原父身份持久校验修正
+
+纯领域身份底座首轮独立 FAIL（回执 SHA256 3578dcfaaf68b8a7d06c471df4a06450bdb3101a024860953c79a13d9e481ee1）：snapshot 严格校验原 render，但持久 epoch/schema/hash 可接受 present `{start:null}` 或缺少 image/workerUid/resources 的材料。直接 JSON 恢复反例在旧源码为 6 pass / 1 fail，修正后单文件 7 pass / 0 fail、75 断言；snapshot 与持久入口共用同一校验，完整原材料和扩展字段进入摘要，只有严格不存在 render 才可为 null，两种诊断期限继续排除。新增 pointer 夹具保持 version/phase 字面量类型，原类型失败回执保留。精确 ESLint 成功，后继类型检查及独立复核仍待回执。
+
+这两个领域文件不生成 Start/Stop 证明，不签物理删除许可，也尚未接通 Task 表、正式 job/rebuild worker 或生产采集。全体原成员、真实父退出、恢复占位和重复保卷恢复继续按完整 v6 实施；完整门禁、上库、精确 CI 与本机部署未在本段提前关闭。
+
+
+## 2026-10-02 正式维护 owner 接线与定向回归
+
+v8 限定设计独立 PASS 后，正式平台和真实 Task 夹具均注册实际 owner 回调；没有安装无条件许可。全局 `maintenance_sweeps` 只登记为非项目内容控制表，删项目保留其完整租约/截止点/游标，未知表仍拒绝清理。显式选中记录即使已注册回调返回 unselected，也必须等待，不能回退到旧清理路径。Task 在原项目准入锁内使用完整 SQL EXISTS 判断受保护子成员，真实 27 行用例中第 27 项的 present false 标记仍阻止旧父回退；不只读取首 25 条。
+
+原始 terminal Agent 的 compaction 对拍自己的数字回执、关闭准入、实际 Start 身份与独立全部容器 Stop proof；新 removal-v1 对拍原 seal，旧 usage-v1 不补造轮换前 token、历史 Secret UID 或新 seal。owner 询问与 Resources proof 读取不发生在资源/项目写事务内，最终资源 CAS 继续受原选择、版本与独立数据库时钟租约约束。新的父 ending/rebuild/retention 尚未接通，保持 waiting；全 v6 的固定全体成员、原父物理退出、最终作业租约、恢复占位与重复保卷重建仍待实施。
+
+针对性覆盖运行使用已批准且未替换的 55334 验收 PG，实际 max_prepared_transactions=10：18 文件 100 pass / 0 fail、688 断言，候选源字节前后稳定。新增用例分别验证全局控制记录保留、显式选择不能回退、旧/新终态压缩与缺 proof/坏选择/错绑定拒绝、完整 27 行查询，以及实际注册能力缺失必须等待。原红例和两次因 UUIDv4 负例夹具不合法而失败的日志保留；负例已换合法 UUIDv7，没有削弱产品验证。当前 arch、37 个精确 TS 文件 lint 与后端类型通过。
+
+本批独立实施门与一次联合完整 check 尚待最终回执。已与 RFC-037 会话协调：共享平台文件保留两方输出，共享迁移锁完整保留 0009 与 SCM 0005/0006；只有两方源码/迁移依赖全部提交后才推送完整快照。当前没有新增发布/CI/部署完成声明，生产开发 producer OFF，RFC-034 与 CS-R02/R13 均保持 In Progress。
+
+## 2026-10-02 维护 owner 的真实历史兼容修订
+
+正式接线 source v1 独立审查保留 FAIL 三项 P2：普通平台算力自测的资源不属于租户项目；truthiness mapper 把 present JSON false/null 等吞成缺省；历史预览维护投影遗漏正式限流中间件。v9 限定修订设计独立 PASS，不覆盖完整父 ending/rebuild/retention，0019 仍未应用，生产 producer 仍关闭。
+
+真实 PostgreSQL 先复现 0 pass / 3 fail：坏 owner JSON 被错误允许、普通平台自测和含正式中间件的历史预览永久等待。修订引入 SQL presence 读取，按原 Task 实际项目（包括平台测试哨兵）锁内重读，严格缺省 runtimeValidation 与规范项目/owner/kind/id/specHash 对拍；完整原材料摘要包含 preview/rebuildId，正式预览解析在项目事务外。补充夹具的错误依赖注入与“新 render 已有 route 因而不查 Service”前提导致 20 pass / 2 fail 已保留；修正为真实旧 owner 后最终 22 pass / 0 fail / 207 assertions（6 文件）。原平台测试通过与失败回收走公开 runProfileTest，限流 route 涵盖旧移交和新 ledger；Service 阻塞期间独立 NOWAIT 证明 Task 项目锁空闲，labels/preview/rebuildId 三种材料变化都等待，严格拒绝坏 specHash 和选中用途验证。
+
+定向 lint、arch、typecheck 通过；更早 18 文件 100/0 及组合根真实迁移 1/0 的成功回执保留。先前 coverage 仅复用于源指纹未变的文件，新修改行使用本轮真实执行 coverage。联合 full gate、当前源码独立实施门、远端 exact-SHA CI 与本机部署仍待完成；没有把任一历史失败或静态评审登记为生产验收。
+
+## 2026-10-02 SQL 原 JSONB 类型补正
+
+SOURCE v2 独立复核保留 FAIL 一项 P2：实际 jsonDocument.fromDriver 可将数据库 scalar string `{}` 解码成 JS object，原 reader 再次 parse 后仅查 typeof 不能证明 SQL 原类型。私有 probe v1 导入路径错误不能算功能红，v2 在真实 PG 确认原 jsonb_typeof='string'→reader present；随后公开创建的完整合法 render 编码成 SQL string 也真实获得错误 unselected 许可。v10 限定设计独立 PASS 后，同测试新增两条反例，旧 source 得到 5 pass / 2 fail，拒绝许可反例均真实复现。
+
+只改同一 reader 的同 SELECT，保留 render/native 原 jsonb_typeof 与 IS NOT NULL。present 仅接受原 SQL object 且驱动值为非 null 非 array object；SQL NULL 要求 flag=false、kind=null、value=null；不二次 parse、不改共享 jsonDocument 或普通 Task mapper。`{}`/`[]`/`null`/`false`/对象样式字符串和精确原 render 字符串全部拒绝，复原真正 SQL object 后合法历史维护继续。最终 24 pass / 0 fail / 253 assertions（6 文件），lint、arch、typecheck 通过，源当前新增行 coverage 单独核对；联合完整门禁、SOURCE v3、远端CI和部署仍待完成。
+
+正式 Mac 已可读；既有业务任务页面重新核对项目名称、算力名称、四类 Token、人民币估值、任务整体/单 Agent、真实泳道与紧凑返回控制。CS 系统已部署 c6860345 的验收范围总量 24423=5917+17728+0+778，¥0.026922；双 Agent 两轮28.0/29.4秒，累计/活跃并集57.4秒、任务起止1.6分钟。项目费用未开放仍显示说明而非零。截图为 native 实屏，只作视觉核对，不冒称 DOM 数值几何；本批维护兼容修订仍未部署，不开启生产开发采集。

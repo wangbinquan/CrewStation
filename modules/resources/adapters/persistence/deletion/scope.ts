@@ -7,7 +7,7 @@ export const CONTENT = ['workload_stop_proofs', 'workload_stop_scans', 'workload
 export type ResourceContentTable = typeof CONTENT[number];
 export async function registered(db: Executor): Promise<void> {
   const rows = await db.execute<{ table_name: string }>(sql`SELECT table_name FROM information_schema.tables WHERE table_schema = 'resources' AND table_type = 'BASE TABLE'`);
-  const allowed: readonly string[] = [...CONTENT, 'deletion_fences', 'deletion_identities', 'deletion_stop_receipts', 'deletion_volume_receipts'];
+  const allowed: readonly string[] = [...CONTENT, 'maintenance_sweeps', 'deletion_fences', 'deletion_identities', 'deletion_stop_receipts', 'deletion_volume_receipts'];
   if (rows.some((row) => !allowed.includes(row.table_name))) throw precondition('资源台账存在未登记的内容表，停止清理');
 }
 export function resourceIds(projectId: ProjectId) {

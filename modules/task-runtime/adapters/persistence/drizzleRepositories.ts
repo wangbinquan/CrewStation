@@ -4,6 +4,7 @@ import { and, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
 import type { EnvironmentState, TaskEnvironment } from '../../domain/taskEnvironment';
 import type { AdmissionRepository, EnvironmentRepository } from '../../ports/repositories';
 import { environmentTraceQueries } from './environmentTraceQueries';
+import { maintenanceEnvironmentReader } from './maintenanceEnvironments';
 import { admissions, environments } from './tables';
 
 const json = <T>(v: unknown): T => (typeof v === 'string' ? JSON.parse(v) : v) as T;
@@ -26,12 +27,21 @@ export function drizzleEnvironmentRepository(db: Executor): EnvironmentRepositor
   return {
     insert: async (e) => { await db.insert(environments).values(toRow(e)); },
     update: async (e) => { await db.update(environments).set(toRow(e)).where(eq(environments.id, e.id)); },
+    getMaintenanceView: maintenanceEnvironmentReader(db, toEnv),
     getById: async (id) => { const row = (await db.select().from(environments).where(eq(environments.id, id)))[0]; return row ? toEnv(row) : undefined; },
     findByPhysicalPod: async (namespace, podName) => (await db.select().from(environments).where(and(eq(environments.namespace, namespace), eq(environments.podName, podName))).limit(2)).map(toEnv),
     getForUpdate: async (id) => { const row = (await db.select().from(environments).where(eq(environments.id, id)).for('update'))[0]; return row ? toEnv(row) : undefined; },
     listByProject: async (projectId, states, page) => (await db.select().from(environments).where(and(eq(environments.projectId, projectId), states?.length ? inArray(environments.state, states) : undefined, page?.after ? gt(environments.id, page.after) : undefined)).orderBy(page ? environments.id : environments.createdAt).limit(page ? Math.min(501, Math.max(1, page.limit)) : 2_147_483_647)).map(toEnv),
     listByStates: async (states, page) => (await db.select().from(environments).where(and(inArray(environments.state, states), page?.after ? gt(environments.id, page.after) : undefined)).orderBy(environments.id).limit(page ? Math.min(500, Math.max(1, page.limit)) : 2_147_483_647)).map(toEnv),
     ...environmentTraceQueries(db, toEnv),
+    hasProtectedDevelopmentChildren: async (parentTaskId) => {
+      const row = (await db.execute<{ present: boolean }>(sql`SELECT EXISTS(
+        SELECT 1 FROM task_runtime.environments WHERE native->>'parentTaskId'=${parentTaskId}
+          AND (render ? 'developmentUsageProtection' OR render ? 'developmentRemovalProtection' OR native ? 'developmentCleanup'
+            OR render IS NOT NULL AND jsonb_typeof(render)<>'object')) AS present`))[0];
+      if (typeof row?.present !== 'boolean') throw new Error('开发子执行存在性查询没有完整回执');
+      return row.present;
+    },
     listChildren: async (parentTaskId) => (await db.select().from(environments).where(sql`${environments.native}->>'parentTaskId' = ${parentTaskId}`).orderBy(environments.createdAt)).map(toEnv),
     // 部分索引 environments_starting 只覆盖启动中的行；按 id 翻页，观测用例轮流看完所有启动中的环境。
     listStarting: async (page) => (await db.select().from(environments).where(and(sql`${environments.startup}->>'state' = 'running'`, inArray(environments.state, ['creating', 'running']), page.after ? gt(environments.id, page.after) : undefined))

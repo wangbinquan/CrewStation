@@ -11,6 +11,7 @@ import type { OwnerLedger, ResourcesModuleApi } from './api/moduleApi';
 import type { ResourceActionHandler } from './api/types';
 import { retireNamespaceIn } from './application/namespaceRetirement';
 import { performAction } from './application/actions';
+import type { MaintenanceEndingHandler } from './api/maintenanceEnding';
 import { maintainLedger } from './application/maintenance';
 import { observationWriter } from './application/observe';
 import { occupancyIn, ownerWriter } from './application/ownerWrites';
@@ -63,11 +64,25 @@ export interface ResourcesModule {
   maintainOnce(): Promise<void>;
 }
 
+function maintenanceLifecycle(run: () => Promise<void>, intervalMs: number) {
+  let timer: ReturnType<typeof setInterval> | undefined;
+  let inFlight: Promise<void> | undefined;
+  const maintainOnce = (): Promise<void> => {
+    inFlight ??= run().finally(() => { inFlight = undefined; });
+    return inFlight;
+  };
+  return { maintainOnce, maintenanceWorker: {
+    start: () => { timer ??= setInterval(() => void maintainOnce(), intervalMs); },
+    stop: async () => { if (timer) clearInterval(timer); timer = undefined; await inFlight; },
+  } };
+}
+
 export function createResourcesModule(deps: ResourcesModuleDeps): ResourcesModule {
   const clock = deps.clock ?? systemClock, logger = deps.logger ?? noopLogger;
   const uow = drizzleLedgerUnitOfWork(deps.db);
   const hub = createStreamHub(uow.read, clock, logger, { ...DEFAULT_STREAM_OPTIONS, ...deps.stream });
   const handlers = new Map<string, ResourceActionHandler>();
+  const endingHandlers = new Map<string, MaintenanceEndingHandler>();
   const observer = observationWriter(uow, clock);
   // 执行者在装配后才登记（registerActionHandler），每次按当时的登记判定。
   const { projectAccess, adminAccess, accessFor } = viewerAccess({ authorizer: deps.authorizer, executable: (owner, action) => action in centerActions || handlers.has(owner) });
@@ -129,17 +144,14 @@ export function createResourcesModule(deps: ResourcesModuleDeps): ResourcesModul
       access: (who, record) => (record.projectId ? projectAccess(who, record.projectId) : adminAccess(who)),
     }, actor, id, action, request),
     registerActionHandler: (module, handler) => { handlers.set(module, handler); },
+    registerMaintenanceEndingHandler: (module, handler) => { endingHandlers.set(module, handler); },
   };
-  let timer: ReturnType<typeof setInterval> | undefined;
-  const maintainOnce = () => maintainLedger(uow, clock, logger);
+  const { maintainOnce, maintenanceWorker } = maintenanceLifecycle(() => maintainLedger(uow, clock, logger, endingHandlers), deps.maintenanceMs ?? 60_000);
   return {
     api,
     http: [resourceRoutes(api, (id) => deps.isAdmin(id as UserId))],
     streamWorker: { start: hub.start, stop: hub.stop },
-    maintenanceWorker: {
-      start: () => { timer ??= setInterval(() => void maintainOnce(), deps.maintenanceMs ?? 60_000); },
-      stop: async () => { if (timer) clearInterval(timer); timer = undefined; },
-    },
+    maintenanceWorker,
     migrations: resourcesMigrations,
     maintainOnce,
   };

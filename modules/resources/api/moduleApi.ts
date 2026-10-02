@@ -3,6 +3,7 @@ import type {
   ChildObservation, ConditionUpdate, ExpectedChild, LedgerRecord, ObservationOutcome, OwnerTransaction, RecordFilter, ResourceActionHandler, ResourceAlias, ResourceLeases,
   ResourceWriter, StreamSubscription, ViewerAccess,
 } from './types';
+import type { MaintenanceEndingHandler } from './maintenanceEnding';
 import type { WorkloadSafety } from './workloadSafety';
 import type { TaskVolumes } from './taskVolumes';
 import type { ResourceProjectDeletion } from './projectDeletion';
@@ -55,4 +56,6 @@ export interface ResourcesModuleApi {
   performAction(actor: Actor, id: string, action: ResourceActionId, request: ResourceActionRequest): Promise<ResourceActionResult>;
   /** 组合根在所属模块装配后登记它的操作执行者（所属模块在更高层，不能反向依赖）。 */
   registerActionHandler(module: string, handler: ResourceActionHandler): void;
+  /** 组合后、启动维护前登记；owner 回调始终在资源事务外。 */
+  registerMaintenanceEndingHandler(module: string, handler: MaintenanceEndingHandler): void;
 }

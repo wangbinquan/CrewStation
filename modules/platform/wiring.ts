@@ -1,4 +1,4 @@
-import { clusterMetadata } from './application/cluster/metadata';
+import { bindTaskMaintenance } from './adapters/observability/taskMaintenance'; import { clusterMetadata } from './application/cluster/metadata';
 import { resourceCatalogs } from './application/resource-center/resourceCatalogs';
 import { projectResourceState } from './adapters/k8s/projectResourceState';
 import { projectResourceSources } from './application/resource-center/projectSources';
@@ -176,7 +176,7 @@ function composeCore(deps: CompositionDeps, late: Late) {
     settings: { defaultPlan: 'db-small', secretKeyBase64: settings.secretKeyBase64, postgres: settings.dataPostgres },
     ...dataPorts(settings, late, objectStorageSources(identity.api, project.api, () => late.release, () => late.taskRuntime), deps.k8s),
   });
-  const scm = createScmModule({ db, project: project.api, identities: deps.identities, templateResources: {
+  const scm = createScmModule({ db, logger, project: project.api, identities: deps.identities, ...(settings.platformPodUid ? { processes: projectCallbackOwners(deps.k8s, settings.systemNamespace, settings.platformPodUid, 'crewstation.io/scm-project-stop') } : {}), templateResources: {
     allocate: (kind, context, templateId, slotId) => deps.identities.bind('scm', kind, ['template', context.serviceId, templateId, slotId]),
     ensureDefinition: config.api.ensureTemplateDefinition,
     eventType: async (producerCode, eventCode) => {
@@ -316,7 +316,7 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
     sources: { ...(data.api.objectEnv ? { objectEnv: data.api.objectEnv } : {}), taskInputEnv: (input) => { if (!data.api.taskInputs) throw precondition('任务对象输入不可用'); return data.api.taskInputs.environment(input); }, bindTaskInputs: (id, uid) => { if (!data.api.taskInputs) throw precondition('任务对象输入不可用'); return data.api.taskInputs.bind(id, uid); }, pinTaskImage: runtimeImages.pinPlatformImage, runtimeImageSecrets: runtimeImages.api.renderInitializationSecrets, configEnv: (projectId, env) => config.api.renderEnv(projectId, env), dataEnv: data.api.envFor, taskDataEnv: data.api.envForTask },
     settings: { taskImage: settings.taskImage, systemNamespace: settings.systemNamespace, sessionUrl: settings.sessionRunnerUrl, userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, workerUid: 10001, defaultProfile: settings.defaultTaskProfile, userAuthMiddleware: 'forward-auth-user', dropIdentityHeadersMiddleware: 'drop-identity-headers', previewRateMiddlewares: ['rate-limit-user', 'rate-limit-host'] },
   });
-  late.taskRuntime = taskRuntime.api;
+  late.taskRuntime = bindTaskMaintenance(resources.api, taskRuntime.api);
   const runner = createSessionClient(settings.sessionInternalUrl);
   // 两类任务共用解析：受理固定档位修订，派发时取材料，凭据仅进入受控 Runner 通道。
   const computeCatalog = { pinLaunchVersion: core.agentRuntime.api.pinLaunchVersion, launchMaterialAt: core.agentRuntime.api.launchMaterialAt, resolve: (name: ComputeProfileSelector | undefined, usage: ComputeUsage, projectId: ProjectId) => core.agentRuntime.api.resolveForProject(projectId, name, usage), launchMaterial: core.agentRuntime.api.launchMaterial, launchMetadata: core.agentRuntime.api.launchMetadata };
@@ -575,7 +575,7 @@ export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
       events: [...m.events.http.ingress],
     },
     background: {
-      controller: [...m.cluster.workers, ...m.data.workers, ...m.release.workers, ...m.gateway.workers, consumerLifecycle(m.gateway.subscriptions), ...m.taskRuntime.workers, ...m.agentRuntime.workers, ...m.runtimeEnvironment.workers, ...m.devSession.workers, ...m.businessTask.workers, consumerLifecycle(m.businessTask.subscriptions), ...m.apiCatalog.subscriptions.map(consumerLifecycle), ...m.data.subscriptions.map(consumerLifecycle), ...m.observability.workers, ...m.provisioning.workers, ...m.provisioning.startupTasks, consumerLifecycle(m.provisioning.subscriptions), m.resources.maintenanceWorker, m.clusterControl.observer, m.dataControl.observer, ...m.resourceAccess.workers,m.events.recoveryWorker],
+      controller: [...m.cluster.workers, ...m.data.workers, ...m.release.workers, ...m.gateway.workers, consumerLifecycle(m.gateway.subscriptions), ...m.taskRuntime.workers, ...m.agentRuntime.workers, ...m.runtimeEnvironment.workers, ...m.devSession.workers, ...m.businessTask.workers, consumerLifecycle(m.businessTask.subscriptions), ...m.apiCatalog.subscriptions.map(consumerLifecycle), ...m.data.subscriptions.map(consumerLifecycle), ...m.observability.workers, ...m.provisioning.workers, ...m.provisioning.startupTasks, consumerLifecycle(m.provisioning.subscriptions), m.resources.maintenanceWorker, m.clusterControl.observer, m.dataControl.observer, m.scm.observer, ...m.resourceAccess.workers,m.events.recoveryWorker],
       // 资源推送流的尾随器（RFC-025 设计 §8.2）：每个 cs-api 副本一个。
       api: [m.resources.streamWorker],
       session: [...m.session.workers],

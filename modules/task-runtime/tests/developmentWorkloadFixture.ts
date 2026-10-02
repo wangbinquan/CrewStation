@@ -104,6 +104,8 @@ export async function developmentWorkloadFixture(creation: 'ledger' | 'native' =
   } };
   Object.assign(deps, { workloadSafety: safety, ...(creation === 'ledger' ? { creation: 'ledger' as const } : {}) });
   let runtime = createTaskRuntimeModule(deps);
+  base.resources.api.registerMaintenanceEndingHandler('task-runtime', (step, snapshot) => runtime.api.inspectResourceEnding
+    ? runtime.api.inspectResourceEnding(step, snapshot) : Promise.resolve({ status: 'waiting', reason: 'task-ending-handler-unavailable' }));
   let closed = false;
   const controllers: ReturnType<typeof createClusterControlModule>[] = [];
   const controller = () => { const control = workloadController(base, () => runtime, safety, faults, emit, calls); controllers.push(control); return control; };

@@ -1,3 +1,4 @@
+export type { MaintenanceEndingDecision, MaintenanceEndingHandler, MaintenanceEndingSnapshot, MaintenanceStep } from './api/maintenanceEnding';
 export type { OwnerLedger, ResourcesModuleApi } from './api/moduleApi';
 export type {
   ChildObservation, ConditionUpdate, ExpectedChild, LedgerRecord, ObservationOutcome, OwnerTransaction, RecordFilter, ResourceActionHandler, ResourceAlias,

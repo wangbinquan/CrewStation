@@ -1,3 +1,4 @@
+import type { ResourceEndingDecision, ResourceEndingSnapshot, ResourceEndingStep } from './resourceEnding';
 import type { RuntimeImageHistoryRead, RuntimeImageHistoryItem } from '@crewstation/contracts';
 import type { ResourceWorkload, ResourceWorkloadPage } from '@crewstation/contracts';
 import type { BusinessStorageFinalization, DevelopmentSourceBinding, WorkloadStopBarrier } from '@crewstation/contracts';
@@ -115,6 +116,8 @@ export interface RebuildRendering {
 }
 
 export interface TaskRuntimeModuleApi {
+  /** Internal neutral maintenance owner callback; never exposed by an HTTP route. */
+  inspectResourceEnding?(step: ResourceEndingStep, snapshot: ResourceEndingSnapshot): Promise<ResourceEndingDecision>;
   /** Internal L6 cleanup composition only, never exposed by HTTP. */
   inspectDevelopmentCleanupSelection?(taskId: TaskId): Promise<DevelopmentCleanupSelection | undefined>;
   resourceWorkload(actor: Actor, taskId: TaskId): Promise<ResourceWorkload>;

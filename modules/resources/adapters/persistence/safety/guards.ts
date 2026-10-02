@@ -16,7 +16,9 @@ export async function requireConsumer(tx: Executor, id: string) {
   return row;
 }
 export async function assertConsumerOwner(tx: Executor, consumer: WorkloadConsumer, permit?: Omit<WorkloadStartPermit, 'grantedAt'>): Promise<void> {
-  const records = drizzleRecordRepository(tx), record = await records.get(consumer.resourceId), parent = await records.get(consumer.taskId);
+  // Task seals its projection under this same parent row lock; hold admission through commit.
+  const records = drizzleRecordRepository(tx), parent = await records.get(consumer.taskId, { forUpdate: true });
+  const record = consumer.resourceId === consumer.taskId ? parent : await records.get(consumer.resourceId);
   if (needsDevelopmentOwnerCheck(record, parent, consumer)) {
     const volume = await records.getByOwner({ module: 'task-runtime', ref: consumer.taskId + '/work' }, 'volume');
     assertDevelopmentConsumerOwner(record, parent, volume, consumer, permit); return;

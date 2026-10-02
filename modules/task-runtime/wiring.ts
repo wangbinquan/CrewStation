@@ -1,3 +1,4 @@
+import { resourceEndingHandler } from './application/development/parent/retention';
 import { developmentRemovalLookup } from './application/development/removalLookup';
 import { developmentCleanupSelection } from './domain/development/cleanupSelection';
 import type { DevelopmentCleanupParticipant } from './ports/developmentCleanup';
@@ -165,6 +166,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     ...businessStorageFinalization(useCaseDeps),
     ...businessRecoveryApi(useCaseDeps),
     name: 'task-runtime',
+    inspectResourceEnding: resourceEndingHandler(useCaseDeps, ledgerProjectionFor(deps)?.preview),
     imageHistory: environmentImageHistory(deps.db),
     blockBusinessAdmission: blockBusinessAdmission(useCaseDeps),
     imageReferenceState: runtimeImageReferenceState(useCaseDeps),

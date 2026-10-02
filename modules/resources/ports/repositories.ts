@@ -1,4 +1,5 @@
 import type { ProjectId, ResourceChild, ResourceKind, ResourceOwner } from '@crewstation/contracts';
+import type { MaintenanceSweepLease, MaintenanceSweepRepository } from './maintenance';
 import type { ExpectedChild, LedgerRecord, RecordFilter, ResourceAlias } from '../domain/record';
 
 /** 落库的子对象：观测＋是否在期望里（期望里已没有、集群里还在的旧对象为 false）。 */
@@ -25,6 +26,10 @@ export interface RecordRepository {
   resolveAlias(alias: ResourceAlias): Promise<string | undefined>;
   /** 保留期已到（按数据库时间）、还没被转成「不要了」的失败记录（保留期巡检用）。 */
   retentionDue(limit: number): Promise<LedgerRecord[]>;
+  maintenancePage(lease: MaintenanceSweepLease, compactAfterMs: number, limit: number): Promise<LedgerRecord[]>;
+  maintenanceOwnerRequired(id: string): Promise<boolean>;
+  updateForMaintenance(record: LedgerRecord, lease: MaintenanceSweepLease): Promise<boolean>;
+  compactForMaintenance(record: LedgerRecord, at: Date, lease: MaintenanceSweepLease): Promise<LedgerRecord | undefined>;
   /** 终态（期望已是「不要了」）且已结束早于某时刻、尚未压缩的记录。 */
   compactable(stoppedBefore: Date, limit: number): Promise<string[]>;
   /** 视图的计数：按种类 × 阶段，条件与 list 相同（不受条数上限影响）。 */
@@ -77,6 +82,7 @@ export interface LedgerScope {
   readonly records: RecordRepository;
   readonly changes: ChangeLog;
   readonly leases: LeaseStore;
+  readonly sweeps: MaintenanceSweepRepository;
   readonly locks: ProjectLocks;
 }
 

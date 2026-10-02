@@ -8,7 +8,6 @@ import { assertConsumerOwner, assertTaskAllowsConsumer, lockStorageTask, require
 import { admissionClosures, consumers, storageFences, stopProofs } from './tables';
 import { workloadAdmissionClosures } from './admissionClosures';
 import { workloadStopBarrier } from './stopBarrier';
-import { needsDevelopmentOwnerCheck } from './development';
 import { bindDevelopmentAdmission, developmentAdmissionSelection } from './developmentAdmission';
 
 async function state(tx: Executor, row: typeof consumers.$inferSelect): Promise<WorkloadConsumerState> {
@@ -33,8 +32,7 @@ export function workloadSafetyRepository(db: Database): WorkloadSafety {
       const prior = (await tx.select().from(consumers).where(eq(consumers.id, consumer.id)))[0];
       if (prior) {
         if (jsonHash(prior.consumer) !== jsonHash(consumer)) throw conflict('消费者身份不可复用');
-        const records = drizzleRecordRepository(tx);
-        if (!prior.admissionClosed && needsDevelopmentOwnerCheck(await records.get(consumer.resourceId), await records.get(consumer.taskId), consumer)) {
+        if (!prior.admissionClosed) {
           await assertConsumerOwner(tx, consumer); await assertTaskAllowsConsumer(tx, consumer);
         }
         return state(tx, prior);
