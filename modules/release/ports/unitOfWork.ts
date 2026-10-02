@@ -3,6 +3,8 @@ import type { PhysicalSlot, ServiceSlots } from '../domain/slots';
 import type { JobProjection, JobRecordRef, SlotRecordRef } from './ledger';
 import type { MaintenanceRepository } from './repositories';
 import type { DomainPayload, DomainTopicName, ServiceId } from '@crewstation/contracts';
+import type { ProjectDeletionContext, ProjectDeletionEvidence, ProjectDeletionInventory, ProjectDeletionTarget } from '@crewstation/contracts';
+import type { ReleaseCallbackRecord, ReleaseDeletionContent, ReleaseDeletionScope, ReleasePhysicalScope } from '../domain/release';
 import type { OfflinePolicyRepository, ReleaseRepository, SlotEventRepository, SlotRepository, TrafficSwitchRepository } from './repositories';
 
 export interface DomainEventPublisher {
@@ -36,4 +38,37 @@ export interface RepositoryScope {
 export interface UnitOfWork {
   readonly read: RepositoryScope;
   run<T>(fn: (scope: RepositoryScope) => Promise<T>): Promise<T>;
+}
+
+export interface ReleaseProjectAdmissions {
+  run<T>(projectId: string, serviceId: string, input: { kind: ReleaseCallbackRecord['kind']; consumerId: string; inputDigest: string }, work: () => Promise<T>): Promise<T>;
+  check(projectId: string, serviceId: string): Promise<void>;
+  checkCurrent(): Promise<void>;
+}
+export type ReleasePhysicalReport = Pick<ProjectDeletionInventory, 'complete' | 'blockers' | 'references'>;
+export type ReleasePhysicalProof =
+  | { kind: 'waiting'; reason: string }
+  | { kind: 'blocked'; blockers: ProjectDeletionInventory['blockers'] }
+  | { kind: 'done'; digest: string; scopeDigest: string; sourceIdentity: string; independent: boolean; producersClosed: boolean; consumersStopped: boolean;
+      nativeRemaining: number; storageRemaining: number; callbackExits: readonly { id: string; originalIdentity: string; digest: string }[] };
+export interface ReleaseDeletionPhysics {
+  capture(target: ProjectDeletionTarget, content: ReleaseDeletionContent): Promise<ReleasePhysicalReport & { scope: ReleasePhysicalScope | null }>;
+  inspect(scope: ReleasePhysicalScope): Promise<ReleasePhysicalReport>;
+  stop(context: ProjectDeletionContext, scope: ReleasePhysicalScope): Promise<ReleasePhysicalProof>;
+  purge(context: ProjectDeletionContext, scope: ReleasePhysicalScope): Promise<ReleasePhysicalProof>;
+  prove(scope: ReleasePhysicalScope): Promise<ReleasePhysicalProof>;
+}
+export interface ReleaseDeletionStored {
+  scope: ReleaseDeletionScope; verified: boolean; phaseIndex: number;
+  receipts: Readonly<Partial<Record<ProjectDeletionContext['phase'], ProjectDeletionEvidence>>>;
+}
+export interface ReleaseDeletionRepository {
+  content(target: ProjectDeletionTarget): Promise<ReleaseDeletionContent>;
+  retained(target: ProjectDeletionTarget): Promise<ReleaseDeletionScope | undefined>;
+  seal(context: ProjectDeletionContext, scope: ReleaseDeletionScope): Promise<boolean | 'waiting'>;
+  load(context: ProjectDeletionContext): Promise<ReleaseDeletionStored>;
+  callbacksExited(context: ProjectDeletionContext): Promise<boolean>;
+  recoverCallbacks(context: ProjectDeletionContext, proof: Extract<ReleasePhysicalProof, { kind: 'done' }>): Promise<void>;
+  advance(context: ProjectDeletionContext, evidence: ProjectDeletionEvidence): Promise<void>;
+  purgeMetadata(context: ProjectDeletionContext): Promise<ProjectDeletionEvidence>;
 }

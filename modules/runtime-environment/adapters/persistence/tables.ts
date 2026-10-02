@@ -1,8 +1,9 @@
 import type { ProjectRuntimeImagePolicyDto } from '@crewstation/contracts';
 import { jsonDocument } from '@crewstation/persistence';
-import { bigint, boolean, integer, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import { bigint, boolean, integer, pgSchema, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 import type { DevelopmentImagePolicy, ImageBuild, ImageRevision, ImageValidation, ImageVersion, RuntimeImage, ImageReference } from '../../domain/records';
-import { runtimeEnvironmentSchema as schema } from './schema';
+import type { ImageAllocationReceipt } from '../../domain/allocation';
+const schema = pgSchema('runtime_environment');
 
 export const runtimeImages = schema.table('images', {
   id: text('id').primaryKey(), name: text('name').notNull(), defaultVisible: boolean('default_visible').notNull(), enabled: boolean('enabled').notNull(),
@@ -41,3 +42,4 @@ export const imageCreationRequests = schema.table('creation_requests', {
 export const projectImagePolicies = schema.table('project_image_policies', { projectId: text('project_id').primaryKey(), payload: jsonDocument('payload').$type<ProjectRuntimeImagePolicyDto>().notNull() });
 
 export const imageProjectGrants = schema.table('image_project_grants', { imageId: text('image_id').notNull(), projectId: text('project_id').notNull() }, (t) => [uniqueIndex('image_project_grants_pkey').on(t.imageId, t.projectId)]);
+export const allocationReceipts = schema.table('allocation_receipts', { operationId: text('operation_id').primaryKey(), projectId: text('project_id').notNull(), payload: jsonDocument('payload').$type<ImageAllocationReceipt>().notNull() });

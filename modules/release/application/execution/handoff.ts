@@ -1,14 +1,15 @@
 import { DomainTopic } from '@crewstation/contracts';
 import type { Actor, ServiceId, TrafficSwitchDto } from '@crewstation/contracts';
-import { conflict, newResourceId, notFound, precondition } from '@crewstation/kernel';
+import { jsonHash, conflict, newResourceId, notFound, precondition } from '@crewstation/kernel';
 import type { ExecutionHandoffOperation } from '../../domain/executionHandoff';
 import { handoffSwitchDto } from '../../domain/executionHandoff';
 import { switchTraffic } from '../../domain/slots';
 import { assertSwitchAllowed } from '../../domain/migrationPolicy';
 import type { ReleaseUseCaseDeps } from '../dependencies';
+import { releaseProjectWork } from '../projectDeletion';
 import type { HandoffRequest } from '../../ports/executionHandoff';
 
-type HandoffDeps = Pick<ReleaseUseCaseDeps, 'uow' | 'services' | 'authorizer' | 'executionHandoff' | 'clock' | 'maintenance'>;
+type HandoffDeps = Pick<ReleaseUseCaseDeps, 'uow' | 'services' | 'authorizer' | 'executionHandoff' | 'clock' | 'maintenance' | 'admission'>;
 const requestOf = (op: ExecutionHandoffOperation): HandoffRequest => ({ operationId: op.id, expectedActiveReleaseId: op.expectedActiveReleaseId, targetReleaseId: op.targetReleaseId, targetSlot: op.targetSlot });
 export function releaseHandoffUseCases(deps: HandoffDeps) {
   return {
@@ -23,17 +24,31 @@ export function releaseHandoffUseCases(deps: HandoffDeps) {
       const operation = await deps.uow.read.handoffs.get(id); if (!operation || operation.serviceId !== serviceId) throw notFound('执行交接', id);
       return handoffSwitchDto(operation);
     },
-    progressHandoffs: async (): Promise<number> => {
-      let count = 0;
-      for (const candidate of await deps.uow.read.handoffs.pending(20)) {
-        const claimed = await deps.uow.read.handoffs.claim(candidate.id, newResourceId()); if (!claimed) continue;
-        try { await advanceHandoff(deps, claimed); }
-        catch (error) { await deps.uow.read.handoffs.settle(claimed, { stage: claimed.stage, message: error instanceof Error ? error.message : '交接状态暂不可确认' }); }
-        count++;
-      }
-      return count;
-    },
+    progressHandoffs: handoffProgress(deps),
   };
+}
+/** 每轮只读一页；页满后沿原 ID 前进，到尾部重新轮转。扫描位置不写业务记录。 */
+function handoffProgress(deps: HandoffDeps): () => Promise<number> {
+  let afterId: string | undefined, inFlight: Promise<number> | undefined;
+  const scan = async (): Promise<number> => {
+    const candidates = await deps.uow.read.handoffs.pending(20, afterId);
+    afterId = candidates.length === 20 ? candidates[candidates.length - 1]!.id : undefined;
+    let count = 0;
+    for (const candidate of candidates) {
+      try {
+        count += await releaseProjectWork(deps, candidate.serviceId, 'handoff', candidate.id, { original: candidate.id, revision: jsonHash(candidate) }, async () => {
+          const service = await deps.services.resolveServiceById(candidate.serviceId);
+          if (deps.admission && service?.projectId !== candidate.projectId) throw precondition('原执行交接项目与服务归属冲突');
+          const claimed = await deps.uow.read.handoffs.claim(candidate.id, newResourceId()); if (!claimed) return 0;
+          try { await advanceHandoff(deps, claimed); }
+          catch (error) { await deps.uow.read.handoffs.settle(claimed, { stage: claimed.stage, message: error instanceof Error ? error.message : '交接状态暂不可确认' }); }
+          return 1;
+        });
+      } catch (error) { if (!deps.admission) throw error; }
+    }
+    return count;
+  };
+  return () => { inFlight ??= scan().finally(() => { inFlight = undefined; }); return inFlight; };
 }
 async function advanceHandoff(deps: HandoffDeps, op: ExecutionHandoffOperation): Promise<void> {
   const port = deps.executionHandoff; if (!port) throw precondition('执行交接端口尚未配置');

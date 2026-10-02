@@ -24,7 +24,8 @@ export interface HandoffRepository {
   active(serviceId: ServiceId): Promise<ExecutionHandoffOperation | undefined>;
   latest(serviceId: ServiceId): Promise<ExecutionHandoffOperation | undefined>;
   insert(operation: ExecutionHandoffOperation): Promise<void>;
-  pending(limit: number): Promise<ExecutionHandoffOperation[]>;
+  /** 有界页按不可变原 ID 排序；afterId 只推进扫描，不认领或改写被拒绝的项目。 */
+  pending(limit: number, afterId?: string): Promise<ExecutionHandoffOperation[]>;
   claim(id: string, owner: string): Promise<ExecutionHandoffOperation | undefined>;
   settle(claim: ExecutionHandoffOperation, update: Pick<ExecutionHandoffOperation, 'stage'> & Partial<Pick<ExecutionHandoffOperation, 'epoch' | 'preparationDigest' | 'message'>>): Promise<boolean>;
 }

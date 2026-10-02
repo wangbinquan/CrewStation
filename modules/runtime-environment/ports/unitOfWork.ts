@@ -1,8 +1,10 @@
 import type { ProjectRuntimeImagePolicyDto } from '@crewstation/contracts';
 import type { ImageAllocationReceipt } from '../domain/allocation';
-import type { BuildRepository, DevelopmentPolicyRepository, ImageRepository, LogRepository, ReferenceRepository, RevisionRepository, ValidationRepository, VersionRepository } from './repositories';
+import type { BuildRepository, DevelopmentPolicyRepository, ImageRepository, LogRepository, ReferenceRepository, RevisionRepository, RuntimeImageProjectContent, ValidationRepository, VersionRepository } from './repositories';
 
 export interface RepositoryScope {
+  /** No UI page limit; reports unknown schema or conflicting ownership instead of treating it as empty. */
+  projectContent(projectId: string): Promise<RuntimeImageProjectContent>;
   readonly allocationReceipts: {
     get(projectId: string, operationId: string): Promise<ImageAllocationReceipt | undefined>;
     save(projectId: string, operationId: string, receipt: ImageAllocationReceipt): Promise<void>;
@@ -27,3 +29,16 @@ export interface RepositoryScope {
   lock(key: string): Promise<void>;
 }
 export interface UnitOfWork { readonly read: RepositoryScope; run<T>(fn: (scope: RepositoryScope) => Promise<T>): Promise<T> }
+
+/** The original platform process is protected before a callback starts; lease/connection expiry is not an exit. */
+export interface RuntimeImageCallbackProcess {
+  readonly podUid: string; readonly containerId: string; readonly nodeUid: string; readonly nodeName: string;
+}
+export interface RuntimeImageCallback {
+  readonly kind: 'build' | 'validation' | 'source' | 'initializer'; readonly id: string; readonly inputDigest: string;
+}
+export interface RuntimeImageProjectAdmissions {
+  run<T>(projectIds: readonly string[], callback: RuntimeImageCallback, work: () => Promise<T>): Promise<T>;
+  assertActive(projectIds: readonly string[]): void;
+  check(projectIds: readonly string[]): Promise<void>;
+}

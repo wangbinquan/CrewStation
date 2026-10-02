@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { ManifestSchema } from '@crewstation/contracts';
 import type { ServiceId } from '@crewstation/contracts';
-import { activeWebhookIngress } from './activeWebhookIngress';
+import { activeWebhookIngress } from './queries';
 import type { RepositoryScope } from '../ports/unitOfWork';
 
 const manifest = ManifestSchema.parse({ apiVersion: 'crewstation/v2', kind: 'EventProducer', spec: {

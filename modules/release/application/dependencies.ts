@@ -5,8 +5,10 @@ import type { ImageBuilder, MigrationRunner, ReleaseJobs, SlotDeployer, SlotRend
 import type { ConfigSource, DataSource, HostNaming, MaintenanceWindow, PlanCatalog, ProjectAuthorizer, ProjectOwners, ReleaseSettings, ServiceResolver, SlotNotifier } from '../ports/platform';
 import type { ReleaseTagger, RepoReader } from '../ports/sourceControl';
 import type { UnitOfWork } from '../ports/unitOfWork';
+import type { ReleaseProjectAdmissions } from '../ports/unitOfWork';
 
 export interface ReleaseUseCaseDeps {
+  admission?: ReleaseProjectAdmissions;
   executionHandoff?: ExecutionHandoff;
   uow: UnitOfWork;
   runtimeImages?: ReleaseRuntimeImages;

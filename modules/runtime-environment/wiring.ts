@@ -7,16 +7,16 @@ import { adminRuntimeImageVersionRoutes } from './http/adminVersionRoutes';
 import { runtimeImageExecutionHistory } from './application/catalog/executionHistory';
 import type { RuntimeImageExecutionHistory } from './ports/executionHistory';
 import { join } from 'node:path';
-import type { Actor, UserId } from '@crewstation/contracts';
+import type { Actor, ProjectDeletionContext, UserId } from '@crewstation/contracts';
 import type { Clock, Logger } from '@crewstation/kernel';
-import { noopLogger, systemClock } from '@crewstation/kernel';
+import { jsonHash, newResourceId, noopLogger, systemClock } from '@crewstation/kernel';
 import type { Database, MigrationSet } from '@crewstation/persistence';
 import { readMigrationDir } from '@crewstation/persistence';
 import type { AppEnv } from '@crewstation/http';
 import type { Hono } from 'hono';
 import type { RuntimeEnvironmentModuleApi } from './api/moduleApi';
 import type { RuntimeInitializationSecrets, RuntimeImageAuthorizer, RuntimeImageLimits, RuntimeImageSourceResolver, RuntimeImageValidationContracts } from './ports/platform';
-import { runtimeImageUnitOfWork } from './adapters/persistence/unitOfWork';
+import { runtimeImageProjectAdmissions, runtimeImageUnitOfWork } from './adapters/persistence/unitOfWork';
 import { developmentImagePolicy } from './application/developmentPolicy';
 import { developmentImageRoutes } from './http/developmentRoutes';
 import { runtimeImageCatalog } from './application/catalog';
@@ -48,10 +48,17 @@ import { configuredImageResolver, serviceImageResolver } from './adapters/regist
 import { runtimeImageSourcePreparation } from './application/sourcePreparation';
 import { runtimeImageReferenceReconciliation } from './application/referenceReconciliation';
 import type { RuntimeImageReferenceOwners } from './ports/referenceOwners';
+import type { RuntimeImageCallbackProcess } from './ports/unitOfWork';
+import type { RuntimeImageDeletionPhysics } from './ports/projectDeletion';
+import { runtimeImageDeletionRepository } from './adapters/persistence/projectDeletion';
+import { runtimeImageProjectDeletionOwner } from './application/projectDeletion';
 
 export const runtimeEnvironmentMigrations: MigrationSet = { module: 'runtime-environment', layer: 4, files: readMigrationDir(join(import.meta.dir, 'adapters', 'persistence', 'migrations')) };
 
 export interface RuntimeEnvironmentModuleDeps {
+  /** Callback admission requires the original process source and project availability port. */
+  readonly projectAdmission?: { protectCurrent(): Promise<RuntimeImageCallbackProcess>; assertAvailable(projectId: string): Promise<void> };
+  readonly deletion?: { physics: RuntimeImageDeletionPhysics; assertGrant(context: ProjectDeletionContext): Promise<void> };
   readonly executionHistory?: RuntimeImageExecutionHistory;
   readonly referenceOwners?: RuntimeImageReferenceOwners;
   readonly db: Database;
@@ -74,8 +81,20 @@ export interface RuntimeEnvironmentModule {
 }
 
 export function createRuntimeEnvironmentModule(deps: RuntimeEnvironmentModuleDeps): RuntimeEnvironmentModule {
-  const useCases = { ...deps, uow: runtimeImageUnitOfWork(deps.db), clock: deps.clock ?? systemClock, logger: deps.logger ?? noopLogger };
-  const api: RuntimeEnvironmentModuleApi = { name: 'runtime-environment', ...projectImagePolicy(useCases), ...imageResourceAllocationUseCases(useCases), createSetup: createRuntimeImageSetup(useCases), imageHistory: runtimeImageExecutionHistory(useCases), reconcileReferences: runtimeImageReferenceReconciliation(useCases), ...developmentImagePolicy(useCases), ...runtimeImageValidationController(useCases, deps.validationExecutor), ...runtimeImageCatalog(useCases), ...runtimeImageBuilds(useCases), ...runtimeImageValidations(useCases), ...runtimeImageReferences(useCases), ...runtimeImageVersionLifecycle(useCases), ...runtimeImageBuildController(useCases, deps.buildExecutor) };
+  if (deps.deletion && !deps.projectAdmission) throw precondition('运行镜像永久清理必须同时装配原回调准入来源');
+  const projectAdmissions = deps.projectAdmission ? runtimeImageProjectAdmissions({ ...deps.projectAdmission, db: deps.db }) : undefined;
+  const sources: RuntimeImageSourceResolver = { prepare: async (actor, projectId, source) => {
+    const prepare = () => deps.sources.prepare(actor, projectId, source);
+    return projectAdmissions && projectId ? projectAdmissions.run([projectId], { kind: 'source', id: newResourceId(), inputDigest: jsonHash({ projectId, source }) }, prepare) : prepare();
+  } };
+  const initializationSecrets: RuntimeInitializationSecrets | undefined = deps.initializationSecrets && { render: async (projectId, stamps) => {
+    const render = () => deps.initializationSecrets!.render(projectId, stamps);
+    return projectAdmissions ? projectAdmissions.run([projectId], { kind: 'initializer', id: newResourceId(), inputDigest: jsonHash({ projectId, stamps }) }, render) : render();
+  } };
+  const useCases = { ...deps, sources, initializationSecrets, projectAdmissions, uow: runtimeImageUnitOfWork(deps.db), clock: deps.clock ?? systemClock, logger: deps.logger ?? noopLogger };
+  const api: RuntimeEnvironmentModuleApi = { name: 'runtime-environment',
+    ...(deps.deletion ? { deletionOwner: runtimeImageProjectDeletionOwner({ ...deps.deletion, repository: runtimeImageDeletionRepository({ db: deps.db, assertGrant: deps.deletion.assertGrant }) }) } : {}),
+    ...projectImagePolicy(useCases), ...imageResourceAllocationUseCases(useCases), createSetup: createRuntimeImageSetup(useCases), imageHistory: runtimeImageExecutionHistory(useCases), reconcileReferences: runtimeImageReferenceReconciliation(useCases), ...developmentImagePolicy(useCases), ...runtimeImageValidationController(useCases, deps.validationExecutor), ...runtimeImageCatalog(useCases), ...runtimeImageBuilds(useCases), ...runtimeImageValidations(useCases), ...runtimeImageReferences(useCases), ...runtimeImageVersionLifecycle(useCases), ...runtimeImageBuildController(useCases, deps.buildExecutor) };
   return { api, http: [adminRuntimeImageCatalogRoutes(api, deps.isAdmin), adminRuntimeImageVersionRoutes(api, deps.isAdmin), projectImagePolicyRoutes(api, deps.isAdmin), developmentImageRoutes(api, deps.isAdmin), runtimeImageRoutes(api, deps.isAdmin), runtimeImageVersionRoutes(api, deps.isAdmin)], migrations: runtimeEnvironmentMigrations };
 }
 
@@ -109,7 +128,8 @@ export function createManagedRuntimeEnvironmentModule(deps: ManagedRuntimeEnviro
     return `${image.repository}@${image.digest}`;
   } });
   const mod = createRuntimeEnvironmentModule({ ...deps, sources, buildExecutor: executor, validationExecutor: validationExecutorWithServices(registry, deps.registry.pullBase, deps.validationExecutor) });
-  const secretValues = runtimeImageBuildSecretValues(intents, deps.credentials, uow.read.revisions.get);
+  const admissions = deps.projectAdmission ? runtimeImageProjectAdmissions({ ...deps.projectAdmission, db: deps.db }) : undefined;
+  const secretValues = runtimeImageBuildSecretValues(intents, deps.credentials, uow.read.revisions.get, admissions);
   return { ...mod, pinServiceImage: serviceImageResolver(deps.registry), pinPlatformImage: configuredImageResolver(deps.registry),
     imageBuildSecretValues: async (input: Parameters<typeof secretValues>[0]) => { await deps.assertBuildIsolation(); return secretValues(input); },
     workers: [periodicJob(async () => { await mod.api.reconcileReferences(); }, () => logger.warn('runtime image reference worker failed'), 30000), periodicJob(mod.api.reconcileValidations, () => logger.warn('runtime image validation worker failed'), 2000), periodicJob(mod.api.reconcileBuilds, () => logger.warn('runtime image build worker failed'), 2000)],

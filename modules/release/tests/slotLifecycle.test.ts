@@ -6,6 +6,7 @@ import { createApp } from '@crewstation/http';
 import type { K8sClient } from '@crewstation/k8s';
 import { createFakeK8sClient, LABELS, Resources } from '@crewstation/k8s';
 import { forbidden } from '@crewstation/kernel';
+import { runMigrations } from '@crewstation/persistence';
 import { queueMigrations } from '@crewstation/queue';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import { sql } from 'drizzle-orm';
@@ -27,8 +28,9 @@ const ns = 'cs-lifecycle';
 const manifest = (migration = '{ compatibility: none, destructive: false, rollback: switch-back }') =>
   `apiVersion: crewstation/v2\nkind: DigitalWorker\nspec:\n  service: { command: [bun], port: 3000, healthPath: /healthz, servicePlanId: 01a0bf5d-8f4b-781d-8b8e-bbbbc69c6c6a, replicas: 1 }\n  release:\n    migration: ${migration}\n`;
 
-async function fixture() {
-  database = await createTestDatabase([eventbusMigrations, queueMigrations, releaseMigrations]);
+async function fixture(previous = false) {
+  const migrations = previous ? { ...releaseMigrations, files: releaseMigrations.files.filter((file) => file.name < '0009') } : releaseMigrations;
+  database = await createTestDatabase([eventbusMigrations, queueMigrations, migrations]);
   const state = { now: new Date('2026-09-23T00:00:00.000Z'), yaml: manifest() as string | undefined, window: false, version: 0, rejectDryRun: undefined as string | undefined, rejectDeploy: undefined as string | undefined, planGone: false, manifestRefs: [] as string[] };
   // API Server 的拒绝：dry-run（统一预检）与真正部署各自可以设一个原因，只针对 Deployment。
   const fake = createFakeK8sClient();
@@ -113,9 +115,10 @@ describe.skipIf(!available)('RFC-021 待命槽生命周期', () => {
 
   // 2026-09-23 实机：RFC-013 之前部署的 Deployment 标签上是旧 `rel_…` ID，只认 UUID 时下线会把它当成别的版本留着不删（本机 8 个待命槽全是这样）。
   test('RFC-013 之前部署的待命槽：Deployment 标签是旧 ID 时下线照样删掉；标签属于别的版本时不删', async () => {
-    const f = await fixture();
+    const f = await fixture(true);
     const v1 = await f.publish(), physical = await f.standby();
     await database!.db.execute(sql`UPDATE release.releases SET legacy_resource_id = 'rel_legacy_v1' WHERE id = ${v1.id}`);
+    await runMigrations(database!.db, [releaseMigrations]);
     await f.k8s.mergePatch(Resources.Deployment!, `lifecycle-${physical}`, ns, { metadata: { labels: { [LABELS.release]: 'rel_legacy_v1' } } });
     await f.release.api.takeOffline(owner, serviceId, { expectedReleaseId: v1.id });
     expect(await f.deployment(physical)).toBeUndefined();

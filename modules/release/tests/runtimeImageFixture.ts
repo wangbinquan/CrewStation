@@ -6,9 +6,10 @@ import { createResourcesModule, resourcesMigrations } from '@crewstation/module-
 import { queueMigrations } from '@crewstation/queue';
 import { createTestDatabase } from '@crewstation/testkit';
 import { drizzleUnitOfWork } from '../adapters/persistence/drizzleUnitOfWork';
+import type { ReleaseModuleDeps } from '../wiring';
 import { createReleaseModule, releaseMigrations } from '../wiring';
 
-export async function releaseImageFixture(ledger = false) {
+export async function releaseImageFixture(ledger = false, overrides?: (projectId: ProjectId, serviceId: ServiceId) => Partial<ReleaseModuleDeps>) {
   const tdb = await createTestDatabase([eventbusMigrations, queueMigrations, resourcesMigrations, releaseMigrations]);
   const k8s = createFakeK8sClient(), userId = newResourceId() as UserId, actor: Actor = { userId, isAdmin: true };
   const projectId = newResourceId() as ProjectId, serviceId = newResourceId() as ServiceId, plan = newResourceId();
@@ -37,6 +38,7 @@ export async function releaseImageFixture(ledger = false) {
     config: { render: async () => ({ values: {}, version: 1 }), validate: async () => ({ missing: [] }) }, data: { envFor: async () => ({}) },
     hosts: { prodHost: () => 'prod.invalid', previewHost: () => 'preview.invalid' }, maintenance: { open: async () => false }, owners: { ownerOf: async () => userId }, notifier: { notify: async () => {} },
     settings: { registryBase: 'registry', buildTimeoutSeconds: 600, deployTimeoutSeconds: 300, builderImage: 'builder', buildkitAddress: 'tcp://buildkitd:1234', workerOwner: 'image-test', serviceDomain: 'svc.internal', userDomain: 'user.invalid' },
+    ...overrides?.(projectId, serviceId),
   });
-  return { runtime, actor, serviceId, projectId, snapshot, state, resources, uow: drizzleUnitOfWork(tdb.db), close: () => tdb.drop() };
+  return { runtime, actor, serviceId, projectId, snapshot, db: tdb.db, state, resources, uow: drizzleUnitOfWork(tdb.db), close: () => tdb.drop() };
 }

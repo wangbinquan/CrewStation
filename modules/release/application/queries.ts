@@ -117,3 +117,26 @@ export function releaseQueries(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'authorize
     },
   };
 }
+
+/** Only the current ready production manifest opens ingress, never a newly registered standby version. */
+export function activeWebhookIngress(read: Pick<RepositoryScope, 'slots' | 'releases'>) {
+  return async (serviceId: ServiceId): Promise<string | undefined> => {
+    const slots = await read.slots.get(serviceId);
+    if (!slots) return undefined;
+    const active = slots[slots.active];
+    if (active.state !== 'ready' || active.replicas < 1 || !active.releaseId) return undefined;
+    const release = await read.releases.getById(active.releaseId);
+    const manifest = release?.manifest;
+    if (release?.status !== 'ready' || manifest?.kind !== 'EventProducer') return undefined;
+    return manifest.spec.ingress.verification === 'none' ? undefined : manifest.spec.ingress.path;
+  };
+}
+
+/** Manifest of the verified source release, including standby slots; never use the current main branch. */
+export function releaseObjectStorage(read: RepositoryScope) {
+  return async (serviceId: ServiceId, releaseId: ReleaseId) => {
+    const release = await read.releases.getById(releaseId);
+    if (release?.serviceId !== serviceId || release.manifest?.kind !== 'DigitalWorker' || !release.manifest.spec.data) return undefined;
+    return { planId: release.manifest.spec.data.objects.planId, fenced: release.manifest.spec.tasks?.executionControl === 'fenced' };
+  };
+}

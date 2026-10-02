@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import { sql } from 'drizzle-orm';
-import type { RuntimeImageVersionDto } from '@crewstation/contracts';
+import type { RuntimeImageBuildDto, RuntimeImageRevisionDto, RuntimeImageVersionDto } from '@crewstation/contracts';
 import { createFakeK8sClient } from '@crewstation/k8s';
 import { newResourceId, noopLogger } from '@crewstation/kernel';
 import { runMigrations } from '@crewstation/persistence';
@@ -21,10 +21,16 @@ afterAll(async () => { await db?.drop(); });
 
 // Seed a registered artifact, without contacting SCM or a registry. Ownership is queried through the real composition root.
 async function seedReferences(ownerType = 'task') {
-  const projectId = newResourceId(), imageId = newResourceId(), buildId = newResourceId();
+  const projectId = newResourceId(), imageId = newResourceId(), buildId = newResourceId(), createdBy = newResourceId();
   const version: RuntimeImageVersionDto = { id: newResourceId(), imageId, buildId, revisionId: newResourceId(), repository: 'registry.test/tools', digest: `sha256:${'a'.repeat(64)}`, architecture: 'linux/amd64', state: 'available', createdAt: new Date().toISOString(), initializerDigest: `sha256:${'b'.repeat(64)}`, toolsDigest: `sha256:${'c'.repeat(64)}` };
+  const revision: RuntimeImageRevisionDto = { id: version.revisionId, imageId, revision: 1,
+    source: { kind: 'existing', reference: `${version.repository}@${version.digest}`, architecture: version.architecture, usage: 'task' }, recipeDigest: version.digest,
+    initializer: { steps: [], env: {}, secrets: [] }, tools: [], createdBy, createdAt: version.createdAt };
+  const build: RuntimeImageBuildDto = { id: buildId, imageId, revisionId: revision.id, projectId, state: 'succeeded', stage: 'complete',
+    createdBy, createdAt: version.createdAt, updatedAt: version.createdAt, deadline: version.createdAt, attempt: 1, versionId: version.id, unknown: false };
   await db.db.execute(sql`INSERT INTO runtime_environment.images (id, name, default_visible, enabled, payload) VALUES (${imageId}, 'tools', false, true, '{}'::jsonb)`);
-  await db.db.execute(sql`INSERT INTO runtime_environment.builds VALUES (${buildId}, ${imageId}, ${projectId}, ${newResourceId()}, 'seed', 'succeeded', NULL, '{}'::jsonb)`);
+  await db.db.execute(sql`INSERT INTO runtime_environment.revisions VALUES (${revision.id}, ${imageId}, ${revision.revision}, ${JSON.stringify(revision)}::jsonb)`);
+  await db.db.execute(sql`INSERT INTO runtime_environment.builds VALUES (${buildId}, ${imageId}, ${projectId}, ${createdBy}, 'seed', 'succeeded', NULL, ${JSON.stringify(build)}::jsonb)`);
   await db.db.execute(sql`INSERT INTO runtime_environment.versions (id, image_id, build_id, repository, digest, state, payload) VALUES (${version.id}, ${imageId}, ${buildId}, ${version.repository}, ${version.digest}, 'available', ${JSON.stringify(version)}::jsonb)`);
   const owners = [newResourceId(), newResourceId()];
   for (const ownerId of owners) {

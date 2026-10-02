@@ -1,7 +1,9 @@
 import type { SlotMaintenance } from '../../domain/slotMaintenance';
-import { integer, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import { integer, pgSchema, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 import { jsonDocument } from '@crewstation/persistence';
-import { releaseSchema } from './schema';
+import type { ExecutionHandoffOperation } from '../../domain/executionHandoff';
+
+export const releaseSchema = pgSchema('release');
 
 export const releases = releaseSchema.table('releases', {
   legacyResourceId: text('legacy_resource_id'),
@@ -68,4 +70,10 @@ export const offlinePolicy = releaseSchema.table('offline_policy', {
   revision: integer('revision').notNull(),
   updatedBy: text('updated_by'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+});
+
+export const executionHandoffs = releaseSchema.table('execution_handoffs', {
+  id: text('id').primaryKey(), requestKey: text('request_key').notNull(), serviceId: text('service_id').notNull(), stage: text('stage').notNull(),
+  body: jsonDocument('body').$type<ExecutionHandoffOperation>().notNull(), revision: integer('revision').notNull().default(0),
+  owner: text('owner'), leaseUntil: timestamp('lease_until', { withTimezone: true }), updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

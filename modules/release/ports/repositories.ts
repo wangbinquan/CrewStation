@@ -80,3 +80,8 @@ export interface MaintenanceRepository {
   setOverride(serviceId: string, physical: string, replicas?: number): Promise<void>;
   projection(serviceId?: string): Promise<ClusterSlotProjection[]>;
 }
+
+export interface ReleaseContentDirectory {
+  aliases(kind: string, id: string): Promise<readonly (readonly string[])[]>;
+  resolve(kind: string, keys: readonly string[]): Promise<string | undefined>;
+}

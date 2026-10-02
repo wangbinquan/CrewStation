@@ -1,4 +1,6 @@
-import { releaseImageHistory } from './adapters/persistence/imageHistory';
+import { releaseImageHistory } from './adapters/persistence/drizzleRepositories';
+import { releaseProjectContent } from './adapters/persistence/projectContent';
+import type { ReleaseContentDirectory } from './ports/repositories';
 import type { ExecutionHandoff } from './ports/executionHandoff';
 import { releaseHandoffUseCases } from './application/execution/handoff';
 import { periodicJob } from '@crewstation/resource-runtime';
@@ -7,7 +9,7 @@ import { kubernetesSlotControl } from './adapters/k8s/slotControl';
 import { slotMaintenanceUseCases } from './application/slotMaintenance';
 import { slotLifecycleUseCases } from './application/slotLifecycle';
 import { join } from 'node:path';
-import type { UserId } from '@crewstation/contracts';
+import type { ReleaseId, UserId } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import type { K8sClient } from '@crewstation/k8s';
 import type { Clock, Logger } from '@crewstation/kernel';
@@ -20,15 +22,18 @@ import type { Hono } from 'hono';
 import { buildKitBuilder } from './adapters/k8s/buildKitBuilder';
 import { migrationJobRunner } from './adapters/k8s/migrationJob';
 import { kubernetesSlotDeployer } from './adapters/k8s/slotDeployer';
-import { drizzleUnitOfWork } from './adapters/persistence/drizzleUnitOfWork';
+import { drizzleUnitOfWork, releaseProjectAdmissions } from './adapters/persistence/drizzleUnitOfWork';
 import { queueReleaseJobs } from './adapters/queue/releaseJobs';
+import type { ProjectDeletionContext } from '@crewstation/contracts';
+import type { ReleaseCallbackProcess } from './domain/release';
+import type { ReleaseDeletionPhysics } from './ports/unitOfWork';
+import { releaseDeletionRepository } from './adapters/persistence/projectDeletion';
+import { admittedReleaseApi, protectedReleaseEffects, releaseProjectWork, releaseProjectDeletionOwner } from './application/projectDeletion';
 import type { ReleaseModuleApi } from './api/moduleApi';
 import type { ReleaseUseCaseDeps } from './application/dependencies';
 import { pipelineStepUseCase } from './application/pipeline';
 import { publishUseCase } from './application/publish';
-import { activeWebhookIngress } from './application/activeWebhookIngress';
-import { releaseObjectStorage } from './application/objectStorage';
-import { releaseQueries } from './application/queries';
+import { activeWebhookIngress, releaseObjectStorage, releaseQueries } from './application/queries';
 import { switchTrafficUseCase } from './application/switchTraffic';
 import { releaseRoutes } from './http/releaseRoutes';
 import type { ImageBuilder, MigrationRunner, SlotDeployer, SlotRenderer } from './ports/delivery';
@@ -41,6 +46,10 @@ import { resyncSlotLedger } from './application/slotLedgerResync';
 import type { SlotLedger } from './ports/ledger';
 
 export interface ReleaseModuleDeps {
+  /** Only old retained identities use this directory; normal release commands keep their UUID boundary. */
+  deletionIdentities?: ReleaseContentDirectory;
+  projectAdmission?: { protectCurrent(): Promise<ReleaseCallbackProcess>; assertAvailable(projectId: string): Promise<void> };
+  deletion?: { physics: ReleaseDeletionPhysics; assertGrant(context: ProjectDeletionContext): Promise<void> };
   executionHandoff?: ExecutionHandoff;
   runtimeImages?: ReleaseRuntimeImages;
   physicalOperationId?: (id: string) => Promise<string>;
@@ -95,37 +104,51 @@ export const releaseMigrations: MigrationSet = {
 
 export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
   const logger = deps.logger ?? noopLogger;
-  const jobs = queueReleaseJobs(deps.db);
+  const admission = deps.projectAdmission ? releaseProjectAdmissions({ db: deps.db, ...deps.projectAdmission }) : undefined;
+  const uow = drizzleUnitOfWork(deps.db, deps.ledger ? { ledger: deps.ledger, services: deps.services, logger } : undefined);
+  const effects = <T extends object>(source: T) => protectedReleaseEffects(source, admission);
+  const jobs = queueReleaseJobs(deps.db, admission ? async (id, work) => {
+    const release = await uow.read.releases.getById(id as ReleaseId); if (!release) return;
+    await releaseProjectWork({ services: deps.services, admission }, release.serviceId, 'pipeline', release.id, { enqueue: release.id }, async () => {
+      if ((await deps.services.resolveServiceById(release.serviceId))?.projectId !== release.projectId) throw new Error('原发布项目与队列服务归属冲突');
+      await admission.checkCurrent(); await work(); await admission.checkCurrent();
+    });
+  } : undefined);
   const useCaseDeps: ReleaseUseCaseDeps = {
-    uow: drizzleUnitOfWork(deps.db, deps.ledger ? { ledger: deps.ledger, services: deps.services, logger } : undefined),
-    tagger: deps.tagger,
-    repo: deps.repo, executionHandoff: deps.executionHandoff,
-    ...(deps.runtimeImages ? { runtimeImages: deps.runtimeImages } : {}),
-    builder: deps.delivery?.builder ?? buildKitBuilder(deps.k8s, { builderImage: deps.settings.builderImage, buildkitAddress: deps.settings.buildkitAddress, timeoutSeconds: deps.settings.buildTimeoutSeconds }),
-    migrator: deps.delivery?.migrator ?? migrationJobRunner(deps.k8s, { timeoutSeconds: deps.settings.buildTimeoutSeconds }),
-    deployer: deps.delivery?.deployer ?? kubernetesSlotDeployer(deps.k8s),
+    uow, admission,
+    tagger: effects(deps.tagger),
+    repo: effects(deps.repo), executionHandoff: deps.executionHandoff ? effects(deps.executionHandoff) : undefined,
+    ...(deps.runtimeImages ? { runtimeImages: effects(deps.runtimeImages) } : {}),
+    builder: effects(deps.delivery?.builder ?? buildKitBuilder(deps.k8s, { builderImage: deps.settings.builderImage, buildkitAddress: deps.settings.buildkitAddress, timeoutSeconds: deps.settings.buildTimeoutSeconds })),
+    migrator: effects(deps.delivery?.migrator ?? migrationJobRunner(deps.k8s, { timeoutSeconds: deps.settings.buildTimeoutSeconds })),
+    deployer: effects(deps.delivery?.deployer ?? kubernetesSlotDeployer(deps.k8s)),
     jobs,
     authorizer: deps.authorizer,
     services: deps.services,
     plans: deps.plans,
-    config: deps.config,
-    data: deps.data,
+    config: effects(deps.config),
+    data: effects(deps.data),
     hosts: deps.hosts,
     maintenance: deps.maintenance,
     owners: deps.owners,
-    notifier: deps.notifier,
+    notifier: effects(deps.notifier),
     settings: deps.settings,
     clock: deps.clock ?? systemClock,
     logger,
-    ...(deps.ledger && deps.creation === 'ledger' ? { creation: 'ledger' as const } : {}), ...(deps.renderer ? { renderer: deps.renderer } : {}),
+    ...(deps.ledger && deps.creation === 'ledger' ? { creation: 'ledger' as const } : {}), ...(deps.renderer ? { renderer: effects(deps.renderer) } : {}),
   };
-  const api: ReleaseModuleApi = {
+  const implementation: ReleaseModuleApi = {
     name: 'release',
+    ...(deps.deletion && admission ? { deletionOwner: releaseProjectDeletionOwner({
+      repository: releaseDeletionRepository({ db: deps.db, services: deps.services, identities: deps.deletionIdentities, assertGrant: deps.deletion.assertGrant }),
+      physics: deps.deletion.physics, assertGrant: deps.deletion.assertGrant,
+    }) } : {}),
+    deletionContent: releaseProjectContent({ db: deps.db, services: deps.services, identities: deps.deletionIdentities }),
     activeWebhookIngress: activeWebhookIngress(useCaseDeps.uow.read),
     objectStorageContract: releaseObjectStorage(useCaseDeps.uow.read),
     imageHistory: releaseImageHistory(deps.db),
     ...releaseHandoffUseCases(useCaseDeps),
-    ...slotMaintenanceUseCases({ ...useCaseDeps, slotControl: kubernetesSlotControl(deps.k8s, deps.physicalOperationId), isAdmin: deps.isAdmin }),
+    ...slotMaintenanceUseCases({ ...useCaseDeps, slotControl: effects(kubernetesSlotControl(deps.k8s, deps.physicalOperationId)), isAdmin: deps.isAdmin }),
     publish: publishUseCase(useCaseDeps),
     switchTraffic: switchTrafficUseCase(useCaseDeps),
     ...releaseQueries(useCaseDeps),
@@ -133,6 +156,7 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
     ...slotLifecycleUseCases({ ...useCaseDeps, isAdmin: deps.isAdmin }),
     ...slotOwnerUseCases(useCaseDeps),
   };
+  const api = admittedReleaseApi(useCaseDeps, implementation);
   let timer: ReturnType<typeof setInterval> | undefined;
   const sweep: ReleaseTimer = {
     start: () => { timer ??= setInterval(() => void api.sweepSlotLifecycle().catch((error: unknown) => logger.error('slot lifecycle sweep failed', { error: String(error) })), SLOT_SWEEP_INTERVAL_MS); },
@@ -142,7 +166,7 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
     api,
     http: [releaseRoutes(api, deps.isAdmin)],
     workers: [createWorker({ db: deps.db, kinds: [PIPELINE_JOB_KIND], owner: deps.settings.workerOwner, concurrency: 4, logger, handler: pipelineJobHandler(api, jobs) }), sweep, periodicJob(() => api.progressHandoffs().then(() => undefined), (error) => logger.warn('execution handoff progress failed', { error: String(error) }), 1000),
-      ...(deps.ledger ? [slotLedgerResyncWorker(() => resyncSlotLedger(useCaseDeps.uow, logger), logger)] : [])],
+      ...(deps.ledger ? [slotLedgerResyncWorker(() => resyncSlotLedger(useCaseDeps.uow, logger, useCaseDeps), logger)] : [])],
     migrations: releaseMigrations,
   };
 }

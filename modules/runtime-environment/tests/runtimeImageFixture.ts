@@ -5,7 +5,8 @@ import { createApp } from '@crewstation/http';
 import { forbidden, newResourceId } from '@crewstation/kernel';
 import { createTestDatabase } from '@crewstation/testkit';
 import { runtimeImageUnitOfWork } from '../adapters/persistence/unitOfWork';
-import { createRuntimeEnvironmentModule, runtimeEnvironmentMigrations } from '../wiring';
+import type { MigrationSet } from '@crewstation/persistence';
+import { createRuntimeEnvironmentModule, runtimeEnvironmentMigrations, type RuntimeEnvironmentModuleDeps } from '../wiring';
 import type { RuntimeInitializationSecrets, RuntimeImageValidationContracts } from '../ports/platform';
 import type { RuntimeImageValidationExecutor } from '../ports/validationExecutor';
 import type { RuntimeImageBuildExecutor } from '../ports/buildExecutor';
@@ -14,8 +15,8 @@ import type { RuntimeImageReferenceOwners } from '../ports/referenceOwners';
 export const actor = (isAdmin = false): Actor => ({ userId: newResourceId() as UserId, isAdmin });
 export const digest = `sha256:${'a'.repeat(64)}`;
 
-export async function runtimeImageFixture(executor?: RuntimeImageBuildExecutor, secrets?: { versions: NonNullable<RuntimeImageValidationContracts['secretVersions']>; values: RuntimeInitializationSecrets }, validationExecutor?: RuntimeImageValidationExecutor, referenceOwners?: RuntimeImageReferenceOwners, executionHistory?: RuntimeImageExecutionHistory) {
-  const tdb = await createTestDatabase([runtimeEnvironmentMigrations]);
+export async function runtimeImageFixture(executor?: RuntimeImageBuildExecutor, secrets?: { versions: NonNullable<RuntimeImageValidationContracts['secretVersions']>; values: RuntimeInitializationSecrets }, validationExecutor?: RuntimeImageValidationExecutor, referenceOwners?: RuntimeImageReferenceOwners, executionHistory?: RuntimeImageExecutionHistory, projectAdmission?: RuntimeEnvironmentModuleDeps['projectAdmission'], migrations: MigrationSet = runtimeEnvironmentMigrations) {
+  const tdb = await createTestDatabase([migrations]);
   const project = newResourceId(), otherProject = newResourceId(), repositoryBindingId = newResourceId();
   const developer = actor(), admin = actor(true), tester = actor(), outsider = actor();
   const admins = new Set([admin.userId]);
@@ -23,7 +24,7 @@ export async function runtimeImageFixture(executor?: RuntimeImageBuildExecutor, 
   const memberships = new Map([[developer.userId, new Set([project, otherProject])], [tester.userId, new Set([project])]]);
   let now = new Date('2026-09-27T00:00:00Z'), prepares = 0, contractFingerprint = digest;
   const mod = createRuntimeEnvironmentModule({
-    db: tdb.db, clock: { now: () => now }, isAdmin: async (id) => admins.has(id), referenceOwners, executionHistory,
+    db: tdb.db, clock: { now: () => now }, isAdmin: async (id) => admins.has(id), referenceOwners, executionHistory, projectAdmission,
     authorizer: { authorize: async (a, p, action) => {
       if (a.isAdmin) return;
       if (!memberships.get(a.userId)?.has(p) || action === 'manage' || (a.userId === tester.userId && action !== 'view')) throw forbidden();

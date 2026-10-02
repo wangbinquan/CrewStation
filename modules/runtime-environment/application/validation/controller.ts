@@ -1,6 +1,6 @@
 import type { UserId } from '@crewstation/contracts';
 import { compatibilityEvidence, requireAvailable } from '../compatibility';
-import { isPlatformError, newResourceId } from '@crewstation/kernel';
+import { isPlatformError, jsonHash, newResourceId } from '@crewstation/kernel';
 import type { ImageValidation } from '../../domain/records';
 import type { RuntimeImageValidationContext, RuntimeImageValidationExecutor } from '../../ports/validationExecutor';
 import type { RuntimeImageDeps } from '../dependencies';
@@ -8,7 +8,7 @@ import { claimValidation, updateClaimedValidation } from './leases';
 
 /** 一个验证最多派发一次。控制器接管在途记录时只清理并报告 unknown，不重放脚本或模型调用。 */
 export function runtimeImageValidationController(deps: RuntimeImageDeps, executor?: RuntimeImageValidationExecutor) {
-  const runValidation = async (id: string) => {
+  const reconcileValidation = async (id: string) => {
     if (!executor) return;
     let claim: ImageValidation | undefined = await claimValidation(deps, id, newResourceId());
     if (!claim) return;
@@ -31,9 +31,11 @@ export function runtimeImageValidationController(deps: RuntimeImageDeps, executo
         if (!claim || claim.state !== 'running') return;
         context = { ...context, validation: claim };
         const heartbeat = async () => {
+          try { await deps.projectAdmissions?.check([claim!.projectId]); } catch { return false; }
           const next = await updateClaimedValidation(deps, claim!, async (_s, current) => ({ ...current, leaseUntil: new Date(deps.clock.now().getTime() + 60000).toISOString() }));
           return !!next && next.state === 'running' && (!next.deadline || next.deadline > deps.clock.now().toISOString());
         };
+        await deps.projectAdmissions?.check([claim.projectId]);
         const outcome = await executor.run(context, heartbeat);
         const matchedImage = outcome.observedImageId === context.snapshot.digest || outcome.observedImageId?.endsWith(`@${context.snapshot.digest}`);
         const checked = outcome.state === 'passed' && ((!matchedImage && !(context.validation.target.usage === 'service' && outcome.verification === 'service-contract')) || outcome.checks.some((check) => !check.passed))
@@ -41,7 +43,9 @@ export function runtimeImageValidationController(deps: RuntimeImageDeps, executo
         claim = await patch({ pendingOutcome: checked });
         if (!claim) return;
       }
-      if (!claim || !await executor.stop({ ...context, validation: claim })) return;
+      if (!claim) return;
+      await deps.projectAdmissions?.check([claim.projectId]);
+      if (!await executor.stop({ ...context, validation: claim })) return;
       await updateClaimedValidation(deps, claim, async (s, current) => {
         const { leaseOwner: _owner, leaseUntil: _until, pendingOutcome, ...rest } = current;
         const result = current.state === 'cancelling' ? { state: 'cancelled' as const } : pendingOutcome;
@@ -57,6 +61,13 @@ export function runtimeImageValidationController(deps: RuntimeImageDeps, executo
     } finally {
       if (claim) await updateClaimedValidation(deps, claim, async (_s, current) => { const { leaseOwner: _owner, leaseUntil: _until, ...rest } = current; return rest; });
     }
+  };
+  const runValidation = async (id: string) => {
+    if (!deps.projectAdmissions || !executor) return reconcileValidation(id);
+    const validation = await deps.uow.read.validations.get(id);
+    if (!validation || ['passed', 'failed', 'unknown', 'cancelled'].includes(validation.state)) return;
+    return deps.projectAdmissions.run([validation.projectId], { kind: 'validation', id,
+      inputDigest: jsonHash({ id, projectId: validation.projectId, versionId: validation.versionId, contractDigest: validation.contractDigest }) }, () => reconcileValidation(id));
   };
   return { runValidation, reconcileValidations: async () => {
     const pending = await deps.uow.read.validations.runnable(deps.clock.now().toISOString(), 4);

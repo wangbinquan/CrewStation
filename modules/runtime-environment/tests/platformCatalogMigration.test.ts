@@ -13,12 +13,12 @@ describe.skipIf(!available)('平台镜像目录升级', () => {
     try {
       const project = newResourceId(), image = newResourceId(), shared = newResourceId(), revision = newResourceId(), build = newResourceId(), version = newResourceId(), actor = newResourceId();
       const digest = `sha256:${'a'.repeat(64)}`, snapshot = { versionId: version, image: `registry/tools@${digest}`, initializerSecretVersions: [{ name: 'TOKEN', version: 'fixed' }] };
-      const recipe = { recipeDigest: digest, initializer: { steps: [], secrets: [{ name: 'TOKEN', ref: 'token' }] } };
-      const buildPayload = { id: build, projectId: project, state: 'building', resourcePlan: { namespace: 'old-namespace', projectId: project }, gitCredentialIds: ['retained-ticket'] };
+      const recipe = { id: revision, imageId: image, recipeDigest: digest, initializer: { steps: [], secrets: [{ name: 'TOKEN', ref: 'token' }] } };
+      const buildPayload = { id: build, imageId: image, revisionId: revision, projectId: project, state: 'building', resourcePlan: { namespace: 'old-namespace', projectId: project }, gitCredentialIds: ['retained-ticket'] };
       await tdb.db.execute(sql`INSERT INTO runtime_environment.images VALUES (${image}, ${project}, 'private', 'project', true, ${JSON.stringify({ id: image, projectId: project, scope: 'project' })}::jsonb), (${shared}, ${project}, 'shared', 'shared', true, ${JSON.stringify({ id: shared, projectId: project, scope: 'shared' })}::jsonb)`);
       await tdb.db.execute(sql`INSERT INTO runtime_environment.revisions VALUES (${revision}, ${image}, 1, ${JSON.stringify(recipe)}::jsonb)`);
       await tdb.db.execute(sql`INSERT INTO runtime_environment.builds (id, image_id, project_id, actor_id, request_key, state, payload) VALUES (${build}, ${image}, ${project}, ${actor}, 'accepted', 'building', ${JSON.stringify(buildPayload)}::jsonb)`);
-      await tdb.db.execute(sql`INSERT INTO runtime_environment.versions VALUES (${version}, ${image}, ${project}, ${build}, 'registry/tools', ${digest}, 'available', ${JSON.stringify({ id: version, projectId: project, digest })}::jsonb)`);
+      await tdb.db.execute(sql`INSERT INTO runtime_environment.versions VALUES (${version}, ${image}, ${project}, ${build}, 'registry/tools', ${digest}, 'available', ${JSON.stringify({ id: version, imageId: image, revisionId: revision, buildId: build, projectId: project, digest })}::jsonb)`);
       await tdb.db.execute(sql`INSERT INTO runtime_environment.references VALUES (${newResourceId()}, ${version}, ${project}, 'task', 'old-task', ${JSON.stringify(snapshot)}::jsonb)`);
       await tdb.db.execute(sql`INSERT INTO runtime_environment.creation_requests VALUES (${project}, ${actor}, 'setup', 'old-fingerprint', ${image}, ${revision})`);
       const upgraded = await runMigrations(tdb.db, [runtimeEnvironmentMigrations]);
@@ -30,7 +30,7 @@ describe.skipIf(!available)('平台镜像目录升级', () => {
       expect([...(await tdb.db.execute(sql`SELECT project_id FROM runtime_environment.image_project_grants`))]).toEqual([{ project_id: project }, { project_id: project }]);
       expect([...(await tdb.db.execute(sql`SELECT payload FROM runtime_environment.revisions`))]).toEqual([{ payload: { ...recipe, sourceProjectId: project, initializerProjectId: project } }]);
       expect([...(await tdb.db.execute(sql`SELECT project_id, payload FROM runtime_environment.builds`))]).toEqual([{ project_id: project, payload: { ...buildPayload, sourceProjectId: project } }]);
-      expect([...(await tdb.db.execute(sql`SELECT payload FROM runtime_environment.versions`))]).toEqual([{ payload: { id: version, digest } }]);
+      expect([...(await tdb.db.execute(sql`SELECT payload FROM runtime_environment.versions`))]).toEqual([{ payload: { id: version, imageId: image, revisionId: revision, buildId: build, digest } }]);
       expect([...(await tdb.db.execute(sql`SELECT payload FROM runtime_environment.references`))]).toEqual([{ payload: snapshot }]);
       expect([...(await tdb.db.execute(sql`SELECT request_scope, fingerprint FROM runtime_environment.creation_requests`))]).toEqual([{ request_scope: project, fingerprint: 'old-fingerprint' }]);
       expect(await runMigrations(tdb.db, [runtimeEnvironmentMigrations])).toEqual([]);

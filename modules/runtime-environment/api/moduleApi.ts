@@ -5,10 +5,12 @@ import type {
   RuntimeImagePageQuery, RuntimeImageRevisionDto, RuntimeImageVersionDto, StartRuntimeImageBuild, UpdateRuntimeImageRequest, StartImageValidation, RuntimeImageValidationDto,
 } from '@crewstation/contracts';
 import type { RuntimeImageBindings, ImageReferenceView } from './bindings';
-import type { ResourceTarget, ResourceValues } from '@crewstation/contracts';
+import type { ProjectDeletionOwner, ResourceTarget, ResourceValues } from '@crewstation/contracts';
 
 /** 运行镜像目录与构建；用途验证结果单独管理，不把构建成功当成可执行。 */
 export interface RuntimeEnvironmentModuleApi extends RuntimeImageBindings {
+  /** Internal owner is available only with callback admission, deletion grant and independent physical source. */
+  readonly deletionOwner?: ProjectDeletionOwner;
   applyResourceChange(actor: Actor, projectId: string, input: { operationId: string; target: ResourceTarget; expectedRevision: string; values: ResourceValues }): Promise<{ revision: string; effect: string; applied: boolean }>;
   resourceChangeReceipt(projectId: string, operationId: string): Promise<{ revision: string; effect: string; applied: boolean } | undefined>;
   imageGrants(actor: Actor, imageId: string): Promise<RuntimeImageGrants>;

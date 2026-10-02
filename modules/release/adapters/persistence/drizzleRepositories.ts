@@ -1,6 +1,6 @@
-import type { Manifest, ProjectId, ReleaseId, ReleaseStatus, ServiceId, SlotEventKind, SlotName, UserId } from '@crewstation/contracts';
+import type { Manifest, ProjectId, ReleaseId, ReleaseStatus, RuntimeImageHistoryItem, RuntimeImageHistoryRead, ServiceId, SlotEventKind, SlotName, UserId } from '@crewstation/contracts';
 import type { Executor } from '@crewstation/persistence';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, lt, sql } from 'drizzle-orm';
 import { IN_PROGRESS, type Release } from '../../domain/release';
 import { normalizeLegacySlot } from '../../domain/slotLifecycle';
 import type { OfflineReason, PhysicalSlot, ServiceSlots, SlotState } from '../../domain/slots';
@@ -122,5 +122,22 @@ function toRow(r: Release): typeof releases.$inferInsert {
     legacyResourceId: r.legacyResourceId ?? null, id: r.id, serviceId: r.serviceId, projectId: r.projectId, tag: r.tag, commitSha: r.commitSha, branch: r.branch, status: r.status, targetSlot: r.targetSlot,
     image: r.image ?? null, manifest: r.manifest ?? null, configVersion: r.configVersion ?? null, pipeline: r.pipeline, message: r.message ?? null,
     createdBy: r.createdBy, createdAt: r.createdAt, updatedAt: r.updatedAt,
+  };
+}
+
+/** Only the service image actually pinned for this release, never its allowed task image configuration. */
+export function releaseImageHistory(db: Executor) {
+  return async (input: RuntimeImageHistoryRead): Promise<RuntimeImageHistoryItem[]> => {
+    if (!input.versionIds.length) return [];
+    const version = sql<string>`${releases.pipeline}->'runtimeImage'->>'versionId'`;
+    const rows = await db.select({ id: releases.id, projectId: releases.projectId, serviceId: releases.serviceId,
+      versionId: version, name: releases.tag, state: releases.status, message: releases.message,
+      createdAt: releases.createdAt, updatedAt: releases.updatedAt,
+    }).from(releases).where(and(input.projectId ? eq(releases.projectId, input.projectId) : undefined, inArray(version, input.versionIds),
+      input.before ? lt(releases.id, input.before) : undefined,
+    )).orderBy(desc(releases.id)).limit(input.limit);
+    return rows.map((row) => ({ ...row, kind: 'service', message: row.message ?? undefined,
+      createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
+    }));
   };
 }

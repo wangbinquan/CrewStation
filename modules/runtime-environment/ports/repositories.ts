@@ -1,5 +1,5 @@
-import type { ProjectRuntimeImagePolicy, RuntimeImageGrants, RuntimeImageCatalogEntryDto } from '@crewstation/contracts';
-import type { ImageBuild, ImageRevision, ImageValidation, ImageVersion, RuntimeImage, ImageReference, ImageLogChunk, DevelopmentImagePolicy } from '../domain/records';
+import type { ProjectDeletionInventory, ProjectRuntimeImagePolicy, RuntimeImageGrants, RuntimeImageCatalogEntryDto } from '@crewstation/contracts';
+import type { ImageBuild, ImageRevision, ImageValidation, ImageVersion, RuntimeImage, ImageReference, ImageLogChunk, DevelopmentImagePolicy, RuntimeImageCallbackRecord } from '../domain/records';
 
 export interface Page { readonly before?: string; readonly limit: number; readonly search?: string }
 export interface ImageRepository {
@@ -61,4 +61,17 @@ export interface LogRepository {
 export interface DevelopmentPolicyRepository {
   get(projectId: string): Promise<DevelopmentImagePolicy | undefined>;
   save(policy: DevelopmentImagePolicy): Promise<void>;
+}
+
+/** Full project content, separate from the bounded catalog and execution-history views. */
+export interface RuntimeImageProjectContent {
+  readonly inventory: ProjectDeletionInventory;
+  readonly rows: readonly { table: string; key: string; identity: string }[];
+  readonly consumers: readonly {
+    kind: 'build' | 'validation'; id: string; state: string; identity: string;
+    resourceId?: string; executionEpoch?: number; podUid?: string; planIdentity?: string;
+  }[];
+  readonly callbacks: readonly RuntimeImageCallbackRecord[];
+  /** Platform definitions remain platform-owned; source/config dependencies must be sealed as well. */
+  readonly dependencies: readonly { kind: 'source' | 'initializer'; revisionId: string; imageId: string }[];
 }

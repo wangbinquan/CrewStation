@@ -1,6 +1,6 @@
 import type { Actor, AutoOfflinePolicyDto, OfflineReason, PostponeOfflineRequest, RedeployPrecheckDto, RedeployRequest, ReleaseDto, ReleaseId, ServiceId, SetAutoOfflinePolicyRequest, SlotDto, SlotEventDto, TakeOfflineRequest, UserId } from '@crewstation/contracts';
 import { DomainTopic } from '@crewstation/contracts';
-import { conflict, forbidden, newId, notFound, precondition } from '@crewstation/kernel';
+import { conflict, forbidden, newId, newResourceId, notFound, precondition } from '@crewstation/kernel';
 import { rollbackBlockedBy } from '../domain/migrationPolicy';
 import type { PrecheckReason } from '../domain/precheck';
 import { precheckFailed, precheckReason, reasonText } from '../domain/precheck';
@@ -17,6 +17,7 @@ import { nextWorkload, standbyOf, withSlot } from '../domain/slots';
 import type { SlotDeploySpec } from '../ports/delivery';
 import type { OfflinePolicyRecord, SlotEventRecord } from '../ports/repositories';
 import type { RepositoryScope } from '../ports/unitOfWork';
+import { releaseProjectWork } from './projectDeletion';
 import type { ReleaseUseCaseDeps } from './dependencies';
 import { createPipelineContext } from './pipelineContext';
 import type { ResolvedService } from './pipelineContext';
@@ -364,17 +365,19 @@ function sweepUseCase(deps: Deps, removeWorkload: (serviceId: ServiceId, svc: Re
     for (const slots of await uow.read.slots.list()) {
       const physical = standbyOf(slots.active), slot = slots[physical];
       try {
-        const svc = await deps.services.resolveServiceById(slots.serviceId);
-        if (!svc) continue;
-        if (slot.offline && !slot.offline.workloadRemoved) {
-          if (await removeWorkload(slots.serviceId, svc, physical, slot.offline.releaseId)) outcome.repaired += 1;
-          continue;
-        }
-        if (!hasWorkload(slot)) continue;
-        const step = await stepService(slots.serviceId, physical, slot.releaseId!, policy, now);
-        if (step.kind === 'initialized') outcome.initialized += 1;
-        if (step.kind === 'reminded') { outcome.reminded += 1; await notify(svc.projectId, step); }
-        if (step.kind === 'offline') { outcome.offline += 1; await removeWorkload(slots.serviceId, svc, physical, step.releaseId); }
+        await releaseProjectWork(deps, slots.serviceId, 'sweep', newResourceId(), { serviceId: slots.serviceId, physical, releaseId: slot.releaseId ?? slot.offline?.releaseId ?? null }, async () => {
+          const svc = await deps.services.resolveServiceById(slots.serviceId);
+          if (!svc) return;
+          if (slot.offline && !slot.offline.workloadRemoved) {
+            if (await removeWorkload(slots.serviceId, svc, physical, slot.offline.releaseId)) outcome.repaired += 1;
+            return;
+          }
+          if (!hasWorkload(slot)) return;
+          const step = await stepService(slots.serviceId, physical, slot.releaseId!, policy, now);
+          if (step.kind === 'initialized') outcome.initialized += 1;
+          if (step.kind === 'reminded') { outcome.reminded += 1; await notify(svc.projectId, step); }
+          if (step.kind === 'offline') { outcome.offline += 1; await removeWorkload(slots.serviceId, svc, physical, step.releaseId); }
+        });
       } catch (error) {
         logger.warn('slot lifecycle sweep failed for service', { serviceId: slots.serviceId, error: error instanceof Error ? error.message : String(error) });
       }

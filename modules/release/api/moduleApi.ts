@@ -1,4 +1,5 @@
 import type { RuntimeImageHistoryRead, RuntimeImageHistoryItem } from '@crewstation/contracts';
+import type { ProjectDeletionInventory, ProjectDeletionOwner, ProjectDeletionTarget } from '@crewstation/contracts';
 import type { ReleaseResourceUsage } from '@crewstation/contracts';
 import type { ClusterResource, ClusterInspectRequest, ClusterInspection, ClusterOperation } from '@crewstation/contracts';
 import type { Actor, AutoOfflinePolicyDto, PostponeOfflineRequest, ProjectId, PublishRequest, RedeployPrecheckDto, RedeployRequest, ReleaseDto, ReleaseId, ServiceId, SetAutoOfflinePolicyRequest, SlotDto, SlotEventDto, TakeOfflineRequest, TrafficSwitchDto, TrafficSwitchRequest } from '@crewstation/contracts';
@@ -29,8 +30,22 @@ export interface ActiveEndpoint {
   port: number;
 }
 
+/** Retained records are a content source; they never prove native processes or registry bytes absent. */
+export interface ReleaseProjectContent {
+  readonly inventory: ProjectDeletionInventory;
+  readonly identityLinks: readonly { kind: string; keys: readonly string[]; id: string }[];
+  readonly rows: readonly { table: string; key: string; identity: string }[];
+  readonly consumers: readonly {
+    kind: 'release' | 'slot' | 'handoff' | 'maintenance' | 'callback'; id: string; serviceId: string;
+    identity: string; state: string; aliases: readonly string[];
+  }[];
+}
+
 /** release 模块对外能力：发布、切流、查询；流水线推进由工作器调用。 */
 export interface ReleaseModuleApi {
+  readonly deletionOwner?: ProjectDeletionOwner;
+  /** Complete retained content, including old identities. Native reclamation requires its own independent source. */
+  deletionContent(target: ProjectDeletionTarget): Promise<ReleaseProjectContent>;
   /** 原发布 UUID 的不可替换项目／服务归属，供工作负载来源核对；不按 tag 或同名服务解析。 */
   sourceOwnership(releaseId: ReleaseId): Promise<{ projectId: ProjectId; serviceId: ServiceId } | undefined>;
   resourceUsage(actor: Actor, serviceId: ServiceId): Promise<ReleaseResourceUsage[]>;

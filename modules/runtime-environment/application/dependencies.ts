@@ -2,7 +2,7 @@ import type { RuntimeImageExecutionHistory } from '../ports/executionHistory';
 import type { UserId } from '@crewstation/contracts';
 import type { Clock, Logger } from '@crewstation/kernel';
 import type { RuntimeInitializationSecrets, RuntimeImageAuthorizer, RuntimeImageLimits, RuntimeImageSourceResolver, RuntimeImageValidationContracts } from '../ports/platform';
-import type { UnitOfWork } from '../ports/unitOfWork';
+import type { RuntimeImageProjectAdmissions, UnitOfWork } from '../ports/unitOfWork';
 import type { RuntimeImageReferenceOwners } from '../ports/referenceOwners';
 
 export interface RuntimeImageDeps {
@@ -12,6 +12,7 @@ export interface RuntimeImageDeps {
   readonly validationContracts: RuntimeImageValidationContracts;
   readonly initializationSecrets?: RuntimeInitializationSecrets;
   readonly uow: UnitOfWork;
+  readonly projectAdmissions?: RuntimeImageProjectAdmissions;
   readonly authorizer: RuntimeImageAuthorizer;
   readonly sources: RuntimeImageSourceResolver;
   readonly limits: RuntimeImageLimits;
