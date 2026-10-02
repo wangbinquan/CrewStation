@@ -779,3 +779,49 @@ v24 的 93 路径完整 SOURCE 独立 PASS（e8197b8451542d3b696819ab06b66e02f1b
 发布前 `git diff --cached --check` 只发现本人两个文件的三个空白问题：parentRebuildPublication.ts 的多余 EOF 空行，以及 developmentParentRebuildWorker.test.ts 两条调用语句后的空格。只修正这三处外部空白，并补入本记录；没有改语句、字面量、断言、测试输入或运行门槛。复核这些限定差异后复用已完成的功能门禁，不重新启动整仓测试。此前暂存区 201 路径是本次失败发布流程精确建立的快照，未收编其他暂存内容；再次发布前会校验完整路径、候选字节与独立审查。
 
 这里只记录本机候选验证结果。精确远端 CI、基于已提交树的本机镜像构建与部署仍待完成；CS-R02 的完整 writer/inflight、unbound、unknown-tail、真实开发/CLI/平台用途及后续观测验收继续，producer OFF，两 RFC 保持 In Progress。
+
+
+### 2026-10-02 后续：旧 CLI/旧 Agent 新执行封口
+
+[具体设计与状态](development-native-writer-seal.md)已通过独立 DESIGN v27。当前补入旧新创建与 queued prepare 的原父 witness 前后核验，真实入口回归及新的 SOURCE/联合门禁待完成。首次父创建 ACK/失败、全部 writer/inflight、未绑定与 unknown-tail 仍未闭合，开发采集 producer 保持 OFF。
+
+## 2026-10-02 已发表父退出部署与旧执行清理占额接续
+
+父退出前批 `37e1f5aaa8acfb64fec43d356ef35f1ed2c9e234` 的 [CI 37017612146](https://github.com/wangbinquan/CrewStation/actions/runs/37017612146) 六项全部 success，2026-10-02T14:54:18.280Z 本机八组件部署完成；实际 Pod／节点 OCI 来源、三项迁移校验与原数据库／任务运行器／项目资源身份已核。部署首次预检因检查未使用的 mutable Task dev 标签而安全拒绝，未作集群变更；修订为核查实际已固定的 Runner 摘要后，经独立部署复核完成升级，失败历史保留。
+
+后续旧 create／queued prepare 的两处父 witness 守卫已落地。其 v27 真实数据库回归 46 pass／1 fail／314 断言：旧 queued cleaning 的未观测对象让台账提前 stopped，配额 3→2。原失败判据保留；独立 DESIGN v28 PASS 后，仅给旧无保护／无 businessStorage native 的 cleaning 补既有 ReleasePending 条件，实际物理清理和消失观测后再按原阶段退额。新增真实 worker 的读取故障／重试及已绑定原对象验证；限定回归 v29 已通过 74 pass／0 fail／501 断言，类型与精确 lint 通过，新增生产语句覆盖 6／6。32 路径 SOURCE v29 的代码功能 PASS，原文档 P2 由 v30 仅修正文档后独立 PASS；旧失败保留。v30 第一次完整检查在 1.03 秒的结构检查处因并行 release/application 的 21 文件超过 20 上限而失败，尚未运行 lint／类型／测试，不能视为完整通过。原会话现已按原职责把只读查询归并至 queries，实际目录为 19，并交接正式 release 依赖及新增 0009 的完整迁移锁；下一候选将与原 runtime 25 路径和本会话 6 路径一起重新冻结、独立 SOURCE 后仅执行一次联合完整检查。该批仍未提交或部署，不能借前批 37e1 的通过代签。
+
+CS-R02 的全 writer／inflight 封口、未绑定／未知尾部、开发 producer 及真实 CLI／开发／自测、其余统计全景验收继续；producer OFF，两个 RFC 保持 In Progress。
+
+
+### 2026-10-03 当前接续边界
+
+当前本机安装与精确 CI 仍为上述 37e1 批。后续 writer 最小补丁与交接依赖的完整检查、精确远端 CI 和新本机部署尚待完成。初始父 Pod 的延迟 ACK／错误回写已有精确私有设计，尚未通过 DESIGN、未实施；不把这份设计算作 writer 全闭合。真实开发 producer、全部入口、未绑定启动授权／unknown-tail、CLI／自测、调用片段及其余观测退出条件继续，producer OFF，两个 RFC 保持 In Progress。
+
+
+### 2026-10-03 联合 SOURCE v31 失败与队列公平修正
+
+65 路径的完整 SOURCE v31 为 FAIL，唯一新增 P2 是 release handoff 反复读取最早 20 条：封存项目在 claim 前拒绝且不更新记录，后面的正常项目因此一直无机会。原回执 `observability-cs-legacy-native-parent-seal-release-joint-source-review-v31.json`（SHA256 f7d24593777dd250e91f36cac10bf57e6cdb1bd69a67fb58f9d0e43985b99964）和未启动完整检查的记录保留；本候选没有运行第二次完整门禁。
+
+原负责会话交接 release v3 共 35 路径（含共享锁），改为原始不可变 handoff ID 的每轮 20 条分页并在尾部回绕，同一控制器并发恢复合并为一次扫描。拒绝仍不 claim、不 settle、不更新业务行。真实 PostgreSQL 的“同一已封闭项目的 20 条交接 + 1 条健康交接”先在旧实现复现失败，再在修正候选及关联套件得到 42 pass / 0 fail / 295 断言、4 文件、12.92 秒；改动行保护 671/673，类型、限定 lint 和结构通过。原 127/0 模块结果属于修正前候选，不能记作新版完整检查。
+
+原 runtime 25 路径、本会话 6 路径及共享迁移锁将与 release 34 个专属路径形成 66 路径候选，经过增量独立 SOURCE 后，仅由本会话启动一次新的联合完整检查。当前仍未发布、未部署；本机和远端精确通过基线仍是 37e1。初始 Pod 回写 DESIGN v2 因普通映射可能吞掉 JSONB 的显式非法值而 FAIL，下一设计要求同 Project 锁读取保留字段 presence/type 的 maintenance view，未实施。全 writer/inflight、unbound/unknown-tail、真实开发/CLI/自测、调用片段及两 RFC 继续，开发 producer OFF。
+
+
+### 2026-10-03 初始 Pod 回写落地与联合完整失败接续
+
+66 路径 SOURCE v32 独立 PASS 后的唯一完整检查已经终态：5,286 pass / 143 skip / 2 fail / 36,281 断言，5,431 用例、1,022 文件；总计 1,386.80 秒，候选与原 PostgreSQL ID 均保持不变。两项失败都在平台根镜像引用测试的旧夹具插入阶段：runtime 0007 原始构建来源保护要求已有 revision 与匹配 build.revisionId。原负责会话已只补该既有测试的真实 revision 行及匹配构建 payload，专项 2/0、11 断言；生产约束、断言、SQL 与冻结 runtime/release 源码原样保留。完整失败回执 v32 保留，尚不能视为新版完整通过。
+
+[初始 Pod 回写](initial-pod-result.md) 的独立 DESIGN v3 PASS（原 v2 FAIL 保留）已经落实原 Project 锁内 maintenance view 与当前身份/UID/状态判定。新真实 PostgreSQL 专项连同上述夹具共 39 pass / 0 fail / 148 断言、2 文件、15.50 秒；真实父结束及保卷恢复、延迟/丢 ACK、正常创建与暂停恢复、原始 JSONB 类型拒绝全部通过。后端类型、精确 lint、结构检查通过；两项生产路径的官方改动行保护 44/44。新联合候选含原 66 路径、新初始 Pod 5 路径和已交接平台测试 1 路径，共 72，需增量独立 SOURCE 后仅执行一次新的完整检查，不能复用 v32 失败结论。
+
+这里同时更正上一段公平回归的输入数量：实际是同一已封闭项目的 20 条交接加 1 条健康交接，并非 20 个独立封存项目。原失败与修正来源保持，39 项只是当前限定验证，不称整仓通过。
+
+当前本机部署与已验证远端仍为 37e1；后续 72 路径未发布未部署。全 writer/inflight、unbound/unknown-tail、开发/CLI/自测与全部观测退出条件继续，开发 producer OFF，两 RFC 保持 In Progress。
+
+### 2026-10-03 联合 72 路径完整检查回执
+
+独立 SOURCE v34 PASS 后，唯一新联合完整检查于 2026-10-02T19:50:02.806642Z 终态成功：结构、全仓 lint、后端/console 类型与测试均通过；5,325 pass、143 skip、0 fail、36,433 断言，5,468 测试/1,023 文件，测试 1,356.12 秒、完整命令 1,408.22 秒。72 候选和 105 引用首尾指纹相同，原授权 PostgreSQL 容器身份及 max_prepared_transactions=10 保持。原 v32 的平台镜像夹具两个 provenance 失败和 v31 固定页饥饿失败保留，分别经原修订/构建 fixture 与 handoff ID keyset 修正后验收，不删除断言或生产约束。
+
+本批包括观测 12 路径、明确交接的 runtime-environment 25 路径、release 34 路径和最后提交的共享迁移锁 1 路径；platform 镜像来源 fixture 包含原 owner 的并行纠正，整份保留。两个新迁移 runtime-environment/0007 与 release/0009 的 SQL 和原 214 条锁记录保持，当前锁共 216 条。检查后只更新这四份观测回执文档，全部生产/测试/迁移内容不变，同内容不重复完整检查。
+
+精确远端提交、该 SHA 的六项 CI、本机镜像/迁移/八组件部署待完成。开发 producer 保持 OFF；全 writer/inflight、未绑定/unknown-tail、真实开发/CLI/平台用途、AW 联合对拍、全部分析和规模验收继续，两个 RFC 保持 In Progress。143 跳过项不计为通过，本机仍为 37e1f5aa 的既有部署与原固定 Runner。

@@ -1,6 +1,6 @@
 # RFC-034 剩余工作与关闭条件
 
-更新：2026-10-02。状态：In Progress。本文是当前待办入口；[plan.md](./plan.md) 的批次是历史回执。源代码已存在、通过门禁、已推送、已部署、真实用户/模型验收分别记录，不互相替代。
+更新：2026-10-03。状态：In Progress。本文是当前待办入口；[plan.md](./plan.md) 的批次是历史回执。源代码已存在、通过门禁、已推送、已部署、真实用户/模型验收分别记录，不互相替代。
 
 ## 当前两级明细批次
 
@@ -10,7 +10,9 @@
 
 ## 当前已实现与实际部署
 
-当前本机控制服务与页面源码版本：`e40330cde9e337a4f1d0617a98bfb2ebd2357384`，2026-10-02T06:59:37.926Z 部署完成；[精确 CI36975154942](https://github.com/wangbinquan/CrewStation/actions/runs/36975154942) 六项成功，八组件 Ready=1、实际 OCI 来源已核。原父持久/事务基础已发布，完整结束和重建的新 worker 候选尚未发布，生产开发 producer OFF。实际业务分类与两级页面复验见本页最新接续。
+当前本机控制服务与页面源码版本：`37e1f5aaa8acfb64fec43d356ef35f1ed2c9e234`，2026-10-02T14:54:18.280Z 部署完成；[精确 CI 37017612146](https://github.com/wangbinquan/CrewStation/actions/runs/37017612146) 六项成功，八组件 Ready=1、实际 Pod／节点 OCI 来源与三项迁移校验已核。父持久／事务基础、父结束和重建 worker 已随该批发布部署。后续旧执行新准入／queued prepare 守卫和清理占额的 32 路径候选 SOURCE 已通过，首次完整检查仅在并行 release 结构处失败、尚未运行测试；该依赖修正后将携正式 release 和 runtime 交接内容重新联合检查，该候选尚未提交；全部 writer／inflight、未绑定／未知尾部仍待闭合，生产开发 producer OFF。实际业务分类与两级页面复验见本页最新接续。
+
+前一本机历史批：`e40330cde9e337a4f1d0617a98bfb2ebd2357384`，2026-10-02T06:59:37.926Z 部署完成；[该批 CI 36975154942](https://github.com/wangbinquan/CrewStation/actions/runs/36975154942) 六项成功，八组件 Ready=1、实际 OCI 来源已核。当时原父持久／事务基础已发布，完整结束和重建的新 worker 候选尚未发布，生产开发 producer OFF。该阶段记录保留，不能作为当前部署版本。
 
 历史分类复验部署版本：`85ee9254a175848d65105d16327e00afbc47cc08`，2026-10-01T14:42:26.034Z 部署完成；[本提交 CI 36875167666](https://github.com/wangbinquan/CrewStation/actions/runs/36875167666) 六项成功。八组件 Ready=1、generation=observedGeneration、实际 Pod imageID / 节点 OCI 来源均已独立核对；迁移 applied=0、storage-contract=1。默认 Runner 保持 `sha256:587a0766440bae22f69bd6e68e101f2348ec8bda95f8b4c3ce6ddef0fa010928`，既有执行不重建。专用修订 4 的三次真实业务模型与命令基线已通过分类 Token / 人民币 / 时间对账，见 [真实分类验收](./live-classification-acceptance.md)；当时真实页面复验待 Mac 解锁；2026-10-02 已完成原身份刷新和正式页复验。开发 producer、全入口清理、CLI 与平台自测数字归因仍未接通，不把业务实采当开发验收。
 
@@ -20,7 +22,7 @@
 
 正式项目/系统统计已有业务任务、Agent/尝试、四桶 Token、人民币估值、基础泳道、算力贡献下钻和采集质量；项目与算力显示名称，保留稳定 ID/受理修订。已有价格配置与冻结目录、OpenCode 根/子树采集、原归属修订和原价补算；资源/容量和当前服务槽/平台 Pod 健康已有入口。
 
-页面修正、实际 Token 柱形数字、时间按钮对齐、项目/算力名称和取消 CSV 已部署。历史独立源码批 `50dbd7a7` 当时的组合根仅注入业务事实；后继 `557cb50c` 已部署同快照业务/开发事实和原 Session 数值 consumer，该装配保留于当前 `85ee9254`，合同支持 `business-tasks` 与 `project-executions`。生产开发 producer 与全入口 cleanup 仍未启用，开发显示 production-disabled；完整查询/消费接线和夹具验证不能当成真实开发 Token、CLI 或算力测试已采集。
+页面修正、实际 Token 柱形数字、时间按钮对齐、项目/算力名称和取消 CSV 已部署。历史独立源码批 `50dbd7a7` 当时的组合根仅注入业务事实；后继 `557cb50c` 已部署同快照业务/开发事实和原 Session 数值 consumer，该装配保留于当前 `37e1f5aa`；`85ee9254` 是前述历史分类复验批，合同支持 `business-tasks` 与 `project-executions`。生产开发 producer 与全入口 cleanup 仍未启用，开发显示 production-disabled；完整查询/消费接线和夹具验证不能当成真实开发 Token、CLI 或算力测试已采集。
 
 | 批次 | 已有证据 | 尚缺的关闭条件 |
 | --- | --- | --- |
@@ -36,7 +38,7 @@
 
 内部持久consumer、原键派发、持久结束与Session独立登记查询均已精确发布并部署；原965b45e8、646da1e9、94378917及05d4ca01均为远端祖先。实际布局808c5af0、普通启动屏障7682fff3及原选择派发恢复3480032c也已分别通过自身六项CI，并随3480032c进入实际镜像。各批原门禁失败及比例闭环历史完整保留。生产 producer 仍未启用；两级开发事实/UI 与消费已由后续完整装配接通，owner 全派发/所有删除排空仍待完成，CS-R02 不关闭。详见各专题与[当前部署回执](./development-protection.md#2026-10-01-精确发布ci与本机部署)。
 
-源码锚点：[本批统计合同](../../../packages/contracts/api/observability/runtimeStatistics.ts) 支持 `business-tasks` 与 `project-executions`，cohort 字段仍为 `started`；业务样本按任务启动时间、开发样本按原受理时间进入范围。[platform 装配](../../../modules/platform/wiring.ts) 的完整已提交/部署版本在同一快照注入业务和开发事实，提供可选 Session 开发数值 consumer；其生产 producer/全入口 cleanup 仍未注入。当前控制/页面部署为前述 `557cb50c`，Runner 保留 `2fb06f38`。[平台健康说明](../../../apps/console/src/features/observability/i18n/zh-CN.ts) 仍明确应用级指标尚未采集。
+源码锚点：[本批统计合同](../../../packages/contracts/api/observability/runtimeStatistics.ts) 支持 `business-tasks` 与 `project-executions`，cohort 字段仍为 `started`；业务样本按任务启动时间、开发样本按原受理时间进入范围。[platform 装配](../../../modules/platform/wiring.ts) 的完整已提交/部署版本在同一快照注入业务和开发事实，提供可选 Session 开发数值 consumer；其生产 producer/全入口 cleanup 仍未注入。当前控制／页面部署为前述 `37e1f5aa`；`557cb50c` 是历史完整装配批，默认 Runner 保持前述 `sha256:587a0766440bae22f69bd6e68e101f2348ec8bda95f8b4c3ce6ddef0fa010928`。[平台健康说明](../../../apps/console/src/features/observability/i18n/zh-CN.ts) 仍明确应用级指标尚未采集。
 
 ## 执行顺序与依赖
 
@@ -670,3 +672,49 @@ v24 的 93 路径完整 SOURCE 独立 PASS（e8197b8451542d3b696819ab06b66e02f1b
 发布前 `git diff --cached --check` 只发现本人两个文件的三个空白问题：parentRebuildPublication.ts 的多余 EOF 空行，以及 developmentParentRebuildWorker.test.ts 两条调用语句后的空格。只修正这三处外部空白，并补入本记录；没有改语句、字面量、断言、测试输入或运行门槛。复核这些限定差异后复用已完成的功能门禁，不重新启动整仓测试。此前暂存区 201 路径是本次失败发布流程精确建立的快照，未收编其他暂存内容；再次发布前会校验完整路径、候选字节与独立审查。
 
 这里只记录本机候选验证结果。精确远端 CI、基于已提交树的本机镜像构建与部署仍待完成；CS-R02 的完整 writer/inflight、unbound、unknown-tail、真实开发/CLI/平台用途及后续观测验收继续，producer OFF，两 RFC 保持 In Progress。
+
+
+### 2026-10-02 后续：旧 CLI/旧 Agent 新执行封口
+
+[具体设计与状态](development-native-writer-seal.md)已通过独立 DESIGN v27。当前补入旧新创建与 queued prepare 的原父 witness 前后核验，真实入口回归及新的 SOURCE/联合门禁待完成。首次父创建 ACK/失败、全部 writer/inflight、未绑定与 unknown-tail 仍未闭合，开发采集 producer 保持 OFF。
+
+## 2026-10-02 已发表父退出部署与旧执行清理占额接续
+
+父退出前批 `37e1f5aaa8acfb64fec43d356ef35f1ed2c9e234` 的 [CI 37017612146](https://github.com/wangbinquan/CrewStation/actions/runs/37017612146) 六项全部 success，2026-10-02T14:54:18.280Z 本机八组件部署完成；实际 Pod／节点 OCI 来源、三项迁移校验与原数据库／任务运行器／项目资源身份已核。部署首次预检因检查未使用的 mutable Task dev 标签而安全拒绝，未作集群变更；修订为核查实际已固定的 Runner 摘要后，经独立部署复核完成升级，失败历史保留。
+
+后续旧 create／queued prepare 的两处父 witness 守卫已落地。其 v27 真实数据库回归 46 pass／1 fail／314 断言：旧 queued cleaning 的未观测对象让台账提前 stopped，配额 3→2。原失败判据保留；独立 DESIGN v28 PASS 后，仅给旧无保护／无 businessStorage native 的 cleaning 补既有 ReleasePending 条件，实际物理清理和消失观测后再按原阶段退额。新增真实 worker 的读取故障／重试及已绑定原对象验证；限定回归 v29 已通过 74 pass／0 fail／501 断言，类型与精确 lint 通过，新增生产语句覆盖 6／6。32 路径 SOURCE v29 的代码功能 PASS，原文档 P2 由 v30 仅修正文档后独立 PASS；旧失败保留。v30 第一次完整检查在 1.03 秒的结构检查处因并行 release/application 的 21 文件超过 20 上限而失败，尚未运行 lint／类型／测试，不能视为完整通过。原会话现已按原职责把只读查询归并至 queries，实际目录为 19，并交接正式 release 依赖及新增 0009 的完整迁移锁；下一候选将与原 runtime 25 路径和本会话 6 路径一起重新冻结、独立 SOURCE 后仅执行一次联合完整检查。该批仍未提交或部署，不能借前批 37e1 的通过代签。
+
+CS-R02 的全 writer／inflight 封口、未绑定／未知尾部、开发 producer 及真实 CLI／开发／自测、其余统计全景验收继续；producer OFF，两个 RFC 保持 In Progress。
+
+
+### 2026-10-03 当前接续边界
+
+当前本机安装与精确 CI 仍为上述 37e1 批。后续 writer 最小补丁与交接依赖的完整检查、精确远端 CI 和新本机部署尚待完成。初始父 Pod 的延迟 ACK／错误回写已有精确私有设计，尚未通过 DESIGN、未实施；不把这份设计算作 writer 全闭合。真实开发 producer、全部入口、未绑定启动授权／unknown-tail、CLI／自测、调用片段及其余观测退出条件继续，producer OFF，两个 RFC 保持 In Progress。
+
+
+### 2026-10-03 联合 SOURCE v31 失败与队列公平修正
+
+65 路径的完整 SOURCE v31 为 FAIL，唯一新增 P2 是 release handoff 反复读取最早 20 条：封存项目在 claim 前拒绝且不更新记录，后面的正常项目因此一直无机会。原回执 `observability-cs-legacy-native-parent-seal-release-joint-source-review-v31.json`（SHA256 f7d24593777dd250e91f36cac10bf57e6cdb1bd69a67fb58f9d0e43985b99964）和未启动完整检查的记录保留；本候选没有运行第二次完整门禁。
+
+原负责会话交接 release v3 共 35 路径（含共享锁），改为原始不可变 handoff ID 的每轮 20 条分页并在尾部回绕，同一控制器并发恢复合并为一次扫描。拒绝仍不 claim、不 settle、不更新业务行。真实 PostgreSQL 的“同一已封闭项目的 20 条交接 + 1 条健康交接”先在旧实现复现失败，再在修正候选及关联套件得到 42 pass / 0 fail / 295 断言、4 文件、12.92 秒；改动行保护 671/673，类型、限定 lint 和结构通过。原 127/0 模块结果属于修正前候选，不能记作新版完整检查。
+
+原 runtime 25 路径、本会话 6 路径及共享迁移锁将与 release 34 个专属路径形成 66 路径候选，经过增量独立 SOURCE 后，仅由本会话启动一次新的联合完整检查。当前仍未发布、未部署；本机和远端精确通过基线仍是 37e1。初始 Pod 回写 DESIGN v2 因普通映射可能吞掉 JSONB 的显式非法值而 FAIL，下一设计要求同 Project 锁读取保留字段 presence/type 的 maintenance view，未实施。全 writer/inflight、unbound/unknown-tail、真实开发/CLI/自测、调用片段及两 RFC 继续，开发 producer OFF。
+
+
+### 2026-10-03 初始 Pod 回写落地与联合完整失败接续
+
+66 路径 SOURCE v32 独立 PASS 后的唯一完整检查已经终态：5,286 pass / 143 skip / 2 fail / 36,281 断言，5,431 用例、1,022 文件；总计 1,386.80 秒，候选与原 PostgreSQL ID 均保持不变。两项失败都在平台根镜像引用测试的旧夹具插入阶段：runtime 0007 原始构建来源保护要求已有 revision 与匹配 build.revisionId。原负责会话已只补该既有测试的真实 revision 行及匹配构建 payload，专项 2/0、11 断言；生产约束、断言、SQL 与冻结 runtime/release 源码原样保留。完整失败回执 v32 保留，尚不能视为新版完整通过。
+
+[初始 Pod 回写](initial-pod-result.md) 的独立 DESIGN v3 PASS（原 v2 FAIL 保留）已经落实原 Project 锁内 maintenance view 与当前身份/UID/状态判定。新真实 PostgreSQL 专项连同上述夹具共 39 pass / 0 fail / 148 断言、2 文件、15.50 秒；真实父结束及保卷恢复、延迟/丢 ACK、正常创建与暂停恢复、原始 JSONB 类型拒绝全部通过。后端类型、精确 lint、结构检查通过；两项生产路径的官方改动行保护 44/44。新联合候选含原 66 路径、新初始 Pod 5 路径和已交接平台测试 1 路径，共 72，需增量独立 SOURCE 后仅执行一次新的完整检查，不能复用 v32 失败结论。
+
+这里同时更正上一段公平回归的输入数量：实际是同一已封闭项目的 20 条交接加 1 条健康交接，并非 20 个独立封存项目。原失败与修正来源保持，39 项只是当前限定验证，不称整仓通过。
+
+当前本机部署与已验证远端仍为 37e1；后续 72 路径未发布未部署。全 writer/inflight、unbound/unknown-tail、开发/CLI/自测与全部观测退出条件继续，开发 producer OFF，两 RFC 保持 In Progress。
+
+### 2026-10-03 联合 72 路径完整检查回执
+
+独立 SOURCE v34 PASS 后，唯一新联合完整检查于 2026-10-02T19:50:02.806642Z 终态成功：结构、全仓 lint、后端/console 类型与测试均通过；5,325 pass、143 skip、0 fail、36,433 断言，5,468 测试/1,023 文件，测试 1,356.12 秒、完整命令 1,408.22 秒。72 候选和 105 引用首尾指纹相同，原授权 PostgreSQL 容器身份及 max_prepared_transactions=10 保持。原 v32 的平台镜像夹具两个 provenance 失败和 v31 固定页饥饿失败保留，分别经原修订/构建 fixture 与 handoff ID keyset 修正后验收，不删除断言或生产约束。
+
+本批包括观测 12 路径、明确交接的 runtime-environment 25 路径、release 34 路径和最后提交的共享迁移锁 1 路径；platform 镜像来源 fixture 包含原 owner 的并行纠正，整份保留。两个新迁移 runtime-environment/0007 与 release/0009 的 SQL 和原 214 条锁记录保持，当前锁共 216 条。检查后只更新这四份观测回执文档，全部生产/测试/迁移内容不变，同内容不重复完整检查。
+
+精确远端提交、该 SHA 的六项 CI、本机镜像/迁移/八组件部署待完成。开发 producer 保持 OFF；全 writer/inflight、未绑定/unknown-tail、真实开发/CLI/平台用途、AW 联合对拍、全部分析和规模验收继续，两个 RFC 保持 In Progress。143 跳过项不计为通过，本机仍为 37e1f5aa 的既有部署与原固定 Runner。

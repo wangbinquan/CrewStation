@@ -14,6 +14,7 @@ import { containerEnv } from './containerEnv';
 import { storageStart } from './business/storageStart';
 import { closeStorageAdmission, storageStopProved } from './business/storageStop';
 import { assertBusinessStorageMutable } from './business/finalizationGuard';
+import { assertDevelopmentWriter } from './development/parent/admission';
 import { assertDevelopmentAdmission, createDevelopmentWorkload, developmentRequestHash, prepareDevelopmentWorkload } from './development/workloadAdmission';
 
 export type NativeExecutionDeps = TaskRuntimeUseCaseDeps & { nativeCluster: NativeExecutionCluster };
@@ -58,12 +59,14 @@ export function createNativeExecutionUseCase(deps: NativeExecutionDeps) {
       if (await scope.admissions.blocked(input.id)) throw conflict('业务执行准入已取消', { code: 'admission_cancelled' });
       const parent = await scope.environments.getById(input.parentTaskId);
       if (!parent || parent.native || parent.kind !== rule.parentKind || parent.state !== 'running' || !parent.connected) throw precondition(rule.unavailable);
+      const writer = await assertDevelopmentWriter(scope, parent);
       assertBusinessStorageMutable(parent);
       if (input.businessSession && (!parent.render?.businessStorage || purpose !== 'subtask' || (input.businessSession.mode === 'create' && input.businessSession.key !== input.id))) throw precondition('原生会话必须绑定隔离业务卷和独立 Agent 身份');
       if (parent.render?.businessStorage && deps.creation !== 'ledger') throw precondition('隔离业务卷不支持回退到旧执行容器创建路径');
       const profile = await deps.profiles.getTaskProfile(input.profile ?? deps.settings.defaultProfile);
       if (!profile) throw precondition(`算力档位指定的资源套餐 ${input.profile ?? deps.settings.defaultProfile} 不存在，请联系管理员调整算力档位`);
       const workspace = await deps.nativeCluster.inspectWorkspace(parent);
+      await assertDevelopmentWriter(scope, parent, writer);
       const limit = (await deps.quotas.quotaLimit(parent.projectId)) ?? 0;
       const env = executionEnvironment(deps, input, parent, workspace, profile);
       await scope.quota.acquire(env, limit, rule.quota);
@@ -133,6 +136,7 @@ export async function prepareNativeExecution(deps: NativeExecutionDeps, scope: R
   const n = env.native!;
   const parent = await scope.environments.getById(n.parentTaskId);
   if (!parent || parent.state !== 'running' || !parent.connected) throw precondition(`原工作区已经断开或释放，此${EXECUTION_NOUN[purposeOf(n)]}未启动`);
+  const writer = await assertDevelopmentWriter(scope, env);
   const verifyWorkspace = async () => {
     const workspace = await deps.nativeCluster.inspectWorkspace(parent);
     if (workspace.podUid !== n.parentPodUid || workspace.pvcUid !== n.pvcUid || workspace.nodeName !== n.nodeName) throw precondition(`启动期间原工作区实例或工作卷已变化，此${EXECUTION_NOUN[purposeOf(n)]}未启动`);
@@ -144,6 +148,7 @@ export async function prepareNativeExecution(deps: NativeExecutionDeps, scope: R
   const prepared = await deps.nativeCluster.prepare(env, () => containerEnv(deps, env, svc, newRunnerToken()));
   await verifyWorkspace();
   await requireExecutionLease(heartbeat);
+  await assertDevelopmentWriter(scope, env, writer);
   const now = deps.clock.now();
   await scope.environments.update({ ...env, runnerTokenHash: hashRunnerToken(prepared.token), updatedAt: now,
     native: { ...n, state: 'starting', podUid: prepared.podUid, secretUid: prepared.secretUid, preparedAt: now.toISOString() }, message: `此${EXECUTION_NOUN[purposeOf(n)]}的执行容器已创建，等待调度和连接`,

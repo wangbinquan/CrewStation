@@ -101,6 +101,8 @@ function conditionsOf(env: TaskEnvironment): ProjectedCondition[] {
   ];
   if (env.render?.developmentUsageProtection !== undefined) conditions.push({ type: 'ReleasePending', status: env.native?.state === 'cleaning' ? 'true' : 'false', reason: 'development-digital-cleanup-pending', message: '开发数值排空与原执行停止尚未确认' });
   if (env.render?.businessStorage) conditions.push({ type: 'ReleasePending', status: (env.render.completionPolicy && env.businessWorkspace?.phase === 'pausing') || (env.state === 'releasing' && (!!env.native || !!env.release?.occupied)) ? 'true' : 'false', reason: 'execution-cleanup-pending', message: '执行资源尚未完成回收确认' });
+  // 未观测到子对象也不代表执行已经停止；旧 CLI/Agent 由原物理清理成功后解除占额。
+  if (env.native && env.render?.developmentUsageProtection === undefined && !env.render?.businessStorage) conditions.push({ type: 'ReleasePending', status: env.native.state === 'cleaning' ? 'true' : 'false', reason: 'execution-cleanup-pending', message: '执行资源尚未完成回收确认' });
   if (env.native) conditions.push({ type: 'Prepared', status: env.native.state === 'queued' ? 'false' : 'true' });
   if (env.render) conditions.push(provisioningOf(env));
   return conditions;

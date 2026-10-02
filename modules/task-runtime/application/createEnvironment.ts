@@ -1,9 +1,9 @@
 import type { ProjectId, ServiceId, TaskId, TraceId, VolumeMode } from '@crewstation/contracts';
 import { newId, newTraceId, notFound, validation } from '@crewstation/kernel';
-import { completeStage, failStartup, initialStartup } from '../domain/podStartup';
+import { initialStartup } from '../domain/podStartup';
 import { hashRunnerToken, newRunnerToken } from '../domain/runnerToken';
 import type { TaskEnvironment, WorkloadRender } from '../domain/taskEnvironment';
-import { podNameFor, pvcNameFor, transition } from '../domain/taskEnvironment';
+import { podNameFor, pvcNameFor } from '../domain/taskEnvironment';
 import type { TaskPodSpec, TaskSourceCheckout } from '../ports/cluster';
 import type { TaskRuntimeSettings } from '../ports/platform';
 import { containerEnv } from './containerEnv';
@@ -11,6 +11,7 @@ import type { CreateEnvironmentInput, TaskRuntimeUseCaseDeps } from './dependenc
 import { storageStart } from './business/storageStart';
 export type { CreateEnvironmentInput } from './dependencies';
 import { admissionFingerprint, admitEnvironment, matchAdmission } from './environmentAdmission';
+import { recordInitialPodAck, recordInitialPodFailure } from './environmentCreation/initialPodResult';
 
 
 /** 开发预览的用户域主机与所需中间件；没有预览进程就不建路由。 */
@@ -57,7 +58,7 @@ async function renderedCheckoutOf(deps: TaskRuntimeUseCaseDeps, serviceId: Servi
 }
 
 /**
- * 创建任务容器：配额原子准入→登记→建卷建 Pod；集群失败时回滚准入并标 failed，不留下无主 Pod。
+ * 创建任务容器：配额原子准入→登记→建卷建 Pod；失败只回写同一未连接创建，迟到回执保持当前身份。
  * 由资源中心建出时（RFC-025 I25）只到登记为止：期望随记录进台账，调和器照它建卷、Runner Secret、Pod 与预览。
  */
 export function createEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
@@ -103,11 +104,7 @@ export function createEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       logger.error('task pod creation failed', { taskId: id, error: message });
-      const failedAt = clock.now();
-      await uow.run(async (scope) => {
-        await scope.environments.update(transition(env, 'failed', failedAt, { message, startup: failStartup(env.startup!, failedAt.toISOString(), { code: 'pod-create-failed', message }) }));
-        await scope.quota.release(env);
-      });
+      await recordInitialPodFailure(deps, env, message);
       throw error;
     }
     return env;
@@ -116,12 +113,5 @@ export function createEnvironmentUseCase(deps: TaskRuntimeUseCaseDeps) {
 
 /** Preserve concurrent Runner updates while binding the exact instance returned by Kubernetes. */
 export async function recordPodInstance(deps: TaskRuntimeUseCaseDeps, env: TaskEnvironment, uid: string | void): Promise<void> {
-  if (!uid) return;
-  await deps.uow.run(async (scope) => {
-    await scope.admissions.lock(env.projectId);
-    const current = await scope.environments.getById(env.id);
-    if (current?.podName !== env.podName || current.runnerTokenHash !== env.runnerTokenHash) return;
-    // 建出 Pod 即「排队分配容器」结束（RFC-022）。
-    await scope.environments.update({ ...current, podUid: uid, ...(current.startup ? { startup: completeStage(current.startup, 'queue', deps.clock.now().toISOString()) } : {}) });
-  });
+  await recordInitialPodAck(deps, env, uid);
 }
