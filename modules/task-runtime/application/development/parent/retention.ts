@@ -56,13 +56,16 @@ async function capture(deps: OwnerDeps, snapshot: ResourceEndingSnapshot, previe
     return { env, selected: isSelected, hash };
   });
 }
-async function parentDecision(deps: OwnerDeps, before: NonNullable<Awaited<ReturnType<typeof capture>>>, snapshot: ResourceEndingSnapshot, preview?: Preview) {
+async function parentDecision(deps: OwnerDeps, step: ResourceEndingStep, before: NonNullable<Awaited<ReturnType<typeof capture>>>, snapshot: ResourceEndingSnapshot, preview?: Preview) {
   const pointer = readDevelopmentParentEnding(before.env);
   if (pointer?.phase === 'complete') {
     const ending = await deps.uow.read.parentEnding?.endings.get(pointer.endingId);
     if (!ending) return waiting();
     const source = await completedDevelopmentParent(deps.uow.read, before.env, ending);
     await observeCompletedDevelopmentParent(deps, source);
+    // Compaction must retain the sealed spec until the original failed Task has its verified retirement receipt.
+    if (step === 'compaction' && source.witness.outcome === 'compensation'
+      && (before.env.state !== 'released' || !Object.hasOwn(ending.progress, 'retentionTransition'))) return waiting();
     const after = await capture(deps, snapshot, preview);
     return after?.selected && after.hash === before.hash ? { status: 'permitted' as const, snapshot } : waiting();
   }
@@ -85,7 +88,7 @@ export function resourceEndingHandler(deps: OwnerDeps, preview?: Preview) {
       const before = await capture(deps, snapshot, preview);
       if (!before) return waiting();
       if (!before.selected) return { status: 'unselected' };
-      if (before.env.kind === 'dev-session' && !before.env.native) return await parentDecision(deps, before, snapshot, preview);
+      if (before.env.kind === 'dev-session' && !before.env.native) return await parentDecision(deps, step, before, snapshot, preview);
       if (step !== 'compaction' || snapshot.kind !== 'agent-execution' || Object.hasOwn(before.env, 'parentEnding')) return waiting();
       const original = terminalDevelopmentMaintenanceOriginal(before.env);
       // Resources proof reads happen only after releasing the Task project transaction.

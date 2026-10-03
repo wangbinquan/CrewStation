@@ -2,6 +2,12 @@ import type { ClusterPurpose, ProjectId, ResourceConditionStatus, ResourceKind, 
 
 /** 台账里 task-runtime 关心的部分（结构上是 resources 模块 LedgerRecord 的子集）。 */
 export interface LedgerRecordRef {
+  /** Original committed Resource fields; selected parent retirement cannot infer absent fields. */
+  readonly kind?: ResourceKind;
+  readonly projectId?: ProjectId;
+  readonly generation?: number;
+  readonly spec?: Readonly<Record<string, unknown>>;
+  readonly retainUntil?: Date;
   readonly phase?: string;
   readonly children?: readonly { readonly kind: string; readonly phase: string; readonly uid?: string }[];
   readonly id: string;

@@ -6,8 +6,7 @@ import type { DevelopmentParentEnding, DevelopmentParentEndingOperation } from '
 import type { RepositoryScope } from '../../../ports/unitOfWork';
 import type { TaskRuntimeUseCaseDeps } from '../../dependencies';
 import { retainedVolume } from '../../rebuildInspection';
-import { originalParentCompletion } from '../../../domain/development/parentCompletion';
-import { developmentParentTransitionHash } from '../../../domain/development/parentEnding';
+import { originalParentCompletion, requireParentCompletionTransition } from '../../../domain/development/parentCompletion';
 import { DevelopmentParentRebuildBindingSchema } from '../../../domain/development/parentRebuildBinding';
 
 export type DevelopmentParentAdmission = { readonly original: TaskEnvironment; readonly epoch: DevelopmentParentEpoch; readonly epochHash: string; readonly nodeName?: string };
@@ -38,7 +37,8 @@ export async function prepareDevelopmentParentEnding(deps: Pick<TaskRuntimeUseCa
       throw precondition('原父结束受理身份尚未恢复', { code: 'development_parent_ending_invalid' });
     if (pointer.phase === 'complete') {
       const witness = originalParentCompletion(stored.completionWitness, stored);
-      if (stored.phase !== 'complete' || witness.afterTransitionHash !== developmentParentTransitionHash(env)) throw precondition('原父完成转换已变化');
+      if (stored.phase !== 'complete' || stored.status !== 'complete') throw precondition('原父完成转换已变化');
+      requireParentCompletionTransition(env, stored, witness);
       return { original: env, epoch: stored.epoch, epochHash: stored.epochHash };
     }
     const epoch = snapshotDevelopmentParentEpoch(env, { podUid: stored.epoch.podUid, pvcUid: stored.epoch.pvcUid });

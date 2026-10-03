@@ -1,5 +1,6 @@
 import type { ProjectId, TaskId } from '@crewstation/contracts';
 import type { DevelopmentParentEpoch, DevelopmentParentEndingPointer } from '../domain/development/parentEnding';
+import type { DevelopmentParentRetentionTransition } from '../domain/development/parentCompletion';
 
 export const DEVELOPMENT_PARENT_ENDING_JOB_KIND = 'task-runtime.development-parent-ending';
 export type DevelopmentParentEndingOperation = 'release' | 'rebuild' | 'retention' | 'compensation';
@@ -59,6 +60,8 @@ export interface DevelopmentParentEndingRepository {
   admit(identity: DevelopmentParentEndingIdentity, now: Date): Promise<DevelopmentParentEnding>;
   /** Only mutable progress; identity, intent and frozen membership cannot be replaced. */
   progress(id: string, expected: DevelopmentParentEndingPointer['phase'], next: Pick<DevelopmentParentEnding, 'phase' | 'status' | 'afterChildId' | 'progress' | 'completionWitness' | 'message' | 'retryAt'>, now: Date): Promise<boolean>;
+  /** Append only the strict legal D9 successor on an immutable complete source, within the Task transaction. */
+  recordRetentionTransition?(source: Pick<DevelopmentParentEnding, 'id' | 'parentId' | 'projectId' | 'epochHash' | 'completionWitness'>, receipt: DevelopmentParentRetentionTransition): Promise<boolean>;
   due(afterId: string | null, cutoff: Date, limit: number): Promise<string[]>;
 }
 export interface DevelopmentParentEndingChildren {

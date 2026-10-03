@@ -1,6 +1,6 @@
 import { jsonHash, precondition } from '@crewstation/kernel';
-import { originalParentCompletion } from '../../../domain/development/parentCompletion';
-import { developmentParentTransitionHash, readDevelopmentParentEnding } from '../../../domain/development/parentEnding';
+import { originalParentCompletion, requireParentCompletionTransition } from '../../../domain/development/parentCompletion';
+import { readDevelopmentParentEnding } from '../../../domain/development/parentEnding';
 import { DevelopmentParentMaterialsSchema, preparedDevelopmentParent, requireDevelopmentParentStop } from '../../../domain/development/parentMaterials';
 import { requireDevelopmentParentAbsence } from '../../../domain/development/parentAbsence';
 import type { TaskEnvironment } from '../../../domain/taskEnvironment';
@@ -15,8 +15,9 @@ export async function completedDevelopmentParent(scope: RepositoryScope, environ
   preparedDevelopmentParent(ending, materials);
   if (!scope.parentEnding || ending.phase !== 'complete' || ending.status !== 'complete' || !pointer || pointer.phase !== 'complete'
     || pointer.endingId !== ending.id || pointer.epochHash !== ending.epochHash || ending.parentId !== environment.id || ending.projectId !== environment.projectId
-    || witness.afterTransitionHash !== developmentParentTransitionHash(environment) || witness.runnerTokenHash !== environment.runnerTokenHash
+    || witness.runnerTokenHash !== environment.runnerTokenHash
     || witness.materialsHash !== jsonHash(materials)) throw precondition('原完成退出及实际 Task 转换不一致');
+  requireParentCompletionTransition(environment, ending, witness);
   const summary = await scope.parentEnding.children.summary(ending.id);
   if (summary.count !== ending.memberCount || summary.count !== summary.closed || summary.count !== witness.membership.count
     || summary.digest !== witness.membership.digest || await scope.parentEnding.children.remaining(ending.id)

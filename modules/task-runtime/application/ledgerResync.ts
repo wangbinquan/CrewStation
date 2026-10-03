@@ -1,10 +1,16 @@
 import type { TaskId } from '@crewstation/contracts';
 import { DomainTopic } from '@crewstation/contracts';
 import type { Clock, Logger } from '@crewstation/kernel';
-import { systemClock } from '@crewstation/kernel';
+import { systemClock, precondition, jsonHash } from '@crewstation/kernel';
 import { RETENTION_EXPIRED } from '../domain/ledgerProjection';
 import type { EnvironmentState, TaskEnvironment } from '../domain/taskEnvironment';
 import { transition } from '../domain/taskEnvironment';
+import { DevelopmentParentRetentionTransitionSchema, developmentParentRetentionSpecHash } from '../domain/development/parentCompletion';
+import { developmentParentTransitionHash, readDevelopmentParentEnding } from '../domain/development/parentEnding';
+import { rebuildIsActive } from '../domain/environmentRebuild';
+import { selectedDevelopmentParent } from './development/parent/request';
+import { completedDevelopmentParent } from './development/parent/completed';
+import { currentDevelopmentParentRebuild } from './development/parent/binding';
 import type { EnvironmentLedger } from '../ports/ledger';
 import type { RepositoryScope, UnitOfWork } from '../ports/unitOfWork';
 
@@ -21,9 +27,46 @@ async function followRetention(scope: RepositoryScope, env: TaskEnvironment, now
   const record = await scope.ledger.workload(env);
   if (record?.desired !== 'absent' || record.releaseReason?.code !== RETENTION_EXPIRED) return false;
   const released = transition(transition(env, 'releasing', now, { connected: false }), 'released', now, { message: `released: ${RETENTION_EXPIRED}` });
+  if (await selectedDevelopmentParent(scope, env)) {
+    const pointer = readDevelopmentParentEnding(env), endings = scope.parentEnding?.endings;
+    if (!pointer || pointer.phase !== 'complete' || !endings?.recordRetentionTransition) throw precondition('原父保留期接续持久能力尚未恢复');
+    const ending = await endings.get(pointer.endingId, true);
+    if (!ending) throw precondition('原父完成来源尚未恢复');
+    const source = await completedDevelopmentParent(scope, env, ending);
+    const current = await currentDevelopmentParentRebuild(scope, env) ?? (env.rebuildId ? await scope.rebuilds.get(env.rebuildId) : undefined);
+    if (env.rebuildId && !current || current && (rebuildIsActive(current) || !['failed', 'cancelled'].includes(current.state)))
+      throw precondition('原父仍有恢复或未确认的请求，等待原请求结束');
+    const specHash = developmentParentRetentionSpecHash(env, ending);
+    if (source.witness.outcome !== 'compensation' || record.id !== env.id || record.kind !== 'dev-workspace'
+      || record.projectId !== env.projectId || record.owner.module !== 'task-runtime' || record.owner.ref !== env.id
+      || !Number.isSafeInteger(record.generation) || record.generation! < 1 || record.retainUntil !== undefined
+      || !record.spec || typeof record.spec !== 'object' || Array.isArray(record.spec) || jsonHash(record.spec) !== specHash)
+      throw precondition('原已受理保留期 Resource 来源不完整');
+    const receipt = DevelopmentParentRetentionTransitionSchema.parse({ version: 1, endingId: ending.id, epochHash: ending.epochHash,
+      sourceCompletionWitnessHash: jsonHash(source.witness), beforeTransitionHash: source.witness.afterTransitionHash,
+      afterTransitionHash: developmentParentTransitionHash(released), runnerTokenHash: env.runnerTokenHash, retiredAt: now.toISOString(),
+      resource: { id: record.id, projectId: record.projectId, ownerRef: record.owner.ref, kind: record.kind, generation: record.generation,
+        specHash, retainUntil: null, releaseReason: RETENTION_EXPIRED } });
+    if (!await endings.recordRetentionTransition(ending, receipt)) throw precondition('原父保留期接续发生竞争');
+  }
   await scope.environments.update(released);
   await scope.events.publish(DomainTopic.taskReleased, { occurredAt: now.toISOString(), traceId: env.traceId, projectId: env.projectId, taskId: env.id, kind: env.kind, reason: 'failed' });
   return true;
+}
+
+/** Project before Task; raw presence is checked on the same Executor while the Task row stays locked. */
+async function freshEnvironment(scope: RepositoryScope, id: TaskId): Promise<TaskEnvironment | undefined> {
+  const original = await scope.environments.getById(id);
+  if (!original) return undefined;
+  if (original.kind === 'dev-session') await scope.admissions.lock(original.projectId);
+  const current = await scope.environments.getForUpdate(id);
+  if (!current) return undefined;
+  if (current.projectId !== original.projectId || current.kind !== original.kind) throw precondition('台账补投影的原 Task 身份已变化');
+  if (current.kind !== 'dev-session') return current;
+  const view = await scope.environments.getMaintenanceView?.(id);
+  if (view?.status !== 'present' || view.environment.id !== current.id || view.environment.projectId !== current.projectId
+    || view.environment.kind !== current.kind) throw precondition('原开发 Task 存在非法或未确认的 SQL 材料');
+  return view.environment;
 }
 
 /**
@@ -44,7 +87,7 @@ export async function resyncLedger(uow: UnitOfWork, ledger: EnvironmentLedger, l
   for (const id of ids) {
     try {
       synced += await uow.run(async (scope) => {
-        const env = await scope.environments.getForUpdate(id as TaskId);
+        const env = await freshEnvironment(scope, id as TaskId);
         if (!env || !scope.ledger) return 0;
         if (await followRetention(scope, env, clock.now())) logger.info('failed environment retired after retention', { taskId: env.id });
         else await scope.ledger.sync(env);

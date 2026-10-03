@@ -1,8 +1,9 @@
 import { ProjectIdSchema, TaskIdSchema } from '@crewstation/contracts';
-import { conflict, precondition } from '@crewstation/kernel';
+import { conflict, jsonHash, precondition } from '@crewstation/kernel';
 import type { Executor } from '@crewstation/persistence';
 import { and, asc, eq, gt, inArray, lte, ne, sql } from 'drizzle-orm';
 import { DevelopmentParentEpochSchema, DevelopmentParentEndingPhaseSchema, developmentParentEpochHash } from '../../domain/development/parentEnding';
+import { DevelopmentParentRetentionTransitionSchema, originalParentCompletion } from '../../domain/development/parentCompletion';
 import type { DevelopmentParentEnding, DevelopmentParentEndingIdentity, DevelopmentParentEndingRepository, DevelopmentParentRebuildClaim, DevelopmentParentRebuildClaims } from '../../ports/developmentParentEnding';
 import { developmentParentEndings as endings, developmentParentRebuildClaims as claims } from './developmentParentEndingTables';
 
@@ -42,6 +43,17 @@ export function drizzleDevelopmentParentEndings(db: Executor): DevelopmentParent
     },
     admit: (identity, now) => admitEnding(db, identity, now),
     progress: async (id, expected, next, now) => (await db.update(endings).set({ ...next, updatedAt: now }).where(and(eq(endings.id, id), eq(endings.phase, expected), ne(endings.phase, 'complete'), eq(endings.membershipFrozen, true))).returning({ id: endings.id })).length === 1,
+    recordRetentionTransition: async (source, raw) => {
+      const receipt = DevelopmentParentRetentionTransitionSchema.parse(raw), witness = originalParentCompletion(source.completionWitness, source);
+      if (witness.outcome !== 'compensation' || receipt.endingId !== source.id || receipt.epochHash !== source.epochHash
+        || receipt.sourceCompletionWitnessHash !== jsonHash(witness) || receipt.beforeTransitionHash !== witness.afterTransitionHash
+        || receipt.runnerTokenHash !== witness.runnerTokenHash || receipt.resource.id !== String(source.parentId)
+        || receipt.resource.ownerRef !== source.parentId || receipt.resource.projectId !== source.projectId) throw precondition('原父保留期接续来源不可替换');
+      return (await db.update(endings).set({ progress: sql`jsonb_set(${endings.progress}, '{retentionTransition}', ${JSON.stringify(receipt)}::jsonb, true)` }).where(and(eq(endings.id, source.id), eq(endings.parentId, source.parentId), eq(endings.projectId, source.projectId),
+        eq(endings.epochHash, source.epochHash), eq(endings.phase, 'complete'), eq(endings.status, 'complete'), eq(endings.membershipFrozen, true),
+        sql`jsonb_typeof(${endings.progress})='object'`, sql`NOT (${endings.progress} ? 'retentionTransition')`,
+        sql`${endings.completionWitness}=${JSON.stringify(source.completionWitness)}::jsonb`)).returning({ id: endings.id })).length === 1;
+    },
     due: async (afterId, cutoff, limit) => (await db.select({ id: endings.id }).from(endings).where(and(ne(endings.status, 'complete'), lte(endings.retryAt, cutoff), afterId ? gt(endings.id, afterId) : undefined)).orderBy(asc(endings.id)).limit(batchLimit(limit))).map((r) => r.id),
   };
 }
