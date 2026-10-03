@@ -16,6 +16,8 @@ spec:
       labels: { app.kubernetes.io/name: cs-api, app.kubernetes.io/part-of: crewstation, app.kubernetes.io/managed-by: crewstation, crewstation.io/project: platform, crewstation.io/service: cs-api, crewstation.io/workload: platform }
     spec:
       serviceAccountName: crewstation-control
+      # 控制面以 bun（GID 1000）运行，让完整统计报告的 emptyDir 可写。
+      securityContext: { fsGroup: 1000 }
       containers:
         - name: cs-api
           image: cs-control-plane:dev
