@@ -1,4 +1,5 @@
 import type { ProjectDeletionContext, ProjectDeletionInventory, ProjectDeletionTarget } from '@crewstation/contracts';
+import { ProjectIdSchema, ResourceIdSchema } from '@crewstation/contracts';
 import { jsonHash, precondition } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
 import { withExclusiveDatabaseAdmission } from '@crewstation/persistence';
@@ -7,6 +8,24 @@ import type { ResourceAccessDeletionRepository } from '../../ports/deletion';
 import { resourceAccessAdmissionKey } from './projectAdmission';
 import { applicationWorkPending } from './applicationWork';
 import { resourceAccessDeletionRecovery } from './deletionRecovery';
+
+/** The module has no opaque legacy alias directory: missing original keys remain unresolved. */
+export async function resourceChangeInfrastructureOrigin(db: Database, key: string, representation: 'current' | 'legacy' = 'current') {
+  if (representation !== 'current' && representation !== 'legacy') throw precondition('资源变更原表示类型未登记');
+  const parsed = ResourceIdSchema.safeParse(key);
+  if (representation === 'legacy' && !parsed.success) return undefined;
+  const id = ResourceIdSchema.parse(key);
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`);
+    const rows = await tx.execute<{ project_id: string; active_project: string | null }>(sql`
+      SELECT original.project_id,(SELECT project_id FROM resource_access.changes WHERE id=${id}) AS active_project
+      FROM resource_access.deletion_identities original WHERE original.id=${id}`);
+    if (!rows.length) return undefined;
+    const row = rows[0]!, projectId = ProjectIdSchema.parse(row.project_id);
+    if (row.active_project !== null && ProjectIdSchema.parse(row.active_project) !== projectId) throw precondition('资源变更原项目归属冲突');
+    return { complete: true as const, id, scope: 'project' as const, projectIds: [projectId], revision: jsonHash({ kind: 'resource-change', id, projectId }) };
+  });
+}
 
 async function registered(db: Executor) {
   const rows = await db.execute<{ table_name: string }>(sql`SELECT table_name FROM information_schema.tables WHERE table_schema='resource_access' AND table_type='BASE TABLE'`);

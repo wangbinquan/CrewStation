@@ -9,7 +9,7 @@ import { createWorker } from '@crewstation/queue';
 import type { ProjectModuleApi } from '@crewstation/module-project';
 import type { ResourceAccessModuleApi } from './api/moduleApi';
 import { resourceAccessRepository, RESOURCE_CHANGE_JOB } from './adapters/persistence/repository';
-import { resourceAccessDeletionRepository } from './adapters/persistence/deletionRepository';
+import { resourceAccessDeletionRepository, resourceChangeInfrastructureOrigin } from './adapters/persistence/deletionRepository';
 import { resourceAccessDeletionOwner } from './application/projectDeletion';
 import { createResourceRequest } from './application/createRequest';
 import { resourceReviewUseCases } from './application/reviewRequest';
@@ -35,6 +35,7 @@ export function createResourceAccessModule(input: ResourceAccessModuleDeps) {
   } };
   const api: ResourceAccessModuleApi = {
     name: 'resource-access', create: createResourceRequest(deps, false), direct: createResourceRequest(deps, true),
+    originalInfrastructureOwnership: (key, representation) => resourceChangeInfrastructureOrigin(input.db, key, representation),
     ...(input.project.assertProjectDeletionGrant ? { deletionOwner: resourceAccessDeletionOwner(resourceAccessDeletionRepository(input.db, input.project.assertProjectDeletionGrant), input.project.assertProjectDeletionGrant, deps) } : {}),
     ...resourceReviewUseCases(deps), ...resourceInspectionUseCases(deps),
     get: async (actor, projectId, id) => changeDto(await loadChange(deps, actor, projectId, id)),

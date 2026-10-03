@@ -16,10 +16,11 @@ export async function claimExecutionOperation(db: Database, input: { owner: stri
       AND (${controls.body}->'storageSync' IS NULL OR ${controls.body}->'storageSync'->>'version' = ${controls.body}->'storageSync'->>'acknowledgedVersion')
       AND (${controls.body}->>'leaseExpiresAt')::timestamptz > clock_timestamp()
       AND (${controls.body}->'handoff' IS NULL OR ${controls.body}->'handoff'->>'stage' = 'complete'))) `;
-  const candidates = await db.select({ id: ops.id, serviceId: ops.serviceId }).from(ops).where(and(ready, dispatchable, input.id ? eq(ops.id, input.id) : undefined)).orderBy(asc(ops.updatedAt), asc(ops.id)).limit(100);
+  const open = sql`NOT EXISTS(SELECT 1 FROM business_task.project_admissions a WHERE a.project_id=${ops.intent}->>'projectId')`;
+  const candidates = await db.select({ id: ops.id, serviceId: ops.serviceId }).from(ops).where(and(ready, dispatchable, open, input.id ? eq(ops.id, input.id) : undefined)).orderBy(asc(ops.updatedAt), asc(ops.id)).limit(100);
   for (const candidate of candidates) {
     const claimed = await executionTransaction(db, candidate.serviceId, async (tx, now) => {
-      const row = (await tx.select().from(ops).where(and(ready, eq(ops.id, candidate.id))).for('update', { skipLocked: true }))[0];
+      const row = (await tx.select().from(ops).where(and(ready, open, eq(ops.id, candidate.id))).for('update', { skipLocked: true }))[0];
       if (!row) return undefined;
       const recovering = row.state === 'running' || row.errorCode === 'admission_unknown';
       const control = await readExecutionControl(tx, row.serviceId);

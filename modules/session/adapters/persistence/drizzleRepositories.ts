@@ -42,10 +42,10 @@ const SUMMARY_SOURCES: readonly RunnerEvent['kind'][] = ['agent', 'nativeTermina
 
 export function drizzleConnectionRegistry(db: Executor): ConnectionRegistry {
   return {
-    claim: async (taskId, replica, at) => {
-      await db.insert(connections).values({ taskId, replica, connectedAt: at, lastSeenAt: at }).onConflictDoUpdate({ target: connections.taskId, set: { replica, connectedAt: at, lastSeenAt: at } });
+    claim: async (taskId, replica, at, consumerId) => {
+      await db.insert(connections).values({ taskId, replica, consumerId: consumerId ?? null, connectedAt: at, lastSeenAt: at }).onConflictDoUpdate({ target: connections.taskId, set: { replica, consumerId: consumerId ?? null, connectedAt: at, lastSeenAt: at } });
     },
-    release: async (taskId, replica) => { await db.delete(connections).where(and(eq(connections.taskId, taskId), eq(connections.replica, replica))); },
+    release: async (taskId, replica, consumerId) => { await db.delete(connections).where(and(eq(connections.taskId, taskId), eq(connections.replica, replica), ...(consumerId ? [eq(connections.consumerId, consumerId)] : []))); },
     heartbeat: async (taskId, replica, at) => { await db.update(connections).set({ lastSeenAt: at }).where(and(eq(connections.taskId, taskId), eq(connections.replica, replica))); },
     lookup: async (taskId) => {
       const row = (await db.select().from(connections).where(eq(connections.taskId, taskId)))[0];

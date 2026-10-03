@@ -16,6 +16,7 @@ export const runnerEvents = sessionSchema.table('runner_events', {
 export const connections = sessionSchema.table('connections', {
   taskId: text('task_id').primaryKey(),
   replica: text('replica').notNull(),
+  consumerId: text('consumer_id'),
   connectedAt: timestamp('connected_at', { withTimezone: true }).notNull(),
   lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull(),
 });

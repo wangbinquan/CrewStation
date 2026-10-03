@@ -24,7 +24,9 @@ export function drizzleProjectDeletions(db: Executor): ProjectDeletions {
     lockProject: async (id) => { const row = (await db.select().from(projects).where(eq(projects.id, id)).for('update'))[0]; return row ? toProject(row) : undefined; },
     getPlan: async (id) => { const row = (await db.select().from(deletionPlans).where(eq(deletionPlans.id, id)))[0]; return row ? { plan: ProjectDeletionPlanSchema.parse(row.body), requestedBy: row.requestedBy as UserId, createdAt: row.createdAt } : undefined; },
     insertPlan: async (item) => { await db.insert(deletionPlans).values({ id: item.plan.id, projectId: item.plan.target.id, body: item.plan, requestedBy: item.requestedBy, createdAt: item.createdAt, expiresAt: new Date(item.plan.expiresAt) }); },
-    getOperation: async (id, lock) => { const query = db.select().from(deletionOperations).where(eq(deletionOperations.id, id)); return record((await (lock ? query.for('update') : query))[0]); },
+    getOperation: async (id, lock) => { const query = db.select().from(deletionOperations).where(eq(deletionOperations.id, id));
+      return record((await (lock === 'available' ? query.for('update', { skipLocked: true }) : lock ? query.for('update') : query))[0]); },
+    withExecutor: (work) => work(db),
     findOperation: (id) => find(eq(deletionOperations.projectId, id)),
     findRequest: async (key) => record((await db.select().from(deletionOperations).where(or(eq(deletionOperations.requestKey, key),
       sql`EXISTS(SELECT 1 FROM jsonb_array_elements(coalesce(${deletionOperations.body}->'confirmations','[]'::jsonb)) AS confirmation WHERE confirmation->>'requestKey'=${key})`)))[0]),

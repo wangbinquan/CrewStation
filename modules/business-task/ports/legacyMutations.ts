@@ -1,5 +1,5 @@
 import type { RepositoryScope } from './repositories';
-export interface LegacyMutationTicket { id: string; serviceId: string; kind: string; taskId?: string; parentId?: string; ownerPodUid?: string }
+export interface LegacyMutationTicket { id: string; serviceId: string; kind: string; taskId?: string; parentId?: string; ownerPodUid?: string; callbackId?: string }
 export interface LegacyMutationRecord extends LegacyMutationTicket { state: 'open' | 'unknown' | 'complete'; createdAt: string }
 
 /** Old protocols carry no fencing token. Every old write must cross this durable service barrier. */

@@ -8,13 +8,14 @@ import { messageView } from '../../domain/executionMessage';
 import type { ExecutionAgentPlan } from '../../domain/executionAgent';
 import type { BusinessExecutionDeps } from './dependencies';
 import { executionSource } from './source';
+import { businessExecutionWork } from './deletion/projectWork';
 
 export function executionMessageUseCases(deps: BusinessExecutionDeps): Pick<BusinessExecutionApi, 'sendMessage'> & { progressMessage(): Promise<number> } {
   const source = executionSource(deps);
   const progress = async (id?: string) => {
     const claim = await deps.messages.claim(newResourceId(), id);
     if (!claim) return 0;
-    await dispatchMessage(deps, claim); return 1;
+    await businessExecutionWork(deps, { serviceId: claim.serviceId, taskId: claim.taskId, kind: 'message', reference: claim.id, revision: claim.revision }, (scoped) => dispatchMessage(scoped, claim)); return 1;
   };
   return {
     sendMessage: async (caller, taskId, subtaskId, input) => {

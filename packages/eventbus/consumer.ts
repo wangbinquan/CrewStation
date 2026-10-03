@@ -3,6 +3,8 @@ import type { Logger } from '@crewstation/kernel';
 import { noopLogger } from '@crewstation/kernel';
 import type { Database, Transaction } from '@crewstation/persistence';
 import { sql } from 'drizzle-orm';
+import type { EventContentIdentity } from './content';
+import { eventBirthDigest, writeEventDeadLetter } from './content';
 
 export interface DomainEventRecord<T extends DomainTopicName = DomainTopicName> {
   id: number;
@@ -39,41 +41,46 @@ export function createEventConsumer(options: ConsumerOptions): EventConsumer {
   const batch = options.batch ?? 100;
   const maxAttempts = options.maxAttempts ?? 10;
   const handlers = new Map<string, Array<DomainEventHandler<DomainTopicName>>>();
-  const attempts = new Map<number, number>();
+  const attempts = new Map<string, number>();
   let running = false;
   let active: Promise<void> | undefined;
 
   const runOnce = (): Promise<number> => db.transaction(async (tx) => {
     await tx.execute(sql`INSERT INTO platform_infra.event_cursors (consumer) VALUES (${consumer}) ON CONFLICT DO NOTHING`);
-    const cursorRows = (await tx.execute(sql`SELECT last_event_id FROM platform_infra.event_cursors WHERE consumer = ${consumer} FOR UPDATE`)) as unknown as Array<{ last_event_id: number }>;
-    const last = Number(cursorRows[0]?.last_event_id ?? 0);
-    const events = (await tx.execute(sql`SELECT id, topic, payload, occurred_at FROM platform_infra.domain_events WHERE id > ${last} ORDER BY id LIMIT ${batch}`)) as unknown as Array<{ id: number; topic: string; payload: unknown; occurred_at: Date }>;
+    const cursorRows = await tx.execute<{ last_event_id: string }>(sql`SELECT last_event_id::text AS last_event_id
+      FROM platform_infra.event_cursors WHERE consumer = ${consumer} FOR UPDATE`);
+    const last = cursorRows[0]?.last_event_id ?? '0';
+    // Keep the original row through handler completion; reclamation must wait for this actual transaction.
+    const events = await tx.execute<{ id: string; topic: string; payload: unknown; occurred_at: Date; birth_digest: string }>(sql`
+      SELECT e.id::text AS id,e.topic,e.payload,e.occurred_at,${eventBirthDigest()} AS birth_digest
+      FROM platform_infra.domain_events e WHERE e.id>${last}::bigint ORDER BY e.id LIMIT ${batch} FOR KEY SHARE OF e`);
     let processed = 0;
     for (const row of events) {
       const record: DomainEventRecord = { id: Number(row.id), topic: row.topic as DomainTopicName, payload: (typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload) as DomainPayload<DomainTopicName>, occurredAt: new Date(row.occurred_at) };
-      if (!(await dispatch(record, tx))) break;
+      if (!(await dispatch(record, { id: row.id, birthDigest: row.birth_digest }, tx))) break;
       processed += 1;
-      await tx.execute(sql`UPDATE platform_infra.event_cursors SET last_event_id = ${record.id}, updated_at = now() WHERE consumer = ${consumer}`);
+      await tx.execute(sql`UPDATE platform_infra.event_cursors SET last_event_id = ${row.id}::bigint, updated_at = now() WHERE consumer = ${consumer}`);
     }
     return processed;
   });
 
-  const dispatch = async (record: DomainEventRecord, tx: Transaction): Promise<boolean> => {
+  const dispatch = async (record: DomainEventRecord, original: Pick<EventContentIdentity, 'id' | 'birthDigest'>, tx: Transaction): Promise<boolean> => {
+    const attemptKey = `${original.id}:${original.birthDigest}`;
     try {
       for (const handler of handlers.get(record.topic) ?? []) await handler(record, tx);
-      attempts.delete(record.id);
+      attempts.delete(attemptKey);
       return true;
     } catch (error) {
-      const n = (attempts.get(record.id) ?? 0) + 1;
-      attempts.set(record.id, n);
+      const n = (attempts.get(attemptKey) ?? 0) + 1;
+      attempts.set(attemptKey, n);
       const message = error instanceof Error ? error.message : String(error);
       if (n < maxAttempts) {
-        logger.warn('event handler failed, will retry', { eventId: record.id, topic: record.topic, attempt: n, error: message });
+        logger.warn('event handler failed, will retry', { eventId: original.id, topic: record.topic, attempt: n, error: message });
         return false;
       }
-      await tx.execute(sql`INSERT INTO platform_infra.event_dead_letters (consumer, event_id, error) VALUES (${consumer}, ${record.id}, ${message}) ON CONFLICT DO NOTHING`);
-      logger.error('event dead-lettered', { eventId: record.id, topic: record.topic, error: message });
-      attempts.delete(record.id);
+      if (await writeEventDeadLetter(tx, original, consumer, message))
+        logger.error('event dead-lettered', { eventId: original.id, topic: record.topic, error: message });
+      attempts.delete(attemptKey);
       return true;
     }
   };

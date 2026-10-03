@@ -22,12 +22,13 @@ export function browserStreams(deps: SessionUseCaseDeps, hub: RunnerHub, dispatc
     /** `viewerName` 是网关注入的显示名，取得输入控制时随用户 ID 一起交给 Runner，别的查看者据此看到是谁在输入。 */
     open: async (actor: Actor, taskId: TaskId, sink: EventSink, sinceSeq: number, options: BrowserReplayOptions & { readonly viewerName?: string } = {}): Promise<BrowserStream> => {
       if (!(await deps.taskAccess.canOpenStream(actor, taskId))) throw forbidden('无权访问该任务的会话流');
+      await deps.connectionHistory?.check(taskId);
       let unsubscribe = () => {};
       const guarded = authorizedSink(sink, () => deps.taskAccess.canOpenStream(actor, taskId), () => unsubscribe());
       const replay = await openBrowserReplay(deps, hub, taskId, guarded, sinceSeq, options);
       unsubscribe = replay.unsubscribe;
       const { complete } = replay;
-      try { await guarded.drain(); if (!(await guarded.check())) throw forbidden('项目权限已变化'); } catch (error) { unsubscribe(); throw error; }
+      try { await guarded.drain(); await deps.connectionHistory?.check(taskId); if (!(await guarded.check())) throw forbidden('项目权限已变化'); } catch (error) { unsubscribe(); throw error; }
       const viewId = crypto.randomUUID(), holder = { userId: actor.userId, name: options.viewerName ?? '' };
       const controlled = new Set<string>();
       return {

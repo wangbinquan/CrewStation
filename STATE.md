@@ -3201,3 +3201,33 @@ RFC-013 最终候选门禁现已通过：**1937 pass／5 skip／0 fail**，326 �
 ### 双路径 render/固定元数据完整候选门禁回执（2026-09-30）
 
 2026-09-30T01:55:33Z，冻结23路径的一次完整本地门禁结束：结构、全仓lint、后端/console类型通过；4288 pass／142 skip／0 fail、27227断言、857文件，测试976.92秒，完整命令1035.26秒。18源码/测试与5文档在检查期间全部指纹一致；独立限定实现功能门PASS，24项相关回归通过。仅补本回执及下一阶段规划，不重复运行同内容完整门禁。精确发布/hosted CI/本机部署另记；生产开发采集仍关闭，真实身份/模型验收未执行，142跳过项不计通过。
+
+
+## 2026-10-03 RFC-037：原开通准入与保留期候选已发布部署，完整删除仍在实施
+
+共同 49 文件以一次完整门 5404 pass／143 skip／0 fail 验证，串行本地提交后一次推送至 `75dd427227fc7e3f587015c37ca411904513c625`；精确 CI 37090652986 六项成功。2026-10-03T03:05:09.837Z，本机八组件实际镜像／OCI 源码核对完成，原项目、GitLab、PG、卷、角色及 Runner 身份保持，四个新增迁移按原始 SQL 校验和核实。部署校验器误用 task-runtime 的失败保留，修正官方 task_runtime 名后复用原 Job／备份／镜像完成续接。
+
+实际控制器 PID 1 的 namespace-reapply 启动记录已通过部署后的组合根和真实只读数据库快照读取，原 finally 已退出；不将孤立读取进程或观察 CID 当作完整物理关联／七阶段证明。详见 `proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/provisioning-admission-deployment.md`。全 22 owner 永久删除仍未完成，producer OFF、删除入口关闭，原项目保留。
+
+后续内容 EOF／原归属候选仍未发布。resource-access 新 0003 保护最小原映射，保持旧 0002 和全部旧事实；先红 2 项，修正后真实 PG 18 pass／0 fail，正常创建与本模块七阶段清理回归保持。共享锁已追加 resource-access 0003 与 api-catalog 0008 至 222，原 220 保持；API 目录同类保护先红 1 项，修正后 24 pass／0 fail。待独立源码审查与后续正式接线。其他会话的在制统计、RFC-036 和共享输出均保留。
+
+
+2026-10-03 RFC-037 BusinessTask 原准入派发接续：0031 追加原回调／最小封写／完整原 Pod 停止沿革，factory 的 HTTP 与实际 task recovery worker 接入；私有 finally、连接断线后迟到请求和 205 原回调 EOF 已验证。封写已排队时续租／结算自阻塞先红后修，短事务携带原 shared 身份后通过。最终源码业务模块229／0、2129断言、60文件；仅追加反例后原派发专项8／0、65断言。架构／精确lint／后端类型通过；新迁移追加后共享锁229，原条目和观测0016／0017完整保持。未提交、未部署，仍仅任务派发准入部件；其他业务写路径／七阶段metadata、DevSession／TaskRuntime owner、全22 Root与实机永久回收继续。删除入口关闭，原验证资源保留。证据 acceptance/business-work.md；观测候选收到稳定16项待SOURCE终态，没有常规跨会话进度消息。
+
+
+2026-10-03 RFC-037 业务执行原回调：子任务、消息、取消、生命周期、投影及源消费确认、Agent清理接入原持久回调，窄外部端口await前后验证scope；实际backend断开后的迟到快照不再请求下一页或消费确认。新0032追加回调种类，0031原字节和观测0016/0017完整保留，共锁230。最终业务235／0、2173断言、61文件、58.41秒；架构/精确lint/类型通过，证据acceptance/business-execution-work.md。服务请求准备、旧接口、恢复/终结及全部数据库写封闭和七阶段metadata仍未完成，DevSession/TaskRuntime/全22 Root/完整物理回收继续，删除入口OFF，原验证资源保留。已收到观测限定SOURCE PASS；实际报告根属于cs-api Pod，controller本地同路径不能证明清空，需真实跨进程owner装配。只发过一次就绪/锁依赖交接消息，没有例行互报进度。
+
+
+## RFC-037 BusinessTask owner 接续（2026-10-03，未提交部署）
+
+业务七阶段 owner、25 表永久封写／整行摘要 CAS 清理、全部原请求与后台回调、旧 detached 命令的私有 finally 已形成候选。正式 Root 接入原 Project／TaskRuntime／BusinessTask 来源和独立完整 Pod 观察；旧票据缺原链接仍阻断 stop／metadata。0033–0036 只追加入锁，共234项，保留并行观测0016／0017。较宽271／0、2589断言；最终Root／来源／原Pod21／0、271断言，架构／后端类型／精确lint通过。详见 proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/business-owner.md。
+
+旧 /private/tmp/cs-rfc037-session-business-source-candidate-v6.json 的167路径指纹已过期，不复用它为当前候选通过。当前 main/origin 都为75dd427227fc7e3f587015c37ca411904513c625，0/0；重新冻结当前源码，继续一次完整门禁、精确提交树与共享锁依赖核对、串行发布及精确SHA CI／部署验收。其余 owner、全部22参与者、SCM物理范围及实际项目永久回收未完成，入口OFF。针对沟通过密的反馈，跨会话只在实际冲突／就绪／提交交接发送消息，不例行互报状态。
+
+
+## 2026-10-03：Session／BusinessTask／开通 owner 与观测依赖联合门禁
+
+- 在 main 上完成一次稳定 350 路径的联合 `bun run check`：5541 pass／143 skip／0 fail，135946 断言、1085 文件，源码首尾指纹一致；精确联合提交树的后端／console 类型均 0 错。日志 `/private/tmp/cs-rfc037-session-business-observability-full-v2.log`，回执同名前缀 `.json` 的 terminalCounts 为权威。
+- 观测依赖已先本地提交 `35ff8871e2c0889a34c4baf29fcafaa1485e0149`，132 个实际变更文件，index 空；共享整文件保留双方输出，当前尚未 push。当前会话接续精确提交剩余 Session／BusinessTask／开通 owner、原身份保护／公开来源、234 项共享迁移锁及本记录，再联合 push、等待精确 SHA CI 与本机部署。登记文字是门禁后的纯文档 delta，未改变通过门禁的生产源码。
+- DevSession 下一批新增 7 个未追踪文件，仅实现 13 表只读完整盘点：实际 PG 8／0、46 断言，精确类型 0 错、lint 通过；初始夹具 SQL 保留词、静态 rows 推断和拒绝消息期望错误均保留日志并已修正。这 7 文件未进入本次门禁、暂存或发布。其原回调封写／退出、七阶段 owner、正式 Root 与剩余物理 owner 继续。
+- 完整 22 owner 装配、SCM／制品物理范围及管理员二次确认实机永久回收未完成，删除入口继续关闭，原专用项目未删除。通信只在真实冲突、就绪和提交交接进行，不例行互报。

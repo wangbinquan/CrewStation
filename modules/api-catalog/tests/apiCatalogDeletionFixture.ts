@@ -9,8 +9,8 @@ import { createTestDatabase } from '@crewstation/testkit';
 import { sql } from 'drizzle-orm';
 import { apiCatalogMigrations, createApiCatalogModule } from '../wiring';
 
-export async function apiCatalogDeletionFixture() {
-  const db = await createTestDatabase([eventbusMigrations, identityMigrations, projectMigrations, { ...apiCatalogMigrations, files: apiCatalogMigrations.files.filter((file) => !file.name.startsWith('0007_')) }]);
+export async function apiCatalogDeletionFixture(options: { withoutOriginalGuard?: boolean } = {}) {
+  const db = await createTestDatabase([eventbusMigrations, identityMigrations, projectMigrations, { ...apiCatalogMigrations, files: apiCatalogMigrations.files.filter((file) => file.name < '0007_') }]);
   const identity = createIdentityModule({ db: db.db, settings: { adminEmails: [] } });
   const user = await identity.api.ensureUser({ externalId: 'catalog-admin', name: 'Admin', email: 'catalog@test.invalid' });
   const admin: Actor = { userId: user.id, isAdmin: true };
@@ -29,7 +29,7 @@ export async function apiCatalogDeletionFixture() {
   for (const [service, operation] of [[own.serviceId!, ids.otherOperation], [other.serviceId!, ids.operation], [other.serviceId!, ids.otherOperation]]) await db.db.execute(sql`INSERT INTO api_catalog.grants(service_id,operation_id,state,granted_by,granted_at) VALUES (${service},${operation},'granted',${admin.userId},now())`);
   for (const [p, request, operation, reason] of [[own, ids.request, ids.otherOperation, 'erase-own-request'], [other, ids.incoming, ids.operation, 'retain-incoming-reason']] as const) await db.db.execute(sql`INSERT INTO api_catalog.requests(id,service_id,project_id,operation_id,state,reason,requested_by,created_at) VALUES (${request},${p.serviceId},${p.id},${operation},'pending',${reason},${admin.userId},now())`);
   await db.db.execute(sql`INSERT INTO api_catalog.allocation_receipts VALUES (${ids.allocation},${own.serviceId},${JSON.stringify({ hash: 'erase-allocation', revision: '1', effect: 'private-result', applied: true })}::jsonb)`);
-  await runMigrations(db.db, [apiCatalogMigrations]);
+  await runMigrations(db.db, [{ ...apiCatalogMigrations, files: apiCatalogMigrations.files.filter((file) => !options.withoutOriginalGuard || file.name < '0008_') }]);
   const begin = async () => {
     const target = await project.api.deletionScope(own.id), report = await catalog.api.deletionOwner!.inspect(target);
     // 其他 owner 的空报告仅用于本模块许可测试，不是全平台回收证据。

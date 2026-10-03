@@ -53,10 +53,12 @@ export function subtaskLaunch(deps: BusinessTaskUseCaseDeps, awaiting: Set<strin
     await uow.run((scope) => scope.subtasks.update(started));
     const execId = run.runnerRef ?? '';
     awaiting.add(execId);
-    void runner.sendCommand(run.taskId, { id: `exec-${execId}`, type: 'exec', execId, command: run.command ?? [], ...(run.cwd ? { cwd: run.cwd } : {}), env: {}, timeoutSeconds: run.timeoutSeconds ?? 3600, wait: true })
-      .then((result) => settleCommand(run, result as ExecResult))
-      .catch((error: unknown) => failCommand(run, error))
-      .finally(() => { awaiting.delete(execId); });
+    const execute = async () => {
+      try { const result = await runner.sendCommand(run.taskId, { id: `exec-${execId}`, type: 'exec', execId, command: run.command ?? [], ...(run.cwd ? { cwd: run.cwd } : {}), env: {}, timeoutSeconds: run.timeoutSeconds ?? 3600, wait: true }); await settleCommand(run, result as ExecResult); }
+      catch (error) { await failCommand(run, error); }
+      finally { awaiting.delete(execId); }
+    };
+    void (deps.legacyBackground ? deps.legacyBackground(run.taskId, execute) : execute()).catch((error: unknown) => logger.warn('command original callback pending', { subtaskId: run.id, error: String(error) }));
     return started;
   };
   const launch = async (run: SubtaskRun): Promise<SubtaskRun> => deps.legacyDispatch

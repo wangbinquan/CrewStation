@@ -1,3 +1,4 @@
+import { businessAdmissionOpen } from '../deletion/admission';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import type { Database, Executor } from '@crewstation/persistence';
 import { executionTransaction } from '../executionTransaction';
@@ -9,7 +10,7 @@ import { recoveryRequests } from './tables';
 import { auditRecovery } from './ownership';
 
 export async function reconcileRecoveryRequests(db: Database): Promise<number> {
-  const candidates = await db.select({ id: recoveryRequests.id, serviceId: recoveryRequests.serviceId }).from(recoveryRequests).where(eq(recoveryRequests.state, 'running')).orderBy(sql`${recoveryRequests.observedAt} ASC NULLS FIRST`, asc(recoveryRequests.id)).limit(100);
+  const candidates = await db.select({ id: recoveryRequests.id, serviceId: recoveryRequests.serviceId }).from(recoveryRequests).where(and(businessAdmissionOpen(recoveryRequests.serviceId), eq(recoveryRequests.state, 'running'))).orderBy(sql`${recoveryRequests.observedAt} ASC NULLS FIRST`, asc(recoveryRequests.id)).limit(100);
   let progressed = 0;
   for (const candidate of candidates) progressed += await executionTransaction(db, candidate.serviceId, async (tx, now) => {
     const row = (await tx.select().from(recoveryRequests).where(and(eq(recoveryRequests.id, candidate.id), eq(recoveryRequests.state, 'running'))))[0];

@@ -8,6 +8,22 @@ import { resourceAccessDeletionFixture, type ResourceAccessDeletionFixture } fro
 const available = await testDatabaseAvailable(); let f: ResourceAccessDeletionFixture;
 afterEach(async () => { await f?.db.drop(); });
 describe.skipIf(!available)('资源申请 owner 项目清理（真实 PG）', () => {
+  test('公开原归属只读最小 UUID，不推断未知旧键；当前申请和原身份冲突必须拒绝', async () => {
+    f = await resourceAccessDeletionFixture({ withoutIdentityGuard: true });
+    const source = await f.resourceAccess.api.originalInfrastructureOwnership(f.ids.own);
+    expect(source).toMatchObject({ complete: true, id: f.ids.own, scope: 'project', projectIds: [f.own.id] });
+    expect(await f.resourceAccess.api.originalInfrastructureOwnership(f.ids.own, 'legacy')).toEqual(source);
+    expect((await f.resourceAccess.api.originalInfrastructureOwnership(f.ids.other))?.projectIds).toEqual([f.other.id]);
+    expect(JSON.stringify(source)).not.toContain('erase-owned-reason');
+    expect(await f.resourceAccess.api.originalInfrastructureOwnership(newResourceId())).toBeUndefined();
+    expect(await f.resourceAccess.api.originalInfrastructureOwnership('unknown-old-change', 'legacy')).toBeUndefined();
+    await expect(f.resourceAccess.api.originalInfrastructureOwnership('resource-delete')).rejects.toThrow();
+    await expect(f.resourceAccess.api.originalInfrastructureOwnership(f.ids.own, 'unknown' as never)).rejects.toThrow('未登记');
+    await f.db.db.execute(sql`UPDATE resource_access.changes SET body='{"private":"changed request"}'::jsonb WHERE id=${f.ids.own}`);
+    expect(await f.resourceAccess.api.originalInfrastructureOwnership(f.ids.own)).toEqual(source);
+    await f.db.db.execute(sql`UPDATE resource_access.deletion_identities SET project_id=${f.other.id} WHERE id=${f.ids.own}`);
+    await expect(f.resourceAccess.api.originalInfrastructureOwnership(f.ids.own)).rejects.toMatchObject({ kind: 'precondition' });
+  });
   test('升级保留申请；盘点包含理由与快照的完整摘要但不暴露原文，全局目录保留', async () => {
     f = await resourceAccessDeletionFixture(); const report = await f.resourceAccess.api.deletionOwner!.inspect(await f.project.api.deletionScope(f.own.id));
     expect(report.complete).toBe(true); expect(report.resources.find((r) => r.kind === 'changes')?.count).toBe(1);
@@ -23,6 +39,7 @@ describe.skipIf(!available)('资源申请 owner 项目清理（真实 PG）', ()
   });
   test('清完超过一页的所有历史及快照，重复稳定；其他项目和目录不变，根消失后原 ID 不能换项目复活', async () => {
     f = await resourceAccessDeletionFixture();
+    const original = await f.resourceAccess.api.originalInfrastructureOwnership(f.ids.own);
     const extra = Array.from({ length: 1501 }, () => ({ id: newResourceId(), key: newResourceId() }));
     await f.db.db.execute(sql`INSERT INTO resource_access.changes SELECT id,${f.own.id},${f.admin.userId},key,id,'rejected',1,'{"private":"erase-history"}'::jsonb,now() FROM jsonb_to_recordset(${JSON.stringify(extra)}::jsonb) AS rows(id text,key text)`);
     const started = await f.begin(); expect(started.context.confirmed.resources.find((r) => r.kind === 'changes')?.count).toBe(1502);
@@ -35,6 +52,12 @@ describe.skipIf(!available)('资源申请 owner 项目清理（真实 PG）', ()
       await f.project.api.recordProjectDeletionReceipt(started.lease, participant, phase, step.evidence);
     }
     expect((await f.project.api.completeProjectDeletion(started.lease)).state).toBe('succeeded');
+    expect(await f.resourceAccess.api.originalInfrastructureOwnership(f.ids.own)).toEqual(original);
+    for (const query of [sql`UPDATE resource_access.deletion_identities SET project_id=${f.other.id} WHERE id=${f.ids.own}`, sql`DELETE FROM resource_access.deletion_identities WHERE id=${f.ids.own}`, sql`TRUNCATE resource_access.deletion_identities`]) {
+      await expect(Promise.resolve(f.db.db.execute(query))).rejects.toMatchObject({ cause: { message: 'resource request original identity is immutable' } });
+      expect(await f.resourceAccess.api.originalInfrastructureOwnership(f.ids.own)).toEqual(original);
+    }
+    expect((await f.resourceAccess.api.originalInfrastructureOwnership(f.ids.other))?.projectIds).toEqual([f.other.id]);
     expect((await f.resourceAccess.api.deletionOwner!.inspect(started.context.target)).resources.every((r) => r.count === 0)).toBe(true);
     expect([...(await f.db.db.execute(sql`SELECT body FROM resource_access.changes WHERE id=${f.ids.other}`))]).toEqual([{ body: { private: 'retain-other-reason' } }]);
     expect((await f.db.db.execute(sql`SELECT key FROM resource_access.catalog_policies`)).map((r) => r.key)).toEqual([f.ids.policy]);

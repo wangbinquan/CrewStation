@@ -19,5 +19,6 @@ export interface ProjectDeletionIntents {
   receipt(lease: DeletionLease, participant: ProjectDeletionParticipant, phase: ProjectDeletionPhase, evidence: ProjectDeletionEvidence): Promise<ProjectDeletionOperation>;
   block(lease: DeletionLease, blockers: readonly ProjectDeletionBlocker[]): Promise<ProjectDeletionOperation>;
   complete(lease: DeletionLease): Promise<ProjectDeletionOperation>;
+  coordinate(id: string, write: (executor: object) => Promise<void>): Promise<boolean>;
   pending(after?: string, limit?: number): Promise<string[]>;
 }

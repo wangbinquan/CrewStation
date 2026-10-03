@@ -4,7 +4,7 @@ import type { ClusterDeps } from './dependencies';
 import { requireAdmin, readSnapshot, snapshotSummary, pageResources, resourceIn, relatedResources, completeSnapshot, projectResources } from './queries';
 import { operationUseCases } from './operations';
 import { overlayLedger } from './ledgerOverlay';
-export function clusterApi(deps: ClusterDeps): ClusterManagementModuleApi {
+export function clusterApi(deps: ClusterDeps): Omit<ClusterManagementModuleApi, 'originalInfrastructureOwnership'> {
   return {
     name: 'cluster-management', ...operationUseCases(deps),
     summary: async (actor, q) => { await requireAdmin(deps, actor); return snapshotSummary(await readSnapshot(deps, q.snapshotId), q); },

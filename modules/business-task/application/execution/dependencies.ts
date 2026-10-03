@@ -15,8 +15,10 @@ import type { ExecutionControls } from '../../ports/executionControl';
 import type { BusinessExecutionSourceResolver } from '../../ports/executionSource';
 import type { TaskRecoveryRequests } from '../../ports/taskRecovery';
 import type { TaskInputPreparation } from '../../ports/storage/taskInputs';
+import type { BusinessProjectWork } from '../../ports/deletion/work';
 
 export interface BusinessExecutionDeps extends Pick<BusinessTaskUseCaseDeps, 'uow' | 'environments' | 'directory' | 'clock' | 'logger' | 'runner' | 'compute' | 'settings'> {
+  projectWork?: BusinessProjectWork;
   taskInputs?: TaskInputPreparation;
   storageStatus?: (serviceId: ServiceId) => Promise<{ available: boolean; reason: string | null }>;
   executionObservations?: ExecutionObservationAdmission;

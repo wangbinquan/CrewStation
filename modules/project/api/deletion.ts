@@ -22,7 +22,10 @@ export interface ProjectDeletionApi {
   deferProjectDeletion(lease: ProjectDeletionLease, participant: ProjectDeletionParticipant, reason: string): Promise<void>;
   recordProjectDeletionReceipt(lease: ProjectDeletionLease, participant: ProjectDeletionParticipant, phase: ProjectDeletionPhase, evidence: ProjectDeletionEvidence): Promise<ProjectDeletionOperation>;
   blockProjectDeletion(lease: ProjectDeletionLease, blockers: readonly ProjectDeletionBlocker[]): Promise<ProjectDeletionOperation>;
-  completeProjectDeletion(lease: ProjectDeletionLease): Promise<ProjectDeletionOperation>;
+  /** Enqueue is serialized with completion. A busy or terminal operation returns false; recovery retries busy operations. */
+  coordinateProjectDeletion(operationId: string, write: (executor: object) => Promise<void>): Promise<boolean>;
+  /** Coordinator content removal and final project state commit or roll back together. */
+  completeProjectDeletion(lease: ProjectDeletionLease, finalize?: (executor: object, operation: ProjectDeletionOperation) => Promise<void>): Promise<ProjectDeletionOperation>;
   listPendingProjectDeletions(after?: string, limit?: number): Promise<string[]>;
   assertProjectAvailable(projectId: ProjectId): Promise<void>;
   inspectProjectDeletionMetadata(projectId: ProjectId): Promise<ProjectDeletionInventory>;

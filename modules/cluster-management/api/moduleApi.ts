@@ -1,6 +1,7 @@
-import type { Actor, ClusterFilter, ClusterSummary, ClusterPage, ClusterDetail, ClusterEvents, ClusterLogs, ClusterLogsQuery, ClusterInspectRequest, ClusterInspection, ClusterOperation, ClusterOperationRequest, ClusterOperationQuery, ProjectClusterResources, ProjectDeletionOwner } from '@crewstation/contracts';
+import type { Actor, ClusterFilter, ClusterSummary, ClusterPage, ClusterDetail, ClusterEvents, ClusterLogs, ClusterLogsQuery, ClusterInspectRequest, ClusterInspection, ClusterOperation, ClusterOperationRequest, ClusterOperationQuery, ProjectClusterResources, ProjectDeletionOwner, ProjectId } from '@crewstation/contracts';
 export interface ClusterManagementModuleApi {
   readonly name: 'cluster-management';
+  originalInfrastructureOwnership(kind: 'cluster-refresh' | 'cluster-operation' | 'cluster-metrics' | 'cluster-storage', key: string, representation?: 'current' | 'legacy'): Promise<{ complete: true; id: string; scope: 'project' | 'platform'; projectIds: readonly ProjectId[]; revision: string } | undefined>;
   readonly deletionOwner?: ProjectDeletionOwner;
   summary(actor: Actor, query: ClusterFilter): Promise<ClusterSummary>;
   resources(actor: Actor, query: ClusterFilter): Promise<ClusterPage>;

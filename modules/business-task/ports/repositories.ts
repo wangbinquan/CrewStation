@@ -49,5 +49,6 @@ export interface RepositoryScope {
 
 export interface UnitOfWork {
   readonly read: RepositoryScope;
+  originalInfrastructureOwnership?(kind: 'task' | 'subtask', key: string, representation?: 'current' | 'legacy'): Promise<{ complete: true; id: string; scope: 'project'; projectIds: readonly ProjectId[]; revision: string } | undefined>;
   run<T>(fn: (scope: RepositoryScope) => Promise<T>): Promise<T>;
 }

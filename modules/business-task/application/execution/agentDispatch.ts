@@ -6,6 +6,7 @@ import type { ExecutionSubtask } from '../../domain/executionSubtask';
 import type { BusinessExecutionDeps } from './dependencies';
 import { agentCommand, agentPayloadDigest } from './agentMaterial';
 import { acceptReceipt, readReceipt, unknown } from './commandDispatch';
+import { businessExecutionWork } from './deletion/projectWork';
 
 /** Environment and RPC always reuse their durable identities, including after ambiguous admission. */
 export async function dispatchBusinessAgent(deps: BusinessExecutionDeps, claimed: ExecutionSubtask): Promise<void> {
@@ -79,9 +80,11 @@ export async function cleanupAgentEnvironments(deps: BusinessExecutionDeps): Pro
   let count = 0;
   for (const subtask of await deps.subtasks.cleanupCandidates(20)) {
     try {
-      const env = await deps.environments.getEnvironment(subtask.runtimeTaskId!);
-      if ((!env && (!subtask.runtimeDispatched || await deps.environments.blockBusinessAdmission?.(subtask.serviceId as ServiceId, subtask.runtimeTaskId!))) || env?.native?.state === 'finished' || env?.state === 'released') { await deps.subtasks.markRuntimeReleased(subtask); count++; }
-      else if (env) await deps.environments.releaseEnvironment(env.id, 'business');
+      await businessExecutionWork(deps, { serviceId: subtask.serviceId, taskId: subtask.taskId, kind: 'agent-cleanup', reference: subtask.view.id, revision: subtask.revision }, async (scoped) => {
+        const env = await scoped.environments.getEnvironment(subtask.runtimeTaskId!);
+        if ((!env && (!subtask.runtimeDispatched || await scoped.environments.blockBusinessAdmission?.(subtask.serviceId as ServiceId, subtask.runtimeTaskId!))) || env?.native?.state === 'finished' || env?.state === 'released') { await scoped.subtasks.markRuntimeReleased(subtask); count++; }
+        else if (env) await scoped.environments.releaseEnvironment(env.id, 'business');
+      });
     } catch { deps.logger.warn('business Agent environment cleanup pending', { subtaskId: subtask.view.id }); }
   }
   return count;

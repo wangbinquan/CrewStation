@@ -1,12 +1,12 @@
 import type { Actor, TaskId } from '@crewstation/contracts';
-import { forbidden, notFound, precondition } from '@crewstation/kernel';
+import { forbidden, jsonHash, notFound, precondition } from '@crewstation/kernel';
 import type { LegacyRecoveryItem, LegacyRecoveryResult } from '../api/legacyRecovery';
 import type { LegacyMutations, LegacyMutationRecord } from '../ports/legacyMutations';
 import type { LegacyRecoveryProof } from '../ports/legacyRecovery';
 import type { BusinessTaskUseCaseDeps } from './dependencies';
 
 /** No TTL unlock. Recovery consumes positive stop proofs and retains a completed tombstone. */
-export function legacyRecoveryUseCases(deps: Pick<BusinessTaskUseCaseDeps, 'directory' | 'environments'>, tickets: LegacyMutations, proof?: LegacyRecoveryProof) {
+export function legacyRecoveryUseCases(deps: Pick<BusinessTaskUseCaseDeps, 'directory' | 'environments' | 'projectWork'>, tickets: LegacyMutations, proof?: LegacyRecoveryProof) {
   const service = async (actor: Actor, identity: string) => {
     if (!actor.isAdmin) throw forbidden('旧执行票据恢复仅供平台管理员');
     const resolved = await deps.directory.resolveServiceIdentity(identity);
@@ -32,7 +32,9 @@ export function legacyRecoveryUseCases(deps: Pick<BusinessTaskUseCaseDeps, 'dire
   };
   return {
     legacyRecovery: async (actor: Actor, identity: string, action: 'inspect' | 'reconcile' | 'stop', ticketId?: string): Promise<LegacyRecoveryResult> => {
-      const resolved = await service(actor, identity); let recovered = 0;
+      const resolved = await service(actor, identity);
+      const run = async () => {
+      let recovered = 0;
       let stoppedTicket: string | undefined;
       const records = await tickets.list(resolved.serviceId);
       if (action === 'stop') {
@@ -48,6 +50,9 @@ export function legacyRecoveryUseCases(deps: Pick<BusinessTaskUseCaseDeps, 'dire
       }
       const items = await Promise.all((await tickets.list(resolved.serviceId)).map((record) => inspect(record)));
       return { recovered, items };
+      };
+      return action === 'inspect' || !deps.projectWork ? run() : deps.projectWork.run({ projectId: resolved.projectId, serviceId: resolved.serviceId,
+        kind: 'legacy-api', reference: ticketId ?? resolved.serviceId, inputDigest: jsonHash({ action, ticketId }) }, run);
     },
   };
 }

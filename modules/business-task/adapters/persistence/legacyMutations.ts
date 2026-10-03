@@ -10,6 +10,7 @@ import { executionTransaction, readExecutionControl } from './executionTransacti
 const tickets = businessTaskSchema.table('legacy_mutations', {
   id: text('id').primaryKey(), serviceId: text('service_id').notNull(), kind: text('kind').notNull(), taskId: text('task_id'),
   parentId: text('parent_id'), ownerPodUid: text('owner_pod_uid'),
+  callbackId: text('callback_id'),
   state: text('state').notNull(), createdAt: timestamp('created_at', { withTimezone: true }).notNull(), updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
 });
 
@@ -29,7 +30,7 @@ export function drizzleLegacyMutations(db: Database, ownerPodUid?: string): Lega
       return run({ ...scope, tasks: { ...scope.tasks, insert: async (task) => { await assertOpen(); return scope.tasks.insert(task); } },
         subtasks: { ...scope.subtasks, insert: async (task) => { await assertOpen(); return scope.subtasks.insert(task); } } });
     }),
-    list: async (serviceId) => (await db.select().from(tickets).where(and(eq(tickets.serviceId, serviceId), ne(tickets.state, 'complete'))).orderBy(asc(tickets.updatedAt)).limit(100)).map((row) => ({ ...row, state: row.state as 'open' | 'unknown', createdAt: row.createdAt.toISOString(), taskId: row.taskId ?? undefined, parentId: row.parentId ?? undefined, ownerPodUid: row.ownerPodUid ?? undefined })),
+    list: async (serviceId) => (await db.select().from(tickets).where(and(eq(tickets.serviceId, serviceId), ne(tickets.state, 'complete'))).orderBy(asc(tickets.updatedAt)).limit(100)).map((row) => ({ ...row, state: row.state as 'open' | 'unknown', createdAt: row.createdAt.toISOString(), taskId: row.taskId ?? undefined, parentId: row.parentId ?? undefined, ownerPodUid: row.ownerPodUid ?? undefined, callbackId: row.callbackId ?? undefined })),
     childrenComplete: async (id) => !(await db.select({ id: tickets.id }).from(tickets).where(and(eq(tickets.parentId, id), ne(tickets.state, 'complete'))).limit(1)).length,
     recover: (ticket) => executionTransaction(db, ticket.serviceId, async (tx, now) => {
       // Compare the observed state; normal completion racing recovery is harmless. Never delete the tombstone.
@@ -41,8 +42,8 @@ export function drizzleLegacyMutations(db: Database, ownerPodUid?: string): Lega
       await tx.insert(tickets).values({ ...ticket, state: 'open', createdAt: now, updatedAt: now });
       return ticket;
     }),
-    settle: async (ticket, state) => {
-      await db.update(tickets).set({ state, updatedAt: sql`clock_timestamp()` }).where(and(eq(tickets.id, ticket.id), eq(tickets.serviceId, ticket.serviceId), eq(tickets.state, 'open')));
-    },
+    settle: (ticket, state) => db.transaction(async (tx) => {
+      await tx.update(tickets).set({ state, updatedAt: sql`clock_timestamp()` }).where(and(eq(tickets.id, ticket.id), eq(tickets.serviceId, ticket.serviceId), eq(tickets.state, 'open')));
+    }),
   };
 }

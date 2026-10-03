@@ -1,3 +1,4 @@
+import { businessAdmissionOpen } from '../deletion/admission';
 import { and, asc, eq, lt, or, sql } from 'drizzle-orm';
 import type { Database } from '@crewstation/persistence';
 import { conflict } from '@crewstation/kernel';
@@ -41,14 +42,14 @@ export function drizzleExecutionMessages(db: Database): ExecutionMessages {
       if (!claim.dispatched && (!subtask || subtask.view.state !== 'awaiting-input' || subtask.view.cancelRequestedAt)) return false;
       return (await tx.update(messages).set({ dispatched: true }).where(leased(claim)).returning()).length === 1;
     }),
-    settle: async (claim, state, errorCode) => (await db.update(messages).set({ state, errorCode: errorCode ?? null, owner: null, leaseUntil: null, updatedAt: sql`clock_timestamp()` }).where(leased(claim)).returning()).length === 1,
+    settle: (claim, state, errorCode) => db.transaction(async (tx) => (await tx.update(messages).set({ state, errorCode: errorCode ?? null, owner: null, leaseUntil: null, updatedAt: sql`clock_timestamp()` }).where(leased(claim)).returning()).length === 1),
   };
 }
 async function claimMessage(db: Database, owner: string, id?: string): Promise<ExecutionMessage | undefined> {
-  const candidates = await db.select({ id: messages.id, serviceId: messages.serviceId }).from(messages).where(and(ready(), id ? eq(messages.id, id) : undefined)).orderBy(asc(messages.updatedAt)).limit(100);
+  const candidates = await db.select({ id: messages.id, serviceId: messages.serviceId }).from(messages).where(and(businessAdmissionOpen(messages.serviceId), ready(), id ? eq(messages.id, id) : undefined)).orderBy(asc(messages.updatedAt)).limit(100);
   for (const candidate of candidates) {
     const claimed = await executionTransaction(db, candidate.serviceId, async (tx, now) => {
-      const row = (await tx.select().from(messages).where(and(eq(messages.id, candidate.id), ready())).for('update', { skipLocked: true }))[0];
+      const row = (await tx.select().from(messages).where(and(businessAdmissionOpen(messages.serviceId), eq(messages.id, candidate.id), ready())).for('update', { skipLocked: true }))[0];
       if (!row) return undefined;
       if (!row.dispatched) {
         const control = await readExecutionControl(tx, row.serviceId);

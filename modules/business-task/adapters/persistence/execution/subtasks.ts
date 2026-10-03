@@ -1,3 +1,4 @@
+import { businessAdmissionOpen } from '../deletion/admission';
 import { reserveSessionHome, releaseSessionHome } from '../sessions/repository';
 import { assertTaskAcceptsExecution } from './lifecycleAdmission';
 import { and, asc, eq, lt, or, sql } from 'drizzle-orm';
@@ -24,9 +25,9 @@ export function drizzleExecutionSubtasks(db: Database): ExecutionSubtasks {
       const [row] = await db.select().from(tasks).where(and(sql`${tasks.view}->>'executionId' = ${executionId}`, sql`COALESCE(${tasks.runtimeTaskId}, ${tasks.taskId}) = ${runtimeTaskId}`)).limit(1);
       return row && rowView(row);
     },
-    checkpointRuntime: async (claim) => (await db.update(tasks).set({ runtimeDispatched: true }).where(and(leased(claim), sql`NOT (${tasks.view} ? 'cancelRequestedAt')`)).returning()).length === 1,
+    checkpointRuntime: (claim) => db.transaction(async (tx) => (await tx.update(tasks).set({ runtimeDispatched: true }).where(and(leased(claim), sql`NOT (${tasks.view} ? 'cancelRequestedAt')`)).returning()).length === 1),
     markRuntimeReleased: (subtask) => executionTransaction(db, subtask.serviceId, async (tx) => { const rows = await tx.update(tasks).set({ runtimeReleased: true }).where(and(eq(tasks.id, subtask.view.id), sql`${tasks.view}->>'state' IN ('succeeded','failed','cancelled')`)).returning(); if (rows.length) await releaseSessionHome(tx, rowView(rows[0]!)); }),
-    cleanupCandidates: async (limit) => (await db.select().from(tasks).where(sql`${tasks.runtimeTaskId} IS NOT NULL AND ${tasks.runtimeReleased} = false AND ${tasks.view}->>'state' IN ('succeeded','failed','cancelled') AND NOT EXISTS (SELECT 1 FROM business_task.execution_messages m WHERE m.subtask_id=${tasks.id} AND m.state NOT IN ('succeeded','failed'))`).orderBy(asc(tasks.updatedAt)).limit(limit)).map(rowView),
+    cleanupCandidates: async (limit) => (await db.select().from(tasks).where(and(businessAdmissionOpen(tasks.serviceId), sql`${tasks.runtimeTaskId} IS NOT NULL AND ${tasks.runtimeReleased} = false AND ${tasks.view}->>'state' IN ('succeeded','failed','cancelled') AND NOT EXISTS (SELECT 1 FROM business_task.execution_messages m WHERE m.subtask_id=${tasks.id} AND m.state NOT IN ('succeeded','failed'))`)).orderBy(asc(tasks.updatedAt)).limit(limit)).map(rowView),
     forExecution: async (serviceId, taskId, executionId) => { const row = (await db.select().from(tasks).where(and(scope(serviceId, taskId), sql`${tasks.view}->>'executionId' = ${executionId}`)))[0]; return row && rowView(row); },
     find: async (serviceId, taskId, key, kind = 'submit', parent = '') => { const row = (await db.select().from(tasks).where(and(scope(serviceId, taskId), eq(tasks.requestKey, key), eq(tasks.requestKind, kind), eq(tasks.requestParent, parent))))[0]; return row && rowView(row); },
     get: async (serviceId, taskId, id) => { const row = (await db.select().from(tasks).where(and(scope(serviceId, taskId), eq(tasks.id, id))))[0]; return row && rowView(row); },
@@ -65,10 +66,10 @@ export function drizzleExecutionSubtasks(db: Database): ExecutionSubtasks {
       }
       return (await tx.update(tasks).set({ incarnation, updatedAt: now }).where(and(leased(claim), sql`NOT (${tasks.view} ? 'cancelRequestedAt')`, or(sql`${tasks.incarnation} IS NULL`, eq(tasks.incarnation, incarnation)))).returning()).length === 1;
     }),
-    settle: async (claim, update) => (await db.update(tasks).set({ ...update, view: sql`CASE WHEN ${tasks.view} ? 'result' THEN ${tasks.view} WHEN ${tasks.view} ? 'cancelRequestedAt' THEN ${JSON.stringify(update.view)}::jsonb || jsonb_build_object('cancelRequestedAt', ${tasks.view}->'cancelRequestedAt', 'state', 'cancelling') ELSE ${JSON.stringify(update.view)}::jsonb END`,
+    settle: (claim, update) => db.transaction(async (tx) => (await tx.update(tasks).set({ ...update, view: sql`CASE WHEN ${tasks.view} ? 'result' THEN ${tasks.view} WHEN ${tasks.view} ? 'cancelRequestedAt' THEN ${JSON.stringify(update.view)}::jsonb || jsonb_build_object('cancelRequestedAt', ${tasks.view}->'cancelRequestedAt', 'state', 'cancelling') ELSE ${JSON.stringify(update.view)}::jsonb END`,
       dispatch: sql`CASE WHEN ${tasks.view} ? 'result' THEN 'accepted' ELSE ${update.dispatch} END`,
       ...(update.receipt ? { receipt: sql`CASE WHEN ${tasks.view} ? 'result' THEN ${tasks.receipt} ELSE ${JSON.stringify(update.receipt)}::jsonb END` } : {}),
-      owner: null, leaseUntil: null, updatedAt: sql`clock_timestamp()` }).where(leased(claim)).returning()).length === 1,
+      owner: null, leaseUntil: null, updatedAt: sql`clock_timestamp()` }).where(leased(claim)).returning()).length === 1),
   };
 }
 
@@ -81,10 +82,10 @@ async function recoveryForRetry(tx: Executor, now: Date, candidate: SubtaskCandi
     action: row.target.action, expectedAttempt: candidate.view.attempt - 1, ...(row.target.action === 'resume-subtask' ? { resumeSessionId: row.target.resumeSessionId } : {}) }, authorization);
 }
 async function claimSubtask(db: Database, owner: string, id?: string): Promise<ExecutionSubtask | undefined> {
-  const candidates = await db.select({ id: tasks.id, serviceId: tasks.serviceId }).from(tasks).where(and(ready(), id ? eq(tasks.id, id) : undefined)).orderBy(asc(tasks.updatedAt), asc(tasks.id)).limit(100);
+  const candidates = await db.select({ id: tasks.id, serviceId: tasks.serviceId }).from(tasks).where(and(businessAdmissionOpen(tasks.serviceId), ready(), id ? eq(tasks.id, id) : undefined)).orderBy(asc(tasks.updatedAt), asc(tasks.id)).limit(100);
   for (const candidate of candidates) {
     const claimed = await executionTransaction(db, candidate.serviceId, async (tx, now) => {
-      const row = (await tx.select().from(tasks).where(and(eq(tasks.id, candidate.id), ready())).for('update', { skipLocked: true }))[0];
+      const row = (await tx.select().from(tasks).where(and(businessAdmissionOpen(tasks.serviceId), eq(tasks.id, candidate.id), ready())).for('update', { skipLocked: true }))[0];
       if (!row) return undefined;
       // Once an incarnation is persisted, reconciliation remains legal after freeze. It cannot choose a new execution.
       if (!row.incarnation && !(row.runtimeDispatched && !row.runtimeAdmitted)) {

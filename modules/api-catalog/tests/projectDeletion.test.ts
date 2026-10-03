@@ -20,9 +20,19 @@ describe.skipIf(!available)('API 登记、授权与申请的项目清理（真�
     await f.db.db.execute(sql`INSERT INTO api_catalog.resource_identity_aliases(kind,key,id) VALUES ('api-operation',${JSON.stringify([alias])},${f.ids.operation})`);
     expect(await f.catalog.api.originalOperationProject(f.ids.operation)).toBe(f.own.id);
     expect(await f.catalog.api.originalOperationProject(alias)).toBe(f.own.id);
+    const origin = await f.catalog.api.originalInfrastructureOwnership(f.ids.operation);
+    expect(origin).toMatchObject({ complete: true, id: f.ids.operation, scope: 'project', projectIds: [f.own.id] });
+    expect(await f.catalog.api.originalInfrastructureOwnership(alias, 'legacy')).toEqual(origin);
+    expect(await f.catalog.api.originalInfrastructureOwnership(f.ids.operation, 'legacy')).toEqual(origin);
+    expect(await f.catalog.api.originalInfrastructureOwnership(newResourceId())).toBeUndefined();
+    expect(await f.catalog.api.originalInfrastructureOwnership('unknown-api-key', 'legacy')).toBeUndefined();
+    expect(JSON.stringify(origin)).not.toContain('erase-owned');
+    await expect(f.catalog.api.originalInfrastructureOwnership(alias)).rejects.toThrow();
+    await expect(f.catalog.api.originalInfrastructureOwnership(f.ids.operation, 'unknown' as never)).rejects.toThrow('未登记');
     expect(await f.catalog.api.originalOperationProject('unknown-original-operation')).toBeUndefined();
     await f.db.db.execute(sql`INSERT INTO api_catalog.resource_identity_aliases(kind,key,id) VALUES ('api-operation',${JSON.stringify([f.ids.operation])},${f.ids.otherOperation})`);
     await expect(f.catalog.api.originalOperationProject(f.ids.operation)).rejects.toMatchObject({ kind: 'precondition' });
+    await expect(f.catalog.api.originalInfrastructureOwnership(f.ids.operation)).rejects.toMatchObject({ kind: 'precondition' });
   });
   test('seal 立即移出可调用目录；迟到登记、审批、间接写和跨项目搬移均由数据库阻断', async () => {
     f = await apiCatalogDeletionFixture(); const started = await f.begin();
@@ -41,6 +51,7 @@ describe.skipIf(!available)('API 登记、授权与申请的项目清理（真�
   });
   test('全部前序证明后清掉本项目所有历史，其他项目申请保留且失效；最小原 ID 防止根消失后复活', async () => {
     f = await apiCatalogDeletionFixture();
+    const origin = await f.catalog.api.originalInfrastructureOwnership(f.ids.operation);
     const extra = Array.from({ length: 1501 }, () => ({ id: newResourceId(), service_id: f.own.serviceId!, project_id: f.own.id, operation_id: f.ids.otherOperation, state: 'rejected', reason: 'erase-history', requested_by: f.admin.userId, created_at: new Date().toISOString() }));
     await f.db.db.execute(sql`INSERT INTO api_catalog.requests(id,service_id,project_id,operation_id,state,reason,requested_by,created_at) SELECT id,service_id,project_id,operation_id,state,reason,requested_by,created_at FROM jsonb_to_recordset(${JSON.stringify(extra)}::jsonb) AS r(id text,service_id text,project_id text,operation_id text,state text,reason text,requested_by text,created_at timestamptz)`);
     const started = await f.begin(); expect(started.context.confirmed.resources.find((r) => r.kind === 'requests')?.count).toBe(1502);
@@ -54,6 +65,12 @@ describe.skipIf(!available)('API 登记、授权与申请的项目清理（真�
     }
     expect((await f.project.api.completeProjectDeletion(started.lease)).state).toBe('succeeded');
     expect(await f.catalog.api.originalOperationProject(f.ids.operation)).toBe(f.own.id);
+    expect(await f.catalog.api.originalInfrastructureOwnership(f.ids.operation)).toEqual(origin);
+    for (const query of [sql`UPDATE api_catalog.deletion_entities SET project_id=${f.other.id} WHERE kind='operation' AND entity_id=${f.ids.operation}`, sql`DELETE FROM api_catalog.deletion_entities WHERE kind='operation' AND entity_id=${f.ids.operation}`, sql`TRUNCATE api_catalog.deletion_entities`]) {
+      await expect(Promise.resolve(f.db.db.execute(query))).rejects.toMatchObject({ cause: { message: 'API catalog original identity is immutable' } });
+      expect(await f.catalog.api.originalInfrastructureOwnership(f.ids.operation)).toEqual(origin);
+    }
+    expect((await f.catalog.api.originalInfrastructureOwnership(f.ids.otherOperation))?.projectIds).toEqual([f.other.id]);
     expect(await f.catalog.api.originalOperationProject(f.ids.otherOperation)).toBe(f.other.id);
     expect((await f.catalog.api.deletionOwner!.inspect(started.context.target)).resources.every((r) => r.count === 0)).toBe(true);
     expect([...(await f.db.db.execute(sql`SELECT reason,state FROM api_catalog.requests WHERE id=${f.ids.incoming}`))]).toEqual([{ reason: 'retain-incoming-reason', state: 'rejected' }]);

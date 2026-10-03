@@ -44,6 +44,22 @@ test('开通的 PID 出生与容器观测分开：旧 lastState 不能结束仍�
   await owners.sweep(accept); expect(stopped).toEqual([]); expect(pods).toEqual([{ podUid: f.podUid,nodeUid: f.nodeUid,nodeName: 'node' }]);
   expect((await f.k8s.get(Resources.Pod!,'sender','system'))?.metadata.finalizers).toEqual(['another/guard']);
 });
+for (const [application, finalizer] of [['cs-session', 'crewstation.io/session-project-stop'], ['cs-api', 'crewstation.io/business-project-stop']] as const) test(`${application} 原进程只接受完整受保护 Pod 停止：旧容器 lastState 与仍在运行的 sidecar 都保留保护`, async () => {
+  const f = await fixture();
+  await f.k8s.mergePatch(Resources.Pod!, 'sender', 'system', { metadata: { labels: { 'app.kubernetes.io/name': application } },
+    spec: { containers: [{ name: application }] }, status: { containerStatuses: [{ name: application, containerID: 'containerd://original', state: { running: {} } }] } });
+  const owners = projectCallbackOwners(f.k8s, 'system', f.podUid, finalizer); await owners.protectCurrent();
+  let recovered = 0;
+  const accept = { stopped: async () => { throw new Error('container status is not an original process exit'); }, podStopped: async () => { recovered++; }, releasable: async () => true };
+  await f.k8s.mergePatch(Resources.Pod!, 'sender', 'system', { status: { containerStatuses: [{ name: application, containerID: 'containerd://new', state: { running: {} }, lastState: { terminated: f.terminal } }] } });
+  await owners.sweep(accept); expect(recovered).toBe(0);
+  await f.k8s.mergePatch(Resources.Pod!, 'sender', 'system', { metadata: { deletionTimestamp: new Date().toISOString() }, spec: { containers: [{ name: application }, { name: 'sidecar' }] },
+    status: { phase: 'Succeeded', containerStatuses: [{ name: application, state: { terminated: f.terminal } }, { name: 'sidecar', state: { running: {} } }] } });
+  await owners.sweep(accept); expect(recovered).toBe(0);
+  expect((await f.k8s.get(Resources.Pod!, 'sender', 'system'))?.metadata.finalizers).toContain(finalizer);
+  await f.k8s.mergePatch(Resources.Pod!, 'sender', 'system', { status: { containerStatuses: [{ name: application, state: { terminated: f.terminal } }, { name: 'sidecar', state: { terminated: f.terminal } }] } });
+  await owners.sweep(accept); expect(recovered).toBe(1); expect((await f.k8s.get(Resources.Pod!, 'sender', 'system'))?.metadata.finalizers).toEqual(['another/guard']);
+});
 test('实际终止证明先持久，再移除自身保护；PG 故障和仍有原在途事实都保留原 Pod',async () => {
   const f = await fixture(); await f.owners.protectCurrent(); await f.stop();
   await expect(f.owners.sweep({ stopped: async () => { throw new Error('database-unavailable'); },releasable: async () => true })).rejects.toThrow('database-unavailable');

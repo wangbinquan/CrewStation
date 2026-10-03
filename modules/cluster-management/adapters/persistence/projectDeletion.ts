@@ -36,6 +36,8 @@ const columns: Readonly<Record<string, readonly string[]>> = {
   deletion_fences: ['project_id', 'operation_id', 'generation', 'revision', 'original', 'scope_verified', 'stopped', 'purged', 'proved', 'metadata_purged', 'completed_digest', 'completed_count'],
   deletion_work: ['id', 'project_id', 'operation_id', 'backend_pid', 'callback_pid', 'callback_started_at', 'process', 'state', 'exit_digest', 'recovery_digest'],
   deletion_legacy_operations: ['operation_id'],
+  // Immutable minimum IDs; original queue/event sources remain readable after content purge.
+  infrastructure_origins: ['kind', 'id', 'material'],
 };
 const table = (name: string) => sql`${sql.identifier('cluster_management')}.${sql.identifier(name)}`;
 const sorted = (keys: readonly string[]) => [...new Set(keys)].sort();

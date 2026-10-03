@@ -9,6 +9,7 @@ import { subtaskToDto } from './toDto';
  */
 export function traceTaskQueries({ uow }: BusinessTaskUseCaseDeps) {
   return {
+    originalInfrastructureOwnership: async (kind: 'task' | 'subtask', key: string, representation?: 'current' | 'legacy') => uow.originalInfrastructureOwnership?.(kind, key, representation),
     listTraceTasks: async (projectId: ProjectId, traceIds: readonly string[]): Promise<TraceBusinessTaskDto[]> => {
       const tasks = await uow.read.tasks.listByProjectTraces(projectId, traceIds);
       const runs = await uow.read.subtasks.listByTasks(tasks.map((task) => task.id));

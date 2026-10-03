@@ -1,5 +1,6 @@
 import { releaseImageHistory } from './adapters/persistence/drizzleRepositories';
 import { releaseProjectContent } from './adapters/persistence/projectContent';
+import { releaseInfrastructureOrigin } from './adapters/persistence/infrastructureOrigins';
 import type { ReleaseContentDirectory } from './ports/repositories';
 import type { ExecutionHandoff } from './ports/executionHandoff';
 import { releaseHandoffUseCases } from './application/execution/handoff';
@@ -139,6 +140,7 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
   };
   const implementation: ReleaseModuleApi = {
     name: 'release',
+    originalInfrastructureOwnership: (key, representation) => releaseInfrastructureOrigin(deps.db, key, representation),
     ...(deps.deletion && admission ? { deletionOwner: releaseProjectDeletionOwner({
       repository: releaseDeletionRepository({ db: deps.db, services: deps.services, identities: deps.deletionIdentities, assertGrant: deps.deletion.assertGrant }),
       physics: deps.deletion.physics, assertGrant: deps.deletion.assertGrant,

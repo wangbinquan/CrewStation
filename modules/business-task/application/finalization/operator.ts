@@ -60,7 +60,7 @@ export function storageOperator(deps: BusinessExecutionDeps & { authorizer: Proj
       const parent = await task(actor, taskId), request = AdministrativeArchiveRevisionSchema.parse(input);
       if (!ports?.archive.revise || !ports.runtime.archiveExecution?.stop) throw precondition('归档清单修订尚不可用');
       const change = await store.revise(parent.serviceId, taskId, request, { administrative: { userId: actor.userId, reason: request.reason } });
-      if (change.state === 'pending') await finalizationRevisions(store, ports)(change.finalizationId);
+      if (change.state === 'pending') await finalizationRevisions(store, ports, deps.projectWork)(change.finalizationId);
       const current = (await store.revision(change.id))!;
       if (current.state === 'rejected') throw conflict('清单修订未生效', { code: current.errorCode });
       return (await store.get(change.finalizationId))!.view;

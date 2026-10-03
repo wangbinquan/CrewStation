@@ -1,3 +1,5 @@
+import type { BusinessProjectWork } from '../../ports/deletion/work';
+import { finalizationWork } from '../execution/deletion/finalizationWork';
 import type { BusinessStorageFinalization } from '@crewstation/contracts';
 import { conflict, newResourceId, PlatformError, precondition } from '@crewstation/kernel';
 import type { FinalizationOperation, FinalizationProgress } from '../../domain/finalization/operation';
@@ -7,11 +9,13 @@ import type { FinalizationPreparation } from '../../ports/storage/preparation';
 import type { Runner } from '../../ports/runtime';
 import { finalizationLease as lease, finalizationProgress } from './progress';
 
-export function prepareFinalizations(store: FinalizationOperations, completion: FinalizationCompletion, ports: FinalizationPreparation, runner: Runner) {
+export function prepareFinalizations(store: FinalizationOperations, completion: FinalizationCompletion, ports: FinalizationPreparation, runner: Runner, work?: BusinessProjectWork) {
   const commit = finalizationProgress(store, ports.archive);
   return async (id?: string): Promise<number> => {
-    let op = await store.claim({ id, owner: newResourceId(), leaseSeconds: 90, phases: ['requested', 'draining'] });
-    if (!op) return 0;
+    const claimed = await store.claim({ id, owner: newResourceId(), leaseSeconds: 90, phases: ['requested', 'draining'] });
+    if (!claimed) return 0;
+    return finalizationWork(work, claimed, 'prepare', async () => {
+    let op = claimed;
     try {
       const input: BusinessStorageFinalization = { projectId: op.projectId, serviceId: op.serviceId, taskId: op.view.taskId, operationId: op.id, revision: op.view.revision, volumeUid: op.volumeUid };
       if (op.view.phase === 'requested') {
@@ -32,6 +36,7 @@ export function prepareFinalizations(store: FinalizationOperations, completion: 
         message: known ? error.message : '终结依赖暂不可用，保留原工作卷并稍后重试' });
     }
     return 1;
+    });
   };
 }
 async function drain(op: FinalizationOperation, input: BusinessStorageFinalization, completion: FinalizationCompletion, ports: FinalizationPreparation, runner: Runner, commit: (op: FinalizationOperation, p: FinalizationProgress) => Promise<void>) {

@@ -38,7 +38,7 @@ export async function executionHttpFixture(db: Database, images?: { port?: Busin
     compute: options?.compute ?? { resolve: async () => { throw new Error('not used'); }, launchMaterial: async () => { throw new Error('not used'); } },
     settings: { mcp: [], outputLimitBytes: 262144, consumerName: newResourceId(), secretKeyBase64: Buffer.alloc(32, 27).toString('base64') },
   };
-  const make = (overrides: Partial<Pick<Parameters<typeof createBusinessTaskModule>[0], 'executionObservations' | 'finalizationPreparation' | 'authorizer' | 'taskStorageStatus' | 'runner'>> = {}) => {
+  const make = (overrides: Partial<Pick<Parameters<typeof createBusinessTaskModule>[0], 'settings' | 'storageControl' | 'deletionWorkSources' | 'executionObservations' | 'finalizationPreparation' | 'authorizer' | 'taskStorageStatus' | 'runner'>> = {}) => {
     const module = createBusinessTaskModule({ ...deps, ...overrides }), app = createApp({ name: 'v3-test' }); app.route('/', module.http.service);
     const request = (path: string, body?: unknown, token = 'trusted', headers: Record<string, string> = {}) => app.request(path, {
       method: body === undefined ? 'GET' : 'POST', headers: { 'x-cs-source-service': 'demo/demo', 'x-cs-source-token': token, 'content-type': 'application/json', ...headers }, ...(body === undefined ? {} : { body: JSON.stringify(body) }),

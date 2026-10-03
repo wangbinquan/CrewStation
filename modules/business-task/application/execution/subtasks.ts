@@ -10,6 +10,7 @@ import type { ExecutionSubtask } from '../../domain/executionSubtask';
 import { assertExecutionFence } from '../../domain/executionControl';
 import { executionSource } from './source';
 import { dispatchBusinessCommand } from './commandDispatch';
+import { businessExecutionWork } from './deletion/projectWork';
 
 export function executionSubtaskUseCases(deps: BusinessExecutionDeps): Pick<BusinessExecutionApi, 'submitSubtask' | 'getSubtask' | 'listSubtasks'> & { progressSubtask(): Promise<number> } {
   const source = executionSource(deps);
@@ -21,7 +22,9 @@ export function executionSubtaskUseCases(deps: BusinessExecutionDeps): Pick<Busi
   const progress = async (id?: string) => {
     const claimed = await deps.subtasks.claim(newResourceId(), id);
     if (!claimed) return 0;
-    if (claimed.view.kind === 'agent') await dispatchBusinessAgent(deps, claimed); else await dispatchBusinessCommand(deps, claimed); return 1;
+    await businessExecutionWork(deps, { serviceId: claimed.serviceId, taskId: claimed.taskId, kind: 'subtask', reference: claimed.view.id, revision: claimed.revision }, async (scoped) => {
+      if (claimed.view.kind === 'agent') await dispatchBusinessAgent(scoped, claimed); else await dispatchBusinessCommand(scoped, claimed);
+    }); return 1;
   };
   return {
     submitSubtask: async (caller, taskId, input) => {

@@ -7,13 +7,14 @@ import type { Clock, Logger } from '@crewstation/kernel';
 import { systemClock } from '@crewstation/kernel';
 import type { ProjectModuleApi } from '@crewstation/module-project';
 import type { Database, MigrationSet } from '@crewstation/persistence';
-import { readMigrationDir } from '@crewstation/persistence';
+import { readMigrationDir, resourceIdentityDirectory } from '@crewstation/persistence';
 import type { Worker } from '@crewstation/queue';
 import type { Hono } from 'hono';
 import { fetchEventPusher } from './adapters/http-client/fetchEventPusher';
 import { drizzleUnitOfWork } from './adapters/persistence/drizzleUnitOfWork';
 import { eventsDeletionRepository } from './adapters/persistence/deletion/repository';
 import { deliveryProcessReleasable, recoverDeliveryProcess } from './adapters/persistence/deliveryWork';
+import { deliveryInfrastructureOrigin } from './adapters/persistence/infrastructureOrigins';
 import type { EventsModuleApi } from './api/moduleApi';
 import { deliverEventUseCase } from './application/deliverEvent';
 import type { EventsUseCaseDeps } from './application/dependencies';
@@ -96,6 +97,10 @@ export function createEventsModule(deps: EventsModuleDeps): EventsModule {
   };
   const api: EventsModuleApi = {
     name: 'events',
+    originalDeliveryOwnership: async (key, representation = 'current') => {
+      const id = representation === 'legacy' ? await resourceIdentityDirectory(deps.db, () => [eventsMigrations]).resolve('delivery',[key]) : key;
+      return id ? deliveryInfrastructureOrigin(deps.db,id) : undefined;
+    },
     resolveIngressSource: (caller) => deps.ingressSource?.resolve(caller) ?? Promise.resolve(undefined),
     ...(deps.projects.assertProjectDeletionGrant ? { deletionOwner: eventsDeletionOwner(eventsDeletionRepository(deps.db,deps.projects.assertProjectDeletionGrant),deps.projects.assertProjectDeletionGrant) } : {}),
     isAdmin: (userId) => deps.projects.isAdmin(userId),

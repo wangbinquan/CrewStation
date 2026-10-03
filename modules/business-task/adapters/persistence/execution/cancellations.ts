@@ -9,6 +9,7 @@ import { executionSubtasks as tasks } from './subtaskTables';
 import { executionCancellations as ops } from './cancellationTables';
 import { cancelAfterStop } from './cancelAfterStop';
 import { cancelBeforeStart } from './cancelBeforeStart';
+import { businessAdmissionOpen } from '../deletion/admission';
 
 const view = (row: typeof ops.$inferSelect): ExecutionCancellation => ({ ...row, taskId: row.taskId as TaskId, state: row.state as ExecutionCancellation['state'] });
 const ready = () => or(eq(ops.state, 'pending'), eq(ops.state, 'awaiting'), and(eq(ops.state, 'dispatching'), lt(ops.leaseUntil, sql`clock_timestamp()`)));
@@ -46,11 +47,11 @@ export function drizzleExecutionCancellations(db: Database): ExecutionCancellati
     }),
     get: async (id) => { const row = (await db.select().from(ops).where(eq(ops.id, id)))[0]; return row && view(row); },
     claim: (owner, id) => db.transaction(async (tx) => {
-      const row = (await tx.select().from(ops).where(and(ready(), id ? eq(ops.id, id) : undefined)).orderBy(asc(ops.updatedAt)).limit(1).for('update', { skipLocked: true }))[0];
+      const row = (await tx.select().from(ops).where(and(businessAdmissionOpen(ops.serviceId), ready(), id ? eq(ops.id, id) : undefined)).orderBy(asc(ops.updatedAt)).limit(1).for('update', { skipLocked: true }))[0];
       if (!row) return undefined;
       const updated = (await tx.update(ops).set({ state: 'dispatching', owner, revision: row.revision + 1, leaseUntil: sql`clock_timestamp() + interval '30 seconds'`, updatedAt: sql`clock_timestamp()` }).where(eq(ops.id, row.id)).returning())[0]!;
       return view(updated);
     }),
-    settle: async (operation, state, errorCode) => (await db.update(ops).set({ state, errorCode: errorCode ?? null, owner: null, leaseUntil: null, updatedAt: sql`clock_timestamp()` }).where(and(eq(ops.id, operation.id), eq(ops.revision, operation.revision), eq(ops.owner, operation.owner!), eq(ops.state, 'dispatching'), sql`${ops.leaseUntil} > clock_timestamp()`)).returning()).length === 1,
+    settle: (operation, state, errorCode) => db.transaction(async (tx) => (await tx.update(ops).set({ state, errorCode: errorCode ?? null, owner: null, leaseUntil: null, updatedAt: sql`clock_timestamp()` }).where(and(eq(ops.id, operation.id), eq(ops.revision, operation.revision), eq(ops.owner, operation.owner!), eq(ops.state, 'dispatching'), sql`${ops.leaseUntil} > clock_timestamp()`)).returning()).length === 1),
   };
 }

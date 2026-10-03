@@ -116,6 +116,8 @@ export interface RebuildRendering {
 }
 
 export interface TaskRuntimeModuleApi {
+  originalInfrastructureOwnership(kind: 'task' | 'rebuild' | 'parent-ending', key: string, representation?: 'current' | 'legacy'): Promise<{ complete: true; id: string; scope: 'project' | 'platform'; projectIds: readonly ProjectId[]; revision: string } | undefined>;
+  originalProjectTaskIds(projectId: ProjectId, after: string | null): Promise<readonly TaskId[]>;
   /** Internal neutral maintenance owner callback; never exposed by an HTTP route. */
   inspectResourceEnding?(step: ResourceEndingStep, snapshot: ResourceEndingSnapshot): Promise<ResourceEndingDecision>;
   /** Internal L6 cleanup composition only, never exposed by HTTP. */

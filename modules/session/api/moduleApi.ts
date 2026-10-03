@@ -1,11 +1,14 @@
 import type { DevelopmentUsageDrainReason, DevelopmentUsageLookup, DevelopmentUsageKey, DevelopmentUsageLoss, DevelopmentUsagePage, DevelopmentUsageRegistration, StoredDevelopmentUsage } from '@crewstation/contracts';
 import type { ExecutionCompletionProof, RunnerUsageMeasurement, RunnerUsageSourceIdentity, RunnerUsageSourcePage, RunnerBusinessEvent, StoredBusinessExecutionDto, RunnerCommand, RunnerEvent, RunnerHello, TaskId } from '@crewstation/contracts';
+import type { ProjectDeletionContext, ProjectDeletionOwner } from '@crewstation/contracts';
 
 export interface StoredEventDto { seq: number; at: string; event: RunnerEvent }
 
 /** session 模块对外能力（本进程内）；跨进程调用走 internal HTTP，客户端在 packages/session-client。 */
 export interface SessionModuleApi {
   readonly name: 'session';
+  readonly deletionOwner?: ProjectDeletionOwner;
+  closeProjectDeletionTransport?(context: ProjectDeletionContext, consumerId: string): Promise<boolean>;
   lookupDevelopmentUsage(taskId: TaskId): Promise<DevelopmentUsageLookup>;
   registerDevelopmentUsage(registration: DevelopmentUsageRegistration): Promise<StoredDevelopmentUsage>;
   getDevelopmentUsage(taskId: TaskId, key: DevelopmentUsageKey): Promise<StoredDevelopmentUsage | undefined>;

@@ -20,8 +20,8 @@ export interface RunnerEventSummary { taskId: TaskId; events: number; sessionIds
 
 /** 多副本：任务的 TaskRunner 连在哪个副本上；命令按此转发。 */
 export interface ConnectionRegistry {
-  claim(taskId: TaskId, replica: string, at: Date): Promise<void>;
-  release(taskId: TaskId, replica: string): Promise<void>;
+  claim(taskId: TaskId, replica: string, at: Date, consumerId?: string): Promise<void>;
+  release(taskId: TaskId, replica: string, consumerId?: string): Promise<void>;
   heartbeat(taskId: TaskId, replica: string, at: Date): Promise<void>;
   lookup(taskId: TaskId): Promise<{ replica: string; lastSeenAt: Date } | undefined>;
 }

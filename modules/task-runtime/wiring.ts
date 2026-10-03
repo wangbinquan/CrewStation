@@ -1,4 +1,5 @@
 import { resourceEndingHandler } from './application/development/parent/retention';
+import { originalProjectTaskIds, runtimeInfrastructureOrigin } from './adapters/persistence/infrastructure/origins';
 import { developmentRemovalLookup } from './application/development/removalLookup';
 import { developmentCleanupSelection } from './domain/development/cleanupSelection';
 import type { DevelopmentCleanupParticipant } from './ports/developmentCleanup';
@@ -181,6 +182,8 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     ...businessStorageFinalization(useCaseDeps),
     ...businessRecoveryApi(useCaseDeps),
     name: 'task-runtime',
+    originalInfrastructureOwnership: (kind, key, representation) => runtimeInfrastructureOrigin(deps.db, kind, key, representation),
+    originalProjectTaskIds: (projectId, after) => originalProjectTaskIds(deps.db, projectId, after),
     inspectResourceEnding: resourceEndingHandler(useCaseDeps, ledgerProjectionFor(deps)?.preview),
     imageHistory: environmentImageHistory(deps.db),
     blockBusinessAdmission: blockBusinessAdmission(useCaseDeps),

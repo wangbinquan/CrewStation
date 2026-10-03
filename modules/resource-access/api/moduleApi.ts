@@ -4,6 +4,8 @@ import type { Actor, CreateResourceRequest, DecideResourceRequest, ProjectDeleti
 export interface ResourceAccessModuleApi {
   readonly name: 'resource-access';
   readonly deletionOwner?: ProjectDeletionOwner;
+  /** Internal original ID facts only; opaque history is never inferred from a resource name. */
+  originalInfrastructureOwnership(key: string, representation?: 'current' | 'legacy'): Promise<{ complete: true; id: string; scope: 'project'; projectIds: readonly ProjectId[]; revision: string } | undefined>;
   create(actor: Actor, projectId: ProjectId, input: CreateResourceRequest): Promise<ResourceRequestDto>;
   direct(actor: Actor, projectId: ProjectId, input: CreateResourceRequest): Promise<ResourceRequestDto>;
   decide(actor: Actor, projectId: ProjectId, id: string, input: DecideResourceRequest): Promise<ResourceRequestDto>;

@@ -2,7 +2,7 @@ import { DomainTopic } from '@crewstation/contracts';
 import type { EventConsumer } from '@crewstation/eventbus';
 import { createEventConsumer } from '@crewstation/eventbus';
 import type { Logger } from '@crewstation/kernel';
-import { noopLogger } from '@crewstation/kernel';
+import { noopLogger, precondition } from '@crewstation/kernel';
 import type { Actor, ProjectDeletionContext, ProjectId, UserId } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import type { Database } from '@crewstation/persistence';
@@ -33,6 +33,11 @@ import { provisioningProjectWork } from './adapters/persistence/projectAdmission
 import type { ProvisioningCallbackProcesses, ProvisioningProjectWork } from './ports/projectWork';
 import { enqueueWithOriginalWork, namespaceWithOriginalWork, projectWorkSteps, provisionWithOriginalWork } from './application/projectWorkSteps';
 import { projectWorkObserver } from './workers/projectWorkObserver';
+import { provisioningDeletionOwner } from './application/projectDeletion';
+import { provisioningDeletionRepository } from './adapters/persistence/projectDeletion';
+import { infrastructureContentSource } from './adapters/persistence/infrastructureContents';
+import { infrastructureContentRemoval } from './adapters/persistence/infrastructureRemoval';
+import { removeDeletionCoordinator } from './adapters/persistence/deletionCoordinator';
 
 export interface ProvisioningModuleDeps {
   db: Database;
@@ -72,9 +77,15 @@ export function createProvisioningModule(deps: ProvisioningModuleDeps): Provisio
   const declare = namespaceWithOriginalWork(work, namespaces.declare);
   const reapply = reapplyNamespacesUseCase({ ...deps.steps, ensureNamespace: declare }, logger);
   const enqueue = enqueueWithOriginalWork(work, deps.steps, async (projectId) => { await enqueueJob(deps.db, PROVISION_JOB_KIND, { projectId }, { dedupKey: projectId, maxAttempts: 5 }); });
-  const deletions = deps.deletion ? projectDeletionController({ ...deps.deletion, isAdmin: deps.isAdmin, logger, workerOwner: `${deps.workerOwner}.deletion`, enqueue: deletionEnqueue(deps.db) }) : undefined;
+  const deletions = deps.deletion ? projectDeletionController({ ...deps.deletion, isAdmin: deps.isAdmin, logger, workerOwner: `${deps.workerOwner}.deletion`, enqueue: deletionEnqueue(deps.db, deps.deletion.intents.coordinate) }) : undefined;
   const deletionRuntime = deletions ? projectDeletionRuntime(deps.db, deletions, deps.workerOwner, logger) : undefined;
   const api: ProvisioningModuleApi = { name: 'provisioning', deleteNamespace: (actor, id) => deleteNamespace(deps.cleanup, deps.isAdmin, actor, id), provisionProject: provision, retry: enqueue, reapplyNamespaces: reapply,
+    projectDeletionOwner: (input) => {
+      if (!work || !deps.projectWork) throw precondition('原开通回调与清理许可尚未装配');
+      return provisioningDeletionOwner({ ...input, work, source: infrastructureContentSource(deps.db), removal: infrastructureContentRemoval(deps.db),
+        repository: provisioningDeletionRepository(deps.db, deps.projectWork.assertGrant), assertGrant: deps.projectWork.assertGrant });
+    },
+    finalizeProjectDeletion: removeDeletionCoordinator,
     reapplyProjectNamespace: async (id) => { const facts = await deps.steps.loadProject(id); if (!facts || facts.state === 'archived' || facts.state === 'deleting') return; await declare(facts); },
   };
   return {

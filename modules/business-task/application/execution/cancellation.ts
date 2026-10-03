@@ -7,13 +7,14 @@ import type { BusinessExecutionDeps } from './dependencies';
 import { cancellationView } from '../../domain/executionCancellation';
 import type { ExecutionCancellation } from '../../domain/executionCancellation';
 import { executionSource } from './source';
+import { businessExecutionWork } from './deletion/projectWork';
 
 export function executionCancellationUseCases(deps: BusinessExecutionDeps): Pick<BusinessExecutionApi, 'cancelSubtask'> & { progressCancellation(): Promise<number> } {
   const source = executionSource(deps);
   const progress = async (id?: string) => {
     const operation = await deps.cancellations.claim(newResourceId(), id);
     if (!operation) return 0;
-    await dispatchCancellation(deps, operation); return 1;
+    await businessExecutionWork(deps, { serviceId: operation.serviceId, taskId: operation.taskId, kind: 'cancellation', reference: operation.id, revision: operation.revision }, (scoped) => dispatchCancellation(scoped, operation)); return 1;
   };
   return {
     cancelSubtask: async (caller, taskId, subtaskId, input) => {

@@ -11,8 +11,8 @@ import { sql } from 'drizzle-orm';
 import { createResourceAccessModule, resourceAccessMigrations } from '../wiring';
 import type { ResourceAdapter } from '../ports/resources';
 
-export async function resourceAccessDeletionFixture() {
-  const db = await createTestDatabase([eventbusMigrations, queueMigrations, identityMigrations, projectMigrations, { ...resourceAccessMigrations, files: resourceAccessMigrations.files.filter((f) => !f.name.startsWith('0002_')) }]);
+export async function resourceAccessDeletionFixture(options: { withoutIdentityGuard?: boolean } = {}) {
+  const db = await createTestDatabase([eventbusMigrations, queueMigrations, identityMigrations, projectMigrations, { ...resourceAccessMigrations, files: resourceAccessMigrations.files.filter((f) => f.name < '0002_') }]);
   const identity = createIdentityModule({ db: db.db, settings: { adminEmails: [] } });
   const user = await identity.api.ensureUser({ externalId: 'resource-admin', name: 'Admin', email: 'resource@test.invalid' });
   const admin: Actor = { userId: user.id, isAdmin: true };
@@ -22,7 +22,7 @@ export async function resourceAccessDeletionFixture() {
   const ids = { own: newResourceId(), other: newResourceId(), policy: newResourceId() };
   for (const [p, id, marker] of [[own, ids.own, 'erase-owned-reason'], [other, ids.other, 'retain-other-reason']] as const) await db.db.execute(sql`INSERT INTO resource_access.changes VALUES (${id},${p.id},${admin.userId},${newResourceId()},${id},'pending',1,${JSON.stringify({ private: marker })}::jsonb,now())`);
   await db.db.execute(sql`INSERT INTO resource_access.catalog_policies VALUES (${ids.policy},'object-plan',${ids.policy},1,1,${admin.userId},now())`);
-  await runMigrations(db.db, [resourceAccessMigrations]);
+  await runMigrations(db.db, [{ ...resourceAccessMigrations, files: resourceAccessMigrations.files.filter((f) => !options.withoutIdentityGuard || f.name < '0003_') }]);
   const application = (adapters: readonly ResourceAdapter[] = []) => createResourceAccessModule({ db: db.db, project: project.api, adapters, userName: async () => 'Admin', instance: 'resource-delete-test' });
   const resourceAccess = application();
   const begin = async () => {

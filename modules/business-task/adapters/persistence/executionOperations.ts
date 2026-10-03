@@ -29,8 +29,8 @@ export function drizzleExecutionOperations(db: Database): ExecutionOperations {
       return { operation, created: rows.length === 1 };
     }),
     claim: (input) => claimExecutionOperation(db, input),
-    renew: async (lease, leaseSeconds) => (await db.update(ops).set({ leaseUntil: sql`clock_timestamp() + ${seconds(leaseSeconds)} * interval '1 second'`, updatedAt: sql`clock_timestamp()` }).where(leased(lease)).returning({ id: ops.id })).length === 1,
-    settle: async (lease, state, errorCode) => (await db.update(ops).set({ state, errorCode: errorCode ?? null, leaseOwner: null, leaseUntil: null, updatedAt: sql`clock_timestamp()` }).where(leased(lease)).returning({ id: ops.id })).length === 1,
+    renew: (lease, leaseSeconds) => db.transaction(async (tx) => (await tx.update(ops).set({ leaseUntil: sql`clock_timestamp() + ${seconds(leaseSeconds)} * interval '1 second'`, updatedAt: sql`clock_timestamp()` }).where(leased(lease)).returning({ id: ops.id })).length === 1),
+    settle: (lease, state, errorCode) => db.transaction(async (tx) => (await tx.update(ops).set({ state, errorCode: errorCode ?? null, leaseOwner: null, leaseUntil: null, updatedAt: sql`clock_timestamp()` }).where(leased(lease)).returning({ id: ops.id })).length === 1),
     retryRejected: (key, digest, authorization) => executionTransaction(db, key.serviceId, async (tx, now) => {
       const row = (await tx.select().from(ops).where(keyed(key)).for('update'))[0];
       if (!row) throw notFound('业务执行操作');

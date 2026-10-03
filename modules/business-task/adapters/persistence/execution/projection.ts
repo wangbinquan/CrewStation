@@ -16,6 +16,7 @@ import { executionTransaction } from '../executionTransaction';
 import { executionSubtasks as tasks } from './subtaskTables';
 import { businessEvents as events, subtaskProjections as projections } from './projectionTables';
 import { readProjectedEvents } from './projectionQueries';
+import { businessAdmissionOpen } from '../deletion/admission';
 
 /** Projection and source watermark commit together; neither HTTP observers nor Runner ACKs drive product state. */
 export function drizzleExecutionProjection(db: Database): ExecutionProjection {
@@ -24,11 +25,11 @@ export function drizzleExecutionProjection(db: Database): ExecutionProjection {
     pendingConsumption: () => db.transaction(async (tx) => {
       const pending = alias(projections, 'consumption_pending');
       const rows = await tx.select({ task: tasks, projection: pending }).from(pending).innerJoin(tasks, eq(tasks.id, pending.subtaskId))
-        .where(and(eq(pending.complete, true), eq(pending.sourceConsumed, false))).orderBy(asc(pending.polledAt), asc(tasks.id)).limit(20).for('update', { skipLocked: true, of: pending });
+        .where(and(businessAdmissionOpen(tasks.serviceId), eq(pending.complete, true), eq(pending.sourceConsumed, false))).orderBy(asc(pending.polledAt), asc(tasks.id)).limit(20).for('update', { skipLocked: true, of: pending });
       for (const row of rows) await tx.update(projections).set({ polledAt: sql`clock_timestamp()` }).where(eq(projections.subtaskId, row.task.id));
       return rows.map(({ task, projection }) => ({ subtaskId: task.id, taskId: (task.runtimeTaskId ?? task.taskId) as TaskId, executionId: task.view.executionId, through: projection.sourceSequence, stopped: projection.sourceStopped }));
     }),
-    consumed: async (subtaskId) => { await db.update(projections).set({ sourceConsumed: true }).where(and(eq(projections.subtaskId, subtaskId), eq(projections.complete, true))); },
+    consumed: (subtaskId) => db.transaction(async (tx) => { await tx.update(projections).set({ sourceConsumed: true }).where(and(eq(projections.subtaskId, subtaskId), eq(projections.complete, true))); }),
     expire: () => expireExecutionLog(db),
     pending: async (limit) => {
       if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw validation('投影批次无效');
@@ -36,11 +37,12 @@ export function drizzleExecutionProjection(db: Database): ExecutionProjection {
         // A dispatch receipt can arrive after the source events; lazy initialization is repeatable.
         await tx.execute(sql`INSERT INTO business_task.subtask_projections(subtask_id)
           SELECT id FROM business_task.execution_subtasks t WHERE dispatch IN ('accepted','unknown')
+          AND ${businessAdmissionOpen(sql.raw('t.service_id'))}
           AND NOT EXISTS (SELECT 1 FROM business_task.subtask_projections p WHERE p.subtask_id=t.id) ORDER BY updated_at LIMIT 100
           ON CONFLICT DO NOTHING`);
         const pending = alias(projections, 'pending');
         const rows = await tx.select({ task: tasks, projection: pending }).from(pending).innerJoin(tasks, eq(tasks.id, pending.subtaskId))
-          .where(and(eq(pending.complete, false), inArray(tasks.dispatch, ['accepted', 'unknown'])))
+          .where(and(businessAdmissionOpen(tasks.serviceId), eq(pending.complete, false), inArray(tasks.dispatch, ['accepted', 'unknown'])))
           .orderBy(asc(pending.polledAt), asc(tasks.id)).limit(limit).for('update', { skipLocked: true, of: pending });
         for (const row of rows) await tx.update(projections).set({ polledAt: sql`clock_timestamp()` }).where(eq(projections.subtaskId, row.task.id));
         return rows.map(({ task, projection }) => ({ subtask: { ...task, taskId: task.taskId as TaskId, requestKind: task.requestKind as ExecutionSubtask['requestKind'], dispatch: task.dispatch as ExecutionSubtask['dispatch'], leaseUntil: task.leaseUntil?.toISOString() ?? null }, sourceSequence: projection.sourceSequence }));

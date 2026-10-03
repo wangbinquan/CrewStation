@@ -9,6 +9,7 @@ import { storageControlUpdate, type StorageControlUpdate } from '../../../domain
 import { businessTaskSchema } from '../schema';
 import { executionControls } from '../executionTables';
 import { executionTransaction, readExecutionControl } from '../executionTransaction';
+import { businessAdmissionOpen } from '../deletion/admission';
 
 const deliveries = businessTaskSchema.table('storage_control_outbox', {
   serviceId: text('service_id').primaryKey(), version: bigint('version', { mode: 'number' }).notNull(),
@@ -33,7 +34,7 @@ export async function persistExecutionControl(tx: Executor, value: ExecutionCont
 
 export function storageControlOutbox(db: Database): StorageControlOutbox {
   return {
-    pending: async (limit) => (await db.select().from(deliveries).orderBy(deliveries.updatedAt).limit(Math.max(1, Math.min(100, limit)))).map((row) => row.body),
+    pending: async (limit) => (await db.select().from(deliveries).where(businessAdmissionOpen(deliveries.serviceId)).orderBy(deliveries.updatedAt).limit(Math.max(1, Math.min(100, limit)))).map((row) => row.body),
     acknowledge: (update) => executionTransaction(db, update.serviceId, async (tx, now) => {
       const current = await readExecutionControl(tx, update.serviceId);
       if (current?.storageSync?.version !== update.controlVersion) return undefined;

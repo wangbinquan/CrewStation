@@ -8,6 +8,7 @@ import { finalizationRevisionOperations } from './revisions';
 import { finalizations } from './tables';
 import { acceptFinalization, recordFinalizationTaskState } from './intake';
 import { bindFinalizationVolume } from './volume';
+import { businessAdmissionOpen } from '../deletion/admission';
 
 export function finalizationOperations(db: Database): FinalizationOperations {
   return {
@@ -19,7 +20,7 @@ export function finalizationOperations(db: Database): FinalizationOperations {
     claim: (input) => db.transaction(async (tx) => {
       if (!input.owner || !Number.isSafeInteger(input.leaseSeconds) || input.leaseSeconds < 1 || input.leaseSeconds > 300) throw validation('终结作业租约无效');
       const now = await executionNow(tx);
-      const row = (await tx.select().from(finalizations).where(and(ne(finalizations.phase, 'completed'), sql`(${finalizations.body}->'view'->>'phaseState' = 'revising') = ${input.revising ?? false}`, lte(finalizations.nextAttemptAt, now), or(isNull(finalizations.leaseUntil), lte(finalizations.leaseUntil, now)), input.id ? eq(finalizations.id, input.id) : undefined, input.phases ? inArray(finalizations.phase, [...input.phases]) : undefined))
+      const row = (await tx.select().from(finalizations).where(and(businessAdmissionOpen(finalizations.serviceId), ne(finalizations.phase, 'completed'), sql`(${finalizations.body}->'view'->>'phaseState' = 'revising') = ${input.revising ?? false}`, lte(finalizations.nextAttemptAt, now), or(isNull(finalizations.leaseUntil), lte(finalizations.leaseUntil, now)), input.id ? eq(finalizations.id, input.id) : undefined, input.phases ? inArray(finalizations.phase, [...input.phases]) : undefined))
         .orderBy(asc(finalizations.nextAttemptAt), asc(finalizations.id)).limit(1).for('update', { skipLocked: true }))[0];
       if (!row) return undefined;
       const until = new Date(now.getTime() + input.leaseSeconds * 1000), sequence = row.sequence + 1;

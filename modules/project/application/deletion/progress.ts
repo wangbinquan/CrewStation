@@ -1,5 +1,5 @@
 import { ProjectDeletionBlockerSchema, ProjectDeletionEvidenceSchema } from '@crewstation/contracts';
-import type { ProjectDeletionBlocker, ProjectDeletionEvidence, ProjectDeletionParticipant, ProjectDeletionPhase } from '@crewstation/contracts';
+import type { ProjectDeletionBlocker, ProjectDeletionEvidence, ProjectDeletionOperation, ProjectDeletionParticipant, ProjectDeletionPhase } from '@crewstation/contracts';
 import { jsonHash, precondition } from '@crewstation/kernel';
 import type { DeletionLease, DeletionOperationRecord } from '../../domain/deletion/records';
 import { assertDeletionComplete, assertDeletionPhase, nextDeletionPhase } from '../../domain/deletion/progress';
@@ -46,11 +46,18 @@ export function deletionProgressUseCases(deps: ProjectUseCaseDeps) {
       const operation = { ...current.operation, state: 'needs-attention' as const, canRetry: true, blockers, updatedAt: now.toISOString() };
       await scope.deletions.saveOperation({ ...rest, operation }); return operation;
     }),
-    completeProjectDeletion: (lease: DeletionLease) => deps.uow.run(async (scope) => {
+    coordinateProjectDeletion: (id: string, write: (executor: object) => Promise<void>) => deps.uow.run(async (scope) => {
+      // Event consumers hold their original event row. Waiting here could prevent final content removal from acquiring it.
+      const current = await scope.deletions.getOperation(id, 'available');
+      if (!current || !['accepted', 'running'].includes(current.operation.state)) return false;
+      await scope.deletions.withExecutor(write); return true;
+    }),
+    completeProjectDeletion: (lease: DeletionLease, finalize?: (executor: object, operation: ProjectDeletionOperation) => Promise<void>) => deps.uow.run(async (scope) => {
       const now = deps.clock.now(), current = await leasedDeletion(scope, lease, now); assertDeletionComplete(current.operation);
       const project = await scope.deletions.lockProject(current.operation.project.id);
       if (project && project.state !== 'deleting') throw precondition('项目根记录已偏离删除状态，不能标记完成');
       if (await scope.deletions.metadataCount(current.operation.project.id) !== 0) throw precondition('项目本模块仍有内容残留');
+      if (finalize) await scope.deletions.withExecutor((executor) => finalize(executor, current.operation));
       await scope.deletions.finish(current.operation.project.id, current.operation.id);
       const { leaseOwner: _owner, leaseUntil: _until, ...rest } = current;
       const operation = { ...current.operation, state: 'succeeded' as const, canRetry: false, blockers: [], updatedAt: now.toISOString(), completedAt: now.toISOString() };

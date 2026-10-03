@@ -4,6 +4,7 @@ import type { ClusterCommands } from '../ports/clusterCommands';
 import type { BusinessTaskUseCaseDeps } from './dependencies';
 import { taskLifecycleUseCases } from './taskLifecycle';
 import { subtaskUseCases } from './subtasks';
+import { originalLegacyResult } from './execution/deletion/legacyWork';
 export function businessClusterUseCases(deps: BusinessTaskUseCaseDeps, commands: ClusterCommands) {
   const tasks = taskLifecycleUseCases(deps), subtasks = subtaskUseCases(deps);
   const resolve = async (actor: Actor, target: ClusterResource) => {
@@ -26,7 +27,7 @@ export function businessClusterUseCases(deps: BusinessTaskUseCaseDeps, commands:
     },
     executeClusterTask: async (actor: Actor, operation: ClusterOperation) => {
       const { task, subtask, caller } = await resolve(actor, operation.target);
-      return commands.withLock(task.id, async () => {
+      return originalLegacyResult(deps.projectWork, task.serviceId, operation.operationId, 'cluster-command', () => commands.withLock(task.id, async () => {
         let record = await commands.get(operation.operationId);
         if (record?.phase === 'applied') return { operationId: record.resultId! };
         record ??= { operation, phase: 'prepared' }; await commands.save(record);
@@ -46,7 +47,7 @@ export function businessClusterUseCases(deps: BusinessTaskUseCaseDeps, commands:
           if (latest?.state === 'paused') await tasks.resumeTask(caller, task.id);
         }
         await commands.save({ ...record, phase: 'applied', resultId }); return { operationId: resultId };
-      });
+      }));
     },
     observeClusterTask: async (operation: ClusterOperation) => {
       const record = await commands.get(operation.operationId); if (!record?.resultId) return { done: false, reason: '等待业务流程受理' };

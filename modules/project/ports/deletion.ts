@@ -6,7 +6,9 @@ export interface ProjectDeletions {
   lockProject(id: ProjectId): Promise<Project | undefined>;
   getPlan(id: string): Promise<DeletionPlanRecord | undefined>;
   insertPlan(plan: DeletionPlanRecord): Promise<void>;
-  getOperation(id: string, lock?: boolean): Promise<DeletionOperationRecord | undefined>;
+  getOperation(id: string, lock?: boolean | 'available'): Promise<DeletionOperationRecord | undefined>;
+  /** The executor belongs to this unit-of-work transaction; callers may only use public package operations. */
+  withExecutor<T>(work: (executor: object) => Promise<T>): Promise<T>;
   findOperation(projectId: ProjectId): Promise<DeletionOperationRecord | undefined>;
   findRequest(requestKey: string): Promise<DeletionOperationRecord | undefined>;
   lockRequest(requestKey: string): Promise<void>;

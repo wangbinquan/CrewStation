@@ -1,14 +1,17 @@
+import type { BusinessProjectWork } from '../../ports/deletion/work';
+import { finalizationWork } from '../execution/deletion/finalizationWork';
 import { newResourceId, PlatformError, precondition } from '@crewstation/kernel';
 import type { FinalizationOperations } from '../../ports/storage/finalizations';
 import type { FinalizationPreparation } from '../../ports/storage/preparation';
 import { finalizationProgress } from './progress';
 
 /** A receipt is fetched from data's single decision point; a helper exit code is never sufficient. */
-export function archiveFinalizations(store: FinalizationOperations, archive: FinalizationPreparation['archive'], runtime?: FinalizationPreparation['runtime']) {
+export function archiveFinalizations(store: FinalizationOperations, archive: FinalizationPreparation['archive'], runtime?: FinalizationPreparation['runtime'], work?: BusinessProjectWork) {
   const commit = finalizationProgress(store, archive);
   return async (id?: string): Promise<number> => {
     const op = await store.claim({ id, owner: newResourceId(), leaseSeconds: 90, phases: ['archiving'] });
     if (!op) return 0;
+    return finalizationWork(work, op, 'archive', async () => {
     try {
       const { stopProofDigest, completionProofDigest } = op.evidence;
       if (!stopProofDigest || !completionProofDigest && op.evidence.receipt?.disposition !== 'loss') throw precondition('归档前的执行停止与持久水位证明尚未齐备');
@@ -29,5 +32,6 @@ export function archiveFinalizations(store: FinalizationOperations, archive: Fin
         message: known ? failure.message : '归档依赖暂不可用，原工作卷继续保留并稍后重试' });
     }
     return 1;
+    });
   };
 }

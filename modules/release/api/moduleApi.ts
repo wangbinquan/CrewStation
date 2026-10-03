@@ -48,6 +48,8 @@ export interface ReleaseModuleApi {
   deletionContent(target: ProjectDeletionTarget): Promise<ReleaseProjectContent>;
   /** 原发布 UUID 的不可替换项目／服务归属，供工作负载来源核对；不按 tag 或同名服务解析。 */
   sourceOwnership(releaseId: ReleaseId): Promise<{ projectId: ProjectId; serviceId: ServiceId } | undefined>;
+  /** Retained minimum source survives release metadata purge; missing legacy lineage stays missing. */
+  originalInfrastructureOwnership(key: string, representation?: 'current' | 'legacy'): Promise<{ complete: true; id: string; scope: 'project'; projectIds: readonly ProjectId[]; revision: string } | undefined>;
   resourceUsage(actor: Actor, serviceId: ServiceId): Promise<ReleaseResourceUsage[]>;
   objectStorageContract(serviceId: ServiceId, releaseId: ReleaseId): Promise<{ planId: string; fenced: boolean } | undefined>;
   imageHistory(input: RuntimeImageHistoryRead): Promise<RuntimeImageHistoryItem[]>;

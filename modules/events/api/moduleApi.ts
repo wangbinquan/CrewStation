@@ -25,6 +25,10 @@ export interface DeliverOutcome {
 export interface EventsModuleApi {
   readonly name: 'events';
   readonly deletionOwner?: ProjectDeletionOwner;
+  /** Internal original recipient/producer relationships survive metadata removal; this is not a physical stopping receipt. */
+  originalDeliveryOwnership(key: string, representation?: 'current'|'legacy'): Promise<{
+    complete: true; id: string; scope: 'project'; projectIds: readonly ProjectId[]; revision: string;
+  } | undefined>;
   /** HTTP 正文读取前固定签名来源；缺失装配或无法核实原身份时不返回调用者。 */
   resolveIngressSource(caller: { identity: string; token?: string }): Promise<ProjectServiceActor | undefined>;
   isAdmin(userId: UserId): Promise<boolean>;

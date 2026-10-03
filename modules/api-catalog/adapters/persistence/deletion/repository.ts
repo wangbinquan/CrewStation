@@ -1,5 +1,6 @@
 import type { ProjectDeletionContext, ProjectId } from '@crewstation/contracts';
-import { precondition } from '@crewstation/kernel';
+import { ProjectIdSchema, ResourceIdSchema } from '@crewstation/contracts';
+import { jsonHash, precondition } from '@crewstation/kernel';
 import type { Database } from '@crewstation/persistence';
 import { sql } from 'drizzle-orm';
 import type { ApiCatalogDeletionRepository } from '../../../ports/deletion';
@@ -12,6 +13,28 @@ export async function originalOperationProject(db: Database, id: string): Promis
     AND (entity_id=${id} OR entity_id IN (SELECT id FROM api_catalog.resource_identity_aliases WHERE kind='api-operation' AND key=${JSON.stringify([id])}))`);
   if (rows.length > 1) throw precondition('原 API 操作别名的项目归属不唯一');
   return rows[0]?.project_id;
+}
+
+/** Current and legacy forms must resolve to the same original canonical operation, including after catalog purge. */
+export async function operationInfrastructureOrigin(db: Database, key: string, representation: 'current' | 'legacy' = 'current') {
+  if (representation !== 'current' && representation !== 'legacy') throw precondition('API 操作原表示类型未登记');
+  if (representation === 'current') ResourceIdSchema.parse(key);
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`);
+    const alias = (await tx.execute<{ id: string }>(sql`SELECT id FROM api_catalog.resource_identity_aliases WHERE kind='api-operation' AND key=${JSON.stringify([key])}`))[0]?.id;
+    const canonical = ResourceIdSchema.safeParse(key).success ? key : undefined;
+    if (alias && canonical && alias !== canonical) throw precondition('API 操作原标识目录冲突');
+    if (!alias && !canonical) return undefined;
+    const id = ResourceIdSchema.parse(alias ?? canonical);
+    const rows = await tx.execute<{ project_id: string; active: boolean; active_project: string | null }>(sql`
+      SELECT original.project_id,EXISTS(SELECT 1 FROM api_catalog.operations WHERE id=${id}) AS active,
+        (SELECT p.project_id FROM api_catalog.operations o JOIN api_catalog.proxies p ON p.id=o.proxy_id WHERE o.id=${id}) AS active_project
+      FROM api_catalog.deletion_entities original WHERE original.kind='operation' AND original.entity_id=${id}`);
+    if (!rows.length) return undefined;
+    const row = rows[0]!, projectId = ProjectIdSchema.parse(row.project_id);
+    if (row.active && ProjectIdSchema.parse(row.active_project) !== projectId) throw precondition('API 操作原项目关系冲突');
+    return { complete: true as const, id, scope: 'project' as const, projectIds: [projectId], revision: jsonHash({ kind: 'api-operation', id, projectId }) };
+  });
 }
 
 export function apiCatalogDeletionRepository(db: Database, assertGrant: (context: ProjectDeletionContext) => Promise<void>): ApiCatalogDeletionRepository {

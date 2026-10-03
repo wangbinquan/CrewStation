@@ -3,6 +3,13 @@ import { drizzleDevelopmentUsageSourceStore } from './adapters/persistence/devel
 import { developmentUsageWorker } from './workers/developmentUsageWorker';
 import { drizzleBusinessUsageSourceStore } from './adapters/persistence/businessUsageSources';
 import { legacyRunnerIdentity } from './adapters/persistence/legacyRunnerIdentity';
+import { sessionConnectionHistory } from './adapters/persistence/deletion/lifetime';
+import { sessionDeletionRepository } from './adapters/persistence/deletion/repository';
+import { sessionDeletionTransport } from './adapters/http/deletionTransport';
+import type { SessionDeletionRequest } from './adapters/http/deletionTransport';
+import { sessionDeletionOwner, sessionTransportCloser } from './application/projectDeletion';
+import { sessionDeletionRoutes } from './http/projectDeletionRoutes';
+import type { SessionDeletionSources } from './ports/projectDeletion';
 import type { ResourceIdentityDirectory } from '@crewstation/persistence';
 import { join } from 'node:path';
 import type { ServerWebSocket } from 'bun';
@@ -30,6 +37,8 @@ import type { CommandForwarder, SessionSettings } from './ports/forwarding';
 import type { RunnerAuth, TaskAccess } from './ports/taskRuntime';
 
 export interface SessionModuleDeps {
+  deletionSources?: SessionDeletionSources;
+  deletionRequest?: SessionDeletionRequest;
   identities?: ResourceIdentityDirectory;
   db: Database;
   runnerAuth: RunnerAuth;
@@ -58,6 +67,7 @@ export const sessionMigrations: MigrationSet = {
 
 export function createSessionModule(deps: SessionModuleDeps): SessionModule {
   const useCaseDeps: SessionUseCaseDeps = {
+    connectionHistory: deps.deletionSources ? sessionConnectionHistory(deps.db, deps.deletionSources) : undefined,
     developmentUsage: drizzleDevelopmentUsageStore(deps.db),
     businessExecutions: drizzleBusinessExecutionStore(deps.db),
     events: drizzleRunnerEventStore(deps.db),
@@ -73,6 +83,9 @@ export function createSessionModule(deps: SessionModuleDeps): SessionModule {
   const usageSources = drizzleBusinessUsageSourceStore(deps.db);
   const developmentSources = drizzleDevelopmentUsageSourceStore(deps.db);
   const hub = runnerHub(useCaseDeps);
+  const deletionRepository = deps.deletionSources ? sessionDeletionRepository(deps.db, deps.deletionSources) : undefined;
+  const close = deps.deletionSources && deletionRepository ? sessionTransportCloser(deletionRepository, deps.deletionSources, hub.drain, deps.settings.selfAddress) : undefined;
+  const transport = close ? sessionDeletionTransport(deps.settings.selfAddress, (context, birth) => close(context, birth.id), deps.deletionRequest) : undefined;
   const dispatch = commandDispatch(useCaseDeps, hub);
   const streams = browserStreams(useCaseDeps, hub, dispatch);
   const ingestion = businessIngestionWorker({ store: useCaseDeps.businessExecutions!, send: dispatch.sendLocalOnly, logger: useCaseDeps.logger,
@@ -82,6 +95,8 @@ export function createSessionModule(deps: SessionModuleDeps): SessionModule {
   const { upgradeWebSocket, websocket } = createBunWebSocket<ServerWebSocket>();
   const api: SessionModuleApi = {
     name: 'session',
+    deletionOwner: deletionRepository && transport && deps.deletionSources ? sessionDeletionOwner(deletionRepository, transport, deps.deletionSources) : undefined,
+    closeProjectDeletionTransport: close,
     lookupDevelopmentUsage: useCaseDeps.developmentUsage!.lookup,
     registerDevelopmentUsage: useCaseDeps.developmentUsage!.register, getDevelopmentUsage: useCaseDeps.developmentUsage!.get,
     requestDevelopmentUsageDrain: useCaseDeps.developmentUsage!.requestDrain, markDevelopmentUsageUnavailable: useCaseDeps.developmentUsage!.unavailable,
@@ -97,11 +112,13 @@ export function createSessionModule(deps: SessionModuleDeps): SessionModule {
     summarizeEvents: (taskIds, kinds) => useCaseDeps.events.summarize(taskIds, kinds),
   };
   let timer: ReturnType<typeof setInterval> | undefined;
+  const internal = internalRoutes(dispatch, useCaseDeps);
+  if (close) internal.route('/', sessionDeletionRoutes(close));
   return {
     api,
-    http: { runner: runnerSocketRoutes(hub, upgradeWebSocket), stream: browserSocketRoutes(streams, deps.isAdmin, upgradeWebSocket), internal: internalRoutes(dispatch, useCaseDeps) },
+    http: { runner: runnerSocketRoutes(hub, upgradeWebSocket), stream: browserSocketRoutes(streams, deps.isAdmin, upgradeWebSocket), internal },
     websocket,
-    workers: [{ start: () => { timer ??= setInterval(() => void hub.tick(), 5000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } }, ingestion, developmentIngestion],
+    workers: [{ start: () => { timer ??= setInterval(() => void hub.tick(), 5000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; await hub.shutdown(); } }, ingestion, developmentIngestion],
     migrations: sessionMigrations,
   };
 }

@@ -5,19 +5,29 @@ import type { BusinessTaskModuleApi } from '../api/moduleApi';
 import type { LegacyMutations, LegacyMutationTicket } from '../ports/legacyMutations';
 import type { BusinessTaskUseCaseDeps } from './dependencies';
 import { isTerminal } from '../domain/subtaskRun';
+import type { BusinessProjectWork } from '../ports/deletion/work';
+import { originalLegacyResult } from './execution/deletion/legacyWork';
 
 const requestScope = new AsyncLocalStorage<LegacyMutationTicket>();
-type LegacyWriteApi = Pick<BusinessTaskModuleApi, 'createTask' | 'closeTask' | 'pauseTask' | 'resumeTask' | 'submitSubtask' | 'retrySubtask' | 'sendSubtaskMessage' | 'cancelSubtask'>;
+type LegacyWriteApi = Pick<BusinessTaskModuleApi, 'getTask' | 'getSubtask' | 'listSubtasks' | 'subtaskOutput' | 'createTask' | 'closeTask' | 'pauseTask' | 'resumeTask' | 'submitSubtask' | 'retrySubtask' | 'sendSubtaskMessage' | 'cancelSubtask'>;
 
 /** Request tickets protect local acceptance too; each outbound effect has its own independent ticket. */
-export function legacyWriteApi(api: LegacyWriteApi, deps: BusinessTaskUseCaseDeps, barrier: LegacyMutations): LegacyWriteApi {
-  const run = async <T>(caller: ServiceActor, kind: string, taskId: TaskId | undefined, action: () => Promise<T>): Promise<T> => {
+export function legacyWriteApi(api: LegacyWriteApi, deps: BusinessTaskUseCaseDeps, barrier: LegacyMutations, projectWork?: BusinessProjectWork): LegacyWriteApi {
+  const run = async <T>(caller: ServiceActor, kind: string, taskId: TaskId | undefined, action: () => Promise<T>, ticketed = true): Promise<T> => {
     const service = await deps.directory.resolveServiceIdentity(caller.identity);
     if (!service) throw forbidden('未登记的服务身份');
-    const ticket = await barrier.begin({ serviceId: service.serviceId, kind, ...(taskId ? { taskId } : {}) });
-    try { return await requestScope.run(ticket, action); } finally { await barrier.settle(ticket, 'complete'); }
+    const request = async () => {
+      if (!ticketed) return action();
+      const ticket = await barrier.begin({ serviceId: service.serviceId, kind, ...(projectWork ? { callbackId: projectWork.callbackId() } : {}), ...(taskId ? { taskId } : {}) });
+      try { return await requestScope.run(ticket, action); } finally { await barrier.settle(ticket, 'complete'); }
+    };
+    return originalLegacyResult(projectWork, service.serviceId, taskId ?? service.serviceId, kind, request);
   };
   return {
+    getTask: (caller, id) => run(caller, 'get-task', id, () => api.getTask(caller, id), false),
+    getSubtask: (caller, id, sub) => run(caller, 'get-subtask', id, () => api.getSubtask(caller, id, sub), false),
+    listSubtasks: (caller, id) => run(caller, 'list-subtasks', id, () => api.listSubtasks(caller, id), false),
+    subtaskOutput: (caller, id, sub) => run(caller, 'subtask-output', id, () => api.subtaskOutput(caller, id, sub), false),
     createTask: (caller, input) => run(caller, 'create-task-request', undefined, () => api.createTask(caller, input)),
     closeTask: (caller, id) => run(caller, 'close-task-request', id, () => api.closeTask(caller, id)),
     pauseTask: (caller, id) => run(caller, 'pause-task-request', id, () => api.pauseTask(caller, id)),
@@ -31,6 +41,7 @@ export function legacyWriteApi(api: LegacyWriteApi, deps: BusinessTaskUseCaseDep
 
 /** Covers background launch and detached exec promises as well as writes made by an HTTP request. */
 export function legacyRuntimePorts(deps: BusinessTaskUseCaseDeps, barrier: LegacyMutations): BusinessTaskUseCaseDeps {
+  const work = deps.projectWork;
   const serviceOf = async (taskId: TaskId): Promise<string> => {
     const native = await deps.uow.read.subtasks.findByExecution(taskId);
     const task = await deps.uow.read.tasks.getById(native?.taskId ?? taskId);
@@ -38,7 +49,7 @@ export function legacyRuntimePorts(deps: BusinessTaskUseCaseDeps, barrier: Legac
     return task.serviceId;
   };
   const effect = async <T>(serviceId: string, kind: string, taskId: TaskId | undefined, action: () => Promise<T>): Promise<T> => {
-    const ticket = await barrier.begin({ serviceId, kind, ...(taskId ? { taskId } : {}), ...(requestScope.getStore() ? { parentId: requestScope.getStore()!.id } : {}) });
+    const ticket = await barrier.begin({ serviceId, kind, ...(work ? { callbackId: work.callbackId() } : {}), ...(taskId ? { taskId } : {}), ...(requestScope.getStore() ? { parentId: requestScope.getStore()!.id } : {}) });
     try {
       const result = await action();
       await barrier.settle(ticket, 'complete');
@@ -58,12 +69,16 @@ export function legacyRuntimePorts(deps: BusinessTaskUseCaseDeps, barrier: Legac
     return taskEffect(id, 'release-environment', () => deps.environments.releaseEnvironment(id, reason));
   };
   return { ...deps,
-    uow: { ...deps.uow, run: (run) => { const ticket = requestScope.getStore(); return ticket ? barrier.local(ticket, run) : deps.uow.run(run); } },
+    uow: { ...deps.uow, run: (run) => { const ticket = requestScope.getStore(), action = () => ticket ? barrier.local(ticket, run) : deps.uow.run(run); return work ? work.whenActive(action) : action(); } },
+    legacyBackground: (id, run) => work ? work.retain(serviceOf(id).then((serviceId) => work.runService({ serviceId, kind: 'legacy-api', reference: id, inputDigest: jsonHash({ background: id }) }, run))) : run(),
     legacyDispatch: async (id, run) => {
+      const serviceId = await serviceOf(id);
+      return originalLegacyResult(work, serviceId, id, 'legacy-dispatch', async () => {
       let ticket;
-      try { ticket = await barrier.begin({ serviceId: await serviceOf(id), kind: 'launch-request', taskId: id, ...(requestScope.getStore() ? { parentId: requestScope.getStore()!.id } : {}) }); }
+      try { ticket = await barrier.begin({ serviceId, kind: 'launch-request', taskId: id, ...(work ? { callbackId: work.callbackId() } : {}), ...(requestScope.getStore() ? { parentId: requestScope.getStore()!.id } : {}) }); }
       catch (error) { if (isPlatformError(error) && error.details?.code === 'execution_fence_required') return undefined; throw error; }
       try { return await requestScope.run(ticket, run); } finally { await barrier.settle(ticket, 'complete'); }
+      });
     },
     environments: {
       ...deps.environments,

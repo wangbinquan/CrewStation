@@ -4,10 +4,15 @@ import type { WorkerOptions } from '@crewstation/queue';
 import { ResourceIdSchema } from '@crewstation/contracts';
 import type { ProjectDeletionController } from '../api/deletion';
 import type { StartupTask } from './namespaceReapply';
+import type { ProjectDeletionIntents } from '../ports/projectDeletions';
 
 export const PROJECT_DELETION_JOB_KIND = 'provisioning.project-deletion';
-export function deletionEnqueue(db: WorkerOptions['db']) {
-  return async (operationId: string) => { ResourceIdSchema.parse(operationId); await enqueueJob(db, PROJECT_DELETION_JOB_KIND, { operationId }, { dedupKey: operationId, maxAttempts: 5 }); };
+export function deletionEnqueue(db: WorkerOptions['db'], coordinate?: ProjectDeletionIntents['coordinate']) {
+  return async (operationId: string) => {
+    ResourceIdSchema.parse(operationId);
+    const write = async (executor: object) => { await enqueueJob(executor as Parameters<typeof enqueueJob>[0], PROJECT_DELETION_JOB_KIND, { operationId }, { dedupKey: operationId, maxAttempts: 5 }); };
+    if (coordinate) await coordinate(operationId, write); else await write(db);
+  };
 }
 export function projectDeletionRuntime(db: WorkerOptions['db'], api: ProjectDeletionController, owner: string, logger: Logger) {
   const worker = createWorker({ db, owner: `${owner}.deletion`, kinds: [PROJECT_DELETION_JOB_KIND], concurrency: 1, leaseSeconds: 600, logger,

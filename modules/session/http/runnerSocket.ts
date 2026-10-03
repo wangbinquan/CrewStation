@@ -32,7 +32,7 @@ export function runnerSocketRoutes(hub: RunnerHub, upgradeWebSocket: UpgradeWebS
         await hub.onMessage(connection, raw);
         return;
       }
-      const opened = await hub.onHello(raw, { send: (frame) => ws.send(frame) });
+      const opened = await hub.onHello(raw, { send: (frame) => ws.send(frame), close: (code, reason) => ws.close(code, reason) });
       if (!opened.ok) {
         closed = true;
         ws.send(JSON.stringify({ type: 'error', id: 'hello', code: opened.code, message: opened.message }));

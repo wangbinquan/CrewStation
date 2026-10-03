@@ -9,6 +9,7 @@ import { PROJECT_DELETION_PHASES, ProjectDeletionTargetSchema, type ProjectDelet
 import { releaseMigrations } from '../wiring';
 import { drizzleUnitOfWork, releaseProjectAdmissions } from '../adapters/persistence/drizzleUnitOfWork';
 import { releaseDeletionRepository } from '../adapters/persistence/projectDeletion';
+import { releaseInfrastructureOrigin } from '../adapters/persistence/infrastructureOrigins';
 import { releaseProjectDeletionOwner } from '../application/projectDeletion';
 import { RELEASE_PHYSICAL_KINDS, releaseCallbackIdentity, type ReleasePhysicalScope } from '../domain/release';
 import type { ReleaseDeletionPhysics } from '../ports/unitOfWork';
@@ -36,10 +37,13 @@ async function setup(){
 describe.skipIf(!available)('发布持久删除原范围与阶段',()=>{
  test('原回调实际 finally 退出，七阶段重建重放；外项目和全局记录保持且永久拒绝迟到写',async()=>{
   const x=await setup();await x.admissions.run(x.project,x.service,{kind:'pipeline',consumerId:x.own.id,inputDigest:jsonHash('input')},async()=>{await x.uow.read.releases.update({...x.own,message:'callback'});});
+  const original=await releaseInfrastructureOrigin(x.db,x.own.id);
   const before=await x.repository.content(x.target);expect(before.callbacks).toHaveLength(1);expect(before.callbacks[0]!.exited).toBe(true);expect(before.callbacks[0]!.exitDigest).toBe(releaseCallbackIdentity(before.callbacks[0]!));
   const confirmed=await x.owner.inspect(x.target);expect(confirmed.complete).toBe(true);
   for(const phase of PROJECT_DELETION_PHASES)expect((await x.owner.run(x.context(confirmed,phase))).kind).toBe('done');
   expect((await x.repository.content(x.target)).rows).toEqual([]);expect(await x.uow.read.releases.getById(x.foreign.id)).toBeDefined();expect(await x.uow.read.slots.get(x.otherService)).toBeDefined();
+  expect(await releaseInfrastructureOrigin(x.db,x.own.id)).toEqual(original);
+  expect((await releaseInfrastructureOrigin(x.db,x.foreign.id))?.projectIds).toEqual([x.otherProject]);
   const stored=await x.repository.load(x.context(confirmed,'verify'));expect(stored.phaseIndex).toBe(6);expect(Object.keys(stored.receipts)).toHaveLength(7);
   expect(await x.owner.run(x.context(confirmed,'metadata'))).toEqual({kind:'done',evidence:stored.receipts.metadata!});
   await expect(x.uow.read.releases.insert(x.record())).rejects.toMatchObject({cause:{code:'55000'}});

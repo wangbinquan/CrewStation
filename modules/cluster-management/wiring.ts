@@ -26,6 +26,7 @@ import { objectStorageHistory } from './application/objectStorageHistory';
 import type { ClusterCallbackProcesses } from './ports/repository';
 import { clusterDeletionRepository, clusterProjectAdmission } from './adapters/persistence/projectDeletion';
 import { clusterManagementDeletionOwner } from './application/projectDeletion';
+import { clusterInfrastructureOrigin } from './adapters/persistence/infrastructureOrigins';
 export interface ClusterManagementModuleDeps { deletion?: { processes: ClusterCallbackProcesses; identities: Pick<ResourceIdentityDirectory, 'aliases' | 'resolve'>; assertAvailable(projectId: string): Promise<void>; assertGrant(context: ProjectDeletionContext): Promise<void> }; metrics?: MetricsOptions; resolveReleaseId?: (legacy: string) => Promise<string | undefined>; physicalOperationId?: (id: string) => Promise<string>; db: Database; k8s: K8sClient; metadata: ClusterMetadata; domains: DomainOperations; isAdmin(id: UserId): Promise<boolean>; authorizeProject(actor: Actor, projectId: string): Promise<void>; systemNamespace: string; catalog: SystemComponent[]; instance: string; logger?: Logger; clock?: Clock; wait?: (ms: number) => Promise<void>; observationMs?: number; /** 资源中心的认领叠加（RFC-025 T13）：清单行换上标准记录，台账维护的对象不给直接删。 */ ledger?: LedgerClaims }
 export const clusterManagementMigrations: MigrationSet = { module: 'cluster-management', layer: 6, files: readMigrationDir(join(import.meta.dir, 'adapters/persistence/migrations')) };
 export function createClusterManagementModule(input: ClusterManagementModuleDeps) {
@@ -38,7 +39,8 @@ export function createClusterManagementModule(input: ClusterManagementModuleDeps
   const objectHistory = objectStorageHistory(history, options.enabled, () => deps.clock.now());
   const metricsApi = metricQueries(metricsDeps, input.isAdmin, history, input.authorizeProject);
   const metricsLifecycle = metricsWorkers(metricsDeps, input.db, input.instance, logger, measureStorageTargets);
-  const api = { ...clusterApi(deps), ...(input.deletion ? { deletionOwner: clusterManagementDeletionOwner(clusterDeletionRepository({ db: input.db, ...input.deletion })) } : {}) }; let abort = new AbortController();
+  const api = { ...clusterApi(deps), originalInfrastructureOwnership: (kind: Parameters<typeof clusterInfrastructureOrigin>[1], key: string, representation?: 'current' | 'legacy') => clusterInfrastructureOrigin(input.db, kind, key, representation),
+    ...(input.deletion ? { deletionOwner: clusterManagementDeletionOwner(clusterDeletionRepository({ db: input.db, ...input.deletion })) } : {}) }; let abort = new AbortController();
   const operations = createWorker({ db: input.db, owner: `${input.instance}.cluster.operations`, kinds: [CLUSTER_OPERATION], concurrency: 2, leaseSeconds: 60, logger, handler: async (job, ctx) => {
     const payload = job.payload as { operationId?: string; requestId?: string; resumeCount?: number };
     await executeOperation(deps, payload.operationId!, job.fencingToken, ctx.heartbeat, payload.resumeCount ?? 0);

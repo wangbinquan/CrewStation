@@ -2,10 +2,11 @@ import { and, asc, eq, lt, sql } from 'drizzle-orm';
 import type { Database } from '@crewstation/persistence';
 import { executionTransaction } from '../executionTransaction';
 import { executionLogs as logs } from './projectionTables';
+import { businessAdmissionOpen } from '../deletion/admission';
 
 /** Only confirmed closed parents expire. Each tick deletes at most 1000 events and preserves the cursor tombstone. */
 export async function expireExecutionLog(db: Database): Promise<number> {
-  const candidates = await db.select().from(logs).where(lt(logs.closedAt, sql`clock_timestamp()-interval '7 days'`)).orderBy(asc(logs.closedAt)).limit(20);
+  const candidates = await db.select().from(logs).where(and(businessAdmissionOpen(logs.serviceId), lt(logs.closedAt, sql`clock_timestamp()-interval '7 days'`))).orderBy(asc(logs.closedAt)).limit(20);
   for (const candidate of candidates) {
     const count = await executionTransaction(db, candidate.serviceId, async (tx) => {
       const current = (await tx.select().from(logs).where(and(eq(logs.taskId, candidate.taskId), lt(logs.closedAt, sql`clock_timestamp()-interval '7 days'`))).for('update'))[0];

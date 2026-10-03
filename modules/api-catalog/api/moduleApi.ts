@@ -16,6 +16,8 @@ export interface ApiCatalogModuleApi {
   readonly deletionOwner?: ProjectDeletionOwner;
   /** 原操作的持久项目归属；目录退役或清理后仍只读最小原 ID 事实。 */
   originalOperationProject(id: string): Promise<ProjectId | undefined>;
+  /** Minimum canonical operation and original Project witness for queue/outbox classification. */
+  originalInfrastructureOwnership(key: string, representation?: 'current' | 'legacy'): Promise<{ complete: true; id: string; scope: 'project'; projectIds: readonly ProjectId[]; revision: string } | undefined>;
   applyResourceChange(actor: Actor, serviceId: ServiceId, input: { operationId: string; target: ResourceTarget; expectedRevision: string; values: ResourceValues }): Promise<{ revision: string; effect: string; applied: boolean }>;
   resourceChangeReceipt(serviceId: ServiceId, operationId: string): Promise<{ revision: string; effect: string; applied: boolean } | undefined>;
   isAdmin(userId: UserId): Promise<boolean>;

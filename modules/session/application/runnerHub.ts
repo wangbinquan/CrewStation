@@ -3,19 +3,21 @@ import { RunnerMessageSchema, TASKRUNNER_PROTOCOL_VERSION } from '@crewstation/c
 import { isDurable } from '../domain/eventDurability';
 import type { ProtocolMismatch } from '../domain/runtimeNegotiation';
 import { protocolMismatchOf } from '../domain/runtimeNegotiation';
-import type { EventSink } from '../domain/runnerConnection';
+import type { EventSink, RunnerOpenResult } from '../domain/runnerConnection';
 import { RunnerConnection } from '../domain/runnerConnection';
+import { runnerLifetime } from './runnerLifetime';
 import type { SessionUseCaseDeps } from './dependencies';
 
-export type RunnerOpenResult = { ok: true; connection: RunnerConnection } | { ok: false; code: string; message: string };
+export type { RunnerOpenResult } from '../domain/runnerConnection';
 
 /** TaskRunner 出向连接的服务端语义：hello 校验令牌、welcome 给出续接 seq、事件去重落库并广播、结果关联命令。 */
 export function runnerHub(deps: SessionUseCaseDeps) {
   const connections = new Map<TaskId, RunnerConnection>();
   const subscribers = new Map<TaskId, Set<EventSink>>();
+  const lifetime = runnerLifetime(deps, connections, subscribers);
   const { logger } = deps;
 
-  const onHello = async (raw: unknown, socket: EventSink): Promise<RunnerOpenResult> => {
+  const hello = async (raw: unknown, socket: EventSink): Promise<RunnerOpenResult> => {
     const legacy = await deps.legacyRunners?.hello(raw);
     const candidate = legacy?.hello ?? await deps.legacyRunners?.normalizeTask?.(raw) ?? raw;
     const mismatch = protocolMismatchOf(candidate);
@@ -25,21 +27,29 @@ export function runnerHub(deps: SessionUseCaseDeps) {
     const hello = parsed.data;
     const auth = await deps.runnerAuth.verifyRunnerToken(hello.taskId, hello.runnerToken);
     if (!auth.ok) return { ok: false, code: 'unauthorized', message: auth.reason };
-    const resumeFromSeq = await deps.events.maxSeq(hello.taskId);
-    if (await deps.taskAccess.onRunnerConnected(hello.taskId, hello.runnerToken) === false) return { ok: false, code: 'unauthorized', message: '环境已变化，请由当前容器重新连接' };
-    const previous = connections.get(hello.taskId);
-    if (previous) previous.pending.failAll('TaskRunner 重新连接');
-    const now = deps.clock.now();
-    const connection = new RunnerConnection(hello, socket, resumeFromSeq, deps.settings.commandTimeoutMs, now.getTime());
-    connection.legacy = legacy?.bridge;
-    for (const sub of subscribers.get(hello.taskId) ?? []) connection.subscribers.add(sub);
-    connections.set(hello.taskId, connection);
-    await deps.registry.claim(hello.taskId, deps.settings.selfAddress, now);
-    socket.send(JSON.stringify({ type: 'welcome', protocolVersion: legacy ? 2 : TASKRUNNER_PROTOCOL_VERSION, resumeFromSeq, nativeActivityVersion: 1 }));
-    deps.taskAccess.onRunnerReady?.(hello.taskId);
-    connection.broadcast(JSON.stringify({ type: 'runnerReconnected' }));
-    logger.info('runner connected', { taskId: hello.taskId, resumeFromSeq, protocols: hello.capabilities.protocols });
-    return { ok: true, connection };
+    return lifetime.bind(hello.taskId, async () => {
+      if (await deps.taskAccess.onRunnerConnected(hello.taskId, hello.runnerToken) === false) return { ok: false, code: 'unauthorized', message: '环境已变化，请由当前容器重新连接' };
+      const previous = connections.get(hello.taskId);
+      if (previous) { connections.delete(hello.taskId); await lifetime.finish(previous, 'TaskRunner 重新连接'); }
+      const resumeFromSeq = await deps.events.maxSeq(hello.taskId);
+      const now = deps.clock.now();
+      const connection = new RunnerConnection(hello, socket, resumeFromSeq, deps.settings.commandTimeoutMs, now.getTime());
+      connection.legacy = legacy?.bridge;
+      for (const sub of subscribers.get(hello.taskId) ?? []) connection.subscribers.add(sub);
+      connections.set(hello.taskId, connection);
+      try {
+        await lifetime.register(connection, now);
+        socket.send(JSON.stringify({ type: 'welcome', protocolVersion: legacy ? 2 : TASKRUNNER_PROTOCOL_VERSION, resumeFromSeq, nativeActivityVersion: 1 }));
+      } catch (error) {
+        if (connections.get(hello.taskId) === connection) connections.delete(hello.taskId);
+        await lifetime.finish(connection, 'TaskRunner 握手未完成', true);
+        throw error;
+      }
+      deps.taskAccess.onRunnerReady?.(hello.taskId);
+      connection.broadcast(JSON.stringify({ type: 'runnerReconnected' }));
+      logger.info('runner connected', { taskId: hello.taskId, resumeFromSeq, protocols: hello.capabilities.protocols });
+      return { ok: true as const, connection };
+    });
   };
 
   const onMessage = (connection: RunnerConnection, raw: unknown): Promise<void> => connection.process(async () => {
@@ -57,6 +67,7 @@ export function runnerHub(deps: SessionUseCaseDeps) {
       case 'pong': return;
       case 'hello': return;
       case 'event': {
+        await deps.connectionHistory?.check(connection.hello.taskId);
         if (!connection.accept(message.seq, now.getTime())) return;
         if (isDurable(message.event)) await deps.events.append({ taskId: connection.hello.taskId, seq: message.seq, at: new Date(message.at), event: message.event, ...(connection.legacy ? { legacyEvent: (raw as { event: unknown }).event } : {}) });
         connection.broadcast(RunnerConnection.frameOf(message.seq, message.at, message.event));
@@ -64,16 +75,6 @@ export function runnerHub(deps: SessionUseCaseDeps) {
       }
     }
   });
-
-  const onClose = async (connection: RunnerConnection): Promise<void> => {
-    if (connections.get(connection.hello.taskId) !== connection) return;
-    connections.delete(connection.hello.taskId);
-    connection.pending.failAll('TaskRunner 连接已断开');
-    connection.broadcast(JSON.stringify({ type: 'runnerDisconnected' }));
-    await deps.registry.release(connection.hello.taskId, deps.settings.selfAddress);
-    await deps.taskAccess.onRunnerDisconnected(connection.hello.taskId, connection.hello.runnerToken);
-    logger.info('runner disconnected', { taskId: connection.hello.taskId });
-  };
 
   const subscribe = (taskId: TaskId, sink: EventSink) => {
     const set = subscribers.get(taskId) ?? new Set<EventSink>();
@@ -86,12 +87,20 @@ export function runnerHub(deps: SessionUseCaseDeps) {
       connections.get(taskId)?.subscribers.delete(sink);
     };
   };
-  return { connections, subscribe, onHello, onMessage, onClose, tick: () => tickRunners(deps, connections) };
+  return { connections, subscribe, onHello: lifetime.open(hello), onMessage, onClose: (connection: RunnerConnection) => closeRunner(deps, connections, lifetime, connection), drain: lifetime.drain, shutdown: lifetime.shutdown, tick: () => tickRunners(deps, connections) };
 }
 
 export type RunnerHub = ReturnType<typeof runnerHub>;
 /** http 层只经 application 认识连接对象。 */
 export type ActiveRunnerConnection = RunnerConnection;
+
+async function closeRunner(deps: SessionUseCaseDeps, connections: Map<TaskId, RunnerConnection>, lifetime: ReturnType<typeof runnerLifetime>, connection: RunnerConnection): Promise<void> {
+  if (connections.get(connection.hello.taskId) !== connection) return;
+  connections.delete(connection.hello.taskId);
+  connection.broadcast(JSON.stringify({ type: 'runnerDisconnected' }));
+  await lifetime.finish(connection, 'TaskRunner 连接已断开', true);
+  deps.logger.info('runner disconnected', { taskId: connection.hello.taskId });
+}
 
 /** 协议不一致的握手（RFC-006 §5.3）：令牌有效才把原因回写给 task-runtime，然后拒绝；不接管连接、不发 welcome。 */
 async function rejectMismatch(deps: SessionUseCaseDeps, mismatch: ProtocolMismatch): Promise<RunnerOpenResult> {

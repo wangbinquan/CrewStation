@@ -1,3 +1,5 @@
+import type { BusinessProjectWork } from '../../ports/deletion/work';
+import { finalizationWork } from '../execution/deletion/finalizationWork';
 import type { BusinessStorageFinalization } from '@crewstation/contracts';
 import { conflict, isPlatformError, newResourceId, precondition } from '@crewstation/kernel';
 import type { BusinessExecutionApi } from '../../api/executionApi';
@@ -8,20 +10,22 @@ import { executionSource } from '../execution/source';
 import { finalizationLease } from './progress';
 
 /** The accepted change is an outbox. Only data can decide whether it beats the old receipt. */
-export function finalizationRevisions(store: FinalizationOperations, ports: FinalizationPreparation) {
+export function finalizationRevisions(store: FinalizationOperations, ports: FinalizationPreparation, work?: BusinessProjectWork) {
   return async (id?: string): Promise<number> => {
-    if (!ports.archive.revise || !ports.runtime.archiveExecution?.stop) return 0;
+    const revise = ports.archive.revise, stop = ports.runtime.archiveExecution?.stop;
+    if (!revise || !stop) return 0;
     const op = await store.claim({ id, owner: newResourceId(), leaseSeconds: 90, revising: true });
     if (!op) return 0;
+    return finalizationWork(work, op, 'revise', async () => {
     const lease = finalizationLease(op);
     try {
       const change = op.revisionRequestId ? await store.revision(op.revisionRequestId) : undefined;
       if (!change || change.state !== 'pending') throw precondition('清单修订意图缺失');
-      const result = await ports.archive.revise(change.id);
+      const result = await revise(change.id);
       if (!result.applied) { await store.settleRevision(lease, false, 'archive_receipt_already_committed'); return 1; }
       if (result.binding.revision !== op.view.revision + 1 || result.binding.receipt) throw conflict('清单修订回执身份不符');
       const input: BusinessStorageFinalization = { taskId: op.view.taskId, projectId: op.projectId, serviceId: op.serviceId, operationId: op.id, revision: op.view.revision, volumeUid: op.volumeUid };
-      if (!await ports.runtime.archiveExecution.stop(input)) throw precondition('新清单已持久确认，等待旧归档助手停止', { code: 'archive_revision_stop_pending' });
+      if (!await stop(input)) throw precondition('新清单已持久确认，等待旧归档助手停止', { code: 'archive_revision_stop_pending' });
       await store.settleRevision(lease, true);
     } catch (error) {
       const code = isPlatformError(error) && typeof error.details.code === 'string' ? error.details.code : 'archive_revision_pending';
@@ -30,11 +34,12 @@ export function finalizationRevisions(store: FinalizationOperations, ports: Fina
       else await store.progress(lease, { phase: op.view.phase, phaseState: 'revising', errorCode: code, message: isPlatformError(error) ? error.message : '清单修订确认暂不可用，保留原卷并继续对账', nextRetryAt: new Date(Date.now() + 5000).toISOString() });
     }
     return 1;
+    });
   };
 }
 
 export function archiveRevisionIntake(deps: BusinessExecutionDeps, store: FinalizationOperations, ports?: FinalizationPreparation): Pick<BusinessExecutionApi, 'reviseArchive'> {
-  const source = executionSource(deps), progress = ports ? finalizationRevisions(store, ports) : undefined;
+  const source = executionSource(deps), progress = ports ? finalizationRevisions(store, ports, deps.projectWork) : undefined;
   return {
     reviseArchive: async (caller, taskId, input) => {
       const context = await source(caller);

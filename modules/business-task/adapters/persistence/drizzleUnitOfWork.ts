@@ -1,4 +1,5 @@
 import { drizzleContractRepository } from './contractRepository';
+import { businessInfrastructureOrigin } from './infrastructureOrigins';
 import { publishDomainEvent } from '@crewstation/eventbus';
 import type { Database, Executor } from '@crewstation/persistence';
 import type { RepositoryScope, UnitOfWork } from '../../ports/repositories';
@@ -14,5 +15,6 @@ export function scopeOver(executor: Executor): RepositoryScope {
 }
 
 export function drizzleUnitOfWork(db: Database): UnitOfWork {
-  return { read: scopeOver(db), run: (fn) => db.transaction((tx) => fn(scopeOver(tx))) };
+  return { read: scopeOver(db), originalInfrastructureOwnership: (kind, key, representation) => businessInfrastructureOrigin(db, kind, key, representation),
+    run: (fn) => db.transaction((tx) => fn(scopeOver(tx))) };
 }

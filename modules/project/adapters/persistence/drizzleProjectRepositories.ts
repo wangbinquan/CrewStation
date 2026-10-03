@@ -1,7 +1,8 @@
 import type { ManifestKind, MemberRole, ProjectId, ProjectState, ServiceId, UserId } from '@crewstation/contracts';
-import type { Executor } from '@crewstation/persistence';
-import { and, eq, gt, inArray, ne } from 'drizzle-orm';
-import { precondition } from '@crewstation/kernel';
+import { ProjectDeletionOperationSchema, ProjectIdSchema, ResourceIdSchema } from '@crewstation/contracts';
+import type { Database, Executor } from '@crewstation/persistence';
+import { and, eq, gt, inArray, ne, sql } from 'drizzle-orm';
+import { jsonHash, precondition } from '@crewstation/kernel';
 import type { Project } from '../../domain/project';
 import type { Service } from '../../domain/service';
 import type { MembershipRepository, ProjectRepository, ServiceRepository } from '../../ports/repositories';
@@ -69,4 +70,42 @@ function toProjectRow(project: Project): typeof projects.$inferInsert {
 
 function toService(row: typeof services.$inferSelect): Service {
   return { id: row.id as ServiceId, projectId: row.projectId as ProjectId, name: row.name, kind: row.kind as ManifestKind, identity: row.identity, createdAt: row.createdAt };
+}
+
+/** Reads only original canonical IDs from the retained operation; private plan/body fields never leave this module. */
+async function operationProject(executor: Executor, id: string, byProject: boolean) {
+  const rows = await executor.execute<{ id: string; project_id: string; body: unknown }>(sql`
+    SELECT id,project_id,body FROM project.deletion_operations WHERE ${sql.identifier(byProject ? 'project_id' : 'id')}=${id}`);
+  if (!rows.length) return undefined;
+  const row = rows[0]!, body = ProjectDeletionOperationSchema.parse(row.body), projectId = ProjectIdSchema.parse(row.project_id);
+  if (body.id !== row.id || body.project.id !== projectId || byProject && projectId !== id)
+    throw precondition('项目删除最小身份不一致');
+  return projectId;
+}
+async function originalProject(executor: Executor, id: string) {
+  const rows = await executor.execute<{ id: string }>(sql`SELECT id FROM project.projects WHERE id=${id}`);
+  const retained = await operationProject(executor,id,true);
+  return rows.length ? ProjectIdSchema.parse(rows[0]!.id) : retained;
+}
+
+/** Service rows must still exist. Missing service history is not reconstructed from names or an old plan. */
+export async function projectInfrastructureOwnership(db: Database, kind: 'project'|'service'|'deletion', rawId: string) {
+  if (!['project','service','deletion'].includes(kind)) throw precondition('项目归属来源类型未登记');
+  const id = ResourceIdSchema.parse(rawId);
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`);
+    let projectId: ProjectId | undefined;
+    if (kind === 'project') projectId = await originalProject(tx,id);
+    else if (kind === 'deletion') projectId = await operationProject(tx,id,false);
+    else {
+      const rows = await tx.execute<{ project_id: string }>(sql`SELECT project_id FROM project.services WHERE id=${id}`);
+      if (rows.length) {
+        const parent = ProjectIdSchema.parse(rows[0]!.project_id);
+        if (await originalProject(tx,parent) !== parent) throw precondition('服务原项目来源不可读取');
+        projectId = parent;
+      }
+    }
+    if (!projectId) return undefined;
+    return { complete:true as const,id,scope:'project' as const,projectIds:[projectId],revision:jsonHash({kind,id,projectId}) };
+  });
 }

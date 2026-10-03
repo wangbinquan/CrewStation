@@ -8,13 +8,14 @@ import { executionSource } from './source';
 import { admissionTaskView } from './taskView';
 import { releaseClosedTaskImages } from '../taskRuntimeImage';
 import { rebuildRecoveryWorkspace } from '../recovery/rebuildExecution';
+import { businessExecutionWork } from './deletion/projectWork';
 
 export function executionLifecycleUseCases(deps: BusinessExecutionDeps): Pick<BusinessExecutionApi, 'mutateTask' | 'getOperation'> & { progressLifecycle(): Promise<number> } {
   const source = executionSource(deps);
   const progress = async (id?: string) => {
     const operation = await deps.lifecycles.claim(newResourceId(), id);
     if (!operation) return 0;
-    await dispatchLifecycle(deps, operation); return 1;
+    await businessExecutionWork(deps, { serviceId: operation.serviceId, taskId: operation.taskId, kind: 'lifecycle', reference: operation.id, revision: operation.revision }, (scoped) => dispatchLifecycle(scoped, operation)); return 1;
   };
   return {
     mutateTask: async (caller, taskId, action, input) => {

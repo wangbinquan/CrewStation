@@ -3,6 +3,7 @@ import { and, asc, eq, lt, or, sql } from 'drizzle-orm';
 import type { Database } from '@crewstation/persistence';
 import type { ExecutionLifecycles } from '../../../ports/executionLifecycle';
 import type { ExecutionTaskState } from '../../../domain/executionLifecycle';
+import { businessAdmissionOpen } from '../deletion/admission';
 import { activeExecutionControl } from '../../../domain/executionControl';
 import { executionTransaction, readExecutionControl } from '../executionTransaction';
 import { lifecycleRow, requestLifecycle } from './lifecycleAdmission';
@@ -28,10 +29,10 @@ export function drizzleExecutionLifecycles(db: Database): ExecutionLifecycles {
   };
 }
 async function claimLifecycle(db: Database, owner: string, id?: string) {
-  const candidates = await db.select({ id: ops.id, serviceId: ops.serviceId }).from(ops).where(and(ready(), id ? eq(ops.id, id) : undefined)).orderBy(asc(ops.updatedAt)).limit(100);
+  const candidates = await db.select({ id: ops.id, serviceId: ops.serviceId }).from(ops).where(and(businessAdmissionOpen(ops.serviceId), ready(), id ? eq(ops.id, id) : undefined)).orderBy(asc(ops.updatedAt)).limit(100);
   for (const candidate of candidates) {
     const claim = await executionTransaction(db, candidate.serviceId, async (tx, now) => {
-      const row = (await tx.select().from(ops).where(and(eq(ops.id, candidate.id), ready())).for('update', { skipLocked: true }))[0];
+      const row = (await tx.select().from(ops).where(and(businessAdmissionOpen(ops.serviceId), eq(ops.id, candidate.id), ready())).for('update', { skipLocked: true }))[0];
       if (!row) return undefined;
       if (!row.dispatched) {
         const control = await readExecutionControl(tx, row.serviceId);

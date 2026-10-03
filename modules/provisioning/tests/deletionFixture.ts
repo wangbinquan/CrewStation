@@ -28,7 +28,7 @@ export async function deletionFixture() {
     read: api.readProjectDeletion, find: api.findProjectDeletion, retry: api.retryProjectDeletion, claim: api.claimProjectDeletion, renew: api.renewProjectDeletion,
     prepareReconfirmation: api.prepareProjectDeletionReconfirmation, replayReconfirmation: api.replayProjectDeletionReconfirmation, reconfirm: api.reconfirmProjectDeletion,
     defer: api.deferProjectDeletion, receipt: api.recordProjectDeletionReceipt, block: api.blockProjectDeletion,
-    complete: api.completeProjectDeletion, pending: api.listPendingProjectDeletions,
+    complete: api.completeProjectDeletion, coordinate: api.coordinateProjectDeletion, pending: api.listPendingProjectDeletions,
   };
   const external = statefulDeletionOwners(api), queued: string[] = [];
   const controller = projectDeletionController({ intents, owners: external.owners, isAdmin: identity.api.isAdmin, logger: noopLogger,

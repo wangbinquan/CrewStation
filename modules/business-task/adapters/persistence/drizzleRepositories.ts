@@ -7,6 +7,7 @@ import type { BusinessTask } from '../../domain/businessTask';
 import type { SubtaskRun } from '../../domain/subtaskRun';
 import type { SubtaskRepository, TaskRepository } from '../../ports/repositories';
 import { subtasks, tasks } from './tables';
+import { businessAdmissionOpen } from './deletion/admission';
 
 const json = <T>(v: unknown): T => (typeof v === 'string' ? JSON.parse(v) : v) as T;
 
@@ -36,6 +37,7 @@ export function drizzleTaskRepository(db: Executor): TaskRepository {
 interface SubtaskSpec { prompt?: string; cwd?: string; command?: string[]; timeoutSeconds?: number; agentProfile?: AgentProfile; outputContract?: OutputContract; computeProfile?: ProfileRevisionRef; execution?: SubtaskRun['execution'] }
 
 export function drizzleSubtaskRepository(db: Executor): SubtaskRepository {
+  const admitted = sql`EXISTS(SELECT 1 FROM ${tasks} WHERE ${tasks.id}=${subtasks.taskId} AND ${businessAdmissionOpen(tasks.serviceId)})`;
   const toRun = (r: typeof subtasks.$inferSelect): SubtaskRun => {
     const spec = json<SubtaskSpec>(r.spec);
     return {
@@ -76,9 +78,9 @@ export function drizzleSubtaskRepository(db: Executor): SubtaskRepository {
     listByTask: async (taskId) => (await db.select().from(subtasks).where(eq(subtasks.taskId, taskId)).orderBy(subtasks.createdAt)).map(toRun),
     listByTasks: async (taskIds) => (await inChunks(taskIds, (chunk) => db.select().from(subtasks).where(inArray(subtasks.taskId, chunk)))).map(toRun)
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id)),
-    listActive: async (limit) => (await db.select().from(subtasks).where(inArray(subtasks.state, ['running', 'awaiting-input'])).orderBy(subtasks.createdAt).limit(limit)).map(toRun),
+    listActive: async (limit) => (await db.select().from(subtasks).where(and(inArray(subtasks.state, ['running', 'awaiting-input']), admitted)).orderBy(subtasks.createdAt).limit(limit)).map(toRun),
     findByExecution: async (executionTaskId) => { const row = (await db.select().from(subtasks).where(sql`${subtasks.spec}->'execution'->>'taskId' = ${executionTaskId}`))[0]; return row ? toRun(row) : undefined; },
-    listPendingExecutions: async (limit) => (await db.select().from(subtasks).where(and(eq(subtasks.state, 'pending'), sql`${subtasks.spec}->'execution' IS NOT NULL`)).orderBy(subtasks.createdAt).limit(limit)).map(toRun),
-    listUnreleasedExecutions: async (limit) => (await db.select().from(subtasks).where(and(inArray(subtasks.state, ['succeeded', 'failed', 'cancelled']), sql`${subtasks.spec}->'execution' IS NOT NULL`, sql`coalesce(${subtasks.spec}->'execution'->>'released', 'false') <> 'true'`)).orderBy(subtasks.createdAt).limit(limit)).map(toRun),
+    listPendingExecutions: async (limit) => (await db.select().from(subtasks).where(and(eq(subtasks.state, 'pending'), sql`${subtasks.spec}->'execution' IS NOT NULL`, admitted)).orderBy(subtasks.createdAt).limit(limit)).map(toRun),
+    listUnreleasedExecutions: async (limit) => (await db.select().from(subtasks).where(and(inArray(subtasks.state, ['succeeded', 'failed', 'cancelled']), sql`${subtasks.spec}->'execution' IS NOT NULL`, sql`coalesce(${subtasks.spec}->'execution'->>'released', 'false') <> 'true'`, admitted)).orderBy(subtasks.createdAt).limit(limit)).map(toRun),
   };
 }

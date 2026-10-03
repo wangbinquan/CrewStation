@@ -9,6 +9,7 @@ import { executionOperations as parents } from '../executionTables';
 import { executionTaskStates as states } from './lifecycleTables';
 import { executionLogs as logs } from './projectionTables';
 import { appendTaskState } from './logEvents';
+import { businessAdmissionOpen } from '../deletion/admission';
 
 /** Poll fairly even when one runtime is unreachable; observations never drive lifecycle effects. */
 export function taskObservationRepository(db: Database): Pick<ExecutionProjection, 'taskObservations' | 'observeTask'> {
@@ -17,12 +18,13 @@ export function taskObservationRepository(db: Database): Pick<ExecutionProjectio
       await tx.execute(sql`INSERT INTO business_task.execution_logs(task_id,service_id)
         SELECT intent->'task'->>'id',service_id FROM business_task.execution_operations p
         WHERE kind='create-task' AND NOT EXISTS (SELECT 1 FROM business_task.execution_logs l WHERE l.task_id=p.intent->'task'->>'id')
+        AND ${businessAdmissionOpen(sql.raw('p.service_id'))}
         ORDER BY created_at LIMIT 100 ON CONFLICT DO NOTHING`);
       const pending = alias(logs, 'pending_task_logs');
       const rows = await tx.select({ parent: parents, lifecycle: states }).from(pending)
         .innerJoin(parents, sql`${parents.intent}->'task'->>'id' = ${pending.taskId}`)
         .leftJoin(states, eq(states.taskId, pending.taskId))
-        .where(and(eq(pending.expired, false), isNull(pending.closedAt)))
+        .where(and(businessAdmissionOpen(parents.serviceId), eq(pending.expired, false), isNull(pending.closedAt)))
         .orderBy(sql`${pending.taskPolledAt} ASC NULLS FIRST`, asc(pending.taskId)).limit(20).for('update', { skipLocked: true, of: pending });
       for (const row of rows) await tx.update(logs).set({ taskPolledAt: sql`clock_timestamp()` }).where(eq(logs.taskId, row.parent.intent.task.id));
       return rows.map(({ parent, lifecycle }) => ({ operation: toOperation(parent), ...(lifecycle ? { lifecycle: lifecycle as ExecutionTaskState } : {}) }));
