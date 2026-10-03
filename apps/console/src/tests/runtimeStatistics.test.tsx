@@ -15,6 +15,9 @@ test('system overview, five tabs and pricing link show real CNY DTOs', async () 
   const f = runtimeStatisticsFixture(); page = await renderApp('/admin/observability?' + f.query);
   expect(page.text()).toContain('系统运行观测与统计'); expect(page.text()).toContain('2,400'); expect(page.text()).toContain('¥6');
   expect(document.querySelector('[data-runtime-metrics]')?.children.length).toBe(3);
+  // RFC-034: the trend follows the metrics directly, so the shared Stack gap is the visible gap.
+  const trend = document.querySelector('[data-runtime-metrics]')!.nextElementSibling!;
+  expect(trend.querySelector('[aria-label="任务与 Token 趋势"]')).not.toBeNull();
   await page.click('用量与费用'); expect(page.text()).toContain('actual-model-hash'); expect(page.text()).toContain('算力档位分布');
   await page.click('性能与质量'); expect(page.text()).toContain('完成任务 P95'); expect(page.text()).toContain('执行时间证据缺失');
   await page.click('配置 Token 人民币单价'); expect(page.path()).toBe('/admin/compute'); expect(page.search()).toMatchObject({ tab: 'pricing' });

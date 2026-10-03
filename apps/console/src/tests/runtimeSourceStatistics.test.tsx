@@ -13,6 +13,9 @@ test('both levels show direct purpose controls, actual token labels and explicit
   const f=runtimeSourceStatisticsFixture();
   for(const root of ['/admin/observability','/projects/'+f.projectId+'/observability']){
     page=await renderApp(root+'?'+f.query);expect(page.text()).toContain('用途与消耗');expect(page.text()).toContain('开发生产采集未开启');expect(page.text()).toContain('9,007,199,254,741,200');
+    const metrics=document.querySelector('[data-runtime-metrics]')!,trend=metrics.nextElementSibling!;
+    expect(trend.querySelector('[aria-label="任务与 Token 趋势"]')).not.toBeNull();
+    expect(trend.nextElementSibling?.querySelector('[data-runtime-source]')).not.toBeNull();
     expect(page.text()).toContain('任务 / 开发执行');expect(page.text()).not.toContain('CSV');expect(page.text()).not.toContain('更多筛选');expect(document.querySelectorAll('[data-runtime-source]')).toHaveLength(2);
     await page.click('开发 Agent');expect(page.search().sourceKind).toBe('development-agent');expect(page.text()).toContain('9,007,199,254,741,000');
     expect(f.reads.filter(read=>read.includes('/statistics')).at(-1)).toContain('sourceKind=development-agent');expect(document.querySelector<HTMLButtonElement>('[aria-label="用途与消耗"] [aria-pressed="true"]')?.textContent).toBe('开发 Agent');
