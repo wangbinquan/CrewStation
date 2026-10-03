@@ -53,7 +53,7 @@ export function provisioningWorkPorts(k8s: K8sClient, namespace: string, podUid:
 }
 
 /** 每个内容 owner 的原回调使用独立保护，停止证明不跨 owner 冒用。 */
-export function projectCallbackOwners(k8s: K8sClient, namespace: string, currentPodUid: string | undefined, finalizer: 'crewstation.io/events-delivery-stop' | 'crewstation.io/gateway-project-stop' | 'crewstation.io/data-control-native-stop' | 'crewstation.io/scm-project-stop' | 'crewstation.io/cluster-project-stop' | 'crewstation.io/provisioning-project-stop' | 'crewstation.io/session-project-stop' | 'crewstation.io/business-project-stop', readBirth = currentProcessBirth) {
+export function projectCallbackOwners(k8s: K8sClient, namespace: string, currentPodUid: string | undefined, finalizer: 'crewstation.io/events-delivery-stop' | 'crewstation.io/gateway-project-stop' | 'crewstation.io/data-control-native-stop' | 'crewstation.io/scm-project-stop' | 'crewstation.io/cluster-project-stop' | 'crewstation.io/provisioning-project-stop' | 'crewstation.io/session-project-stop' | 'crewstation.io/business-project-stop' | 'crewstation.io/development-project-stop', readBirth = currentProcessBirth) {
   const owners = {
     protectCurrent: async (): Promise<Process> => {
       if (!currentPodUid) throw precondition('当前投递进程缺少原 Pod UID');
@@ -73,7 +73,7 @@ export function projectCallbackOwners(k8s: K8sClient, namespace: string, current
         if (!pod.metadata.uid || !pod.metadata.resourceVersion || !pod.metadata.finalizers?.includes(finalizer)) continue;
         const podStopped = await protectedPlatformPodStopped(k8s,pod,finalizer);
         const node = await freshPlatformNode(k8s,pod),container = hostContainer(pod);
-        if (finalizer === 'crewstation.io/provisioning-project-stop' || finalizer === 'crewstation.io/session-project-stop' || finalizer === 'crewstation.io/business-project-stop') {
+        if (finalizer === 'crewstation.io/provisioning-project-stop' || finalizer === 'crewstation.io/session-project-stop' || finalizer === 'crewstation.io/business-project-stop' || finalizer === 'crewstation.io/development-project-stop') {
           // A PID birth and a potentially delayed container status do not establish PID-to-CID correlation.
           if (node && podStopped && accept.podStopped) {
             const process = { podUid: pod.metadata.uid,nodeUid: node.uid,nodeName: node.name };

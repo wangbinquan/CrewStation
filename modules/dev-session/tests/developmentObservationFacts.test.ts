@@ -1,16 +1,16 @@
 // Actual owner prepare/frozen price and AgentStart rows, without model dispatch.
-import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { sql } from 'drizzle-orm';
 import { newResourceId } from '@crewstation/kernel';
+import { runMigrations } from '@crewstation/persistence';
 import { createTestDatabase, testDatabaseAvailable, type TestDatabase } from '@crewstation/testkit';
 import { readDevelopmentObservationFacts, readDevelopmentObservationTaskPage, readDevelopmentObservationAttemptPage, devSessionMigrations } from '../wiring';
 import { developmentUsageFixture } from './developmentUsageFixture';
 
 const available = await testDatabaseAvailable(); let tdb: TestDatabase;
 const query = { from: '2026-09-30T00:00:00.000Z', to: '2026-10-01T00:00:00.000Z', timezone: 'Asia/Shanghai' };
-beforeAll(async () => { if (available) tdb = await createTestDatabase([devSessionMigrations]); });
-afterEach(async () => { if (tdb) await tdb.db.execute(sql`TRUNCATE dev_session.development_agent_usage, dev_session.agent_starts CASCADE`); });
-afterAll(async () => { await tdb?.drop(); });
+beforeEach(async () => { if (available) tdb = await createTestDatabase([devSessionMigrations]); });
+afterEach(async () => { await tdb?.drop(); });
 async function accepted() { const f = await developmentUsageFixture(tdb.db); await f.starts.update({ ...f.start, computeName: 'Accepted Compute', createdAt: '2025-01-01T00:00:00.000Z' }); await f.owner.prepare(f.preparation); return f; }
 
 describe.skipIf(!available)('development safe runtime owner facts', () => {
@@ -36,6 +36,9 @@ describe.skipIf(!available)('development safe runtime owner facts', () => {
     await developmentUsageFixture(tdb.db); expect(await readDevelopmentObservationFacts(tdb.db, query)).toEqual({ items: [], partial: false });
   });
   test('mismatched Agent, workspace, profile and frozen price are rejected', async () => {
+    // Corruption already present in an old database remains unreadable after the new write guards are installed.
+    await tdb.drop();
+    tdb = await createTestDatabase([{ ...devSessionMigrations, files: devSessionMigrations.files.filter((m) => m.name < '0016_') }]);
     const f = await accepted();
     for (const patch of [{ agentId: newResourceId() }, { taskId: newResourceId() }, { compute: newResourceId() }, { profile: { profileId: f.start.profile.profileId, revision: 99 } }]) {
       await tdb.db.execute(sql`UPDATE dev_session.agent_starts SET agent_id=${patch.agentId ?? f.start.agentId},task_id=${patch.taskId ?? f.start.taskId},compute=${patch.compute ?? f.start.compute},profile=${JSON.stringify(patch.profile ?? f.start.profile)}::jsonb WHERE execution_task_id=${f.child.id}`);
@@ -44,6 +47,16 @@ describe.skipIf(!available)('development safe runtime owner facts', () => {
     await tdb.db.execute(sql`UPDATE dev_session.agent_starts SET agent_id=${f.start.agentId},task_id=${f.start.taskId},compute=${f.start.compute},profile=${JSON.stringify(f.start.profile)}::jsonb WHERE execution_task_id=${f.child.id}`);
     await tdb.db.execute(sql`UPDATE dev_session.development_agent_usage SET prepared=jsonb_set(prepared,'{price,identity,agentId}',to_jsonb(${newResourceId()}::text)) WHERE execution_task_id=${f.child.id}`);
     await expect(readDevelopmentObservationFacts(tdb.db, query)).rejects.toMatchObject({ kind: 'conflict' });
+    await runMigrations(tdb.db, [devSessionMigrations]);
+    await expect(readDevelopmentObservationFacts(tdb.db, query)).rejects.toMatchObject({ kind: 'conflict' });
+  });
+  test('new content guards reject replacement of original Agent and workspace links without damaging the readable owner', async () => {
+    const f = await accepted();
+    for (const patch of [{ agentId: newResourceId() }, { taskId: newResourceId() }]) {
+      await expect(Promise.resolve(tdb.db.execute(sql`UPDATE dev_session.agent_starts SET agent_id=${patch.agentId ?? f.start.agentId},task_id=${patch.taskId ?? f.start.taskId} WHERE execution_task_id=${f.child.id}`)))
+        .rejects.toMatchObject({ cause: { message: 'Development original parent and project links cannot be replaced' } });
+      expect((await readDevelopmentObservationFacts(tdb.db, { ...query, taskId: f.child.id })).items).toHaveLength(1);
+    }
   });
   test('bounds signal partial and independent detail remains readable beyond overview', async () => {
     let last = '';

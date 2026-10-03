@@ -19,7 +19,7 @@ const toRow = (start: AgentStart): typeof table.$inferInsert => ({
   finalized: start.finalized, createdAt: start.createdAt, dispatchedAt: start.dispatchedAt ?? null, endedAt: start.endedAt ?? null,
 });
 
-export function drizzleAgentStarts(db: Database): AgentStartRepository {
+export function drizzleAgentStarts(db: Database, admissionGuarded = false): AgentStartRepository {
   return {
     reserveRestart: async (operationId) => {
       const [row] = await db.insert(clusterAgentRestarts).values({ operationId, agentId: newResourceId(), taskId: newResourceId() })
@@ -30,7 +30,8 @@ export function drizzleAgentStarts(db: Database): AgentStartRepository {
     get: async (agentId) => { const row = (await db.select().from(table).where(eq(table.agentId, agentId)))[0]; return row ? toStart(row) : undefined; },
     findByExecution: async (id) => { const row = (await db.select().from(table).where(eq(table.executionTaskId, id)))[0]; return row ? toStart(row) : undefined; },
     listByTask: async (taskId) => (await db.select().from(table).where(eq(table.taskId, taskId)).orderBy(asc(table.createdAt))).map(toStart),
-    listUnfinalized: async (after, limit) => (await db.select().from(table).where(and(eq(table.finalized, false), after ? gt(table.agentId, after) : undefined)).orderBy(asc(table.agentId)).limit(limit)).map(toStart),
+    listUnfinalized: async (after, limit) => (await db.select().from(table).where(and(eq(table.finalized, false), after ? gt(table.agentId, after) : undefined,
+      admissionGuarded ? sql`NOT EXISTS(SELECT 1 FROM dev_session.content_origins o INNER JOIN dev_session.project_admissions a ON a.project_id=o.project_id WHERE o.kind='task' AND o.key=${table.taskId})` : undefined)).orderBy(asc(table.agentId)).limit(limit)).map(toStart),
     update: async (start) => {
       // PostgreSQL rechecks the target predicate after an ending transaction releases this row.
       const changed = await db.update(table).set(toRow(start)).where(and(eq(table.agentId, start.agentId), eq(table.logicalEnding, false))).returning({ id: table.agentId });

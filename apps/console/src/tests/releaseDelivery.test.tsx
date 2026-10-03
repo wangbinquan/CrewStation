@@ -164,10 +164,12 @@ test('fenced 交接受理不报完成，刷新页面继续展示原操作且禁�
   const key = f.writes[0]!.body.requestKey; expect(typeof key).toBe('string');
   f.state.handoff!.handoff = { stage: 'activating', message: '等待目标应用激活执行权' };
   page.unmount(); page = await renderApp(`/projects/${projectId}/release`);
+  for (let attempt = 0; attempt < 8 && !page.text().includes('等待目标应用激活执行权'); attempt++) await page.settle();
   expect(page.text()).toContain('交接尚未完成'); expect(page.text()).toContain('等待目标应用激活执行权');
   expect(f.writes).toHaveLength(1);
   f.state.handoff!.handoff = { stage: 'complete' };
   page.unmount(); page = await renderApp(`/projects/${projectId}/release`);
+  for (let attempt = 0; attempt < 8 && !page.text().includes('执行交接已完成'); attempt++) await page.settle();
   expect(page.text()).toContain('执行交接已完成');
 });
 

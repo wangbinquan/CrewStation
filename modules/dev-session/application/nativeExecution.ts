@@ -1,6 +1,6 @@
 import type { BeforeStartExecution, NativeTerminalDto, NativeTerminalRecord, NativeTerminalRoster, ServiceId, StartupRecord, TaskId } from '@crewstation/contracts';
 import { IDENTITY_HEADERS, PLATFORM_AGENT_PERMISSION, RunnerResultPayloads } from '@crewstation/contracts';
-import { isPlatformError, newId } from '@crewstation/kernel';
+import { isPlatformError, jsonHash, newId } from '@crewstation/kernel';
 import { composeCliStartup } from '../domain/nativeTerminalProjection';
 import type { NativeTerminalRepository, NativeTerminalStart } from '../ports/nativeTerminals';
 import type { EnvironmentView } from '../ports/runtime';
@@ -193,7 +193,13 @@ export class NativeExecutionLifecycle {
   dispatch(id: TaskId): Promise<void> {
     const current = this.active.get(id); if (current) return current;
     if (this.active.size >= 2) return Promise.resolve();
-    const operation = this.repo.withExecutionLock(id, () => this.tick(id)).catch(() => { this.deps.logger.warn('native execution will retry', { executionTaskId: id }); }).finally(() => { this.active.delete(id); });
+    const operation = (async () => {
+      const start = await this.repo.findExecution(id); if (!start?.execution || start.execution.finalized) return;
+      const dispatch = () => this.repo.withExecutionLock(id, () => this.tick(id));
+      if (!this.deps.projectWork) return dispatch();
+      return this.deps.projectWork.runOrigin({ originKind: 'task', originKey: start.taskId, kind: 'native-dispatch', reference: start.record.agentId,
+        inputDigest: jsonHash({ agentId: start.record.agentId, workspace: start.taskId, execution: id }) }, dispatch);
+    })().catch(() => { this.deps.logger.warn('native execution will retry', { executionTaskId: id }); }).finally(() => { this.active.delete(id); });
     this.active.set(id, operation); return operation;
   }
   async sweep() {

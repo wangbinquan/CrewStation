@@ -93,6 +93,8 @@
     "modules/dev-session/adapters/persistence/migrations/0012_development_agent_usage.sql": "b43e376e7eb50206ba7dfe1a7b015b1f64baae79432855fe6af8d1e769fcd01b",
     "modules/dev-session/adapters/persistence/migrations/0013_development_dispatch_capability.sql": "7b48d83a7fa771c6ac25b90586c5dd16f3c73f0bb5b9ca8e48d7809f0f245ac4",
     "modules/dev-session/adapters/persistence/migrations/0014_development_agent_endings.sql": "21371b99d8f5653051e8f948740c261b64f90b165c243f0a49a80f379f3e8304",
+    "modules/dev-session/adapters/persistence/migrations/0015_project_work.sql": "1ccc2bc26f68c54114c271472184244b5f4108ae71bc6992abbefadda4146bc9",
+    "modules/dev-session/adapters/persistence/migrations/0016_content_deletion.sql": "1da2a6743de4b637c823bd6c587f08f93f784a8995b3dd7d59170931b8074a7d",
     "modules/events/adapters/persistence/migrations/0001_create_schema.sql": "b19de80e761ea8697df6ddb7349e8c77f0f3953bfb3294b279c546a0545a70cb",
     "modules/events/adapters/persistence/migrations/0002_event_tables.sql": "de4f64852a5917d0f59b4cfcfcf26067fc9ec1ecb0b75e5972c745753da9774d",
     "modules/events/adapters/persistence/migrations/0003_resource_identity.sql": "d738bbf128da82051cb138ab238f50357b2deef7130f9cb0988028113fff5b01",

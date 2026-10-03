@@ -29,6 +29,10 @@ describe.skipIf(!available)('删除编排（真实 PG＋有状态外部替身）
     await f.controller.advance(operation.id); const waiting = await f.controller.read(f.admin, operation.id);
     expect(waiting).toMatchObject({ state: 'running', phase: 'stop', canRetry: false });
     expect(waiting.blockers[0]?.code).toBe('waiting-for-proof');
+    for (const participant of ['task-runtime', 'session', 'resources', 'cluster-control']) {
+      expect(f.external.calls.some((c) => c.projectId === value.id && c.phase === 'stop' && c.participant === participant)).toBe(true);
+      expect(waiting.receipts.some((r) => r.phase === 'stop' && r.participant === participant)).toBe(true);
+    }
     expect(f.external.calls.some((c) => c.projectId === value.id && c.phase === 'purge')).toBe(false);
     expect((await f.api.getProject(f.admin, value.id)).state).toBe('deleting');
     f.external.waitStop.delete('business-task'); f.elapse(15_001); await f.controller.advance(operation.id);

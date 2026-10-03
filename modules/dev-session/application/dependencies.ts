@@ -4,8 +4,10 @@ import type { Clock, Logger } from '@crewstation/kernel';
 import type { ApiInvocationCatalog, ComputeCatalog, DevSessionSettings, ManifestParser, McpCredentials, Notifier, ProjectAuthorizer, Releases, ServiceResolver, SourceControl } from '../ports/platform';
 import type { Environments, ReminderRepository, Runner } from '../ports/runtime';
 import type { ComparisonReferences } from '../ports/comparisons';
+import type { DevelopmentProjectWork } from '../ports/deletion/work';
 
 export interface DevSessionUseCaseDeps {
+  projectWork?: DevelopmentProjectWork;
   runtimeImages?: DevelopmentRuntimeImages;
   executions?: ExecutionRecords;
   comparisons: ComparisonReferences;

@@ -14,18 +14,26 @@ export async function advanceProjectDeletion(intents: ProjectDeletionIntents, ow
   if (!claimed) return;
   const { lease, plan } = claimed; let operation = claimed.operation, currentOwner: ProjectDeletionOwner | undefined;
   try {
-    for (const phase of PROJECT_DELETION_PHASES) for (const owner of orderedOwners(owners, phase)) {
+    for (const phase of PROJECT_DELETION_PHASES) {
+      let waiting: { participant: ProjectDeletionOwner['participant']; reason: string } | undefined;
+      for (const owner of orderedOwners(owners, phase)) {
       currentOwner = owner;
       if (operation.receipts.some((r) => r.participant === owner.participant && r.phase === phase)) continue;
       if (heartbeat && !(await heartbeat())) throw precondition('项目删除队列租约已失效');
       await intents.renew(lease, 600);
       const result = ProjectDeletionStepResultSchema.parse(await owner.run({ operationId: id, generation: lease.generation, target: plan.target, phase, confirmed: plan.participants.find((p) => p.participant === owner.participant)! }));
-      if (result.kind === 'waiting') { await intents.defer(lease, owner.participant, result.reason); return; }
+      if (result.kind === 'waiting') {
+        if (phase !== 'stop') { await intents.defer(lease, owner.participant, result.reason); return; }
+        // A consumer may await its original runtime owner. Initiate every stop, retaining the all-owner barrier before purge.
+        waiting ??= { participant: owner.participant, reason: result.reason }; continue;
+      }
       if (result.kind === 'blocked') {
         if (result.blockers.some((b) => b.participant !== owner.participant)) throw precondition('清理阻塞来源身份不符');
         await intents.block(lease, result.blockers); return;
       }
       operation = await intents.receipt(lease, owner.participant, phase, result.evidence);
+      }
+      if (waiting) { await intents.defer(lease, waiting.participant, waiting.reason); return; }
     }
     await intents.complete(lease);
   } catch {

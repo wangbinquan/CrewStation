@@ -41,8 +41,17 @@ import type { ApiInvocationCatalog, ComputeCatalog, DevSessionSettings, McpCrede
 import type { Environments, Runner } from './ports/runtime';
 import type { ExecutionRecords } from './ports/executionRecords';
 import { withExecutionPhase } from './domain/terminalPhase';
+import type { DevelopmentProjectWork, DevelopmentWorkSources } from './ports/deletion/work';
+import { developmentProjectWork } from './adapters/persistence/deletion/projectWork';
+import { developmentDeletionRepository } from './adapters/persistence/deletion/repository';
+import { developmentDeletionOwner } from './application/deletion/owner';
+import { guardedDevelopmentPort, scopedDevelopmentPorts } from './application/deletion/ports';
+import { developmentWorkApi } from './application/deletion/api';
+import { developmentCleanupWork, developmentUsageWork } from './application/deletion/internalWork';
+import { developmentWorker } from './application/developmentWorker';
 
 export interface DevSessionModuleDeps {
+  deletionWorkSources?: DevelopmentWorkSources;
   developmentUsagePricing?: DevelopmentUsagePricing;
   developmentCleanupSession?: DevelopmentCleanupSession;
   identities?: ResourceIdentityDirectory;
@@ -83,7 +92,9 @@ export const devSessionMigrations: MigrationSet = {
 };
 
 export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionModule {
-  const useCaseDeps: DevSessionUseCaseDeps = {
+  const projectWork = deps.deletionWorkSources ? developmentProjectWork(deps.db, deps.deletionWorkSources,
+    (error) => (deps.logger ?? noopLogger).error('development original lifetime failed', { error: String(error) })) : undefined;
+  const rawDeps: DevSessionUseCaseDeps = {
     executions: deps.executions, runtimeImages: deps.runtimeImages,
     comparisons: drizzleComparisonReferences(deps.db, deps.clock ?? systemClock, deps.identities),
     environments: deps.environments, runner: deps.runner, scm: deps.scm, releases: deps.releases, manifests: yamlManifestParser,
@@ -91,13 +102,26 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
     compute: deps.compute, services: deps.services, notifier: deps.notifier, credentials: deps.credentials, reminders: drizzleReminderRepository(deps.db),
     settings: deps.settings, clock: deps.clock ?? systemClock, logger: deps.logger ?? noopLogger,
   };
+  const useCaseDeps = projectWork ? scopedDevelopmentPorts(rawDeps, projectWork) : rawDeps;
+  const api = developmentApi(deps, useCaseDeps, projectWork);
+  const drain = () => projectWork?.drain() ?? Promise.resolve();
+  return {
+    api,
+    http: [devSessionRoutes(api, deps.isAdmin), nativeTerminalRoutes(api, deps.isAdmin), workspaceLayoutRoutes(api, deps.isAdmin)],
+    workers: [developmentWorker(api.sendIdleReminders, 60_000, drain, (error) => useCaseDeps.logger.error('idle reminder failed', { error: String(error) })),
+      developmentWorker(api.reconcileNativeExecutions, 2000, drain, () => useCaseDeps.logger.error('execution reconciliation failed'))],
+    migrations: devSessionMigrations,
+  };
+}
+
+function developmentApi(deps: DevSessionModuleDeps, useCaseDeps: DevSessionUseCaseDeps, projectWork?: DevelopmentProjectWork): DevSessionModuleApi {
   const lifecycle = sessionLifecycleUseCases(useCaseDeps);
-  const agentStarts = drizzleAgentStarts(deps.db);
+  const rawAgentStarts = drizzleAgentStarts(deps.db, !!projectWork), agentStarts = projectWork ? guardedDevelopmentPort(rawAgentStarts, projectWork) : rawAgentStarts;
   const agentExecutions = new AgentExecutionLifecycle(useCaseDeps, agentStarts);
   const agents = agentUseCases(useCaseDeps, agentStarts, agentExecutions);
   const remind = idleReminderUseCase(useCaseDeps);
-  const terminals = drizzleNativeTerminals(deps.db);
-  const activity = nativeActivityUseCases(useCaseDeps, drizzleNativeActivity(deps.db), terminals);
+  const rawTerminals = drizzleNativeTerminals(deps.db, !!projectWork), terminals = projectWork ? guardedDevelopmentPort(rawTerminals, projectWork) : rawTerminals;
+  const rawActivity = drizzleNativeActivity(deps.db), activity = nativeActivityUseCases(useCaseDeps, projectWork ? guardedDevelopmentPort(rawActivity, projectWork) : rawActivity, terminals);
   const native = nativeTerminalUseCases(useCaseDeps, terminals);
   // 启动中名册每秒读一次（RFC-022），原生活动页不跟着每秒做：同一任务、同一人 5 秒内复用。
   const activityPage = rosterActivity((actor, taskId) => boundedNativeRead(activity.getAgentActivity(actor, taskId, { limit: 1 })).catch((error: unknown) => {
@@ -105,14 +129,21 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
     useCaseDeps.logger.warn('native activity query unavailable', { taskId });
     return undefined;
   }), useCaseDeps.clock);
-  const developmentUsage = developmentUsageOwner(developmentUsageOwnerStore(deps.db), agentStarts, deps.environments, deps.developmentUsagePricing);
+  const store = developmentUsageOwnerStore(deps.db), pricing = deps.developmentUsagePricing;
+  const rawUsage = developmentUsageOwner(projectWork ? guardedDevelopmentPort(store, projectWork) : store, agentStarts, useCaseDeps.environments,
+    pricing && projectWork ? guardedDevelopmentPort(pricing, projectWork) : pricing);
+  const developmentUsage = projectWork ? developmentUsageWork(rawUsage, projectWork) : rawUsage;
+  const endingStore = developmentEndingStore(deps.db, useCaseDeps.clock);
+  const cleanup = deps.developmentCleanupSession ? developmentCleanupParticipant({ owner: developmentUsage,
+    store: projectWork ? guardedDevelopmentPort(endingStore, projectWork) : endingStore, environments: useCaseDeps.environments,
+    session: projectWork ? guardedDevelopmentPort(deps.developmentCleanupSession, projectWork) : deps.developmentCleanupSession, clock: useCaseDeps.clock }) : undefined;
   const api: DevSessionModuleApi = {
+    ...(deps.deletionWorkSources ? { deletionOwner: developmentDeletionOwner(developmentDeletionRepository(deps.db, deps.deletionWorkSources), deps.deletionWorkSources) } : {}),
     developmentUsage,
-    ...(deps.developmentCleanupSession ? { developmentCleanup: developmentCleanupParticipant({ owner: developmentUsage, store: developmentEndingStore(deps.db, useCaseDeps.clock),
-      environments: deps.environments, session: deps.developmentCleanupSession, clock: useCaseDeps.clock }) } : {}),
+    ...(cleanup ? { developmentCleanup: projectWork ? developmentCleanupWork(cleanup, projectWork) : cleanup } : {}),
     invokeApi: apiInvocationUseCase(useCaseDeps),
     ...clusterAgentUseCases(useCaseDeps, agentStarts, agentExecutions), ...clusterNativeUseCases(useCaseDeps, terminals),
-    name: 'dev-session', ...lifecycle, ...agents, ...native, ...activity, ...workspaceLayoutUseCases(useCaseDeps, drizzleWorkspaceLayouts(deps.db), terminals),
+    name: 'dev-session', ...lifecycle, ...agents, ...native, ...activity, ...workspaceLayoutUseCases(useCaseDeps, projectWork ? guardedDevelopmentPort(drizzleWorkspaceLayouts(deps.db), projectWork) : drizzleWorkspaceLayouts(deps.db), terminals),
     // 子 Runner 连上时由组合根调用：headless Agent 的执行环境先认领，其余按「＋ CLI」处理（RFC-006）。
     dispatchPendingNativeExecution: async (executionTaskId) => { if (!(await agentExecutions.dispatchExecution(executionTaskId))) await native.dispatchPendingNativeExecution(executionTaskId); },
     reconcileNativeExecutions: async () => { await Promise.all([native.reconcileNativeExecutions(), agentExecutions.sweep()]); },
@@ -125,13 +156,6 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
       return { ...roster, activitySync: page?.sync ?? 'unavailable', items: roster.items.map((item) => withExecutionPhase({ ...item, activity: page?.states.find((state) => state.agentId === item.agentId && state.terminalId === item.terminalId && state.runnerId === item.runnerId) }, item.execution ? phases.get(item.execution.taskId) : undefined)) };
     },
   };
-  let timer: ReturnType<typeof setInterval> | undefined;
-  let executionTimer: ReturnType<typeof setInterval> | undefined;
-  return {
-    api,
-    http: [devSessionRoutes(api, deps.isAdmin), nativeTerminalRoutes(api, deps.isAdmin), workspaceLayoutRoutes(api, deps.isAdmin)],
-    workers: [{ start: () => { timer ??= setInterval(() => void remind().catch((e: unknown) => useCaseDeps.logger.error('idle reminder failed', { error: String(e) })), 60_000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } },
-      { start: () => { executionTimer ??= setInterval(() => void api.reconcileNativeExecutions().catch(() => useCaseDeps.logger.error('execution reconciliation failed')), 2000); }, stop: async () => { if (executionTimer) clearInterval(executionTimer); executionTimer = undefined; } }],
-    migrations: devSessionMigrations,
-  };
+  return projectWork ? developmentWorkApi(api, projectWork) : api;
+
 }

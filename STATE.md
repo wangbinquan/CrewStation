@@ -3231,3 +3231,21 @@ RFC-013 最终候选门禁现已通过：**1937 pass／5 skip／0 fail**，326 �
 - 观测依赖已先本地提交 `35ff8871e2c0889a34c4baf29fcafaa1485e0149`，132 个实际变更文件，index 空；共享整文件保留双方输出，当前尚未 push。当前会话接续精确提交剩余 Session／BusinessTask／开通 owner、原身份保护／公开来源、234 项共享迁移锁及本记录，再联合 push、等待精确 SHA CI 与本机部署。登记文字是门禁后的纯文档 delta，未改变通过门禁的生产源码。
 - DevSession 下一批新增 7 个未追踪文件，仅实现 13 表只读完整盘点：实际 PG 8／0、46 断言，精确类型 0 错、lint 通过；初始夹具 SQL 保留词、静态 rows 推断和拒绝消息期望错误均保留日志并已修正。这 7 文件未进入本次门禁、暂存或发布。其原回调封写／退出、七阶段 owner、正式 Root 与剩余物理 owner 继续。
 - 完整 22 owner 装配、SCM／制品物理范围及管理员二次确认实机永久回收未完成，删除入口继续关闭，原专用项目未删除。通信只在真实冲突、就绪和提交交接进行，不例行互报。
+
+
+## 2026-10-03 RFC-037 DevSession 原回调候选接续
+
+创建弹窗／域名解释保持既有已验收实现；永久删除仍 OFF。DevSession 44／0、319断言，旧库升级／实际 PG 准入／factory 生命周期通过，精确候选类型0、lint／arch通过，0015／0016精确入锁至236。51源码路径冻结在 /private/tmp/cs-rfc037-development-owner-types-candidate-v5.json，一次完整检查 PID11519、exec session14082，日志 /private/tmp/cs-rfc037-development-owner-full-v1.log 运行中；必须等终态及内容指纹核对。活跃旧执行原排空、正式 TaskRuntime owner／全部22方／SCM物理范围及实机二次确认全回收继续，不能把受控来源用例称为物理验收。
+
+HEAD/origin 786489，CI37130953072由观测会话交接六项全绿；仅786489控制面／console镜像构建完成，集群未滚，现部署75dd427。实测cs-api uid/gid1000、securityContext={}，待发布两路径 deploy/k8s/platform/30-cs-api.yaml 和 runtimeReportSpool.test.ts 的 fsGroup:1000 修复。只发布这两路径，排除新 DevSession／迁移锁和 RFC036 WIP；等其精确 CI 后八组件部署及真实报告目录写入探测。/private/tmp/cs-rfc037-report-spool-deploy-draft-v1.ts 只是未完成草稿，尚缺实际API volumes/security/config CAS与正确迁移 module 名来源，禁止执行。新构建记录 /private/tmp/cs-rfc037-786489b85906-joined-owner-observability-v1-build.json；当前真实八组件部署基线 /private/tmp/cs-rfc037-joined-owner-observability-deployment-baseline-v1.json。
+
+按用户要求只在冲突、发布就绪、部署交接或实际失败协调，不做例行会话互报。
+
+
+### 2026-10-04 RFC-037 开发 owner 夹具修订与报告目录独立发布
+
+51 功能路径首轮完整检查终态5560 pass／143环境skip／7 fail，原指纹保持；开发旧迁移边界、受保护表TRUNCATE夹具与旧库腐化用例已修订，发布页改为等实际刷新数据，4文件定向21／0、195断言及精准lint通过。修订候选排除已提交目录修复、加入3个失败用例，共52路径，其唯一完整检查full-v2进行中，不能称全量通过。
+报告目录fsGroup1000和实际挂载／non-root测试仅两路径已提交推送d2ab5f349d20，远端精确同步、索引为空，其余开发owner和236锁均未捎带。精确Git归档镜像构建完成，CI37135430507仍等待自身六项终态；尚未滚集群。正式部署会保留原对象/共享PG/Runner身份并验证真实API报告目录可写。所有22方、TaskRuntime专用stop/数字排空、SCM及其余物理清理与原专用项目二次确认继续；入口关闭。见RFC-037/acceptance/development-owner.md。
+
+
+2026-10-04 终态补记：开发52路径修订完整检查已结束，5564 pass／143环境skip／4 fail，136169断言、1094文件、1559.78秒，全部冻结指纹保持；本批拥有用例71项通过、0失败，静态四层成功。4个失败均在未修改eventsModule测试，起始HTTP500预期收到503后后续依赖状态断言失败；同组单独7／0、63断言，原失败仍保留，不声称全量绿，也不按未变化内容再跑完整门禁。报告目录d2ab5f3自身CI37135430507的module唯一失败是观测10001项夹具hook超时65002ms（3071pass／11skip／1fail），其余static/unit/console/e2e成功；gate失败，尚不部署，已作为实际故障交接观测owner修复。当前正式TaskRuntime、全22方装配／物理范围及原专用项目永久回收仍未完成，入口OFF。

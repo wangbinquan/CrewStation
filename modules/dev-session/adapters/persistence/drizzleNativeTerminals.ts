@@ -11,7 +11,7 @@ type StartRow = Pick<typeof table.$inferSelect, keyof typeof selection>;
 const toStart = (row: StartRow): NativeTerminalStart => ({ ...row, taskId: row.taskId as TaskId, createdBy: row.createdBy as UserId, profile: row.profile ?? undefined, execution: row.execution ?? undefined });
 const agentKey = (taskId: TaskId, agentId: string) => and(eq(table.taskId, taskId), eq(table.agentId, agentId));
 
-export function drizzleNativeTerminals(db: Database): NativeTerminalRepository {
+export function drizzleNativeTerminals(db: Database, admissionGuarded = false): NativeTerminalRepository {
   return {
     withExecutionLock: (id, operation) => db.transaction(async (tx) => { await tx.execute(sql`select pg_advisory_xact_lock(hashtext('dev_session.native_execution'), hashtext(${id}))`); await operation(); }),
     async findRequest(taskId, actorId, requestId) {
@@ -20,7 +20,8 @@ export function drizzleNativeTerminals(db: Database): NativeTerminalRepository {
     },
     async findAgent(taskId, agentId) { const row = (await db.select(selection).from(table).where(agentKey(taskId, agentId)))[0]; return row ? toStart(row) : undefined; },
     async findExecution(id) { const row = (await db.select(selection).from(table).where(eq(table.executionTaskId, id)))[0]; return row ? toStart(row) : undefined; },
-    listExecutions: async (after, limit = 32) => (await db.select(selection).from(table).where(and(isNotNull(table.executionTaskId), sql`coalesce(${table.execution}->>'finalized', 'false') <> 'true'`, after ? gt(table.agentId, after) : undefined)).orderBy(table.agentId).limit(limit)).map(toStart),
+    listExecutions: async (after, limit = 32) => (await db.select(selection).from(table).where(and(isNotNull(table.executionTaskId), sql`coalesce(${table.execution}->>'finalized', 'false') <> 'true'`, after ? gt(table.agentId, after) : undefined,
+      admissionGuarded ? sql`NOT EXISTS(SELECT 1 FROM dev_session.content_origins o INNER JOIN dev_session.project_admissions a ON a.project_id=o.project_id WHERE o.kind='task' AND o.key=${table.taskId})` : undefined)).orderBy(table.agentId).limit(limit)).map(toStart),
     async reserve(input) {
       return db.transaction(async (tx) => {
         await tx.execute(sql`select pg_advisory_xact_lock(hashtext('dev_session.native_terminals'), hashtext(${input.taskId}))`);

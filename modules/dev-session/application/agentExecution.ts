@@ -1,6 +1,6 @@
 import type { ServiceId, TaskId } from '@crewstation/contracts';
 import { IDENTITY_HEADERS, PLATFORM_AGENT_PERMISSION } from '@crewstation/contracts';
-import { isPlatformError } from '@crewstation/kernel';
+import { isPlatformError, jsonHash } from '@crewstation/kernel';
 import type { AgentStart, AgentStartRepository } from '../ports/agentStarts';
 import type { EnvironmentView } from '../ports/runtime';
 import type { DevSessionUseCaseDeps } from './dependencies';
@@ -102,11 +102,15 @@ export class AgentExecutionLifecycle {
     // 每个处理占一条带咨询锁的事务连接：与「＋ CLI」的派发一样每进程最多两项，避免占满连接池。
     if (this.active.size >= 2) return Promise.resolve();
     const operation = (async () => {
-      do {
-        this.rerun.delete(agentId);
-        await this.repo.withLock(agentId, () => this.tick(agentId)).catch((error: unknown) => { this.deps.logger.warn('agent execution will retry', { agentId, error: error instanceof Error ? error.message : String(error) }); });
-      } while (this.rerun.has(agentId));
-    })().finally(() => { this.active.delete(agentId); });
+      const start = await this.repo.get(agentId); if (!start || start.finalized) return;
+      const dispatch = async () => {
+        do { this.rerun.delete(agentId); await this.repo.withLock(agentId, () => this.tick(agentId)); } while (this.rerun.has(agentId));
+      };
+      if (!this.deps.projectWork) return dispatch();
+      return this.deps.projectWork.runOrigin({ originKind: 'task', originKey: start.taskId, kind: 'agent-dispatch', reference: agentId,
+        inputDigest: jsonHash({ agentId, workspace: start.taskId, execution: start.execution.taskId }) }, dispatch);
+    })().catch((error: unknown) => { this.deps.logger.warn('agent execution will retry', { agentId, error: error instanceof Error ? error.message : String(error) }); })
+      .finally(() => { this.active.delete(agentId); });
     this.active.set(agentId, operation); return operation;
   }
 

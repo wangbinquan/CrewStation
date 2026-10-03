@@ -1,6 +1,7 @@
 import { bindTaskMaintenance } from './adapters/observability/taskMaintenance'; import { clusterMetadata } from './application/cluster/metadata';
 import { resourceCatalogs } from './application/resource-center/resourceCatalogs'; import { sessionDeletionSources } from './application/deletion/sessionSources';
 import { businessRuntimePorts } from './application/deletion/businessSources';
+import { developmentDeletionSources, developmentSourceControl } from './application/deletion/developmentSources';
 import { projectResourceState } from './adapters/k8s/projectResourceState';
 import { projectResourceSources } from './application/resource-center/projectSources';
 import { createResourceAccessModule } from '@crewstation/module-resource-access';
@@ -78,7 +79,7 @@ export const SYSTEM_ACTOR: Actor = { userId: BUILTIN_RESOURCES.systemActor as Us
 
 const consumerLifecycle = (consumer: EventConsumer): Lifecycle => ({ start: () => consumer.start(), stop: () => consumer.stop() });
 
-interface Late { resourceAccess?: ReturnType<typeof createResourceAccessModule>['api']; observability?: ObservabilityModuleApi; objectHistory?: NonNullable<NonNullable<Parameters<typeof createDataModule>[0]['objects']>['history']>; businessTask?: BusinessTaskModuleApi; events?: EventsModuleApi; project?: ProjectModuleApi; gateway?: GatewayModuleApi; taskRuntime?: TaskRuntimeModuleApi; release?: ReleaseModuleApi; resources?: ResourcesModuleApi; dataControl?: DataControlModuleApi; clusterControl?: ClusterControlModuleApi }
+interface Late { clusterManagement?: ReturnType<typeof createClusterManagementModule>['api']; resourceAccess?: ReturnType<typeof createResourceAccessModule>['api']; observability?: ObservabilityModuleApi; objectHistory?: NonNullable<NonNullable<Parameters<typeof createDataModule>[0]['objects']>['history']>; businessTask?: BusinessTaskModuleApi; events?: EventsModuleApi; project?: ProjectModuleApi; gateway?: GatewayModuleApi; taskRuntime?: TaskRuntimeModuleApi; release?: ReleaseModuleApi; resources?: ResourcesModuleApi; dataControl?: DataControlModuleApi; clusterControl?: ClusterControlModuleApi }
 
 type CompositionDeps = PlatformModuleDeps & { identities: ResourceIdentityDirectory };
 
@@ -322,6 +323,7 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
   // 两类任务共用解析：受理固定档位修订，派发时取材料，凭据仅进入受控 Runner 通道。
   const computeCatalog = { pinLaunchVersion: core.agentRuntime.api.pinLaunchVersion, launchMaterialAt: core.agentRuntime.api.launchMaterialAt, resolve: (name: ComputeProfileSelector | undefined, usage: ComputeUsage, projectId: ProjectId) => core.agentRuntime.api.resolveForProject(projectId, name, usage), launchMaterial: core.agentRuntime.api.launchMaterial, launchMetadata: core.agentRuntime.api.launchMetadata };
   const devSession = createDevSessionModule({
+    ...(settings.platformPodUid ? { deletionWorkSources: developmentDeletionSources(project.api, taskRuntime.api, () => late.clusterManagement, projectCallbackOwners(k8s, settings.systemNamespace, settings.platformPodUid, 'crewstation.io/development-project-stop')) } : {}),
     developmentUsagePricing: developmentObservationAdmission(() => late.observability),
     runtimeImages: developmentImagePorts(runtimeImages.api),
     identities: deps.identities,
@@ -329,11 +331,7 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
     executions: executionRecords(resources.api),
     apiCatalog: core.apiCatalog.api,
     db, logger, isAdmin: (id) => isAdmin(id), environments: taskRuntime.api, runner, releases: release.api,
-    scm: {
-      listBranches: (serviceId, compare) => scm.api.listBranches(SYSTEM_ACTOR, serviceId, compare),
-      pushUrl: async (serviceId) => { const c = await scm.api.issueSessionCredential(serviceId, 60); return { url: c.httpUrlWithCredentialTemplate.replace('{token}', encodeURIComponent(c.token)), expiresAt: c.expiresAt }; },
-      readFile: scm.api.readFile,
-    },
+    scm: developmentSourceControl(scm.api, SYSTEM_ACTOR),
     authorizer: { authorize: project.api.authorize, ownerOf: project.api.ownerOf },
     services: { resolveServiceOfProject: project.api.resolveServiceOfProject },
     notifier: { notify: async (projectId, users, message, context) => { logger.warn('dev session notice', { projectId, users, message, taskId: context.taskId }); } },
@@ -550,6 +548,7 @@ function composeModules(deps: CompositionDeps) {
   const runtime = composeRuntime(deps, core, delivery, late, resources, runtimeEnvironment);
   const aggregates = composeAggregates(deps, late, core, delivery, runtime, resources, runtimeEnvironment);
   const cluster = composeCluster(deps, core, delivery, runtime, resources);
+  late.clusterManagement = cluster.api;
   late.objectHistory = { read: cluster.objectHistory };
   const clusterControl = composeControl(deps, core, resources, runtime, delivery, runtimeEnvironment);
   const dataControl = composeDataControl(deps, resources, core.project.api);

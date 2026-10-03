@@ -44,7 +44,7 @@ test('开通的 PID 出生与容器观测分开：旧 lastState 不能结束仍�
   await owners.sweep(accept); expect(stopped).toEqual([]); expect(pods).toEqual([{ podUid: f.podUid,nodeUid: f.nodeUid,nodeName: 'node' }]);
   expect((await f.k8s.get(Resources.Pod!,'sender','system'))?.metadata.finalizers).toEqual(['another/guard']);
 });
-for (const [application, finalizer] of [['cs-session', 'crewstation.io/session-project-stop'], ['cs-api', 'crewstation.io/business-project-stop']] as const) test(`${application} 原进程只接受完整受保护 Pod 停止：旧容器 lastState 与仍在运行的 sidecar 都保留保护`, async () => {
+for (const [application, finalizer] of [['cs-session', 'crewstation.io/session-project-stop'], ['cs-api', 'crewstation.io/business-project-stop'], ['cs-api', 'crewstation.io/development-project-stop']] as const) test(`${application}/${finalizer} 原进程只接受完整受保护 Pod 停止：旧容器 lastState 与仍在运行的 sidecar 都保留保护`, async () => {
   const f = await fixture();
   await f.k8s.mergePatch(Resources.Pod!, 'sender', 'system', { metadata: { labels: { 'app.kubernetes.io/name': application } },
     spec: { containers: [{ name: application }] }, status: { containerStatuses: [{ name: application, containerID: 'containerd://original', state: { running: {} } }] } });

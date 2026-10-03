@@ -8,6 +8,7 @@ import type { DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessi
 import type { PreviewAction, PreviewLogsDto, PreviewLogsQuery, PreviewStatusDto } from '@crewstation/contracts';
 import type { DevelopmentCleanupParticipant } from './developmentCleanup';
 import type { DevelopmentUsageOwner } from './developmentUsage';
+import type { ProjectDeletionOwner } from '@crewstation/contracts';
 
 /** dev-session 对外能力：一项目一会话、分支、并行流式 Agent、从会话发布、空闲提醒。 */
 export interface NativeTerminalApi {
@@ -19,6 +20,7 @@ export interface NativeTerminalApi {
 
 export interface DevSessionModuleApi extends NativeTerminalApi {
   readonly name: 'dev-session';
+  readonly deletionOwner?: ProjectDeletionOwner;
   /** Internal preparation only. This is not a production launch or cleanup capability flag. */
   readonly developmentUsage?: DevelopmentUsageOwner;
   readonly developmentCleanup?: DevelopmentCleanupParticipant;
