@@ -1,4 +1,4 @@
-import type { ProjectRuntimeStatistics, RuntimeStatisticsQuery, RuntimeTaskObservation, SystemRuntimeStatistics } from '@crewstation/contracts';
+import type { RuntimeCompleteReport,RuntimeReportPage,RuntimeReportPageQuery,RuntimeStatisticsQuery } from '@crewstation/contracts';
 import type { ExecutionCostVisibilityDto, SetExecutionCostVisibility, ExecutionObservationPage, ExecutionObservationQuery, AlertDto, HealthDto, LogEntryDto, SaveTokenPrice, TokenPriceHistory, TokenPriceProfile, TokenPriceVersion } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
@@ -9,10 +9,12 @@ import { segment } from '../requestUrl';
 export type ExecutionObservationInput = ExecutionObservationQuery extends infer Q ? Q extends ExecutionObservationQuery ? Omit<Q, 'limit'> & { limit?: number } : never : never;
 
 export interface ObservabilityResource {
-  projectRuntimeStatistics(projectId: string, query: RuntimeStatisticsQuery): Promise<ProjectRuntimeStatistics>;
-  systemRuntimeStatistics(query: RuntimeStatisticsQuery): Promise<SystemRuntimeStatistics>;
-  projectRuntimeTask(projectId: string, taskId: string): Promise<RuntimeTaskObservation>;
-  systemRuntimeTask(taskId: string): Promise<RuntimeTaskObservation>;
+  projectRuntimeStatistics(projectId: string, query: RuntimeStatisticsQuery): Promise<RuntimeCompleteReport>;
+  systemRuntimeStatistics(query: RuntimeStatisticsQuery): Promise<RuntimeCompleteReport>;
+  projectRuntimeTask(projectId: string, taskId: string): Promise<RuntimeCompleteReport>;
+  systemRuntimeTask(taskId: string): Promise<RuntimeCompleteReport>;
+  runtimeReportStatus(projectId:string|undefined,reportId:string):Promise<RuntimeCompleteReport>;
+  runtimeReportPage<T>(projectId:string|undefined,reportId:string,query:RuntimeReportPageQuery):Promise<RuntimeReportPage<T>>;
   executionObservations(taskId: string, query?: ExecutionObservationInput): Promise<ExecutionObservationPage>;
   executionCostVisibility(projectId: string): Promise<ExecutionCostVisibilityDto>;
   setExecutionCostVisibility(projectId: string, input: SetExecutionCostVisibility): Promise<ExecutionCostVisibilityDto>;
@@ -35,6 +37,8 @@ export function observabilityResource(transport: Transport): ObservabilityResour
     systemRuntimeStatistics: (query) => transport.request('GET', '/v1/admin/observability/statistics', { query: { ...query } }),
     projectRuntimeTask: (id, taskId) => transport.request('GET', project(id) + '/observability/tasks/' + segment(taskId)),
     systemRuntimeTask: (taskId) => transport.request('GET', '/v1/admin/observability/tasks/' + segment(taskId)),
+    runtimeReportStatus: (id,reportId)=>transport.request('GET',(id?project(id):'/v1/admin')+'/observability/reports/'+segment(reportId)),
+    runtimeReportPage: <T>(id:string|undefined,reportId:string,query:RuntimeReportPageQuery)=>transport.request<RuntimeReportPage<T>>('GET',(id?project(id):'/v1/admin')+'/observability/reports/'+segment(reportId)+'/pages',{query:{...query}}),
     executionObservations: (id, query = {}) => transport.request('GET', '/v3/business-tasks/' + segment(id) + '/observations', { query }),
     executionCostVisibility: (id) => transport.request('GET', visibility(id)),
     setExecutionCostVisibility: (id, body) => transport.request('PUT', visibility(id), { body }),

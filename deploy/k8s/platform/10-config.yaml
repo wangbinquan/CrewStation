@@ -5,6 +5,7 @@ metadata:
   name: crewstation-env
   namespace: crewstation-system
 data:
+  CS_RUNTIME_REPORT_DATA_ROOT: /var/lib/crewstation/observability
   CS_USER_DOMAIN: cs.localhost
   CS_SERVICE_DOMAIN: svc.cs.internal
   CS_SYSTEM_NAMESPACE: crewstation-system

@@ -38,6 +38,8 @@ export interface ProfileLaunchMaterial extends ProfileLaunchMetadata {
  */
 export interface AgentRuntimeModuleApi {
   readonly name: 'agent-runtime';
+  /** Internal ownership witness; no test logs, launch material or credentials are returned. */
+  originalInfrastructureOwnership(key: string, representation?: 'current' | 'legacy'): Promise<{ complete: true; id: string; scope: 'platform'; projectIds: readonly []; revision: string } | undefined>;
   readonly deletionOwner?: ProjectDeletionOwner;
   applyResourceChange(actor: Actor, projectId: ProjectId, input: { operationId: string; target: ResourceTarget; expectedRevision: string; values: ResourceValues }): Promise<{ revision: string; effect: string; applied: boolean }>;
   resourceChangeReceipt(projectId: ProjectId, operationId: string): Promise<{ revision: string; effect: string; applied: boolean } | undefined>;

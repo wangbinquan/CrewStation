@@ -2,7 +2,7 @@
 import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
-import { RuntimeNativeCaptureSchema } from '@crewstation/contracts';
+import { RuntimeNativeCaptureSchema, RuntimeTaskObservationSchema } from '@crewstation/contracts';
 import { renderApp } from './renderApp';
 import { openDialog } from './confirmDialogDriver';
 import { runtimeStatisticsFixture } from './runtimeStatisticsFixture';
@@ -45,7 +45,7 @@ test('attempt swimlane opens immediate details and zoom only changes the local t
   attempt.metrics = { ...attempt.metrics, tokens: { ...attempt.metrics.tokens, input: '280', total: '300' }, cost: { ...attempt.metrics.cost, amount: '1.25' } };
   attempt.durationMs = 15000; attempt.endedAt = '2026-09-28T00:00:15.000Z';
   await page.reread(); expect(openDialog().textContent).toContain('¥1.25'); expect(openDialog().textContent).toContain('300'); expect(openDialog().textContent).toContain('15.0 s');
-  await act(async () => openDialog().dispatchEvent(new Event('cancel', { cancelable: true }))); await page.settle(); expect(document.activeElement).toBe(bar);
+  await act(async () => openDialog().dispatchEvent(new Event('cancel', { cancelable: true }))); await page.settle(); expect(document.activeElement).toBe(document.querySelector('[aria-label="Agent 0 · 第 1 次 · 15.0 s"]'));
   await page.click('放大 2 倍'); expect(document.querySelector<HTMLElement>('[aria-label="Agent 执行泳道"]')?.firstElementChild?.getAttribute('style')).toContain('1200');
   await page.click('适应宽度'); expect(page.text()).toContain('活跃时间并集');
 });
@@ -100,37 +100,27 @@ test('both scopes show named profile contributions and have no CSV operation', a
 test('each trend column prints exact tokens and unknown or zero has no positive bar', async () => {
   const f = runtimeStatisticsFixture();
   for (const [i, total] of ['90071992547409930001', '0', '0', '2500'].entries()) {
-    const row = f.data.trend[i]!; row.metrics = { ...row.metrics, tokens: { ...row.metrics.tokens, total, hasKnown: i !== 2, complete: i < 2 } };
+    const row = f.data.trend[i]!; row.metrics = { ...row.metrics, tokens: { ...row.metrics.tokens, input: total, cacheRead:'0',cacheWrite:'0',output:'0',total, hasKnown: i !== 2, complete: true } };
   }
   page = await renderApp('/admin/observability?' + f.query);
   const columns = document.querySelectorAll<HTMLButtonElement>('[aria-label="任务与 Token 趋势"] button');
-  expect([...columns].slice(0, 4).map((b) => b.firstElementChild?.textContent)).toEqual(['90,071,992,547,409,930,001', '0', '—', '≥ 2,500']);
+  expect([...columns].slice(0, 4).map((b) => b.firstElementChild?.textContent)).toEqual(['90,071,992,547,409,930,001', '0', '—', '2,500']);
   expect(columns[1]!.lastElementChild?.children.length).toBe(0); expect(columns[2]!.lastElementChild?.children.length).toBe(0);
 });
 
-test('native capture evidence stays inside the selected attempt dialog, follows refresh and preserves focus', async () => {
-  const f = runtimeStatisticsFixture(), task = f.details[0]!, attempt = task.attempts[0]!;
-  const capture = RuntimeNativeCaptureSchema.parse({ id: 'native-proof', identity: { projectId: task.projectId, taskId: task.id, subtaskId: attempt.id, executionId: attempt.executionId, executionGeneration: attempt.attempt }, sourceId: 'runner',
-    proof: { contract: 'opencode-child-steps-v1', lineageKey: 'session', turn: 'turn', turnIndex: 0, state: 'pending', root: 'root', observedAt: f.from,
-      baseline: { kind: 'fresh', fingerprint: null }, fingerprint: null, sessions: 0, steps: 0, emitted: 0, baselineSteps: 0, priorRevisionGap: false, issues: [] },
-    state: 'pending', receivedSteps: 0, receivedBaselineSteps: 0, unresolvedBaselineSteps: 0, revisedBaselineSteps: 0, historicalRevisionGap: false, issues: [] });
-  attempt.nativeCaptures = [capture];
-  page = await renderApp('/admin/observability/tasks/' + task.id + '?' + f.query);
-  const bar = document.querySelector<HTMLButtonElement>('[aria-label="Agent 0 · 第 1 次 · 10.0 s"]')!;
-  expect(page.text()).not.toContain('原生采集完整性'); bar.focus(); await act(async () => bar.click()); await page.settle();
-  expect(openDialog().textContent).toContain('原生采集完整性'); expect(openDialog().textContent).toContain('采集中');
-  expect(openDialog().querySelectorAll('select option')).toHaveLength(1);
-  attempt.nativeCaptures = [{ ...capture, state: 'partial', historicalRevisionGap: true, issues: ['native-prior-revision-gap', 'collector-new-gap'], revisedBaselineSteps: 1 }];
-  await page.reread(); expect(openDialog().textContent).toContain('部分采集'); expect(openDialog().textContent).toContain('历史修订尚未补算');
-  expect(openDialog().textContent).toContain('历史步骤已修订，原任务数值待核对'); expect(openDialog().textContent).toContain('采集器报告了其他数据缺口，请查看运行日志。');
-  attempt.nativeCaptures = [{ ...capture, state: 'complete', correctedBaselineSteps: 1 }];
-  await page.reread();
-  expect(openDialog().textContent).toContain('已校正历史步骤');
-  expect(openDialog().textContent).not.toContain('历史修订尚未补算');
-  const corrected = [...openDialog().querySelectorAll('dt')].find((row) => row.textContent === '已校正历史步骤');
-  expect(corrected?.nextElementSibling?.textContent).toBe('1');
-  await act(async () => openDialog().dispatchEvent(new Event('cancel', { cancelable: true }))); await page.settle();
-  expect(document.activeElement).toBe(bar); expect(document.querySelector('dialog')).toBeNull();
+test('incomplete native evidence publishes no statistics; completed proof exposes corrections and returns focus', async () => {
+ const f=runtimeStatisticsFixture(),task=f.details[0]!,attempt=task.attempts[0]!;
+ const capture=RuntimeNativeCaptureSchema.parse({id:'native-proof',identity:{projectId:task.projectId,taskId:task.id,subtaskId:attempt.id,executionId:attempt.executionId,executionGeneration:attempt.attempt},sourceId:'runner',proof:{contract:'opencode-child-steps-v1',lineageKey:'session',turn:'turn',turnIndex:0,state:'pending',root:'root',observedAt:f.from,baseline:{kind:'fresh',fingerprint:null},fingerprint:null,sessions:0,steps:0,emitted:0,baselineSteps:0,priorRevisionGap:false,issues:[]},state:'pending',receivedSteps:0,receivedBaselineSteps:0,unresolvedBaselineSteps:0,revisedBaselineSteps:0,historicalRevisionGap:false,issues:[]});
+ attempt.nativeCaptures=[capture];page=await renderApp('/admin/observability/tasks/'+task.id+'?'+f.query);
+ expect(page.text()).toContain('完整统计尚未就绪');expect(page.text()).toContain('原生采集完整性尚未核对');expect(document.querySelector('[data-runtime-metrics]')).toBeNull();expect(page.text()).not.toContain('¥');expect(document.querySelector('[aria-label="Agent 执行泳道"]')).toBeNull();
+ attempt.nativeCaptures=[{...capture,state:'partial',historicalRevisionGap:true,issues:['native-prior-revision-gap','collector-new-gap'],revisedBaselineSteps:1}];await page.reread();
+ expect(page.text()).toContain('完整统计尚未就绪');expect(document.querySelector('[data-runtime-metrics]')).toBeNull();expect(page.text()).not.toContain('≥');
+ attempt.nativeCaptures=[{...capture,state:'complete',receivedSteps:1,correctedBaselineSteps:1,proof:{...capture.proof,state:'complete',fingerprint:'complete-original-fixture',sessions:1,steps:1,emitted:1}}];await page.reread();await page.settle();
+ const bar=document.querySelector<HTMLButtonElement>('[aria-label="Agent 0 · 第 1 次 · 10.0 s"]')!;bar.focus();await act(async()=>bar.click());await page.settle();
+ expect(openDialog().textContent).toContain('原生采集完整性');expect(openDialog().textContent).toContain('采集完整');await page.click('第 1 轮');
+ const corrected=[...openDialog().querySelectorAll('dt')].find(row=>row.textContent==='已校正历史步骤');expect(corrected?.nextElementSibling?.textContent).toBe('1');expect(openDialog().textContent).not.toContain('历史修订尚未补算');
+ await act(async()=>openDialog().dispatchEvent(new Event('cancel',{cancelable:true})));await page.settle();expect(document.activeElement?.textContent).toContain('第 1 轮');
+ await act(async()=>openDialog().dispatchEvent(new Event('cancel',{cancelable:true})));await page.settle();expect(document.activeElement).toBe(bar);expect(document.querySelector('dialog')).toBeNull();
 });
 
 // Acceptance regression: input/cache/output must be readable at both levels and every task/Agent/compute grouping.
@@ -166,4 +156,31 @@ test('older incomplete zero without per-bucket evidence is unobserved, but newer
   const f = runtimeStatisticsFixture(), m = { ...f.metrics, tokens: { ...f.metrics.tokens, complete: false } };
   expect(runtimeTokens(m, 'cacheRead')).toBe('—');
   expect(runtimeTokens({ ...m, tokens: { ...m.tokens, hasKnownBuckets: { input: true, cacheRead: true, cacheWrite: true, output: true } } }, 'cacheRead')).toBe('≥ 0');
+});
+
+// Transport pagination must never change the full task population or global four-bin totals.
+test('201 original tasks keep full totals while paging, drilling the final row and returning to its page',async()=>{
+ const f=runtimeStatisticsFixture(),base=f.details[0]!;
+ for(let i=24;i<201;i++){const id=Bun.randomUUIDv7(),attempt={...base.attempts[0]!,id:Bun.randomUUIDv7(),taskId:id,executionId:Bun.randomUUIDv7(),agentId:Bun.randomUUIDv7(),name:'Agent '+i};const task=RuntimeTaskObservationSchema.parse({...base,id,name:'Task '+i,attempts:[attempt]});f.details.push(task);const {attempts:_a,scope:_s,asOf:_at,partial:_p,...summary}=task;f.data.tasks.push(summary);}
+ page=await renderApp('/admin/observability?tab=tasks&'+f.query);expect(document.querySelectorAll('[data-runtime-task-id]')).toHaveLength(100);expect(page.text()).toContain('总计 201 条');
+ await page.click('下一页');expect(document.querySelectorAll('[data-runtime-task-id]')).toHaveLength(100);await page.click('下一页');expect(document.querySelectorAll('[data-runtime-task-id]')).toHaveLength(1);expect(page.text()).toContain('Task 200');
+ await page.click('Task 200');const reportId=page.search().reportId;expect(page.path()).toContain('/tasks/'+f.details[200]!.id);expect(page.text()).toContain('Agent 200');expect(page.search().reportId).toBeDefined();await page.click('返回统计列表');
+ expect(document.querySelectorAll('[data-runtime-task-id]')).toHaveLength(1);expect(document.activeElement?.textContent).toBe('Task 200');await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('[role=tab]')].find(tab=>tab.textContent==='总览')!.click());await page.settle();expect(page.search().tab).toBe('overview');expect(document.querySelector('[data-runtime-metrics]')?.textContent).toContain('20,100');expect(document.querySelector('[data-runtime-metrics]')?.textContent).toContain('16,080');expect(document.querySelector('[data-runtime-metrics]')?.textContent).toContain('4,020');expect(page.search().reportId).toBe(reportId);
+});
+
+test.each(['agents', 'usage'] as const)('long contribution dialog returns to its final page, internal scroll and task focus for %s', async tab => {
+ const f=runtimeStatisticsFixture(),base=f.details[0]!;
+ for(let i=24;i<201;i++){const id=Bun.randomUUIDv7(),attempt={...base.attempts[0]!,id:Bun.randomUUIDv7(),taskId:id,executionId:Bun.randomUUIDv7(),agentId:Bun.randomUUIDv7(),name:'Agent '+i};const task=RuntimeTaskObservationSchema.parse({...base,id,name:'Task '+i,attempts:[attempt]});f.details.push(task);const {attempts:_a,scope:_s,asOf:_at,partial:_p,...summary}=task;f.data.tasks.push(summary);}
+ const parts=f.data.tasks.map(task=>({taskId:task.id,metrics:task.metrics,attempts:1}));f.data.agents[0]!.tasks=parts;f.data.profiles[0]!.tasks=parts;
+ page=await renderApp('/admin/observability?tab='+tab+'&'+f.query);
+ const label=tab==='agents'?'Agent 0':'Compute 0 · r7';await page.click(label);await page.click('下一页');await page.click('下一页');
+ expect(openDialog().querySelectorAll('[data-runtime-task-id]')).toHaveLength(1);expect(openDialog().textContent).toContain('总计 201 条');
+ const dialogBody=openDialog().firstElementChild!.children[1] as HTMLElement,main=document.querySelector('main')!;
+ dialogBody.scrollTop=270;main.scrollTop=350;const taskButton=openDialog().querySelector<HTMLButtonElement>('[data-runtime-task-id] button')!;taskButton.focus();
+ await page.click('Task 200');const reportId=page.search().reportId;expect(page.path()).toContain('/tasks/'+f.details[200]!.id);await page.click('返回统计列表');
+ await act(async()=>{await new Promise(resolve=>requestAnimationFrame(resolve));});
+ const restored=openDialog().querySelector<HTMLButtonElement>('[data-runtime-task-id] button')!;
+ expect(openDialog().querySelectorAll('[data-runtime-task-id]')).toHaveLength(1);expect(restored.textContent).toBe('Task 200');expect(document.activeElement).toBe(restored);
+ expect((openDialog().firstElementChild!.children[1] as HTMLElement).scrollTop).toBe(270);expect(main.scrollTop).toBe(350);expect(page.search().reportId).toBe(reportId);
+ await act(async()=>openDialog().dispatchEvent(new Event('cancel',{cancelable:true})));await page.settle();expect(document.activeElement?.textContent).toBe(label);
 });

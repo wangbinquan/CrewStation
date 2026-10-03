@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test
 import { sql } from 'drizzle-orm';
 import { newResourceId } from '@crewstation/kernel';
 import { createTestDatabase, testDatabaseAvailable, type TestDatabase } from '@crewstation/testkit';
-import { readDevelopmentObservationFacts, devSessionMigrations } from '../wiring';
+import { readDevelopmentObservationFacts, readDevelopmentObservationTaskPage, readDevelopmentObservationAttemptPage, devSessionMigrations } from '../wiring';
 import { developmentUsageFixture } from './developmentUsageFixture';
 
 const available = await testDatabaseAvailable(); let tdb: TestDatabase;
@@ -51,5 +51,14 @@ describe.skipIf(!available)('development safe runtime owner facts', () => {
     const page = await readDevelopmentObservationFacts(tdb.db, query); expect(page.items).toHaveLength(200); expect(page.partial).toBe(true);
     const missing = await tdb.db.execute<{ execution_task_id: string }>(sql`SELECT execution_task_id FROM dev_session.development_agent_usage ORDER BY accepted_at::timestamptz DESC,execution_task_id OFFSET 200 LIMIT 1`);
     const detail = await readDevelopmentObservationFacts(tdb.db, { ...query, taskId: missing[0]!.execution_task_id }); expect(detail.items).toHaveLength(1); expect(detail.partial).toBe(false); expect(last).not.toBe('');
+    const all: string[] = []; let after: string | undefined;
+    do { const full = await readDevelopmentObservationTaskPage(tdb.db, { ...query, pageSize: 37, ...(after === undefined ? {} : { after }) }); all.push(...full.items.map((row) => row.id)); after = full.nextCursor ?? undefined; } while (after !== undefined);
+    const originals = await tdb.db.execute<{ execution_task_id: string }>(sql`SELECT execution_task_id FROM dev_session.development_agent_usage ORDER BY accepted_at::timestamptz DESC, execution_task_id`);
+    expect(all).toEqual(originals.map((row) => row.execution_task_id)); expect(new Set(all).size).toBe(201);
+    const attempt = await readDevelopmentObservationAttemptPage(tdb.db, { ...query, taskId: missing[0]!.execution_task_id, pageSize: 37 });
+    expect(attempt.nextCursor).toBeNull(); expect(attempt.items).toEqual(detail.items[0]!.attempts);
+    const first = await readDevelopmentObservationTaskPage(tdb.db, { ...query, pageSize: 37 });
+    await expect(readDevelopmentObservationTaskPage(tdb.db, { ...query, projectId: newResourceId(), pageSize: 37, after: first.nextCursor! })).rejects.toMatchObject({ kind: 'validation' });
+
   }, 60_000);
 });

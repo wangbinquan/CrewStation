@@ -1,3 +1,4 @@
+import {installRuntimeCompleteFixture} from './runtimeCompleteFixture';
 import { RUNTIME_IMAGES } from './computeProfileFixture';
 import { RuntimeTaskObservationSchema, SystemRuntimeStatisticsSchema, ProjectRuntimeStatisticsSchema, RuntimeUsageMetricsSchema } from '@crewstation/contracts';
 import { adminDirectoryFixture } from './adminDirectoryFixture';
@@ -33,5 +34,6 @@ export function runtimeStatisticsFixture() {
     if (!project) return Response.json(value);
     const { models: _m, ...common } = value; return Response.json(ProjectRuntimeStatisticsSchema.parse(hide({ ...common, scope: 'project', projectId })));
   }) as typeof fetch;
+  installRuntimeCompleteFixture(()=>details,reads);
   return { projectId, from, to, data, details, metrics, state, reads, directory, query: `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}` };
 }

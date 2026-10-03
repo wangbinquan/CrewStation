@@ -1,4 +1,4 @@
-import type { AcceptedArchiveFinalization, AcceptedArchiveRevision, BusinessExecutionTaskPage, BusinessExecutionTaskQuery, BusinessTaskStorageDetail } from '@crewstation/contracts';
+import type { AcceptedArchiveFinalization, AcceptedArchiveRevision, BusinessExecutionTaskPage, BusinessExecutionTaskQuery, BusinessTaskStorageDetail, ProjectDeletionOwner } from '@crewstation/contracts';
 import type { BusinessReleaseHandoff } from './releaseHandoff';
 import type { ClusterOperation, ClusterResource, ClusterInspectRequest, Actor, BusinessTaskDto, BusinessTaskState, CreateBusinessTaskRequest, DomainPayload, ProjectId, ServiceActor, SubmitSubtaskRequest, SubtaskDto, SubtaskId, SubtaskMessageRequest, TaskId } from '@crewstation/contracts';
 import type { LegacyRecoveryResult } from './legacyRecovery';
@@ -14,6 +14,8 @@ export interface TraceBusinessTaskDto {
 
 /** business-task 对外能力：业务服务以自身身份创建任务并提交契约化子任务；用户只读查看。 */
 export interface BusinessTaskModuleApi extends BusinessTaskRecoveryApi, BusinessStorageOperatorApi {
+  readonly deletionOwner: ProjectDeletionOwner;
+  originalInfrastructureOwnership(kind: 'task' | 'subtask', key: string, representation?: 'current' | 'legacy'): Promise<{ complete: true; id: string; scope: 'project'; projectIds: readonly ProjectId[]; revision: string } | undefined>;
   listProjectTaskStorage(actor: Actor, projectId: ProjectId, query: Omit<BusinessExecutionTaskQuery, 'projectId'>): Promise<BusinessExecutionTaskPage>;
   describeTaskStorage(actor: Actor, taskId: TaskId): Promise<BusinessTaskStorageDetail>;
   /** Internal lookup for data archive plans; a caller cannot self-assert task ownership. */

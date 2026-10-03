@@ -32,9 +32,13 @@ spec:
             - { name: CS_PLATFORM_POD_UID, valueFrom: { fieldRef: { fieldPath: metadata.uid } } }
             - { name: POD_IP, valueFrom: { fieldRef: { fieldPath: status.podIP } } }
 
+          volumeMounts:
+            - { name: runtime-report-spool, mountPath: /var/lib/crewstation/observability }
           readinessProbe: { httpGet: { path: /healthz, port: 8080 }, periodSeconds: 5, timeoutSeconds: 5 }
           livenessProbe: { httpGet: { path: /healthz, port: 8080 }, periodSeconds: 15, initialDelaySeconds: 10, timeoutSeconds: 5 }
           resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: "1", memory: 1Gi } }
+      volumes:
+        - { name: runtime-report-spool, emptyDir: {} }
 ---
 apiVersion: v1
 kind: Service

@@ -29,6 +29,12 @@ export const RuntimeTaskFactSchema = z.strictObject({
 });
 export type RuntimeAttemptFact = z.infer<typeof RuntimeAttemptFactSchema>;
 export type RuntimeTaskFact = z.infer<typeof RuntimeTaskFactSchema>;
+/** Complete-report owner headers exclude independently paged attempts. */
+export const RuntimeTaskHeaderFactSchema = RuntimeTaskFactSchema.omit({ attempts: true, attemptsPartial: true });
+export type RuntimeTaskHeaderFact = z.infer<typeof RuntimeTaskHeaderFactSchema>;
+export interface RuntimeOwnerPage<T> { readonly items: readonly T[]; readonly nextCursor: string | null }
+export interface RuntimeOwnerPageQuery extends RuntimeFactQuery { readonly pageSize: number; readonly after?: string }
+
 export interface RuntimeFactQuery extends RuntimeStatisticsQuery { projectId?: string; taskId?: string }
 export interface RuntimeFactPage { items: RuntimeTaskFact[]; partial: boolean; sourceScope?: 'business-tasks' | 'project-executions' }
 

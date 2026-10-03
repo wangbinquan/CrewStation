@@ -19,11 +19,11 @@ export function validateRuntimeFacts(tasks: RuntimeTaskFact[]) {
       task.closedAt !== null || a.startedAt !== null || a.endedAt !== null) throw conflict('开发观测事实没有唯一的原执行身份');
   }
 }
-export function runtimeLedgerScope(task: RuntimeTaskFact) {
+export function runtimeLedgerScope(task: Pick<RuntimeTaskFact, 'id' | 'projectId' | 'source'>) {
   return { projectId: task.projectId, taskId: task.source?.kind === 'development-agent' ? task.source.identity.taskId : task.id };
 }
 /** Coarse ownership retains wrong Agent evidence as unknown, while excluding unselected siblings. */
-export function runtimeOwnsIdentity(task: RuntimeTaskFact, i: UsageExecutionIdentity) {
+export function runtimeOwnsIdentity(task: Pick<RuntimeTaskFact, 'id' | 'projectId' | 'source'>, i: UsageExecutionIdentity) {
   const scope = runtimeLedgerScope(task);
   if (i.projectId !== scope.projectId || i.taskId !== scope.taskId) return false;
   if (task.source?.kind === 'development-agent') return 'sourceKind' in i && i.sourceKind === 'development-agent' && i.executionId === task.id && i.executionGeneration === 1;

@@ -1,4 +1,5 @@
-import type { ProjectRuntimeStatistics, RuntimeStatisticsQuery, RuntimeTaskObservation, SystemRuntimeStatistics, ExecutionCostVisibilityDto, ExecutionObservationV2Page, ExecutionObservationPage, ExecutionObservationQuery, SetExecutionCostVisibility, UsageValuation, UsageExecutionIdentity, UsageRecord, Actor, AlertDto, HealthDto, LogEntryDto, LogQuery, ProjectId, TaskId, TraceChainDto, TraceEventDto, TraceEventsQuery, TraceId, TraceListQuery, TraceSummaryDto, SaveTokenPrice, TokenPriceHistory, TokenPricePageQuery, TokenPriceProfile, TokenPriceVersion } from "@crewstation/contracts";
+import type {RuntimeCompleteReport,RuntimeReportPage,RuntimeReportPageQuery} from '@crewstation/contracts';
+import type { RuntimeStatisticsQuery, ExecutionCostVisibilityDto, ExecutionObservationV2Page, ExecutionObservationPage, ExecutionObservationQuery, SetExecutionCostVisibility, UsageValuation, UsageExecutionIdentity, UsageRecord, Actor, AlertDto, HealthDto, LogEntryDto, LogQuery, ProjectId, TaskId, TraceChainDto, TraceEventDto, TraceEventsQuery, TraceId, TraceListQuery, TraceSummaryDto, SaveTokenPrice, TokenPriceHistory, TokenPricePageQuery, TokenPriceProfile, TokenPriceVersion } from "@crewstation/contracts";
 import type { ProjectDeletionOwner } from '@crewstation/contracts';
 
 /** Public input/output values are independent of persistence ports. Wiring checks their structural compatibility. */
@@ -19,11 +20,15 @@ export interface ExecutionObservationCaller { identity: string; token?: string }
 
 export interface ObservabilityModuleApi extends TokenPricingApi {
   readonly name: 'observability';
+  runtimeCompleteTaskReport(actor:Actor,projectId:ProjectId|null,taskId:TaskId):Promise<RuntimeCompleteReport>;
+  runtimeCompleteReport(actor:Actor,projectId:ProjectId|null,query:RuntimeStatisticsQuery):Promise<RuntimeCompleteReport>;
+  runtimeCompleteReportStatus(actor:Actor,projectId:ProjectId|null,reportId:string):Promise<RuntimeCompleteReport>;
+  runtimeCompleteReportPage(actor:Actor,projectId:ProjectId|null,reportId:string,query:RuntimeReportPageQuery):Promise<RuntimeReportPage<unknown>>;
   readonly deletionOwner?: ProjectDeletionOwner;
-  projectRuntimeStatistics(actor: Actor, projectId: ProjectId, query: RuntimeStatisticsQuery): Promise<ProjectRuntimeStatistics>;
-  systemRuntimeStatistics(actor: Actor, query: RuntimeStatisticsQuery): Promise<SystemRuntimeStatistics>;
-  projectRuntimeTask(actor: Actor, projectId: ProjectId, taskId: TaskId): Promise<RuntimeTaskObservation>;
-  systemRuntimeTask(actor: Actor, taskId: TaskId): Promise<RuntimeTaskObservation>;
+  projectRuntimeStatistics(actor: Actor, projectId: ProjectId, query: RuntimeStatisticsQuery): Promise<RuntimeCompleteReport>;
+  systemRuntimeStatistics(actor: Actor, query: RuntimeStatisticsQuery): Promise<RuntimeCompleteReport>;
+  projectRuntimeTask(actor: Actor, projectId: ProjectId, taskId: TaskId): Promise<RuntimeCompleteReport>;
+  systemRuntimeTask(actor: Actor, taskId: TaskId): Promise<RuntimeCompleteReport>;
   reconcileExecutionUsage(): Promise<number>;
   /** Internal owner admission participant; call before starting this execution. */
   acceptExecutionPrice(input: ExecutionPriceInput): Promise<AcceptedExecutionPrice>;
@@ -53,3 +58,5 @@ export interface TokenPricingApi {
   priceHistory(actor: Actor, profileId: string, query: TokenPricePageQuery): Promise<TokenPriceHistory>;
   savePrice(actor: Actor, profileId: string, input: SaveTokenPrice): Promise<TokenPriceVersion>;
 }
+
+export type {CompleteRuntimeFactSources,CompleteRuntimeFactSourceFactory} from "./completeRuntimeSources";

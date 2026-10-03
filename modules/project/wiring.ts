@@ -2,14 +2,16 @@ import { sharpAppIconDecoder } from './adapters/media/sharpAppIconDecoder';
 import { appIconUseCases } from './application/appIcons';
 import { appIconRoutes } from './http/appIconRoutes';
 import { join } from 'node:path';
+import { ResourceIdSchema } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import type { Clock } from '@crewstation/kernel';
 import { systemClock } from '@crewstation/kernel';
 import type { IdentityModuleApi } from '@crewstation/module-identity';
 import type { Database, MigrationSet } from '@crewstation/persistence';
-import { keyedLock, readMigrationDir } from '@crewstation/persistence';
+import { keyedLock, readMigrationDir, resourceIdentityDirectory } from '@crewstation/persistence';
 import type { Hono } from 'hono';
 import { drizzleUnitOfWork } from './adapters/persistence/drizzleUnitOfWork';
+import { projectInfrastructureOwnership } from './adapters/persistence/drizzleProjectRepositories';
 import type { ProjectModuleApi } from './api/moduleApi';
 import { archiveProjectUseCase } from './application/archiveProject';
 import { authorizationUseCases } from './application/authorization';
@@ -79,6 +81,12 @@ export function createProjectModule(deps: ProjectModuleDeps): ProjectModule {
   };
   const api: ProjectModuleApi = {
     name: 'project',
+    originalInfrastructureOwnership: async (kind,key,representation = 'current') => {
+      const id = representation === 'legacy' && kind !== 'deletion'
+        ? await resourceIdentityDirectory(deps.db,() => [projectMigrations]).resolve(kind,[key]) ?? (ResourceIdSchema.safeParse(key).success ? key : undefined)
+        : key;
+      return id ? projectInfrastructureOwnership(deps.db,kind,id) : undefined;
+    },
     creationCatalog: creationCatalogUseCase(useCaseDeps),
     projectDomainPreview: projectDomainPreviewUseCase(useCaseDeps),
     isAdmin: (userId) => deps.identity.isAdmin(userId),
@@ -103,3 +111,5 @@ export function createProjectModule(deps: ProjectModuleDeps): ProjectModule {
   };
   return { api, http: [projectRoutes(api), catalogRoutes(api), appListingRoutes(api), appIconRoutes(api), appAccessRoutes(api), servicePolicyRoutes(api)], migrations: projectMigrations };
 }
+
+export { readProjectObservationName } from './adapters/persistence/observationNames';

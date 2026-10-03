@@ -58,6 +58,10 @@ export type MarketListing = Omit<MarketAppDto, 'production' | 'entry'> & { servi
 /** project 模块对外能力；其他模块经 ports 注入其中的子集。 */
 export interface ProjectModuleApi extends ProjectDeletionApi {
   readonly name: 'project';
+  /** Internal canonical ownership only. Project/operation minimum IDs survive completion; absent service lineage stays unavailable. */
+  originalInfrastructureOwnership(kind: 'project'|'service'|'deletion', key: string, representation?: 'current'|'legacy'): Promise<{
+    complete: true; id: string; scope: 'project'; projectIds: readonly ProjectId[]; revision: string;
+  } | undefined>;
   isAdmin(userId: UserId): Promise<boolean>;
   roleOf(actor: Actor, projectId: ProjectId): Promise<EffectiveRole | undefined>;
   /** 无权限时抛 forbidden；非成员抛 not_found。 */

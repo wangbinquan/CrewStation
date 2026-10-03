@@ -39,3 +39,5 @@ export type LogQuery = z.infer<typeof LogQuerySchema>;
 export type LogEntryDto = z.infer<typeof LogEntryDtoSchema>;
 export type HealthDto = z.infer<typeof HealthDtoSchema>;
 export type AlertDto = z.infer<typeof AlertDtoSchema>;
+
+export * from './observability/completeRuntimeReport';

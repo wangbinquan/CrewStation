@@ -26,11 +26,11 @@ export function observabilityRoutes(api: ObservabilityModuleApi, isAdmin: (userI
     const p = parseParams(c, traceParams.extend({ taskId: TaskIdSchema }));
     return c.json(await api.listTraceEvents(await actor(c), p.projectId as ProjectId, p.traceId as TraceId, p.taskId as TaskId, parseQuery(c, TraceEventsQuerySchema)));
   });
-  r.get('/v1/projects/:projectId/observability/statistics', async (c) => c.json(await api.projectRuntimeStatistics(await actor(c), pid(c), parseQuery(c, RuntimeStatisticsQuerySchema))));
-  r.get('/v1/admin/observability/statistics', async (c) => c.json(await api.systemRuntimeStatistics(await actor(c), parseQuery(c, RuntimeStatisticsQuerySchema))));
+  r.get('/v1/projects/:projectId/observability/statistics', async (c) => c.json(await api.runtimeCompleteReport(await actor(c), pid(c), parseQuery(c, RuntimeStatisticsQuerySchema))));
+  r.get('/v1/admin/observability/statistics', async (c) => c.json(await api.runtimeCompleteReport(await actor(c),null, parseQuery(c, RuntimeStatisticsQuerySchema))));
   r.get('/v1/projects/:projectId/observability/tasks/:taskId', async (c) => {
-    const p = parseParams(c, projectParams.extend({ taskId: TaskIdSchema })); return c.json(await api.projectRuntimeTask(await actor(c), p.projectId as ProjectId, p.taskId as TaskId));
+    const p = parseParams(c, projectParams.extend({ taskId: TaskIdSchema })); return c.json(await api.runtimeCompleteTaskReport(await actor(c), p.projectId as ProjectId, p.taskId as TaskId));
   });
-  r.get('/v1/admin/observability/tasks/:taskId', async (c) => c.json(await api.systemRuntimeTask(await actor(c), parseParams(c, z.object({ taskId: TaskIdSchema })).taskId as TaskId)));
+  r.get('/v1/admin/observability/tasks/:taskId', async (c) => c.json(await api.runtimeCompleteTaskReport(await actor(c),null, parseParams(c, z.object({ taskId: TaskIdSchema })).taskId as TaskId)));
   return r;
 }

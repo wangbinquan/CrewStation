@@ -74,7 +74,7 @@ export interface DevSessionModule {
   readonly migrations: MigrationSet;
 }
 
-export { readDevelopmentObservationFacts } from './adapters/persistence/developmentObservationFacts';
+export { readDevelopmentObservationFacts, readDevelopmentObservationTaskPage, readDevelopmentObservationAttemptPage } from './adapters/persistence/developmentObservationFacts';
 
 export const devSessionMigrations: MigrationSet = {
   module: 'dev_session',

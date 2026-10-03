@@ -8,3 +8,7 @@ export { jsonDocument } from './jsonDocument';
 export { keyedLock } from './keyedLock';
 export { resourceIdentityDirectory } from './identity/identityDirectory';
 export type { ResourceIdentityDirectory } from './identity/identityDirectory';
+
+export { originalReportSnapshotSession } from './reportSnapshot';
+export type { OriginalReportSnapshot, ReportSnapshotSession } from './reportSnapshot';
+export type { ReportWorkingRow, ReportWorkingPage, ReportWorkspace } from './reportWorkspace';

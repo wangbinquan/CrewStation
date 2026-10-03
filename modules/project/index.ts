@@ -3,3 +3,5 @@ export { createProjectModule, projectMigrations } from './wiring';
 export type { ProjectModule, ProjectModuleDeps } from './wiring';
 export type { ProjectDeletionApi, ProjectDeletionLease } from './api/deletion';
 export { namespaceQuotaRevision, serviceAllocationRevision, executionQuotaRevision, servicePlanAllowed } from './api/resourceRevisions';
+
+export { readProjectObservationName } from './wiring';

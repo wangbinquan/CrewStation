@@ -15,7 +15,7 @@ test('both levels show direct purpose controls, actual token labels and explicit
     page=await renderApp(root+'?'+f.query);expect(page.text()).toContain('用途与消耗');expect(page.text()).toContain('开发生产采集未开启');expect(page.text()).toContain('9,007,199,254,741,200');
     expect(page.text()).toContain('任务 / 开发执行');expect(page.text()).not.toContain('CSV');expect(page.text()).not.toContain('更多筛选');expect(document.querySelectorAll('[data-runtime-source]')).toHaveLength(2);
     await page.click('开发 Agent');expect(page.search().sourceKind).toBe('development-agent');expect(page.text()).toContain('9,007,199,254,741,000');
-    expect(f.reads.at(-1)).toContain('sourceKind=development-agent');expect(document.querySelector<HTMLButtonElement>('[aria-label="用途与消耗"] [aria-pressed="true"]')?.textContent).toBe('开发 Agent');
+    expect(f.reads.filter(read=>read.includes('/statistics')).at(-1)).toContain('sourceKind=development-agent');expect(document.querySelector<HTMLButtonElement>('[aria-label="用途与消耗"] [aria-pressed="true"]')?.textContent).toBe('开发 Agent');
     await page.click('全部用途');expect(page.search().sourceKind).toBeUndefined();page.unmount();page=undefined;
   }
 });
@@ -53,8 +53,9 @@ test('project and system lists retain each original compute name and revision, i
   const f=runtimeSourceStatisticsFixture({differentCompute:true});
   for(const root of ['/admin/observability','/projects/'+f.projectId+'/observability'])for(const tab of ['overview','tasks']){
     page=await renderApp(root+'?tab='+tab+'&sourceKind=development-agent&'+f.query);
-    expect(document.querySelector(`[data-runtime-task-id="${f.development[0]!.id}"]`)?.textContent).toContain('Accepted Compute A · r7');
-    expect(document.querySelector(`[data-runtime-task-id="${f.development[1]!.id}"]`)?.textContent).toContain('Accepted Compute B · r8');
+    for(const [index,label]of ['Accepted Compute A · r7','Accepted Compute B · r8'].entries()){
+      const row=document.querySelector(`[data-runtime-task-id="${f.development[index]!.id}"]`)!;expect(row.querySelector('[data-runtime-accepted-profile]')).not.toBeNull();await act(async()=>row.querySelector<HTMLButtonElement>('[data-runtime-accepted-profile]')!.click());await page.settle();expect(openDialog().textContent).toContain(label);await act(async()=>openDialog().dispatchEvent(new Event('cancel',{cancelable:true})));await page.settle();
+    }
     expect(document.querySelectorAll('[data-runtime-accepted-profile]')).toHaveLength(2);page.unmount();page=undefined;
   }
 });
@@ -64,7 +65,7 @@ test('business list retains multiple original compute profiles and detail labels
   for(const root of ['/admin/observability','/projects/'+f.projectId+'/observability']){
     page=await renderApp(root+'?tab=tasks&sourceKind=business-task&'+f.query);
     const row=document.querySelector(`[data-runtime-task-id="${business.id}"]`)!;
-    expect(row.textContent).toContain('Accepted Business A · r7');expect(row.textContent).toContain('Accepted Business B · r8');
+    await act(async()=>row.querySelector<HTMLButtonElement>('[data-runtime-accepted-profile]')!.click());await page.settle();expect(openDialog().textContent).toContain('Accepted Business A · r7');expect(openDialog().textContent).toContain('Accepted Business B · r8');expect(openDialog().querySelectorAll('tbody tr')).toHaveLength(2);await act(async()=>openDialog().dispatchEvent(new Event('cancel',{cancelable:true})));await page.settle();
     await act(async()=>sourceTaskButton(business.id).click());await page.settle();
     const facts=document.querySelector('[data-runtime-task] dl')!;expect(facts.querySelector('dt')?.textContent).toBe('任务');expect(facts.querySelector('dd')?.textContent).toBe(business.id);
     page.unmount();page=undefined;

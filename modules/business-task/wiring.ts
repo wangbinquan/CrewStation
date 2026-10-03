@@ -59,7 +59,7 @@ import type { EventConsumer } from '@crewstation/eventbus';
 import { createEventConsumer } from '@crewstation/eventbus';
 import type { AppEnv } from '@crewstation/http';
 import type { Clock, Logger } from '@crewstation/kernel';
-import { noopLogger, systemClock } from '@crewstation/kernel';
+import { noopLogger, precondition, systemClock } from '@crewstation/kernel';
 import type { Database, MigrationSet } from '@crewstation/persistence';
 import { readMigrationDir } from '@crewstation/persistence';
 import type { Hono } from 'hono';
@@ -84,8 +84,19 @@ import { executionWorker } from './workers/executionWorker';
 import { executionFileUseCases } from './application/execution/files';
 import { drizzleLegacyMutations } from './adapters/persistence/legacyMutations';
 import { legacyRuntimePorts, legacyWriteApi } from './application/legacyWriteBarrier';
+import { businessProjectWork } from './adapters/persistence/deletion/projectWork';
+import type { BusinessProjectWork, BusinessWorkSources } from './ports/deletion/work';
+import { scopedLegacyPorts } from './application/execution/deletion/legacyWork';
+import { scopedFinalizationPorts } from './application/execution/deletion/finalizationWork';
+import { guardedBusinessPort, scopedBusinessPorts } from './application/execution/deletion/projectWork';
+import { scopedBusinessServiceApi } from './application/execution/deletion/serviceApi';
+import { businessDeletionOwner } from './application/execution/deletion/owner';
+import { businessDeletionRepository } from './adapters/persistence/deletion/repository';
+import { scopedBusinessOperatorApi } from './application/execution/deletion/operatorApi';
+import { scopedBusinessHandoff } from './application/execution/deletion/handoffApi';
 
 export interface BusinessTaskModuleDeps {
+  deletionWorkSources?: BusinessWorkSources;
   taskInputs?: TaskInputPreparation;
   taskStorageStatus?: (serviceId: ServiceId) => Promise<{ available: boolean; reason: string | null }>;
   finalizationPreparation?: FinalizationPreparation;
@@ -110,6 +121,7 @@ export interface BusinessTaskModuleDeps {
 }
 
 export interface BusinessTaskModule {
+  readonly projectWork?: BusinessProjectWork;
   readonly api: BusinessTaskModuleApi;
   readonly http: { service: Hono<AppEnv>; user: Hono<AppEnv> };
   readonly subscriptions: EventConsumer;
@@ -125,50 +137,60 @@ export const businessTaskMigrations: MigrationSet = {
 
 export function createBusinessTaskModule(deps: BusinessTaskModuleDeps): BusinessTaskModule {
   const logger = deps.logger ?? noopLogger;
-  const useCaseDeps: BusinessTaskUseCaseDeps = {
+  const unavailable = async (): Promise<never> => { throw precondition('业务清理的原来源或进程观察器尚未装配'); };
+  const deletionSources: BusinessWorkSources = deps.deletionWorkSources ?? { resolve: async () => undefined, assertAvailable: unavailable, assertGrant: unavailable,
+    processes: { protectCurrent: unavailable, sweep: unavailable } };
+  const deletionOwner = businessDeletionOwner(businessDeletionRepository(deps.db, deletionSources), deletionSources);
+  const useCaseDeps: BusinessTaskUseCaseDeps & { projectWork?: BusinessProjectWork } = {
+    ...(deps.deletionWorkSources ? { projectWork: businessProjectWork(deps.db, deps.deletionWorkSources) } : {}),
     uow: drizzleUnitOfWork(deps.db), environments: deps.environments, runner: deps.runner, directory: deps.directory, authorizer: deps.authorizer,
     compute: deps.compute, settings: deps.settings, clock: deps.clock ?? systemClock, logger,
   };
-  const legacyBarrier = drizzleLegacyMutations(deps.db, deps.settings.legacyOwnerPodUid), legacyDeps = legacyRuntimePorts(useCaseDeps, legacyBarrier);
+  const finalizationPorts = scopedFinalizationPorts(deps.finalizationPreparation, useCaseDeps.projectWork);
+  const scopedRunner = useCaseDeps.projectWork ? guardedBusinessPort(deps.runner, useCaseDeps.projectWork, true, ['getExecutionCompletionProof']) : deps.runner;
+  const legacyBarrier = drizzleLegacyMutations(deps.db, deps.settings.legacyOwnerPodUid), legacyDeps = legacyRuntimePorts(scopedLegacyPorts(useCaseDeps), legacyBarrier);
   const lifecycle = taskLifecycleUseCases(legacyDeps);
   const subtasks = subtaskUseCases(legacyDeps);
   const registerContracts = registerContractsUseCase(useCaseDeps);
   const recoveryRequests = drizzleTaskRecoveryRequests(deps.db);
   const finalizations = finalizationOperations(deps.db);
-  const prepareStorage = deps.finalizationPreparation ? prepareFinalizations(finalizations, finalizationCompletion(deps.db), deps.finalizationPreparation, deps.runner) : async () => 0;
-  const archiveStorage = deps.finalizationPreparation ? archiveFinalizations(finalizations, deps.finalizationPreparation.archive, deps.finalizationPreparation.runtime) : async () => 0;
-  const reviseStorage = deps.finalizationPreparation ? finalizationRevisions(finalizations, deps.finalizationPreparation) : async () => 0;
-  const cleanupStorage = deps.finalizationPreparation ? cleanupFinalizations(finalizations, deps.finalizationPreparation) : async () => 0;
+  const prepareStorage = finalizationPorts ? prepareFinalizations(finalizations, finalizationCompletion(deps.db), finalizationPorts, scopedRunner, useCaseDeps.projectWork) : async () => 0;
+  const archiveStorage = finalizationPorts ? archiveFinalizations(finalizations, finalizationPorts.archive, finalizationPorts.runtime, useCaseDeps.projectWork) : async () => 0;
+  const reviseStorage = finalizationPorts ? finalizationRevisions(finalizations, finalizationPorts, useCaseDeps.projectWork) : async () => 0;
+  const cleanupStorage = finalizationPorts ? cleanupFinalizations(finalizations, finalizationPorts, useCaseDeps.projectWork) : async () => 0;
   const storedControls = drizzleExecutionControls(deps.db, !!deps.storageControl);
-  const synchronizedControls = deps.storageControl ? storageSynchronizedControls(storedControls, storageControlOutbox(deps.db), deps.storageControl, logger) : undefined;
-  const executionDeps = { ...useCaseDeps, storageStatus: completeFinalizationPorts(deps.finalizationPreparation) && deps.runner.getExecutionCompletionProof ? deps.taskStorageStatus : undefined, taskInputs: deps.taskInputs, executionObservations: deps.executionObservations, recoveryRequests, sessions: drizzleExecutionSessions(deps.db), messages: drizzleExecutionMessages(deps.db), agentSecrets: deps.agentSecrets, materials: drizzleExecutionMaterials(deps.db), lifecycles: drizzleExecutionLifecycles(deps.db), runtimeImages: deps.runtimeImages, cancellations: drizzleExecutionCancellations(deps.db), projection: drizzleExecutionProjection(deps.db), subtasks: drizzleExecutionSubtasks(deps.db), cipher: executionCipher(deps.settings.secretKeyBase64), operations: drizzleExecutionOperations(deps.db), controls: synchronizedControls ?? storedControls, sources: deps.executionSources ?? { resolve: async () => undefined } };
+  const synchronizedControls = deps.storageControl ? storageSynchronizedControls(storedControls, storageControlOutbox(deps.db), deps.storageControl, logger, useCaseDeps.projectWork) : undefined;
+  const executionDeps = scopedBusinessPorts({ ...useCaseDeps, storageStatus: completeFinalizationPorts(finalizationPorts) && deps.runner.getExecutionCompletionProof ? deps.taskStorageStatus : undefined, taskInputs: deps.taskInputs, executionObservations: deps.executionObservations, recoveryRequests, sessions: drizzleExecutionSessions(deps.db), messages: drizzleExecutionMessages(deps.db), agentSecrets: deps.agentSecrets, materials: drizzleExecutionMaterials(deps.db), lifecycles: drizzleExecutionLifecycles(deps.db), runtimeImages: deps.runtimeImages, cancellations: drizzleExecutionCancellations(deps.db), projection: drizzleExecutionProjection(deps.db), subtasks: drizzleExecutionSubtasks(deps.db), cipher: executionCipher(deps.settings.secretKeyBase64), operations: drizzleExecutionOperations(deps.db), controls: synchronizedControls ?? storedControls, sources: deps.executionSources ?? { resolve: async () => undefined } }, true);
   const tasksV3 = executionTaskUseCases(executionDeps), { progressSubtask, ...subtasksV3 } = executionSubtaskUseCases(executionDeps);
   const { progressProjection, ...projectionV3 } = executionProjectionUseCases(executionDeps);
   const { progressCancellation, ...cancellationV3 } = executionCancellationUseCases(executionDeps);
   const { progressLifecycle, ...lifecycleV3 } = executionLifecycleUseCases(executionDeps);
   const { progressMessage, ...messagesV3 } = executionMessageUseCases(executionDeps);
-  const v3 = { ...executionCapabilities(executionDeps), ...messagesV3, ...executionMaterialUseCases(executionDeps), ...lifecycleV3, ...executionRetryUseCases(executionDeps), ...cancellationV3, ...tasksV3, ...subtasksV3, ...projectionV3, ...executionControlUseCases(executionDeps), ...executionFileUseCases(executionDeps), ...executionOperationQueries(executionDeps),
-    ...recoveryIntakeUseCases(executionDeps), ...restartExecutionUseCase(executionDeps), ...finalizationIntake(executionDeps, finalizations, deps.finalizationPreparation), ...archiveRevisionIntake(executionDeps, finalizations, deps.finalizationPreparation),
+  const rawV3 = { ...executionCapabilities(executionDeps), ...messagesV3, ...executionMaterialUseCases(executionDeps), ...lifecycleV3, ...executionRetryUseCases(executionDeps), ...cancellationV3, ...tasksV3, ...subtasksV3, ...projectionV3, ...executionControlUseCases(executionDeps), ...executionFileUseCases(executionDeps), ...executionOperationQueries(executionDeps),
+    ...recoveryIntakeUseCases(executionDeps), ...restartExecutionUseCase(executionDeps), ...finalizationIntake(executionDeps, finalizations, finalizationPorts), ...archiveRevisionIntake(executionDeps, finalizations, finalizationPorts),
     runOnce: async () => (await synchronizedControls?.syncPending() ?? 0) + (await tasksV3.runOnce()) + (await progressSubtask()) + (await progressProjection()) + (await progressCancellation()) + (await progressLifecycle()) + (await progressMessage()) + (await recoveryRequests.reconcile()) + (await prepareStorage()) + (await archiveStorage()) + (await cleanupStorage()) + (await reviseStorage()),
   };
+  const v3 = scopedBusinessServiceApi(rawV3, executionDeps);
+  const operatorQueries = recoveryQueries(deps.db);
+  const operatorApi = scopedBusinessOperatorApi({ ...storageOperator(executionDeps, operatorQueries, finalizations, finalizationPorts),
+    ...storageLossOperator(deps.authorizer, operatorQueries, finalizations, finalizationPorts), ...recoveryAdminUseCases(executionDeps, operatorQueries) }, executionDeps, operatorQueries);
   const api: BusinessTaskModuleApi = {
-    ...storageOperator(executionDeps, recoveryQueries(deps.db), finalizations, deps.finalizationPreparation),
-    ...storageLossOperator(deps.authorizer, recoveryQueries(deps.db), finalizations, deps.finalizationPreparation),
+    deletionOwner,
+    ...operatorApi,
     ...taskStorageQueries(recoveryQueries(deps.db), finalizations, deps.authorizer),
     ...projectTaskStorageList(drizzleBusinessTaskList(deps.db), deps.authorizer),
     acceptedArchiveRevision: async (id) => { const change = await finalizations.revision(id); return change?.state === 'pending' ? change : undefined; },
     acceptedFinalization: async (id) => { const op = await finalizations.get(id); return op ? { id: op.id, projectId: op.projectId, serviceId: op.serviceId, spaceId: op.spaceId, taskId: op.view.taskId, taskGeneration: op.view.taskGeneration, volumeUid: op.volumeUid, outcome: op.view.outcome, archive: op.archive } : undefined; },
     archiveTask: async (serviceId, taskId) => { const op = await executionDeps.operations.forTask(serviceId, taskId); return op ? { projectId: op.intent.projectId, completionPolicy: op.intent.task.completionPolicy ?? 'legacy' } : undefined; },
-    ...recoveryAdminUseCases(executionDeps, recoveryQueries(deps.db)),
     ...taskListUseCases(drizzleBusinessTaskList(deps.db)),
-    ...legacyRecoveryUseCases(useCaseDeps, legacyBarrier, deps.legacyRecoveryProof),
+    ...legacyRecoveryUseCases(scopedLegacyPorts(useCaseDeps), legacyBarrier, deps.legacyRecoveryProof),
     imageReferenceState: drizzleImageReferenceState(deps.db),
-    v3, releaseHandoff: releaseHandoffUseCases(executionDeps),
+    v3, releaseHandoff: scopedBusinessHandoff(releaseHandoffUseCases(executionDeps), useCaseDeps.projectWork),
     name: 'business-task',
     ...businessClusterUseCases(legacyDeps, drizzleClusterCommands(deps.db)),
-    getTask: lifecycle.getTask, listProjectTasks: lifecycle.listProjectTasks,
+    listProjectTasks: lifecycle.listProjectTasks,
     ...subtasks,
-    ...legacyWriteApi({ ...lifecycle, ...subtasks }, useCaseDeps, legacyBarrier),
+    ...legacyWriteApi({ ...lifecycle, ...subtasks }, useCaseDeps, legacyBarrier, useCaseDeps.projectWork),
     ...traceTaskQueries(useCaseDeps),
     registerContracts,
   };
@@ -181,6 +203,7 @@ export function createBusinessTaskModule(deps: BusinessTaskModuleDeps): Business
   if (deps.identities) service.route('/', legacyServiceRoutes(api, legacyBusinessIdentity(deps.identities)));
   let timer: ReturnType<typeof setInterval> | undefined;
   return {
+    projectWork: useCaseDeps.projectWork,
     api,
     http: { service, user: userRoutes(api, deps.isAdmin) },
     subscriptions,
@@ -191,3 +214,5 @@ export function createBusinessTaskModule(deps: BusinessTaskModuleDeps): Business
 
 /** Read-only owner source; the composition root supplies its transaction snapshot. */
 export { readBusinessObservationFacts } from './adapters/persistence/task-list/repository';
+
+export { readBusinessObservationTaskPage, readBusinessObservationAttemptPage } from './adapters/persistence/task-list/observationPages';

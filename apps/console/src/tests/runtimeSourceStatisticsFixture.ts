@@ -1,3 +1,4 @@
+import {installRuntimeCompleteFixture} from './runtimeCompleteFixture';
 import type { RuntimeTaskObservation, RuntimeUsageMetrics, RuntimeTaskSummary } from '@crewstation/contracts';
 import { RuntimeTaskObservationSchema, SystemRuntimeStatisticsSchema, ProjectRuntimeStatisticsSchema, UsageNativeCaptureSchema } from '@crewstation/contracts';
 import { runtimeStatisticsFixture } from './runtimeStatisticsFixture';
@@ -50,6 +51,7 @@ export function runtimeSourceStatisticsFixture(options: { development?: boolean;
       trend:f.data.trend.map((r,n)=>({...r,tasks:n===0?picked.length:0,metrics:n===0?metrics:r.metrics})),durations:{samples:picked.filter(r=>!r.source).length,p50Ms:20000,p95Ms:20000,maxMs:20000}});
     if(!project)return Response.json(data);const{models:_m,...common}=data;return Response.json(ProjectRuntimeStatisticsSchema.parse(hide({...common,scope:'project',projectId:f.projectId})));
   }) as typeof fetch;
+  installRuntimeCompleteFixture(()=>details,f.reads);
   return {...f,details,summaries,development:details.filter(r=>r.source?.kind==='development-agent')};
 }
 export function sourceTaskButton(id:string){return document.querySelector<HTMLButtonElement>(`[data-runtime-task-id="${id}"] button`)!;}

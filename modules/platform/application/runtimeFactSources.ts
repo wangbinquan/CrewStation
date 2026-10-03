@@ -25,3 +25,5 @@ export function runtimeFactSources<Snapshot>(owners: RuntimeFactOwners<Snapshot>
     return { items: bounded, partial: clipped || pages.some((page) => page.partial) || items.length > 200, sourceScope: 'project-executions' };
   };
 }
+
+export {completeRuntimeFactSources} from './completeRuntimeFactSources';

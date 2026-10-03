@@ -2,3 +2,5 @@ export type { AgentRuntimeModuleApi, ProfileLaunchMaterial, ProfileLaunchMetadat
 export { createAgentRuntimeModule, agentRuntimeMigrations } from './wiring';
 export type { AgentRuntimeModule, AgentRuntimeModuleDeps } from './wiring';
 export { computeAllocationRevision, taskProfileAllocationRevision } from './api/allocationRevision';
+
+export { readProfileObservationName } from './wiring';

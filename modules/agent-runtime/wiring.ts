@@ -34,6 +34,7 @@ import type { ProfileTestExecutor } from './ports/testExecutor';
 import { testWorker } from './workers/testWorker';
 import { computeDeletionRepository } from './adapters/persistence/deletionRepository';
 import { computeDeletionOwner } from './application/projectDeletion';
+import { profileTestInfrastructureOrigin } from './adapters/persistence/infrastructureOrigins';
 
 export interface AgentRuntimeModuleDeps {
   db: Database;
@@ -88,6 +89,7 @@ export function createAgentRuntimeModule(deps: AgentRuntimeModuleDeps): AgentRun
   });
   const api: AgentRuntimeModuleApi = {
     name: 'agent-runtime',
+    originalInfrastructureOwnership: (key, representation) => profileTestInfrastructureOrigin(deps.db, key, representation),
     ...(deps.projects?.assertProjectDeletionGrant ? { deletionOwner: computeDeletionOwner(deletion, deps.projects.assertProjectDeletionGrant) } : {}),
     ...projectComputePolicyUseCases(useCaseDeps), ...projectProfileUseCases(useCaseDeps),
     ...computeResourceAllocationUseCases(useCaseDeps, deps.isAdmin),
@@ -102,3 +104,5 @@ export function createAgentRuntimeModule(deps: AgentRuntimeModuleDeps): AgentRun
   };
   return { api, http: [computeProfileAdminRoutes(api, deps.isAdmin), computeProfileCatalogRoutes(api), projectComputeRoutes(api, deps.isAdmin)], forwardAuth: [registryForwardAuthRoutes(api)], workers: [testWorker(deps.db, api, logger)], migrations: agentRuntimeMigrations };
 }
+
+export { readProfileObservationName } from './adapters/persistence/observationNames';

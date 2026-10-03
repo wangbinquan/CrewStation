@@ -5,15 +5,15 @@ import { createApp, installShutdown, serve, serveStreams } from '@crewstation/ht
 import { createK8sClient, loadClusterConfig } from '@crewstation/k8s';
 import { createJsonLogger } from '@crewstation/kernel';
 import { createPlatformModule } from '@crewstation/module-platform';
-import { connectDatabase, databaseReady, runMigrations } from '@crewstation/persistence';
+import { connectDatabase, databaseReady, runMigrations,originalReportSnapshotSession } from '@crewstation/persistence';
 import { loadPlatformSettings, portFrom } from '@crewstation/settings';
 
 const name = 'cs-api';
 const logger = createJsonLogger({ service: name });
 const settings = loadPlatformSettings();
-const { db, close } = connectDatabase(settings.databaseUrl);
+const { db, client, close } = connectDatabase(settings.databaseUrl);
 const k8s = createK8sClient(loadClusterConfig());
-const platform = createPlatformModule({ db, k8s, settings, logger, instance: `${name}-${hostname()}` });
+const platform = createPlatformModule({ db, runtimeReportSnapshot:originalReportSnapshotSession({client}), k8s, settings, logger, instance: `${name}-${hostname()}` });
 await platform.api.storageContract.check();
 
 if (process.argv[2] === 'migrate') {

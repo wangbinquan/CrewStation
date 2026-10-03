@@ -1,11 +1,26 @@
-import type { RuntimeFactPage, RuntimeFactQuery } from '@crewstation/contracts';
+import {randomUUID} from 'node:crypto';
+import type {ReportSnapshotSession} from '@crewstation/persistence';
+import type {CompleteRuntimeFactSourceFactory} from './ports/completeRuntimeFactSources';
+import {buildCompleteRuntimeCohort} from './application/complete-statistics/cohort';
+import {buildCompleteRuntimeTask} from './application/completeRuntimeTask';
+import {sealCompleteRuntimeReport} from './application/complete-statistics/reportBuild';
+import {runtimeReportAdmissionKey} from './ports/completeRuntimeReportCache';
+import {completeRuntimeReportUseCases} from './application/complete-statistics/reportService';
+import {completeRuntimeReportCache,originalRuntimeReportIdentity} from './adapters/persistence/reports/reportStore';
+import {completeRuntimeFileSpool} from './adapters/persistence/reports/fileSpool';
+import {completeRuntimeLedgerSources} from './adapters/persistence/completeRuntimeLedgerSources';
+import {jsonHash} from '@crewstation/kernel';
+import {completeRuntimeReportRoutes} from './http/completeRuntimeReportRoutes';
+import {completeUsageWorkspace} from './adapters/persistence/completeUsageWorkspace';
+import {completeExternalSort} from './application/completeExternalSort';
+import type {CompleteUsageWorkspaceFactory} from './ports/completeUsageWorkspace';
 import { developmentUsageReconciliation } from './application/developmentUsage';
 import { valueDevelopmentUsagePage } from './application/developmentValuations';
 import type { DevelopmentUsageSource } from './ports/developmentUsage';
 import { executionValuations, valueRunnerUsagePage } from './application/executionValuations';
-import { drizzleExecutionValuations, drizzleUsageLedger, readRuntimeStatisticsLedger } from './adapters/persistence/drizzleUsageLedger';
+import { drizzleExecutionValuations, drizzleUsageLedger } from './adapters/persistence/drizzleUsageLedger';
 import { runnerUsageReconciliation, usageIngestion } from './application/usageIngestion';
-import { executionObservationUseCases, runtimeStatisticsUseCases } from './application/executionObservations';
+import { executionObservationUseCases } from './application/executionObservations';
 import { executionObservationRoutes } from './http/executionObservationRoutes';
 import type { ExecutionObservationAccess, RunnerUsageSource } from './ports/usageLedger';
 import { join } from 'node:path';
@@ -38,9 +53,10 @@ import { observabilityDeletionOwner } from './application/projectDeletion';
 
 export interface ObservabilityModuleDeps {
   db: Database;
+  reportSnapshot?:ReportSnapshotSession;
+  reportFacts?:CompleteRuntimeFactSourceFactory<Executor>;
+  reportDataRoot?:string;
   deletion?: { identities: ObservabilityProjectDirectory; tasks?: ObservabilityDeletionTasks; assertGrant(context: ProjectDeletionContext): Promise<void> };
-  runtimeNames?: () => Promise<{ projects: Record<string, string>; profiles: Record<string, string> }>;
-  runtimeTasks?: (executor: Executor, query: RuntimeFactQuery) => Promise<RuntimeFactPage>;
   pricingProfiles?: PricingProfileDirectory;
   executionAccess?: ExecutionObservationAccess;
   usageSource?: RunnerUsageSource;
@@ -66,6 +82,7 @@ export interface ObservabilityModule {
   readonly api: ObservabilityModuleApi;
   readonly http: Hono<AppEnv>[];
   readonly workers: Array<{ start(): void; stop(): Promise<void> }>;
+  readonly reportWorkers:Array<{start():void;stop():Promise<void>}>;
   readonly migrations: MigrationSet;
 }
 
@@ -96,24 +113,17 @@ export function createObservabilityModule(deps: ObservabilityModuleDeps): Observ
     return results.reduce((sum, result) => sum + (result.status === 'fulfilled' ? result.value : 0), 0);
   })()
     .finally(() => { pendingUsage = undefined; }) : reconcileBusinessUsage;
-  const runtimeStatistics = runtimeStatisticsUseCases({ authorizer: deps.authorizer, clock: useCaseDeps.clock, source: {
-    read: async (query) => {
-      const snapshot = await deps.db.transaction(async (tx) => {
-        if (!deps.runtimeTasks) throw precondition('运行统计任务来源尚未接入');
-        return readRuntimeStatisticsLedger(tx, await deps.runtimeTasks(tx, query));
-      }, { isolationLevel: 'repeatable read', accessMode: 'read only' });
-      // Resolve current display metadata after releasing the ledger transaction, including single-connection pools.
-      const names = await deps.runtimeNames?.().catch(() => {
-        if (query.q) throw precondition('项目名称目录暂不可用，当前搜索无法完成，请稍后重试');
-        logger.warn('runtime display names unavailable'); return undefined;
-      });
-      if (!names) return snapshot;
-      return { ...snapshot, tasks: snapshot.tasks.map((task) => ({ ...task, projectName: names.projects[task.projectId] ?? null,
-        attempts: task.attempts.map((attempt) => ({ ...attempt, profileName: attempt.profileName ?? (attempt.profileId ? names.profiles[attempt.profileId] ?? null : null) })) })) };
-    },
-  } });
-  const api: ObservabilityModuleApi = { ...runtimeStatistics,
-    ...(deps.deletion ? { deletionOwner: observabilityDeletionOwner(observabilityDeletionRepository({ db: deps.db, ...deps.deletion })) } : {}),
+  const completeReports=completeRuntimeReports(deps);
+  const api: ObservabilityModuleApi = {
+    runtimeCompleteTaskReport:(actor,projectId,taskId)=>{if(!completeReports)throw precondition('完整运行报告原来源尚未接入');return completeReports.request(actor,projectId,{from:'0001-01-01T00:00:00.000Z',to:useCaseDeps.clock.now().toISOString(),timezone:'Asia/Shanghai'},taskId);},
+    runtimeCompleteReport:(actor,projectId,query)=>{if(!completeReports)throw precondition('完整运行报告原来源尚未接入');return completeReports.request(actor,projectId,query);},
+    projectRuntimeStatistics:(actor,projectId,query)=>{if(!completeReports)throw precondition('完整运行报告原来源尚未接入');return completeReports.request(actor,projectId,query);},
+    systemRuntimeStatistics:(actor,query)=>{if(!completeReports)throw precondition('完整运行报告原来源尚未接入');return completeReports.request(actor,null,query);},
+    projectRuntimeTask:(actor,projectId,taskId)=>{if(!completeReports)throw precondition('完整运行报告原来源尚未接入');return completeReports.request(actor,projectId,{from:'0001-01-01T00:00:00.000Z',to:useCaseDeps.clock.now().toISOString(),timezone:'Asia/Shanghai'},taskId);},
+    systemRuntimeTask:(actor,taskId)=>{if(!completeReports)throw precondition('完整运行报告原来源尚未接入');return completeReports.request(actor,null,{from:'0001-01-01T00:00:00.000Z',to:useCaseDeps.clock.now().toISOString(),timezone:'Asia/Shanghai'},taskId);},
+    runtimeCompleteReportStatus:(actor,projectId,id)=>{if(!completeReports)throw precondition('完整运行报告原来源尚未接入');return completeReports.status(actor,projectId,id);},
+    runtimeCompleteReportPage:(actor,projectId,id,query)=>{if(!completeReports)throw precondition('完整运行报告原来源尚未接入');return completeReports.page(actor,projectId,id,query);},
+    ...(deps.deletion ? { deletionOwner: observabilityDeletionOwner(observabilityDeletionRepository({ db: deps.db, ...deps.deletion,...(completeReports?{reports:completeReports.deletionLifecycle}: {}) })) } : {}),
     name: 'observability', reconcileExecutionUsage: reconcileUsage, valueExecutionUsage: valueUsage,
     acceptExecutionPrice: (input) => executionPricing.accept(input, useCaseDeps.clock.now()), ...observations, ingestExecutionUsage: usageIngestion(ledger), ...logsAndHealthUseCases(useCaseDeps), ...alerting,
     ...tokenPricingUseCases({ store: drizzleTokenPriceStore(deps.db), profiles: deps.pricingProfiles ?? { list: async () => [] }, clock: useCaseDeps.clock }),
@@ -123,7 +133,8 @@ export function createObservabilityModule(deps: ObservabilityModuleDeps): Observ
   const sweepAll = async (): Promise<void> => { for (const projectId of await (deps.listProjectIds?.() ?? Promise.resolve([]))) await alerting.sweepProject(projectId).catch((e: unknown) => logger.warn('alert sweep failed', { projectId, error: String(e) })); };
   return {
     api,
-    http: [observabilityRoutes(api, deps.isAdmin), tokenPricingRoutes(api, deps.isAdmin), executionObservationRoutes(api, deps.isAdmin)],
+    http: [observabilityRoutes(api, deps.isAdmin), tokenPricingRoutes(api, deps.isAdmin), executionObservationRoutes(api, deps.isAdmin),completeRuntimeReportRoutes(api,deps.isAdmin)],
+    reportWorkers:completeReports?[completeReports.worker]:[],
     workers: [...(deps.usageSource || deps.developmentUsageSource ? [executionUsageWorker(reconcileUsage, logger)] : []), { start: () => { timer ??= setInterval(() => void sweepAll(), 30_000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } }],
     migrations: observabilityMigrations,
   };
@@ -134,4 +145,29 @@ function executionUsageWorker(reconcile: () => Promise<number>, logger: Logger) 
   const tick = () => running ??= reconcile().then(() => {}, () => { logger.warn('execution usage source unavailable'); }).finally(() => { running = undefined; });
   return { start: () => { if (!timer) { timer = setInterval(() => { void tick(); }, 1000); void tick(); } },
     stop: async () => { if (timer) clearInterval(timer); timer = undefined; await running; } };
+}
+
+/** Wire original TEMP retention to the domain ordering and application merge at the composition boundary. */
+export const completeStatisticsWorkspace:CompleteUsageWorkspaceFactory=(input)=>completeUsageWorkspace({...input,order:completeExternalSort});
+
+function completeRuntimeReports(deps:ObservabilityModuleDeps) {
+ const session=deps.reportSnapshot,factory=deps.reportFacts,root=deps.reportDataRoot;
+ if(!session||!factory||!root)return undefined;
+ const spool=completeRuntimeFileSpool(root),store=completeRuntimeReportCache(deps.db),owner=randomUUID();
+ const costVisible=async(projectId:ProjectId)=> (await drizzleCostVisibility(deps.db).read(projectId))?.visibility==='project-members-and-services';
+ return completeRuntimeReportUseCases({store,spool,owner,authorizer:deps.authorizer,costVisible,
+  build:async(report,signal)=>{
+   const started=Date.now(),query={...report.request.filters,...(report.request.taskId?{taskId:report.request.taskId}:{}),...(report.request.projectId?{projectId:report.request.projectId}:{} )};
+   return session.run(async(snapshot)=>{
+    const identity=await originalRuntimeReportIdentity(snapshot.executor),facts=factory(snapshot.executor,query,snapshot.snapshotId),namespace='complete-report/'+report.id;
+    const build=await buildCompleteRuntimeCohort({query,facts,snapshotId:snapshot.snapshotId,asOf:snapshot.asOf,rows:snapshot.workspace,namespace,keyOf:jsonHash,system:report.request.projectId===null,usageWorkspace:completeStatisticsWorkspace,signal,
+      task:(task,privateNamespace)=>buildCompleteRuntimeTask({task,snapshotId:snapshot.snapshotId,asOf:snapshot.asOf,rows:snapshot.workspace,namespace:privateNamespace,keyOf:jsonHash,system:report.request.projectId===null,usageWorkspace:completeStatisticsWorkspace,signal,attempts:facts.attempts(task),ledger:completeRuntimeLedgerSources(snapshot.executor,task,snapshot.snapshotId)}),
+    });
+    if(report.request.taskId&&build.summary.tasks!=='1')throw precondition('原任务不存在或原受理身份不唯一');
+    if(build.summary.metrics.state==='not-ready')return {state:'not-ready' as const,gaps:build.summary.metrics.gaps.map(reason=>({source:'original-cohort',reason}))};
+    const header={reportId:report.id,projectionVersion:2 as const,scope:report.request.projectId===null?'system' as const:'project' as const,projectId:report.request.projectId,filters:report.request.filters,asOf:snapshot.asOf,snapshotId:snapshot.snapshotId,generation:identity.generation,sourceRevision:identity.revision,...(report.request.taskId?{taskId:report.request.taskId}:{}),coverage:'complete' as const,buildMs:Date.now()-started};
+    const manifest=await sealCompleteRuntimeReport({rows:snapshot.workspace,build,spool,header,buildOwner:report.owner,requestKey:report.requestKey,signal});return {state:'ready' as const,manifest};
+   },signal,runtimeReportAdmissionKey);
+  },
+ });
 }
