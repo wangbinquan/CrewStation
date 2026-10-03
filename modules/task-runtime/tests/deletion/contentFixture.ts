@@ -44,6 +44,13 @@ export async function runtimeContentFixture(extra: MigrationSet[] = []) {
 }
 export type RuntimeContentFixture = Awaited<ReturnType<typeof runtimeContentFixture>>;
 
+/** Corrupt only this isolated test database to retain the read-only defenses for historical rows that predate SQL fences. */
+export async function corruptRuntimeContent(f: Pick<RuntimeContentFixture, 'database'>, table: 'environments' | 'archive_executions' | 'environment_rebuilds', change: () => Promise<unknown>) {
+  await f.database.db.execute(sql.raw('ALTER TABLE task_runtime.' + table + ' DISABLE TRIGGER runtime_all_content_guard'));
+  try { await change(); }
+  finally { await f.database.db.execute(sql.raw('ALTER TABLE task_runtime.' + table + ' ENABLE TRIGGER runtime_all_content_guard')); }
+}
+
 export async function seedRuntimeContent(f: RuntimeContentFixture) {
   const db = f.database.db, child = TaskIdSchema.parse(await f.environment({ native: f.native() })), ending = newResourceId(), rebuild = newResourceId();
   const epoch = DevelopmentParentEpochSchema.parse({ version: 1, parentId: f.parent, projectId: f.project, serviceId: f.service, kind: 'dev-session',

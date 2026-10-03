@@ -7,7 +7,7 @@ import { sql } from 'drizzle-orm';
 import { RUNTIME_CONTENT } from '../../adapters/persistence/deletion/contentTables';
 import { taskRuntimeMigrations } from '../../wiring';
 import { developmentParentEpochHash } from '../../domain/development/parentEnding';
-import { runtimeContentFixture, seedRuntimeContent } from './contentFixture';
+import { corruptRuntimeContent, runtimeContentFixture, seedRuntimeContent } from './contentFixture';
 
 const available = await testDatabaseAvailable();
 describe.skipIf(!available)('TaskRuntime content inventory (actual read-only PG; controlled original public identities)', () => {
@@ -57,7 +57,7 @@ describe.skipIf(!available)('TaskRuntime content inventory (actual read-only PG;
       const result = await f.inspect();
       expect(result.contents.some((row) => row.key.includes(validation))).toBe(true); expect(result.contents.some((row) => row.key.includes(shared))).toBe(false);
       expect(result.contents.some((row) => row.table === 'admissions')).toBe(false);
-      await f.database.db.execute(sql`UPDATE task_runtime.environments SET render='{"runtimeValidation":null}' WHERE id=${validation}`);
+      await corruptRuntimeContent(f, 'environments', () => f.database.db.execute(sql`UPDATE task_runtime.environments SET render='{"runtimeValidation":null}' WHERE id=${validation}`));
       await expect(f.inspect()).rejects.toThrow('关系必须是对象');
       await f.database.db.execute(sql`UPDATE task_runtime.environments SET render=NULL,service_id=${f.service} WHERE id=${shared}`);
       await expect(f.inspect()).rejects.toThrow('原范围冲突');
@@ -83,10 +83,10 @@ describe.skipIf(!available)('TaskRuntime content inventory (actual read-only PG;
     const f = await runtimeContentFixture();
     try {
       const seeded = await seedRuntimeContent(f);
-      await f.database.db.execute(sql`UPDATE task_runtime.environments SET service_id=${f.otherService} WHERE id=${seeded.child}`); await expect(f.inspect()).rejects.toThrow('归属冲突');
-      await f.database.db.execute(sql`UPDATE task_runtime.environments SET service_id=${f.service},native=jsonb_set(native,'{parentTaskId}',to_jsonb(${f.otherParent}::text)) WHERE id=${seeded.child}`);
+      await corruptRuntimeContent(f, 'environments', () => f.database.db.execute(sql`UPDATE task_runtime.environments SET service_id=${f.otherService} WHERE id=${seeded.child}`)); await expect(f.inspect()).rejects.toThrow('归属冲突');
+      await corruptRuntimeContent(f, 'environments', () => f.database.db.execute(sql`UPDATE task_runtime.environments SET service_id=${f.service},native=jsonb_set(native,'{parentTaskId}',to_jsonb(${f.otherParent}::text)) WHERE id=${seeded.child}`));
       await expect(f.inspect()).rejects.toThrow('父关系冲突');
-      await f.database.db.execute(sql`UPDATE task_runtime.environments SET native=jsonb_set(native,'{parentTaskId}',to_jsonb(${f.parent}::text)) WHERE id=${seeded.child}`);
+      await corruptRuntimeContent(f, 'environments', () => f.database.db.execute(sql`UPDATE task_runtime.environments SET native=jsonb_set(native,'{parentTaskId}',to_jsonb(${f.parent}::text)) WHERE id=${seeded.child}`));
       await f.database.db.execute(sql`UPDATE task_runtime.environments SET native=jsonb_set(native,'{runnerId}',to_jsonb(${newResourceId()}::text)) WHERE id=${seeded.child}`);
       await expect(f.inspect()).rejects.toThrow('原父记录关系不符');
     } finally { await f.database.drop(); }
@@ -156,9 +156,9 @@ describe.skipIf(!available)('TaskRuntime content inventory (actual read-only PG;
     const f = await runtimeContentFixture();
     try {
       const seeded = await seedRuntimeContent(f);
-      await f.database.db.execute(sql`UPDATE task_runtime.archive_executions SET body=jsonb_set(body,'{taskId}',to_jsonb(${f.otherParent}::text)) WHERE id=${seeded.archive}`);
+      await corruptRuntimeContent(f, 'archive_executions', () => f.database.db.execute(sql`UPDATE task_runtime.archive_executions SET body=jsonb_set(body,'{taskId}',to_jsonb(${f.otherParent}::text)) WHERE id=${seeded.archive}`));
       await expect(f.inspect()).rejects.toThrow('原父记录关系不符');
-      await f.database.db.execute(sql`UPDATE task_runtime.archive_executions SET body=jsonb_set(body,'{taskId}',to_jsonb(${seeded.business}::text)) WHERE id=${seeded.archive}`);
+      await corruptRuntimeContent(f, 'archive_executions', () => f.database.db.execute(sql`UPDATE task_runtime.archive_executions SET body=jsonb_set(body,'{taskId}',to_jsonb(${seeded.business}::text)) WHERE id=${seeded.archive}`));
       // Only this isolated fixture is corrupted. Inspection must reject missing members even if the original table guard was lost.
       await f.database.db.execute('ALTER TABLE task_runtime.development_parent_endings DISABLE TRIGGER ALL');
       await f.database.db.execute(sql`UPDATE task_runtime.development_parent_endings SET member_count=2 WHERE id=${seeded.ending}`);

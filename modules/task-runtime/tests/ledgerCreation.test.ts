@@ -5,6 +5,7 @@ import { createFakeK8sClient, pvcObject, Resources, taskPodObject } from '@crews
 import type { ResourcesModule } from '@crewstation/module-resources';
 import { createResourcesModule, resourcesMigrations } from '@crewstation/module-resources';
 import { queueMigrations } from '@crewstation/queue';
+import { newResourceId } from '@crewstation/kernel';
 import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import { drizzleUnitOfWork } from '../adapters/persistence/drizzleUnitOfWork';
@@ -17,6 +18,12 @@ import { createTaskRuntimeModule, taskRuntimeMigrations } from '../wiring';
 const available = await testDatabaseAvailable();
 const projectId = '01a0bf5d-8f4b-7fc7-8b88-183626175a01' as ProjectId;
 const serviceId = '01a0bf5d-8f4b-77df-8856-e078a980da02' as ServiceId;
+const projectServices = new Map<ProjectId, ServiceId>([[projectId, serviceId]]);
+function serviceFor(project: ProjectId): ServiceId {
+  let original = projectServices.get(project);
+  if (!original) { original = newResourceId() as ServiceId; projectServices.set(project, original); }
+  return original;
+}
 const profiles = [{ id: '01a0bf5d-8f4b-7001-8458-107366e7de39', name: 'coding-medium', cpu: '1', memory: '2Gi', storage: '10Gi', description: '' }] as TaskProfileDto[];
 
 describe.skipIf(!available)('工作区容器由资源中心建出（RFC-025 I25）', () => {
@@ -47,6 +54,7 @@ describe.skipIf(!available)('工作区容器由资源中心建出（RFC-025 I25�
 
   test('RFC-027：并发固定 ID 只准入一次，重建模块和套餐删除后仍返回原回执，参数变化冲突', async () => {
     const project = '01a0bf5d-8f4b-7fc7-8b88-183626175b01' as ProjectId;
+    const serviceId = serviceFor(project);
     const admission = { id: '01a0bf5d-8f4b-7fc7-8b88-183626175b02' as TaskId, fingerprint: 'a'.repeat(64) };
     const input = { admission, serviceId, kind: 'business' as const, volumeMode: 'persistent' as const, businessStorage: 'isolated-v1' as const };
     const tasks = runtime(undefined, project);
@@ -67,6 +75,7 @@ describe.skipIf(!available)('工作区容器由资源中心建出（RFC-025 I25�
 
   test('RFC-027：额度拒绝不留任务或排队记录，释放额度后同一 ID 可重试，终态重放不复活', async () => {
     const project = '01a0bf5d-8f4b-7fc7-8b88-183626175c01' as ProjectId;
+    const serviceId = serviceFor(project);
     const tasks = runtime(undefined, project);
     const occupied = await Promise.all(Array.from({ length: 4 }, () => tasks.api.createEnvironment({ serviceId, kind: 'business' })));
     const input = { serviceId, kind: 'business' as const, admission: { id: '01a0bf5d-8f4b-7fc7-8b88-183626175c02' as TaskId, fingerprint: 'c'.repeat(64) } };
@@ -115,7 +124,8 @@ describe.skipIf(!available)('工作区容器由资源中心建出（RFC-025 I25�
 
   test('检出凭据归这一次启动：受理只要仓库地址（不签令牌、不写按服务的 Secret），凭据 Secret 是记录的子对象，令牌建的时候才签', async () => {
     // 一个项目只能有一个开发会话：这条用另一个项目。
-    const tasks = runtime(ownedCheckout, '01a0bf5d-8f4b-7fc7-8b88-183626175a09' as ProjectId);
+    const checkoutProject = '01a0bf5d-8f4b-7fc7-8b88-183626175a09' as ProjectId, serviceId = serviceFor(checkoutProject);
+    const tasks = runtime(ownedCheckout, checkoutProject);
     const created = await tasks.api.createEnvironment({ serviceId, kind: 'dev-session', branch: 'feature', labels: { 'crewstation.io/project': 'lc', 'crewstation.io/service': 'lc' } });
     expect(tokensIssued).toBe(0);
     const env = (await drizzleUnitOfWork(tdb.db).read.environments.getById(created.id as TaskId))!;
@@ -127,7 +137,7 @@ describe.skipIf(!available)('工作区容器由资源中心建出（RFC-025 I25�
     await tasks.api.bindWorkload(created.id as TaskId, 'uid-dev-pod');
     await expect(tasks.api.checkoutValues(created.id as TaskId)).rejects.toMatchObject({ kind: 'precondition' });
     // 旧形状（受理时写好按服务的 Secret）与不检出的，都不向这里要令牌。
-    const legacy = await runtime().api.createEnvironment({ serviceId, kind: 'business', labels: {} });
+    const legacy = await runtime().api.createEnvironment({ serviceId: serviceFor(projectId), kind: 'business', labels: {} });
     await expect(runtime().api.checkoutValues(legacy.id as TaskId)).rejects.toMatchObject({ kind: 'precondition' });
     expect(tokensIssued).toBe(1);
   });
@@ -169,6 +179,7 @@ describe.skipIf(!available)('工作区容器由资源中心建出（RFC-025 I25�
   });
   test('RFC-027：子 Agent 继承父卷布局与 UID，日志按自己的环境 ID 隔离', async () => {
     const project = '01a0bf5d-8f4b-7fc7-8b88-183626175d01' as ProjectId;
+    const serviceId = serviceFor(project);
     const parentId = '01a0bf5d-8f4b-7fc7-8b88-183626175d02' as TaskId;
     const childId = '01a0bf5d-8f4b-7fc7-8b88-183626175d03' as TaskId;
     const tasks = runtime(undefined, project), uow = drizzleUnitOfWork(tdb.db);

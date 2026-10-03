@@ -1,9 +1,15 @@
 import type { DevelopmentParentEndingRepository, DevelopmentParentEndingChildren, DevelopmentParentEndingObjects, DevelopmentParentRebuildClaims } from './developmentParentEnding';
 
 export interface DevelopmentParentEndingJobLease { readonly jobId: number; readonly fencingToken: number }
+export interface DevelopmentParentRecoveryCandidate { readonly kind: 'ending' | 'rebuild'; readonly requestId: string }
 /** Only a real UnitOfWork transaction can retain either authorization until final commit. */
 export interface DevelopmentParentEndingScope {
-  readonly recovery: { refill(cutoff: Date, limit?: number): Promise<number> };
+  readonly recovery: {
+    /** Global cursor transaction only; publish each returned original in its own project admission after this commit. */
+    scan(cutoff: Date, limit?: number): Promise<DevelopmentParentRecoveryCandidate[]>;
+    /** Legacy installations without project callback admission keep their original atomic refill. */
+    refill(cutoff: Date, limit?: number): Promise<number>;
+  };
   readonly endings: DevelopmentParentEndingRepository;
   readonly children: DevelopmentParentEndingChildren;
   readonly objects: DevelopmentParentEndingObjects;

@@ -67,3 +67,23 @@
 精确发布清单 61 文件，包含57功能／锁、STATE与3份本任务文档；25 个非本任务文件按当前指纹单独保留。共享index为空，main/origin当时均为7a18725。提交／自身六项精确CI／部署尚未完成；原后台恢复生产请求必须拆开全局游标事务和按项目入队事务，不能在 shared 回调退出之后才提交原多项目批次。其余明确删除许可、TaskRuntime七阶段及全部22方／原物理范围继续，入口OFF。
 
 控制台辅助检查 v2 已终止 **0 错**，回执 `/private/tmp/cs-rfc037-runtime-work-exact-console-types-v2.json`。仅补齐原 TypeScript 配置文件路径，未改源码或放宽类型；57功能／锁指纹保持。精确后端与控制台提交树均已核对，61路径发布就绪，完整永久删除仍未完成。
+
+
+## 2026-10-04：原回调精确发布与实际部署
+
+61 路径精确发布为 `064859cdecd7e4cc240b54558abe451b966001bf`，提交包含标准Codex co-author；25个非本任务路径完整保留，共享index为空，main与origin/main核对0/0。 [CI37154760717](https://github.com/wangbinquan/CrewStation/actions/runs/37154760717) 六项终态成功；实际module日志的原删除队列首测1493.02ms，原5000ms时限未改。回执 `/private/tmp/cs-rfc037-runtime-work-publication-v1.json`、`/private/tmp/cs-rfc037-064859cdecd7-exact-ci-v1.json`，原日志下载504保留，v2经实际job API取得终态。
+
+仅从精确Git提交树构建两个镜像，未导出开发checkout或夹带RFC-036在制源码。2026-10-03T21:50:04.182Z八组件部署完成，所有实际Pod imageID和节点OCI revision标签与该SHA一致，238项已安装迁移校验和一致。实际API Pod `f7081dea-8b66-4b5e-87a1-7f32fc29e0da` 的 `/var/lib/crewstation/observability` 以uid/gid1000完成独占0600文件创建、fsync、回读及只删除本证明文件。原Namespace／Pod／PVC／PV、数据库／角色OID、GitLab、原生容器与Runner摘要完整保持。实际部署回执 `/private/tmp/cs-rfc037-064859cdecd7-runtime-work-v1-deployment-receipt.json`；新0023不在该部署内。部署开始和结束各交接一次，没有例行问询。
+
+## 2026-10-04：全局恢复提交边界和内容SQL屏障候选
+
+全局父恢复先短事务推进原三族游标，只返回原ending／rebuild键；实际工厂之后逐项目取得原callback并提交原入队事务。25项总预算、v1／v2／旧标量位置和轮转保持。真实PG红回归曾让封闭项目仍发布2项，修订后拒绝其入队且另一项目继续。独立事务在原入队COMMIT阻塞时能锁全局游标；项目seal等待真正的入队COMMIT，私有finally观察已持久作业，worker.stop等待原迭代。证据 `runtime-recovery-queue-red-v1.log`、`runtime-recovery-queue-green-v1.log`，4文件10／0、221断言；本机PG及受控原来源不充当实际物理停止证明。
+
+0023新增私有project_deletions journal，对10正文表封写，普通SQL不能改原project／service／task／native-parent链接。真实shared原callback下当前stop许可仅能更新旧状态或追加纯停止元数据，不能创建新环境；其他阶段或shared锁本身不足以写入。metadata必须匹配实际exclusive后端、原operation／generation、原namespace阶段及全部原callback退出，才能删原固定父成员和回调；最小原归属／封写／删除墓碑保留。stopped快照另保留最初确认，当前stop阶段只能追加一次完整数组／数量／摘要，重复同值回执保持幂等，错误摘要、数量、附加字段、错误阶段、替换和原回调仍在途均拒绝。SQL先红原件 `runtime-content-fence-red-v1.log` 保留；5项快照专项99断言通过，较宽最终结果另记。
+
+新的不可变屏障也拒绝旧用例通过重写service／project伪造不同记录：正向查询夹具改为实际不同service；历史坏记录的只读拒绝用例仅在自己的隔离TestDatabase中暂禁新触发器并finally恢复，未放宽生产SQL或既有旧触发器。较宽初版385／11fail原件保留，11项属于上述夹具不再合法，定向修订28／0、511断言；不得把初版写成通过。官方按路径锁0023到239项，原238项逐键checksum保持；精确lint／arch／后端类型通过。完整门禁、发布部署及TaskRuntime实际停止／数字排空／七阶段owner仍继续；全部22方与原验收项目永久回收未闭合，入口OFF。
+
+本批较宽v2终态 **400 pass／0 fail，4385断言，75文件，317.84秒**，新触发器全部应用；29／29新增可执行行100%覆盖，无违规。回执 `/private/tmp/cs-rfc037-runtime-recovery-content-module-v2.json`、`runtime-recovery-content-patch-v1.json`。固定16功能/锁与3文档路径，25外部WIP保留；单次完整 `runtime-recovery-content-full-v1` 运行中。早期类型辅助结果的stop交叉类型never已在用例改为Omit修订，生产代码未放宽，最终backend类型0错。
+
+
+2026-10-04 本批稳定候选单次完整门禁终态：5610 pass／143环境skip／0 fail、136545断言、1105文件、1473.20秒；16功能/锁首尾指纹保持，静态四层全绿。完整LCOV精确改动行29／29、100%且无违规，回执 `/private/tmp/cs-rfc037-runtime-recovery-content-full-v1.json`、`/private/tmp/cs-rfc037-runtime-recovery-content-patch-v2.json`。本批19路径精确发布接续；后续8个未追踪TaskRuntime七阶段owner文件未进入本批完整门禁或发布，其真实PG原子停止证明/快照专项6／0、61断言仅使用受控停止端口。删除入口OFF，实际stop／数字排空、全22方/SCM及专用项目永久回收继续，不能将受控停止称为实机验收。跨会话只保留必要发布/部署交接。

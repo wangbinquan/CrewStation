@@ -10,13 +10,14 @@ const available = await testDatabaseAvailable();
 let f: Awaited<ReturnType<typeof rebuildFixture>>;
 const project = '01a0bf5d-8f4b-7a01-8b88-18362617594b' as ProjectId, other = '01a0bf5d-8f4b-7a02-8b88-18362617594b' as ProjectId;
 const service = '01a0bf5d-8f4b-7a03-8856-e078a980dc2f' as ServiceId;
+const otherService = '01a0bf5d-8f4b-7a04-8856-e078a980dc2f' as ServiceId;
 const trace = (n: number) => n.toString(16).padStart(32, '0') as TraceId;
 const at = (minute: number, ms = 0) => new Date(Date.UTC(2026, 8, 23, 10, minute, 0, ms));
 
 function env(input: { traceId: TraceId; created: Date; projectId?: ProjectId; kind?: TaskEnvironment['kind']; state?: TaskEnvironment['state']; activity?: Date; parent?: TaskId }): TaskEnvironment {
   const id = newId('task') as TaskId;
   return {
-    id, projectId: input.projectId ?? project, serviceId: service, kind: input.kind ?? 'dev-session', state: input.state ?? 'released', volumeMode: 'follow-container', profile: 'coding-medium',
+    id, projectId: input.projectId ?? project, serviceId: input.projectId === other ? otherService : service, kind: input.kind ?? 'dev-session', state: input.state ?? 'released', volumeMode: 'follow-container', profile: 'coding-medium',
     namespace: 'cs-trace', podName: `task-${id.slice(-12)}`, pvcName: `work-${id.slice(-12)}`, traceId: input.traceId, runnerTokenHash: 'hash', connected: false, labels: {},
     createdAt: input.created, updatedAt: input.activity ?? input.created, lastActivityAt: input.activity ?? input.created,
     ...(input.parent ? { native: { purpose: 'cli', parentTaskId: input.parent, parentPodUid: 'pod', pvcUid: 'pvc', nodeName: 'n', agentId: 'agent-1', runnerId: 'runner-1', fingerprint: 'f',

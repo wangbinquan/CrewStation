@@ -220,3 +220,9 @@ TaskRuntime上述较宽模块检查已结束：383／0、4161断言、70文件�
 TaskRuntime 57功能/锁的单次完整门禁已终止5603 pass／143环境skip／0 fail，136421断言、1103文件、1610.07秒，源码指纹保持，静态四层全绿；801／806改动行覆盖99.38%通过，包括未追踪新源码。精确提交树backend0错，控制台辅助VFS配置路径修订待终态（原完整console类型已通过）；61文件精确发布/自身CI/部署接续。不重复未变源码全量，25非本任务文件保留；完整后台恢复准入提交边界、原任务数字排空/所有SQL封写及22方物理回收继续，删除入口OFF。详见acceptance/task-runtime-content.md稳定候选回执。
 
 控制台精确提交树辅助检查 v2 终态0错，回执 runtime-work-exact-console-types-v2.json；修订仅涉及检查器配置路径，57功能/锁候选保持。61文件发布就绪，不能据此关闭TaskRuntime七阶段或完整永久回收。
+
+
+2026-10-04：TaskRuntime 原回调61路径批已精确发布 `064859cdecd7e4cc240b54558abe451b966001bf`；CI37154760717六项成功，八组件及238项实际迁移于2026-10-03T21:50:04.182Z完成核对，原资源及Runner保持。后续0023／全局父恢复按项目实际COMMIT形成独立候选，旧238项保留；较宽回归和稳定候选单次完整门禁接续。原任务stop／数字排空、正式七阶段及全22方／物理资源永久回收尚未完成，入口OFF。见[TaskRuntime证据](acceptance/task-runtime-content.md)。
+
+
+2026-10-04 本批稳定候选单次完整门禁终态：5610 pass／143环境skip／0 fail、136545断言、1105文件、1473.20秒；16功能/锁首尾指纹保持，静态四层全绿。完整LCOV精确改动行29／29、100%且无违规，回执 `/private/tmp/cs-rfc037-runtime-recovery-content-full-v1.json`、`/private/tmp/cs-rfc037-runtime-recovery-content-patch-v2.json`。本批19路径精确发布接续；后续8个未追踪TaskRuntime七阶段owner文件未进入本批完整门禁或发布，其真实PG原子停止证明/快照专项6／0、61断言仅使用受控停止端口。删除入口OFF，实际stop／数字排空、全22方/SCM及专用项目永久回收继续，不能将受控停止称为实机验收。跨会话只保留必要发布/部署交接。

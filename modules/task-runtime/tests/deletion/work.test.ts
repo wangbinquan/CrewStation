@@ -8,6 +8,7 @@ import { runtimeProjectAdmissionKey } from '../../adapters/persistence/deletion/
 import { originalRuntimeWorkInfrastructure } from '../../adapters/persistence/deletion/workOrigin';
 import { runtimeWorkIdentity } from '../../domain/deletion/work';
 import { runtimeWorkFixture } from './workFixture';
+import { corruptRuntimeContent } from './contentFixture';
 
 const available = await testDatabaseAvailable();
 describe.skipIf(!available)('TaskRuntime original work (actual PG; controlled public owners and whole-Pod witnesses)', () => {
@@ -84,7 +85,8 @@ describe.skipIf(!available)('TaskRuntime original work (actual PG; controlled pu
       await expect(f.work.run(f.input(f.otherProject, f.parent), async () => undefined)).rejects.toThrow('归属不符');
       await f.database.db.execute(sql`DELETE FROM task_runtime.environments WHERE id=${f.parent}`);
       expect(await originalRuntimeWorkInfrastructure(f.database.db, 'task', f.parent)).toEqual(before);
-      await f.environment({ id: f.parent, projectId: f.otherProject, serviceId: f.otherService });
+      await expect(f.environment({ id: f.parent, projectId: f.otherProject, serviceId: f.otherService })).rejects.toThrow();
+      await corruptRuntimeContent(f, 'environments', () => f.environment({ id: f.parent, projectId: f.otherProject, serviceId: f.otherService }));
       await expect(f.work.run(f.input(), async () => undefined)).rejects.toThrow('沿革冲突');
       expect(await f.work.history(f.project)).toEqual([birth!]);
     } finally { await f.drop(); }

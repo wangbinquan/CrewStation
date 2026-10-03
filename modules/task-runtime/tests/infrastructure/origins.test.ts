@@ -7,6 +7,7 @@ import { sql } from 'drizzle-orm';
 import { taskRuntimeMigrations } from '../../wiring';
 import { rebuildFixture } from '../rebuildFixture';
 import { developmentParentEndingStorageFixture } from '../developmentParentEndingStorageFixture';
+import { corruptRuntimeContent } from '../deletion/contentFixture';
 
 const available = await testDatabaseAvailable();
 describe.skipIf(!available)('runtime infrastructure ownership (actual PG, not physical stopping)', () => {
@@ -29,7 +30,7 @@ describe.skipIf(!available)('runtime infrastructure ownership (actual PG, not ph
       for (const secret of ['original-checkout', 'CS_DATABASE_URL', 'input', 'render', 'runnerToken', 'private-old-rebuild']) expect(JSON.stringify([task, rebuild])).not.toContain(secret);
       await f.tdb.db.execute(sql`UPDATE task_runtime.environment_rebuilds SET message='private failure' WHERE id=${accepted.id}`);
       expect(await read('rebuild', accepted.id)).toEqual(rebuild);
-      await f.tdb.db.execute(sql`UPDATE task_runtime.environment_rebuilds SET project_id=${newResourceId()} WHERE id=${accepted.id}`);
+      await corruptRuntimeContent({ database: f.tdb }, 'environment_rebuilds', () => f.tdb.db.execute(sql`UPDATE task_runtime.environment_rebuilds SET project_id=${newResourceId()} WHERE id=${accepted.id}`));
       await expect(read('rebuild', accepted.id)).rejects.toThrow('归属冲突');
     } finally { await f.close(); }
   });
@@ -67,10 +68,10 @@ describe.skipIf(!available)('runtime infrastructure ownership (actual PG, not ph
       const read = () => f.runtime.api.originalInfrastructureOwnership('task',id);
       expect(await read()).toMatchObject({ scope:'platform',projectIds:[] });
       expect(await f.runtime.api.originalProjectTaskIds(f.projectId, null)).not.toContain(id);
-      await f.tdb.db.execute(sql`UPDATE task_runtime.environments SET render=jsonb_build_object('runtimeValidation',jsonb_build_object('projectId',${f.projectId}::text)) WHERE id=${id}`);
+      await corruptRuntimeContent({ database: f.tdb }, 'environments', () => f.tdb.db.execute(sql`UPDATE task_runtime.environments SET render=jsonb_build_object('runtimeValidation',jsonb_build_object('projectId',${f.projectId}::text)) WHERE id=${id}`));
       expect(await read()).toMatchObject({ scope:'project',projectIds:[f.projectId] });
       expect(await f.runtime.api.originalProjectTaskIds(f.projectId, null)).toContain(id);
-      await f.tdb.db.execute(sql`UPDATE task_runtime.environments SET render='{"runtimeValidation":{}}' WHERE id=${id}`);
+      await corruptRuntimeContent({ database: f.tdb }, 'environments', () => f.tdb.db.execute(sql`UPDATE task_runtime.environments SET render='{"runtimeValidation":{}}' WHERE id=${id}`));
       await expect(read()).rejects.toThrow();
       await f.tdb.db.execute(sql`UPDATE task_runtime.environments SET service_id=${f.serviceId} WHERE id=${id}`);
       await expect(read()).rejects.toThrow('原范围冲突');

@@ -29,11 +29,12 @@ export const RUNTIME_CONTENT: readonly ContentTable[] = [
   entry('development_parent_rebuild_claims', ['source_ending_id'], 'after_transition_hash current_rebuild_id retry_at revision source_ending_id state'),
   entry('original_callbacks', ['id'], 'backend_pid consumer_id entered_at exit_digest exit_key_hash exited_at deletion_grant id input_digest kind origin_id origin_key origin_kind origin_revision original_process project_id recovery_digest reference'),
 ];
-/** These are shared minimum identities and one global traversal cursor, not project payloads. */
+/** Immutable identities, the global cursor and deletion proof journal survive recoverable project payloads. */
 export const RUNTIME_RETAINED = [
   entry('resource_identity_aliases', ['kind', 'key'], 'id key kind'),
   entry('development_parent_recovery_sweep', ['singleton'], 'after_id epoch kind scan_cutoff singleton'),
   entry('work_origins', ['kind', 'key'], 'id identity key kind project_id revision'),
   entry('project_admissions', ['project_id'], 'generation operation_id project_id revision'),
   entry('callback_pod_stops', ['identity'], 'digest identity original_process'),
+  entry('project_deletions', ['project_id'], 'body generation operation_id phases project_id revision verified'),
 ] as const;

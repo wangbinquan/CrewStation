@@ -5,6 +5,7 @@ import { and, asc, eq, gt, inArray, lte, sql } from 'drizzle-orm';
 import { precondition } from '@crewstation/kernel';
 import { enqueueJob } from '@crewstation/queue';
 import { DEVELOPMENT_PARENT_ENDING_JOB_KIND } from '../../ports/developmentParentEnding';
+import type { DevelopmentParentRecoveryCandidate } from '../../ports/developmentParentEndingScope';
 import { REBUILD_JOB_KIND } from '../../ports/rebuilds';
 import { drizzleDevelopmentParentEndings, drizzleDevelopmentParentRebuildClaims } from './developmentParentEndings';
 import { developmentParentRecoverySweep as sweep } from './developmentParentEndingTables';
@@ -31,25 +32,29 @@ async function publishedRebuilds(db: Executor, afterId: string | null, cutoff: D
       afterId ? gt(rebuilds.id, afterId) : undefined)).orderBy(asc(rebuilds.id)).limit(limit)).map(({ id }) => ({ id, requestId: id }));
 }
 export function developmentParentRecovery(db: Executor, transactional: boolean) {
-  return { refill: async (cutoff: Date, limit = 25): Promise<number> => {
+  const scan = async (cutoff: Date, limit = 25): Promise<DevelopmentParentRecoveryCandidate[]> => {
     if (!transactional || !Number.isSafeInteger(limit) || limit < 1 || limit > 25) throw precondition('原父恢复需要实际事务与总预算 25');
     await db.insert(sweep).values({ singleton: true, kind: 'ending', scanCutoff: cutoff }).onConflictDoNothing();
     const row = (await db.select().from(sweep).where(eq(sweep.singleton, true)).for('update'))[0]!;
     const cursor = cursors(row), offset = families.indexOf(cursor.next), order = [...families.slice(offset), ...families.slice(0, offset)];
-    let count = 0;
+    const candidates: DevelopmentParentRecoveryCandidate[] = [];
     for (const [index, kind] of order.entries()) {
-      const budget = Math.ceil((limit - count) / (order.length - index));
+      const budget = Math.ceil((limit - candidates.length) / (order.length - index));
       if (!budget) break;
       const entries = kind === 'ending' ? (await drizzleDevelopmentParentEndings(db).due(cursor.ending, cutoff, budget)).map((id) => ({ id, requestId: id }))
         : kind === 'claim' ? (await drizzleDevelopmentParentRebuildClaims(db).due(cursor.claim, cutoff, budget)).map((claim) => ({ id: claim.sourceEndingId, requestId: claim.currentRebuildId }))
           : await publishedRebuilds(db, cursor.rebuild, cutoff, budget);
-      for (const entry of entries) await enqueueJob(db, kind === 'ending' ? DEVELOPMENT_PARENT_ENDING_JOB_KIND : REBUILD_JOB_KIND,
-        kind === 'ending' ? { endingId: entry.id } : { requestId: entry.requestId }, { dedupKey: entry.requestId, maxAttempts: 5 });
+      for (const entry of entries) candidates.push({ kind: kind === 'ending' ? 'ending' : 'rebuild', requestId: entry.requestId });
       cursor[kind] = entries.length === budget ? ResourceIdSchema.parse(entries.at(-1)!.id) : null;
-      count += entries.length;
     }
     cursor.next = families[(offset + 1) % families.length]!;
     await db.update(sweep).set({ kind: cursor.next === 'rebuild' ? row.kind : cursor.next, scanCutoff: cutoff, afterId: JSON.stringify(cursor), epoch: sql`${sweep.epoch} + 1` }).where(eq(sweep.singleton, true));
-    return count;
+    return candidates;
+  };
+  return { scan, refill: async (cutoff: Date, limit = 25): Promise<number> => {
+    const candidates = await scan(cutoff, limit);
+    for (const candidate of candidates) await enqueueJob(db, candidate.kind === 'ending' ? DEVELOPMENT_PARENT_ENDING_JOB_KIND : REBUILD_JOB_KIND,
+      candidate.kind === 'ending' ? { endingId: candidate.requestId } : { requestId: candidate.requestId }, { dedupKey: candidate.requestId, maxAttempts: 5 });
+    return candidates.length;
   } };
 }

@@ -10,6 +10,7 @@ import { PROFILE_TEST_PROJECT_ID } from '../domain/profileTestEnvironment';
 import { resourceEndingHandler } from '../application/development/parent/retention';
 import { developmentWorkloadFixture } from './developmentWorkloadFixture';
 import type { DevelopmentWorkloadFixture } from './developmentWorkloadFixture';
+import { corruptRuntimeContent } from './deletion/contentFixture';
 
 const available = await testDatabaseAvailable();
 const rates = ['rate-limit-user', 'rate-limit-host'];
@@ -88,10 +89,10 @@ describe.skipIf(!available)('actual maintenance legacy owners and original prese
     expect(await runtime.api.inspectResourceEnding!('compaction', { ...original, projectId: ProjectIdSchema.parse(Bun.randomUUIDv7()) })).toMatchObject({ status: 'waiting' });
     const validation = { image: 'task:current', workerUid: 10001, resources: { cpu: '1', memory: '2Gi', storage: '10Gi' }, start: 1, workVolume: 'emptyDir' };
     for (const value of [false, null, { projectId: ProjectIdSchema.parse(Bun.randomUUIDv7()), usage: 'task', quotaHeld: true }]) {
-      await f.tdb.db.execute(sql`UPDATE task_runtime.environments SET render=${JSON.stringify({ ...validation, runtimeValidation: value })}::jsonb WHERE id=${completed.id}`);
+      await corruptRuntimeContent({ database: f.tdb }, 'environments', () => f.tdb.db.execute(sql`UPDATE task_runtime.environments SET render=${JSON.stringify({ ...validation, runtimeValidation: value })}::jsonb WHERE id=${completed.id}`));
       expect(await inspect(completed.id)).toMatchObject({ status: 'waiting' });
     }
-    await f.tdb.db.execute(sql`UPDATE task_runtime.environments SET render=NULL WHERE id=${completed.id}`);
+    await corruptRuntimeContent({ database: f.tdb }, 'environments', () => f.tdb.db.execute(sql`UPDATE task_runtime.environments SET render=NULL WHERE id=${completed.id}`));
     await f.tdb.db.execute(sql`UPDATE resources.records SET phase='stopped',phase_since=clock_timestamp()-interval '8 days' WHERE id=${completed.id}`);
     await f.resources.maintainOnce();
     expect((await f.resources.api.get(completed.id))?.compactedAt).toBeInstanceOf(Date);
