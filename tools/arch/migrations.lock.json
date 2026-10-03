@@ -143,6 +143,7 @@
     "modules/observability/adapters/persistence/migrations/0015_project_deletion_lookup_indexes.sql": "a7f02a1d4961085a0f9cead1129d1a10e1e0e18a1705cd29a03d013d43dfbff5",
     "modules/observability/adapters/persistence/migrations/0016_complete_runtime_reports.sql": "c4d19a51ea6846b7841dc13ca55e035e7e5df6c5d379b0f47d1fe86f6c9929ef",
     "modules/observability/adapters/persistence/migrations/0017_nonblocking_runtime_report_clock.sql": "fb6de36b2f391e9daf3872a07db1a163217795349533f85822f863f385b1941d",
+    "modules/observability/adapters/persistence/migrations/0018_complete_usage_admission.sql": "52942cd54aec6fa8cef03972356c661aa582a72fd49f3df284e496c2e5b925c0",
     "modules/project/adapters/persistence/migrations/0001_create_schema.sql": "8cb29f5022308ccafceedb3e0b1130e8bc13fc2d831e5146d9dd34abe30b8abe",
     "modules/project/adapters/persistence/migrations/0002_core_tables.sql": "29e544627de379d3f7ab195cbacf8959f234b7c661a2ed5402ab29ffc8483f22",
     "modules/project/adapters/persistence/migrations/0003_compute_profiles.sql": "1ca73704b0fa919337946e02244842673141e27d337033c111478a9405f82ba6",

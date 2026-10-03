@@ -744,3 +744,21 @@ CS-R02 的全 writer／inflight 封口、未绑定／未知尾部、开发 produ
 迁移 Job `rfc037-migrate-463f24d85b0e` 完成，release/0009 与 runtime-environment/0007 已安装且 SQL checksum 匹配。原固定 Runner `sha256:587a0766440bae22f69bd6e68e101f2348ec8bda95f8b4c3ce6ddef0fa010928` 保持，实际 OCI storage-contract=1；原 PostgreSQL Pod/PVC/PV、数据库/角色、项目 Namespace/PV/PVC/Task Pod 和本机 native 容器身份、PID、启动时间及重启数保持，缺失列表为空。
 
 私有证据：`observability-cs-463f24d85b0e-joint-ci-receipt-v1.json`、`cs-rfc037-463f24d85b0e-runtime-release-v1-deployment-receipt.json`、`observability-cs-463f24d85b0e-joint-live-deployment-verification-v1.json`。此回执只关闭该片的发布/部署步骤：没有创建新模型任务、没有切换真实身份。开发 producer 保持 OFF；全 writer/inflight、unbound/unknown-tail、真实开发/CLI/平台用途、AW 联合对拍、调用片段及全部统计退出条件继续，两 RFC 仍 In Progress；143 skip 不计通过。
+
+
+### 2026-10-04 完整 EOF 报告及 10001 行写入吞吐接续
+
+全量报告正式代码已经进入远端；CS 9b287d488916a6029fc2a433ca3522f03fdb3aa4 的 CI37139454921 六项均成功，约定八组件本机部署已验证实际 OCI、236 项已提交迁移和报告 spool 写入。该版本部署成功不能代替新原生全量与真实任务验收；开发 producer 仍 OFF。
+
+原 d2ab 的 10001 行用例曾在 65002ms 超出原60s，失败保留。后继有限功能设计将原每条归属关联集合化，只有相同 canonical owner 集合复用原 admit_project；没有去掉任何原来源/记录/归属/关闭判断，也没有修改已锁0014/0015。真实一次性PG prototype 的原三项报告用例、20025断言和原九项删除回归保持；正常0018迁移安装后的同一10001原用例约21.12s通过。新三项批插入回归验证每个有效项目和重复引用都保留、一个矛盾或未知引用会回滚完整批次；首轮加载器/新测试适配失败保留并只修相应适配，不改迁移或原断言。新批插入回归后继3/0、7断言，精确lint通过。
+
+官方迁移锁只追加观测0018，236旧条目保持、总237；并行TaskRuntime0022及STATE等输出不收编，短发布顺序按必要窗口协调。正式候选实现审阅、完整本机门、新exact-SHA六作业CI与0018本机部署仍待，不把目标测试写成整仓成功。详情在 complete-report-performance.md。
+
+仍不声明所有限制已移除：native v1 的session/step/part/ancestry及基线/ownership总量上限、durable native v2与原始完成证明、完整追踪/数值关联、真实100K Task/10M usage性能、真正任务输入/缓存读写/输出/总Token与人民币、AW独立及CS联合部署/正式浏览器验收均继续。缺任意源或完整证明时不返回数值小计，不自动缩小范围；两个RFC保持In Progress。
+
+
+### 2026-10-04 正式候选检查与未发布迁移修正
+
+正常0018安装后的原10001报告用例约21.12s、三项20025断言通过；只改新未发布0018的查询别名 distinct_entries 为 d，使原结构解析器识别同一查询。SQL逻辑不变，0014/0015原文和236旧锁校验值均保持；使用原writeMigrationLock只重封本会话未发布0018校验值，新总数237，并行0022排除。首次私有重封脚本误比较原读锁接口与包含note的原JSON，写入前失败，后继已按原始字节和逐条校验值确认并真正完成重封；保留失败记录，不据旧误报宣称完成。
+
+首次完整检查发现本会话查询别名两项结构错误及两项并行在制错误，原失败保留。别名改正后的新候选只执行一次完整检查，现仅有并行platform/wiring.ts的601行与未登记TaskRuntime0022两项错误，没有本会话迁移错误；检查在结构阶段停止，不能写成全仓通过。按development-rules §3的共享在制品规则，本会话精确lint通过、新三项批插入真实PG回归再次3 pass /0 fail /7断言，完整原10001回归的语义候选未变而复用成功。正式结果仍需实现审阅、精确提交与新的六作业CI；本机部署、native v2与追踪上限移除仍未完成，开发producer OFF。
