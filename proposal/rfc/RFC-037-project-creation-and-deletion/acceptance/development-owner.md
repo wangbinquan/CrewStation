@@ -29,3 +29,14 @@
 
 
 2026-10-04 终态补记：开发52路径修订完整检查已结束，5564 pass／143环境skip／4 fail，136169断言、1094文件、1559.78秒，全部冻结指纹保持；本批拥有用例71项通过、0失败，静态四层成功。4个失败均在未修改eventsModule测试，起始HTTP500预期收到503后后续依赖状态断言失败；同组单独7／0、63断言，原失败仍保留，不声称全量绿，也不按未变化内容再跑完整门禁。报告目录d2ab5f3自身CI37135430507的module唯一失败是观测10001项夹具hook超时65002ms（3071pass／11skip／1fail），其余static/unit/console/e2e成功；gate失败，尚不部署，已作为实际故障交接观测owner修复。当前正式TaskRuntime、全22方装配／物理范围及原专用项目永久回收仍未完成，入口OFF。
+## 2026-10-04 已发布版本部署回执
+
+55 路径已精确提交并推送 `9b287d488916a6029fc2a433ca3522f03fdb3aa4`，共享索引为空，原 234 迁移条目完整保持，开发 0015／0016 追加后共 236 项。[该 SHA 的 CI 37139454921](https://github.com/wangbinquan/CrewStation/actions/runs/37139454921) 六项终态全部成功。先前 d2 夹具 hook 失败及本地 events HTTP503 失败原证据保持，不改写为通过。
+
+2026-10-03T17:55:35.506Z，本机八组件完成部署；实际 Pod imageID 和节点 OCI source revision 全部核对，236 项已提交迁移按实际模块声明与 SQL 校验和核实。构建仅以该 Git 提交归档直接传 Docker，不包含新 TaskRuntime 盘点或 RFC-036 在制品。
+
+实际 API Pod `81578b52-cc3c-4521-9ce5-977e9a977fbb` 的 uid／gid／groups 均为 1000，原配置合并报告 root／emptyDir／fsGroup1000 后，`/var/lib/crewstation/observability` 完成独占 0600 创建、fsync、读回和仅移除自己的证明文件。证明是实际 API 容器文件系统可写，不是业务报告／模型任务验收。
+
+原 namespace、PVC／PV／claim、项目 Pod、数据库及角色 OID、原 native 容器身份与固定 Runner 摘要均保持；root 本轮未创建新模型任务，producer OFF。部署回执 `/private/tmp/cs-rfc037-9b287d488916-development-owner-v1-deployment-receipt.json`；原状态／备份及阶段文件使用同一前缀，未重跑迁移或变更原资源身份。
+
+完整 TaskRuntime owner、所有 22 方与物理清理范围仍在实施。永久删除入口关闭，原专用项目未删除；八组件部署与目录验证不能代替最终永久回收验收。

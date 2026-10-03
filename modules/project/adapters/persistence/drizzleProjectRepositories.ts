@@ -93,7 +93,6 @@ export async function projectInfrastructureOwnership(db: Database, kind: 'projec
   if (!['project','service','deletion'].includes(kind)) throw precondition('项目归属来源类型未登记');
   const id = ResourceIdSchema.parse(rawId);
   return db.transaction(async (tx) => {
-    await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`);
     let projectId: ProjectId | undefined;
     if (kind === 'project') projectId = await originalProject(tx,id);
     else if (kind === 'deletion') projectId = await operationProject(tx,id,false);
@@ -107,5 +106,5 @@ export async function projectInfrastructureOwnership(db: Database, kind: 'projec
     }
     if (!projectId) return undefined;
     return { complete:true as const,id,scope:'project' as const,projectIds:[projectId],revision:jsonHash({kind,id,projectId}) };
-  });
+  }, { isolationLevel: 'repeatable read', accessMode: 'read only' });
 }

@@ -171,6 +171,28 @@ describe.skipIf(!available)('项目永久删除的持久意图与完成屏障（
     await mod.api.recordProjectDeletionReceipt(resumed!.lease, 'scm', 'seal', proof);
   });
 
+  test('删除心跳只延长原租约，不重新发布逐渐增长的进度正文；过期或换持有者仍拒绝', async () => {
+    const { operation, lease } = await start();
+    await mod.api.recordProjectDeletionReceipt(lease, 'scm', 'seal', evidence('original-heartbeat-proof'));
+    const before = await mod.api.readProjectDeletion(admin, operation.id);
+    // 2026-10-04 exact CI: each owner heartbeat rewrote and reparsed all prior receipts, exceeding the original 5s queue test budget.
+    await db.db.execute(`CREATE FUNCTION project.heartbeat_body_probe() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN RAISE EXCEPTION 'heartbeat republished progress body'; END $$`);
+    await db.db.execute(`CREATE TRIGGER heartbeat_body_probe BEFORE UPDATE OF body ON project.deletion_operations FOR EACH ROW EXECUTE FUNCTION project.heartbeat_body_probe()`);
+    try {
+      await mod.api.renewProjectDeletion(lease, 600);
+      expect(await mod.api.readProjectDeletion(admin, operation.id)).toEqual(before);
+      await expect(mod.api.renewProjectDeletion({ ...lease, owner: 'another-worker' }, 600)).rejects.toMatchObject({ kind: 'precondition' });
+      await expect(mod.api.renewProjectDeletion({ ...lease, generation: lease.generation + 1 }, 600)).rejects.toMatchObject({ kind: 'precondition' });
+      offset += 601_000;
+      await expect(mod.api.renewProjectDeletion(lease, 600)).rejects.toMatchObject({ kind: 'precondition' });
+    } finally {
+      offset = 0;
+      await db.db.execute('DROP TRIGGER heartbeat_body_probe ON project.deletion_operations');
+      await db.db.execute('DROP FUNCTION project.heartbeat_body_probe()');
+    }
+  });
+
   test('完整阶段后仍必须清完本模块内容才删根；清理证据和最小结果跨根删除可读，同键重放不重建', async () => {
     const { project, operation, lease, input, reports } = await start(), other = await create();
     await receipts(lease, PROJECT_DELETION_PHASES.slice(0, 5));

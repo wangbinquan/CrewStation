@@ -10,6 +10,7 @@ import type { TaskRuntimeUseCaseDeps } from './dependencies';
 import type { lifecycleUseCases } from './lifecycle';
 import { reconcileRuntimeInitialization } from './runtimeInitialization';
 import { describeNativeScheduling, expireExecutionProvisioning } from './nativeExecution';
+import { runtimeBackground } from './deletion/background';
 
 type Lifecycle = ReturnType<typeof lifecycleUseCases>;
 
@@ -18,17 +19,21 @@ export function reconcileUseCase(deps: TaskRuntimeUseCaseDeps, lifecycle: Lifecy
   return async (): Promise<number> => {
     let changed = 0;
     // 作业崩溃或补偿重试耗尽后仍有持久化意图：去重补投，不丢失恢复。
-    for (const record of await deps.uow.read.rebuilds.pending()) if (record.creation !== 'ledger' && !Object.hasOwn(record, 'developmentParentBinding')) await deps.uow.read.rebuildQueue.enqueue(record.id);
-    for (const env of await deps.uow.read.environments.pendingExecutions()) await deps.uow.read.nativeQueue.enqueue(env.id);
+    for (const record of await deps.uow.read.rebuilds.pending()) if (record.creation !== 'ledger' && !Object.hasOwn(record, 'developmentParentBinding'))
+      await runtimeBackground(deps.projectWork, 'reconcile', 'rebuild', record.id, () => deps.uow.read.rebuildQueue.enqueue(record.id), undefined);
+    for (const env of await deps.uow.read.environments.pendingExecutions())
+      await runtimeBackground(deps.projectWork, 'reconcile', 'task', env.id, () => deps.uow.read.nativeQueue.enqueue(env.id), undefined);
     for (const env of await deps.uow.read.environments.listByStates(['creating', 'running'])) {
-      if (env.businessWorkspace?.phase === 'pausing') { await finishBusinessPause(deps, env).catch((error: unknown) => deps.logger.warn('business workspace cleanup pending', { taskId: env.id, error: String(error) })); changed += 1; continue; }
-      if (await reconcileRuntimeInitialization(deps, env)) { changed += 1; continue; }
-      if (await expireExecutionProvisioning(deps, env)) { changed += 1; continue; }
-      const target = await judgeable(deps, env);
-      if (target && await judgeEnvironment(deps, lifecycle, env, target.rebuild, await deps.cluster.podPhase(env))) changed += 1;
+      changed += await runtimeBackground(deps.projectWork, 'reconcile', 'task', env.id, () => reconcileEnvironment(deps, lifecycle, env), 0);
     }
     return changed;
   };
+}
+async function reconcileEnvironment(deps: TaskRuntimeUseCaseDeps, lifecycle: Lifecycle, env: TaskEnvironment) {
+  if (env.businessWorkspace?.phase === 'pausing') { await finishBusinessPause(deps, env).catch((error: unknown) => deps.logger.warn('business workspace cleanup pending', { taskId: env.id, error: String(error) })); return 1; }
+  if (await reconcileRuntimeInitialization(deps, env) || await expireExecutionProvisioning(deps, env)) return 1;
+  const target = await judgeable(deps, env);
+  return target && await judgeEnvironment(deps, lifecycle, env, target.rebuild, await deps.cluster.podPhase(env)) ? 1 : 0;
 }
 
 /**
@@ -42,15 +47,17 @@ export function observeStartupUseCase(deps: TaskRuntimeUseCaseDeps, lifecycle: L
     after = page.length === pageSize ? page.at(-1)!.id : undefined;
     let changed = 0;
     for (const env of page) {
-      if (await reconcileRuntimeInitialization(deps, env)) { changed += 1; continue; }
-      const target = await judgeable(deps, env);
-      if (!target || !env.startup) continue;
-      const read = await deps.cluster.observeStartup(env, { events: runningStage(env.startup) === 'container' });
-      if (await judgeEnvironment(deps, lifecycle, env, target.rebuild, read.pod)) { changed += 1; continue; }
-      if (read.observation && await recordObservation(deps, env, read.observation)) changed += 1;
+      changed += await runtimeBackground(deps.projectWork, 'observe-startup', 'task', env.id, () => observeEnvironment(deps, lifecycle, env), 0);
     }
     return changed;
   };
+}
+async function observeEnvironment(deps: TaskRuntimeUseCaseDeps, lifecycle: Lifecycle, env: TaskEnvironment) {
+  if (await reconcileRuntimeInitialization(deps, env)) return 1;
+  const target = await judgeable(deps, env); if (!target || !env.startup) return 0;
+  const read = await deps.cluster.observeStartup(env, { events: runningStage(env.startup) === 'container' });
+  if (await judgeEnvironment(deps, lifecycle, env, target.rebuild, read.pod)) return 1;
+  return read.observation && await recordObservation(deps, env, read.observation) ? 1 : 0;
 }
 
 async function recordObservation(deps: TaskRuntimeUseCaseDeps, env: TaskEnvironment, observation: NonNullable<Awaited<ReturnType<TaskRuntimeUseCaseDeps['cluster']['observeStartup']>>['observation']>): Promise<boolean> {

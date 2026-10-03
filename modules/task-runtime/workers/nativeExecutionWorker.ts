@@ -5,9 +5,10 @@ import type { JobHandler } from '@crewstation/queue';
 import type { NativeExecutionDeps } from '../application/nativeExecution';
 import { failPreparation, preparationFailureReason, requireExecutionLease, runNativeExecution } from '../application/nativeExecution';
 import { NATIVE_EXECUTION_JOB_KIND } from '../ports/repositories';
+import { runtimeBackground } from '../application/deletion/background';
 
 export function nativeExecutionJobHandler(deps: NativeExecutionDeps): JobHandler {
-  return async (job, ctx) => {
+  const handle: JobHandler = async (job, ctx) => {
     const taskId = TaskIdSchema.parse((job.payload as { taskId?: unknown }).taskId);
     try { await runNativeExecution(deps, taskId, ctx.heartbeat, { jobId: job.id, fencingToken: job.fencingToken }); }
     catch (error) {
@@ -31,6 +32,8 @@ export function nativeExecutionJobHandler(deps: NativeExecutionDeps): JobHandler
       throw new Error('Agent 执行环境操作尚未完成，将按持久状态继续准备或清理');
     }
   };
+  return (job, ctx) => runtimeBackground(deps.projectWork, 'native-job', 'task', TaskIdSchema.parse((job.payload as { taskId?: unknown }).taskId),
+    () => handle(job, ctx), undefined, { jobId: job.id, fencingToken: job.fencingToken });
 }
 
 export function nativeExecutionWorker(db: Parameters<typeof createWorker>[0]['db'], deps: NativeExecutionDeps) {

@@ -4,7 +4,7 @@ import type { Actor, ProjectDeletionInventory } from '@crewstation/contracts';
 import { eventbusMigrations } from '@crewstation/eventbus';
 import { jsonHash, newResourceId } from '@crewstation/kernel';
 import { createIdentityModule, identityMigrations } from '@crewstation/module-identity';
-import { resourceIdentityDirectory } from '@crewstation/persistence';
+import { resourceIdentityDirectory, withSharedDatabaseAdmission } from '@crewstation/persistence';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import { sql } from 'drizzle-orm';
 import { createProjectModule, projectMigrations } from '../wiring';
@@ -32,6 +32,10 @@ describe.skipIf(!available)('project infrastructure origins (real PG; ownership 
       expect(current).toMatchObject({complete:true,id:own.id,scope:'project',projectIds:[own.id]});
       expect(await f.project.api.originalInfrastructureOwnership('project','old-project-key','legacy')).toEqual(current);
       const service = await f.project.api.originalInfrastructureOwnership('service',own.serviceId!);
+      await withSharedDatabaseAdmission(f.database.db, 'runtime-original-source-test:' + own.id, async () => {
+        expect(await f.project.api.originalInfrastructureOwnership('project',own.id)).toEqual(current);
+        expect(await f.project.api.originalInfrastructureOwnership('service',own.serviceId!)).toEqual(service);
+      });
       expect(service?.projectIds).toEqual([own.id]);
       expect(await f.project.api.originalInfrastructureOwnership('service','old-service-key','legacy')).toEqual(service);
       expect((await f.project.api.originalInfrastructureOwnership('service',other.serviceId!))?.projectIds).toEqual([other.id]);

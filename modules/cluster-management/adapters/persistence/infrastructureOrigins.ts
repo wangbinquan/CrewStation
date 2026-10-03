@@ -8,7 +8,6 @@ export async function clusterInfrastructureOrigin(db: Database, kind: Kind, key:
   if (!['cluster-refresh', 'cluster-operation', 'cluster-metrics', 'cluster-storage'].includes(kind) || !['current', 'legacy'].includes(representation)) throw precondition('集群原来源类型未登记');
   if (representation === 'current') ResourceIdSchema.parse(key);
   return db.transaction(async (tx) => {
-    await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`);
     const alias = (await tx.execute<{ id: string }>(sql`SELECT id FROM cluster_management.resource_identity_aliases WHERE kind=${kind} AND key=${JSON.stringify([key])}`))[0]?.id;
     const canonical = ResourceIdSchema.safeParse(key).success ? key : undefined;
     if (alias && canonical && alias !== canonical) throw precondition('集群原标识目录冲突');
@@ -31,5 +30,5 @@ export async function clusterInfrastructureOrigin(db: Database, kind: Kind, key:
     if (material.scope !== 'project' || kind !== 'cluster-operation') throw precondition('集群原来源范围未登记');
     const projectId = ProjectIdSchema.parse(material.projectId);
     return { complete: true as const, id, scope: 'project' as const, projectIds: [projectId], revision: jsonHash({ kind, id, material }) };
-  });
+  }, { isolationLevel: 'repeatable read', accessMode: 'read only' });
 }

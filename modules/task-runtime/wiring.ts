@@ -1,5 +1,11 @@
 import { resourceEndingHandler } from './application/development/parent/retention';
-import { originalProjectTaskIds, runtimeInfrastructureOrigin } from './adapters/persistence/infrastructure/origins';
+import { originalProjectTaskIds } from './adapters/persistence/infrastructure/origins';
+import { originalRuntimeWorkInfrastructure } from './adapters/persistence/deletion/workOrigin';
+import { runtimeProjectWork } from './adapters/persistence/deletion/projectWork';
+import { scopedRuntimePorts, guardedRuntimePort } from './application/deletion/ports';
+import { runtimeWorkApi } from './application/deletion/api';
+import { runtimeArchiveWork, runtimeStorageWork } from './application/deletion/storage';
+import type { RuntimeProjectWork, RuntimeWorkSources } from './ports/deletion/work';
 import { developmentRemovalLookup } from './application/development/removalLookup';
 import { developmentCleanupSelection } from './domain/development/cleanupSelection';
 import type { DevelopmentCleanupParticipant } from './ports/developmentCleanup';
@@ -66,9 +72,11 @@ import type { EnvironmentLedger } from './ports/ledger';
 import type { WorkloadSafetyPort, TaskVolumePort } from './ports/workloadSafety';
 import { resyncLedger } from './application/ledgerResync';
 import { ledgerResyncWorker } from './workers/ledgerResyncWorker';
+import { runtimeLifecycleWorkers } from './workers/runtimeLifecycle';
 import type { EnvironmentSources, ProfileCatalog, ProjectAuthorizer, QuotaSource, ServiceResolver, SourceCheckoutSource, TaskRuntimeSettings, TestRunner } from './ports/platform';
 
 export interface TaskRuntimeModuleDeps {
+  deletionWorkSources?: RuntimeWorkSources;
   developmentParentPhysical?: DevelopmentParentPhysical;
   developmentCleanup?: DevelopmentCleanupParticipant;
   archive?: { credentials: ArchiveCredentials; apiUrl: string };
@@ -152,18 +160,24 @@ function taskRuntimeUseCaseDeps(deps: TaskRuntimeModuleDeps, developmentRemoval:
 
 function taskRuntimeParticipants(deps: TaskRuntimeModuleDeps) {
   const forward: TaskDevelopmentRemovalQuery = (target) => query ? query(target) : Promise.resolve({ kind: 'waiting', reason: '原开发删除来源尚未装配' });
-  const useCaseDeps = taskRuntimeUseCaseDeps(deps, forward);
-  useCaseDeps.developmentParentPhysical = deps.developmentParentPhysical ?? kubernetesDevelopmentParentPhysical(deps.k8s, forward);
-  const executionDeps = { ...useCaseDeps, nativeCluster: kubernetesNativeExecutions(deps.k8s, deps.settings.workerUid, deps.workloadSafety) };
+  const work = deps.deletionWorkSources ? runtimeProjectWork(deps.db, deps.deletionWorkSources,
+    (error) => (deps.logger ?? noopLogger).warn('runtime original lifetime pending', { error: String(error) })) : undefined;
+  const raw = taskRuntimeUseCaseDeps(deps, forward);
+  raw.developmentParentPhysical = deps.developmentParentPhysical ?? kubernetesDevelopmentParentPhysical(deps.k8s, forward);
+  const useCaseDeps = work ? scopedRuntimePorts(raw, work) : raw;
+  const nativeCluster = kubernetesNativeExecutions(deps.k8s, deps.settings.workerUid, deps.workloadSafety);
+  const executionDeps = { ...useCaseDeps, nativeCluster: work ? guardedRuntimePort(nativeCluster, work) : nativeCluster };
   const query = developmentRemovalLookup(executionDeps);
-  const recoveryDeps = { ...useCaseDeps, recoveryCluster: kubernetesTaskRecoveryCluster(deps.k8s, forward), provisioner: kubernetesRebuildProvisioner(deps.k8s, deps.settings.workerUid, forward) };
-  return { useCaseDeps, executionDeps, recoveryDeps };
+  const recoveryCluster = kubernetesTaskRecoveryCluster(deps.k8s, forward), provisioner = kubernetesRebuildProvisioner(deps.k8s, deps.settings.workerUid, forward);
+  const recoveryDeps = { ...useCaseDeps, recoveryCluster: work ? guardedRuntimePort(recoveryCluster, work) : recoveryCluster, provisioner: work ? guardedRuntimePort(provisioner, work) : provisioner };
+  return { useCaseDeps, executionDeps, recoveryDeps, work };
 }
 
 export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntimeModule {
-  const { useCaseDeps, executionDeps, recoveryDeps } = taskRuntimeParticipants(deps);
+  const { useCaseDeps, executionDeps, recoveryDeps, work } = taskRuntimeParticipants(deps);
   const create = createEnvironmentUseCase(useCaseDeps);
-  const archives = deps.archive && deps.ledger && deps.creation === 'ledger' ? archiveExecution({ runtime: useCaseDeps, store: archiveExecutionStore(deps.db, deps.ledger), ...deps.archive }) : undefined;
+  const { archiveStore, archives } = runtimeArchives(deps, useCaseDeps, work);
+  const testRunner = deps.testRunner && (work ? guardedRuntimePort(deps.testRunner, work) : deps.testRunner);
   const lifecycle = lifecycleUseCases(useCaseDeps);
   const queries = environmentQueries(useCaseDeps);
   const reconcile = reconcileUseCase(useCaseDeps, lifecycle);
@@ -174,7 +188,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
   const runProfileTest = runProfileTestUseCase(useCaseDeps, {
     createTestEnvironment: (input) => createTestEnvironment({ ...input, labels: { [LABELS.project]: PROFILE_TEST_LABELS.project, [LABELS.service]: PROFILE_TEST_LABELS.service, ...input.labels } }),
     release: (taskId) => lifecycle.releaseEnvironment(taskId, 'profile-test'),
-    ...(deps.testRunner ? { runner: deps.testRunner } : {}), ...(deps.testTiming ? { timing: deps.testTiming } : {}), ...(deps.testMcp ? { mcp: deps.testMcp } : {}),
+    ...(testRunner ? { runner: testRunner } : {}), ...(deps.testTiming ? { timing: deps.testTiming } : {}), ...(deps.testMcp ? { mcp: deps.testMcp } : {}),
   });
   const api: TaskRuntimeModuleApi = {
     ...(archives ? { archiveExecution: archives } : {}),
@@ -182,13 +196,13 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     ...businessStorageFinalization(useCaseDeps),
     ...businessRecoveryApi(useCaseDeps),
     name: 'task-runtime',
-    originalInfrastructureOwnership: (kind, key, representation) => runtimeInfrastructureOrigin(deps.db, kind, key, representation),
+    originalInfrastructureOwnership: (kind, key, representation) => originalRuntimeWorkInfrastructure(deps.db, kind, key, representation),
     originalProjectTaskIds: (projectId, after) => originalProjectTaskIds(deps.db, projectId, after),
     inspectResourceEnding: resourceEndingHandler(useCaseDeps, ledgerProjectionFor(deps)?.preview),
     imageHistory: environmentImageHistory(deps.db),
     blockBusinessAdmission: blockBusinessAdmission(useCaseDeps),
     imageReferenceState: runtimeImageReferenceState(useCaseDeps),
-    runRuntimeImageProbe: runImageProbe(useCaseDeps, { create: createTestEnvironment, runner: deps.testRunner, mcp: deps.testMcp }),
+    runRuntimeImageProbe: runImageProbe(useCaseDeps, { create: createTestEnvironment, runner: testRunner, mcp: deps.testMcp }),
     stopRuntimeImageProbe: stopImageProbe(useCaseDeps, deps.imageProbeLeases ? imageProbeCleanup(deps.k8s, deps.imageProbeLeases.port, deps.imageProbeLeases.holder) : undefined),
     reconcileRebuild: reconcileRebuildUseCase(recoveryDeps),
     listClusterTasks: queries.listClusterTasks,
@@ -227,14 +241,28 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     ...workloadRenderUseCases(useCaseDeps),
   };
   const ledger = deps.ledger;
+  const guardedApi = scopedRuntimeApi(api, work, archiveStore);
   return {
-    api,
-    http: [environmentRoutes(api, deps.isAdmin)],
-    workers: [rebuildWorker(deps.db, recoveryDeps), nativeExecutionWorker(deps.db, executionDeps), ...periodicWorkers(useCaseDeps.logger, reconcile, observeStartup), ...(archives ? [archiveExecutionWorker(archives.reconcile, useCaseDeps.logger)] : []),
+    api: guardedApi,
+    http: [environmentRoutes(guardedApi, deps.isAdmin)],
+    workers: [rebuildWorker(deps.db, recoveryDeps), nativeExecutionWorker(deps.db, executionDeps), ...runtimeLifecycleWorkers(useCaseDeps.logger, reconcile, observeStartup), ...(archives ? [archiveExecutionWorker(archives.reconcile, useCaseDeps.logger)] : []),
       developmentParentEndingWorker(deps.db, useCaseDeps), developmentParentRecoveryWorker(useCaseDeps),
-      ...(ledger ? [ledgerResyncWorker(() => resyncLedger(useCaseDeps.uow, ledger, useCaseDeps.logger, useCaseDeps.clock), useCaseDeps.logger)] : [])],
+      ...(ledger ? [ledgerResyncWorker(() => resyncLedger(useCaseDeps.uow, ledger, useCaseDeps.logger, useCaseDeps.clock, work), useCaseDeps.logger)] : []),
+      ...(work ? [{ start: () => {}, stop: work.drain }] : [])],
     migrations: taskRuntimeMigrations,
   };
+}
+function runtimeArchives(deps: TaskRuntimeModuleDeps, runtime: TaskRuntimeUseCaseDeps, work?: RuntimeProjectWork) {
+  const archiveStore = deps.archive && deps.ledger && deps.creation === 'ledger' ? archiveExecutionStore(deps.db, deps.ledger) : undefined;
+  const archives = deps.archive && archiveStore ? archiveExecution({ runtime, store: work ? guardedRuntimePort(archiveStore, work) : archiveStore,
+    apiUrl: deps.archive.apiUrl, credentials: work ? guardedRuntimePort(deps.archive.credentials, work) : deps.archive.credentials }) : undefined;
+  return { archiveStore, archives };
+}
+function scopedRuntimeApi(api: TaskRuntimeModuleApi, work: RuntimeProjectWork | undefined, archiveStore: ReturnType<typeof archiveExecutionStore> | undefined) {
+  return work ? runtimeWorkApi({ ...api,
+    ...(api.archiveExecution && archiveStore ? { archiveExecution: runtimeArchiveWork(api.archiveExecution, archiveStore, work) } : {}),
+    ...(api.storageCleanup ? { storageCleanup: runtimeStorageWork(api.storageCleanup, work) } : {}),
+  }, work) : api;
 }
 
 function businessRecoveryApi(deps: TaskRuntimeUseCaseDeps): Pick<TaskRuntimeModuleApi, 'inspectBusinessRecovery' | 'rebuildBusinessWorkspace' | 'restartBusinessWorkspace'> {
@@ -245,19 +273,4 @@ function businessRecoveryApi(deps: TaskRuntimeUseCaseDeps): Pick<TaskRuntimeModu
 async function captureStartupLog(deps: TaskRuntimeUseCaseDeps, taskId: TaskId) {
   const env = await deps.uow.read.environments.getById(taskId);
   return env ? startupLogTail(deps, env, env.podName) : undefined;
-}
-
-/** 对账每 15 秒一轮；启动观测每秒一轮（RFC-022），上一轮没跑完就跳过这一轮，不叠加。 */
-function periodicWorkers(logger: Logger, reconcile: () => Promise<unknown>, observeStartup: () => Promise<unknown>) {
-  let timer: ReturnType<typeof setInterval> | undefined;
-  let observer: ReturnType<typeof setInterval> | undefined, observing = false;
-  const observeTick = () => {
-    if (observing) return;
-    observing = true;
-    void observeStartup().catch((e: unknown) => logger.error('startup observation failed', { error: String(e) })).finally(() => { observing = false; });
-  };
-  return [
-    { start: () => { timer ??= setInterval(() => void reconcile().catch((e: unknown) => logger.error('reconcile failed', { error: String(e) })), 15000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } },
-    { start: () => { observer ??= setInterval(observeTick, 1000); }, stop: async () => { if (observer) clearInterval(observer); observer = undefined; } },
-  ];
 }

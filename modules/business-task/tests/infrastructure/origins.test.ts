@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import type { ProjectId, ServiceId, SubtaskId, TaskId, TraceId } from '@crewstation/contracts';
 import { eventbusMigrations } from '@crewstation/eventbus';
 import { newResourceId } from '@crewstation/kernel';
-import { resourceIdentityDirectory } from '@crewstation/persistence';
+import { resourceIdentityDirectory, withSharedDatabaseAdmission } from '@crewstation/persistence';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import { sql } from 'drizzle-orm';
 import { drizzleTaskRepository, drizzleSubtaskRepository } from '../../adapters/persistence/drizzleRepositories';
@@ -26,6 +26,9 @@ describe.skipIf(!available)('business infrastructure ownership (actual PG, minim
       const read = mod.api.originalInfrastructureOwnership, task = await read('task', taskId), child = await read('subtask', subtaskId);
       expect(task).toMatchObject({ id: taskId, scope: 'project', projectIds: [projectId] });
       expect(child).toMatchObject({ id: subtaskId, scope: 'project', projectIds: [projectId] });
+      await withSharedDatabaseAdmission(f.db, 'runtime-original-source-test:' + projectId, async () => {
+        expect(await read('task', taskId)).toEqual(task); expect(await read('subtask', subtaskId)).toEqual(child);
+      });
       const directory = resourceIdentityDirectory(f.db, () => [businessTaskMigrations]);
       await directory.bind('business_task', 'subtask', ['private-old-child'], subtaskId);
       expect(await read('subtask', 'private-old-child', 'legacy')).toEqual(child);

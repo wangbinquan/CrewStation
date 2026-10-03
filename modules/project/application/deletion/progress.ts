@@ -20,8 +20,11 @@ export function deletionProgressUseCases(deps: ProjectUseCaseDeps) {
       return { lease: { operationId: id, owner, generation: next.generation }, operation: next.operation, plan: stored.plan };
     }),
     renewProjectDeletion: (lease: DeletionLease, seconds?: number) => deps.uow.run(async (scope) => {
-      const now = deps.clock.now(), current = await leasedDeletion(scope, lease, now);
-      await scope.deletions.saveOperation({ ...current, leaseUntil: deletionLeaseUntil(now, seconds) });
+      const now = deps.clock.now(), until = deletionLeaseUntil(now, seconds);
+      if (await scope.deletions.renewOperation(lease, now, until)) return;
+      // Preserve missing/stale lease diagnostics without loading the growing operation on every healthy heartbeat.
+      await leasedDeletion(scope, lease, now);
+      throw precondition('项目删除租约已失效', { operationId: lease.operationId });
     }),
     deferProjectDeletion: (lease: DeletionLease, participant: ProjectDeletionParticipant, reason: string) => deps.uow.run(async (scope) => {
       const now = deps.clock.now(), current = await leasedDeletion(scope, lease, now);

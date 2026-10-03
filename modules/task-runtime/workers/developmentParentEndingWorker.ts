@@ -4,11 +4,13 @@ import { ResourceIdSchema } from '@crewstation/contracts';
 import type { TaskRuntimeUseCaseDeps } from '../application/dependencies';
 import { runDevelopmentParentEnding } from '../application/development/parent/run';
 import { DEVELOPMENT_PARENT_ENDING_JOB_KIND } from '../ports/developmentParentEnding';
+import { runtimeBackground } from '../application/deletion/background';
 
 export function developmentParentEndingHandler(deps: TaskRuntimeUseCaseDeps): JobHandler {
   return async (job) => {
     const id = ResourceIdSchema.parse((job.payload as { endingId?: unknown }).endingId);
-    await runDevelopmentParentEnding(deps, id, { jobId: job.id, fencingToken: job.fencingToken });
+    await runtimeBackground(deps.projectWork, 'parent-ending', 'parent-ending', id,
+      () => runDevelopmentParentEnding(deps, id, { jobId: job.id, fencingToken: job.fencingToken }), undefined, { jobId: job.id, fencingToken: job.fencingToken });
   };
 }
 export function developmentParentEndingWorker(db: Parameters<typeof createWorker>[0]['db'], deps: TaskRuntimeUseCaseDeps) {

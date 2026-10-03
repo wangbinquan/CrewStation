@@ -13,6 +13,8 @@ import { completedDevelopmentParent } from './development/parent/completed';
 import { currentDevelopmentParentRebuild } from './development/parent/binding';
 import type { EnvironmentLedger } from '../ports/ledger';
 import type { RepositoryScope, UnitOfWork } from '../ports/unitOfWork';
+import type { RuntimeProjectWork } from '../ports/deletion/work';
+import { runtimeBackground } from './deletion/background';
 
 const LIVE: EnvironmentState[] = ['creating', 'running', 'paused', 'releasing', 'failed'];
 const PAGE = 200;
@@ -74,7 +76,7 @@ async function freshEnvironment(scope: RepositoryScope, id: TaskId): Promise<Tas
  * 部署时已存在的会话由它第一次写进台账；投影失败漏掉的（保存点回滚）由它追上；保留期满的失败会话由它记为已释放。
  * 锁行保证不会拿旧快照盖过并发更新的新状态。
  */
-export async function resyncLedger(uow: UnitOfWork, ledger: EnvironmentLedger, logger: Logger, clock: Clock = systemClock): Promise<number> {
+export async function resyncLedger(uow: UnitOfWork, ledger: EnvironmentLedger, logger: Logger, clock: Clock = systemClock, work?: RuntimeProjectWork): Promise<number> {
   const ids = new Set<string>();
   for (let after: string | undefined; ;) {
     const page = await uow.read.environments.listByStates(LIVE, { ...(after ? { after } : {}), limit: PAGE });
@@ -86,13 +88,13 @@ export async function resyncLedger(uow: UnitOfWork, ledger: EnvironmentLedger, l
   let synced = 0;
   for (const id of ids) {
     try {
-      synced += await uow.run(async (scope) => {
+      synced += await runtimeBackground(work, 'ledger-resync', 'task', id, () => uow.run(async (scope) => {
         const env = await freshEnvironment(scope, id as TaskId);
         if (!env || !scope.ledger) return 0;
         if (await followRetention(scope, env, clock.now())) logger.info('failed environment retired after retention', { taskId: env.id });
         else await scope.ledger.sync(env);
         return 1;
-      });
+      }), 0);
     } catch (error) {
       logger.warn('resource ledger resync failed', { taskId: id, error: error instanceof Error ? error.message : String(error) });
     }

@@ -2,6 +2,8 @@ import { bindTaskMaintenance } from './adapters/observability/taskMaintenance'; 
 import { resourceCatalogs } from './application/resource-center/resourceCatalogs'; import { sessionDeletionSources } from './application/deletion/sessionSources';
 import { businessRuntimePorts } from './application/deletion/businessSources';
 import { developmentDeletionSources, developmentSourceControl } from './application/deletion/developmentSources';
+import { runtimeDeletionSources } from './application/deletion/runtimeSources';
+import { runtimeCheckout } from './adapters/k8s/runtimeCheckout';
 import { projectResourceState } from './adapters/k8s/projectResourceState';
 import { projectResourceSources } from './application/resource-center/projectSources';
 import { createResourceAccessModule } from '@crewstation/module-resource-access';
@@ -52,7 +54,7 @@ import { createProjectModule,readProjectObservationName, serviceAllocationRevisi
 import { createReleaseModule, type ReleaseModuleApi } from '@crewstation/module-release';
 import { createScmModule } from '@crewstation/module-scm';
 import { createSessionModule } from '@crewstation/module-session';
-import { createTaskRuntimeModule, type TaskRuntimeModuleApi, type TaskRuntimeModuleDeps } from '@crewstation/module-task-runtime';
+import { createTaskRuntimeModule, type TaskRuntimeModuleApi } from '@crewstation/module-task-runtime';
 import { queueMigrations } from '@crewstation/queue';
 import { createSessionClient } from '@crewstation/session-client';
 import type { PlatformSettings } from '@crewstation/settings';
@@ -279,23 +281,6 @@ function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeC
   return { release, gateway };
 }
 
-/**
- * 开发容器的工作卷要先有源码：只读的会话级 Git 令牌只挂给 checkout init 容器（推送由平台在发布时完成）。旧形状受理时签好、写进按服务
- * 共用的 Secret；由资源中心建出时（RFC-025 I25）受理只要仓库地址，令牌在调和器建这一次启动的凭据 Secret 时才签。
- */
-function taskCheckout(core: ReturnType<typeof composeCore>, k8s: K8sClient, resolveById: (serviceId: ServiceId) => ReturnType<ProjectModuleApi['resolveServiceById']>): NonNullable<TaskRuntimeModuleDeps['checkout']> {
-  return {
-    checkoutFor: async (serviceId) => {
-      const [binding, svc, credential] = await Promise.all([core.scm.api.getBinding(SYSTEM_ACTOR, serviceId), resolveById(serviceId), core.scm.api.issueSessionCredential(serviceId, 30)]);
-      if (!svc) return undefined;
-      const name = `git-checkout-${serviceId.replaceAll('-', '')}`;
-      await k8s.apply(secretObject({ name, namespace: svc.namespace, stringData: { token: credential.token }, labels: { 'crewstation.io/service': svc.name } }));
-      return { repoUrl: binding.httpUrl, credentialSecretName: name };
-    },
-    repositoryFor: async (serviceId) => ({ repoUrl: (await core.scm.api.getBinding(SYSTEM_ACTOR, serviceId)).httpUrl }),
-    credentialFor: async (serviceId) => ({ token: (await core.scm.api.issueSessionCredential(serviceId, 30)).token }),
-  };
-}
 function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, late: Late, resources: ReturnType<typeof composeLedger>, runtimeImages: ReturnType<typeof createManagedRuntimeEnvironmentModule>) {
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, scm, isAdmin, resolveById } = core;
@@ -304,6 +289,7 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
   const mcp = [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }];
   const ledger = resources.api.owner('task-runtime');
   const taskRuntime = createTaskRuntimeModule({
+    ...(settings.platformPodUid ? { deletionWorkSources: runtimeDeletionSources(project.api, () => late.businessTask, projectCallbackOwners(k8s, settings.systemNamespace, settings.platformPodUid, 'crewstation.io/runtime-project-stop')) } : {}),
     ...(data.api.archiveHelper ? { archive: { credentials: data.api.archiveHelper, apiUrl: `http://cs-api.${settings.systemNamespace}.svc:8087` } } : {}),
     imageProbeLeases: { port: resources.api.leases, holder: deps.instance },
     db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, quotas: { quotaLimit: project.api.quotaLimit }, testRunner, testMcp: mcp,
@@ -314,7 +300,7 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
     ...(settings.workloadCreation === 'ledger' ? { creation: 'ledger' as const } : {}),
     profiles: { devSessionProfile: core.agentRuntime.api.projectDevTaskProfile, listTaskProfiles: project.api.listTaskProfiles, getTaskProfile: async (name) => (await project.api.listTaskProfiles()).find((p) => p.id === name) },
     services: { resolveServiceById: resolveById },
-    checkout: taskCheckout(core, k8s, resolveById),
+    checkout: runtimeCheckout(scm.api, SYSTEM_ACTOR, k8s, resolveById),
     sources: { ...(data.api.objectEnv ? { objectEnv: data.api.objectEnv } : {}), taskInputEnv: (input) => { if (!data.api.taskInputs) throw precondition('任务对象输入不可用'); return data.api.taskInputs.environment(input); }, bindTaskInputs: (id, uid) => { if (!data.api.taskInputs) throw precondition('任务对象输入不可用'); return data.api.taskInputs.bind(id, uid); }, pinTaskImage: runtimeImages.pinPlatformImage, runtimeImageSecrets: runtimeImages.api.renderInitializationSecrets, configEnv: (projectId, env) => config.api.renderEnv(projectId, env), dataEnv: data.api.envFor, taskDataEnv: data.api.envForTask },
     settings: { taskImage: settings.taskImage, systemNamespace: settings.systemNamespace, sessionUrl: settings.sessionRunnerUrl, userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, workerUid: 10001, defaultProfile: settings.defaultTaskProfile, userAuthMiddleware: 'forward-auth-user', dropIdentityHeadersMiddleware: 'drop-identity-headers', previewRateMiddlewares: ['rate-limit-user', 'rate-limit-host'] },
   });

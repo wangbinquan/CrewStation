@@ -7,6 +7,7 @@ import { executeDevelopmentParentRebuild } from '../application/development/pare
 import { publishDevelopmentParentRebuild } from '../application/development/parent/rebuildPublication';
 import type { DevelopmentParentEndingJobLease } from '../ports/developmentParentEndingScope';
 import { REBUILD_JOB_KIND } from '../ports/rebuilds';
+import { runtimeBackground } from '../application/deletion/background';
 
 async function runRebuild(deps: RebuildExecutionDeps, id: string, heartbeat: RebuildHeartbeat, identity: DevelopmentParentEndingJobLease): Promise<void> {
   const publication = await publishDevelopmentParentRebuild(deps, id, identity);
@@ -32,7 +33,7 @@ async function runRebuild(deps: RebuildExecutionDeps, id: string, heartbeat: Reb
 }
 
 export function rebuildJobHandler(deps: RebuildExecutionDeps): JobHandler {
-  return async (job, ctx) => {
+  const handle: JobHandler = async (job, ctx) => {
     const id = (job.payload as { requestId?: unknown }).requestId;
     if (typeof id !== 'string') throw new Error('恢复作业缺少请求编号');
     try { await runRebuild(deps, id, ctx.heartbeat, { jobId: job.id, fencingToken: job.fencingToken }); }
@@ -52,6 +53,11 @@ export function rebuildJobHandler(deps: RebuildExecutionDeps): JobHandler {
       // 不把集群响应体、环境变量或令牌写进队列错误记录。
       throw new Error('恢复作业尚未完成，将按记录继续重试或清理');
     }
+  };
+  return (job, ctx) => {
+    const id = (job.payload as { requestId?: unknown }).requestId;
+    if (typeof id !== 'string') throw new Error('恢复作业缺少请求编号');
+    return runtimeBackground(deps.projectWork, 'rebuild-job', 'rebuild', id, () => handle(job, ctx), undefined, { jobId: job.id, fencingToken: job.fencingToken });
   };
 }
 

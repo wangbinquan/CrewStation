@@ -232,6 +232,7 @@
     "modules/task-runtime/adapters/persistence/migrations/0019_development_parent_endings.sql": "aec14559d1762fab7cd4d05924bb9864b6ea022d7e8c668447b471ba18ae7dbc",
     "modules/task-runtime/adapters/persistence/migrations/0020_development_parent_rebuild_binding.sql": "322460d82f37219be35f55cae082246a2f59be9f76558d2204c02a79183bf678",
     "modules/task-runtime/adapters/persistence/migrations/0021_development_parent_retention.sql": "b6c113a36533b43f6188186bc7afbdb92e81aee33d943072027b998aef8e57ac",
+    "modules/task-runtime/adapters/persistence/migrations/0022_project_work.sql": "2c974bbd58407fb16ad80cddc07d233e68a9111522a5a999d2551482bf113226",
     "packages/eventbus/migrations/0001_domain_events.sql": "7ccc2ba8096db7efc7e2fa9c1818cac4042cafe73698a5bbee9652a3054225bc",
     "packages/eventbus/migrations/0002_resource_identity.sql": "b8c9081ea799d5d31a8d2a99324453003022d4d306a558b5776de0dee10b5957",
     "packages/eventbus/migrations/0003_resource_identity.identity.json": "8bfabfeaed4d5a6312b3bde66810ab01e9945b85a4e3220b55fd45107971651d",

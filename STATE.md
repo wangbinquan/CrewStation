@@ -3249,3 +3249,26 @@ HEAD/origin 786489，CI37130953072由观测会话交接六项全绿；仅786489�
 
 
 2026-10-04 终态补记：开发52路径修订完整检查已结束，5564 pass／143环境skip／4 fail，136169断言、1094文件、1559.78秒，全部冻结指纹保持；本批拥有用例71项通过、0失败，静态四层成功。4个失败均在未修改eventsModule测试，起始HTTP500预期收到503后后续依赖状态断言失败；同组单独7／0、63断言，原失败仍保留，不声称全量绿，也不按未变化内容再跑完整门禁。报告目录d2ab5f3自身CI37135430507的module唯一失败是观测10001项夹具hook超时65002ms（3071pass／11skip／1fail），其余static/unit/console/e2e成功；gate失败，尚不部署，已作为实际故障交接观测owner修复。当前正式TaskRuntime、全22方装配／物理范围及原专用项目永久回收仍未完成，入口OFF。
+
+
+## 2026-10-04 RFC-037 已发布开发 owner 部署与 TaskRuntime 内容接续
+
+9b287d488916a6029fc2a433ca3522f03fdb3aa4 的 CI37139454921六项终态全部成功，已于2026-10-03T17:55:35.506Z本机部署完成。八组件实际镜像／节点OCI源码核对，236项已提交迁移与真实模块名／SQL校验和保持；实际API Pod81578b52-cc3c-4521-9ce5-977e9a977fbb uid/gid/groups1000，报告root独占0600写入／fsync／读回并清理自己的证明文件通过。原namespace／PVC／PV／项目Pod／数据库与角色OID／原native容器和固定Runner保持，root未创建新模型任务、producer OFF。回执/private/tmp/cs-rfc037-9b287d488916-development-owner-v1-deployment-receipt.json。先前失败保留，不用部署绿改写旧失败。
+
+TaskRuntime新14路径仅实现10内容表完整只读PG EOF／整行摘要／公开原来源与共享平台范围，以及实际对账／启动观测迭代保留和关停等待。最后专项17／0、79断言，类型／精确lint／arch通过；候选/private/tmp/cs-rfc037-runtime-content-candidate-v1.json，较宽模块检查exec session40022、日志/private/tmp/cs-rfc037-runtime-content-module-v1.log，等待终态。尚未提交／完整全仓门禁／CI／部署，完整TaskRuntime项目删除准入／停止／数字排空／全部22 Root和SCM物理范围继续，入口OFF，原专用项目保留。详见acceptance/task-runtime-content.md。
+
+按照用户通信反馈，本轮跨会话仅发送部署就绪和部署完成两次必要交接；没有例行互报、状态轮询或新子会话。共享迁移锁未写入，保留观测性能修正窗口及所有RFC036 WIP。
+
+2026-10-04 TaskRuntime较宽模块检查终态383 pass／0 fail、4161断言、70文件、288.62秒；14功能路径首尾指纹保持，回执/private/tmp/cs-rfc037-runtime-content-module-v1.json。所有本轮检查进程已终止；新候选未提交、完整全仓门禁未启动，专用停止／数字排空／全部22方及实机永久清理继续。
+
+## 2026-10-04 RFC-037 原 TaskRuntime 回调与删除队列续租候选
+
+TaskRuntime 追加0022、共享锁238且原237保持，实际PG原出生/私有finally/HTTP期限和连接丢失后的原工作保留/整Pod恢复/当前阶段删除许可及最小原身份已实现。实际factory项目API、队列/对账/启动观测/归档/存储/台账接入；普通历史/原来源读取保留。shared原来源25001先红后修，Task/Project/BusinessTask/Cluster的隔离级别移至BEGIN。最终专项54／0、595断言；实际归档/存储2／0；较宽模块464／0、4803断言、87文件、277.64秒。新旧失败日志均保留，误建的两个本任务PG夹具已按OID/时间窗/原请求摘要/零资源/全部真实退出证明逐一清理，keeper650023保持。
+
+观测7a18725发布后实际CI37150242311交接4success/2failure：10001归约18.129秒及新批量原来源PASS，唯一module失败是本任务持久删除队列首测原5s超时。原续租重写整份正文改为原子只更新deadline，仍核同操作/持有者/世代/running/未过期；新增真实PG反例先红后绿，两模块16／0、138断言，原队列2245.58ms且预算未改。未部署失败SHA，不把本机专项称为hosted通过。
+
+57功能/锁路径稳定candidate-v3：/private/tmp/cs-rfc037-runtime-work-candidate-v3.json；精确lint、backend类型0、arch59单元4144源码无违规。唯一完整full-v1已启动，exec session36710，日志/private/tmp/cs-rfc037-runtime-work-full-v1.log及相同前缀-coverage，等待终态与指纹；未提交/自身精确CI/部署。生产源码在完整门禁中保持冻结。所有内容SQL写屏障/metadata许可、全局父恢复扫描、正式TaskRuntime停止/数字排空/七阶段owner、全部22方与SCM/其余物理范围/原专用项目二次确认全回收继续；删除入口OFF，producerOFF，原验证资源保留。跨会话只答复一次实际迁移发布交接，后续只接收实际失败，不例行发进度/轮询/开子会话。
+
+2026-10-04 稳定原回调候选终态：唯一完整门禁5603 pass／143环境skip／0 fail、136421断言、1103文件、1610.07秒；57功能/锁指纹保持，静态四层成功。/private/tmp/cs-rfc037-runtime-work-full-v1.json 为结构化回执；包括全部未追踪新源码的801／806改动行、99.38%防护无违规，patch-v1.json。精确候选backend0错；控制台辅助检查第一次漏configFilePath导致317个vite客户端派生错误，只修检查器，不改生产码/类型，修订待终态。原完整console类型已通过。本轮未提交/CI/部署；61文件串行精确发布接续，25个非本任务文件保留。原父恢复全局游标事务须与按项目入队事务拆开并覆盖commit，TaskRuntime明确停止/数字排空/全SQL屏障/七阶段、全部22方与实际原项目永久回收继续，入口OFF。
+
+控制台精确提交树辅助检查 v2 已终止0错（/private/tmp/cs-rfc037-runtime-work-exact-console-types-v2.json）；只补齐检查器的原配置路径，57功能/锁指纹保持，不重复完整门禁。61路径精确发布就绪，完整永久删除仍未完成、入口OFF。

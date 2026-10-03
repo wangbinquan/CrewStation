@@ -66,7 +66,7 @@ export function deletionIntentUseCases(deps: ProjectUseCaseDeps) {
     assertProjectAvailable: async (id: ProjectId) => {
       const project = await deps.uow.read.projects.getById(id);
       if (!project) throw notFound('项目', id);
-      if (project.state === 'deleting') throw precondition('项目正在永久删除，不能继续写入或新增资源', { projectId: id });
+      if (project.state === 'deleting') throw precondition('项目正在永久删除，不能继续写入或新增资源', { projectId: id, code: 'project_deletion_admission_closed' });
     },
     inspectProjectDeletionMetadata: (id: ProjectId) => deps.uow.read.deletions.inspectMetadata(id),
   };

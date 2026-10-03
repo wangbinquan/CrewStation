@@ -8,8 +8,10 @@ import type { UnitOfWork } from '../ports/unitOfWork';
 import type { DevelopmentParentPhysical } from '../ports/developmentParentPhysical';
 import type { WorkloadSafetyPort, TaskVolumePort } from '../ports/workloadSafety';
 import type { UnprovisionedStorage } from '../ports/unprovisionedStorage';
+import type { RuntimeProjectWork } from '../ports/deletion/work';
 
 export interface TaskRuntimeUseCaseDeps {
+  projectWork?: RuntimeProjectWork;
   developmentParentPhysical?: DevelopmentParentPhysical;
   developmentCleanup?: DevelopmentCleanupParticipant;
   unprovisionedStorage?: UnprovisionedStorage;

@@ -33,6 +33,9 @@ export function drizzleProjectDeletions(db: Executor): ProjectDeletions {
     lockRequest: async (key) => { await db.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`project.deletion-confirmation:${key}`},0))`); },
     insertOperation: async (item) => { await db.insert(deletionOperations).values(operationRow(item)); },
     saveOperation: async (item) => { await db.update(deletionOperations).set(operationRow(item)).where(eq(deletionOperations.id, item.operation.id)); },
+    renewOperation: async (lease, now, until) => (await db.update(deletionOperations).set({ leaseUntil: until }).where(and(
+      eq(deletionOperations.id, lease.operationId), eq(deletionOperations.leaseOwner, lease.owner), eq(deletionOperations.generation, lease.generation),
+      gt(deletionOperations.leaseUntil, now), sql`${deletionOperations.body}->>'state' = 'running'`)).returning({ id: deletionOperations.id })).length === 1,
     markDeleting: async (id, at) => { await db.update(projects).set({ state: 'deleting', updatedAt: at, message: null }).where(eq(projects.id, id)); },
     lifecycleRevision: async (id) => { const row = (await db.select({ revision: projects.lifecycleRevision }).from(projects).where(eq(projects.id, id)))[0]; if (!row) throw notFound('项目', id); return row.revision.toString(); },
     listPending: async (now, after, limit = 100) => (await db.select({ id: deletionOperations.id }).from(deletionOperations)

@@ -4,6 +4,7 @@ import type { ArchiveExecution } from '../../domain/archiveExecution';
 import type { ArchiveCredentials, ArchiveExecutionStore } from '../../ports/archiveExecution';
 import type { ArchiveExecutionApi } from '../../api/archiveExecution';
 import type { TaskRuntimeUseCaseDeps } from '../dependencies';
+import { runtimeBackground } from '../deletion/background';
 
 export interface ArchiveExecutionDeps { runtime: TaskRuntimeUseCaseDeps; store: ArchiveExecutionStore; credentials: ArchiveCredentials; apiUrl: string }
 function match(e: ArchiveExecution, input: BusinessStorageFinalization): void {
@@ -57,11 +58,13 @@ export function archiveExecution(deps: ArchiveExecutionDeps): ArchiveExecutionAp
       const page = await store.list(after); after = page.length === 50 ? page.at(-1)!.id : undefined;
       for (const e of page) {
         try {
-          if (e.state === 'stopping') { await stop(e); continue; }
-          if (e.state !== 'admitted') continue;
-          const record = await store.record(e.id), pod = record?.children?.find((child) => child.kind === 'Pod');
-          const terminated = pod?.uid && ['Succeeded', 'Failed'].includes(pod.phase) || e.podUid && pod?.phase === 'absent';
-          if (terminated || e.expiresAt && runtime.clock.now().getTime() >= Date.parse(e.expiresAt) - 10 * 60_000) await stop(e);
+          await runtimeBackground(runtime.projectWork, 'archive', 'task', e.taskId, async () => {
+            if (e.state === 'stopping') { await stop(e); return; }
+            if (e.state !== 'admitted') return;
+            const record = await store.record(e.id), pod = record?.children?.find((child) => child.kind === 'Pod');
+            const terminated = pod?.uid && ['Succeeded', 'Failed'].includes(pod.phase) || e.podUid && pod?.phase === 'absent';
+            if (terminated || e.expiresAt && runtime.clock.now().getTime() >= Date.parse(e.expiresAt) - 10 * 60_000) await stop(e);
+          }, undefined);
         } catch (error) { runtime.logger.warn('archive execution reconciliation pending', { id: e.id, error: error instanceof Error ? error.message : String(error) }); }
       }
     },

@@ -22,7 +22,6 @@ export async function businessInfrastructureOrigin(db: Database, kind: 'task' | 
   if (!['task', 'subtask'].includes(kind) || !['current', 'legacy'].includes(representation)) throw precondition('业务任务原来源类型未登记');
   if (representation === 'current') ResourceIdSchema.parse(key);
   return db.transaction(async (tx) => {
-    await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`);
     const alias = (await tx.execute<{ id: string }>(sql`SELECT id FROM business_task.resource_identity_aliases WHERE kind=${kind} AND key=${JSON.stringify([key])}`))[0]?.id;
     const canonical = ResourceIdSchema.safeParse(key).success ? key : undefined;
     if (alias && canonical && alias !== canonical) throw precondition('业务任务原标识目录冲突');
@@ -42,5 +41,5 @@ export async function businessInfrastructureOrigin(db: Database, kind: 'task' | 
     if (!projectId) return undefined;
     const project = ProjectIdSchema.parse(projectId);
     return { complete: true as const, id, scope: 'project' as const, projectIds: [project], revision: jsonHash({ kind, id, taskId, projectId: project }) };
-  });
+  }, { isolationLevel: 'repeatable read', accessMode: 'read only' });
 }

@@ -9,9 +9,10 @@ import { PROFILE_TEST_PROJECT_ID, PROFILE_TEST_SERVICE_ID } from '../../../domai
 type Kind = 'task' | 'rebuild' | 'parent-ending';
 /** Full keyset traversal includes project-bound platform validation tasks as well as ordinary historical environments. */
 export async function originalProjectTaskIds(db: Database, projectId: ProjectId, after: string | null) {
-  const rows = await db.execute<{ id: string }>(sql`SELECT id FROM task_runtime.environments
-    WHERE (project_id=${projectId} AND kind<>'profile-test' OR kind='profile-test' AND render->'runtimeValidation'->>'projectId'=${projectId})
-    ${after === null ? sql`` : sql`AND id>${after}`} ORDER BY id COLLATE "C" LIMIT 200`);
+  const rows = await db.execute<{ id: string }>(sql`WITH originals AS (
+    SELECT id FROM task_runtime.environments WHERE (project_id=${projectId} AND kind<>'profile-test' OR kind='profile-test' AND render->'runtimeValidation'->>'projectId'=${projectId})
+    UNION SELECT id FROM task_runtime.work_origins WHERE kind='task' AND project_id=${projectId})
+    SELECT id FROM originals WHERE ${after === null ? sql`true` : sql`id COLLATE "C">${after} COLLATE "C"`} ORDER BY id COLLATE "C" LIMIT 200`);
   return rows.map((row) => TaskIdSchema.parse(row.id));
 }
 /** Minimum ownership fields only; runner tokens, DSNs, rebuild input and accepted render stay private. */
@@ -19,7 +20,6 @@ export async function runtimeInfrastructureOrigin(db: Database, kind: Kind, key:
   if (!['task', 'rebuild', 'parent-ending'].includes(kind) || !['current', 'legacy'].includes(representation)) throw precondition('运行环境原来源类型未登记');
   if (representation === 'current') ResourceIdSchema.parse(key);
   return db.transaction(async (tx) => {
-    await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`);
     const alias = (await tx.execute<{ id: string }>(sql`SELECT id FROM task_runtime.resource_identity_aliases WHERE kind=${kind} AND key=${JSON.stringify([key])}`))[0]?.id;
     const canonical = ResourceIdSchema.safeParse(key).success ? key : undefined;
     if (alias && canonical && alias !== canonical) throw precondition('运行环境原标识目录冲突');
@@ -55,5 +55,5 @@ export async function runtimeInfrastructureOrigin(db: Database, kind: Kind, key:
       if (parent && parent.project_id !== project) throw precondition('运行环境原项目归属冲突');
     }
     return { complete: true as const, id, scope: 'project' as const, projectIds: [project], revision: jsonHash({ kind, id, projectId: project, ...(parentId ? { parentId } : {}) }) };
-  });
+  }, { isolationLevel: 'repeatable read', accessMode: 'read only' });
 }

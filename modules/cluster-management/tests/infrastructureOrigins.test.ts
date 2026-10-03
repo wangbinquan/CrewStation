@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import type { ClusterOperation } from '@crewstation/contracts';
 import { createFakeK8sClient } from '@crewstation/k8s';
 import { newResourceId } from '@crewstation/kernel';
-import { resourceIdentityDirectory, runMigrations } from '@crewstation/persistence';
+import { resourceIdentityDirectory, runMigrations, withSharedDatabaseAdmission } from '@crewstation/persistence';
 import { queueMigrations } from '@crewstation/queue';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import { sql } from 'drizzle-orm';
@@ -50,6 +50,9 @@ describe.skipIf(!available)('cluster original infrastructure ownership (actual P
       const origin = await read('cluster-operation', f.operation.operationId);
       const projectId = f.operation.target.ownership.scope === 'project' ? f.operation.target.ownership.projectId : undefined;
       expect(origin).toMatchObject({ id: f.operation.operationId, scope: 'project', projectIds: [projectId] });
+      await withSharedDatabaseAdmission(f.database.db, 'runtime-original-source-test:' + projectId, async () => {
+        expect(await read('cluster-operation', f.operation.operationId)).toEqual(origin);
+      });
       const directory = resourceIdentityDirectory(f.database.db, () => [clusterManagementMigrations]);
       await directory.bind('cluster_management', 'cluster-operation', ['private-old-operation'], f.operation.operationId);
       expect(await read('cluster-operation', 'private-old-operation', 'legacy')).toEqual(origin);

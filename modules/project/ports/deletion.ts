@@ -1,5 +1,5 @@
 import type { ProjectDeletionInventory, ProjectId } from '@crewstation/contracts';
-import type { DeletionOperationRecord, DeletionPlanRecord } from '../domain/deletion/records';
+import type { DeletionLease, DeletionOperationRecord, DeletionPlanRecord } from '../domain/deletion/records';
 import type { Project } from '../domain/project';
 
 export interface ProjectDeletions {
@@ -14,6 +14,8 @@ export interface ProjectDeletions {
   lockRequest(requestKey: string): Promise<void>;
   insertOperation(operation: DeletionOperationRecord): Promise<void>;
   saveOperation(operation: DeletionOperationRecord): Promise<void>;
+  /** Atomically extend only a live original lease; never serialize or republish receipt bodies. */
+  renewOperation(lease: DeletionLease, now: Date, until: Date): Promise<boolean>;
   markDeleting(id: ProjectId, at: Date): Promise<void>;
   lifecycleRevision(id: ProjectId): Promise<string>;
   listPending(now: Date, after?: string, limit?: number): Promise<string[]>;
