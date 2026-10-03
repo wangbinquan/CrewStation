@@ -29,6 +29,7 @@ import type { TemplateResourceBindings } from './ports/templateSource';
 import type { ScmSettings } from './ports/scmSettings';
 import type { ScmCallbackProcesses } from './ports/repositoryWrites';
 import type { ScmDeletionPhysics } from './ports/projectDeletion';
+import type { ScmCurrentRepositoryOriginsSource } from './ports/currentRepositoryOrigins';
 
 const DEFAULT_BOT_EMAIL = 'bot@crewstation.local';
 
@@ -40,6 +41,7 @@ export interface ScmModuleDeps {
   processes?: ScmCallbackProcesses;
   /** Original native/storage source; absent or incomplete sources keep permanent deletion unavailable. */
   deletionPhysics?: ScmDeletionPhysics;
+  currentRepositoryOrigins?: ScmCurrentRepositoryOriginsSource;
   settings: ScmSettings;
   /** 业务项目模板所在目录；默认仓库根 `templates/`。 */
   templatesRoot?: string;
@@ -86,7 +88,7 @@ export function createScmModule(deps: ScmModuleDeps): ScmModule {
   const api: ScmModuleApi = {
     name: 'scm',
     ...(deps.deletionPhysics && deps.project.assertProjectDeletionGrant ? { deletionOwner: scmProjectDeletionOwner({ writes,
-      repository: scmDeletionRepository({ db: deps.db, assertGrant: deps.project.assertProjectDeletionGrant }), physics: deps.deletionPhysics, assertGrant: deps.project.assertProjectDeletionGrant }) } : {}),
+      repository: scmDeletionRepository({ db: deps.db, assertGrant: deps.project.assertProjectDeletionGrant }), physics: deps.deletionPhysics, currentOrigins: deps.currentRepositoryOrigins, assertGrant: deps.project.assertProjectDeletionGrant }) } : {}),
     repositoryWrites: { history: writes.history, close: writes.close, recover: writes.recover },
     listTemplates: listTemplatesUseCase(useCaseDeps.templates),
     previewManifestUpgrade: previewManifestUpgradeUseCase(useCaseDeps),

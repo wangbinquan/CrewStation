@@ -4,8 +4,9 @@ import { createTestDatabase } from '@crewstation/testkit';
 import { createScmModule, scmMigrations } from '../wiring';
 import { TEST_SETTINGS, fakeGit, fakeGitLab, fakeScratch, fakeTemplates, mutableClock } from './fakeAdapters';
 import type { ScmDeletionPhysics } from '../ports/projectDeletion';
+import type { ScmCurrentRepositoryOriginsSource } from '../ports/currentRepositoryOrigins';
 
-export async function repositoryWriteFixture(legacy = false, deletionPhysics?: ScmDeletionPhysics) {
+export async function repositoryWriteFixture(legacy = false, deletionPhysics?: ScmDeletionPhysics, currentRepositoryOrigins?: ScmCurrentRepositoryOriginsSource) {
   const migrations = legacy ? { ...scmMigrations, files: scmMigrations.files.filter((f) => !/^000[567]_/.test(f.name)) } : scmMigrations;
   const database = await createTestDatabase([migrations]), gitlab = fakeGitLab(), git = fakeGit(gitlab), clock = mutableClock();
   const projectId = newResourceId() as ProjectId, serviceId = newResourceId() as ServiceId, operationId = newResourceId();
@@ -17,6 +18,7 @@ export async function repositoryWriteFixture(legacy = false, deletionPhysics?: S
   };
   const scm = createScmModule({ db: database.db, settings: TEST_SETTINGS, clock,
     ...(deletionPhysics ? { deletionPhysics } : {}),
+    ...(currentRepositoryOrigins ? { currentRepositoryOrigins } : {}),
     project: { authorize: async () => 'owner' as const, isAdmin: async () => false, assertProjectAvailable: async () => undefined, assertProjectDeletionGrant: grant },
     processes: { protectCurrent: async () => process, sweep: async (accept) => { if (stopped) await accept.stopped(process, jsonHash({ process, stopped: true })); } },
     overrides: { gitlab: gitlab.gateway, git: git.runner, templates: fakeTemplates().source, scratch: fakeScratch().dirs },

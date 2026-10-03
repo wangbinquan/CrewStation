@@ -5,12 +5,15 @@ import { z } from 'zod';
 import { SCM_STORAGE_KINDS } from '../ports/projectDeletion';
 import type { ScmDeletionPhysics, ScmDeletionPlan, ScmDeletionProof, ScmDeletionRepository, ScmDeletionScope, ScmDeletionSourceReport, ScmDeletionStored } from '../ports/projectDeletion';
 import type { RepositoryWrites, ScmWriteHistory } from '../ports/repositoryWrites';
+import type { ScmCurrentRepositoryOriginsSource } from '../ports/currentRepositoryOrigins';
+import { scmCurrentRepositoryOrigins, ScmCurrentRepositoryOriginsWitnessSchema } from './currentRepositoryOrigins';
 
 const hash = z.string().regex(/^[a-f0-9]{64}$/), remoteId = z.string().regex(/^[1-9][0-9]*$/).refine((v) => Number.isSafeInteger(Number(v)));
 const path = z.string().min(1).max(512).regex(/^[^\x00-\x20\x7f]+$/), timestamp = z.iso.datetime({ offset: true });
 const original = z.object({ remoteProjectId: remoteId, pathWithNamespace: path, createdAt: timestamp.nullable() }).strict();
 const planSchema = z.object({ projectId: ProjectIdSchema, serviceIds: z.array(z.uuid()), credentialIds: z.array(z.uuid()), repositories: z.array(original),
   credentials: z.array(z.object({ remoteProjectId: remoteId, remoteTokenId: remoteId, createdAt: timestamp.nullable(), userId: remoteId.nullable() }).strict()),
+  currentOrigins: ScmCurrentRepositoryOriginsWitnessSchema.optional(),
 }).strict();
 const reportSchema = z.object({ complete: z.boolean(), blockers: z.array(ProjectDeletionBlockerSchema), references: z.array(ProjectDeletionReferenceSchema) }).strict();
 const proofSchema = z.discriminatedUnion('kind', [
@@ -26,7 +29,7 @@ const scopeSchema = z.object({ version: z.literal(1), plan: planSchema, source: 
 const blocker = (code: string, message: string, resourceId?: string) => ({ participant: 'scm' as const, code, message, ...(resourceId ? { resourceId } : {}) });
 const historyReferences = (history: ScmWriteHistory) => history.foreignRepositoryReferences.map((entry) => ({ kind: 'gitlab-project-reference', id: entry.remoteProjectId + ':' + entry.projectId, projectId: entry.projectId, description: '其他项目的绑定、原沿革或回调仍引用此原远端仓库' }));
 const ordered = <T>(entries: readonly T[]) => [...new Map(entries.map((entry) => [jsonHash(entry), entry])).values()].sort((a, b) => jsonHash(a).localeCompare(jsonHash(b)));
-type Input = { writes: RepositoryWrites; repository: ScmDeletionRepository; physics: ScmDeletionPhysics; assertGrant(context: ProjectDeletionContext): Promise<void> };
+type Input = { writes: RepositoryWrites; repository: ScmDeletionRepository; physics: ScmDeletionPhysics; currentOrigins?: ScmCurrentRepositoryOriginsSource; assertGrant(context: ProjectDeletionContext): Promise<void> };
 
 function deletionPlan(target: ProjectDeletionTarget, history: ScmWriteHistory) {
   const blockers: ProjectDeletionInventory['blockers'] = [], repositories = ordered(history.origins.map(({ remoteProjectId, pathWithNamespace, createdAt }) => ({ remoteProjectId, pathWithNamespace, createdAt })));
@@ -49,8 +52,12 @@ function deletionPlan(target: ProjectDeletionTarget, history: ScmWriteHistory) {
 function validateScope(raw: ScmDeletionScope, plan?: ScmDeletionPlan): ScmDeletionScope {
   const scope = scopeSchema.parse(raw);
   if (plan && jsonHash(scope.plan) !== jsonHash(plan)) throw precondition('代码仓库物理范围未绑定本项目完整原历史');
-  const expected = scope.plan.repositories.map((entry) => jsonHash(entry)), actual = scope.repositories.map(({ identity: _identity, ...entry }) => jsonHash(entry));
+  const current = scope.plan.currentOrigins;
+  if (current && (current.projectId !== scope.plan.projectId || jsonHash(current.source) !== jsonHash(scope.source))) throw precondition('当前归属与原物理来源没有绑定同一项目／原实例');
+  const expected = scope.plan.repositories.map((entry) => jsonHash({ ...entry, createdAt: entry.createdAt ?? current?.repositories.find((row) => row.remoteProjectId === entry.remoteProjectId && row.pathWithNamespace === entry.pathWithNamespace)?.createdAt ?? null }));
+  const actual = scope.repositories.map(({ identity: _identity, ...entry }) => jsonHash(entry));
   if (new Set(expected).size !== expected.length || new Set(actual).size !== actual.length || jsonHash(expected.sort()) !== jsonHash(actual.sort())) throw precondition('代码仓库物理范围遗漏、重复或替换原远端身份');
+  if (current && jsonHash(ordered(current.repositories)) !== jsonHash(ordered(scope.repositories))) throw precondition('当前原仓库身份与物理范围不一致');
   const keys = scope.coverage.map((entry) => entry.repositoryId + ':' + entry.kind), all = scope.repositories.flatMap((entry) => SCM_STORAGE_KINDS.map((kind) => entry.remoteProjectId + ':' + kind));
   if (new Set(keys).size !== keys.length || jsonHash(keys.sort()) !== jsonHash(all.sort())) throw precondition('代码仓库存储类别未独立完整覆盖');
   const objects = scope.objects.map((entry) => entry.repositoryId + ':' + entry.kind + ':' + entry.id);
@@ -59,6 +66,7 @@ function validateScope(raw: ScmDeletionScope, plan?: ScmDeletionPlan): ScmDeleti
 }
 function physicalResources(scope: ScmDeletionScope): ProjectDeletionInventory['resources'] {
   const resources: ProjectDeletionInventory['resources'] = scope.repositories.map((entry) => ({ kind: 'gitlab-project', id: entry.remoteProjectId, identity: entry.identity, sourceIdentity: entry.identity, scope: 'physical', count: 1 }));
+  if (scope.plan.currentOrigins) resources.push({ kind: 'gitlab-current-origins', id: scope.plan.projectId, identity: scope.plan.currentOrigins.digest, sourceIdentity: scope.plan.currentOrigins.source.identity, scope: 'physical', count: 0 });
   for (const entry of scope.objects) resources.push({ kind: 'gitlab-storage:' + entry.kind, id: jsonHash([entry.repositoryId, entry.kind, entry.id]), identity: entry.identity, sourceIdentity: entry.sourceIdentity, scope: 'physical', count: entry.count });
   for (const entry of scope.coverage) resources.push({ kind: 'gitlab-coverage:' + entry.kind, id: entry.repositoryId, identity: entry.identity, sourceIdentity: jsonHash(scope.source), scope: 'physical', count: 0 });
   return resources.sort((a, b) => (a.kind + ':' + a.id).localeCompare(b.kind + ':' + b.id));
@@ -86,11 +94,19 @@ export function scmProjectDeletionOwner(input: Input): ProjectDeletionOwner {
     if (retained) {
       const scope = validateScope(retained), source = reportSchema.parse(await input.physics.inspect(scope));
       if (scope.plan.projectId !== target.id) throw precondition('SCM 保留原范围属于其他项目');
-      const report = { complete: source.complete && history.metadataComplete && history.foreignRepositoryReferences.length === 0 && source.blockers.length === 0 && source.references.length === 0,
-        blockers: [...source.blockers, ...(!history.metadataComplete ? [blocker('scm-credential-owner-unknown', '部分旧凭据归属未知，保留原材料')] : [])], references: [...source.references, ...historyReferences(history)] };
+      const report = { complete: source.complete && history.metadataComplete && history.unresolvedEffects.length === 0 && history.foreignRepositoryReferences.length === 0 && source.blockers.length === 0 && source.references.length === 0,
+        blockers: [...source.blockers, ...(!history.metadataComplete ? [blocker('scm-credential-owner-unknown', '部分旧凭据归属未知，保留原材料')] : []), ...(history.unresolvedEffects.length ? [blocker('scm-effect-unresolved', '保留范围仍有未闭合原副作用，不能用当前身份替代原结果')] : [])], references: [...source.references, ...historyReferences(history)] };
       return { report: inventory(target, history, scope, report), scope };
     }
     const prepared = deletionPlan(target, history);
+    const recoverable = new Set(['scm-origin-unrecorded', 'scm-credential-history-incomplete']);
+    if (input.currentOrigins && prepared.blockers.every((entry) => recoverable.has(entry.code))) {
+      const historyHash = jsonHash(history), raw = await input.currentOrigins.read(target, history);
+      const after = await input.writes.history(target.id);
+      if (jsonHash(history) !== historyHash || after.revision !== history.revision) return { report: inventory(target, after, null, { complete: false, blockers: [blocker('scm-source-history-changed', '当前归属读取期间原历史变化，需重新核对')], references: historyReferences(after) }), scope: null };
+      prepared.plan.currentOrigins = ScmCurrentRepositoryOriginsWitnessSchema.parse(scmCurrentRepositoryOrigins(target.id, history, raw));
+      prepared.blockers.length = 0;
+    }
     if (prepared.blockers.length) return { report: inventory(target, history, null, { complete: false, blockers: prepared.blockers, references: historyReferences(history) }), scope: null };
     const captured = await input.physics.capture(prepared.plan), scope = captured.scope ? validateScope(captured.scope, prepared.plan) : null;
     const source = reportSchema.parse({ complete: captured.complete, blockers: captured.blockers, references: captured.references });

@@ -1,4 +1,5 @@
 import type { ProjectDeletionBlocker, ProjectDeletionContext, ProjectDeletionInventory, ProjectId } from '@crewstation/contracts';
+import type { ScmCurrentRepositoryOriginsWitness } from './currentRepositoryOrigins';
 
 /** Coverage is explicit even for an empty category; repository API absence is never file absence. */
 export const SCM_STORAGE_KINDS = ['repository', 'wiki', 'design', 'snippet', 'lfs', 'upload', 'artifact', 'trace', 'package', 'registry', 'secure-file'] as const;
@@ -9,6 +10,7 @@ export interface ScmDeletionPlan {
   readonly credentialIds: readonly string[];
   readonly repositories: readonly { remoteProjectId: string; pathWithNamespace: string; createdAt: string | null }[];
   readonly credentials: readonly { remoteProjectId: string; remoteTokenId: string; createdAt: string | null; userId: string | null }[];
+  readonly currentOrigins?: ScmCurrentRepositoryOriginsWitness;
 }
 export interface ScmDeletionScope {
   readonly version: 1;

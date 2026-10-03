@@ -47,3 +47,11 @@
 - 全工作树后端类型检查仍被并行 `task-runtime/tests/developmentLegacyWriterSeal.test.ts` 的三项在制类型诊断阻断。本批以固定已发布 HEAD `37e1f5aaa8acfb64fec43d356ef35f1ed2c9e234` 加自己的八路径，在只读 TypeScript CompilerHost 中核对，0 诊断；没有创建分支／worktree／checkout，也没有替换并行工作树文件。不能据此把全工作树检查称为通过。
 
 本机原始回执位于 `/private/tmp/cs-rfc037-release-content-*`，包括原失败、模块／专项日志、LCOV、精确改动行报告和固定提交树的类型结果。该候选尚未跑自己的共同完整门禁、提交、推送或部署，不能借用旧 SHA 的 CI 宣称本批发布完成。剩余 release 原回调持久准入、独立物理来源、七阶段清理、全部 owner 的 Root／API／管理员两次确认及原项目容量回收继续按 PD-01…PD-23 完成。
+
+## 2026-10-03 精确发布与本机部署回执
+
+本批与观测会话的就绪内容已串行提交并统一发布：本任务 61 路径为 `463f24d85b0e6edfc8fbf984758be3f2c585d400`，包含其前序 `a6021a88` 和完整 216 项迁移锁；共享 STATE 与平台来源夹具的并行输出完整保留。[该 SHA 的 CI](https://github.com/wangbinquan/CrewStation/actions/runs/37060038342) 六项均终态成功。2026-10-02T20:34:54.250Z 八个本机组件完成部署，实际 Pod imageID 和节点 OCI 的 source revision 都对应该 SHA。控制面 digest 为 `495313d740dee1a76bbdd0adaec0b0aca8e81110bb188ac3d5b540487955301f`，工作台为 `9fcfd35062a78d2f4e75e812df5fceb7f732912c4925a289d4587a93d21eaec2`。
+
+release/0009 与 runtime-environment/0007 的安装校验和分别为 `9fb0caab1f7a578102d521f778a0b19103eb7c58a5e4ad7142d2f656f0c81a92`、`c55ec5f13818fba2f02bd928dde884f3a6c6618811db9df28165a8b542ea51d7`。原固定 Runner、GitLab 容器、平台 PG/PVC/PV、所有项目 Namespace/Pod/卷及 52 库/64 角色的身份保持；发布后 main/origin 为 0/0、index 为空，其他在制路径保持。私有终态回执为 `cs-rfc037-runtime-release-publication-receipt-v1.json`、`cs-rfc037-463f24d85b0e-exact-ci-v1.json` 和 `cs-rfc037-463f24d85b0e-runtime-release-v1-deployment-receipt.json`。
+
+此回执证明本批发布、迁移和部署，不证明完整 22 owner 或独立物理来源已装配。删除 HTTP 尚未开放，原专用项目未删除，全资源回收继续验收。后续 SCM 当前归属接续是另一份在制候选，不属于上述 SHA。

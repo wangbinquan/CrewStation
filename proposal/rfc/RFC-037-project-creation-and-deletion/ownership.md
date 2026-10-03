@@ -4,7 +4,7 @@
 
 ## 1. 完整性与许可
 
-22 个 owner 必须显式登记：`packages/contracts/api/projectDeletion/values.ts`。provisioning 和 cluster-control 没有持久业务 schema，但分别拥有控制器／队列和物理集群副作用，不能因此省略。盘点报告必须包含完整性、来源修订、原身份与外部引用；未知表、未知对象、未走完分页或不可读来源都阻断销毁。
+22 个 owner 必须显式登记：`packages/contracts/api/projectDeletion/values.ts`。provisioning 在本 schema 保存原开通工作／准入事实，并拥有共享控制器／队列；cluster-control 拥有物理集群副作用，不能因没有持久业务内容表而省略。盘点报告必须包含完整性、来源修订、原身份与外部引用；未知表、未知对象、未走完分页或不可读来源都阻断销毁。开通原工作接线见 [provisioning-work.md](provisioning-work.md)。
 
 盘点目标使用 project 单调 lifecycle_revision，资源集合用规范化摘要。受理会重读目标和盘点并核对原计划，原子落 deleting、操作和 outbox。每个 owner 仍须在本 schema 闭准入、排空已开始的副作用并取得停止证明；中央权限检查本身不能代替这个屏障。
 

@@ -28,10 +28,15 @@ function pending(label: string, record: NamespaceRecordView | undefined): string
  * 项目命名空间（RFC-025 第四期）：provisioning 写期望——命名空间（Namespace＋额度）与网络策略各一条记录，调和器建出、被改或被删就补回。
  * 同样的期望台账不写库，所以重跑、启动重下发都是幂等的。
  */
-export function namespaceRecords(ledger: NamespaceLedger, settings: NamespaceSettings) {
+export function namespaceRecords(ledger: NamespaceLedger, settings: NamespaceSettings, check?: (facts: ProjectFacts) => Promise<void>) {
   const declare = async (facts: ProjectFacts): Promise<readonly [string, string]> => {
-    const namespace = await ledger.declare(namespaceDeclaration(facts, await settings.quota?.(facts.projectId)));
+    await check?.(facts);
+    const quota = await settings.quota?.(facts.projectId);
+    await check?.(facts);
+    const namespace = await ledger.declare(namespaceDeclaration(facts, quota));
+    await check?.(facts);
     const policies = await ledger.declare(networkPolicyDeclaration(facts, settings.systemNamespace));
+    await check?.(facts);
     return [namespace.id, policies.id];
   };
   return {
@@ -45,7 +50,9 @@ export function namespaceRecords(ledger: NamespaceLedger, settings: NamespaceSet
       const [namespaceId, policiesId] = await declare(facts);
       const deadline = Date.now() + (settings.readyTimeoutMs ?? DEFAULT_TIMEOUT_MS);
       for (;;) {
+        await check?.(facts);
         const waiting = [pending('命名空间', await ledger.get(namespaceId)), pending('网络策略', await ledger.get(policiesId))].filter((entry) => entry !== undefined);
+        await check?.(facts);
         if (!waiting.length) return;
         if (Date.now() >= deadline) throw new Error(`命名空间 ${facts.namespace} 没有就绪：${waiting.join('；')}`);
         await Bun.sleep(settings.pollMs ?? DEFAULT_POLL_MS);

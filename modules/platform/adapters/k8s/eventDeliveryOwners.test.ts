@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { createFakeK8sClient, Resources } from '@crewstation/k8s';
-import { EVENT_DELIVERY_FINALIZER, eventDeliveryOwners, projectCallbackOwners } from './eventDeliveryOwners';
+import { EVENT_DELIVERY_FINALIZER, currentProcessBirth, eventDeliveryOwners, projectCallbackOwners, provisioningWorkPorts } from './eventDeliveryOwners';
 
 async function fixture() {
   const k8s = createFakeK8sClient(),podUid = Bun.randomUUIDv7(),nodeUid = Bun.randomUUIDv7();
@@ -28,6 +28,21 @@ test('同 Pod 重启只证明原 containerID，运行中的新实例不被停止
   expect(stopped).toEqual([{ podUid: f.podUid,containerId: 'containerd://original',nodeUid: f.nodeUid,nodeName: 'node' }]);
   expect((await f.k8s.get(Resources.Pod!,'sender','system'))?.metadata.finalizers).toContain(EVENT_DELIVERY_FINALIZER);
   expect(await f.owners.protectCurrent()).toMatchObject({ containerId: 'containerd://replacement' });
+});
+test('开通的 PID 出生与容器观测分开：旧 lastState 不能结束仍在运行的原 Pod 工作',async () => {
+  const f = await fixture(), finalizer = 'crewstation.io/provisioning-project-stop' as const;
+  const owners = projectCallbackOwners(f.k8s,'system',f.podUid,finalizer); await owners.protectCurrent();
+  const stopped: string[] = [], pods: object[] = [];
+  await f.k8s.mergePatch(Resources.Pod!,'sender','system',{ status: { containerStatuses: [{ name: 'cs-events',containerID: 'containerd://replacement',
+    state: { running: {} },lastState: { terminated: f.terminal } }] } });
+  const accept = { stopped: async (process: { containerId: string }) => { stopped.push(process.containerId); },
+    podStopped: async (process: { podUid: string }) => { pods.push(process); },releasable: async () => true };
+  await owners.sweep(accept); expect(stopped).toEqual([]); expect(pods).toEqual([]);
+  expect((await f.k8s.get(Resources.Pod!,'sender','system'))?.metadata.finalizers).toContain(finalizer);
+  await f.k8s.mergePatch(Resources.Pod!,'sender','system',{ metadata: { deletionTimestamp: new Date().toISOString() },status: { phase: 'Succeeded',
+    containerStatuses: [{ name: 'cs-events',containerID: 'containerd://replacement',state: { terminated: { ...f.terminal,containerID: 'containerd://replacement' } },lastState: { terminated: f.terminal } }] } });
+  await owners.sweep(accept); expect(stopped).toEqual([]); expect(pods).toEqual([{ podUid: f.podUid,nodeUid: f.nodeUid,nodeName: 'node' }]);
+  expect((await f.k8s.get(Resources.Pod!,'sender','system'))?.metadata.finalizers).toEqual(['another/guard']);
 });
 test('实际终止证明先持久，再移除自身保护；PG 故障和仍有原在途事实都保留原 Pod',async () => {
   const f = await fixture(); await f.owners.protectCurrent(); await f.stop();
@@ -107,7 +122,7 @@ test('API 承载的网关、数据库、SCM 与事件回调使用独立保护；
   expect((await f.k8s.get(Resources.Pod!, 'sender', 'system'))?.metadata.finalizers).toEqual(['another/guard']);
 });
 
-for (const finalizer of ['crewstation.io/gateway-project-stop', 'crewstation.io/data-control-native-stop', 'crewstation.io/scm-project-stop', 'crewstation.io/cluster-project-stop'] as const) test(`${finalizer} 拒绝缺失 UID、读取故障和未实际退出，不从 Pod 消失补造停止回执`, async () => {
+for (const finalizer of ['crewstation.io/gateway-project-stop', 'crewstation.io/data-control-native-stop', 'crewstation.io/scm-project-stop', 'crewstation.io/cluster-project-stop', 'crewstation.io/provisioning-project-stop'] as const) test(`${finalizer} 拒绝缺失 UID、读取故障和未实际退出，不从 Pod 消失补造停止回执`, async () => {
   const f = await fixture();
   await expect(projectCallbackOwners(f.k8s, 'system', undefined, finalizer).protectCurrent()).rejects.toThrow();
   const gateway = projectCallbackOwners(f.k8s, 'system', f.podUid, finalizer); await gateway.protectCurrent();
@@ -116,4 +131,32 @@ for (const finalizer of ['crewstation.io/gateway-project-stop', 'crewstation.io/
   expect((await f.k8s.get(Resources.Pod!, 'sender', 'system'))?.metadata.finalizers).toContain(finalizer);
   await expect(projectCallbackOwners({ ...f.k8s, listPage: async () => { throw new Error('source-unavailable'); } }, 'system', f.podUid, finalizer).sweep(accept)).rejects.toThrow('source-unavailable');
   await f.k8s.delete(Resources.Pod!, 'sender', 'system'); await gateway.sweep(accept); expect(stopped).toBe(0);
+});
+
+test('原进程出生读取真实字段位置；括号进程名、读取故障、换 PID／时代都明确拒绝', async () => {
+  const stat = (pid = process.pid, tick = '1931') => `${pid} (name ) with spaces) ${['S', ...Array(18).fill('0'), tick].join(' ')}`;
+  const bootId = Bun.randomUUIDv7(), source = { stat: async () => stat(), namespace: async () => 'pid:[303]', bootId: async () => bootId + '\n' };
+  expect(await currentProcessBirth(source)).toEqual({ pid: process.pid, startTicks: '1931', pidNamespace: '303', bootId });
+  let reads = 0;
+  for (const changed of [{ ...source, stat: async () => stat(process.pid + 1) }, { ...source, stat: async () => 'invalid' },
+    { ...source, stat: async () => stat(process.pid, ++reads === 1 ? '1931' : '1932') },
+    { ...source, namespace: async () => 'unrecognized' }, { ...source, bootId: async () => 'unrecognized' },
+    { ...source, stat: async () => { throw new Error('source-unavailable'); } }]) await expect(currentProcessBirth(changed)).rejects.toThrow();
+});
+test('原开通保护绑定当前原 PID 出生，保护期间身份变化不生成可用出生', async () => {
+  const f = await fixture(), finalizer = 'crewstation.io/provisioning-project-stop' as const;
+  const birth = { pid: process.pid, pidNamespace: '303', startTicks: '1931', bootId: Bun.randomUUIDv7() };
+  const original = projectCallbackOwners(f.k8s, 'system', f.podUid, finalizer, async () => birth);
+  expect(await original.protectCurrentProcess()).toEqual({ podUid: f.podUid, containerId: 'containerd://original', nodeUid: f.nodeUid, nodeName: 'node', ...birth });
+  expect((await f.k8s.get(Resources.Pod!, 'sender', 'system'))?.metadata.finalizers).toContain(finalizer);
+  let reads = 0;
+  await expect(projectCallbackOwners(f.k8s, 'system', f.podUid, finalizer, async () => ({ ...birth, startTicks: String(++reads) })).protectCurrentProcess()).rejects.toThrow('在读取期间变化');
+});
+test('实际 Root 的开通工作反转端口只在原 Pod 配置存在时装配，并保留原许可来源', async () => {
+  const f = await fixture(), available = async () => undefined, grant = async () => undefined;
+  const source = { assertProjectAvailable: available, assertProjectDeletionGrant: grant };
+  expect(provisioningWorkPorts(f.k8s, 'system', undefined, source)).toEqual({});
+  const ports = provisioningWorkPorts(f.k8s, 'system', f.podUid, source);
+  expect(ports.projectWork?.assertAvailable).toBe(available); expect(ports.projectWork?.assertGrant).toBe(grant);
+  await ports.projectWork?.processes.sweep({ stopped: async () => { throw new Error('not terminated'); }, releasable: async () => true });
 });

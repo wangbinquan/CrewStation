@@ -14,7 +14,7 @@ import { nativeWorkloadOwnership, originalGatewayPodProject } from './adapters/k
 import { nativePostgresSource } from './adapters/k8s/nativePostgresSource';
 import { assertStorageConsumers } from './adapters/k8s/storageContract'; import { objectTransferOwners } from './adapters/k8s/objectTransferOwners';
 import { releaseImagePorts } from './application/releaseImagePorts';
-import { eventDeliveryOwners, projectCallbackOwners } from './adapters/k8s/eventDeliveryOwners';
+import { eventDeliveryOwners, projectCallbackOwners, provisioningWorkPorts } from './adapters/k8s/eventDeliveryOwners';
 import { imageValidationPorts } from './application/imageValidationPorts';
 import { businessExecutionPorts, executionHandoffPorts } from './application/businessExecutionPorts';
 import { developmentImagePorts, imageOwnerPorts } from './application/developmentImagePorts';
@@ -434,7 +434,7 @@ function composeAggregates(deps: PlatformModuleDeps, late: Late, core: ReturnTyp
     },
   });
   const provisioning = createProvisioningModule({
-    db, logger, workerOwner: `${deps.instance}.provisioning`, consumerName: 'provisioning', isAdmin: (id) => isAdmin(id),
+    db, logger, ...provisioningWorkPorts(k8s, settings.systemNamespace, settings.platformPodUid, project.api), workerOwner: `${deps.instance}.provisioning`, consumerName: 'provisioning', isAdmin: (id) => isAdmin(id),
     authorizeRetry: async (actor, id) => {
       const role = await project.api.authorize(actor, id, 'view');
       if (role !== 'owner' && role !== 'admin') throw forbidden('只有负责人或管理员可以重新开通项目');
@@ -582,7 +582,7 @@ export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
       events: [...m.events.workers, ...m.events.subscriptions.map(consumerLifecycle)],
     },
     websocket: m.session.websocket,
-    migrations: [queueMigrations, eventbusMigrations, m.resources.migrations, m.identity.migrations, m.project.migrations, m.config.migrations, m.agentRuntime.migrations, m.runtimeEnvironment.migrations, m.data.migrations, m.scm.migrations, m.apiCatalog.migrations, m.events.migrations, m.release.migrations, m.taskRuntime.migrations, m.devSession.migrations, m.businessTask.migrations, m.session.migrations, m.gateway.migrations, m.observability.migrations, m.cluster.migrations, m.dataControl.migrations, m.resourceAccess.migrations],
+    migrations: [queueMigrations, eventbusMigrations, m.resources.migrations, m.identity.migrations, m.project.migrations, m.config.migrations, m.agentRuntime.migrations, m.runtimeEnvironment.migrations, m.data.migrations, m.scm.migrations, m.apiCatalog.migrations, m.events.migrations, m.release.migrations, m.taskRuntime.migrations, m.devSession.migrations, m.businessTask.migrations, m.session.migrations, m.gateway.migrations, m.observability.migrations, m.cluster.migrations, m.dataControl.migrations, m.resourceAccess.migrations, m.provisioning.migrations],
   };
   migrations = api.migrations;
   return { api, modules: m };
