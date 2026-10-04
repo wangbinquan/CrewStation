@@ -3,6 +3,7 @@ import type {Database,Executor} from '@crewstation/persistence';
 import {RuntimeCompleteReportSchema} from '@crewstation/contracts';
 import type {CompleteRuntimeReportCache,CompleteReportStored,CompleteReportRequest,CompleteReportTransferPage,CompleteReportManifest} from '../../../ports/completeRuntimeReportCache';
 import {completeReportInitialDigest,assertCompleteReportTransferPage} from '../../../domain/completeReportEnvelope';
+import {assertPublishedRuntimeReport} from './reportIntegrity';
 import {completeRuntimeReportPage} from './reportStorePage';
 import {admitRuntimeReport,assertRuntimeReportProjects,assertRuntimeReportPageProjects} from './reportAdmission';
 const json=(value:unknown)=>JSON.stringify(value);
@@ -39,24 +40,17 @@ async function stageReportPage(db:Database,id:string,owner:string,page:CompleteR
  });
 }
 async function publishReport(db:Database,id:string,owner:string,manifest:CompleteReportManifest) {
- const report=RuntimeCompleteReportSchema.parse({reportId:id,state:'ready',header:manifest.header,summary:manifest.summary});
+ const facts=manifest.header.coverage==='complete-facts',report=RuntimeCompleteReportSchema.parse(facts?{reportId:id,state:'not-ready',gaps:manifest.summary.metrics.state==='not-ready'?manifest.summary.metrics.gaps.map(reason=>({source:'original-cohort',reason})):[],facts:{header:manifest.header,summary:manifest.summary}}:{reportId:id,state:'ready',header:manifest.header,summary:manifest.summary});
  await db.transaction(async tx=>{
   await admitRuntimeReport(tx);const row=await owned(tx,id,owner),identity=await originalRuntimeReportIdentity(tx);
   await assertRuntimeReportProjects(tx,id,(row['request'] as CompleteReportRequest).projectId);
   if(manifest.reportId!==id||manifest.requestKey!==row['request_key']||manifest.buildOwner!==owner||identity.generation!==manifest.generation)throw new Error('Original complete report manifest or generation changed');
-  const [pop]=await tx.execute(sql`SELECT (SELECT count(*)::text FROM observability.runtime_report_pages WHERE report_id=${id}) AS pages,(SELECT count(*)::text FROM observability.runtime_report_rows WHERE report_id=${id}) AS rows,(SELECT count(*)::text FROM observability.runtime_report_counts WHERE report_id=${id}) AS counts,(SELECT count(*)::text FROM observability.runtime_report_receipts WHERE report_id=${id}) AS receipts`);
-  for(const key of ['pages','rows','counts','receipts'] as const)if(String(pop?.[key])!==manifest[key])throw new Error('Complete report staged population missing: '+key);
-  const [tail]=await tx.execute(sql`SELECT digest FROM observability.runtime_report_pages WHERE report_id=${id} ORDER BY ordinal DESC LIMIT 1`);
-  if((tail?.['digest']??completeReportInitialDigest)!==manifest.digest)throw new Error('Complete report staged final digest changed');
-  const mismatch=await tx.execute(sql`WITH actual AS(SELECT section,parent,count(*) AS total FROM observability.runtime_report_rows WHERE report_id=${id} GROUP BY section,parent),expected AS(SELECT section,parent,total FROM observability.runtime_report_counts WHERE report_id=${id}) SELECT * FROM ((SELECT * FROM actual EXCEPT SELECT * FROM expected) UNION ALL (SELECT * FROM expected EXCEPT SELECT * FROM actual)) d LIMIT 1`);
-  if(mismatch.length)throw new Error('Complete report dimension population does not match original sealed counts');
-  const taskCount=await tx.execute(sql`SELECT total::text FROM observability.runtime_report_counts WHERE report_id=${id} AND section='tasks' AND parent=''`);
-  if(String(taskCount[0]?.['total']??'0')!==manifest.summary.tasks||manifest.receipts!==manifest.summary.tasks)throw new Error('Complete report original task EOF count changed');
-  await tx.execute(sql`UPDATE observability.runtime_reports SET state='ready',report=${json(report)}::jsonb,manifest=${json(manifest)}::jsonb WHERE id=${id} AND owner=${owner} AND state='building'`);
+  await assertPublishedRuntimeReport(tx,id,report,manifest);
+  await tx.execute(sql`UPDATE observability.runtime_reports SET state=${report.state},report=${json(report)}::jsonb,manifest=${json(manifest)}::jsonb WHERE id=${id} AND owner=${owner} AND state='building'`);
  });
 }
 export function completeRuntimeReportCache(db:Database):CompleteRuntimeReportCache {
- const get=async(id:string)=>db.transaction(async tx=>{await admitRuntimeReport(tx);const [row]=await tx.execute(sql`SELECT * FROM observability.runtime_reports WHERE id=${id}`);if(!row)return undefined;await assertRuntimeReportProjects(tx,id,(row['request'] as CompleteReportRequest).projectId);return stored(row);});
+ const get=async(id:string)=>db.transaction(async tx=>{await admitRuntimeReport(tx);const [row]=await tx.execute(sql`SELECT * FROM observability.runtime_reports WHERE id=${id}`);if(!row)return undefined;await assertRuntimeReportProjects(tx,id,(row['request'] as CompleteReportRequest).projectId);const report=stored(row);await assertPublishedRuntimeReport(tx,id,report.report,row['manifest'] as CompleteReportManifest|null);return report;});
  const terminal=async(id:string,owner:string,state:'not-ready'|'failed',report:unknown)=>{const value=RuntimeCompleteReportSchema.parse(report);await db.transaction(async tx=>{await owned(tx,id,owner);await tx.execute(sql`DELETE FROM observability.runtime_report_pages WHERE report_id=${id}`);await tx.execute(sql`DELETE FROM observability.runtime_report_rows WHERE report_id=${id}`);await tx.execute(sql`DELETE FROM observability.runtime_report_counts WHERE report_id=${id}`);await tx.execute(sql`DELETE FROM observability.runtime_report_receipts WHERE report_id=${id}`);await tx.execute(sql`UPDATE observability.runtime_reports SET state=${state},report=${json(value)}::jsonb WHERE id=${id}`);});};
  return {identity:()=>originalRuntimeReportIdentity(db),get,
   async claim(id,owner){return db.transaction(async tx=>{

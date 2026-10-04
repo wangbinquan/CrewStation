@@ -1,3 +1,21 @@
+## 2026-10-04 RFC-034 完整门自然终态与实际数据库补验
+
+本候选唯一完整 bun run check 已自然结束：静态四层通过，5675 pass／144环境skip／1 fail、221354断言、5820 tests／1119 files；31源和16控制首尾指纹一致。原 FAIL 回执和1701.47秒完整日志保留，不记整仓通过。唯一失败为未修改的 data-control 原测试：默认55432 PostgreSQL max_prepared_transactions 为0，实际 PREPARE TRANSACTION 报55000；CI module原17.11环境已明确设置该参数10。
+
+在既有、先前授权的55337专用测试实例只读核对原system_identifier和prepared10后，仅补跑同一原用例，1pass／0fail／5断言／0.843秒。原测试完整字节、原预算、候选31源保持，实例身份及原30库／41角色名字OID核对保持；没有改默认或生产PG、没有新增数据库服务器、没有绕过或弱化用例。后续按开发规则§3以精确提交树六项CI验证全仓，不因这个外范围测试环境问题重复同候选完整门。
+
+精确发布和CI、本机八组件部署及正式页面仍待；不能拿专项通过追记原完整门通过。系统/项目/Task完整执行记录修复的SOURCE31有限PASS保持，用量缺口继续明确未知，完整Token/CNY资格未伪造。原native装配/历史caps、真实用途与100K Task/10M usage继续，两RFC In Progress。下方当前共享STATE全部并行输出与旧历史保持。
+
+## 2026-10-04 RFC-034 完整执行事实与旧缓存恢复
+
+用户发现系统/项目观测在用量有缺口后整页不显示。当前修复只在原两个 Task owner 全量 EOF、同一原始数据库 snapshot 的 cohort 成功后，封存准确 Task/attempt/名称/时段与泳道；走原 spool 摘要、持久 stage、原 build owner CAS 和 publish。原 Token/CNY 数字资格继续 not-ready，未知不当零，也不把完整执行事实称为完整用量。遗漏原行、损坏人口/摘要或页 snapshot 不一致会撤下该报告的事实；不是加载有限样本的兜底。
+
+DESIGN1 和 SOURCE31 v2 独立功能 PASS，原 SOURCE29 两 P2/FAIL 保留。内部 requestKey 加 executionFactsVersion1，使同 actor/query/generation/revision 的新请求可以离开旧无 facts 缓存，旧 immutable reportId 状态不变；原 header projectionVersion2 保持。来源质量真实消费点按 metrics.state 区分执行记录已核对且用量有缺口与完整用量。
+
+真实 PG 回归的原201 Task/1001 attempt/2001 capture 在系统、项目与 Task 生命周期分别核到 EOF；单原行丢失和源失败明确拒绝，旧同 revision 缓存先红后绿1pass12断言38.71秒。来源列两范围先红后绿，console当前25pass/0fail/247断言（含全部原16测试），strict domain4pass56断言；当前两层类型、精确lint、arch59units4189source通过。完整本机门禁仅启动一次，冻结31候选与16控制；结果另补，不用定向通过冒充整仓通过。
+
+本片源码尚待精确远端发布、该 SHA 六项 CI 和本机部署。当前已核部署为427cc8c68bbf6203e76702f464b612d8f2b38e9d，八组件/实际OCI与241迁移checksum回执存在；新 facts 修复没有部署。正式浏览器/原任务四桶和人民币对账、native owner 持久 ACK producer 装配/原 caps、100K Task/10M usage 与两 RFC 完成条件继续，producer/删除入口 OFF。不改变其他会话在制源码；提交共享 STATE 时保留其进行中记录全文。
+
 ## 2026-10-03 RFC-037 原数据库准入修正候选
 
 真实两库先红复现：原开通出生 guard 未匹配 database OID，另一库同名真实锁与伪造 GUC 可冒充本库准入。只新增 0003 限制实际本库，0001／0002 字节保持；官方锁 219 保留原 218，外会话 0021 仍未入锁。专项含旧库升级、原出生保持、合法 finally 与 Pod 恢复 28／0、173 断言，类型／精确 lint 通过。已知缺口后的 v2 不作发布 PASS；最终候选增量 SOURCE、共享锁闭合及唯一完整门继续。下一批独立 11 路径为队列／事件原语、旧键归属核对和真实投递原关系读取，21／0、117 断言，201／201 改动行与类型/lint通过；尚未导出或接实际消费者、不是正式 owner，也不计入本批提交。原项目保持、删除入口仍关闭，下方所有并行输出和历史保留。
@@ -3316,3 +3334,9 @@ TaskRuntime本批较宽终态400 pass／0 fail、4385断言、75文件、317.84�
 TaskRuntime七阶段仅受控停止端口，DevSession的原删除许可/回调finally/停止后快照及两项追加迁移锁241保持。下一批Session原连接私有回调与停止/数字命令基础在制，未混入本批；正式跨进程排空、全22 owner、SCM物理来源及原专用项目永久回收继续。删除入口及producer OFF，实际部署仍845462；协调仅限实际发布/部署和文件冲突，既有并行STATE/源码全文保持。
 
 2026-10-04 本批 v3 自然终态 5643 pass／143 环境 skip／0 fail、216454 断言、1110 文件、1739.55 秒，静态四层通过；39 功能/锁及单独冻结的观测日期夹具首尾摘要一致，旧 v1/v2 红记录保持。回执 `/private/tmp/cs-rfc037-granted-stop-full-v3.json`。精确 90968 提交树的本批后端类型 0 错；43 路径发布准备仅包含本批与证据文档。下一批 Session 私有命令、原连接 finally 及停止依赖回归不作为本批受控 stop 的正式生产验收，继续留在工作树；全 22 方和原专用项目永久回收仍未完成，入口 OFF。
+
+本批 43 路径已精确推送 `427cc8c68bbf6203e76702f464b612d8f2b38e9d`，CI37167948510六项全部成功；本地与 origin/main 0／0、共享索引空、54 个批外文件摘要保持。部署经共享锁串行完成，实际八组件就绪、Pod imageID／节点 OCI 源码与该提交一致、241 项安装迁移 checksum 匹配，实际 API uid/gid1000完成报告根独占写入、fsync、回读和删除。原项目、Namespace／Pod／PVC／PV、原数据库与角色 OID、原生容器和 Runner 身份保持；回执 `/private/tmp/cs-rfc037-427cc8c68bbf-granted-stop-v1-deployment-receipt.json`。没有创建模型任务，producer 与删除入口 OFF。
+
+下一批 Session/停止依赖基础 21 源码路径：原连接 private finally 与受限停止/数字命令定向15／0、142断言；停止依赖、只观测原终结 Pod、资源 sealed 许可及恢复定向29／0、343断言。原业务等待时提前关闭 Session 的反例先红；新增测试两处夹具误用保留17／2红记录后修正，生产严格许可不放宽。精确427cc提交树叠加21路径类型0错，精确lint0；首次完整门禁接续，21源码及原Session接线/迁移锁依赖冻结，不重复在途门禁。资源 stop 要求全部前序消费者持久证明，观测不能产生资源 stop 回执、发起活动 Pod 删除或回收卷。正式清理数字通道、停止后完整快照/CAS、22方装配/SCM物理来源和原专用项目永久回收仍在进行。已停止本会话主动跨会话发送，使用共享锁和 STATE 交接。
+
+本批首次完整门禁已自然终止：5660 pass／143 环境 skip／3 fail、221177 断言、1116 文件、1610.61秒，21源码与2依赖首尾摘要保持。失败是并行观测在制 `completeRuntimeFacts.test.ts` 两个 quality 页预期正数而实际0，以及 `RuntimeSources.tsx` 的 `runtime.source.facts` 文案键；不修改该会话输出，不把该次完整门禁写绿。回执 `/private/tmp/cs-rfc037-session-stop-full-v1.json`。正式持久命令/清理回调、受限数字通道和停止后快照/CAS继续补齐后形成下一候选；本批尚未提交部署，实际环境仍427cc8c6，入口与producer OFF。

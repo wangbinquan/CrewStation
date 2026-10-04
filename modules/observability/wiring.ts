@@ -82,7 +82,7 @@ export interface ObservabilityModule {
   readonly api: ObservabilityModuleApi;
   readonly http: Hono<AppEnv>[];
   readonly workers: Array<{ start(): void; stop(): Promise<void> }>;
-  readonly reportWorkers:Array<{start():void;stop():Promise<void>}>;
+  readonly reportWorkers:Array<{start():void;drain():Promise<void>;stop():Promise<void>}>;
   readonly migrations: MigrationSet;
 }
 
@@ -164,9 +164,8 @@ function completeRuntimeReports(deps:ObservabilityModuleDeps) {
       task:(task,privateNamespace)=>buildCompleteRuntimeTask({task,snapshotId:snapshot.snapshotId,asOf:snapshot.asOf,rows:snapshot.workspace,namespace:privateNamespace,keyOf:jsonHash,system:report.request.projectId===null,usageWorkspace:completeStatisticsWorkspace,signal,attempts:facts.attempts(task),ledger:completeRuntimeLedgerSources(snapshot.executor,task,snapshot.snapshotId)}),
     });
     if(report.request.taskId&&build.summary.tasks!=='1')throw precondition('原任务不存在或原受理身份不唯一');
-    if(build.summary.metrics.state==='not-ready')return {state:'not-ready' as const,gaps:build.summary.metrics.gaps.map(reason=>({source:'original-cohort',reason}))};
-    const header={reportId:report.id,projectionVersion:2 as const,scope:report.request.projectId===null?'system' as const:'project' as const,projectId:report.request.projectId,filters:report.request.filters,asOf:snapshot.asOf,snapshotId:snapshot.snapshotId,generation:identity.generation,sourceRevision:identity.revision,...(report.request.taskId?{taskId:report.request.taskId}:{}),coverage:'complete' as const,buildMs:Date.now()-started};
-    const manifest=await sealCompleteRuntimeReport({rows:snapshot.workspace,build,spool,header,buildOwner:report.owner,requestKey:report.requestKey,signal});return {state:'ready' as const,manifest};
+    const header={reportId:report.id,projectionVersion:2 as const,scope:report.request.projectId===null?'system' as const:'project' as const,projectId:report.request.projectId,filters:report.request.filters,asOf:snapshot.asOf,snapshotId:snapshot.snapshotId,generation:identity.generation,sourceRevision:identity.revision,...(report.request.taskId?{taskId:report.request.taskId}:{}),coverage:build.summary.metrics.state==='not-ready'?'complete-facts' as const:'complete' as const,buildMs:Date.now()-started};
+    const manifest=await sealCompleteRuntimeReport({rows:snapshot.workspace,build,spool,header,buildOwner:report.owner,requestKey:report.requestKey,signal});return build.summary.metrics.state==='not-ready'?{state:'not-ready' as const,gaps:build.summary.metrics.gaps.map(reason=>({source:'original-cohort',reason})),manifest}:{state:'ready' as const,manifest};
    },signal,runtimeReportAdmissionKey);
   },
  });

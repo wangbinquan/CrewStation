@@ -1,7 +1,8 @@
 import {mkdirSync,writeFileSync,readFileSync,rmSync,readdirSync,lstatSync,existsSync} from 'node:fs';
 import {resolve,isAbsolute} from 'node:path';
 import {jsonHash} from '@crewstation/kernel';
-import {ResourceIdSchema,RuntimeReportHeaderSchema,RuntimeCompleteSummarySchema} from '@crewstation/contracts';
+import {ResourceIdSchema,RuntimeReportHeaderSchema,RuntimeFactReportHeaderSchema,RuntimeCompleteSummarySchema,RuntimeCompleteFactSummarySchema} from '@crewstation/contracts';
+import {assertCompleteRuntimeFactItem} from '../../../domain/completeReportFacts';
 import {completeReportInitialDigest,completeReportTransferPage,assertCompleteReportTransferPage,assertCompleteReportManifest} from '../../../domain/completeReportEnvelope';
 import type {CompleteReportSpool,CompleteReportManifest,CompleteReportTransferItem,CompleteReportTransferPage} from '../../../ports/completeRuntimeReportCache';
 /** Original configured operations root; files only transport sealed derived rows. */
@@ -22,12 +23,13 @@ export function completeRuntimeFileSpool(dataRoot:string):CompleteReportSpool {
  const directory=(id:string,owner:string)=>{if(!owner)throw new Error('Original report build owner missing');return resolve(dataRoot,'runtime-reports',ResourceIdSchema.parse(id),jsonHash(owner));};
  return {
   async seal(identity,items,signal) {
-   RuntimeReportHeaderSchema.parse(identity.header);RuntimeCompleteSummarySchema.parse(identity.summary);
-   if(identity.header.reportId!==identity.reportId||identity.header.generation!==identity.generation||identity.header.sourceRevision!==identity.sourceRevision||identity.summary.metrics.state==='not-ready')throw new Error('Incomplete runtime report cannot be sealed');
+   const facts=identity.header.coverage==='complete-facts';
+   (facts?RuntimeFactReportHeaderSchema:RuntimeReportHeaderSchema).parse(identity.header);(facts?RuntimeCompleteFactSummarySchema:RuntimeCompleteSummarySchema).parse(identity.summary);
+   if(identity.header.reportId!==identity.reportId||identity.header.generation!==identity.generation||identity.header.sourceRevision!==identity.sourceRevision||!facts&&identity.summary.metrics.state==='not-ready')throw new Error('Incomplete runtime report cannot be sealed');
    const folder=directory(identity.reportId,identity.buildOwner);mkdirSync(folder,{recursive:true});
    let pages=0n,rows=0n,counts=0n,receipts=0n,digest=completeReportInitialDigest,buffer:CompleteReportTransferItem[]=[];
    const flush=()=>{if(!buffer.length)return;const page=completeReportTransferPage(identity.reportId,String(pages),digest,buffer);writeFileSync(resolve(folder,String(pages)+'.json'),JSON.stringify(page),{flag:'wx'});digest=page.digest;pages++;buffer=[];};
-   for await(const item of items){signal?.throwIfAborted();buffer.push(item);if(item.kind==='row')rows++;else if(item.kind==='count')counts++;else receipts++;if(buffer.length===500)flush();}
+   for await(const item of items){signal?.throwIfAborted();if(facts)assertCompleteRuntimeFactItem(item);buffer.push(item);if(item.kind==='row')rows++;else if(item.kind==='count')counts++;else receipts++;if(buffer.length===500)flush();}
    signal?.throwIfAborted();flush();
    const manifest:CompleteReportManifest={...identity,pages:String(pages),rows:String(rows),counts:String(counts),receipts:String(receipts),digest};
    writeFileSync(resolve(folder,'sealed.json'),JSON.stringify(manifest),{flag:'wx'});return manifest;

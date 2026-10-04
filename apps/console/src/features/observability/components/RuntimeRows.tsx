@@ -1,7 +1,6 @@
 import {useState,type ReactNode} from 'react';
 import type {RuntimeReportPageQuery,RuntimeReportHeader} from '@crewstation/contracts';
-import {api} from '../../../shared/api/client';
-import {useApiQuery} from '../../../shared/api/useApi';
+import {useRuntimeReportPage} from '../hooks/useRuntimeReportPage';
 import {useT} from '../../../shared/lib/useT';
 import {Button} from '../../../shared/ui/Button';
 import {ActionRow} from '../../../shared/ui/ActionRow';
@@ -19,7 +18,7 @@ export function RuntimeRows<T>(props:Props<T>) {
 }
 function RuntimeRowsPage<T>({header,section,parent,rowKey,children,emptyKey='runtime.empty',positionKey}:Props<T>&{positionKey:string}) {
  const t=useT(),[cursors,setCursors]=useState<readonly (string|undefined)[]>(()=>positions.get(positionKey)??[undefined]);
- const after=cursors.at(-1),page=useApiQuery(['runtime-report-page',positionKey,after],()=>api.observability.runtimeReportPage<T>(header.projectId??undefined,header.reportId,{section,parent,rowKey,after,pageSize:100}));
+ const after=cursors.at(-1),page=useRuntimeReportPage<T>(['runtime-report-page',positionKey,after],header,{section,parent,rowKey,after,pageSize:100});
  const change=(next:readonly (string|undefined)[])=>{positions.set(positionKey,next);setCursors(next);};
  const data=page.error?undefined:page.data;
  return <Stack data-runtime-section={section}><QueryStatus isPending={page.isPending} error={page.error}/>
@@ -34,7 +33,7 @@ function RuntimeRowsPage<T>({header,section,parent,rowKey,children,emptyKey='run
 
 export function RuntimeItem<T>({header,section,parent,rowKey,children}:{header:RuntimeReportHeader;parent?:string;section:RuntimeReportPageQuery['section'];rowKey:string;children:(item:T)=>ReactNode}) {
  const t=useT(),identity=JSON.stringify([section,parent,rowKey]);
- const page=useApiQuery(['runtime-report-item',header.reportId,section,parent,rowKey],()=>api.observability.runtimeReportPage<T>(header.projectId??undefined,header.reportId,{section,parent,rowKey,pageSize:1}));
+ const page=useRuntimeReportPage<T>(['runtime-report-item',header.reportId,section,parent,rowKey],header,{section,parent,rowKey,pageSize:1});
  const [previous,retain]=useState<{identity:string;item:T}>();
  const current=page.error?undefined:page.data?.items[0];
  if(current&&(previous?.identity!==identity||previous.item!==current))retain({identity,item:current});

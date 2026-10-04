@@ -22,7 +22,7 @@ export function RuntimeSources({ data, search, change }: FilterProps & { data: R
     <DataTable className={styles.table} columns={['source.title', 'objects', 'input', 'cacheRead', 'cacheWrite', 'output', 'tokens', 'cost', 'source.collection'].map((key) => t('runtime.' + key))}>
       {data.sources.map((row) => <tr key={row.kind} data-runtime-source={row.kind}><td><Button size="small" variant="ghost" onClick={() => change({ ...search, sourceKind: row.kind, tab: 'tasks', agent: undefined, profile: undefined })}>{runtimeSourceLabel(row.kind, t)}</Button></td>
         <td>{completeCount(row.tasks)}</td>{(['input', 'cacheRead', 'cacheWrite', 'output'] as const).map((bucket) => <td key={bucket}>{completeTokens(row.metrics, bucket)}</td>)}
-        <td>{completeTokens(row.metrics)}</td><td>{completeCny(row.metrics,t)}</td><td>{t('runtime.source.' + row.collectionState)}<span className={styles.identity}>{t('runtime.source.complete')}</span></td></tr>)}
+        <td>{completeTokens(row.metrics)}</td><td>{completeCny(row.metrics,t)}</td><td>{t('runtime.source.' + row.collectionState)}<span className={styles.identity}>{t(row.metrics.state==='ready'?'runtime.source.complete':row.metrics.state==='not-ready'?'runtime.source.facts':'runtime.reason.not-applicable')}</span></td></tr>)}
     </DataTable>
   </Card>;
 }

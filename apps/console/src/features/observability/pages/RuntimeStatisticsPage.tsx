@@ -1,7 +1,7 @@
 import { rememberRuntimeList, runtimeReturnKey, useRuntimeListReturn } from '../hooks/useRuntimeListReturn';
 import { useState } from 'react';
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
-import type {CompleteRuntimeTaskSummary} from '@crewstation/contracts';
+import {runtimeCompleteReportContent,type CompleteRuntimeTaskSummary} from '@crewstation/contracts';
 import { api } from '../../../shared/api/client';
 import { useT } from '../../../shared/lib/useT';
 import { useProjectScope } from '../../../shared/project/ProjectScope';
@@ -32,9 +32,9 @@ function RuntimeViewTabs({projectId,search,change,children}:{projectId?:string;s
 function RuntimeTaskPage({projectId,taskId,go}:PageProps&{taskId:string}) {
  const t=useT(),search=parseRuntimeSearch(useSearch({strict:false}));
  const query=useRuntimeReport(['task',projectId??'system',taskId],()=>projectId?api.observability.projectRuntimeTask(projectId,taskId):api.observability.systemRuntimeTask(taskId),projectId,search.reportId);
- const report=query.error?undefined:query.data,back=()=>go(search);
+ const report=query.error?undefined:query.data,data=report?runtimeCompleteReportContent(report):undefined,back=()=>go(search);
  return <Stack className={styles.page}><QueryStatus isPending={query.isPending} error={query.error}/>
-  {report?.state==='ready'?<RuntimeItem<CompleteRuntimeTaskSummary> header={report.header} section="tasks" rowKey={taskId}>{task=><RuntimeTaskView task={task} header={report.header} back={back}/>}</RuntimeItem>:<><PageHeader title={t('runtime.task')} actions={<Button size="small" variant="ghost" onClick={back}>{t('runtime.back')}</Button>}/>{report?<RuntimeReportState report={report}/>:null}</>}
+  {report&&data?<><RuntimeReportState report={report}/><RuntimeItem<CompleteRuntimeTaskSummary> header={data.header} section="tasks" rowKey={taskId}>{task=><RuntimeTaskView task={task} header={data.header} back={back}/>}</RuntimeItem></>:<><PageHeader title={t('runtime.task')} actions={<Button size="small" variant="ghost" onClick={back}>{t('runtime.back')}</Button>}/>{report?<RuntimeReportState report={report}/>:null}</>}
  </Stack>;
 }
 const runtimeStates=['admitting','creating','pending','running','awaiting-input','verifying','cancelling','cancelled','succeeded','failed','pausing','paused','finalizing','closing','closed','unknown'];
@@ -44,7 +44,7 @@ function RuntimeOverviewPage({projectId,go}:PageProps) {
  const window=runtimeWindow(search,initialNow),operations=search.tab==='resources'||search.tab==='health',current={...search,from:window.from,to:window.to};
  const filters={...window,q:search.q,state:search.state,quality:search.quality,sourceKind:search.sourceKind};
  const query=useRuntimeReport(['statistics',projectId??'system',filters],()=>projectId?api.observability.projectRuntimeStatistics(projectId,filters):api.observability.systemRuntimeStatistics(filters),projectId,search.reportId,!operations);
- const report=operations||query.error?undefined:query.data,data=report?.state==='ready'?report:undefined;
+ const report=operations||query.error?undefined:query.data,data=report?runtimeCompleteReportContent(report):undefined;
  const change=(next:RuntimeSearch)=>{const candidate={...current,...next};go({...candidate,reportId:cohortKey(candidate)===cohortKey(current)?candidate.reportId:undefined});};
  const returnKey=runtimeReturnKey(projectId??'system',current);useRuntimeListReturn(returnKey,data!==undefined);
  const openTask=(id:string)=>{if(!data)return;rememberRuntimeList(returnKey,id);go({...current,reportId:data.header.reportId},id);};
@@ -53,7 +53,7 @@ function RuntimeOverviewPage({projectId,go}:PageProps) {
   {!operations?<RuntimeFilters key={window.from+window.to} window={window} search={search} change={change} states={runtimeStates}/>:null}
   {!operations?<RuntimeSourceFilter search={search} change={change}/>:null}
   {!operations?<QueryStatus isPending={query.isPending} error={query.error}/>:null}
-  <RuntimeViewTabs projectId={projectId} search={search} change={change}>{search.tab==='resources'?<RuntimeResourceMetrics projectId={projectId} search={search} change={change}/>:search.tab==='health'?<RuntimeHealth projectId={projectId}/>:data?<RuntimeAnalysis summary={data.summary} header={data.header} search={search} change={change} task={openTask}/>:report?<RuntimeReportState report={report}/>:null}</RuntimeViewTabs>
+  <RuntimeViewTabs projectId={projectId} search={search} change={change}>{search.tab==='resources'?<RuntimeResourceMetrics projectId={projectId} search={search} change={change}/>:search.tab==='health'?<RuntimeHealth projectId={projectId}/>:data?<Stack>{report?<RuntimeReportState report={report}/>:null}<RuntimeAnalysis summary={data.summary} header={data.header} search={search} change={change} task={openTask}/></Stack>:report?<RuntimeReportState report={report}/>:null}</RuntimeViewTabs>
  </Stack>;
 }
 export function SystemRuntimeStatisticsPage() {

@@ -39,7 +39,7 @@ export function completeCohortContext(input:CompleteRuntimeCohortInput) {
       if(!trend)throw new Error('Original task falls outside its creation cohort');trend.count=String(BigInt(trend.count)+1n);mergeCompleteRuntimeFold(trend.fold,build.fold);
       if(completeDurationSample(task)){if(build.timing.wallMs===null)missingDuration=true;else await input.rows.insert(input.namespace+'/durations',[{key:task.id,document:build.timing.wallMs}]);}
       await retainCompleteTaskDimensions(input,selected,dimensions,reportRows);
-      for(const reason of quality)await reportRows.append('quality',reason,task.id,{taskId:task.id,taskName:task.name,projectId:task.projectId,projectName:task.projectName,reason});
+      for(const reason of quality){const document={taskId:task.id,taskName:task.name,projectId:task.projectId,projectName:task.projectName,reason};await reportRows.append('quality',reason,task.id,document);await reportRows.append('quality',null,input.keyOf(JSON.stringify([reason,task.id])),document);}
       await input.rows.clearTree(input.namespace+'/private-tasks/'+input.keyOf(task.id));
     },
     finishSummary(durations:RuntimeCompleteSummary['durations']):RuntimeCompleteSummary {
