@@ -17,7 +17,7 @@ export async function assertPublishedRuntimeReport(db:Executor,id:string,report:
  const taskCount=await db.execute(sql`SELECT total::text FROM observability.runtime_report_counts WHERE report_id=${id} AND section='tasks' AND parent=''`);
  if(String(taskCount[0]?.['total']??'0')!==manifest.summary.tasks||manifest.receipts!==manifest.summary.tasks)throw new Error('Complete report original task EOF count changed');
  if(content.header.coverage==='complete-facts') {
-  const sections=sql.join(RUNTIME_REPORT_FACT_SECTIONS.map(section=>sql`${section}`),sql`,`),invalid=await db.execute(sql`SELECT 1 FROM observability.runtime_report_rows WHERE report_id=${id} AND (section NOT IN (${sections}) OR ((section<>'quality' OR document ? 'metrics') AND (COALESCE(document->'metrics'->>'state','')<>'not-ready' OR document->'metrics' ? 'tokens' OR document->'metrics' ? 'cost'))) LIMIT 1`);
+  const sections=sql.join(RUNTIME_REPORT_FACT_SECTIONS.map(section=>sql`${section}`),sql`,`),invalid=await db.execute(sql`SELECT 1 FROM observability.runtime_report_rows WHERE report_id=${id} AND (section NOT IN (${sections}) OR ((section<>'quality' OR document ? 'metrics') AND NOT(section='tasks' AND parent='' AND COALESCE(document->'metrics'->>'state','') IN ('ready','not-applicable')) AND (COALESCE(document->'metrics'->>'state','')<>'not-ready' OR document->'metrics' ? 'tokens' OR document->'metrics' ? 'cost'))) LIMIT 1`);
   if(invalid.length)throw new Error('Incomplete usage cannot publish child subtotals or numeric collections');
  }
 }

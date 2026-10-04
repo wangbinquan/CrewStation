@@ -9,14 +9,19 @@ import {createTestDatabase} from '@crewstation/testkit';
 import {UserIdSchema,type Actor,type RuntimeTaskHeaderFact,type RuntimeCompleteReport,type ProjectId} from '@crewstation/contracts';
 import {createObservabilityModule,observabilityMigrations} from '../wiring';
 import {completeCohortFixture,completeCohortWindow,seedCompleteCohort} from './completeCohortFixture';
-export async function completeFactsFixture() {
- const tdb=await createTestDatabase([observabilityMigrations]),f=completeCohortFixture();await seedCompleteCohort(tdb,f,true);
+import {seedCompleteSibling} from './completeSiblingFixture';
+export async function completeFactsFixture(options:{completeSibling?:boolean;feePolicyCohort?:boolean}={}) {
+ const tdb=await createTestDatabase([observabilityMigrations]),f=completeCohortFixture();
+ // The fee-setting regression has its own complete three-Task population; the original 201/1001 EOF cohort is unchanged by default.
+ if(options.feePolicyCohort){f.tasks.splice(3);f.attempts.splice(1);f.records.splice(1);f.captures.length=0;}
+ await seedCompleteCohort(tdb,f,true);
+ const sibling=options.completeSibling?await seedCompleteSibling(tdb,f):undefined;
  const root=mkdtempSync(join(tmpdir(),'cs-sealed-facts-')),actor:Actor={userId:UserIdSchema.parse(newResourceId()),isAdmin:true},controls={broken:false};
  const module=createObservabilityModule({db:tdb.db,reportSnapshot:originalReportSnapshotSession(tdb.handle),reportDataRoot:root,
   reportFacts:(_db,query,snapshotId)=>{
    const facts=f.facts(snapshotId),tasks=f.tasks.filter(task=>(!query.taskId||task.id===query.taskId)&&(!query.projectId||task.projectId===query.projectId));
    const reader=<T,>(rows:readonly T[])=>({next:async(after:string|null)=>{const start=after===null?0:Number(after),items=rows.slice(start,start+37);return {items,snapshotId,nextCursor:start+items.length<rows.length?String(start+items.length):null};}});
-   return {...facts,tasks:{'business-task':{next:async(after:string|null)=>{if(controls.broken)throw new Error('Original Task source unavailable');return reader(tasks).next(after);}},'development-agent':reader<RuntimeTaskHeaderFact>([])}};
+   return {...facts,attempts:(task:RuntimeTaskHeaderFact)=>sibling&&task.id===sibling.task.id?reader([sibling.attempt]):facts.attempts(task),tasks:{'business-task':{next:async(after:string|null)=>{if(controls.broken)throw new Error('Original Task source unavailable');return reader(tasks).next(after);}},'development-agent':reader<RuntimeTaskHeaderFact>([])}};
   },k8s:createFakeK8sClient(),clock:fixedClock(completeCohortWindow.to),isAdmin:async()=>true,authorizer:{authorize:async()=>{}},services:{resolveServiceOfProject:async()=>undefined},slots:{slotRoles:async()=>undefined},
   traces:{environments:{traceKeys:async()=>[],activeTraceIds:async()=>[],list:async()=>[]},deliveries:{traceKeys:async()=>[],activeTraceIds:async()=>[],list:async()=>[]},businessTasks:{list:async()=>[]},sessions:{summarize:async()=>[],events:async()=>[]}},
  });
@@ -25,5 +30,5 @@ export async function completeFactsFixture() {
   while(report.state==='building'){for(const worker of module.reportWorkers)await worker.drain();report=await module.api.runtimeCompleteReportStatus(actor,projectId,report.reportId);}
   return report;
  }
- return {f,tdb,module,actor,controls,settle,close:async()=>{for(const worker of module.reportWorkers)await worker.stop();await tdb.drop();rmSync(root,{recursive:true,force:true});}};
+ return {f,tdb,module,actor,controls,sibling,settle,close:async()=>{for(const worker of module.reportWorkers)await worker.stop();await tdb.drop();rmSync(root,{recursive:true,force:true});}};
 }

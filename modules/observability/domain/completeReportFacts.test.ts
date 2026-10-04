@@ -1,4 +1,4 @@
-// Sealed execution facts cannot carry numerical usage in any child row, even with a not-ready state.
+// An incomplete sibling must not hide a fully proved ordinary Task; other subtotals stay unknown.
 import {describe,expect,test} from 'bun:test';
 import {RUNTIME_REPORT_FACT_SECTIONS,type RuntimeCompleteSummary,type RuntimeReportSection} from '@crewstation/contracts';
 import {completeRuntimeFactSummary,completeRuntimeFactRow,assertCompleteRuntimeFactItem} from './completeReportFacts';
@@ -7,6 +7,18 @@ const missing={state:'not-ready' as const,gaps:['native-capture-incomplete']};
 const ready={state:'ready' as const,tokens:{input:'80',cacheRead:'3',cacheWrite:'5',output:'7',total:'95'},executions:'1',observedExecutions:'1',records:'1',cost:{currency:'CNY' as const,state:'complete' as const,amount:'0.25'}};
 const row=(section:RuntimeReportSection,document:unknown):CompleteReportOutputRow=>({section,parent:'original-task',key:'original-row',document});
 describe('sealed fact-only contract boundary',()=>{
+ test('ordinary Tasks preserve their independent ready, not-applicable and missing metrics without rewriting the source',()=>{
+  for(const metrics of [ready,{state:'not-applicable' as const},missing]) {
+   const original={...row('tasks',{id:'original-task',metrics}),parent:null},facts=completeRuntimeFactRow(original,missing.gaps)!;
+   expect(facts).toBe(original);expect(facts.document).toBe(original.document);assertCompleteRuntimeFactItem({kind:'row',row:facts});
+  }
+ });
+ test('ordinary Task qualification rejects bad four-bin totals and leaked unknown values',()=>{
+  for(const metrics of [{...ready,tokens:{...ready.tokens,total:'94'}},{state:'not-applicable',tokens:ready.tokens},{...missing,tokens:ready.tokens},{...missing,cost:ready.cost},{...ready,cost:{...ready.cost,currency:'USD'}},undefined]) {
+   const original={...row('tasks',{id:'original-task',metrics}),parent:null};
+   expect(()=>completeRuntimeFactRow(original,missing.gaps)).toThrow();expect(()=>assertCompleteRuntimeFactItem({kind:'row',row:original})).toThrow('child subtotals');
+  }
+ });
  test('known population and duration survive while every trend and source receives the original unknown usage state',()=>{
   const summary:RuntimeCompleteSummary={tasks:'9007199254740993',metrics:missing,durations:{state:'complete',samples:'9007199254740993',p50Ms:'10000',p95Ms:'20000',maxMs:'30000'},trend:[{from:'2026-10-03T00:00:00.000Z',to:'2026-10-04T00:00:00.000Z',tasks:'9007199254740993',metrics:ready}],sources:[{kind:'business-task',tasks:'9007199254740993',metrics:ready,collectionState:'available'}]};
   const facts=completeRuntimeFactSummary(summary);expect(facts.tasks).toBe(summary.tasks);expect(facts.durations).toEqual(summary.durations);expect(facts.trend[0]!.tasks).toBe(summary.tasks);expect(facts.sources[0]!.tasks).toBe(summary.tasks);expect([facts.metrics,facts.trend[0]!.metrics,facts.sources[0]!.metrics]).toEqual([missing,missing,missing]);expect(summary.trend[0]!.metrics).toEqual(ready);

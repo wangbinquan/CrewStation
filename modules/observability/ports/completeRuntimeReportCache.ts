@@ -15,6 +15,7 @@ export interface CompleteRuntimeReportCache {
  identity():Promise<{generation:string;revision:string}>;
  ensure(request:CompleteReportRequest,requestKey:string,owner:string,id:string):Promise<CompleteReportStored>;
  get(id:string):Promise<CompleteReportStored|undefined>;
+ hasVisibleTaskCosts(id:string):Promise<boolean>;
  claim(id:string,owner:string):Promise<CompleteReportStored>;
  renew(id:string,owner:string):Promise<boolean>;
  phase(id:string,owner:string,phase:string):Promise<void>;

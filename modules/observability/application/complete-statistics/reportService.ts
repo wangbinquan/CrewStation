@@ -14,7 +14,7 @@ export function completeRuntimeReportUseCases(input:{store:CompleteRuntimeReport
   const content=runtimeCompleteReportContent(report.report);
   if(content) {
    const identity=await input.store.identity();if(identity.generation!==content.header.generation)throw precondition('原运行数据代次已改变，请刷新报告');
-   if(projectId&&content.summary.metrics.state==='ready'&&content.summary.metrics.cost.state!=='hidden'&&!(await input.costVisible(projectId)))throw precondition('项目费用显示配置已改变，请刷新报告');
+   if(projectId&&((content.summary.metrics.state==='ready'&&content.summary.metrics.cost.state!=='hidden')||(content.header.coverage==='complete-facts'&&await input.store.hasVisibleTaskCosts(id)))&&!(await input.costVisible(projectId)))throw precondition('项目费用显示配置已改变，请刷新报告');
   }
   return report;
  }
@@ -40,7 +40,7 @@ export function completeRuntimeReportUseCases(input:{store:CompleteRuntimeReport
  }
  async function request(actor:Actor,projectId:ProjectId|null,filters:RuntimeStatisticsQuery,taskId?:TaskId) {
   await authorize(actor,projectId);if(paused||controller.signal.aborted)throw precondition('完整报告正在清理，请稍后刷新');const identity=await input.store.identity(),query=RuntimeStatisticsQuerySchema.parse(filters),request:CompleteReportRequest={actor,projectId,filters:query,...(taskId?{taskId}: {})};
-  const requestKey=jsonHash({projectionVersion:2,executionFactsVersion:1,identity,request}),owner=input.owner+'/'+newResourceId();
+  const requestKey=jsonHash({projectionVersion:2,executionFactsVersion:2,identity,request}),owner=input.owner+'/'+newResourceId();
   const existing=await input.store.ensure(request,requestKey,owner,newResourceId());
   if(existing.state==='failed'&&jobs.has(existing.id))await jobs.get(existing.id);
   const report=jobs.has(existing.id)?existing:await input.store.claim(existing.id,owner);schedule(report);return report.report;
