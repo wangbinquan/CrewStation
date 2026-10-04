@@ -1,4 +1,7 @@
 import type { ProjectDeletionContext, ProjectDeletionEvidence, ProjectDeletionInventory, ProjectDeletionTarget, ProjectId, TaskId } from '@crewstation/contracts';
+import type { SessionWorkBirth } from '../domain/deletion/work';
+import type { SessionStopSnapshotSchema } from '../domain/deletion/stopSnapshot';
+import type { z } from 'zod';
 
 export interface SessionTaskOrigin { readonly id: TaskId; readonly complete: true; readonly scope: 'project' | 'platform'; readonly projectIds: readonly ProjectId[]; readonly revision: string }
 export interface SessionDeletionSources {
@@ -27,6 +30,8 @@ export interface SessionConnectionHistory {
 }
 export interface SessionDeletionScope {
   readonly taskKeys: readonly string[]; readonly births: readonly SessionConnectionBirth[];
+  readonly callbacks?: readonly SessionWorkBirth[];
+  readonly stopped?: z.infer<typeof SessionStopSnapshotSchema>;
   readonly digest: string; readonly count: number;
   readonly compacted: boolean;
 }
@@ -34,11 +39,13 @@ export interface SessionDeletionRepository {
   inspect(target: ProjectDeletionTarget): Promise<{ inventory: ProjectDeletionInventory; scope: SessionDeletionScope }>;
   seal(context: ProjectDeletionContext): Promise<boolean>;
   scope(context: ProjectDeletionContext): Promise<SessionDeletionScope>;
+  originalTasks(context: ProjectDeletionContext, after: TaskId | null): Promise<readonly TaskId[]>;
   proof(context: ProjectDeletionContext): Promise<ProjectDeletionEvidence | undefined>;
   record(context: ProjectDeletionContext, evidence: ProjectDeletionEvidence): Promise<void>;
   exited(birth: SessionConnectionBirth): Promise<boolean>;
+  quiescent(context: ProjectDeletionContext): Promise<boolean>;
   observe(): Promise<void>;
-  purge(context: ProjectDeletionContext): Promise<void>;
+  purge(context: ProjectDeletionContext, evidence: ProjectDeletionEvidence): Promise<void>;
 }
 export interface SessionDeletionTransport {
   close(context: ProjectDeletionContext, birth: SessionConnectionBirth): Promise<boolean>;

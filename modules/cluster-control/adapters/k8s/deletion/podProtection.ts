@@ -55,7 +55,8 @@ export function kubernetesProjectPodProtection(k8s: K8sClient, ledger: Pick<Ledg
   const authorize = async (context: ProjectDeletionContext) => { if (context.confirmed.participant !== 'resources' || expectedPods(context).some((entry) => keyOf(entry.id).namespace !== context.target.namespace)) throw precondition('Pod 物理停止许可来源不符'); await admission.assertGrant(context); };
   return { inspect,
     seal: async (context) => { if (context.phase !== 'seal') throw precondition('Pod 保护许可阶段不符'); await authorize(context); for (const entry of expectedPods(context)) { const original = originalPodIdentity(entry.identity), pod = await currentPod(k8s, entry.id, original.uid); if (!pod || jsonHash(pod['spec'] ?? {}) !== original.specDigest) throw precondition('原 Pod 在保护前变化或消失'); await authorize(context); await protect(k8s, pod, context); } return done(context, 'seal'); },
-    stop: async (context) => { if (context.phase !== 'stop') throw precondition('Pod 停止许可阶段不符'); return stopPods(k8s, context, store, authorize, now); },
+    observeTerminating: async (context) => { if (context.phase !== 'stop') throw precondition('Pod 观测许可阶段不符'); await stopPods(k8s, context, store, authorize, now, false); },
+    stop: async (context) => { if (context.phase !== 'stop') throw precondition('Pod 停止许可阶段不符'); return stopPods(k8s, context, store, authorize, now, true); },
     verify: async (context) => {
       if (!['prove', 'verify'].includes(context.phase)) throw precondition('Pod 物理证明许可阶段不符');
       await authorize(context);
@@ -69,8 +70,9 @@ export function kubernetesProjectPodProtection(k8s: K8sClient, ledger: Pick<Ledg
     },
   };
 }
-async function stopPods(k8s: K8sClient, context: ProjectDeletionContext, store: ClusterPodStopReceipts, authorize: (context: ProjectDeletionContext) => Promise<void>, now: () => Date): Promise<ProjectDeletionStepResult> {
+async function stopPods(k8s: K8sClient, context: ProjectDeletionContext, store: ClusterPodStopReceipts, authorize: (context: ProjectDeletionContext) => Promise<void>, now: () => Date, initiate: boolean): Promise<ProjectDeletionStepResult> {
   await authorize(context);
+  let waiting = false;
   for (const entry of expectedPods(context)) {
     const original = originalPodIdentity(entry.identity); let pod = await currentPod(k8s, entry.id, original.uid);
     const saved = await store.get(context, entry.id, original.uid);
@@ -78,14 +80,17 @@ async function stopPods(k8s: K8sClient, context: ProjectDeletionContext, store: 
     if (!pod) throw precondition('API 中的 Pod 不存在不能替代原容器停止证明');
     assertProjectPodProtection(pod, original, context.operationId);
     await authorize(context);
-    if (!pod.metadata.deletionTimestamp) { await k8s.delete(Resources.Pod!, pod.metadata.name, pod.metadata.namespace, { preconditions: { uid: original.uid }, propagationPolicy: 'Foreground' }); pod = await currentPod(k8s, entry.id, original.uid); }
+    if (!pod.metadata.deletionTimestamp) {
+      if (!initiate) { waiting = true; continue; }
+      await k8s.delete(Resources.Pod!, pod.metadata.name, pod.metadata.namespace, { preconditions: { uid: original.uid }, propagationPolicy: 'Foreground' }); pod = await currentPod(k8s, entry.id, original.uid);
+    }
     if (!pod) throw precondition('原 Pod 在保存停止证明前消失');
     const node = original.nodeName ? await nodeEvidence(k8s, original.nodeName, now(), AbortSignal.timeout(15_000)) : undefined;
     const containers = projectPodTerminated(pod, original, context.operationId, node);
-    if (!containers) return { kind: 'waiting', reason: '等待原节点新鲜心跳和所有普通／初始化／临时容器的实际停止状态' };
+    if (!containers) { waiting = true; continue; }
     const proof = { uid: original.uid, nodeUid: node?.uid ?? null, resourceVersion: pod.metadata.resourceVersion, containers };
     await store.save(context, { key: entry.id, uid: original.uid, nodeUid: proof.nodeUid, digest: jsonHash(proof), observedAt: now().toISOString() });
     await authorize(context); await release(k8s, context, entry.id, original);
   }
-  return done(context, 'stop');
+  return waiting ? { kind: 'waiting', reason: '等待原节点新鲜心跳和所有普通／初始化／临时容器的实际停止状态' } : done(context, 'stop');
 }

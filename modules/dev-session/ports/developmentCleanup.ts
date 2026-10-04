@@ -9,6 +9,8 @@ export interface DevelopmentCleanupSession extends DevelopmentEndingSession {
 export interface DevelopmentCleanupDeps extends Omit<DevelopmentEndingDeps, 'session'> {
   session: DevelopmentCleanupSession;
   environments: Pick<Environments, 'getEnvironment'>;
+  /** Deletion-only closure of this already-verified original admission, not a physical stop assertion. */
+  closeOriginalAdmission?(id: TaskId): Promise<void>;
 }
 export interface DevelopmentCleanupParticipant {
   advance(input: DevelopmentCleanupSelection): Promise<{ readonly kind: 'waiting'; readonly reason: string } | { readonly kind: 'permitted'; readonly evidence: DevelopmentCleanupEvidence }>;

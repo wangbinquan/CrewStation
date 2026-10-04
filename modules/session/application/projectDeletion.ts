@@ -27,7 +27,7 @@ export function sessionDeletionOwner(repository: SessionDeletionRepository, tran
         if (!(await repository.exited(birth))) return { kind: 'waiting', reason: '等待原副本关闭连接与命令，并记录私有 finally；失联不算退出' };
       }
     }
-    if (context.phase === 'metadata') await repository.purge(context);
+    if (context.phase === 'stop' && !(await repository.quiescent(context))) return { kind: 'waiting', reason: '等待原命令和清理回调的实际退出证明，网络断开不能冒充退出' };
     if (context.phase === 'verify' && (await repository.inspect(context.target)).scope.count !== 0)
       return { kind: 'blocked', blockers: [{ participant: 'session', code: 'content-remains', message: '完整分页仍有会话内容，不能完成清理' }] };
     const evidence: ProjectDeletionEvidence = { kind: context.phase === 'namespace' ? 'not-applicable' : 'metadata', count: context.phase === 'namespace' ? 0 : scope.count,
@@ -36,7 +36,9 @@ export function sessionDeletionOwner(repository: SessionDeletionRepository, tran
         : context.phase === 'namespace' ? '会话数据位于共享控制面；任务容器和存储由对应资源 owner 清理'
           : context.phase === 'metadata' ? '会话十类内容和原连接记录已删除，清理范围仅保留数量与摘要'
             : '会话准入已封闭，完整原范围与持久阶段证明已核对' };
-    await sources.assertGrant(context); await repository.record(context, evidence);
+    await sources.assertGrant(context);
+    if (context.phase === 'metadata') await repository.purge(context, evidence);
+    else await repository.record(context, evidence);
     return { kind: 'done', evidence };
   };
   return { participant: 'session', inspect: async (target) => {

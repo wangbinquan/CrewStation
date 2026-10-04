@@ -1,3 +1,29 @@
+## 2026-10-04 RFC-037 按最新指令立即推进发布
+
+用户再次明确要求最快提交上库和上线，减少跨会话沟通不撤销既有发布／部署授权。立即固定已有原停止、Session 数字通道和观测排空的完整依赖候选，执行本候选唯一完整检查并串行精确发布；共享 contracts/index.ts 原样保留，新增 native-usage 导出依赖只作实际发布协调。当前入口仍关闭，完整删除与原项目物理回收继续；不能把本次代码部署记作永久删除可用。以下此前暂停分批发布的状态属于历史，最新用户指令优先。
+
+本候选完整检查静态四层通过，5734 pass／143环境skip／9 fail；原完整失败回执保持。九项真实 HTTP 失败已定位为 console DOM 注册替换原生 Response：新增真实 Bun.serve／node:http 反例先红，保留原生 Response 后变绿。预加载真实 DOM 的全部 Session 删除与观测组合回归34／0、384断言通过。生产候选148路径未变，只追加测试环境修复及回归，复用原完整检查的未受影响项，补跑本候选全部用例与完整 console 层，并以推送的精确 SHA 六项 CI 作为部署前整仓权威结论；不将旧完整失败追记为通过。
+
+本候选全部测试加完整console层共207文件，1264通过／1旧输入模拟失败；该旧用例只发keyup，在明确DOM预加载时没有触发真实输入。补发input事件、保持所有草稿保护断言后，原失败文件与真实HTTP回归8／0；精确提交树console类型0错，原错误VFS配置未指定console配置文件路径的诊断保留。最后一次静态／原失败文件检查完成即精确发布151路径，不再重复已通过的未变候选用例；部署必须等待该SHA六项CI成功。
+
+## 2026-10-04 RFC-037 原观测数值排空实际接线
+
+实际平台／Observability工厂接原 Session 任务目录、业务／开发数字页、独立归属与原计价，全部 EOF 且落库后才确认来源；Root失效回滚，最终 STOP 内容范围固定。403原任务、101执行／26页边界和114条实际用量／估值、丢请求／响应恢复及健康项目保留通过。真实PG先红发现同项目跨任务证据改写，追加0020核对旧／新绑定，旧0019保持；锁246保留原244全部校验和。较宽78／0、585断言、14文件、51.29秒，整树后端类型、精确lint与结构通过；严格目录／金样11／0。详见[原观测排空证据](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/observability-original-drain.md)。
+
+未另起完整门、未分批发布部署，创建弹窗已交付；删除仍不可用。全部22 owner、旧数字键／未启动原执行、SCM十一类正式物理回收、管理员入口与二次确认、精确CI／部署／原项目实机回收继续。入口／producer OFF，原项目保持。fetch后HEAD／origin fa187精确同步，索引空。跨会话结构通知被自动审批拒绝，未发出，不重试；下方并行状态与旧历史全文保持。
+
+## 2026-10-04 RFC-037 原运行停止实际接线
+
+TaskRuntime 实际模块／平台已接原队列 fence、持续续租、DevSession／Session 数字排空和 Resources 独立停止证明；原开发子执行可等待控制器观测后清原 Secret，父容器与工作盘保留。持久消费者历史可证明已回收 Pod 的原停止，finished 历史执行不再依赖已清掉的队列行。修复取消丢原登记与错误期待业务 ACK 返回 receipt 的实际协议问题，先红日志保持。最新实际停止／取消13／0、历史组合8／0、ACK／开发／Runner11／0，精确lint及结构通过；全树类型仍被并行观测测试的 ProjectId 类型问题阻断，未改外会话源码。详见 [原运行停止证据](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/runtime-original-stop.md)。
+
+本轮未分批发布／部署、未另起完整门禁、未发例行跨会话消息。创建弹窗已交付，整项目删除仍不可用：观测消费者和全部22 owner正式组合、SCM十一类物理清理、入口与二次确认实机验收继续；删除入口／producer OFF，原专用项目保持。fetch 后 HEAD／origin fa187同步，索引空。下方所有并行输出与历史保持。
+
+## 2026-10-04 RFC-037 正式数字通道与开发停止接线
+
+Session 的封写后原数据读取／有限分页／消费确认已接入真实 internal HTTP 和专用跨进程客户端；原连接只能从原封写范围取得，数字消费不能替代容器停止证明。平台现在向 DevSession 的 `projectDeletionCleanup` 注入从实际 Root 还原的 Session 许可，先确认原开发选择再关闭准入，通过原连接执行停止、读取一页和确认已落库水位，保留普通 producer OFF。完整 TaskRuntime 停止器、业务／观测消费者的许可接线、22 owner、SCM 物理来源与最终二次确认回收仍需完成，删除入口 OFF，原专用项目保持。按用户最新反馈，以整条删除链路可用并真实验收为后续发布目标，本轮不分批发布／部署底座。
+
+全 Session、专用客户端、开发清理及组合适配回归135／0、989断言、38文件；类型／精确lint／结构均通过。回归修复旧普通命令因 `await undefined` 延迟 pending 的问题，保留先红记录。真实PG先红证明旧guard误用 attemptId/incarnationId，追加不可变0015只阻断封写后的真实attempt/incarnation/payloadDigest替换；旧0014封写库升级、内容和阶段保留均通过。官方锁244，fa187原241校验和全保持。详细日志见 acceptance/session-cleanup-lifetime.md。新 `contracts/index.ts` 仅追加sessionData导出，同时保留并行native-usage导出；完整共享文件若发布必须带齐所有新增导出依赖，不单独发布缺依赖的index。无主动跨会话消息；HEAD/origin fa187精确同步，索引为空。
+
 ## 2026-10-04 RFC-034 完整门自然终态与实际数据库补验
 
 本候选唯一完整 bun run check 已自然结束：静态四层通过，5675 pass／144环境skip／1 fail、221354断言、5820 tests／1119 files；31源和16控制首尾指纹一致。原 FAIL 回执和1701.47秒完整日志保留，不记整仓通过。唯一失败为未修改的 data-control 原测试：默认55432 PostgreSQL max_prepared_transactions 为0，实际 PREPARE TRANSACTION 报55000；CI module原17.11环境已明确设置该参数10。

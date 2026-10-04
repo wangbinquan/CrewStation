@@ -32,13 +32,13 @@ async function requireHeartbeat(renew: () => Promise<boolean>): Promise<void> {
 /** Real job fence at both commits; all participant, Session and Kubernetes I/O is outside project locks. */
 export async function cleanupDevelopmentWorkload(deps: Deps, original: TaskEnvironment, renew: () => Promise<boolean>, identity: NativeExecutionJobLease | undefined): Promise<void> {
   const selection = developmentCleanupSelection(original);
-  if (!selection || !deps.developmentCleanup || !deps.nativeCluster.cleanupDevelopment) throw precondition('等待开发数字排空与原执行停止屏障装配');
+  if (!selection || !deps.developmentCleanup || !deps.nativeCluster.cleanupDevelopment) throw precondition('等待开发数字排空与原执行停止屏障装配', { code: 'runtime_original_stop_waiting' });
   await requireHeartbeat(renew);
   let current = await withCurrent(deps, original, identity, selection, async (_scope, env) => env);
   await developmentAdmissionSecretUid(deps.workloadSafety, current);
   if (!current.native!.developmentCleanup) {
     const result = await deps.developmentCleanup.advance(selection);
-    if (result.kind !== 'permitted') throw precondition('等待开发数字排空的持久出口');
+    if (result.kind !== 'permitted') throw precondition('等待开发数字排空的持久出口：' + result.reason, { code: 'runtime_original_stop_waiting' });
     const evidence = requireDevelopmentCleanupEvidence(result.evidence, selection);
     await requireHeartbeat(renew);
     current = await withCurrent(deps, original, identity, selection, async (scope, env) => {

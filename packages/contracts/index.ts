@@ -27,6 +27,7 @@ export * from './api/project';
 export * from './api/projectDeletion/values';
 export * from './api/projectDeletion/responses';
 export * from './api/projectDeletion/owner';
+export * from './api/projectDeletion/sessionData';
 export * from './api/compute/computeProfile';
 export * from './api/release';
 export * from './api/maintenance';
@@ -150,3 +151,5 @@ export * from './api/resourceCenter/catalog';
 export * from './api/resourceCenter/inspection';
 export * from './api/resourceCenter/namespaceQuota';
 export * from './api/resourceCenter/usage';
+
+export * from './taskrunner/native-usage/pages';

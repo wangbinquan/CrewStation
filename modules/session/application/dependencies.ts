@@ -6,9 +6,11 @@ import type { ConnectionRegistry, RunnerEventStore } from '../ports/repositories
 import type { RunnerAuth, TaskAccess } from '../ports/taskRuntime';
 import type { BusinessExecutionStore } from '../ports/businessExecutions';
 import type { SessionConnectionHistory } from '../ports/projectDeletion';
+import type { SessionProjectWork } from '../ports/projectWork';
 
 export interface SessionUseCaseDeps {
   connectionHistory?: SessionConnectionHistory;
+  projectWork?: SessionProjectWork;
   developmentUsage?: DevelopmentUsageStore;
   businessExecutions?: BusinessExecutionStore;
   legacyRunners?: LegacyRunnerBoundary;

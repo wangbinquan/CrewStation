@@ -3,13 +3,16 @@ import { resourceCatalogs } from './application/resource-center/resourceCatalogs
 import { businessRuntimePorts } from './application/deletion/businessSources';
 import { developmentDeletionSources, developmentSourceControl } from './application/deletion/developmentSources';
 import { runtimeDeletionSources } from './application/deletion/runtimeSources';
+import { runtimeCleanupPorts } from './application/deletion/runtimeCleanup';
+import { developmentDeletionSession } from './application/deletion/developmentSession';
 import { runtimeCheckout } from './adapters/k8s/runtimeCheckout';
 import { projectResourceState } from './adapters/k8s/projectResourceState';
 import { projectResourceSources } from './application/resource-center/projectSources';
 import { createResourceAccessModule } from '@crewstation/module-resource-access';
 import { clusterOperationPorts } from './application/cluster/operations';
+import { originalObservationTasks, originalObservationUsage } from './application/deletion/observationUsage';
 import { developmentObservationSource } from './application/developmentObservationPorts';
-import {completeRuntimeFactSources} from './application/completeRuntimeFactSources';
+import { completeRuntimeFactSources } from './application/completeRuntimeFactSources';
 import { businessObservationAdmission, developmentObservationAdmission, observationPorts, observationUsageSource } from './application/observationPorts';
 import { executionWriterObserver, migrationWriterObserver, legacyOwnerObserver } from './adapters/executionWriters';
 import { webhookAwareAllowlist } from './application/webhookIngress';
@@ -37,26 +40,26 @@ import { BUILTIN_RESOURCES, ServiceIdSchema, type Actor, type ComputeProfileSele
 import { eventbusMigrations, type EventConsumer } from '@crewstation/eventbus';
 import { secretObject, type K8sClient } from '@crewstation/k8s';
 import { forbidden, precondition, type Logger } from '@crewstation/kernel';
-import { createAgentRuntimeModule,readProfileObservationName, computeAllocationRevision, taskProfileAllocationRevision } from '@crewstation/module-agent-runtime';
+import { createAgentRuntimeModule, readProfileObservationName, computeAllocationRevision, taskProfileAllocationRevision } from '@crewstation/module-agent-runtime';
 import { createApiCatalogModule, apiAllocationRevision } from '@crewstation/module-api-catalog';
-import { createBusinessTaskModule, readBusinessObservationTaskPage,readBusinessObservationAttemptPage, type BusinessTaskModuleApi } from '@crewstation/module-business-task';
+import { createBusinessTaskModule, readBusinessObservationTaskPage, readBusinessObservationAttemptPage, type BusinessTaskModuleApi } from '@crewstation/module-business-task';
 import { createCapabilitiesModule } from '@crewstation/module-capabilities';
 import { createConfigModule } from '@crewstation/module-config';
 import { createDataModule, objectPlanAllocationRevision, objectSpaceAllocationRevision } from '@crewstation/module-data';
 import { createDataControlModule, type DataControlModuleApi } from '@crewstation/module-data-control';
-import { createDevSessionModule, readDevelopmentObservationTaskPage,readDevelopmentObservationAttemptPage } from '@crewstation/module-dev-session';
+import { createDevSessionModule, readDevelopmentObservationTaskPage, readDevelopmentObservationAttemptPage } from '@crewstation/module-dev-session';
 import { createEventsModule, type EventsModuleApi } from '@crewstation/module-events';
 import { createGatewayModule, gatewayAllocationRevision, projectRateLimitValues, UNAVAILABLE_PATH, type GatewayModuleApi } from '@crewstation/module-gateway';
 import { createIdentityModule } from '@crewstation/module-identity';
 import { createObservabilityModule, type ObservabilityModuleApi } from '@crewstation/module-observability';
 import { createProvisioningModule, type ProjectFacts } from '@crewstation/module-provisioning';
-import { createProjectModule,readProjectObservationName, serviceAllocationRevision, namespaceQuotaRevision, executionQuotaRevision, type ProjectModuleApi, type ResolvedService } from '@crewstation/module-project';
+import { createProjectModule, readProjectObservationName, serviceAllocationRevision, namespaceQuotaRevision, executionQuotaRevision, type ProjectModuleApi, type ResolvedService } from '@crewstation/module-project';
 import { createReleaseModule, type ReleaseModuleApi } from '@crewstation/module-release';
 import { createScmModule } from '@crewstation/module-scm';
 import { createSessionModule } from '@crewstation/module-session';
 import { createTaskRuntimeModule, type TaskRuntimeModuleApi } from '@crewstation/module-task-runtime';
 import { queueMigrations } from '@crewstation/queue';
-import { createSessionClient } from '@crewstation/session-client';
+import { createProjectDeletionSessionClient, createSessionClient } from '@crewstation/session-client';
 import type { PlatformSettings } from '@crewstation/settings';
 import type { AppEnv } from '@crewstation/http';
 import type { Hono } from 'hono';
@@ -289,6 +292,7 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
   const mcp = [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }];
   const ledger = resources.api.owner('task-runtime');
   const taskRuntime = createTaskRuntimeModule({
+    deletionStops: runtimeCleanupPorts(project.api, resources.api, () => devSession.api, createProjectDeletionSessionClient(settings.sessionInternalUrl)),
     ...(settings.platformPodUid ? { deletionWorkSources: runtimeDeletionSources(project.api, () => late.businessTask, projectCallbackOwners(k8s, settings.systemNamespace, settings.platformPodUid, 'crewstation.io/runtime-project-stop')) } : {}),
     ...(data.api.archiveHelper ? { archive: { credentials: data.api.archiveHelper, apiUrl: `http://cs-api.${settings.systemNamespace}.svc:8087` } } : {}),
     imageProbeLeases: { port: resources.api.leases, holder: deps.instance },
@@ -309,6 +313,7 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
   // 两类任务共用解析：受理固定档位修订，派发时取材料，凭据仅进入受控 Runner 通道。
   const computeCatalog = { pinLaunchVersion: core.agentRuntime.api.pinLaunchVersion, launchMaterialAt: core.agentRuntime.api.launchMaterialAt, resolve: (name: ComputeProfileSelector | undefined, usage: ComputeUsage, projectId: ProjectId) => core.agentRuntime.api.resolveForProject(projectId, name, usage), launchMaterial: core.agentRuntime.api.launchMaterial, launchMetadata: core.agentRuntime.api.launchMetadata };
   const devSession = createDevSessionModule({
+    projectDeletionSession: developmentDeletionSession(project.api, createProjectDeletionSessionClient(settings.sessionInternalUrl)),
     ...(settings.platformPodUid ? { deletionWorkSources: developmentDeletionSources(project.api, taskRuntime.api, () => late.clusterManagement, projectCallbackOwners(k8s, settings.systemNamespace, settings.platformPodUid, 'crewstation.io/development-project-stop')) } : {}),
     developmentUsagePricing: developmentObservationAdmission(() => late.observability),
     runtimeImages: developmentImagePorts(runtimeImages.api),
@@ -368,22 +373,21 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
   return { taskRuntime, devSession, businessTask, events, session, sessionClient: runner };
 }
 
-function composeAggregates(deps: PlatformModuleDeps, late: Late, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, runtime: ReturnType<typeof composeRuntime>, resources: ReturnType<typeof composeLedger>, images: ReturnType<typeof createManagedRuntimeEnvironmentModule>) {
+function composeAggregates(deps: CompositionDeps, late: Late, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, runtime: ReturnType<typeof composeRuntime>, resources: ReturnType<typeof composeLedger>, images: ReturnType<typeof createManagedRuntimeEnvironmentModule>) {
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, apiCatalog, isAdmin } = core;
   const serviceOfProject = project.api.resolveServiceOfProject;
   const observability = createObservabilityModule({ reportSnapshot:deps.runtimeReportSnapshot,reportDataRoot:settings.runtimeReportDataRoot,reportFacts:completeRuntimeFactSources({business:{tasks:readBusinessObservationTaskPage,attempts:readBusinessObservationAttemptPage},development:{tasks:readDevelopmentObservationTaskPage,attempts:readDevelopmentObservationAttemptPage},projectName:readProjectObservationName,profileName:readProfileObservationName}),
+    deletion: { identities: deps.identities, assertGrant: project.api.assertProjectDeletionGrant,
+      tasks: { list: (target) => originalObservationTasks(runtime.taskRuntime.api, target.id) },
+      originalUsage: originalObservationUsage(project.api, createProjectDeletionSessionClient(settings.sessionInternalUrl), runtime.businessTask.api.v3, runtime.devSession.api.developmentUsage) },
     ...(runtime.devSession.api.developmentUsage ? { developmentUsageSource: developmentObservationSource(runtime.devSession.api.developmentUsage, runtime.session.api) } : {}), usageSource: observationUsageSource(runtime.businessTask.api.v3, runtime.session.api), ...observationPorts(runtime.businessTask.api.v3, project.api, core.agentRuntime.api, resources.api),
     db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, services: { resolveServiceOfProject: serviceOfProject }, slots: delivery.release.api,
-    // 调用链（Design §14）：每个来源按项目读取，跨模块接口仅在组合根装配。
     traces: {
       environments: { traceKeys: runtime.taskRuntime.api.traceKeys, activeTraceIds: runtime.taskRuntime.api.activeTraceIds, list: runtime.taskRuntime.api.listTraceEnvironments },
       deliveries: { traceKeys: runtime.events.api.traceKeys, activeTraceIds: runtime.events.api.activeTraceIds, list: runtime.events.api.listTraceDeliveries },
       businessTasks: { list: runtime.businessTask.api.listTraceTasks },
-      sessions: {
-        summarize: runtime.session.api.summarizeEvents,
-        events: (taskId, page) => runtime.session.api.listEvents(taskId, { sinceSeq: page.afterSeq, limit: page.limit, kinds: page.kinds }),
-      },
+      sessions: { summarize: runtime.session.api.summarizeEvents, events: (taskId, page) => runtime.session.api.listEvents(taskId, { sinceSeq: page.afterSeq, limit: page.limit, kinds: page.kinds }) },
     },
     listProjectIds: async () => (await project.api.listServices()).map((s) => s.projectId),
   });

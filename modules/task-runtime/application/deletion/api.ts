@@ -6,6 +6,7 @@ import { guardedRuntimePort } from './ports';
 
 type Rule = 'readonly' | 'platform' | 'background' | 'nested' | 'task-0' | 'task-1' | 'project-0' | 'project-1' | 'project-input' | 'service-input' | 'service-0' | 'task-input' | 'parent-input' | 'ending' | 'probe-stop';
 const origins = {
+  deletionOwner: 'nested',
   originalInfrastructureOwnership: 'readonly', originalProjectTaskIds: 'readonly', inspectDevelopmentRemoval: 'readonly', listClusterTasks: 'readonly',
   reconcile: 'background', observeStartup: 'background', runProfileTest: 'platform', archiveExecution: 'nested', storageCleanup: 'nested',
   resourceWorkload: 'readonly', resourceWorkloads: 'readonly', inspectResourceEnding: 'ending',

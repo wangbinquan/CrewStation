@@ -66,19 +66,19 @@ function checkSql(path: string, sql: string, schema: string): Violation[] {
   // A declared table/CTE alias qualifies columns, never a schema. Object positions still require ownership.
   const aliases = new Set([...sql.matchAll(/\b(?:from|join|update)\s+[a-z_][a-z0-9_.]*\s+(?:as\s+)?([a-z_][a-z0-9_]*)/g)]
     .map((m) => m[1]).filter((name) => name && !['where', 'join', 'left', 'right', 'inner', 'outer', 'full', 'cross', 'on', 'set', 'order', 'group', 'limit', 'union', 'returning', 'for'].includes(name)));
-  // PostgreSQL 的触发器函数体内 OLD/NEW 是行变量；仍严格检查 FROM/UPDATE 等对象位置和函数调用。
-  const triggerBodies = [...sql.matchAll(/\breturns\s+trigger\b[\s\S]*?\bas\s+(\$[a-z0-9_]*\$)([\s\S]*?)\1/g)]
+  // PL/pgSQL typed rows qualify fields in scalar functions too. Relation positions and calls still require ownership.
+  const functionBodies = [...sql.matchAll(/\breturns\s+[a-z_][a-z0-9_.]*(?:\[\])?\b[\s\S]*?\bas\s+(\$[a-z0-9_]*\$)([\s\S]*?)\1/g)]
     .map((m) => {
       const start = m.index + m[0].indexOf(m[2]!), declarations = m[2]!.match(/^\s*declare\b([\s\S]*?)\bbegin\b/)?.[1] ?? '';
       const names = [...declarations.matchAll(new RegExp('\\b([a-z_][a-z0-9_]*)\\s+(?:record|' + schema + '\\.[a-z_][a-z0-9_]*(?:%rowtype)?)\\s*(?=;|:=|default\\b)', 'g'))].map((row) => row[1]);
-      return { start, end: start + m[2]!.length, names };
+      return { start, end: start + m[2]!.length, names, trigger: /^returns\s+trigger\b/.test(m[0]) };
     });
   const objects = new Set([...sql.matchAll(/\b(?:from|join|update|into|table|references|index|sequence)\s+(?:if\s+(?:not\s+)?exists\s+)?([a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*)/g)]
     // IS [NOT] DISTINCT FROM 比较行值，FROM 在这里并不引入关系对象。
     .filter((m) => !m[0].startsWith('from') || !/\bis\s+(?:not\s+)?distinct\s*$/.test(sql.slice(0, m.index)))
     .map((m) => m.index + m[0].lastIndexOf(m[1]!)));
   for (const m of sql.matchAll(QUALIFIED_RE)) {
-    const rowVariable = triggerBodies.some((body) => m.index >= body.start && m.index < body.end && (['old', 'new'].includes(m[1]!) || body.names.includes(m[1])));
+    const rowVariable = functionBodies.some((body) => m.index >= body.start && m.index < body.end && (body.trigger && ['old', 'new'].includes(m[1]!) || body.names.includes(m[1])));
     if ((aliases.has(m[1]) || rowVariable) && !objects.has(m.index) && sql[m.index + m[0].length] !== '(') continue;
     if (m[1] !== schema && m[1] !== 'pg_catalog') out.push({ rule: RULE, file: path, message: `引用了其他 schema 的对象 ${m[0]}` });
   }

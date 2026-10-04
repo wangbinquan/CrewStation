@@ -6,6 +6,7 @@ import { sql } from 'drizzle-orm';
 import { SessionBirthSchema, SessionDeletionScopeSchema } from '../../../domain/projectDeletion';
 import type { SessionDeletionSources } from '../../../ports/projectDeletion';
 import { readSessionTask, registeredSessionContent, SESSION_CONTENT } from './identity';
+import { sessionWorkHistory } from './workHistory';
 
 async function taskKeys(db: Executor, sources: SessionDeletionSources, target: ProjectDeletionTarget) {
   const own = new Set<string>(), all = new Set<string>();
@@ -20,7 +21,7 @@ async function taskKeys(db: Executor, sources: SessionDeletionSources, target: P
       after = id; all.add(id);
     }
   }
-  const union = sql.join([...SESSION_CONTENT.map((name) => sql`SELECT task_id AS task_key FROM ${sql.raw('session.' + name)}`), sql`SELECT task_key FROM session.connection_births`], sql` UNION `);
+  const union = sql.join([...SESSION_CONTENT.map((name) => sql`SELECT task_id AS task_key FROM ${sql.raw('session.' + name)}`), sql`SELECT task_key FROM session.connection_births`, sql`SELECT task_key FROM session.original_callbacks`], sql` UNION `);
   after = null;
   for (;;) {
     const rows: { task_key: string }[] = await db.execute(sql`SELECT task_key FROM (${union}) contents ${after === null ? sql`` : sql`WHERE task_key>${after}`} ORDER BY task_key COLLATE "C" LIMIT 200`);
@@ -41,7 +42,7 @@ async function taskKeys(db: Executor, sources: SessionDeletionSources, target: P
 export async function inspectSessionDeletion(db: Executor, sources: SessionDeletionSources, target: ProjectDeletionTarget) {
   await registeredSessionContent(db);
   const { keys, origins } = await taskKeys(db, sources, target), resources = [];
-  const selected = sql.join(keys.map((key) => sql`${key}`), sql`,`);
+  const selected = sql`SELECT jsonb_array_elements_text(${JSON.stringify(keys)}::jsonb)`;
   if (keys.length) for (const table of SESSION_CONTENT) {
     const body = table === 'connections' ? sql`to_jsonb(content)-'last_seen_at'` : sql`to_jsonb(content)`;
     const rows = await db.execute<{ id: string; count: string; identity: string }>(sql`SELECT task_id AS id,count(*)::text AS count,
@@ -59,11 +60,14 @@ export async function inspectSessionDeletion(db: Executor, sources: SessionDelet
     return birth;
   });
   resources.push(...births.map((row) => ({ kind: 'original-connection', id: row.id, identity: row.identity, count: 1, scope: 'metadata' as const })));
+  const callbacks = (await sessionWorkHistory(db, target.id)).map(({ identity, exited: _exited, exitDigest: _exitDigest, recoveryDigest: _recoveryDigest, ...birth }) => {
+    resources.push({ kind: 'original-command', id: birth.id, identity, count: 1, scope: 'metadata' as const }); return birth;
+  });
   if (keys.length && (await db.execute(sql`SELECT task_id FROM session.connections c WHERE task_id IN(${selected})
     AND NOT EXISTS(SELECT 1 FROM session.connection_births b WHERE b.id=c.consumer_id AND b.task_key=c.task_id AND b.replica=c.replica AND b.connected_at=c.connected_at)`)).length)
     throw precondition('会话仍有缺少原出生证明的旧连接，不能据离线推断退出');
-  const digest = jsonHash({ origins, births, resources });
-  const scope = SessionDeletionScopeSchema.parse({ taskKeys: keys, births, digest, count: resources.reduce((n, row) => n + row.count, 0), compacted: false });
+  const digest = jsonHash({ origins, births, callbacks, resources });
+  const scope = SessionDeletionScopeSchema.parse({ taskKeys: keys, births, callbacks, digest, count: resources.reduce((n, row) => n + row.count, 0), compacted: false });
   const inventory = ProjectDeletionInventorySchema.parse({ participant: 'session', complete: true, resources, references: [], blockers: [], revision: digest });
   return { inventory, scope };
 }

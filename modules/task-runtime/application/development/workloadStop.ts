@@ -15,7 +15,7 @@ function originalConsumer(env: TaskEnvironment) {
 export async function developmentAdmissionSecretUid(safety: WorkloadSafetyPort | undefined, env: TaskEnvironment): Promise<string | undefined> {
   if (env.render?.developmentRemovalProtection === undefined) return undefined;
   const expected = originalConsumer(env), state = await safety?.get(expected.id), selected = DevelopmentAdmissionStateSchema.safeParse(state?.developmentAdmission);
-  if (!state?.startPermit || !selected.success || !selected.data.secretUid) throw precondition('等待原准入 Secret 历史 UID 回执');
+  if (!state?.startPermit || !selected.success || !selected.data.secretUid) throw precondition('等待原准入 Secret 历史 UID 回执', { code: 'runtime_original_stop_waiting' });
   if (jsonHash(WorkloadConsumerSchema.parse(state.consumer)) !== jsonHash(expected) || selected.data.intentHash !== canonicalNativeIntent(env.id, env.native!)
     || state.startPermit.podUid !== env.native!.podUid || state.startPermit.nodeName !== env.native!.nodeName || !WorkloadStartPermitSchema.safeParse(state.startPermit).success) throw precondition('原准入 Secret 回执的消费者、意图或许可已变化');
   return selected.data.secretUid;
@@ -31,7 +31,7 @@ export async function closeDevelopmentAdmission(safety: WorkloadSafetyPort | und
 export async function developmentPhysicalStop(safety: WorkloadSafetyPort | undefined, env: TaskEnvironment): Promise<DevelopmentPhysicalStopEvidence> {
   if (!safety) throw precondition('原开发工作卷停止能力未装配');
   const expected = originalConsumer(env), state = await safety.get(expected.id);
-  if (!state?.admissionClosed || !await safety.admissionClosed(expected.id) || !state.startPermit || !state.stopProof) throw precondition('等待原开发消费者的独立容器停止证明');
+  if (!state?.admissionClosed || !await safety.admissionClosed(expected.id) || !state.startPermit || !state.stopProof) throw precondition('等待原开发消费者的独立容器停止证明', { code: 'runtime_original_stop_waiting' });
   const consumer = WorkloadConsumerSchema.parse(state.consumer), startPermit = WorkloadStartPermitSchema.parse(state.startPermit), stopProof = WorkloadStopProofSchema.parse(state.stopProof);
   if (jsonHash(consumer) !== jsonHash(expected) || jsonHash(stopProof.consumer) !== jsonHash(expected) || startPermit.podUid !== env.native!.podUid
     || startPermit.nodeName !== env.native!.nodeName || stopProof.podUid !== startPermit.podUid || stopProof.nodeUid !== startPermit.nodeUid

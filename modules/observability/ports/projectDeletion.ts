@@ -17,5 +17,6 @@ export interface ObservabilityReportLifecycle {
 export interface ObservabilityDeletionRepository {
   inspect(target: ProjectDeletionTarget): Promise<ProjectDeletionInventory>;
   seal(context: ProjectDeletionContext): Promise<boolean | 'waiting'>;
+  needsDrain(context: ProjectDeletionContext): Promise<boolean>;
   step(context: ProjectDeletionContext): Promise<{ count: number; digest: string } | 'waiting'>;
 }

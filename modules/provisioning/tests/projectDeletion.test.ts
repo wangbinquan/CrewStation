@@ -26,16 +26,22 @@ describe.skipIf(!available)('删除编排（真实 PG＋有状态外部替身）
   });
   test('消费者未停止时只等待，全部 stop 证明之前不调用 purge；恢复后项目根最后清除', async () => {
     const shared = await f.create(), { value, operation } = await f.start(); f.external.waitStop.add('business-task');
-    await f.controller.advance(operation.id); const waiting = await f.controller.read(f.admin, operation.id);
-    expect(waiting).toMatchObject({ state: 'running', phase: 'stop', canRetry: false });
-    expect(waiting.blockers[0]?.code).toBe('waiting-for-proof');
-    for (const participant of ['task-runtime', 'session', 'resources', 'cluster-control']) {
-      expect(f.external.calls.some((c) => c.projectId === value.id && c.phase === 'stop' && c.participant === participant)).toBe(true);
-      expect(waiting.receipts.some((r) => r.phase === 'stop' && r.participant === participant)).toBe(true);
-    }
-    expect(f.external.calls.some((c) => c.projectId === value.id && c.phase === 'purge')).toBe(false);
-    expect((await f.api.getProject(f.admin, value.id)).state).toBe('deleting');
-    f.external.waitStop.delete('business-task'); f.elapse(15_001); await f.controller.advance(operation.id);
+    try {
+      await f.controller.advance(operation.id); const waiting = await f.controller.read(f.admin, operation.id);
+      expect(waiting).toMatchObject({ state: 'running', phase: 'stop', canRetry: false });
+      expect(waiting.blockers[0]?.code).toBe('waiting-for-proof');
+      expect(f.external.calls.some((c) => c.projectId === value.id && c.phase === 'stop' && c.participant === 'task-runtime')).toBe(true);
+      expect(waiting.receipts.some((r) => r.phase === 'stop' && r.participant === 'task-runtime')).toBe(true);
+      // A waiting business tail still needs its original Session; downstream stop must not close/delete it.
+      for (const participant of ['session', 'resources', 'cluster-control'] as const) {
+        expect(f.external.calls.some((c) => c.projectId === value.id && c.phase === 'stop' && c.participant === participant)).toBe(false);
+        expect(waiting.receipts.some((r) => r.phase === 'stop' && r.participant === participant)).toBe(false);
+        expect(f.external.state(participant, value.id).running).toBe(true);
+      }
+      expect(f.external.calls.some((c) => c.projectId === value.id && c.phase === 'purge')).toBe(false);
+      expect((await f.api.getProject(f.admin, value.id)).state).toBe('deleting');
+    } finally { f.external.waitStop.delete('business-task'); }
+    f.elapse(15_001); await f.controller.advance(operation.id);
     const result = await f.controller.read(f.admin, operation.id); expect(result.state).toBe('succeeded');
     expect(result.receipts).toHaveLength(22 * PROJECT_DELETION_PHASES.length);
     await expect(f.api.getProject(f.admin, value.id)).rejects.toMatchObject({ kind: 'not_found' });

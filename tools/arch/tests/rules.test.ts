@@ -54,6 +54,11 @@ describe('module-template', () => {
 });
 
 describe('persistence-ownership', () => {
+  test('scalar PL/pgSQL functions can read declared owner rows while relation positions and foreign calls stay forbidden', () => {
+    expect(messagesOf(persistenceOwnership(ws), 'modules/low/adapters/persistence/migrations/0006_function_rows.sql')).toEqual([]);
+    const messages = messagesOf(persistenceOwnership(ws), 'modules/low/adapters/persistence/migrations/0007_function_foreign.sql');
+    expect(messages.join()).toContain('fence.foreign_table'); expect(messages.join()).toContain('foreign_schema.execute');
+  });
   test('裸表别名和本 schema 复合行变量不是外部 schema', () => {
     expect(messagesOf(persistenceOwnership(ws), 'modules/low/adapters/persistence/migrations/0004_alias_rows.sql')).toEqual([]);
   });

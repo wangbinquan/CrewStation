@@ -1,8 +1,9 @@
-import type { ProjectDeletionContext, ProjectDeletionTarget, ProjectId, TaskId } from '@crewstation/contracts';
+import type { ProjectDeletionContext, ProjectDeletionTarget, ProjectId, RunnerHello, TaskId } from '@crewstation/contracts';
 import { ProjectIdSchema, ServiceIdSchema, TASKRUNNER_PROTOCOL_VERSION, TaskIdSchema } from '@crewstation/contracts';
 import { createApp } from '@crewstation/http';
 import { jsonHash, newResourceId, precondition } from '@crewstation/kernel';
 import { createTestDatabase } from '@crewstation/testkit';
+import type { MigrationSet } from '@crewstation/persistence';
 import { sql } from 'drizzle-orm';
 import type { SessionCallbackProcesses, SessionDeletionSources, SessionTaskOrigin } from '../../ports/projectDeletion';
 import type { SessionModule } from '../../wiring';
@@ -11,8 +12,8 @@ import { loopbackRequest } from './request';
 
 type SocketData = Parameters<SessionModule['websocket']['message']>[0]['data'];
 
-export async function sessionDeletionFixture(processes?: SessionCallbackProcesses) {
-  const database = await createTestDatabase([sessionMigrations]);
+export async function sessionDeletionFixture(processes?: SessionCallbackProcesses, migrations: MigrationSet = sessionMigrations) {
+  const database = await createTestDatabase([migrations]);
   const projectId = ProjectIdSchema.parse(newResourceId()), otherProject = ProjectIdSchema.parse(newResourceId()), operationId = newResourceId();
   const target: ProjectDeletionTarget = { id: projectId, slug: 'delete-session', name: 'Session cleanup', namespace: 'cs-delete-session',
     serviceId: ServiceIdSchema.parse(newResourceId()), kind: 'DigitalWorker', state: 'active', revision: '1',
@@ -68,7 +69,7 @@ export async function sessionDeletionFixture(processes?: SessionCallbackProcesse
     permit: (value: boolean) => { permitted = value; }, deleting: (value = true) => { closing = value; } };
 }
 
-export async function openRunner(address: string, taskId: TaskId) {
+export async function openRunner(address: string, taskId: TaskId, capabilities: Partial<RunnerHello['capabilities']> = {}) {
   const ws = new WebSocket(address.replace('http:', 'ws:') + '/runner'), opened = Promise.withResolvers<void>(), closed = Promise.withResolvers<void>();
   const frames: Record<string, unknown>[] = [], waiters: { test: (frame: Record<string, unknown>) => boolean; resolve: (frame: Record<string, unknown>) => void }[] = [];
   ws.onopen = () => opened.resolve(); ws.onerror = () => opened.reject(new Error('runner socket failed')); ws.onclose = () => closed.resolve();
@@ -79,7 +80,7 @@ export async function openRunner(address: string, taskId: TaskId) {
   };
   await opened.promise;
   ws.send(JSON.stringify({ type: 'hello', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, taskId, runnerToken: 'private runner token', workdir: '/private-work',
-    capabilities: { protocols: ['terminal'], pty: true, preview: false } }));
+    capabilities: { protocols: ['terminal'], pty: true, preview: false, ...capabilities } }));
   await next((frame) => frame.type === 'welcome');
   return { ws, frames, next, closed: closed.promise };
 }

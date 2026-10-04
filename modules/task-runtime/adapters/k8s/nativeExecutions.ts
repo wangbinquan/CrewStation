@@ -117,7 +117,7 @@ export function kubernetesNativeExecutions(k8s: K8sClient, workerUid: number, sa
         if (!object) continue;
         const uid = owned(object, env, expectedUid);
         await k8s.delete(ref, name, env.namespace, { gracePeriodSeconds: 30, preconditions: { uid } });
-        if (await k8s.get(ref, name, env.namespace)) throw new Error('等待 CLI 执行资源退出');
+        if (await k8s.get(ref, name, env.namespace)) throw precondition('等待 CLI 执行资源退出', { code: 'runtime_original_stop_waiting' });
       }
     },
   };

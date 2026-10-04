@@ -68,7 +68,7 @@ export function drizzleDevelopmentUsageStore(db: Database): DevelopmentUsageStor
       if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw validation('开发数字轮询批次无效');
       if (!taskIds.length) return [];
       return db.transaction(async (tx) => {
-        const rows = await tx.select().from(streams).where(and(inArray(streams.taskId, taskIds), sql`${streams.loss} IS NULL`, or(and(sql`${streams.closure} IS NULL`, eq(streams.complete, false)), lt(streams.runnerAcknowledgedThrough, streams.persistedThrough))))
+        const rows = await tx.select().from(streams).where(and(ordinarySessionTask(sql`${streams.taskId}`), inArray(streams.taskId, taskIds), sql`${streams.loss} IS NULL`, or(and(sql`${streams.closure} IS NULL`, eq(streams.complete, false)), lt(streams.runnerAcknowledgedThrough, streams.persistedThrough))))
           .orderBy(asc(streams.polledAt), asc(streams.taskId)).limit(limit).for('update', { skipLocked: true });
         for (const row of rows) await tx.update(streams).set({ polledAt: sql`clock_timestamp()` }).where(eq(streams.taskId, row.taskId));
         return rows.map(snapshot);
@@ -92,3 +92,4 @@ async function contiguousThrough(tx: Executor, taskId: TaskId, after: number): P
   ) SELECT coalesce((min(expected) FILTER (WHERE sequence<>expected))-1, max(sequence), ${after}) AS through FROM ordered`);
   return Number(row!.through);
 }
+import { ordinarySessionTask } from './deletion/admission';

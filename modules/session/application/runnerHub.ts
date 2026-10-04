@@ -1,6 +1,6 @@
 import type { RunnerMessage, TaskId } from '@crewstation/contracts';
 import { RunnerMessageSchema, TASKRUNNER_PROTOCOL_VERSION } from '@crewstation/contracts';
-import { isDurable } from '../domain/eventDurability';
+import { persistRunnerMessage } from './runnerEvent';
 import type { ProtocolMismatch } from '../domain/runtimeNegotiation';
 import { protocolMismatchOf } from '../domain/runtimeNegotiation';
 import type { EventSink, RunnerOpenResult } from '../domain/runnerConnection';
@@ -67,11 +67,7 @@ export function runnerHub(deps: SessionUseCaseDeps) {
       case 'pong': return;
       case 'hello': return;
       case 'event': {
-        await deps.connectionHistory?.check(connection.hello.taskId);
-        if (!connection.accept(message.seq, now.getTime())) return;
-        if (isDurable(message.event)) await deps.events.append({ taskId: connection.hello.taskId, seq: message.seq, at: new Date(message.at), event: message.event, ...(connection.legacy ? { legacyEvent: (raw as { event: unknown }).event } : {}) });
-        connection.broadcast(RunnerConnection.frameOf(message.seq, message.at, message.event));
-        return;
+        await persistRunnerMessage(deps, connection, message, raw, now); return;
       }
     }
   });
@@ -87,7 +83,7 @@ export function runnerHub(deps: SessionUseCaseDeps) {
       connections.get(taskId)?.subscribers.delete(sink);
     };
   };
-  return { connections, subscribe, onHello: lifetime.open(hello), onMessage, onClose: (connection: RunnerConnection) => closeRunner(deps, connections, lifetime, connection), drain: lifetime.drain, shutdown: lifetime.shutdown, tick: () => tickRunners(deps, connections) };
+  return { connections, subscribe, onHello: lifetime.open(hello), onMessage, onClose: (connection: RunnerConnection) => closeRunner(deps, connections, lifetime, connection), drain: lifetime.drain, withOriginal: lifetime.withOriginal, shutdown: lifetime.shutdown, tick: () => tickRunners(deps, connections) };
 }
 
 export type RunnerHub = ReturnType<typeof runnerHub>;

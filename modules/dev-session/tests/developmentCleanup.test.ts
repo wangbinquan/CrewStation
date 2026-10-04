@@ -6,6 +6,7 @@ import { ProjectIdSchema } from '@crewstation/contracts';
 import { newResourceId } from '@crewstation/kernel';
 import { devSessionMigrations } from '../wiring';
 import { developmentCleanupFixture } from './developmentCleanupFixture';
+import { developmentCleanupParticipant } from '../application/development/cleanup';
 
 const available = await testDatabaseAvailable();
 describe.skipIf(!available)('RFC-034 owner-private bound cleanup participant', () => {
@@ -57,5 +58,15 @@ describe.skipIf(!available)('RFC-034 owner-private bound cleanup participant', (
   test('public internal API is optional by default and explicit wiring uses the existing PG owner', async () => {
     const f = await setup(); expect(f.module(false).api.developmentCleanup).toBeUndefined();
     expect((await f.module(true).api.developmentCleanup!.advance(f.input)).kind).toBe('permitted');
+  });
+  test('deletion closes only the verified original admission and still requires the durable stopping and numeric evidence', async () => {
+    const f = await setup(), closed: string[] = [];
+    const participant = developmentCleanupParticipant({ ...f.deps, session: f.session, environments: f.environmentPort,
+      closeOriginalAdmission: async (id) => { closed.push(id); await f.owner.close(id, 'cancelled'); } });
+    await expect(participant.advance({ ...f.input, podUid: crypto.randomUUID() })).rejects.toThrow('不匹配'); expect(closed).toEqual([]);
+    f.endingControl.stopState = 'unknown'; expect((await participant.advance(f.input)).kind).toBe('waiting'); expect(closed).toEqual([f.child.id]);
+    expect((await f.store.get(f.child.id))?.stop).toBeNull();
+    f.endingControl.stopState = 'finished'; expect((await participant.advance(f.input)).kind).toBe('permitted');
+    expect((await f.owner.get(f.child.id))?.closeReason).toBe('cancelled');
   });
 });

@@ -10,6 +10,8 @@ export interface StoredBusinessExecution {
 }
 
 export interface BusinessExecutionStore {
+  /** Full original receipts for private sealed cleanup; no phase, retention or ordinary polling filter. */
+  originals?(taskId: TaskId, after: string | null): Promise<RunnerBusinessReceipt[]>;
   completionProof(taskId: TaskId, executionId: string): Promise<ExecutionCompletionProof | undefined>;
   consume(taskId: TaskId, executionId: string, through: number, stopped?: boolean): Promise<void>;
   expire(): Promise<number>;

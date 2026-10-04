@@ -1,11 +1,12 @@
 import { appendBusinessUsageSources } from './businessUsageSources';
+import { ordinarySessionTask } from './deletion/admission';
 import { assertBusinessStreamOpen, lockBusinessStream } from './stoppedExecutions';
 import { businessRetention } from './businessRetention';
 import { readCompletionProof } from './completionProofs';
 import { and, asc, eq, gt, inArray, lt, or, sql } from 'drizzle-orm';
 import type { RunnerBusinessEvent, RunnerBusinessReceipt, TaskId } from '@crewstation/contracts';
 import { BusinessExecutionEventSchema, BusinessExecutionReceiptSchema, businessFrameOutputBytes } from '@crewstation/contracts';
-import { conflict, gone, jsonHash, notFound, validation } from '@crewstation/kernel';
+import { conflict, gone, jsonHash, notFound, precondition, validation } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
 import type { BusinessExecutionStore, StoredBusinessExecution } from '../../ports/businessExecutions';
 import { businessExecutionEvents as events, businessExecutions as streams } from './businessTables';
@@ -43,6 +44,15 @@ async function locked(tx: Executor, taskId: TaskId, executionId: string): Promis
 /** 每条执行一个短行锁；重复和乱序先落库，只有连续水位才允许 ACK Runner。 */
 export function drizzleBusinessExecutionStore(db: Database): BusinessExecutionStore {
   return {
+    originals: async (taskId, after) => {
+      const rows = await db.select({ executionId: streams.executionId, receipt: streams.receipt }).from(streams)
+        .where(and(eq(streams.taskId, taskId), after === null ? undefined : gt(streams.executionId, after))).orderBy(asc(streams.executionId)).limit(100);
+      return rows.map((row) => {
+        const receipt = checkedReceipt(row.receipt);
+        if (receipt.executionId !== row.executionId) throw precondition('原业务执行行与回执身份冲突');
+        return receipt;
+      });
+    },
     completionProof: (taskId, executionId) => readCompletionProof(db, taskId, executionId),
     ...businessRetention(db),
     register: (taskId, raw) => db.transaction(async (tx) => {
@@ -104,7 +114,7 @@ export function drizzleBusinessExecutionStore(db: Database): BusinessExecutionSt
       if (!taskIds.length) return [];
       if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw validation('可靠执行轮询批次无效');
       return db.transaction(async (tx) => {
-        const rows = await tx.select().from(streams).where(and(eq(streams.expired, false), sql`NOT EXISTS (SELECT 1 FROM session.business_stopped_executions stopped WHERE stopped.task_id=${streams.taskId} AND stopped.execution_id=${streams.executionId})`, inArray(streams.taskId, taskIds), or(eq(streams.complete, false), lt(streams.acknowledgedThrough, streams.persistedThrough))))
+        const rows = await tx.select().from(streams).where(and(ordinarySessionTask(sql`${streams.taskId}`), eq(streams.expired, false), sql`NOT EXISTS (SELECT 1 FROM session.business_stopped_executions stopped WHERE stopped.task_id=${streams.taskId} AND stopped.execution_id=${streams.executionId})`, inArray(streams.taskId, taskIds), or(eq(streams.complete, false), lt(streams.acknowledgedThrough, streams.persistedThrough))))
           .orderBy(asc(streams.polledAt)).limit(limit).for('update', { skipLocked: true });
         for (const row of rows) await tx.update(streams).set({ polledAt: sql`clock_timestamp()` }).where(key(row.taskId as TaskId, row.executionId));
         return rows.map(snapshot);

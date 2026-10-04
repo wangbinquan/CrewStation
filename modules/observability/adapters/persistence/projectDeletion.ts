@@ -39,11 +39,12 @@ const columns: Readonly<Record<string, readonly string[]>> = {
   usage_projections: ["document", "meter_key", "task_key"],
   usage_snapshots: ["created_at", "expires_at", "id", "task_key", "through", "visibility_revision"],
   usage_sources: ["cursor", "source_id", "task_key"],
-  deletion_fences: ["project_id", "operation_id", "generation", "revision", "original", "verified", "phase_index", "completed_count", "completed_digest"],
+  deletion_fences: ["project_id", "operation_id", "generation", "revision", "original", "verified", "phase_index", "completed_count", "completed_digest", "stopped_revision", "stopped_count"],
+  deletion_drain_admissions: ["backend", "transaction_id", "nonce", "project_id", "operation_id", "generation", "task_id", "task_key"],
   deletion_entities: ["kind", "entity_id", "project_id"],
 };
 
-const excluded = new Set(['token_prices', 'token_price_heads', 'resource_identity_aliases', 'deletion_fences', 'deletion_entities','runtime_report_clock','runtime_report_revisions','runtime_reports','runtime_report_pages','runtime_report_rows','runtime_report_counts','runtime_report_receipts']);
+const excluded = new Set(['token_prices', 'token_price_heads', 'resource_identity_aliases', 'deletion_fences', 'deletion_entities', 'deletion_drain_admissions','runtime_report_clock','runtime_report_revisions','runtime_reports','runtime_report_pages','runtime_report_rows','runtime_report_counts','runtime_report_receipts']);
 const contentTables = Object.keys(columns).filter((name) => !excluded.has(name));
 const table = (name: string) => sql`${sql.identifier('observability')}.${sql.identifier(name)}`;
 const admissionKey = (projectId: string) => 'observability.project:' + projectId;
@@ -51,11 +52,12 @@ const scopeSchema = z.object({ projectId: z.string().min(1), projectKeys: z.arra
 type Scope = z.infer<typeof scopeSchema>;
 type Entity = { kind: string; id: string };
 type ContentRow = { table: string; tid: string; body: Record<string, unknown>; projects: string[]; entities: Entity[]; owners: Set<string> };
-type Fence = { project_id: string; operation_id: string; generation: number; revision: string; original: Scope; verified: boolean; phase_index: number; completed_count: number; completed_digest: string | null };
-interface Input {
+type Fence = { project_id: string; operation_id: string; generation: number; revision: string; original: Scope; verified: boolean; phase_index: number; completed_count: number; completed_digest: string | null; stopped_revision: string | null; stopped_count: number | null };
+export interface ObservabilityDeletionInput {
   db: Database; identities: ObservabilityProjectDirectory; tasks?: ObservabilityDeletionTasks; reports?:ObservabilityReportLifecycle;
   assertGrant(context: ProjectDeletionContext): Promise<void>;
 }
+type Input = ObservabilityDeletionInput;
 const lockTimeout = (error: unknown): boolean => !!error && typeof error === 'object' && ('code' in error && error.code === '55P03' || 'cause' in error && lockTimeout(error.cause));
 const ownerKey = (entity: Entity) => JSON.stringify([entity.kind, entity.id]);
 const normalized = (scope: Scope, projectId: string) => scope.projectKeys.includes(projectId) ? scope.projectId : projectId;
@@ -70,7 +72,7 @@ async function knownColumns(db: Executor): Promise<void> {
     throw precondition('观测存在未知或缺失的内容表／列，不能证明完整清理');
   }
 }
-async function originalScope(input: Input, db: Executor, target: ProjectDeletionTarget): Promise<Scope> {
+export async function originalObservationScope(input: Input, db: Executor, target: ProjectDeletionTarget): Promise<Scope> {
   const retained = (await db.execute<{ original: Scope }>(sql`SELECT original FROM observability.deletion_fences WHERE project_id=${target.id}`))[0]?.original;
   if (retained) {
     const scope = scopeSchema.parse(retained);
@@ -135,14 +137,14 @@ async function scan(db: Executor, scope: Scope, tasks?: { ids: readonly string[]
   const material = { participant: 'observability' as const, complete: !blockers.length, resources, references: [], blockers };
   return { inventory: ProjectDeletionInventorySchema.parse({ ...material, revision: jsonHash(material) }), own };
 }
-async function ownerTransaction<T>(input: Input, context: ProjectDeletionContext, scope: Scope, work: (tx: Transaction) => Promise<T>) {
+export async function observationOwnerTransaction<T>(input: Input, context: ProjectDeletionContext, scope: Scope, work: (tx: Transaction) => Promise<T>) {
   return withExclusiveDatabaseAdmission(input.db, admissionKey(scope.projectId), async (tx) => {
     for (const key of scope.projectKeys.filter((key) => key !== scope.projectId)) await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${admissionKey(key)},0))`);
     await tx.execute(sql`SELECT set_config('crewstation.observability_deletion',${context.operationId + ':' + context.generation + ':' + context.phase},true)`);
     return work(tx);
   });
 }
-async function authorized(input: Input, raw: ProjectDeletionContext): Promise<ProjectDeletionContext> {
+export async function authorizeObservationDeletion(input: Input, raw: ProjectDeletionContext): Promise<ProjectDeletionContext> {
   const context = ProjectDeletionContextSchema.parse(raw);
   const { revision, ...material } = context.confirmed;
   if (context.confirmed.participant !== 'observability' || !context.confirmed.complete || context.confirmed.blockers.length || revision !== jsonHash(material)) {
@@ -150,7 +152,7 @@ async function authorized(input: Input, raw: ProjectDeletionContext): Promise<Pr
   }
   await input.assertGrant(context); return context;
 }
-async function currentFence(db: Executor, context: ProjectDeletionContext): Promise<Fence | undefined> {
+export async function currentObservationFence(db: Executor, context: ProjectDeletionContext): Promise<Fence | undefined> {
   const fence = (await db.execute<Fence>(sql`SELECT * FROM observability.deletion_fences WHERE project_id=${context.target.id}`))[0];
   if (fence && (fence.operation_id !== context.operationId || fence.generation > context.generation || fence.generation === context.generation && fence.revision !== context.confirmed.revision)) throw precondition('观测清理操作、世代或原确认范围冲突');
   return fence;
@@ -173,20 +175,24 @@ async function clearReports(input:Input,tx:Transaction):Promise<boolean>{
 async function quiesce<T>(input:Input,work:()=>Promise<T>):Promise<T>{return input.reports?input.reports.quiesce(work):work();}
 async function seal(input:Input,raw:ProjectDeletionContext):Promise<boolean|'waiting'>{return quiesce(input,()=>sealQuiesced(input,raw));}
 async function sealQuiesced(input: Input, raw: ProjectDeletionContext): Promise<boolean | 'waiting'> {
-  const context = await authorized(input, raw), scope = await originalScope(input, input.db, context.target);
+  const context = await authorizeObservationDeletion(input, raw), scope = await originalObservationScope(input, input.db, context.target);
   const tasks = await input.tasks?.list(context.target);
   if (context.phase !== 'seal') throw precondition('观测封闭只能在 seal 阶段执行');
-  try { return await ownerTransaction(input, context, scope, async (tx) => {
+  try { return await observationOwnerTransaction(input, context, scope, async (tx) => {
     if(!(await clearReports(input,tx)))return 'waiting' as const;
-    const previous = await currentFence(tx, context);
+    const previous = await currentObservationFence(tx, context);
     if (previous?.generation === context.generation) return previous.verified;
     if (previous?.phase_index === 6) throw precondition('观测清理已经完成，不能重开');
     const current = await scan(tx, scope, tasks), verified = current.inventory.complete && current.inventory.revision === context.confirmed.revision;
-    if (current.inventory.complete) await retainEntities(tx, scope, current.own);
+    if (current.inventory.complete) {
+      await retainEntities(tx, scope, current.own);
+      if (tasks?.complete) for (const id of tasks.ids) for (const entity of [{ kind: 'task', id }, { kind: 'task-key', id: jsonHash({ projectId: scope.projectId, taskId: id }) }])
+        await tx.execute(sql`INSERT INTO observability.deletion_entities(kind,entity_id,project_id) VALUES(${entity.kind},${entity.id},${scope.projectId}) ON CONFLICT(kind,entity_id) DO NOTHING`);
+    }
     const count = current.own.length;
     await tx.execute(sql`INSERT INTO observability.deletion_fences(project_id,operation_id,generation,revision,original,verified,phase_index,completed_count)
       VALUES(${scope.projectId},${context.operationId},${context.generation},${context.confirmed.revision},${JSON.stringify(scope)}::jsonb,${verified},-1,${count})
-      ON CONFLICT(project_id) DO UPDATE SET generation=excluded.generation,revision=excluded.revision,verified=excluded.verified,phase_index=-1,completed_count=excluded.completed_count`);
+      ON CONFLICT(project_id) DO UPDATE SET generation=excluded.generation,revision=excluded.revision,verified=excluded.verified,phase_index=-1,completed_count=excluded.completed_count,stopped_revision=NULL,stopped_count=NULL`);
     return verified;
   }); } catch (error) { if (lockTimeout(error)) return 'waiting'; throw error; }
 }
@@ -199,25 +205,31 @@ async function erase(tx: Transaction, rows: ContentRow[]): Promise<void> {
 }
 async function step(input:Input,raw:ProjectDeletionContext):Promise<{count:number;digest:string}|'waiting'>{return raw.phase==='verify'?quiesce(input,()=>stepQuiesced(input,raw)):stepQuiesced(input,raw);}
 async function stepQuiesced(input: Input, raw: ProjectDeletionContext): Promise<{ count: number; digest: string }|'waiting'> {
-  const context = await authorized(input, raw), scope = await originalScope(input, input.db, context.target), index = PROJECT_DELETION_PHASES.indexOf(context.phase);
+  const context = await authorizeObservationDeletion(input, raw), scope = await originalObservationScope(input, input.db, context.target), index = PROJECT_DELETION_PHASES.indexOf(context.phase);
   const tasks = await input.tasks?.list(context.target);
-  const work=()=>ownerTransaction(input, context, scope, async (tx) => {
-    const fence = await currentFence(tx, context);
+  const work=()=>observationOwnerTransaction(input, context, scope, async (tx) => {
+    const fence = await currentObservationFence(tx, context);
     if (!fence?.verified || fence.generation !== context.generation) throw precondition('观测原范围尚未确认或世代已变化');
     if (fence.phase_index < index - 1 || fence.phase_index > index && context.phase !== 'metadata') throw precondition('观测清理需要原前序阶段，不能跳步');
     if(context.phase==='verify'&&!(await clearReports(input,tx)))return 'waiting' as const;
+    let stoppedRevision = fence.stopped_revision, stoppedCount = fence.stopped_count;
+    if (context.phase === 'stop' && fence.phase_index === 0) {
+      const current = await scan(tx, scope, tasks);
+      if (!current.inventory.complete) throw precondition('观测最终数值范围的原归属不完整');
+      stoppedRevision = current.inventory.revision; stoppedCount = current.own.length;
+    }
     if (context.phase === 'metadata' && fence.phase_index < 5) {
       const current = await scan(tx, scope, tasks);
-      if (!current.inventory.complete || current.inventory.revision !== context.confirmed.revision) throw precondition('观测原清理范围已经变化');
+      if (!current.inventory.complete || current.inventory.revision !== stoppedRevision || current.own.length !== stoppedCount) throw precondition('观测原停止后的清理范围已经变化');
       await erase(tx, current.own);
     }
     if (context.phase === 'verify') {
       const current = await scan(tx, scope, tasks);
       if (!current.inventory.complete || current.own.length) throw precondition('观测内容仍有残留或来源不完整');
     }
-    const count = ['seal', 'metadata', 'verify'].includes(context.phase) ? fence.completed_count : 0;
-    const digest = fence.completed_digest && context.phase === 'verify' ? fence.completed_digest : jsonHash({ participant: 'observability', operationId: context.operationId, generation: context.generation, phase: context.phase, count, remaining: 0 });
-    if (fence.phase_index < index) await tx.execute(sql`UPDATE observability.deletion_fences SET phase_index=${index},completed_digest=${context.phase === 'verify' ? digest : null} WHERE project_id=${scope.projectId}`);
+    const count = context.phase === 'seal' ? fence.completed_count : ['stop', 'metadata', 'verify'].includes(context.phase) ? stoppedCount ?? 0 : 0;
+    const digest = fence.completed_digest && context.phase === 'verify' ? fence.completed_digest : jsonHash({ participant: 'observability', operationId: context.operationId, generation: context.generation, phase: context.phase, count, stoppedRevision, remaining: 0 });
+    if (fence.phase_index < index) await tx.execute(sql`UPDATE observability.deletion_fences SET phase_index=${index},stopped_revision=${stoppedRevision},stopped_count=${stoppedCount},completed_digest=${context.phase === 'verify' ? digest : null} WHERE project_id=${scope.projectId}`);
     return { count, digest };
   });
   return work();
@@ -226,9 +238,14 @@ export function observabilityDeletionRepository(input: Input): ObservabilityDele
   return {
     inspect: async (target) => {
       // Public directories can use the same one-connection base pool. Read them before opening our transaction.
-      const scope = await originalScope(input, input.db, target), tasks = await input.tasks?.list(target);
+      const scope = await originalObservationScope(input, input.db, target), tasks = await input.tasks?.list(target);
       return input.db.transaction(async (tx) => (await scan(tx, scope, tasks)).inventory, { isolationLevel: 'repeatable read', accessMode: 'read only' });
     },
     seal: (context) => seal(input, context), step: (context) => step(input, context),
+    needsDrain: async (raw) => {
+      const context = await authorizeObservationDeletion(input, raw), fence = await currentObservationFence(input.db, context);
+      if (context.phase !== 'stop' || !fence?.verified || fence.generation !== context.generation || fence.phase_index < 0) throw precondition('观测排空缺少当前封写许可');
+      return fence.phase_index === 0;
+    },
   };
 }

@@ -1,13 +1,13 @@
-import type { Actor, ProjectDeletionOwner, UserId } from '@crewstation/contracts';
+import type { Actor, UserId } from '@crewstation/contracts';
 import { forbidden, precondition } from '@crewstation/kernel';
 import type { Logger } from '@crewstation/kernel';
 import type { ProjectDeletionController } from '../../api/deletion';
-import type { ProjectDeletionIntents } from '../../ports/projectDeletions';
+import type { ProjectDeletionIntents, ProjectDeletionStopOwner } from '../../ports/projectDeletions';
 import { assertDeletionOwners, collectDeletionInventory } from './inventory';
 import { advanceProjectDeletion } from './advance';
 
 export interface DeletionControllerDeps {
-  readonly intents: ProjectDeletionIntents; readonly owners: readonly ProjectDeletionOwner[]; readonly workerOwner: string;
+  readonly intents: ProjectDeletionIntents; readonly owners: readonly ProjectDeletionStopOwner[]; readonly workerOwner: string;
   readonly isAdmin: (id: UserId) => Promise<boolean>; readonly enqueue: (id: string) => Promise<void>; readonly logger: Logger;
 }
 export function projectDeletionController(deps: DeletionControllerDeps): ProjectDeletionController {

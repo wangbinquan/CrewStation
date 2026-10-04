@@ -21,6 +21,7 @@ export function developmentCleanupParticipant(deps: DevelopmentCleanupDeps): Dev
     const selection = DevelopmentCleanupSelectionSchema.parse(raw), id = TaskIdSchema.parse(selection.identity.executionId);
     const original = await inspectOriginal(deps, selection);
     if (!original) return { kind: 'waiting', reason: 'unbound' };
+    await deps.closeOriginalAdmission?.(id);
     await requestDevelopmentEnding(deps, id, original.closeReason ?? 'cancelled');
     await advanceDevelopmentEnding(deps, id);
     const owner = await inspectOriginal(deps, selection), job = await deps.store.get(id);

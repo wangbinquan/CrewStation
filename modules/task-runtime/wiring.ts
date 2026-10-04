@@ -2,6 +2,12 @@ import { resourceEndingHandler } from './application/development/parent/retentio
 import { originalProjectTaskIds } from './adapters/persistence/infrastructure/origins';
 import { originalRuntimeWorkInfrastructure } from './adapters/persistence/deletion/workOrigin';
 import { runtimeProjectWork } from './adapters/persistence/deletion/projectWork';
+import { runtimeDeletionRepository } from './adapters/persistence/deletion/repository';
+import { runtimeOriginalJobs } from './adapters/persistence/deletion/originalJobs';
+import { runtimeStopUnitOfWork } from './adapters/persistence/deletion/stopUnitOfWork';
+import { runtimeDeletionOwner } from './application/deletion/owner';
+import { runtimeOriginalStop } from './application/deletion/originalStop';
+import type { RuntimeOriginalStopSources } from './ports/deletion/originalStop';
 import { scopedRuntimePorts, guardedRuntimePort } from './application/deletion/ports';
 import { runtimeWorkApi } from './application/deletion/api';
 import { runtimeArchiveWork, runtimeStorageWork } from './application/deletion/storage';
@@ -77,6 +83,7 @@ import type { EnvironmentSources, ProfileCatalog, ProjectAuthorizer, QuotaSource
 
 export interface TaskRuntimeModuleDeps {
   deletionWorkSources?: RuntimeWorkSources;
+  deletionStops?: RuntimeOriginalStopSources;
   developmentParentPhysical?: DevelopmentParentPhysical;
   developmentCleanup?: DevelopmentCleanupParticipant;
   archive?: { credentials: ArchiveCredentials; apiUrl: string };
@@ -167,14 +174,22 @@ function taskRuntimeParticipants(deps: TaskRuntimeModuleDeps) {
   const useCaseDeps = work ? scopedRuntimePorts(raw, work) : raw;
   const nativeCluster = kubernetesNativeExecutions(deps.k8s, deps.settings.workerUid, deps.workloadSafety);
   const executionDeps = { ...useCaseDeps, nativeCluster: work ? guardedRuntimePort(nativeCluster, work) : nativeCluster };
+  const stopping = work && deps.deletionWorkSources && deps.deletionStops ? runtimeOriginalStop({
+    ...scopedRuntimePorts({ ...raw, uow: runtimeStopUnitOfWork(deps.db), cluster: { ...raw.cluster,
+      deleteVolume: async () => { throw new Error('项目停止阶段禁止提前回收工作卷'); } }, }, work),
+    nativeCluster: guardedRuntimePort(nativeCluster, work),
+  }, work, guardedRuntimePort(runtimeOriginalJobs(deps.db, deps.deletionWorkSources), work), {
+    ...guardedRuntimePort({ digital: deps.deletionStops.digital, stopped: deps.deletionStops.stopped }, work),
+    development: (context) => guardedRuntimePort(deps.deletionStops!.development(context), work),
+  }) : undefined;
   const query = developmentRemovalLookup(executionDeps);
   const recoveryCluster = kubernetesTaskRecoveryCluster(deps.k8s, forward), provisioner = kubernetesRebuildProvisioner(deps.k8s, deps.settings.workerUid, forward);
   const recoveryDeps = { ...useCaseDeps, recoveryCluster: work ? guardedRuntimePort(recoveryCluster, work) : recoveryCluster, provisioner: work ? guardedRuntimePort(provisioner, work) : provisioner };
-  return { useCaseDeps, executionDeps, recoveryDeps, work };
+  return { useCaseDeps, executionDeps, recoveryDeps, work, stopping };
 }
 
 export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntimeModule {
-  const { useCaseDeps, executionDeps, recoveryDeps, work } = taskRuntimeParticipants(deps);
+  const { useCaseDeps, executionDeps, recoveryDeps, work, stopping } = taskRuntimeParticipants(deps);
   const create = createEnvironmentUseCase(useCaseDeps);
   const { archiveStore, archives } = runtimeArchives(deps, useCaseDeps, work);
   const testRunner = deps.testRunner && (work ? guardedRuntimePort(deps.testRunner, work) : deps.testRunner);
@@ -191,6 +206,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     ...(testRunner ? { runner: testRunner } : {}), ...(deps.testTiming ? { timing: deps.testTiming } : {}), ...(deps.testMcp ? { mcp: deps.testMcp } : {}),
   });
   const api: TaskRuntimeModuleApi = {
+    ...(stopping && deps.deletionWorkSources ? { deletionOwner: runtimeDeletionOwner(runtimeDeletionRepository(deps.db, deps.deletionWorkSources), deps.deletionWorkSources, stopping) } : {}),
     ...(archives ? { archiveExecution: archives } : {}),
     ...(archives && deps.taskVolumes ? { storageCleanup: businessStorageCleanup(useCaseDeps, archives) } : {}),
     ...businessStorageFinalization(useCaseDeps),

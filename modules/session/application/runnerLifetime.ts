@@ -1,11 +1,26 @@
 import type { TaskId } from '@crewstation/contracts';
-import { jsonHash, newResourceId } from '@crewstation/kernel';
+import { jsonHash, newResourceId, precondition } from '@crewstation/kernel';
+import { SessionBirthSchema } from '../domain/projectDeletion';
 import type { EventSink, RunnerConnection, RunnerOpenResult } from '../domain/runnerConnection';
 import type { SessionConnectionBirth } from '../ports/projectDeletion';
 import type { SessionUseCaseDeps } from './dependencies';
 
+function originalCallback<T>(raw: SessionConnectionBirth, address: string, connections: Map<TaskId, RunnerConnection>,
+  births: WeakMap<RunnerConnection, { original: SessionConnectionBirth; privateKey: string }>, retiring: Map<string, RunnerConnection>,
+  action: (connection: RunnerConnection, privateKey: string) => Promise<T>): Promise<T> {
+  const original = SessionBirthSchema.parse(structuredClone(raw));
+  const connection = connections.get(original.taskId), birth = connection ? births.get(connection) : undefined;
+  if (!connection || connection.closed || retiring.has(original.id) || !birth || jsonHash(birth.original) !== jsonHash(original)
+    || original.replica !== address) return Promise.reject(precondition('会话清理缺少本副本原连接的私有许可'));
+  return connection.command(async () => {
+    if (connection.closed || connections.get(original.taskId) !== connection || births.get(connection) !== birth)
+      throw precondition('会话原连接已退出，不能发起新的清理回调');
+    return action(connection, birth.privateKey);
+  });
+}
+
 /** Own the original connection's private exit permission until every callback has drained and its durable exit is saved. */
-export function runnerLifetime(deps: SessionUseCaseDeps, connections: Map<TaskId, RunnerConnection>, subscribers: Map<TaskId, Set<EventSink>>) {
+export function runnerLifetime(deps: Pick<SessionUseCaseDeps, 'connectionHistory' | 'taskAccess' | 'registry' | 'settings'>, connections: Map<TaskId, RunnerConnection>, subscribers: Map<TaskId, Set<EventSink>>) {
   const births = new WeakMap<RunnerConnection, { original: SessionConnectionBirth; privateKey: string }>();
   const finishing = new WeakMap<RunnerConnection, Promise<void>>();
   const closing = new Map<string, Promise<void>>(), retiring = new Map<string, RunnerConnection>();
@@ -48,6 +63,9 @@ export function runnerLifetime(deps: SessionUseCaseDeps, connections: Map<TaskId
     return pending.then(() => true);
   };
   return { finish, drain,
+    /** Private local capability: bind the captured birth and keep its finally behind the complete cleanup callback. */
+    withOriginal: <T>(raw: SessionConnectionBirth, action: (connection: RunnerConnection, privateKey: string) => Promise<T>): Promise<T> =>
+      originalCallback(raw, deps.settings.selfAddress, connections, births, retiring, action),
     bind: <T>(taskId: TaskId, action: () => Promise<T>): Promise<T> => {
       const pending = (bindings.get(taskId) ?? Promise.resolve()).then(action), tail = pending.then(() => undefined, () => undefined);
       bindings.set(taskId, tail);

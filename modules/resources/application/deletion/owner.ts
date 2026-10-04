@@ -2,10 +2,10 @@ import type { ProjectDeletionContext, ProjectDeletionInventory, ProjectDeletionO
 import { ProjectDeletionStepResultSchema } from '@crewstation/contracts';
 import { jsonHash, precondition } from '@crewstation/kernel';
 import type { ResourceDeletionRepository } from '../../ports/deletion';
-import type { ResourceDeletionPhysics } from '../../api/projectDeletion';
+import type { ResourceDeletionPhysics, ResourceProjectDeletionOwner } from '../../api/projectDeletion';
 import { compatiblePhysicalScope } from '../../domain/deletionScope';
 
-export function resourceProjectDeletionOwner(repository: ResourceDeletionRepository, physics: ResourceDeletionPhysics, assertGrant: (context: ProjectDeletionContext) => Promise<void>): ProjectDeletionOwner {
+export function resourceProjectDeletionOwner(repository: ResourceDeletionRepository, physics: ResourceDeletionPhysics, assertGrant: (context: ProjectDeletionContext) => Promise<void>): ResourceProjectDeletionOwner {
   const physicalStep = async (context: ProjectDeletionContext, step: keyof Pick<ResourceDeletionPhysics, 'stop' | 'purge' | 'prove' | 'verify'>) => {
     const result = ProjectDeletionStepResultSchema.parse(await physics[step](context));
     if (result.kind === 'done' && result.evidence.kind !== 'physical') throw precondition('资源阶段缺少实际物理来源证明');
@@ -18,7 +18,11 @@ export function resourceProjectDeletionOwner(repository: ResourceDeletionReposit
       revision: jsonHash(resources), resources, references: [...metadata.references, ...physical.references], blockers: [...metadata.blockers, ...physical.blockers] };
     return report;
   };
-  return { participant: 'resources', inspect, run: async (context) => {
+  return { participant: 'resources', inspect,
+    observeTerminating: async (context) => {
+      if (context.phase !== 'stop' || context.confirmed.participant !== 'resources') throw precondition('原 Pod 停止观测许可来源或阶段不符');
+      await assertGrant(context); await repository.assertSealed(context); await physics.observeTerminating(context);
+    }, run: async (context) => {
     await assertGrant(context);
     if (context.confirmed.participant !== 'resources') throw precondition('台账清理许可来源不符');
     if (context.phase === 'seal') {

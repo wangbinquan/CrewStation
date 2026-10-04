@@ -11,26 +11,37 @@ import { openRunner, sessionDeletionFixture } from './fixture';
 
 const available = await testDatabaseAvailable();
 describe.skipIf(!available)('session deletion owner (actual PG and two WebSocket replicas; controlled ownership source)', () => {
-  test('all stages close the original remote transport and pending command, clear ten content tables and preserve other project/platform sessions', async () => {
+  test('seal waits for the original remote command callback before closing transport and clearing every content table, preserving other sessions', async () => {
     const f = await sessionDeletionFixture();
     try {
       const own = f.task(), other = f.task(f.otherProject), platform = f.task(null);
       await f.seed(own, 205); await f.seed(other); await f.seed(platform);
       const runner = await openRunner(f.second.address, own), otherRunner = await openRunner(f.second.address, other), platformRunner = await openRunner(f.first.address, platform);
-      const pending = f.second.module.api.sendCommand(own, { id: 'original-command', type: 'previewStatus' }).then(() => 'unexpected-success', (error) => error.details?.code ?? error.kind);
+      const pending = f.second.module.api.sendCommand(own, { id: 'original-command', type: 'previewStatus' });
       await runner.next((frame) => frame.id === 'original-command');
       const context = await f.context(), owner = f.first.module.api.deletionOwner!;
       expect(context.confirmed.complete).toBe(true);
       const retained = await f.database.db.execute(sql`SELECT session.digest(to_jsonb(e)) AS hash FROM session.runner_events e WHERE task_id IN(${other},${platform}) ORDER BY task_id`);
       f.deleting();
-      for (const phase of PROJECT_DELETION_PHASES) expect((await owner.run({ ...context, phase })).kind).toBe('done');
-      await runner.closed; expect(await pending).toBe('runner_disconnected');
+      const sealing = owner.run(context);
+      const deadline = Date.now() + 2000;
+      while (!(await f.database.db.execute(sql`SELECT pid FROM pg_locks WHERE locktype='advisory' AND mode='ExclusiveLock' AND NOT granted
+        AND classid=((hashtextextended(${'session.project-admission:' + f.projectId},0)>>32)&4294967295)::oid
+        AND objid=(hashtextextended(${'session.project-admission:' + f.projectId},0)&4294967295)::oid`)).length && Date.now() < deadline) await Bun.sleep(5);
+      expect((await f.database.db.execute(sql`SELECT pid FROM pg_locks WHERE locktype='advisory' AND mode='ExclusiveLock' AND NOT granted
+        AND classid=((hashtextextended(${'session.project-admission:' + f.projectId},0)>>32)&4294967295)::oid
+        AND objid=(hashtextextended(${'session.project-admission:' + f.projectId},0)&4294967295)::oid`)).length).toBe(1);
+      expect(await f.database.db.execute(sql`SELECT id FROM session.original_callbacks WHERE project_id=${f.projectId} AND exited_at IS NULL`)).toHaveLength(1);
+      runner.ws.send(JSON.stringify({ type: 'result', id: 'original-command', payload: { state: 'stopped' } }));
+      expect(await pending).toEqual({ state: 'stopped' }); expect((await sealing).kind).toBe('done');
+      for (const phase of PROJECT_DELETION_PHASES.slice(1)) expect((await owner.run({ ...context, phase })).kind).toBe('done');
+      await runner.closed;
       expect(otherRunner.ws.readyState).toBe(WebSocket.OPEN); expect(platformRunner.ws.readyState).toBe(WebSocket.OPEN);
       expect(await f.second.module.api.connectionStatus(own)).toEqual({ connected: false });
       for (const table of SESSION_CONTENT) expect(await f.database.db.execute(sql`SELECT task_id FROM ${sql.raw('session.' + table)} WHERE task_id=${own}`)).toHaveLength(0);
       expect(await f.database.db.execute(sql`SELECT session.digest(to_jsonb(e)) AS hash FROM session.runner_events e WHERE task_id IN(${other},${platform}) ORDER BY task_id`)).toEqual(retained);
       const stored = (await f.database.db.execute<{ body: unknown; phases: object }>(sql`SELECT body,phases FROM session.project_deletions WHERE project_id=${f.projectId}`))[0]!;
-      expect(stored.body).toMatchObject({ taskKeys: [], births: [], compacted: true, count: 215 }); expect(Object.keys(stored.phases)).toHaveLength(7);
+      expect(stored.body).toMatchObject({ taskKeys: [], births: [], callbacks: [], compacted: true, count: 216 }); expect(Object.keys(stored.phases)).toHaveLength(7);
       expect(JSON.stringify(stored)).not.toContain('private'); expect(JSON.stringify(stored)).not.toContain(own);
       expect((await owner.inspect(f.target)).resources).toEqual([]);
       expect(await owner.run({ ...context, phase: 'verify', generation: 2 })).toEqual(await owner.run({ ...context, phase: 'verify' }));

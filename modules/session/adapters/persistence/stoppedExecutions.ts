@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import type { Executor } from '@crewstation/persistence';
 import { conflict, gone } from '@crewstation/kernel';
+import { ordinarySessionTask } from './deletion/admission';
 
 export async function lockBusinessStream(tx: Executor, taskId: string, executionId: string): Promise<void> {
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${JSON.stringify([taskId, executionId])}, 0))`);
@@ -16,7 +17,7 @@ export async function consumeStoppedStream(tx: Executor, taskId: string, executi
 }
 export async function expireStoppedStreams(tx: Executor): Promise<number> {
   const rows = await tx.execute<{ task_id: string; execution_id: string }>(sql`SELECT task_id, execution_id FROM session.business_stopped_executions
-    WHERE stopped_at < clock_timestamp()-interval '7 days' AND expired=false ORDER BY stopped_at LIMIT 20 FOR UPDATE SKIP LOCKED`);
+    WHERE stopped_at < clock_timestamp()-interval '7 days' AND expired=false AND ${ordinarySessionTask(sql`business_stopped_executions.task_id`)} ORDER BY stopped_at LIMIT 20 FOR UPDATE SKIP LOCKED`);
   let count = 0;
   for (const row of rows) {
     await tx.execute(sql`UPDATE session.business_executions SET expired=true WHERE task_id=${row.task_id} AND execution_id=${row.execution_id}`);

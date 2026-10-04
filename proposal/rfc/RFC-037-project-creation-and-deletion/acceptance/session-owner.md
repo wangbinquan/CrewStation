@@ -39,3 +39,8 @@ HTTP 夹具最终修订后，全 Session 及原来源／Pod 组合为 **136 pass
 Session 与业务／开通 owner 及必要观测依赖共同冻结 350 路径，一次完整 `bun run check` 终态 5541 pass／143 skip／0 fail、135946 断言、1085 文件；源码指纹首尾一致，精确联合提交树后端／console 类型均 0 错。回执 `/private/tmp/cs-rfc037-session-business-observability-full-v2.json`；原 136 项 Session 专项证据继续有效。观测依赖先本地提交 35ff8871，余下 owner、234 锁和登记接续提交后再联合发布；当前未把中间依赖提交单独 push。
 
 上述检查不含下一批 DevSession 的 7 个新增文件，不替代原跨 Pod 完整退出或专用项目物理回收。其他 owner、完整 Root 装配与二次确认实机验收继续，删除入口关闭。
+## 2026-10-04 原连接回调与停止依赖基础
+
+新增原出生、原副本、当前持有连接及私有key约束的回调入口；外层请求先报错后，已经发出的内部回调仍保留到实际finally，不能提前持久退出原连接。受限命令只允许原开发/业务执行的停止、信息、分页与已持久水位ACK，拒绝启动、身份替换和未落库ACK。
+
+Root停止依赖现在读取原操作持久回执：DevSession／BusinessTask／TaskRuntime未完成时不能关闭Session；全部前序消费者未完成时不能发起resources stop，cluster-control等待resources。只观测已终结原Pod保存物理停止摘要并释放本操作保护，不主动删除活动Pod、不生成Root stop回执。真实PG编排与资源许可、API Server替身验证见[本批证据](session-cleanup-lifetime.md)。正式跨进程数字通道和停止后快照/CAS尚未接线，本批不宣称实机完整删除。

@@ -12,6 +12,8 @@ export interface DevelopmentUsageStore {
 }
 export interface DevelopmentUsageSourceStore {
   next(): Promise<DevelopmentUsagePage | undefined>;
+  /** Private cleanup selects the exact registered original journal. */
+  offer?(key: DevelopmentUsageKey): Promise<DevelopmentUsagePage | undefined>;
   measurement(key: DevelopmentUsageKey, recordId: string, revision: number): Promise<RunnerUsageMeasurement | undefined>;
   acknowledge(key: DevelopmentUsageKey, through: number): Promise<void>;
 }

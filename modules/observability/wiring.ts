@@ -1,3 +1,8 @@
+import { observationDeletionUsageDatabase } from './adapters/persistence/deletionUsageDatabase';
+import type { ObservabilityDeletionInput } from './adapters/persistence/projectDeletion';
+import { drainOriginalObservationUsage } from './application/deletion/usage';
+import { developmentUsageIngestion, prepareDevelopmentUsagePage } from './application/developmentUsage';
+
 import {randomUUID} from 'node:crypto';
 import type {ReportSnapshotSession} from '@crewstation/persistence';
 import type {CompleteRuntimeFactSourceFactory} from './ports/completeRuntimeFactSources';
@@ -50,13 +55,14 @@ import type { ObservabilityDeletionTasks, ObservabilityProjectDirectory } from '
 import type { ProjectDeletionContext } from '@crewstation/contracts';
 import { observabilityDeletionRepository } from './adapters/persistence/projectDeletion';
 import { observabilityDeletionOwner } from './application/projectDeletion';
+import type { ObservationOriginalUsage } from './ports/deletionUsage';
 
 export interface ObservabilityModuleDeps {
   db: Database;
   reportSnapshot?:ReportSnapshotSession;
   reportFacts?:CompleteRuntimeFactSourceFactory<Executor>;
   reportDataRoot?:string;
-  deletion?: { identities: ObservabilityProjectDirectory; tasks?: ObservabilityDeletionTasks; assertGrant(context: ProjectDeletionContext): Promise<void> };
+  deletion?: { identities: ObservabilityProjectDirectory; tasks?: ObservabilityDeletionTasks; originalUsage?: ObservationOriginalUsage; assertGrant(context: ProjectDeletionContext): Promise<void> };
   pricingProfiles?: PricingProfileDirectory;
   executionAccess?: ExecutionObservationAccess;
   usageSource?: RunnerUsageSource;
@@ -123,7 +129,8 @@ export function createObservabilityModule(deps: ObservabilityModuleDeps): Observ
     systemRuntimeTask:(actor,taskId)=>{if(!completeReports)throw precondition('完整运行报告原来源尚未接入');return completeReports.request(actor,null,{from:'0001-01-01T00:00:00.000Z',to:useCaseDeps.clock.now().toISOString(),timezone:'Asia/Shanghai'},taskId);},
     runtimeCompleteReportStatus:(actor,projectId,id)=>{if(!completeReports)throw precondition('完整运行报告原来源尚未接入');return completeReports.status(actor,projectId,id);},
     runtimeCompleteReportPage:(actor,projectId,id,query)=>{if(!completeReports)throw precondition('完整运行报告原来源尚未接入');return completeReports.page(actor,projectId,id,query);},
-    ...(deps.deletion ? { deletionOwner: observabilityDeletionOwner(observabilityDeletionRepository({ db: deps.db, ...deps.deletion,...(completeReports?{reports:completeReports.deletionLifecycle}: {}) })) } : {}),
+    ...(deps.deletion ? { deletionOwner: observabilityDeletionOwner(observabilityDeletionRepository({ db: deps.db, ...deps.deletion,...(completeReports?{reports:completeReports.deletionLifecycle}: {}) }),
+      deps.deletion.originalUsage ? originalObservationDrain({ db: deps.db, ...deps.deletion }, deps.deletion.originalUsage, useCaseDeps.clock) : undefined) } : {}),
     name: 'observability', reconcileExecutionUsage: reconcileUsage, valueExecutionUsage: valueUsage,
     acceptExecutionPrice: (input) => executionPricing.accept(input, useCaseDeps.clock.now()), ...observations, ingestExecutionUsage: usageIngestion(ledger), ...logsAndHealthUseCases(useCaseDeps), ...alerting,
     ...tokenPricingUseCases({ store: drizzleTokenPriceStore(deps.db), profiles: deps.pricingProfiles ?? { list: async () => [] }, clock: useCaseDeps.clock }),
@@ -169,4 +176,25 @@ function completeRuntimeReports(deps:ObservabilityModuleDeps) {
    },signal,runtimeReportAdmissionKey);
   },
  });
+}
+
+/** Use the same original price, selected native model, projection and valuation code as ordinary ingestion. */
+function originalObservationDrain(input: ObservabilityDeletionInput, source: ObservationOriginalUsage, clock: Clock) {
+  const pricing = drizzleExecutionPricing(input.db);
+  return drainOriginalObservationUsage(source, {
+    business: async (context, original, sourcePage, page) => {
+      const db = observationDeletionUsageDatabase(input, context, page), ledger = drizzleUsageLedger(db), store = drizzleExecutionValuations(db);
+      await usageIngestion(ledger)(page);
+      const value = executionValuations({ store, pricing, clock });
+      await valueRunnerUsagePage({ store, source: { measurement: original.businessMeasurement }, value })(sourcePage, page);
+    },
+    development: async (context, sourcePage, owner, registration) => {
+      const accepted = await pricing.get(registration.identity);
+      if (!accepted) throw precondition('原开发执行缺少人民币受理，不能伪造数值排空');
+      const page = prepareDevelopmentUsagePage(sourcePage, owner, registration, accepted), db = observationDeletionUsageDatabase(input, context, page);
+      const ledger = drizzleUsageLedger(db), store = drizzleExecutionValuations(db), value = executionValuations({ store, pricing, clock });
+      await developmentUsageIngestion(ledger)(page);
+      await valueDevelopmentUsagePage({ models: ledger, store, value })(page);
+    },
+  });
 }

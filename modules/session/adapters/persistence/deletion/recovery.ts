@@ -1,7 +1,7 @@
 import { jsonHash, precondition } from '@crewstation/kernel';
 import type { Database } from '@crewstation/persistence';
 import { sql } from 'drizzle-orm';
-import { SessionProcessSchema } from '../../../domain/projectDeletion';
+import { SessionProcessSchema } from '../../../domain/deletion/process';
 import type { SessionDeletionSources } from '../../../ports/projectDeletion';
 
 const podIdentity = SessionProcessSchema.pick({ podUid: true, nodeUid: true, nodeName: true });
@@ -17,7 +17,10 @@ export async function observeSessionTransports(db: Database, sources: SessionDel
       const original = (await tx.execute<{ digest: string }>(sql`SELECT digest FROM session.process_stops WHERE identity=${identity}`))[0]!;
       await tx.execute(sql`UPDATE session.connection_births SET exited_at=clock_timestamp(),exit_digest=identity,recovery_digest=${original.digest}
         WHERE original_process->>'podUid'=${process.podUid} AND original_process->>'nodeUid'=${process.nodeUid} AND original_process->>'nodeName'=${process.nodeName} AND exited_at IS NULL`);
+      await tx.execute(sql`UPDATE session.original_callbacks SET exited_at=clock_timestamp(),exit_digest=session.work_identity(to_jsonb(original_callbacks),${original.digest}),recovery_digest=${original.digest}
+        WHERE original_process->>'podUid'=${process.podUid} AND original_process->>'nodeUid'=${process.nodeUid} AND original_process->>'nodeName'=${process.nodeName} AND exited_at IS NULL`);
     });
   }, releasable: async (podUid) => (await db.execute<{ releasable: boolean }>(sql`SELECT NOT EXISTS(SELECT 1 FROM session.connection_births
-    WHERE original_process->>'podUid'=${podUid} AND exited_at IS NULL) AS releasable`))[0]?.releasable === true });
+    WHERE original_process->>'podUid'=${podUid} AND exited_at IS NULL)
+    AND NOT EXISTS(SELECT 1 FROM session.original_callbacks WHERE original_process->>'podUid'=${podUid} AND exited_at IS NULL) AS releasable`))[0]?.releasable === true });
 }

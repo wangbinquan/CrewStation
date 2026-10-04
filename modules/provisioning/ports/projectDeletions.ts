@@ -1,4 +1,9 @@
-import type { AcceptProjectDeletion, Actor, ProjectDeletionBlocker, ProjectDeletionEvidence, ProjectDeletionInventory, ProjectDeletionOperation, ProjectDeletionParticipant, ProjectDeletionPhase, ProjectDeletionPlan, ProjectDeletionTarget, ProjectId } from '@crewstation/contracts';
+import type { AcceptProjectDeletion, Actor, ProjectDeletionBlocker, ProjectDeletionContext, ProjectDeletionEvidence, ProjectDeletionInventory, ProjectDeletionOperation, ProjectDeletionOwner, ProjectDeletionParticipant, ProjectDeletionPhase, ProjectDeletionPlan, ProjectDeletionTarget, ProjectId } from '@crewstation/contracts';
+
+/** 只观察已进入终结的原 Pod；不发起删除，也不产生参与者的 stop 完成回执。 */
+export interface ProjectDeletionStopOwner extends ProjectDeletionOwner {
+  observeTerminating?(context: ProjectDeletionContext): Promise<void>;
+}
 
 export interface DeletionLease { readonly operationId: string; readonly owner: string; readonly generation: number }
 /** 生命周期事实经 project 公开能力反转，不在 provisioning 操作 project schema。 */

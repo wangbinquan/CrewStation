@@ -8,6 +8,8 @@ export interface ClusterPodStopReceipts {
 export interface ProjectPodProtection {
   inspect(target: ProjectDeletionTarget): Promise<ProjectDeletionInventory>;
   seal(context: ProjectDeletionContext): Promise<ProjectDeletionStepResult>;
+  /** 只保存已终结原 Pod 的停止证明并释放本操作的保护；不发起 Pod 删除。 */
+  observeTerminating(context: ProjectDeletionContext): Promise<void>;
   stop(context: ProjectDeletionContext): Promise<ProjectDeletionStepResult>;
   verify(context: ProjectDeletionContext): Promise<ProjectDeletionStepResult>;
 }

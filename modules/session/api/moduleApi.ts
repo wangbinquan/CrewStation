@@ -1,6 +1,6 @@
 import type { DevelopmentUsageDrainReason, DevelopmentUsageLookup, DevelopmentUsageKey, DevelopmentUsageLoss, DevelopmentUsagePage, DevelopmentUsageRegistration, StoredDevelopmentUsage } from '@crewstation/contracts';
 import type { ExecutionCompletionProof, RunnerUsageMeasurement, RunnerUsageSourceIdentity, RunnerUsageSourcePage, RunnerBusinessEvent, StoredBusinessExecutionDto, RunnerCommand, RunnerEvent, RunnerHello, TaskId } from '@crewstation/contracts';
-import type { ProjectDeletionContext, ProjectDeletionOwner } from '@crewstation/contracts';
+import type { ProjectDeletionContext, ProjectDeletionOwner, ProjectDeletionSessionData } from '@crewstation/contracts';
 
 export interface StoredEventDto { seq: number; at: string; event: RunnerEvent }
 
@@ -9,6 +9,9 @@ export interface SessionModuleApi {
   readonly name: 'session';
   readonly deletionOwner?: ProjectDeletionOwner;
   closeProjectDeletionTransport?(context: ProjectDeletionContext, consumerId: string): Promise<boolean>;
+  sendProjectDeletionCommand?(context: ProjectDeletionContext, consumerId: string, command: RunnerCommand): Promise<unknown>;
+  applyProjectDeletionData?(context: ProjectDeletionContext, taskId: TaskId, operation: ProjectDeletionSessionData): Promise<unknown>;
+  originalProjectDeletionTasks?(context: ProjectDeletionContext, after: TaskId | null): Promise<readonly TaskId[]>;
   lookupDevelopmentUsage(taskId: TaskId): Promise<DevelopmentUsageLookup>;
   registerDevelopmentUsage(registration: DevelopmentUsageRegistration): Promise<StoredDevelopmentUsage>;
   getDevelopmentUsage(taskId: TaskId, key: DevelopmentUsageKey): Promise<StoredDevelopmentUsage | undefined>;

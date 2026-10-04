@@ -6,7 +6,8 @@ import type { DevelopmentUsagePricing } from './ports/developmentUsage';
 import { developmentUsageOwnerStore } from './adapters/persistence/developmentUsage';
 import { developmentUsageOwner } from './application/developmentUsage';
 import { join } from 'node:path';
-import type { UserId } from '@crewstation/contracts';
+import type { ProjectDeletionContext, TaskId, UserId } from '@crewstation/contracts';
+import { TaskIdSchema } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import type { Clock, Logger } from '@crewstation/kernel';
 import { isPlatformError, jsonHash, newResourceId, noopLogger, precondition, systemClock } from '@crewstation/kernel';
@@ -54,6 +55,7 @@ export interface DevSessionModuleDeps {
   deletionWorkSources?: DevelopmentWorkSources;
   developmentUsagePricing?: DevelopmentUsagePricing;
   developmentCleanupSession?: DevelopmentCleanupSession;
+  projectDeletionSession?: (context: ProjectDeletionContext, taskId: TaskId) => Promise<DevelopmentCleanupSession>;
   identities?: ResourceIdentityDirectory;
   /** 资源台账里 CLI／Agent 执行记录的阶段（RFC-025 §11.2）；缺省时名册照 Runner 的说法给出。 */
   runtimeImages?: DevelopmentRuntimeImages;
@@ -134,17 +136,22 @@ function developmentApi(deps: DevSessionModuleDeps, useCaseDeps: DevSessionUseCa
     pricing && projectWork ? guardedDevelopmentPort(pricing, projectWork) : pricing);
   const developmentUsage = projectWork ? developmentUsageWork(rawUsage, projectWork) : rawUsage;
   const endingStore = developmentEndingStore(deps.db, useCaseDeps.clock);
-  const cleanup = deps.developmentCleanupSession ? developmentCleanupParticipant({ owner: rawUsage,
+  const makeCleanup = (session: DevelopmentCleanupSession, closing = false) => developmentCleanupParticipant({ owner: rawUsage,
     store: projectWork ? guardedDevelopmentPort(endingStore, projectWork) : endingStore, environments: useCaseDeps.environments,
-    session: projectWork ? guardedDevelopmentPort(deps.developmentCleanupSession, projectWork) : deps.developmentCleanupSession, clock: useCaseDeps.clock }) : undefined;
+    session: projectWork ? guardedDevelopmentPort(session, projectWork) : session, clock: useCaseDeps.clock,
+    ...(closing ? { closeOriginalAdmission: async (id: TaskId) => { await rawUsage.close(id, 'cancelled'); } } : {}) });
+  const cleanup = deps.developmentCleanupSession ? makeCleanup(deps.developmentCleanupSession) : undefined;
   const api: DevSessionModuleApi = {
     ...(deps.deletionWorkSources ? { deletionOwner: developmentDeletionOwner(developmentDeletionRepository(deps.db, deps.deletionWorkSources), deps.deletionWorkSources) } : {}),
     developmentUsage,
     ...(cleanup ? { developmentCleanup: projectWork ? developmentCleanupWork(cleanup, projectWork) : cleanup } : {}),
-    ...(cleanup && projectWork ? { projectDeletionCleanup: (context, input) => {
+    ...((cleanup || deps.projectDeletionSession) && projectWork ? { projectDeletionCleanup: (context, input) => {
       if (context.phase !== 'stop') throw precondition('开发项目清理只接受当前停止阶段许可');
       return projectWork.runGranted(context, { originKind: 'task', originKey: input.identity.executionId,
-        reference: newResourceId(), inputDigest: jsonHash(input) }, () => cleanup.advance(input));
+        reference: newResourceId(), inputDigest: jsonHash(input) }, async () => {
+        const session = await deps.projectDeletionSession?.(context, TaskIdSchema.parse(input.identity.executionId));
+        return (session ? makeCleanup(session, true) : cleanup!).advance(input);
+      });
     } } : {}),
     invokeApi: apiInvocationUseCase(useCaseDeps),
     ...clusterAgentUseCases(useCaseDeps, agentStarts, agentExecutions), ...clusterNativeUseCases(useCaseDeps, terminals),

@@ -10,7 +10,7 @@ let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 const field = (label: string) => [...document.querySelectorAll('label')].find((node) => node.textContent?.startsWith(label))!.querySelector<HTMLInputElement | HTMLSelectElement>('input,select')!;
 const select = async (label: string, value: string) => { await act(async () => { const node = field(label); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!.call(node, value); node.dispatchEvent(new Event('change', { bubbles: true })); }); await page!.settle(); };
-const input = async (label: string, value: string) => { await act(async () => { const node = field(label); node.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(node, value); node.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true })); }); await page!.settle(); };
+const input = async (label: string, value: string) => { await act(async () => { const node = field(label); node.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(node, value); node.dispatchEvent(new Event('input', { bubbles: true })); node.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true })); }); await page!.settle(); };
 const choosePlan = async () => { await act(async () => { const label = [...document.querySelectorAll('fieldset label')].find((node) => node.textContent?.includes('服务标准'))!; label.querySelector<HTMLInputElement>('input')!.click(); }); await page!.settle(); };
 
 test('旧算力入口跳转资源中心，继承与范围管理使用统一弹窗', async () => {

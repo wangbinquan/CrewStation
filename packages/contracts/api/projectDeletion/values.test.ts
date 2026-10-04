@@ -1,11 +1,26 @@
 import { expect, test } from 'bun:test';
 import { AcceptProjectDeletionSchema, ProjectDeletionInventorySchema } from './values';
 import { ProjectDeletionOperationSchema, ProjectDeletionPlanSchema } from './responses';
+import { ProjectDeletionSessionTasksRequestSchema, ProjectDeletionSessionTasksSchema } from './sessionData';
+import { ProjectIdSchema, TaskIdSchema } from '../../ids';
 
 test('删除确认严格绑定完整 UUIDv7 和 delete，不接受名单、未知字段或模糊确认', () => {
   const input = { planId: Bun.randomUUIDv7(), requestKey: Bun.randomUUIDv7(), confirm: 'delete' as const };
   expect(AcceptProjectDeletionSchema.parse(input)).toEqual(input);
   for (const patch of [{ confirm: 'DELETE' }, { confirm: true }, { planId: 'slug' }, { requestKey: 'short' }, { resources: [] }]) expect(AcceptProjectDeletionSchema.safeParse({ ...input, ...patch }).success).toBe(false);
+});
+test('原 Session 任务目录严格绑定完整许可与分页游标，拒绝替代范围和超过单页上限的回复', () => {
+  const id = () => Bun.randomUUIDv7(), digest = 'a'.repeat(64), taskId = TaskIdSchema.parse(id());
+  const context = { operationId: id(), generation: 1, phase: 'stop' as const,
+    target: { id: ProjectIdSchema.parse(id()), slug: 'original', name: '原目录', namespace: 'cs-original', kind: 'DigitalWorker' as const, state: 'deleting' as const, revision: '1', prodHost: 'original.invalid', previewHost: 'preview.original.invalid', serviceHost: 'original.service.invalid' },
+    confirmed: { participant: 'session' as const, complete: true as const, resources: [], references: [], blockers: [], revision: digest } };
+  expect(ProjectDeletionSessionTasksRequestSchema.parse({ context, after: null })).toEqual({ context, after: null });
+  expect(ProjectDeletionSessionTasksRequestSchema.parse({ context, after: taskId }).after).toBe(taskId);
+  for (const patch of [{ after: 'old-task-alias' }, { after: undefined }, { tasks: [taskId] }, { projectId: id() }])
+    expect(ProjectDeletionSessionTasksRequestSchema.safeParse({ context, after: null, ...patch }).success).toBe(false);
+  expect(ProjectDeletionSessionTasksSchema.parse([taskId])).toEqual([taskId]);
+  expect(ProjectDeletionSessionTasksSchema.safeParse(['legacy-key']).success).toBe(false);
+  expect(ProjectDeletionSessionTasksSchema.safeParse(Array.from({ length: 201 }, id)).success).toBe(false);
 });
 test('盘点必需完整性与来源摘要，拒绝未知 owner、负数量和无原身份的对象', () => {
   const report = { participant: 'scm' as const, revision: 'a'.repeat(64), complete: true, resources: [{ kind: 'repository', id: '8', identity: 'remote-id=8,path=group/slug', count: 1 }], references: [], blockers: [] };

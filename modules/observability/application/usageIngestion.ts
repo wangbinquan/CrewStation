@@ -70,7 +70,7 @@ export function usageIngestion(store: UsageLedgerStore) {
   };
 }
 
-function runnerPage(page: RunnerUsageSourcePage, identity: UsageExecutionIdentity): UsageSourcePage {
+export function runnerPage(page: RunnerUsageSourcePage, identity: UsageExecutionIdentity): UsageSourcePage {
   if (identity.executionId !== page.executionId || identity.executionGeneration !== page.attempt || !Number.isSafeInteger(page.after) || page.after < 0 ||
       page.events.length < 1 || page.events.length > 5 || page.through !== page.events.at(-1)?.sequence) throw validation('数值来源页身份或水位不一致');
   const sourceId = 'runner:' + jsonHash({ runtimeTaskId: page.runtimeTaskId, executionId: page.executionId, attempt: page.attempt, incarnation: page.incarnation, payloadDigest: page.payloadDigest });

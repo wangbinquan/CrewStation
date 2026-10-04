@@ -4,6 +4,10 @@ import { developmentUsageWorker } from './workers/developmentUsageWorker';
 import { drizzleBusinessUsageSourceStore } from './adapters/persistence/businessUsageSources';
 import { legacyRunnerIdentity } from './adapters/persistence/legacyRunnerIdentity';
 import { sessionConnectionHistory } from './adapters/persistence/deletion/lifetime';
+import { sessionProjectWork } from './adapters/persistence/deletion/projectWork';
+import { sessionCleanupCommands, originalSessionCleanup } from './application/deletion/cleanupCommands';
+import { sessionCleanupData } from './application/deletion/cleanupData';
+import { sessionCleanupCommandTransport } from './adapters/http/cleanupCommandTransport';
 import { sessionDeletionRepository } from './adapters/persistence/deletion/repository';
 import { sessionDeletionTransport } from './adapters/http/deletionTransport';
 import type { SessionDeletionRequest } from './adapters/http/deletionTransport';
@@ -66,11 +70,14 @@ export const sessionMigrations: MigrationSet = {
 };
 
 export function createSessionModule(deps: SessionModuleDeps): SessionModule {
+  const projectWork = deps.deletionSources ? sessionProjectWork(deps.db, deps.deletionSources) : undefined;
+  const workDb = projectWork?.database ?? deps.db;
   const useCaseDeps: SessionUseCaseDeps = {
+    projectWork,
     connectionHistory: deps.deletionSources ? sessionConnectionHistory(deps.db, deps.deletionSources) : undefined,
-    developmentUsage: drizzleDevelopmentUsageStore(deps.db),
-    businessExecutions: drizzleBusinessExecutionStore(deps.db),
-    events: drizzleRunnerEventStore(deps.db),
+    developmentUsage: drizzleDevelopmentUsageStore(workDb),
+    businessExecutions: drizzleBusinessExecutionStore(workDb),
+    events: drizzleRunnerEventStore(workDb),
     legacyRunners: deps.identities ? legacyRunnerIdentity(deps.identities) : undefined,
     registry: drizzleConnectionRegistry(deps.db),
     forwarder: deps.forwarder ?? fetchForwarder(),
@@ -80,12 +87,17 @@ export function createSessionModule(deps: SessionModuleDeps): SessionModule {
     clock: deps.clock ?? systemClock,
     logger: deps.logger ?? noopLogger,
   };
-  const usageSources = drizzleBusinessUsageSourceStore(deps.db);
-  const developmentSources = drizzleDevelopmentUsageSourceStore(deps.db);
+  const usageSources = drizzleBusinessUsageSourceStore(workDb);
+  const developmentSources = drizzleDevelopmentUsageSourceStore(workDb);
   const hub = runnerHub(useCaseDeps);
   const deletionRepository = deps.deletionSources ? sessionDeletionRepository(deps.db, deps.deletionSources) : undefined;
   const close = deps.deletionSources && deletionRepository ? sessionTransportCloser(deletionRepository, deps.deletionSources, hub.drain, deps.settings.selfAddress) : undefined;
   const transport = close ? sessionDeletionTransport(deps.settings.selfAddress, (context, birth) => close(context, birth.id), deps.deletionRequest) : undefined;
+  const cleanup = deletionRepository && deps.deletionSources && projectWork ? sessionCleanupCommands(deletionRepository, deps.deletionSources,
+    { clock: useCaseDeps.clock, businessExecutions: useCaseDeps.businessExecutions!, developmentUsage: useCaseDeps.developmentUsage!, projectWork }, hub, deps.settings.selfAddress) : undefined;
+  const cleanupTransport = cleanup ? sessionCleanupCommandTransport(deps.settings.selfAddress, cleanup, deps.deletionRequest) : undefined;
+  const cleanupData = deletionRepository && deps.deletionSources && projectWork ? sessionCleanupData(deletionRepository, deps.deletionSources, projectWork,
+    { business: useCaseDeps.businessExecutions!, development: useCaseDeps.developmentUsage!, businessSources: usageSources, developmentSources }) : undefined;
   const dispatch = commandDispatch(useCaseDeps, hub);
   const streams = browserStreams(useCaseDeps, hub, dispatch);
   const ingestion = businessIngestionWorker({ store: useCaseDeps.businessExecutions!, send: dispatch.sendLocalOnly, logger: useCaseDeps.logger,
@@ -97,6 +109,12 @@ export function createSessionModule(deps: SessionModuleDeps): SessionModule {
     name: 'session',
     deletionOwner: deletionRepository && transport && deps.deletionSources ? sessionDeletionOwner(deletionRepository, transport, deps.deletionSources) : undefined,
     closeProjectDeletionTransport: close,
+    applyProjectDeletionData: cleanupData,
+    originalProjectDeletionTasks: deletionRepository?.originalTasks,
+    sendProjectDeletionCommand: cleanupTransport && deletionRepository && deps.deletionSources ? async (raw, consumerId, command) => {
+      const { context, birth } = await originalSessionCleanup(deletionRepository, deps.deletionSources!, raw, consumerId);
+      const payload = await cleanupTransport(context, birth, command); await deps.deletionSources!.assertGrant(context); return payload;
+    } : undefined,
     lookupDevelopmentUsage: useCaseDeps.developmentUsage!.lookup,
     registerDevelopmentUsage: useCaseDeps.developmentUsage!.register, getDevelopmentUsage: useCaseDeps.developmentUsage!.get,
     requestDevelopmentUsageDrain: useCaseDeps.developmentUsage!.requestDrain, markDevelopmentUsageUnavailable: useCaseDeps.developmentUsage!.unavailable,
@@ -113,12 +131,12 @@ export function createSessionModule(deps: SessionModuleDeps): SessionModule {
   };
   let timer: ReturnType<typeof setInterval> | undefined;
   const internal = internalRoutes(dispatch, useCaseDeps);
-  if (close) internal.route('/', sessionDeletionRoutes(close));
+  if (close) internal.route('/', sessionDeletionRoutes(close, cleanup, cleanupData, deletionRepository?.originalTasks));
   return {
     api,
     http: { runner: runnerSocketRoutes(hub, upgradeWebSocket), stream: browserSocketRoutes(streams, deps.isAdmin, upgradeWebSocket), internal },
     websocket,
-    workers: [{ start: () => { timer ??= setInterval(() => void hub.tick(), 5000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; await hub.shutdown(); } }, ingestion, developmentIngestion],
+    workers: [{ start: () => { timer ??= setInterval(() => void hub.tick(), 5000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; await hub.shutdown(); await projectWork?.drain(); } }, ingestion, developmentIngestion],
     migrations: sessionMigrations,
   };
 }

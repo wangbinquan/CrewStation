@@ -4,7 +4,7 @@ import type { Database } from '@crewstation/persistence';
 import { assertSharedDatabaseAdmissionActive, withSharedDatabaseAdmission } from '@crewstation/persistence';
 import { sql } from 'drizzle-orm';
 import type { SessionConnectionHistory, SessionDeletionSources } from '../../../ports/projectDeletion';
-import { SessionProcessSchema } from '../../../domain/projectDeletion';
+import { SessionProcessSchema } from '../../../domain/deletion/process';
 import { registerSessionTask } from './identity';
 
 interface Scope { taskId: string; key: string; backendPid: number; active: boolean }

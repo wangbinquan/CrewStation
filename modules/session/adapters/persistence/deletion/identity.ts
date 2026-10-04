@@ -25,6 +25,6 @@ export async function registerSessionTask(db: Executor, sources: SessionDeletion
 }
 export async function registeredSessionContent(db: Executor) {
   const actual = await db.execute<{ table_name: string }>(sql`SELECT DISTINCT table_name FROM information_schema.columns WHERE table_schema='session' AND column_name IN('task_id','task_key','project_id') ORDER BY table_name`);
-  const expected = [...SESSION_CONTENT, 'task_origins', 'connection_births', 'project_deletions'].sort();
+  const expected = [...SESSION_CONTENT, 'task_origins', 'connection_births', 'original_callbacks', 'project_deletions'].sort();
   if (jsonHash(actual.map((row) => row.table_name)) !== jsonHash(expected)) throw precondition('会话内容表未完整登记');
 }

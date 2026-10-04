@@ -1,18 +1,19 @@
 import { and, asc, eq, gt, lte, sql } from 'drizzle-orm';
-import { DEVELOPMENT_USAGE_LIMITS, DevelopmentUsageKeySchema, DevelopmentUsagePageSchema, RunnerUsageMeasurementSchema } from '@crewstation/contracts';
+import { DEVELOPMENT_USAGE_LIMITS, DevelopmentUsageKeySchema, DevelopmentUsagePageSchema, RunnerUsageMeasurementSchema, type DevelopmentUsageKey } from '@crewstation/contracts';
 import { conflict, validation } from '@crewstation/kernel';
 import type { Database } from '@crewstation/persistence';
 import type { DevelopmentUsageSourceStore } from '../../ports/developmentUsage';
 import { locked } from './developmentUsageState';
+import { ordinarySessionTask } from './deletion/admission';
 import { developmentUsageEvents as events, developmentUsageStreams as streams } from './developmentUsageTables';
 
 /** Independent fair PG outbox; it keeps original journal keys and has no ordinary text frames. */
 export function drizzleDevelopmentUsageSourceStore(db: Database): DevelopmentUsageSourceStore {
-  return {
-    next: () => db.transaction(async (tx) => {
-      const [row] = await tx.select().from(streams).where(gt(streams.persistedThrough, streams.sourceAcknowledgedThrough))
-        .orderBy(asc(streams.sourcePolledAt), asc(streams.taskId)).limit(1).for('update', { skipLocked: true });
-      if (!row) return undefined;
+  const offer = (key?: DevelopmentUsageKey) => db.transaction(async (tx) => {
+      const row = key ? await locked(tx, key.executionId, key) : (await tx.select().from(streams)
+        .where(and(ordinarySessionTask(sql`${streams.taskId}`), gt(streams.persistedThrough, streams.sourceAcknowledgedThrough)))
+        .orderBy(asc(streams.sourcePolledAt), asc(streams.taskId)).limit(1).for('update', { skipLocked: true }))[0];
+      if (!row || row.persistedThrough <= row.sourceAcknowledgedThrough) return undefined;
       const rows = await tx.select({ event: events.event }).from(events).where(and(eq(events.taskId, row.taskId), gt(events.sequence, row.sourceAcknowledgedThrough), lte(events.sequence, row.persistedThrough),
         row.offeredThrough > row.sourceAcknowledgedThrough ? lte(events.sequence, row.offeredThrough) : undefined)).orderBy(asc(events.sequence)).limit(DEVELOPMENT_USAGE_LIMITS.capturesPerPage);
       const selected: typeof rows = [];
@@ -26,7 +27,10 @@ export function drizzleDevelopmentUsageSourceStore(db: Database): DevelopmentUsa
       if (row.offeredThrough > row.sourceAcknowledgedThrough && page.through !== row.offeredThrough) throw conflict('未确认数字页的边界已变化');
       await tx.update(streams).set({ offeredThrough: page.through, sourcePolledAt: sql`clock_timestamp()` }).where(eq(streams.taskId, row.taskId));
       return page;
-    }),
+    });
+  return {
+    next: () => offer(),
+    offer: (key) => offer(DevelopmentUsageKeySchema.parse(key)),
     acknowledge: (rawKey, through) => db.transaction(async (tx) => {
       const key = DevelopmentUsageKeySchema.parse(rawKey), row = await locked(tx, key.executionId, key);
       if (!Number.isSafeInteger(through) || through < 0) throw validation('开发数字消费水位无效');

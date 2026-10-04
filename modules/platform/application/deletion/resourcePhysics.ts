@@ -8,7 +8,7 @@ interface PhysicalSource {
   seal(context: ProjectDeletionContext): Promise<ProjectDeletionStepResult>;
   verify(context: ProjectDeletionContext): Promise<ProjectDeletionStepResult>;
 }
-export function projectResourcePhysics(pods: PhysicalSource & { stop(context: ProjectDeletionContext): Promise<ProjectDeletionStepResult> }, volumes: PhysicalSource & { purge(context: ProjectDeletionContext): Promise<ProjectDeletionStepResult>; prove(context: ProjectDeletionContext): Promise<ProjectDeletionStepResult> }) {
+export function projectResourcePhysics(pods: PhysicalSource & { observeTerminating(context: ProjectDeletionContext): Promise<void>; stop(context: ProjectDeletionContext): Promise<ProjectDeletionStepResult> }, volumes: PhysicalSource & { purge(context: ProjectDeletionContext): Promise<ProjectDeletionStepResult>; prove(context: ProjectDeletionContext): Promise<ProjectDeletionStepResult> }) {
   const combined = async (context: ProjectDeletionContext, steps: Array<() => Promise<ProjectDeletionStepResult>>) => {
     const proofs = [];
     for (const step of steps) {
@@ -26,6 +26,7 @@ export function projectResourcePhysics(pods: PhysicalSource & { stop(context: Pr
       return { participant: 'resources', complete: reports.every((report) => report.complete), resources, revision: jsonHash(resources), references: unique(reports.flatMap((report) => report.references)), blockers: unique(reports.flatMap((report) => report.blockers)) };
     },
     seal: (context: ProjectDeletionContext) => combined(context, [() => pods.seal(context), () => volumes.seal(context)]),
+    observeTerminating: (context: ProjectDeletionContext) => pods.observeTerminating(context),
     stop: (context: ProjectDeletionContext) => pods.stop(context),
     purge: (context: ProjectDeletionContext) => volumes.purge(context),
     prove: (context: ProjectDeletionContext) => combined(context, [() => pods.verify(context), () => volumes.prove(context)]),

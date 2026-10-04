@@ -44,7 +44,7 @@ export function executionValuations(deps: { store: ExecutionValuationStore; pric
 }
 
 /** Value the selected model evidence, retaining it when a newer native sample was rejected. */
-export function valueRunnerUsagePage(deps: { store: ExecutionValuationStore; source: RunnerUsageSource; value: ReturnType<typeof executionValuations> }) {
+export function valueRunnerUsagePage(deps: { store: ExecutionValuationStore; source: Pick<RunnerUsageSource, 'measurement'>; value: ReturnType<typeof executionValuations> }) {
   return async (sourcePage: RunnerUsageSourcePage, page: UsageSourcePage) => {
     const refs = new Map(page.events.map(({ measurement }) => [measurement.recordId, { identity: measurement.identity, sourceId: measurement.sourceId, recordId: measurement.recordId }]));
     for (const ref of refs.values()) {

@@ -1,4 +1,4 @@
-import { PROJECT_DELETION_PHASES, ProjectDeletionEvidenceSchema } from '@crewstation/contracts';
+import { PROJECT_DELETION_PHASES, ProjectDeletionEvidenceSchema, ProjectDeletionSessionTasksRequestSchema } from '@crewstation/contracts';
 import type { ProjectDeletionContext } from '@crewstation/contracts';
 import { jsonHash, precondition } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
@@ -7,8 +7,10 @@ import { sql } from 'drizzle-orm';
 import { SessionDeletionProofsSchema, SessionDeletionScopeSchema } from '../../../domain/projectDeletion';
 import type { SessionDeletionRepository, SessionDeletionSources } from '../../../ports/projectDeletion';
 import { inspectSessionDeletion } from './inspection';
-import { registerSessionTask, registeredSessionContent, SESSION_CONTENT } from './identity';
+import { registerSessionTask, registeredSessionContent } from './identity';
 import { observeSessionTransports } from './recovery';
+import { captureSessionStop, purgeSessionSnapshot, sessionCallbacksExited } from './stopSnapshot';
+import { readOriginalSessionTasks } from './scopeTasks';
 
 async function load(db: Executor, context: ProjectDeletionContext) {
   const row = (await db.execute<{ operation_id: string; generation: number; revision: string; body: unknown; phases: unknown; verified: boolean }>(sql`
@@ -40,6 +42,15 @@ export function sessionDeletionRepository(db: Database, sources: SessionDeletion
       return verified;
     }),
     scope: (context) => transact(context, async (tx) => (await load(tx, context)).scope),
+    originalTasks: (raw, after) => {
+      const { context, after: cursor } = ProjectDeletionSessionTasksRequestSchema.parse({ context: raw, after });
+      if (context.confirmed.participant !== 'session' || !['seal', 'stop'].includes(context.phase)) throw precondition('原任务目录只接受 Session 封写或停止许可');
+      return transact(context, async (tx) => {
+        const state = await load(tx, context);
+        if (state.scope.compacted || state.proofs.stop) throw precondition('Session 原停止已经完成，不能再读取排空范围');
+        return readOriginalSessionTasks(tx, context.target.id, state.scope, cursor);
+      });
+    },
     proof: (context) => transact(context, async (tx) => {
       const state = await load(tx, context), index = PROJECT_DELETION_PHASES.indexOf(context.phase);
       if (index > 0 && !state.proofs[PROJECT_DELETION_PHASES[index - 1]!]) throw precondition('会话前一阶段原持久证明缺失');
@@ -49,26 +60,28 @@ export function sessionDeletionRepository(db: Database, sources: SessionDeletion
       const state = await load(tx, context), evidence = ProjectDeletionEvidenceSchema.parse(raw), index = PROJECT_DELETION_PHASES.indexOf(context.phase);
       if (index > 0 && !state.proofs[PROJECT_DELETION_PHASES[index - 1]!]) throw precondition('会话阶段不可跳过');
       if (state.proofs[context.phase] && jsonHash(state.proofs[context.phase]) !== jsonHash(evidence)) throw precondition('会话原证明不可替换');
-      await tx.execute(sql`UPDATE session.project_deletions SET generation=${context.generation},phases=phases||${JSON.stringify({ [context.phase]: evidence })}::jsonb WHERE project_id=${context.target.id}`);
+      const scope = context.phase === 'stop' && !state.proofs.stop ? { ...state.scope, stopped: await captureSessionStop(tx, context, state.scope) } : state.scope;
+      await tx.execute(sql`UPDATE session.project_deletions SET generation=${context.generation},body=${JSON.stringify(scope)}::jsonb,
+        phases=phases||${JSON.stringify({ [context.phase]: evidence })}::jsonb WHERE project_id=${context.target.id}`);
     }),
     exited: async (birth) => {
       const row = (await db.execute<{ identity: string; exited_at: Date | null; exit_digest: string | null }>(sql`SELECT identity,exited_at,exit_digest FROM session.connection_births WHERE id=${birth.id}`))[0];
       return !!row && row.identity === birth.identity && row.exited_at !== null && row.exit_digest === birth.identity;
     },
     observe: () => observeSessionTransports(db, sources),
-    purge: (context) => transact(context, async (tx) => {
+    quiescent: (context) => transact(context, async (tx) => sessionCallbacksExited(tx, context, (await load(tx, context)).scope)),
+    purge: (context, raw) => transact(context, async (tx) => {
       const state = await load(tx, context);
       if (context.phase !== 'metadata' || !state.proofs.namespace) throw precondition('会话删除内容缺少前五阶段证明');
-      if (state.scope.compacted) return;
-      for (const birth of state.scope.births) if (!(await tx.execute(sql`SELECT id FROM session.connection_births WHERE id=${birth.id} AND identity=${birth.identity} AND exited_at IS NOT NULL AND exit_digest=identity`)).length)
-        throw precondition('会话原连接仍未退出');
-      await tx.execute(sql`UPDATE session.project_deletions SET generation=${context.generation} WHERE project_id=${context.target.id}`);
-      const selected = sql.join(state.scope.taskKeys.map((key) => sql`${key}`), sql`,`);
-      if (state.scope.taskKeys.length) {
-        for (const table of SESSION_CONTENT) await tx.execute(sql`DELETE FROM ${sql.raw('session.' + table)} WHERE task_id IN(${selected})`);
-        await tx.execute(sql`DELETE FROM session.connection_births WHERE task_key IN(${selected})`);
+      const evidence = ProjectDeletionEvidenceSchema.parse(raw);
+      if (state.proofs.metadata && jsonHash(state.proofs.metadata) !== jsonHash(evidence)) throw precondition('会话原证明不可替换');
+      if (!state.scope.compacted) {
+        await tx.execute(sql`UPDATE session.project_deletions SET generation=${context.generation} WHERE project_id=${context.target.id}`);
+        await purgeSessionSnapshot(tx, context, state.scope);
       }
-      await tx.execute(sql`UPDATE session.project_deletions SET body=${JSON.stringify({ ...state.scope, taskKeys: [], births: [], compacted: true })}::jsonb WHERE project_id=${context.target.id}`);
+      const compacted = { ...state.scope, taskKeys: [], births: [], ...(state.scope.callbacks ? { callbacks: [] } : {}), compacted: true };
+      await tx.execute(sql`UPDATE session.project_deletions SET generation=${context.generation},body=${JSON.stringify(compacted)}::jsonb,
+        phases=phases||${JSON.stringify({ metadata: evidence })}::jsonb WHERE project_id=${context.target.id}`);
     }),
   };
 }

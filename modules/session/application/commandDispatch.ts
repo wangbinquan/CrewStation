@@ -1,9 +1,10 @@
 import { persistDevelopmentReply, prepareDevelopmentCommand } from './developmentCommandReceipt';
 import type { RunnerCommand, RunnerHello, TaskId } from '@crewstation/contracts';
-import { PlatformError, precondition } from '@crewstation/kernel';
+import { jsonHash, PlatformError } from '@crewstation/kernel';
 import type { SessionUseCaseDeps } from './dependencies';
 import type { RunnerHub } from './runnerHub';
-import { commandTimeout } from '../domain/commandTimeout';
+import { sendRunnerWire } from './commandWire';
+import type { SessionWorkHandle } from '../ports/projectWork';
 import { assertLaunchSupported } from '../domain/runtimeNegotiation';
 import { persistBusinessReply, prepareBusinessCommand } from './businessCommandReceipt';
 
@@ -11,7 +12,7 @@ import { persistBusinessReply, prepareBusinessCommand } from './businessCommandR
 const PREVIEW_CONTROL_COMMANDS: ReadonlySet<RunnerCommand['type']> = new Set(['startPreview', 'stopPreview', 'previewLogs']);
 
 /** 命令派发：本副本持有连接就直接发，否则按注册表转发到持有副本；无人持有即 TaskRunner 离线。 */
-export function commandDispatch(deps: Pick<SessionUseCaseDeps, 'registry' | 'forwarder' | 'settings' | 'clock' | 'businessExecutions' | 'developmentUsage' | 'connectionHistory'>, hub: Pick<RunnerHub, 'connections'>) {
+export function commandDispatch(deps: Pick<SessionUseCaseDeps, 'registry' | 'forwarder' | 'settings' | 'clock' | 'businessExecutions' | 'developmentUsage' | 'connectionHistory' | 'projectWork'>, hub: Pick<RunnerHub, 'connections'>) {
   const sendLocal = (taskId: TaskId, command: RunnerCommand): Promise<unknown> | undefined => {
     const connection = hub.connections.get(taskId);
     if (!connection) return undefined;
@@ -24,26 +25,21 @@ export function commandDispatch(deps: Pick<SessionUseCaseDeps, 'registry' | 'for
       throw new PlatformError('precondition', '当前开发容器不支持停止／启动预览与读取预览输出；请保存工作并在容器更新后重建会话', { code: 'preview_control_unavailable' });
     }
     assertLaunchSupported(command, connection.hello.capabilities);
-    return connection.command(async () => {
-      if (deps.connectionHistory) await deps.connectionHistory.check(taskId);
+    const perform = async (handle?: SessionWorkHandle) => {
+      if (!handle && deps.connectionHistory) await deps.connectionHistory.check(taskId);
       // 普通命令保持同步入 pending 的旧行为；可靠命令先提交持久接收意图。
       if ((command.type === 'startBusinessCommand' || command.type === 'startBusinessAgent') || command.type === 'ackBusinessExecutionEvents' || command.type === 'cancelBusinessExecution') await prepareBusinessCommand(deps.businessExecutions, taskId, command);
       if (command.type === 'stopDevelopmentAgent' || (command.type === 'startAgent' && command.developmentUsage) || command.type === 'ackDevelopmentUsageEvents') await prepareDevelopmentCommand(deps.developmentUsage, taskId, command);
-      if (connection.closed || hub.connections.get(taskId) !== connection) throw precondition('原 Runner 连接已退出，不能继续发送命令');
-      const wire = connection.legacy ? await connection.legacy.outgoing(command) : command;
-      if (connection.closed || hub.connections.get(taskId) !== connection) throw precondition('原 Runner 连接已退出，不能继续发送命令');
-      const payload = await new Promise<unknown>((resolve, reject) => {
-      connection.pending.add({
-        id: command.id, type: command.type, sentAt: deps.clock.now().getTime(), resolve,
-        ...commandTimeout(command),
-        reject: (error) => reject(new PlatformError(error.code === 'timeout' ? 'unavailable' : 'precondition', error.message, { code: error.code })),
-      });
-      try { connection.socket.send(JSON.stringify(wire)); } catch (error) { connection.pending.settle(command.id, { ok: false, code: 'send_failed', message: String(error) }); }
-      });
+      if (handle) await handle.check();
+      const payload = await sendRunnerWire(connection, command, deps.clock, () => hub.connections.get(taskId) === connection);
+      if (handle) await handle.check();
       await persistBusinessReply(deps.businessExecutions, taskId, command, payload);
       await persistDevelopmentReply(deps.developmentUsage, taskId, command, payload);
       return payload;
-    });
+    };
+    return deps.projectWork
+      ? deps.projectWork.run({ taskKey: taskId, kind: 'command', reference: command.id, inputDigest: jsonHash(command) }, perform, connection.command.bind(connection))
+      : connection.command(perform);
   };
 
   return {

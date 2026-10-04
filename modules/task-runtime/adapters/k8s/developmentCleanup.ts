@@ -77,7 +77,7 @@ export async function cleanupDevelopmentExecution(k8s: K8sClient, env: TaskEnvir
     if (pod.metadata.uid !== env.native!.podUid) throw precondition('同名开发 Pod 已被替换');
     admittedSpec(pod, env); await current();
     await k8s.delete(Resources.Pod!, env.podName, env.namespace, { gracePeriodSeconds: 30, preconditions: { uid: env.native!.podUid } });
-    if (await k8s.get(Resources.Pod!, env.podName, env.namespace, AbortSignal.timeout(15_000))) throw precondition('等待原开发 Pod 与 Controller 停止 finalizer 完成');
+    if (await k8s.get(Resources.Pod!, env.podName, env.namespace, AbortSignal.timeout(15_000))) throw precondition('等待原开发 Pod 与 Controller 停止 finalizer 完成', { code: 'runtime_original_stop_waiting' });
   }
   const stopped = await guard.stopped(); allOriginalContainers(env, stopped);
   for (const admission of [false, true]) {
@@ -86,6 +86,6 @@ export async function cleanupDevelopmentExecution(k8s: K8sClient, env: TaskEnvir
     if (!secret) continue;
     const uid = originalSecret(secret, env, stopped, admission, historicalUid); await current();
     await k8s.delete(Resources.Secret!, name, env.namespace, { preconditions: { uid } });
-    if (await k8s.get(Resources.Secret!, name, env.namespace, AbortSignal.timeout(15_000))) throw precondition('等待原开发凭据回收确认');
+    if (await k8s.get(Resources.Secret!, name, env.namespace, AbortSignal.timeout(15_000))) throw precondition('等待原开发凭据回收确认', { code: 'runtime_original_stop_waiting' });
   }
 }

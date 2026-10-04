@@ -17,6 +17,7 @@ export function deletionControls(database: TestDatabase) {
   const physics: ResourceDeletionPhysics = {
     inspect: async () => ({ participant: 'resources', revision: jsonHash({ fake: true }), complete: true, resources: [{ kind: 'fake-volume', id: 'original', identity: 'original-uid', count: purged ? 0 : 1 }], references: [], blockers: [] }),
     seal: async () => { effects.push('seal'); return { kind: 'done', evidence: { kind: 'metadata', digest: jsonHash('seal'), description: '测试替身的原实例保护确认', count: 1 } }; },
+    observeTerminating: async () => { effects.push('observe-terminating'); },
     stop: async () => { effects.push('stop'); if (waiting) return { kind: 'waiting', reason: '测试停止来源仍在等待' }; stopped = true; return done('stop'); },
     purge: async () => { if (!stopped) throw precondition('未停止'); effects.push('purge'); purged = true; return done('purge'); },
     prove: async () => { if (!purged) return { kind: 'waiting', reason: '测试物理源尚未归零' }; effects.push('prove'); return done('prove'); },

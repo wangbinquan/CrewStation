@@ -1,15 +1,17 @@
 import { PROJECT_DELETION_PHASES, ProjectDeletionStepResultSchema } from '@crewstation/contracts';
 import type { ProjectDeletionOwner, ProjectDeletionPhase } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
-import type { ProjectDeletionIntents } from '../../ports/projectDeletions';
+import type { ProjectDeletionIntents, ProjectDeletionStopOwner } from '../../ports/projectDeletions';
+import { missingStopDependencies } from './stopDependencies';
+import { withDeletionOwnerLease } from './ownerLease';
 
 /** 元数据阶段先清子 owner，project 的服务／成员事实保留到最后。 */
-function orderedOwners(owners: readonly ProjectDeletionOwner[], phase: ProjectDeletionPhase) {
-  const last = phase === 'metadata' ? ['task-runtime', 'resources', 'project'] : phase === 'stop' ? ['task-runtime', 'session', 'resources', 'cluster-control'] : phase === 'namespace' ? ['resources', 'provisioning', 'cluster-control'] : [];
+function orderedOwners(owners: readonly ProjectDeletionStopOwner[], phase: ProjectDeletionPhase) {
+  const last = phase === 'metadata' ? ['task-runtime', 'resources', 'project'] : phase === 'stop' ? ['task-runtime', 'observability', 'session', 'resources', 'cluster-control'] : phase === 'namespace' ? ['resources', 'provisioning', 'cluster-control'] : [];
   const rank = (name: string) => { const i = last.indexOf(name); return i < 0 ? 0 : i + 1; };
   return [...owners].sort((a, b) => rank(a.participant) - rank(b.participant));
 }
-export async function advanceProjectDeletion(intents: ProjectDeletionIntents, owners: readonly ProjectDeletionOwner[], id: string, worker: string, heartbeat?: () => Promise<boolean>) {
+export async function advanceProjectDeletion(intents: ProjectDeletionIntents, owners: readonly ProjectDeletionStopOwner[], id: string, worker: string, heartbeat?: () => Promise<boolean>) {
   const claimed = await intents.claim(id, worker, 600);
   if (!claimed) return;
   const { lease, plan } = claimed; let operation = claimed.operation, currentOwner: ProjectDeletionOwner | undefined;
@@ -21,10 +23,19 @@ export async function advanceProjectDeletion(intents: ProjectDeletionIntents, ow
       if (operation.receipts.some((r) => r.participant === owner.participant && r.phase === phase)) continue;
       if (heartbeat && !(await heartbeat())) throw precondition('项目删除队列租约已失效');
       await intents.renew(lease, 600);
-      const result = ProjectDeletionStepResultSchema.parse(await owner.run({ operationId: id, generation: lease.generation, target: plan.target, phase, confirmed: plan.participants.find((p) => p.participant === owner.participant)! }));
+      const context = { operationId: id, generation: lease.generation, target: plan.target, phase, confirmed: plan.participants.find((p) => p.participant === owner.participant)! };
+      const missing = phase === 'stop' ? missingStopDependencies(owner.participant, operation.receipts) : [];
+      if (missing.length) {
+        if (owner.participant === 'resources') await owner.observeTerminating?.(context);
+        waiting ??= { participant: owner.participant, reason: `等待 ${missing.join('、')} 的停止与收尾证明` }; continue;
+      }
+      const result = ProjectDeletionStepResultSchema.parse(await withDeletionOwnerLease(async () => {
+        if (heartbeat && !(await heartbeat())) throw precondition('项目删除队列租约已失效');
+        await intents.renew(lease, 600);
+      }, () => owner.run(context)));
       if (result.kind === 'waiting') {
         if (phase !== 'stop') { await intents.defer(lease, owner.participant, result.reason); return; }
-        // A consumer may await its original runtime owner. Initiate every stop, retaining the all-owner barrier before purge.
+        // Independent owners can progress; original connections and resource deletion require completed dependencies.
         waiting ??= { participant: owner.participant, reason: result.reason }; continue;
       }
       if (result.kind === 'blocked') {

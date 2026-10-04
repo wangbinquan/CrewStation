@@ -5,6 +5,7 @@ import { conflict, notFound } from '@crewstation/kernel';
 import type { BusinessExecutionStore } from '../../ports/businessExecutions';
 import { businessExecutions as streams } from './businessTables';
 import { persistCompletionProof } from './completionProofs';
+import { ordinarySessionTask } from './deletion/admission';
 
 export function businessRetention(db: Database): Pick<BusinessExecutionStore, 'consume' | 'expire'> {
   return {
@@ -21,7 +22,7 @@ export function businessRetention(db: Database): Pick<BusinessExecutionStore, 'c
     }),
     expire: async () => db.transaction(async (tx) => {
       const rows = await tx.execute<{ task_id: string; execution_id: string }>(sql`SELECT task_id, execution_id FROM session.business_executions
-        WHERE consumed_at < clock_timestamp()-interval '7 days' AND complete=true ORDER BY consumed_at LIMIT 20 FOR UPDATE SKIP LOCKED`);
+        WHERE consumed_at < clock_timestamp()-interval '7 days' AND complete=true AND ${ordinarySessionTask(sql`business_executions.task_id`)} ORDER BY consumed_at LIMIT 20 FOR UPDATE SKIP LOCKED`);
       let count = await expireStoppedStreams(tx);
       for (const row of rows) {
         await tx.execute(sql`UPDATE session.business_executions SET expired=true WHERE task_id=${row.task_id} AND execution_id=${row.execution_id}`);
