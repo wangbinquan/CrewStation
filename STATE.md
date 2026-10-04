@@ -3299,3 +3299,12 @@ TaskRuntime本批较宽终态400 pass／0 fail、4385断言、75文件、317.84�
 两个稳定候选各只启动一次完整check：v1静态通过后5622 pass／144环境skip／3 fail，失败来自并行删除用例；P2修正后的v2 arch通过，lint被并行scopeStore的未使用导入阻断，七个候选首尾hash保持。两次失败均保留，不声称全仓绿；正式结论仍待本批确切提交的GitHub Actions。实际本机部署仍为845462d1ba9102965c9d8dadf814a096324c195a，本批读取器不作已部署或真实模型任务验收。
 
 持久before baseline、原owner肯定page ACK、同事务emission/revision/source、正式producer切换、旧采集与ownership/baseline总量分支移除、100K Task／10M usage和真实任务四桶／人民币／页面核对继续；生产开发producer OFF，两个RFC仍In Progress，不能把读取器基础PASS当统计已经完整。下方和既有全部并行输出保持。
+
+
+## 2026-10-04 RFC-034 完整 Task 用例的真实受理时间修正
+
+确切 SHA555061963e6408007ab8ab35e0ff718f02a93c5c 的 CI37163645146 已 completed/failure：static、unit、console、e2e 成功，module 因完整 Task 用例201／202失败，gate随之失败。原窗口固定为10月3日到4日UTC，真实HTTP新建的v3 Task已在4日合法落窗外；本机原测试0／1先红复现。这不是生产查询截断，不修改原半开范围或降低202期望。
+
+仅修改原测试及对应说明：在真实受理前冻结时钟前后24小时，保留201原Task与v3 HTTP受理、202完整身份及每Task1001attempt；增加from前1ms和恰在to的两条窗外Task，验证受理DTO及原execution_operation时间，原60秒预算和旧断言保持。真实PG定向1／0、58断言，精确lint通过；有限独立SOURCE2 PASS，两个候选、三控制、五引用首尾保持。旧CI及本机红记录完整保留，新正式结果仍待修复提交确切SHA hosted CI。
+
+本批不包含在制native page底座或并行删除源码/锁。正式原owner页持久/肯定ACK、before/reap接线、旧producer采集总量上限移除、100K Task／10M usage及真实任务四桶／人民币／页面验收继续；producer仍OFF，实际部署仍845462d1ba9102965c9d8dadf814a096324c195a，两个RFC不关闭。既有共享STATE全文和并行输出保持。
