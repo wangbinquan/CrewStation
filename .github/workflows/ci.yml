@@ -61,7 +61,7 @@ jobs:
   module:
     name: module（模块级 UT）
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:17.11

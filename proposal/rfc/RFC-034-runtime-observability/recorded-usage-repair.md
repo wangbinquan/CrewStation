@@ -39,3 +39,7 @@ complete-facts summary 保留各日期／source 自己的 metrics，原 Task、A
 ## 2026-10-05 原输出分类说明单位回归
 
 bb80a01a7d51ca2596b48a81f48eba40ef573f38 的六项 CI 在 console 中正式失败：1144 pass、1 fail，runtimeStatistics.test.tsx:144 原断言要求“输出包含推理 Token”，新分类提示仍有推理说明，但漏了 Token 单位。中英文仅补回这个原单位；原系统／项目、四桶、趋势键盘、分组、预算及所有断言完整保留。static、unit、e2e 已绿，module 被取消，gate 失败，不能计为六项通过或部署完成。旧确切失败回执保留，新提交继续确切 SHA 的六项 CI，再进行原本机部署。
+
+## 2026-10-05 原模块 CI 完整执行时间
+
+d2b9356953b82391924f79518a890f71fd6b27d9 的 ci37219704930 中 static、unit、console、e2e 均正式通过；module 在20分钟作业期限被 GitHub 取消，gate 因缺 tier-module 报告失败。原日志保留，没有已报 fail 的用例；包含201 Task／1001 attempts／10001原行、同快照与不可变缓存的原观测用例已逐项通过，但仍不能记整个 module 或六项通过。完整模块集合增长后仅将该作业执行期限调整到30分钟，让剩余原用例执行并上传完整报告；不改任何用例、单例超时、断言、分层、覆盖规则或采集／统计人口。新确切 SHA 的完整六项 CI 与本机部署继续另验，旧 cancelled／gate failure 不改写。
