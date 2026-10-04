@@ -19,6 +19,7 @@ export interface DevelopmentProjectWork {
   runResponse<T>(input: DevelopmentWorkInput, callback: () => Promise<T>): Promise<T>;
   runOrigin<T>(input: Omit<DevelopmentWorkInput, 'projectId'>, callback: () => Promise<T>): Promise<T>;
   runOriginResponse<T>(input: Omit<DevelopmentWorkInput, 'projectId'>, callback: () => Promise<T>): Promise<T>;
+  runGranted<T>(context: ProjectDeletionContext, input: Omit<DevelopmentWorkInput, 'projectId' | 'kind'>, callback: () => Promise<T>): Promise<T>;
   effect<T>(inputDigest: string, callback: () => Promise<T>): Promise<T>;
   whenActive<T>(inputDigest: string, callback: () => Promise<T>): Promise<T>;
   history(project: ProjectId): Promise<readonly DevelopmentWorkCallback[]>;

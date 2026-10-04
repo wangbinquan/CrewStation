@@ -10,7 +10,7 @@ const origins = {
   startAgent: 'task', sendMessage: 'task', cancelAgent: 'task', listAgents: 'task', startNativeTerminal: 'task', listNativeTerminals: 'task',
   stopNativeTerminal: 'task', getNativeTerminalSnapshot: 'task', touch: 'task-key',
   dispatchPendingNativeExecution: 'background', reconcileNativeExecutions: 'background', sendIdleReminders: 'background',
-} satisfies Record<Exclude<keyof DevSessionModuleApi, 'name' | 'deletionOwner' | 'developmentUsage' | 'developmentCleanup'>, 'project' | 'task' | 'task-key' | 'background'>;
+} satisfies Record<Exclude<keyof DevSessionModuleApi, 'name' | 'deletionOwner' | 'developmentUsage' | 'developmentCleanup' | 'projectDeletionCleanup'>, 'project' | 'task' | 'task-key' | 'background'>;
 
 /** One original callback for every project-facing response, with separate retained lifetimes for bounded child I/O. */
 export function developmentWorkApi(api: DevSessionModuleApi, work: DevelopmentProjectWork): DevSessionModuleApi {

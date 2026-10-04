@@ -87,3 +87,9 @@
 
 
 2026-10-04 本批稳定候选单次完整门禁终态：5610 pass／143环境skip／0 fail、136545断言、1105文件、1473.20秒；16功能/锁首尾指纹保持，静态四层全绿。完整LCOV精确改动行29／29、100%且无违规，回执 `/private/tmp/cs-rfc037-runtime-recovery-content-full-v1.json`、`/private/tmp/cs-rfc037-runtime-recovery-content-patch-v2.json`。本批19路径精确发布接续；后续8个未追踪TaskRuntime七阶段owner文件未进入本批完整门禁或发布，其真实PG原子停止证明/快照专项6／0、61断言仅使用受控停止端口。删除入口OFF，实际stop／数字排空、全22方/SCM及专用项目永久回收继续，不能将受控停止称为实机验收。跨会话只保留必要发布/部署交接。
+
+
+2026-10-04 本批19路径已精确发布 `845462d1ba9102965c9d8dadf814a096324c195a`，[CI37159979455](https://github.com/wangbinquan/CrewStation/actions/runs/37159979455) 六项终态成功。2026-10-03T23:19:52.833Z 八组件就绪，实际Pod imageID与节点OCI revision核对该提交，239份已安装迁移checksum全部一致；实际API Pod 2702c026-cc3e-4f05-87f9-ed574e9b3096以uid/gid1000完成报告根独占创建、fsync、回读和删除本证明文件。所有原Namespace／Pod／PVC／PV、数据库与角色OID、原生容器及Runner摘要保持，未创建模型任务。实际部署回执 `/private/tmp/cs-rfc037-845462d1ba91-runtime-recovery-content-v1-deployment-receipt.json`；构建v1因Docker本地状态文件沙箱权限在构建前失败，已保留原件，授权v2精确Git提交树构建通过。后续TaskRuntime七阶段、明确原作业claim和DevSession停止快照／清理许可在制文件未进入本次部署。真实停止／数字排空、全部22方与原专用项目永久回收继续，入口与producer均OFF。跨会话仅发送实际部署开始／终态交接，锁已释放。
+# 2026-10-04 私有停止 owner 批次完整门禁
+
+原许可与停止后完整快照批次 v3 自然终态：5643 pass、143 环境 skip、0 fail、216454 断言、1110 文件、1739.55 秒，39 功能/锁及日期依赖摘要保持。原 v1/v2 失败日志保持，最新完整回执 `/private/tmp/cs-rfc037-granted-stop-full-v3.json`，精确 90968 本批后端类型 0 错。43 路径精确发布准备不包含下一批 Session/停止依赖源码。私有七阶段的受控停止端口通过不代表正式生产停止或跨进程数字排空通过；全 22 方与原专用项目永久回收仍在进行，入口 OFF。

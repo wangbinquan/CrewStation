@@ -6,6 +6,8 @@ export interface ProjectDeletionLease { readonly operationId: string; readonly o
 export interface ProjectDeletionApi {
   readonly deletionOwner: ProjectDeletionOwner;
   assertProjectDeletionGrant(context: ProjectDeletionContext): Promise<void>;
+  /** Internal participants obtain another owner's original confirmed material from the stored plan, never from a caller-made inventory. */
+  projectDeletionParticipantContext(context: ProjectDeletionContext, participant: ProjectDeletionParticipant): Promise<ProjectDeletionContext>;
   deletionScope(projectId: ProjectId): Promise<ProjectDeletionTarget>;
   prepareDeletionPlan(actor: Actor, projectId: ProjectId, inventory: readonly ProjectDeletionInventory[]): Promise<ProjectDeletionPlan>;
   acceptProjectDeletion(actor: Actor, projectId: ProjectId, input: AcceptProjectDeletion, inventory: readonly ProjectDeletionInventory[]): Promise<ProjectDeletionOperation>;

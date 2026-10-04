@@ -18,9 +18,10 @@ describe.skipIf(!available)('development deletion owner (actual PG; controlled o
       const confirmed = await f.owner().inspect(f.target); expect(confirmed.complete).toBe(true); expect(confirmed.resources).toHaveLength(14);
       await expect(f.owner().run(f.context(confirmed, 'metadata'))).rejects.toThrow();
       const firstSeal = await f.owner().run(f.context(confirmed)); expect(firstSeal.kind).toBe('done');
+      let generation = 1;
       for (const phase of PROJECT_DELETION_PHASES) {
-        const first = await f.owner().run(f.context(confirmed, phase)); expect(first.kind).toBe('done');
-        expect(await f.owner().run(f.context(confirmed, phase, 2))).toEqual(first);
+        const first = await f.owner().run(f.context(confirmed, phase, generation)); expect(first.kind).toBe('done');
+        expect(await f.owner().run(f.context(confirmed, phase, ++generation))).toEqual(first);
       }
       expect((await f.owner().inspect(f.target)).resources).toEqual([]);
       expect([...await f.database.db.execute('SELECT task_id,layout FROM dev_session.workspace_layouts')]).toEqual([{ task_id: f.otherWorkspace, layout: { private: 'foreign-layout' } }]);

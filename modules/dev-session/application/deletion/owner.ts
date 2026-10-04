@@ -20,7 +20,9 @@ export function developmentDeletionOwner(repository: DevelopmentDeletionReposito
     if (context.phase === 'stop') {
       await repository.observe();
       for (const callback of scope.callbacks) if (!(await repository.exited(callback))) return { kind: 'waiting', reason: '等待开发原回调及已发起副作用的私有 finally；请求超时、断线和租约过期不算退出' };
+      if (await repository.pending(context)) return { kind: 'waiting', reason: '等待原开发清理尝试的私有 finally，不能并发接续数字排空' };
       if (await repository.legacyPending(context)) return { kind: 'waiting', reason: '原开发执行仍有未收尾记录，需接续原执行停止，不能由逻辑状态证明物理回收' };
+      return { kind: 'done', evidence: await repository.captureStopped(context) };
     }
     if (context.phase === 'metadata') await repository.purge(context);
     if (context.phase === 'verify' && (await repository.inspect(context.target)).scope.count !== 0)
@@ -29,8 +31,7 @@ export function developmentDeletionOwner(repository: DevelopmentDeletionReposito
     const evidence: ProjectDeletionEvidence = { kind: delegated ? 'not-applicable' : 'metadata', count: delegated ? 0 : scope.count,
       digest: jsonHash({ operationId: context.operationId, phase: context.phase, scope: scope.digest }),
       description: delegated ? '开发任务容器、工作盘、对象和命名空间由对应物理资源 owner 逐项证明'
-        : context.phase === 'stop' ? '已登记的开发原回调及在途副作用已由私有 finally 或受保护原完整 Pod 停止证明退出'
-          : context.phase === 'metadata' ? '开发历史和正文已完整删除，仅保留数量、摘要及阻断旧键写入的最小原归属'
+        : context.phase === 'metadata' ? '开发历史和正文已完整删除，仅保留数量、摘要及阻断旧键写入的最小原归属'
             : '开发准入与原持久阶段证明已核对，全部内容按原身份遍历' };
     await sources.assertGrant(context); await repository.record(context, evidence); return { kind: 'done', evidence };
   } };

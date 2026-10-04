@@ -16,8 +16,14 @@ describe.skipIf(!available)('events 永久删除（真实 PG）', () => {
     expect(started.context.confirmed.references.map((r) => r.id)).toContain(f.other.id);
     const [before] = await f.database.db.execute<{ body: object }>(sql`SELECT to_jsonb(i) AS body FROM events.inbox i WHERE id=${f.ids.foreignEvent}`);
     expect((await owner.run(started.context)).kind).toBe('done');
+    await f.proceed(started,'namespace');
+    const metadataContext = { ...started.context,phase: 'metadata' as const };
+    const metadata = await owner.run(metadataContext);
+    expect(metadata.kind).toBe('done');
+    expect(await owner.run(metadataContext)).toEqual(metadata);
     await f.proceed(started,'metadata');
-    expect((await owner.run({ ...started.context,phase: 'metadata' })).kind).toBe('done');
+    // Root 已推进到 verify，旧 metadata 许可不能再发起清理。
+    await expect(owner.run(metadataContext)).rejects.toMatchObject({ kind: 'precondition' });
     await f.proceed(started,'verify');
     expect((await f.project.api.completeProjectDeletion(started.lease)).state).toBe('succeeded');
     expect((await owner.inspect(started.context.target)).resources.every((r) => r.count === 0)).toBe(true);

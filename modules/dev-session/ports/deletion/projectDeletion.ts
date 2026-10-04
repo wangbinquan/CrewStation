@@ -10,6 +10,8 @@ export interface DevelopmentDeletionRepository {
   record(context: ProjectDeletionContext, evidence: ProjectDeletionEvidence): Promise<void>;
   exited(callback: DevelopmentWorkCallback): Promise<boolean>;
   legacyPending(context: ProjectDeletionContext): Promise<boolean>;
+  pending(context: ProjectDeletionContext): Promise<boolean>;
+  captureStopped(context: ProjectDeletionContext): Promise<ProjectDeletionEvidence>;
   observe(): Promise<void>;
   purge(context: ProjectDeletionContext): Promise<void>;
 }

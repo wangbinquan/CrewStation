@@ -224,4 +224,21 @@ describe.skipIf(!available)('项目永久删除的持久意图与完成屏障（
     await mod.api.blockProjectDeletion(lease, [{ participant: 'project', code: 'test-pause', message: '测试暂停' }]);
     await expect(mod.api.deletionOwner.run(context)).rejects.toMatchObject({ kind: 'precondition' });
   });
+
+  test('private cross-owner cleanup context uses the stored original confirmation and retains the actual lease generation', async () => {
+    const { operation, lease, plan } = await start();
+    await receipts(lease, ['seal']);
+    const context = { operationId: operation.id, generation: lease.generation, target: plan.target, phase: 'stop' as const,
+      confirmed: plan.participants.find((p) => p.participant === 'task-runtime')! };
+    const derived = await mod.api.projectDeletionParticipantContext(context, 'dev-session');
+    expect(derived).toEqual({ ...context, confirmed: plan.participants.find((p) => p.participant === 'dev-session')! });
+    await mod.api.assertProjectDeletionGrant(derived);
+    derived.confirmed.revision = jsonHash('caller-mutated-copy');
+    expect((await mod.api.projectDeletionParticipantContext(context, 'dev-session')).confirmed.revision).toBe(jsonHash('dev-session'));
+    for (const patch of [{ generation: lease.generation + 1 }, { phase: 'metadata' as const }, { phase: 'seal' as const },
+      { target: { ...context.target, namespace: 'replacement-project' } }, { confirmed: { ...context.confirmed, revision: jsonHash('forged') } }])
+      await expect(mod.api.projectDeletionParticipantContext({ ...context, ...patch }, 'session')).rejects.toMatchObject({ kind: 'precondition' });
+    await mod.api.blockProjectDeletion(lease, [{ participant: 'project', code: 'test-block', message: 'original lease no longer runs' }]);
+    await expect(mod.api.projectDeletionParticipantContext(context, 'session')).rejects.toMatchObject({ kind: 'precondition' });
+  });
 });

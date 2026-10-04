@@ -66,7 +66,7 @@ describe.skipIf(!available)('development original work (actual PG; controlled pu
           FROM dev_session.original_callbacks WHERE id=${birth!.id}`))).rejects.toThrow();
         await expect(f.database.db.transaction((tx) => tx.execute(sql`INSERT INTO dev_session.original_callbacks(id,project_id,origin_kind,origin_key,origin_id,kind,reference,consumer_id,input_digest,origin_revision,backend_pid,original_process,exit_key_hash)
           SELECT ${newResourceId()},project_id,origin_kind,origin_key,${newResourceId()},kind,reference,${newResourceId()},input_digest,origin_revision,${pid},original_process,exit_key_hash
-          FROM dev_session.original_callbacks WHERE id=${birth!.id}`))).rejects.toMatchObject({ cause: { message: expect.stringContaining('original public source') } });
+          FROM dev_session.original_callbacks WHERE id=${birth!.id}`))).rejects.toMatchObject({ cause: { message: expect.stringContaining('original source') } });
       });
       f.protect({ ...f.processIdentity, pid: process.pid + 1 }); await expect(f.work.run(f.input(), async () => undefined)).rejects.toThrow('PID'); f.protect(f.processIdentity);
       await expect(f.work.run({ ...f.input(), inputDigest: 'incomplete' }, async () => undefined)).rejects.toThrow();

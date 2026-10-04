@@ -102,8 +102,9 @@ export function runtimeProjectWork(db: Database, sources: RuntimeWorkSources, li
   })());
   const api: RuntimeProjectWork = {
     run: (input, callback) => run(input, callback), runOrigin: (input, callback) => runOrigin(input, callback), runOriginResponse: (input, callback) => runOrigin(input, callback, true),
-    runGranted: (context, input, callback) => {
+    runGranted: async (context, input, callback) => {
       const original = ProjectDeletionContextSchema.parse(structuredClone(context));
+      if (original.confirmed.participant !== 'task-runtime') throw precondition('运行清理许可不属于 task-runtime');
       return run({ ...input, projectId: original.target.id, kind: 'deletion' }, callback, original);
     },
     history: (project) => runtimeWorkHistory(db, ProjectIdSchema.parse(project)), observe: () => observeRuntimeWork(db, sources.processes),

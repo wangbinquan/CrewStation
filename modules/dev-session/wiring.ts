@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import type { UserId } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import type { Clock, Logger } from '@crewstation/kernel';
-import { isPlatformError, noopLogger, systemClock } from '@crewstation/kernel';
+import { isPlatformError, jsonHash, newResourceId, noopLogger, precondition, systemClock } from '@crewstation/kernel';
 import type { Database, MigrationSet, ResourceIdentityDirectory } from '@crewstation/persistence';
 import { readMigrationDir } from '@crewstation/persistence';
 import type { Hono } from 'hono';
@@ -134,13 +134,18 @@ function developmentApi(deps: DevSessionModuleDeps, useCaseDeps: DevSessionUseCa
     pricing && projectWork ? guardedDevelopmentPort(pricing, projectWork) : pricing);
   const developmentUsage = projectWork ? developmentUsageWork(rawUsage, projectWork) : rawUsage;
   const endingStore = developmentEndingStore(deps.db, useCaseDeps.clock);
-  const cleanup = deps.developmentCleanupSession ? developmentCleanupParticipant({ owner: developmentUsage,
+  const cleanup = deps.developmentCleanupSession ? developmentCleanupParticipant({ owner: rawUsage,
     store: projectWork ? guardedDevelopmentPort(endingStore, projectWork) : endingStore, environments: useCaseDeps.environments,
     session: projectWork ? guardedDevelopmentPort(deps.developmentCleanupSession, projectWork) : deps.developmentCleanupSession, clock: useCaseDeps.clock }) : undefined;
   const api: DevSessionModuleApi = {
     ...(deps.deletionWorkSources ? { deletionOwner: developmentDeletionOwner(developmentDeletionRepository(deps.db, deps.deletionWorkSources), deps.deletionWorkSources) } : {}),
     developmentUsage,
     ...(cleanup ? { developmentCleanup: projectWork ? developmentCleanupWork(cleanup, projectWork) : cleanup } : {}),
+    ...(cleanup && projectWork ? { projectDeletionCleanup: (context, input) => {
+      if (context.phase !== 'stop') throw precondition('开发项目清理只接受当前停止阶段许可');
+      return projectWork.runGranted(context, { originKind: 'task', originKey: input.identity.executionId,
+        reference: newResourceId(), inputDigest: jsonHash(input) }, () => cleanup.advance(input));
+    } } : {}),
     invokeApi: apiInvocationUseCase(useCaseDeps),
     ...clusterAgentUseCases(useCaseDeps, agentStarts, agentExecutions), ...clusterNativeUseCases(useCaseDeps, terminals),
     name: 'dev-session', ...lifecycle, ...agents, ...native, ...activity, ...workspaceLayoutUseCases(useCaseDeps, projectWork ? guardedDevelopmentPort(drizzleWorkspaceLayouts(deps.db), projectWork) : drizzleWorkspaceLayouts(deps.db), terminals),

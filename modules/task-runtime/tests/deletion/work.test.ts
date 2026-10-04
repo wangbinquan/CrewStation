@@ -60,6 +60,7 @@ describe.skipIf(!available)('TaskRuntime original work (actual PG; controlled pu
       await expect(f.work.runGranted(context, input, async () => undefined)).rejects.toThrow('grant-unavailable');
       f.permit(true); await f.seal(2); await expect(f.work.runGranted(context, input, async () => undefined)).rejects.toThrow('世代');
       const next = await f.context('stop', 2); await f.work.runGranted(next, input, async () => undefined);
+      await expect(f.work.runGranted({ ...next, confirmed: { ...next.confirmed, participant: 'dev-session' } }, input, async () => undefined)).rejects.toThrow('task-runtime');
       await expect(f.work.runGranted(await f.context('seal', 2), input, async () => undefined)).rejects.toThrow();
       const history = await f.work.history(f.project); expect(history.filter((row) => row.grant).every((row) => row.exited)).toBe(true);
       expect(history.some((row) => row.grant?.generation === 2)).toBe(true);

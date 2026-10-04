@@ -10,7 +10,7 @@ import { devSessionMigrations } from '../../wiring';
 /** Actual owner PostgreSQL; public origin ports are controlled identity witnesses, not physical stop evidence. */
 export async function developmentContentFixture(options: { legacyOnly?: boolean } = {}) {
   const database = await createTestDatabase([options.legacyOnly ? { ...devSessionMigrations,
-    files: devSessionMigrations.files.filter((file) => !/^001[56]_/.test(file.name)) } : devSessionMigrations]);
+    files: devSessionMigrations.files.filter((file) => !/^001[5-8]_/.test(file.name)) } : devSessionMigrations]);
   const project = ProjectIdSchema.parse(newResourceId()), otherProject = ProjectIdSchema.parse(newResourceId());
   const workspace = TaskIdSchema.parse(newResourceId()), otherWorkspace = TaskIdSchema.parse(newResourceId());
   const origins = new Map<string, DevelopmentDeletionOrigin>(), unavailable = new Set<string>(), requests: string[] = [];
