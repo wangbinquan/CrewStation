@@ -35,3 +35,7 @@ complete-facts summary 保留各日期／source 自己的 metrics，原 Task、A
 本片完整 check v1 在该真实测试类型问题停止；修正后的唯一新候选完整 check v2 在并行 filesystem-metrics/registry/inventory.ts 的 TS2769 停止，原失败回执保持，不能记整仓通过。原观测31候选首尾字节稳定，结构与 lint 通过，未因并行源码变动重复完整门。按 development-rules §3 对本次全部30源码／测试路径精确 lint、console 类型及全部13观测测试文件核对：59 pass／0 fail、25,821断言，真实原 PostgreSQL prepared10 实例身份保持，未增加数据库服务器或改变原预算；覆盖201任务／1001 attempts／10001原行、分页 EOF、同模型歧义与原归属、部分定价／hidden／零值、各范围与旧不可变缓存。
 
 精确提交树六项 hosted CI、本机八组件部署和正式系统／项目页面对账仍待后继回执，不以本片专项代替这些验收。新录入的数字是实际已收到的原范围贡献与人民币验收费率估值；native owner 生产接线、完整 before／历史采集及真实100K Task／10M usage继续，两RFC尚未完成。
+
+## 2026-10-05 原输出分类说明单位回归
+
+bb80a01a7d51ca2596b48a81f48eba40ef573f38 的六项 CI 在 console 中正式失败：1144 pass、1 fail，runtimeStatistics.test.tsx:144 原断言要求“输出包含推理 Token”，新分类提示仍有推理说明，但漏了 Token 单位。中英文仅补回这个原单位；原系统／项目、四桶、趋势键盘、分组、预算及所有断言完整保留。static、unit、e2e 已绿，module 被取消，gate 失败，不能计为六项通过或部署完成。旧确切失败回执保留，新提交继续确切 SHA 的六项 CI，再进行原本机部署。

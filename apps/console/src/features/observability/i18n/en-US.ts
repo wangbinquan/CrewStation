@@ -106,7 +106,7 @@ export const messages = {
   "runtime.wall": "Task elapsed time",
   "runtime.wallHint": "Elapsed time does not add parallel executions",
   "runtime.input": "Uncached input",
-  "runtime.bucketHint": "Input excludes cache; output includes reasoning. Unknown buckets stay unknown; the total sums known buckets.",
+  "runtime.bucketHint": "Input excludes cache; output includes reasoning tokens. Unknown buckets stay unknown; the total sums known buckets.",
   "runtime.tokenUnknown": "Unobserved",
   "runtime.trendInterval": "Current trend interval",
   "runtime.cacheRead": "Cache read tokens",
