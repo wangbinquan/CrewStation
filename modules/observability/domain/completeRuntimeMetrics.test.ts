@@ -29,15 +29,15 @@ describe('complete runtime metrics exact publication',()=>{
     const metric=completeRuntimeMetrics(hidden);if(metric.state!=='ready') throw new Error('known hidden-cost token evidence missing');
     expect(metric.cost).toEqual({currency:'CNY',state:'hidden',amount:null});
   });
-  test('a single missing native row makes the whole aggregate non-ready with no numbers',()=>{
+  test('a single missing native row keeps full totals unknown while preserving its received evidence',()=>{
     const good=emptyCompleteRuntimeFold(true,'1');addCompleteRuntimeAllocation(good,contribution,priced(),true,7);
     const missing=emptyCompleteRuntimeFold(true,'1');completeRuntimeGap(missing,'native-capture-unobserved');
     const overall=emptyCompleteRuntimeFold(true);mergeCompleteRuntimeFold(overall,good);mergeCompleteRuntimeFold(overall,missing);
-    expect(completeRuntimeMetrics(overall)).toEqual({state:'not-ready',gaps:['native-capture-unobserved']});
+    const metrics=completeRuntimeMetrics(overall);expect(metrics).toMatchObject({state:'not-ready',gaps:['native-capture-unobserved'],recordedUsage:{tokens:{...contribution,total:(BigInt(contribution.input)+15n).toString()},records:'1'},recordedCost:{currency:'CNY',amount:'0.000001234567',records:'1',pricedRecords:'1'}});expect(metrics).not.toHaveProperty('tokens');expect(metrics).not.toHaveProperty('cost');
     expect(completeRuntimeMetrics(emptyCompleteRuntimeFold(true))).toEqual({state:'not-applicable'});
   });
   test('an unknown category cannot become a numeric zero or a priced total',()=>{
     const fold=emptyCompleteRuntimeFold(true,'1');addCompleteRuntimeAllocation(fold,{...contribution,cacheRead:null},priced(),true,7);
-    expect(completeRuntimeMetrics(fold)).toEqual({state:'not-ready',gaps:['usage-incomplete']});
+    const metrics=completeRuntimeMetrics(fold);expect(metrics).toMatchObject({state:'not-ready',gaps:['usage-incomplete'],recordedUsage:{tokens:{...contribution,cacheRead:null,total:(BigInt(contribution.input)+12n).toString()},bucketRecords:{input:'1',cacheRead:'0',cacheWrite:'1',output:'1'}}});expect(metrics).not.toHaveProperty('tokens');expect(metrics).not.toHaveProperty('cost');
   });
 });

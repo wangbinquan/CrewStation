@@ -9,7 +9,12 @@ import { selectCompleteUsage } from './completeUsageSelection';
 
 export async function allocateCompleteTaskUsage(context:CompleteTaskEvidenceContext,count:string) {
   context.usage.seal(count);
-  const selection=await selectCompleteUsage(context.usage.workspace,context.input.signal);
+  const selection=await selectCompleteUsage(context.usage.workspace,context.input.signal,async(record,_quality,allocated)=>{
+    const found=await context.attemptFor(record.original.identity);if(!found)return;
+    completeRuntimeGap(found.entry.fold,'coverage-incomplete');
+    if(!allocated)addCompleteRuntimeAllocation(found.entry.fold,record.contribution,undefined,false,record.original.projection.projectionRevision,false);
+    await context.attempts.put(found.key,found.entry);
+  });
   await context.usage.flush();
   if (selection.ambiguousOverlaps!=='0' || selection.unavailableSummaries!=='0') completeRuntimeGap(context.fold,'coverage-incomplete');
   for await (const page of completeWorkingPages<CompleteRuntimeAllocation>(context.input.rows,context.usage.allocationsNamespace,context.input.signal)) {
@@ -24,7 +29,7 @@ export async function allocateCompleteTaskUsage(context:CompleteTaskEvidenceCont
       if (!original.projection.complete || original.projection.issues.length) completeRuntimeGap(entry.fold,'usage-incomplete');
       const whole=TOKEN_BUCKETS.every(bucket=>contribution[bucket]===original.projection.contribution[bucket]);
       const valuation=values.get(context.input.keyOf(completeUsageIdentity(original)));
-      addCompleteRuntimeAllocation(entry.fold,contribution,valuation,whole,original.projection.projectionRevision);
+      addCompleteRuntimeAllocation(entry.fold,contribution,valuation,whole,original.projection.projectionRevision,!quality.ambiguous&&!quality.unavailable);
       valued.push({key:row.key,document:{...row.document,valuation:valuation??null,whole}});
       await context.attempts.put(key,entry);
     }

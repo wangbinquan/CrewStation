@@ -53,7 +53,7 @@ function RuntimeOverviewPage({projectId,go}:PageProps) {
   {!operations?<RuntimeFilters key={window.from+window.to} window={window} search={search} change={change} states={runtimeStates}/>:null}
   {!operations?<RuntimeSourceFilter search={search} change={change}/>:null}
   {!operations?<QueryStatus isPending={query.isPending} error={query.error}/>:null}
-  <RuntimeViewTabs projectId={projectId} search={search} change={change}>{search.tab==='resources'?<RuntimeResourceMetrics projectId={projectId} search={search} change={change}/>:search.tab==='health'?<RuntimeHealth projectId={projectId}/>:data?<Stack>{report?<RuntimeReportState report={report}/>:null}<RuntimeAnalysis summary={data.summary} header={data.header} search={search} change={change} task={openTask}/></Stack>:report?<RuntimeReportState report={report}/>:null}</RuntimeViewTabs>
+  <RuntimeViewTabs projectId={projectId} search={search} change={change}>{search.tab==='resources'?<RuntimeResourceMetrics projectId={projectId} search={search} change={change}/>:search.tab==='health'?<RuntimeHealth projectId={projectId}/>:data?<Stack>{report&&(search.tab??'overview')==='overview'?<RuntimeReportState report={report} compact/>:null}<RuntimeAnalysis summary={data.summary} header={data.header} search={search} change={change} task={openTask}/></Stack>:report?<RuntimeReportState report={report}/>:null}</RuntimeViewTabs>
  </Stack>;
 }
 export function SystemRuntimeStatisticsPage() {

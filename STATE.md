@@ -1,3 +1,55 @@
+## 2026-10-05 RFC-034 已收到分类用量与人民币候选
+
+本片在同一原 allocation／merge 中保留四桶已知分类、各桶记录覆盖及实际已定价人民币；原全范围有缺口时完整 Token／CNY仍未知，Task／Agent／算力／项目／贡献／attempt／泳道及趋势各自保持原范围资格。四桶全歧义排除也经同一 awaited 原选择回调标回原 attempt，只人口与缺口、不猜值；原全来源 EOF、人口、spool／摘要／CAS不放宽，旧不可变报告及费用可见性撤销保持。页面重复大缺口改为仅总览短状态，新卡片沿用原标准间距。
+
+DESIGN v2 与增量 SOURCE1通过，原 SOURCE31唯一测试类型P2及check v1失败保留；修正后的唯一完整check v2被并行filesystem-metrics registry类型停止，31候选稳定，未改其源码、不重复整仓门。依 development-rules §3，全部30自有源码／测试精确lint、console类型及13原测试文件通过：59／0、25,821断言，原prepared10 PostgreSQL身份保持，原人口／损坏拒绝／预算不变。详见 [已记录用量修复](proposal/rfc/RFC-034-runtime-observability/recorded-usage-repair.md)。
+
+本片精确发布／六项CI／本机部署与正式浏览器仍待，尚未称整仓或RFC完成。原native持久owner生产装配、完整before／历史采集与真实100K Task／10M usage继续。共享STATE下方所有并行RFC-037、RFC-036和历史正文逐字保持；提交若包含该文件，明确保留这份并行状态，但不包含其在制代码／迁移。
+
+## 2026-10-04 RFC-037 Data 完整对象处理器候选通过
+
+原下载读取租约／计数／完整性、上传与验证结果／heartbeat finally、检查与回收结果已纳入同一原请求；同类型原位置的内部字节操作借用当前出生。实际 PG 上传 finish／verified 暂停及 Data 工厂下载 metadata try-lock 锁场景均验证删除 waiting、没有封写行，放行后原记录 finished 与计数归零。完整 Data／相关 Root／K8s 282 pass／11 Garage 环境 skip／0 fail、1982断言，官方改动行207／210、98.57%无违规。结构／lint、工作台类型通过；全树后端类型有并行观测用例 string/null 错误，保留其文件，不计全仓绿。15功能路径固定、组合79路径，当前52外部在制指纹单独记录，原28全保持、索引空；原0007／0008、锁248不变。见[完整处理器证据](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/object-requests.md)。
+
+这是未提交／CI／部署的候选。完整应用处理器收尾缺口已修，部署前历史、正式对象／SCM十一类／镜像／发布物理来源、剩余legacy／未启动、入口和原项目全回收实机验收继续；生产入口／producer OFF、原项目保持、总目标active。上库部署授权有效，自动审批的Git联网／引用写入拒绝未变，没有绕过或新增跨会话消息；以下所有并行输出与历史全文保持。
+
+## 2026-10-04 RFC-037 Data 原对象字节请求候选通过
+
+实际 Data 工厂／Root 接原 key／服务归属、独立 Pod／PID 出生保护、private finally 与原 shared 准入，真实连接丢失不算原字节回调退出；下载提前 completed 和 body 失败误记成功两项真实红例已修，EOF／取消前继续阻断删除。seal 等待原 durable 请求，201条原请求跨页和其他项目／共享后端保持通过。追加0008，锁248保持已发布246及先前0007；现在Data31表全登记。完整Data及相关Root／K8s278 pass／11 Garage环境skip／0 fail、1952断言；末次仅变动收尾的原请求8／0、79断言及整仓静态四层通过，官方改动行426／428、99.53%无违规。19功能／锁和28并行指纹保持，索引空。超时自有隔离fixture精确移除，其他37库名字OID保持。见[原对象请求证据](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/object-requests.md)。
+
+这是正式接线后的平台字节回调历史，不能冒充原完整处理器 metadata finally、部署前历史、Garage版本／副本及远端消费者闭合；正式objectPhysics仍须实现并安装。SCM十一类、镜像／发布、剩余legacy／未启动、删除入口及原项目全回收继续。没有跨会话消息、没有重复未变整仓门。提交／部署授权有效，Git执行拒绝未变，未绕过或部署未提交代码；当前候选未提交、CI或部署，缓存8db不算fresh同步。入口／producer OFF、原项目保持、总目标active；以下并行输出和历史全文保留。
+
+## 2026-10-04 RFC-037 全22方实际工厂条件组合通过
+
+全部22实际owner、原开通自身清理／最终协调事务、Resources原Pod／卷持久证明、镜像和发布原回调保护已接条件Root。默认生产尚未提供SCM／对象／镜像／发布正式物理来源，删除入口仍OFF，不算已生产安装。实际管理员HTTP先30秒超时：22方快照并行耗尽原四连接池，顺序读取留出归属端口连接后同预算2.228秒通过；保留失败，无扩大预算。非管理员403、全部22方盘点、实际Data内容、物理源故障拒绝受理、两个项目保留均验证。整仓静态及全部Platform／Provisioning239 pass／1Garage环境skip／0 fail、2113断言、75文件；官方改动行77／81，95.06%无违规。12功能和28并行指纹保持，索引空。原超时隔离测试库按原窗口／用户／项目及无活动连接精确清除，其他37库名字OID全保持。见[Root证据](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/root-composition.md)。
+
+下一步正式物理来源与原生产者／消费者闭合：Data对象、SCM十一类、镜像／发布；剩余legacy／未启动、管理员两层确认及原专用项目全回收继续。用户上库部署授权持续有效，执行环境的Git联网／引用写入拒绝未变，未绕过、未提交推送部署新候选；缓存8db不能当fresh同步。本轮零跨会话消息，没有重复未变内容整仓全量。入口／producer OFF、原项目保持、总目标active；以下并行输出及历史全文保留。
+
+## 2026-10-04 RFC-037 Data 完整内容 owner 已接实际 Root
+
+实际 Data 工厂和平台 Root 已接原归属／许可及七阶段持久 owner，完整覆盖既有28表（20内容＋8共享／最小身份），新增不可变0007及锁247，原246校验和全保持。全局备份漏封写、续租世代、原文件key越界和本地归档引用四项真实红例已修，原失败保留。完整Data及相关平台组合141 pass／8 Garage环境skip／0 fail；最终两个盘点保护按比例补验13／0，整仓静态四层通过；官方改动行259／261、99.23%，15功能候选及28并行指纹保持。见[Data证据](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/data-owner.md)。没有重复未变内容的整仓全量门。
+
+Data owner 已存在，下面“data无完整owner”属于先前历史。正式 objectPhysics 和原生产者／消费者物理闭合尚未装配；非空原对象必须阻断，受控物理端口不算生产回收。下一步完整22方Root和实际物理来源，剩余legacy／未启动、SCM十一类、镜像／发布、入口二次确认及原项目全回收继续。入口／producer OFF，原项目保持。上库／部署授权一直有效；Git联网／引用写入被自动审批两次明确拒绝，执行限制未变，未绕过，未提交推送部署新候选；缓存8db不能冒充fresh同步。所有并行输出与以下历史原样保留。
+
+## 2026-10-04 RFC-037 原目录容量与旧数字副本接线候选
+
+70,001 原任务键真实PG红例 `MAX_PARAMETERS_EXCEEDED` 已修，完整目录不截断；目录组合3／0。旧数字存储键通过不可变原归属映射接实际Session内部HTTP，业务／开发页重放、数值ACK、终态消费和排空均保持原存储键与原JSON，专项3／0、32断言。直接私有读取孤立数字事件误报不存在的真实红例已修，多条原键仍阻断。最终整仓静态四层及全部Session／相关Root／消费者组合174／0、1285断言通过（check-v4）；完整console1144／0、7970断言通过（console-final-v2）。真实WebSocket和POST先红后绿，保留原生网络对象并隔离既有UI用例遗留fetch替身；旧失败原件保持。官方改动行222／222，32路径候选及28并行路径指纹核对，索引空；没有运行或宣称整仓全部测试。见[旧数字接线证据](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/legacy-task-data.md)。
+
+生产组合核对确认data尚无完整删除owner，不能用空报告凑22方；数据／对象、完整Root、未启动与剩余legacy、SCM十一类及镜像/发布正式物理来源、二次确认／原项目全回收继续。入口与producer OFF。Git执行限制未变，没有再次重试或绕过拒绝，没有提交／推送／部署新候选；缓存8db不可冒充fresh fetch。上库／部署授权一直有效，待应用执行限制解除。原验证资源保持，以下并行输出与历史原样保留。
+
+## 2026-10-04 RFC-037 原文件消费者鉴权接线候选
+
+全线程读取原语接固定鉴权HTTP及严格客户端，uint64原身份/原boot与PID namespace绑定，错误和取消不算零占用；FD后开及最终复核取消两项真实红例已修。候选预加载DOM29／0，完整console1142／0，真实PG/原HTTP删除组合34／0；整仓静态与最终精确lint通过。原API既有容器的只读Linux核对找到6条原FD引用，关闭自己的句柄后0，原UID/CID及GitLab保持；这不是完整GitLab来源、生产者闭合或项目物理清理。详见[消费者接线证据](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/consumer-transport.md)。
+
+用户上库/部署授权有效，自动审批却连续两次拒绝必要git fetch，明确禁止联网/Git引用写入且用户授权不能覆盖执行限制；已有授权与低风险证据重审仍被拒绝。未绕过、未暂存/提交/推送/部署，已请求解除执行限制。HEAD及缓存origin8db，不能宣称已刷新远端同步。上一批c58的六项CI和实际部署不变；新候选不冒充已上线。全部22 owner、旧键/未启动兼容、SCM十一类与镜像/发布正式物理来源、最终二次确认及原项目全回收继续，入口/producer OFF、总目标active。以下并行输出和旧历史保持。
+
+## 2026-10-04 RFC-037 原停止与数字排空已经发布部署
+
+按用户最快上线指令，151路径已精确上库 `c58a3a79ad2727673dc34a9eddd59dadcb57bf8c`，[CI37192203246](https://github.com/wangbinquan/CrewStation/actions/runs/37192203246) 六项终态成功。2026-10-04T09:55:55.169Z本机八组件就绪，实际Pod imageID／节点OCI来源及246项已安装迁移checksum核对提交；原Namespace／项目Pod／PVC／PV、全部数据库/角色名字与OID、原GitLab容器及Runner保持，无新模型任务。原件 `/private/tmp/cs-rfc037-c58a3a79ad27-fast-release-v4-deployment-receipt.json`；完整迁移映射及部署基线 `/private/tmp/cs-rfc037-fast-release-migration-module-map-v4.json`、`cs-rfc037-fast-release-deployment-baseline-v4.json`。后续部署必须从当前c58实际八组件与246迁移重新取基线，旧fa187基线已过期。
+
+发布critical section保留44项并行文件且指纹全不变，索引空。部署期间并行观测16路径提交8db68361继承本批；再次fetch确认本地／origin精确8db同步，本批c58为其祖先。该并行提交的CI/部署不计本任务验收。详细检查范围和旧失败保持见[本次发布证据](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/fast-release.md)。减少跨会话沟通未妨碍发布，仅一次必要依赖交接，无例行进度往返。
+
+创建弹窗已交付；永久删除仍不可用，全部22 owner生产组合、旧数字键／未启动原执行兼容、SCM十一类及镜像/发布的正式物理回收、管理员入口实机二次确认和原项目全资源回收继续。入口与producer OFF，原项目保持，RFC与总目标均不关闭。原专用项目实际Session origins／legacy origins／deletion operations各0。以下发布前记录及并行历史保持。
+
 ## 2026-10-04 RFC-037 按最新指令立即推进发布
 
 用户再次明确要求最快提交上库和上线，减少跨会话沟通不撤销既有发布／部署授权。立即固定已有原停止、Session 数字通道和观测排空的完整依赖候选，执行本候选唯一完整检查并串行精确发布；共享 contracts/index.ts 原样保留，新增 native-usage 导出依赖只作实际发布协调。当前入口仍关闭，完整删除与原项目物理回收继续；不能把本次代码部署记作永久删除可用。以下此前暂停分批发布的状态属于历史，最新用户指令优先。

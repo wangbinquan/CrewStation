@@ -13,7 +13,8 @@ async function allTasks(f:Awaited<ReturnType<typeof completeFactsFixture>>,proje
 }
 function assertUnknown(report:RuntimeCompleteReport,expected=201) {
  const content=runtimeCompleteReportContent(report)!;expect(report.state).toBe('not-ready');expect(content.summary.tasks).toBe(String(expected));
- for(const metrics of [content.summary.metrics,...content.summary.trend.map(row=>row.metrics),...content.summary.sources.map(row=>row.metrics)]){expect(metrics.state).toBe('not-ready');expect(metrics).not.toHaveProperty('tokens');expect(metrics).not.toHaveProperty('cost');}
+ expect(content.summary.metrics.state).toBe('not-ready');expect(content.summary.metrics).not.toHaveProperty('tokens');expect(content.summary.metrics).not.toHaveProperty('cost');
+ for(const row of [...content.summary.trend,...content.summary.sources]){expect(row.metrics.state).toBe(row.tasks==='0'?'not-applicable':'not-ready');expect(row.metrics).not.toHaveProperty('tokens');expect(row.metrics).not.toHaveProperty('cost');}
 }
 describe.skipIf(!available)('independent ordinary Task metrics within sealed whole-report facts',()=>{
  test.each(['system','project'] as const)('%s traverses every original Task and matches the complete sibling lifecycle without summing known subsets',async scope=>{
@@ -23,7 +24,8 @@ describe.skipIf(!available)('independent ordinary Task metrics within sealed who
   expect(rows.filter(row=>row.metrics.state==='not-applicable')).toHaveLength(199);expect(rows.every(row=>row.projectName==='Original Project Name')).toBe(true);
   const lifecycle=await f.settle(projectId,f.sibling!.task.id);expect(lifecycle.state).toBe('ready');expect(runtimeCompleteReportContent(lifecycle)!.summary.metrics).toEqual(complete.metrics);
   const one=await f.module.api.runtimeCompleteReportPage(f.actor,projectId,lifecycle.reportId,{section:'tasks',pageSize:37});expect(one.total).toBe('1');expect(CompleteRuntimeTaskSummarySchema.parse(one.items[0]).metrics).toEqual(complete.metrics);expect(one.nextCursor).toBeNull();
-  for(const section of ['agents','profiles','projects'] as const){const page=await f.module.api.runtimeCompleteReportPage(f.actor,projectId,report.reportId,{section,pageSize:37});for(const row of page.items){const metrics=(row as {metrics:{state:string}}).metrics;expect(metrics.state).toBe('not-ready');expect(metrics).not.toHaveProperty('tokens');expect(metrics).not.toHaveProperty('cost');}}
+  const agents:unknown[]=[];let after:string|undefined;do{const page=await f.module.api.runtimeCompleteReportPage(f.actor,projectId,report.reportId,{section:'agents',pageSize:37,after});agents.push(...page.items);after=page.nextCursor??undefined;}while(after!==undefined);expect(agents).toHaveLength(1002);expect(agents.find(row=>(row as {agentId:string}).agentId===f.sibling!.attempt.agentId)).toMatchObject({metrics:complete.metrics});
+  for(const section of ['profiles','projects'] as const){const page=await f.module.api.runtimeCompleteReportPage(f.actor,projectId,report.reportId,{section,pageSize:37});for(const row of page.items){const metrics=(row as {metrics:{state:string}}).metrics;expect(metrics.state).toBe('not-ready');expect(metrics).not.toHaveProperty('tokens');expect(metrics).not.toHaveProperty('cost');expect(metrics).toHaveProperty('recordedUsage');}}
  },60000);
  test('project fee hiding revokes an existing visible sibling cost while a new report retains all exact Token bins',async()=>{
   const f=fixture=await completeFactsFixture({completeSibling:true,feePolicyCohort:true}),projectId=f.f.tasks[0]!.projectId;

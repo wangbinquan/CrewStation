@@ -70,9 +70,9 @@ describe.skipIf(!available)('complete task reduction on original PG',()=>{
     const total=input*2_000_000n+BigInt(count)*(3n*500_000n+5n*3_000_000n+7n*8_000_000n);
     expect(result.metrics.cost).toEqual({currency:'CNY',state:'complete',amount:decimal(total)});
   },60000);
-  test('one missing original capture blocks every total, while incomplete valuation publishes no priced subset',async()=>{
+  test('one missing original capture keeps complete totals unknown and incomplete pricing retains its exact recorded population',async()=>{
     tdb=await createTestDatabase([observabilityMigrations]);const missing=fixture();await seed(missing,17,'missing-capture');
-    const partial=await build(missing);expect(partial.metrics).toEqual({state:'not-ready',gaps:['native-capture-unobserved']});
+    const partial=await build(missing);expect(partial.metrics).toMatchObject({state:'not-ready',gaps:['native-capture-unobserved'],recordedUsage:{records:'17',tokens:{input:'153',cacheRead:'51',cacheWrite:'85',output:'119',total:'408'},bucketRecords:{input:'17',cacheRead:'17',cacheWrite:'17',output:'17'}},costCoverage:{records:'17',pricedRecords:'17',visibility:'visible'},recordedCost:{currency:'CNY',amount:'0.0015385',records:'17',pricedRecords:'17'}});expect(partial.metrics).not.toHaveProperty('tokens');expect(partial.metrics).not.toHaveProperty('cost');
     expect(partial.sourceReceipts.map(receipt=>receipt.rows)).toEqual(['1','17','16','17']);
     const unpriced=fixture();await seed(unpriced,17,'unpriced');const result=await build(unpriced);
     if(result.metrics.state!=='ready') throw new Error(JSON.stringify(result.metrics));

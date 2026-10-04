@@ -36,7 +36,7 @@ export function completeRuntimeDimensions(input:CompleteRuntimeCohortInput,repor
     },
     async model(task:RuntimeTaskHeaderFact,allocation:CompleteRuntimeAllocation,visible:boolean) {
       const original=allocation.record.original,key=JSON.stringify(original.modelRef),fold=emptyCompleteRuntimeFold(visible);
-      addCompleteRuntimeAllocation(fold,allocation.contribution,allocation.valuation??undefined,allocation.whole===true,original.projection.projectionRevision);
+      addCompleteRuntimeAllocation(fold,allocation.contribution,allocation.valuation??undefined,allocation.whole===true,original.projection.projectionRevision,!allocation.quality.ambiguous&&!allocation.quality.unavailable);
       if(await first(JSON.stringify(['model-execution',key,completeObservedIdentity(original.identity)]))){fold.executions='1';fold.observedExecutions='1';}
       await merge('models',key,{modelRef:original.modelRef},fold,await first(JSON.stringify(['model-task',key,task.id]))?'1':'0');
     },
@@ -76,7 +76,7 @@ export async function retainCompleteTaskDimensions(input:CompleteRuntimeCohortIn
   for await(const row of completeWorkingTraversal<CompleteRuntimeAllocation>(input.rows,task.build.allocationsNamespace,input.signal)) {
     await dimensions.model(task.summary,row.document,task.build.fold.visible);
     const original=row.document.record.original,fold=emptyCompleteRuntimeFold(task.build.fold.visible,'1');fold.observedExecutions='1';
-    addCompleteRuntimeAllocation(fold,row.document.contribution,row.document.valuation??undefined,row.document.whole===true,original.projection.projectionRevision);
+    addCompleteRuntimeAllocation(fold,row.document.contribution,row.document.valuation??undefined,row.document.whole===true,original.projection.projectionRevision,!row.document.quality.ambiguous&&!row.document.quality.unavailable);
     const attemptKey=input.keyOf(completeObservedIdentity(original.identity)),attempt=await attempts.get(attemptKey);
     if(!attempt)throw new Error('Original call admitted attempt missing');
     await reportRows.append('calls',task.summary.id,row.key,{taskId:task.summary.id,projectId:task.summary.projectId,projectName:task.summary.projectName??null,identity:original.identity,sourceId:original.sourceId,recordId:original.recordId,modelRef:original.modelRef,occurredAt:original.occurredAt,scope:original.scope,agentName:attempt.name,profileId:attempt.profileId,profileName:attempt.profileName??null,profileRevision:attempt.profileRevision,metrics:completeRuntimeMetrics(fold)});

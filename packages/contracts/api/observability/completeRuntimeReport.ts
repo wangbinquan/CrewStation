@@ -4,11 +4,16 @@ import {ResourceIdSchema,ProjectIdSchema,TaskIdSchema} from '../../ids';
 import {UsageExecutionIdentitySchema,UsageRecordSchema} from './usageLedger';
 const count=z.string().regex(/^(0|[1-9]\d*)$/);
 const amount=z.string().regex(/^(0|[1-9]\d*)(\.\d{1,12})?$/);
-export const CompleteRuntimeGapMetricsSchema=z.strictObject({state:z.literal('not-ready'),gaps:z.array(z.string())});
+const buckets=['input','cacheRead','cacheWrite','output'] as const;
+const recordedUsage=z.strictObject({executions:count,observedExecutions:count,records:count,tokens:z.strictObject({input:count.nullable(),cacheRead:count.nullable(),cacheWrite:count.nullable(),output:count.nullable(),total:count}),bucketRecords:z.strictObject({input:count,cacheRead:count,cacheWrite:count,output:count})}).refine(v=>BigInt(v.observedExecutions)<=BigInt(v.executions)&&buckets.some(b=>v.bucketRecords[b]!=='0')&&buckets.every(b=>BigInt(v.bucketRecords[b])<=BigInt(v.records)&&((v.tokens[b]===null)===(v.bucketRecords[b]==='0')))&&buckets.reduce((sum,b)=>sum+BigInt(v.tokens[b]??'0'),0n)===BigInt(v.tokens.total),{message:'已记录 Token 或原记录覆盖不一致'});
+const costCoverage=z.strictObject({records:count,pricedRecords:count,visibility:z.enum(['visible','hidden'])}).refine(v=>BigInt(v.pricedRecords)<=BigInt(v.records),{message:'定价记录超出原人口'});
+const recordedCost=z.strictObject({currency:z.literal('CNY'),amount,records:count,pricedRecords:count}).refine(v=>BigInt(v.pricedRecords)>0n&&BigInt(v.pricedRecords)<=BigInt(v.records),{message:'已记录估值缺少原定价记录'});
+const receivedCost={costCoverage:costCoverage.optional(),recordedCost:recordedCost.optional()};
+export const CompleteRuntimeGapMetricsSchema=z.strictObject({state:z.literal('not-ready'),gaps:z.array(z.string()),recordedUsage:recordedUsage.optional(),...receivedCost}).refine(v=>(!v.recordedUsage||!v.costCoverage||v.recordedUsage.records===v.costCoverage.records)&&(!v.recordedCost||(v.costCoverage?.visibility==='visible'&&v.recordedCost.records===v.costCoverage.records&&v.recordedCost.pricedRecords===v.costCoverage.pricedRecords)),{message:'已记录用量与费用人口不一致'});
 export const CompleteRuntimeMetricsSchema=z.discriminatedUnion('state',[
   CompleteRuntimeGapMetricsSchema,
   z.strictObject({state:z.literal('not-applicable')}),
-  z.strictObject({state:z.literal('ready'),tokens:z.strictObject({input:count,cacheRead:count,cacheWrite:count,output:count,total:count}),executions:count,observedExecutions:count,records:count,cost:z.strictObject({currency:z.literal('CNY'),state:z.enum(['complete','unpriced','hidden']),amount:amount.nullable()})}).refine(v=>v.cost.state==='complete'?v.cost.amount!==null:v.cost.amount===null,{message:'非完整估值不得包含金额'}).refine(v=>BigInt(v.tokens.input)+BigInt(v.tokens.cacheRead)+BigInt(v.tokens.cacheWrite)+BigInt(v.tokens.output)===BigInt(v.tokens.total)&&BigInt(v.observedExecutions)<=BigInt(v.executions),{message:'分类 Token 或原执行数量不一致'}),
+  z.strictObject({state:z.literal('ready'),tokens:z.strictObject({input:count,cacheRead:count,cacheWrite:count,output:count,total:count}),executions:count,observedExecutions:count,records:count,cost:z.strictObject({currency:z.literal('CNY'),state:z.enum(['complete','unpriced','hidden']),amount:amount.nullable()}),...receivedCost}).refine(v=>v.cost.state==='complete'?v.cost.amount!==null:v.cost.amount===null,{message:'非完整估值不得包含金额'}).refine(v=>BigInt(v.tokens.input)+BigInt(v.tokens.cacheRead)+BigInt(v.tokens.cacheWrite)+BigInt(v.tokens.output)===BigInt(v.tokens.total)&&BigInt(v.observedExecutions)<=BigInt(v.executions),{message:'分类 Token 或原执行数量不一致'}).refine(v=>(!v.costCoverage||(v.costCoverage.records===v.records&&(v.cost.state==='hidden')===(v.costCoverage.visibility==='hidden')))&&(!v.recordedCost||(v.cost.state==='unpriced'&&v.recordedCost.records===v.records&&v.costCoverage?.visibility==='visible'&&v.recordedCost.pricedRecords===v.costCoverage.pricedRecords)),{message:'已记录费用与完整费用资格不一致'}),
 ]);
 export type CompleteRuntimeMetricsDto=z.infer<typeof CompleteRuntimeMetricsSchema>;
 export const CompleteTaskTimingSchema=z.strictObject({wallMs:count.nullable(),range:z.strictObject({from:z.iso.datetime(),to:z.iso.datetime()}).nullable(),intervals:z.discriminatedUnion('state',[
@@ -34,8 +39,6 @@ export const RuntimeFactReportHeaderSchema=RuntimeReportHeaderSchema.extend({cov
 export type RuntimeReportHeader=z.infer<typeof RuntimeReportHeaderSchema>|z.infer<typeof RuntimeFactReportHeaderSchema>;
 export const RuntimeCompleteFactSummarySchema=RuntimeCompleteSummarySchema.extend({
  metrics:CompleteRuntimeGapMetricsSchema,
- trend:z.array(RuntimeCompleteSummarySchema.shape.trend.element.extend({metrics:CompleteRuntimeGapMetricsSchema})),
- sources:z.array(RuntimeCompleteSummarySchema.shape.sources.element.extend({metrics:CompleteRuntimeGapMetricsSchema})),
 });
 export const RuntimeCompleteFactsSchema=z.strictObject({header:RuntimeFactReportHeaderSchema,summary:RuntimeCompleteFactSummarySchema});
 const base={reportId:ResourceIdSchema};

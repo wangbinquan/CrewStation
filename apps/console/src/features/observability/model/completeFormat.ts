@@ -1,12 +1,14 @@
 import type {CompleteRuntimeMetricsDto} from '@crewstation/contracts';
 import type {Translate} from '../../../shared/lib/useT';
 export const completeCount=(value:string)=>BigInt(value).toLocaleString();
-export function completeTokens(metrics:CompleteRuntimeMetricsDto,bucket?:'input'|'cacheRead'|'cacheWrite'|'output') {return metrics.state==='ready'?completeCount(metrics.tokens[bucket??'total']):'—';}
+export function completeTokenValues(metrics:CompleteRuntimeMetricsDto) {return metrics.state==='ready'?metrics.tokens:metrics.state==='not-ready'?metrics.recordedUsage?.tokens:undefined;}
+export function completeTokens(metrics:CompleteRuntimeMetricsDto,bucket?:'input'|'cacheRead'|'cacheWrite'|'output') {const value=completeTokenValues(metrics)?.[bucket??'total'];return value===null||value===undefined?'—':completeCount(value);}
 export function completeCny(metrics:CompleteRuntimeMetricsDto,t:Translate) {
-  if(metrics.state!=='ready')return '—';
-  if(metrics.cost.state!=='complete')return t(metrics.cost.state==='hidden'?'runtime.hiddenCost':'runtime.unpricedCost');
-  const [whole='0',fraction='']=metrics.cost.amount!.split('.'),trimmed=fraction.replace(/0+$/,'');
-  return `¥${completeCount(whole)}${trimmed?'.'+trimmed:''}`;
+  const amount=metrics.state==='ready'&&metrics.cost.state==='complete'?metrics.cost.amount:'recordedCost' in metrics?metrics.recordedCost?.amount:undefined;
+  if(amount!==null&&amount!==undefined){const [whole='0',fraction='']=amount.split('.'),trimmed=fraction.replace(/0+$/,'');return `¥${completeCount(whole)}${trimmed?'.'+trimmed:''}${metrics.state==='ready'&&metrics.cost.state==='complete'?'':t('runtime.recordedCostSuffix')}`;}
+  if(metrics.state==='ready')return t(metrics.cost.state==='hidden'?'runtime.hiddenCost':'runtime.unpricedCost');
+  if(metrics.state==='not-ready'&&metrics.costCoverage)return t(metrics.costCoverage.visibility==='hidden'?'runtime.hiddenCost':'runtime.unpricedCost');
+  return '—';
 }
 export function completeDuration(value:string|null) {
   if(value===null)return '—';const ms=BigInt(value);

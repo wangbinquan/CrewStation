@@ -10,7 +10,7 @@ const originalFetch=globalThis.fetch;
 afterEach(()=>{page?.unmount();page=undefined;globalThis.fetch=originalFetch;});
 test.each(['system','project'] as const)('%s preserves all 201 tasks, exact timing and four unknown bins through task drill and return',async scope=>{
  const f=runtimeSealedFactsFixture(),root=scope==='system'?'/admin/observability':'/projects/'+f.projectId+'/observability';page=await renderApp(root+'?'+f.query);
- expect(page.text()).toContain('Token 用量存在缺口');expect(page.text()).toContain('继续等待不会自动补齐');expect(page.text()).toContain('201');expect(page.text()).toContain('Original Execution Project');
+ expect(page.text()).toContain('Token 用量存在缺口');expect(page.text()).toContain('缺失记录不按零计入');expect(page.text()).toContain('201');expect(page.text()).toContain('Original Execution Project');
  expect([...document.querySelectorAll('[data-runtime-metrics] [data-token-bucket] dd')].map(row=>row.textContent)).toEqual(['—','—','—','—']);expect(document.querySelector('[data-runtime-metrics]')?.textContent).not.toContain('¥');
  const trend=document.querySelector('[aria-label="任务与 Token 趋势"]');expect(trend).not.toBeNull();expect(trend?.querySelector('button')?.getAttribute('aria-label')).toContain('201');expect(document.querySelector('[aria-label="当前趋势区间"]')?.textContent).toContain('201');
  await page.click('任务明细');expect(document.querySelectorAll('[data-runtime-task-id]')).toHaveLength(100);await page.click('下一页');expect(document.querySelectorAll('[data-runtime-task-id]')).toHaveLength(100);await page.click('下一页');expect(document.querySelectorAll('[data-runtime-task-id]')).toHaveLength(1);expect(page.text()).toContain('总计 201 条');

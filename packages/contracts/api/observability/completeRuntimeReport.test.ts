@@ -28,7 +28,7 @@ describe('complete statistics contract',()=>{
 
 // Missing numeric evidence must preserve the independent execution facts without upgrading readiness.
 describe('sealed execution facts',()=>{
- test('strict not-ready facts retain counts and timing but reject every nested token or amount subtotal',()=>{
+ test('strict not-ready facts retain counts and timing, qualify child scopes, and reject leaked complete totals',()=>{
   const reportId=Bun.randomUUIDv7(),metrics={state:'not-ready' as const,gaps:['native-capture-incomplete']};
   const header={reportId,projectionVersion:2 as const,scope:'system' as const,projectId:null,filters:{from:'2026-10-03T00:00:00.000Z',to:'2026-10-04T00:00:00.000Z',timezone:'Asia/Shanghai'},asOf:'2026-10-04T00:00:00.000Z',snapshotId:'original-facts',generation:'1',sourceRevision:'2',coverage:'complete-facts' as const,buildMs:1};
   const summary={tasks:'201',metrics,durations:{state:'complete' as const,samples:'201',p50Ms:'10000',p95Ms:'10000',maxMs:'10000'},trend:[{from:header.filters.from,to:header.filters.to,tasks:'201',metrics}],sources:[{kind:'business-task' as const,tasks:'201',metrics,collectionState:'available' as const}]};
@@ -38,11 +38,10 @@ describe('sealed execution facts',()=>{
   expect(RuntimeCompleteReportSchema.safeParse({...report,facts:{header:{...header,coverage:'complete'},summary}}).success).toBe(false);
   for(const replacement of [
    {...summary,metrics:ready},
-   {...summary,trend:[{...summary.trend[0]!,metrics:ready}]},
-   {...summary,sources:[{...summary.sources[0]!,metrics:ready}]},
    {...summary,metrics:{...metrics,tokens:ready.tokens}},
    {...summary,metrics:{...metrics,cost:ready.cost}},
   ])expect(RuntimeCompleteReportSchema.safeParse({...report,facts:{header,summary:replacement}}).success).toBe(false);
+  for(const replacement of [{...summary,trend:[{...summary.trend[0]!,metrics:ready}]},{...summary,sources:[{...summary.sources[0]!,metrics:ready}]}])expect(RuntimeCompleteReportSchema.parse({...report,facts:{header,summary:replacement}})).toMatchObject({state:'not-ready',facts:{summary:replacement}});
   expect(RuntimeCompleteReportSchema.safeParse({reportId,state:'ready',header,summary:{...summary,metrics:ready}}).success).toBe(false);
  });
 });

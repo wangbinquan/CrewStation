@@ -69,7 +69,7 @@ function record(
   }
 }
 
-async function indexed(records: UsageContributionEvidence[]) {
+async function indexed(records: UsageContributionEvidence[], issue?: (record:UsageContributionEvidence,quality:{ambiguous:boolean;unavailable:boolean},allocated:boolean)=>Promise<void>) {
   const index = intervalStore(),
     paths = new Map<string, string>(),
     allocated: Array<{ record: UsageContributionEvidence; contribution: TokenUsage }> = []
@@ -91,7 +91,7 @@ async function indexed(records: UsageContributionEvidence[]) {
     async allocate(record, contribution) {
       allocated.push({ record, contribution })
     },
-  })
+  },undefined,issue)
   return { output, allocated, reads: index.reads() }
 }
 
@@ -130,6 +130,16 @@ async function compareOracle(rows: UsageContributionEvidence[]) {
 }
 
 describe('persistent exact coverage selection', () => {
+  // An all-bucket overlap previously disappeared before its original attempt could receive the gap.
+  test('quality callbacks retain excluded ambiguous owners, await completion and leave normal covered records unchanged',async()=>{
+    const a=record('a',{measurement:{...record('a').measurement,coveredThroughTurn:2}}),b=record('b',{measurement:{...record('b').measurement,coveredThroughTurn:3,scope:{...record('b').measurement.scope!,turnIndex:2}}}),covered=record('covered',{measurement:{...record('a').measurement,recordId:'covered',scope:{...record('a').measurement.scope!,level:'request'}}});
+    const issues:Array<{id:string;allocated:boolean;quality:{ambiguous:boolean;unavailable:boolean}}>=[];
+    const result=await indexed([covered,b,a],async(record,quality,allocated)=>{await Promise.resolve();issues.push({id:record.measurement.recordId,quality,allocated});});
+    expect(issues).toEqual([{id:'b',allocated:false,quality:{ambiguous:true,unavailable:false}}]);expect(result.output.selected).toBe('1');expect(result.output.excluded).toBe('2');expect(result.output.ambiguousOverlaps).toBe('1');expect(result.allocated).toHaveLength(1);expect(result.allocated[0]!.record.measurement.recordId).toBe('a');
+    const mixed=record('a',{coveredThrough:{input:4,cacheRead:1,cacheWrite:2,output:3}}),partial=record('b',{measurement:{...record('b').measurement,coveredThroughTurn:5,scope:{...record('b').measurement.scope!,turnIndex:2}}});
+    issues.length=0;const allocated=await indexed([mixed,partial],async(record,quality,selected)=>{issues.push({id:record.measurement.recordId,quality,allocated:selected});});expect(issues).toEqual([{id:'b',allocated:true,quality:{ambiguous:true,unavailable:false}}]);expect(allocated.output.selected).toBe('2');expect(allocated.output.excluded).toBe('0');
+  })
+
   test('keeps original selected-count rejection and covered-count exclusion semantics', async () => {
     for (const invalid of ['-1', '01', '0x10', '', '1.0', '1e3', '9'.repeat(61)]) {
       for (const bucket of ['input', 'cacheRead', 'cacheWrite', 'output'] as const) {
