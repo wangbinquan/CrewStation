@@ -1,3 +1,17 @@
+## 2026-10-05 RFC-034 原页运输与持久复制候选
+
+原 journal 页按严格64KiB块到实际字节EOF接通Runner／Session，未知root出生保持null。原文附在原首帧既有JSONB，与数字行同一PG事务提交，普通outbox仍只输原数字；真实PG副本与所有缺口判定先于Runner ACK。内部原页HTTP与严格client、结束／普通ACK／重启后的原文保持，不加第二数字账本或迁移。原JSON顺序摘要与实际Unicode字节完整保存。
+
+相关31用例通过，最后两测试变更再验10/0、2491断言；实际1201步骤四桶721801输入／6005输出／8407缓存读／15613缓存写准确，真实PG异常回滚／ACK回复丢失重启恢复。初始root依赖、包装异常断言及闭包类型问题原失败保留，修正后类型与精确lint通过。SOURCE25加完整STATE有限门、唯一完整check终态与新确切SHA CI／部署继续验核。此前3447104d六CI成功／本机八组件Ready保持，不替代当前候选。
+
+AW c835052b5本会话三文件已直接推送，main／origin同步，完整共享STATE含并行RFC370正文保留，无跨会话消息；纯测试路径只触发主CI37313859339，终态待验。浏览器连接暂不可用，正式刷新验收仍待。完整producer／before-final／platform v2／历史seal与100KTask／10Musage仍开放，两RFC不关闭。下方全部原共享正文与并行历史逐字保留。
+
+
+## 2026-10-05 本批检查与直接发布
+
+固定24TS的补跑完整check于13:45:53Z终态exit2，54.03秒，候选首尾字节一致。结构与lint通过；停止于其他会话未提交的packages/filesystem-metrics/buildkit/controlTransport.ts:32 TS2367，未进入整仓测试，不记全量通过。前轮检查因会话中断无终态，原日志和中断回执保留。复用此前31项定向和最后10项回归、精确24TS lint与类型通过，依development-rules §3提交自有文件，以新精确SHA hosted六项CI核对干净提交树。SOURCE25功能复核通过；源文件没有为新HEAD重跑或修改。
+
+AW c835052b5主CI37313859339已终态failure，原日志保留。实际失败为并行RFC370迁移后的旧路径与跨模块架构引用；本批原清理回归未再超时。旧定时布局失败已有后继full/WebKit/visual成功，今天full schedule37318548076正在运行。没有跨会话消息，foreign在制品保持。新CS精确CI、本机部署、生产采集与完整规模验收继续，两RFC保持In Progress。
 ## 2026-10-05 RFC-037 原存储与管理员删除入口修订候选
 
 管理员目录与生命周期已接统一双确认；实际 admin／capability 控制入口，默认完整删除 OFF。原 46 项界面协议、2 项生命周期、4 项正式 Root 通过；旧闭门用例已增加实际 capability=false 与删除 POST 404，6 pass／45 断言。Garage 原来源／实际请求、Registry 原 SQLite journal／真实 PG 全局准入、原执行兼容及 selected Pod stop 形成 199 路径候选。正式 runtime owner 的原生许可包装衔接已修复，Linux 独立临时文件实际 unlink／重建重放／正式许可 9 pass／60 断言，原 Registry 与专用项目保持。

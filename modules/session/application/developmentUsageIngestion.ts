@@ -2,6 +2,7 @@ import type { RunnerCommand, StoredDevelopmentUsage, TaskId } from '@crewstation
 import { DevelopmentUsageInfoSchema, DevelopmentUsagePageSchema, DevelopmentUsageReceiptSchema } from '@crewstation/contracts';
 import { newResourceId, PlatformError } from '@crewstation/kernel';
 import type { DevelopmentUsageStore } from '../ports/developmentUsage';
+import { readDevelopmentNativePage } from './developmentNativePageRead';
 import { persistDevelopmentInfo } from './developmentUsageReceipt';
 
 export interface DevelopmentUsageIngestionDeps { store: DevelopmentUsageStore; send(taskId: TaskId, command: RunnerCommand): Promise<unknown> }
@@ -15,9 +16,19 @@ export async function ingestDevelopmentUsage(deps: DevelopmentUsageIngestionDeps
     let current = (await deps.store.get(taskId, key))!;
     if (current.persistedThrough < receipt.lastSequence) {
       const page = DevelopmentUsagePageSchema.parse(await deps.send(taskId, { id: newResourceId(), type: 'readDevelopmentUsageEvents', key, after: current.persistedThrough, limit: 5 }));
-      current = await deps.store.ingest(taskId, receipt, page);
+      const copies = [];
+      const copied = new Set<string>();
+      for (const event of page.events) {
+        if (event.capture.version !== 2) continue;
+        const { passId } = event.capture.nativeSource.ack.identity, { ordinal } = event.capture.nativeSource.ack;
+        const id = JSON.stringify([passId, ordinal]);
+        if (copied.has(id)) continue;
+        copies.push(await readDevelopmentNativePage(deps, taskId, key, passId, ordinal)); copied.add(id);
+      }
+      current = await deps.store.ingest(taskId, receipt, page, copies);
     }
     if (current.persistedThrough > current.runnerAcknowledgedThrough) {
+      await deps.store.verifyRunnerCopy(taskId, key, current.persistedThrough);
       const ack = DevelopmentUsageReceiptSchema.parse(await deps.send(taskId, { id: newResourceId(), type: 'ackDevelopmentUsageEvents', key, through: current.persistedThrough }));
       await deps.store.ingest(taskId, ack);
       if (ack.acknowledgedSequence < current.persistedThrough) throw new Error('Runner did not confirm the copied development watermark');

@@ -6,6 +6,7 @@ import type { DevelopmentUsagePage, TaskId } from '@crewstation/contracts';
 import { conflict, jsonHash, precondition, validation } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
 import type { DevelopmentUsageStore } from '../../ports/developmentUsage';
+import { copyNativeEvidence, hasMissingNativeCopy, nativeCopyControls } from './developmentNativeCopies';
 import { assertKey, latestReceipt, locked, snapshot, updateClosure } from './developmentUsageState';
 import { developmentUsageEvents as events, developmentUsageStreams as streams } from './developmentUsageTables';
 
@@ -33,7 +34,7 @@ export function drizzleDevelopmentUsageStore(db: Database, storage?: SessionOrig
       if (!row) return undefined;
       assertKey(row, key); return snapshot(row);
     },
-    ingest: (taskId, rawReceipt, rawPage) => db.transaction(async (tx) => {
+    ingest: (taskId, rawReceipt, rawPage, nativeCopies = []) => db.transaction(async (tx) => {
       if (storage) throw precondition('私有原数字适配器不能新增开发数字');
       const receipt = DevelopmentUsageReceiptSchema.parse(rawReceipt);
       const page = rawPage ? DevelopmentUsagePageSchema.parse(rawPage) : undefined;
@@ -44,13 +45,15 @@ export function drizzleDevelopmentUsageStore(db: Database, storage?: SessionOrig
         if (jsonHash(page.key) !== jsonHash(receipt.key) || page.through > receipt.lastSequence) throw conflict('数字页超出原回执范围');
         await appendPage(tx, taskId, page);
       }
+      await copyNativeEvidence(tx, taskId, row.registration, nativeCopies);
       const persistedThrough = await contiguousThrough(tx, taskId, row.persistedThrough);
-      const complete = row.complete || (latest.finalThrough !== null && latest.finalThrough === persistedThrough);
+      const complete = row.complete || (latest.finalThrough !== null && latest.finalThrough === persistedThrough && !await hasMissingNativeCopy(tx, taskId, persistedThrough));
       const [updated] = await tx.update(streams).set({ receipt: latest, persistedThrough, complete,
         runnerAcknowledgedThrough: Math.max(row.runnerAcknowledgedThrough, receipt.acknowledgedSequence),
       }).where(eq(streams.taskId, taskId)).returning();
       return snapshot(await updateClosure(tx, updated!));
     }),
+    ...nativeCopyControls(db, storage),
     acknowledgeRunner: (taskId, rawKey, through) => db.transaction(async (tx) => {
       if (storage) throw precondition('私有原数字适配器不能确认开发 Runner 水位');
       const row = await locked(tx, taskId, DevelopmentUsageKeySchema.parse(rawKey));

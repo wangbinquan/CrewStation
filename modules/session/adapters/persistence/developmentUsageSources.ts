@@ -5,6 +5,7 @@ import { DEVELOPMENT_USAGE_LIMITS, DevelopmentUsageKeySchema, DevelopmentUsagePa
 import { conflict, precondition, validation } from '@crewstation/kernel';
 import type { Database } from '@crewstation/persistence';
 import type { DevelopmentUsageSourceStore } from '../../ports/developmentUsage';
+import { publicDevelopmentEvent, retainedNativePage } from './developmentNativeCopies';
 import { locked } from './developmentUsageState';
 import { ordinarySessionTask } from './deletion/admission';
 import { developmentUsageEvents as events, developmentUsageStreams as streams } from './developmentUsageTables';
@@ -18,8 +19,9 @@ export function drizzleDevelopmentUsageSourceStore(db: Database, storage?: Sessi
       if (!row || row.persistedThrough <= row.sourceAcknowledgedThrough) return undefined;
       const rows = await tx.select({ event: events.event }).from(events).where(and(eq(events.taskId, row.taskId), gt(events.sequence, row.sourceAcknowledgedThrough), lte(events.sequence, row.persistedThrough),
         row.offeredThrough > row.sourceAcknowledgedThrough ? lte(events.sequence, row.offeredThrough) : undefined)).orderBy(asc(events.sequence)).limit(DEVELOPMENT_USAGE_LIMITS.capturesPerPage);
-      const selected: typeof rows = [];
-      for (const item of rows) {
+      const packets = rows.map(({ event }) => ({ event: publicDevelopmentEvent(event) }));
+      const selected: typeof packets = [];
+      for (const item of packets) {
         const value = { key: row.registration.key, after: row.sourceAcknowledgedThrough, through: item.event.sequence, events: [...selected.map((value) => value.event), item.event] };
         if (Buffer.byteLength(JSON.stringify(value)) > DEVELOPMENT_USAGE_LIMITS.pageBytes) break;
         selected.push(item);
@@ -39,6 +41,10 @@ export function drizzleDevelopmentUsageSourceStore(db: Database, storage?: Sessi
       if (through <= row.sourceAcknowledgedThrough) return;
       if (through !== row.offeredThrough) throw conflict('只能确认已提供的完整数字页');
       await tx.update(streams).set({ sourceAcknowledgedThrough: through }).where(eq(streams.taskId, row.taskId));
+    }),
+    nativePage: (rawKey, passId, ordinal) => db.transaction(async (tx) => {
+      const key = DevelopmentUsageKeySchema.parse(rawKey); await locked(tx, key.executionId, key, storage);
+      return retainedNativePage(tx, sessionStorageKey(key.executionId, storage), key, passId, ordinal);
     }),
     measurement: async (rawKey, recordId, revision) => {
       const key = DevelopmentUsageKeySchema.parse(rawKey);

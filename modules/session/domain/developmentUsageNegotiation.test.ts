@@ -7,7 +7,7 @@ const capabilities: RunnerHello['capabilities'] = { protocols: ['opencode'], pre
 const key = { executionId: '019f0000-0000-7000-8000-000000000003', journalId: crypto.randomUUID(), incarnation: crypto.randomUUID(), payloadDigest: 'a'.repeat(64) };
 
 test('numeric info/read/ack negotiate before sending to legacy runners and cannot be issued by browser views', () => {
-  const inputs = [{ type: 'developmentUsageInfo', key }, { type: 'readDevelopmentUsageEvents', key, after: 0 }, { type: 'ackDevelopmentUsageEvents', key, through: 1 }];
+  const inputs = [{ type: 'developmentUsageInfo', key }, { type: 'readDevelopmentUsageEvents', key, after: 0 }, { type: 'readDevelopmentNativePage', key, passId: 'original', ordinal: '0', afterByte: 0 }, { type: 'ackDevelopmentUsageEvents', key, through: 1 }];
   for (const input of inputs) {
     const command = RunnerCommandSchema.parse({ id: 'cmd', ...input });
     expect(() => assertLaunchSupported(command, capabilities)).toThrow('开发数值日志能力');

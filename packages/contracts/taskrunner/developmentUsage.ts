@@ -7,6 +7,8 @@ import { LaunchSpecSchema } from './launch';
 import { DevelopmentRunnerUsageCaptureSchema } from './development/nativeSource';
 import { DevelopmentNativePageCaptureSchema } from './development/nativePages';
 export * from './development/nativePages';
+import { DevelopmentNativePageChunkBodySchema, DevelopmentNativePageEvidenceBodySchema } from './development/nativePageRead';
+export { DEVELOPMENT_NATIVE_PAGE_CHUNK_BYTES } from './development/nativePageRead';
 
 const sequence = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 export const DEVELOPMENT_USAGE_LIMITS = { capturesPerPage: 5, pageBytes: 1024 * 1024 } as const;
@@ -46,6 +48,10 @@ export const DevelopmentStartIntentSchema = z.strictObject({
 export const DevelopmentUsageKeySchema = z.strictObject({
   executionId: ResourceIdSchema, journalId: z.uuid(), incarnation: z.uuid(), payloadDigest: z.string().regex(/^[a-f0-9]{64}$/),
 });
+export const DevelopmentNativePageChunkSchema = DevelopmentNativePageChunkBodySchema.safeExtend({ key: DevelopmentUsageKeySchema });
+export type DevelopmentNativePageChunk = z.infer<typeof DevelopmentNativePageChunkSchema>;
+export const DevelopmentNativePageEvidenceSchema = DevelopmentNativePageEvidenceBodySchema.safeExtend({ key: DevelopmentUsageKeySchema });
+export type DevelopmentNativePageEvidence = z.infer<typeof DevelopmentNativePageEvidenceSchema>;
 export const DevelopmentUsageStoreBindingSchema = z.strictObject({ version: z.literal(1), journalId: DevelopmentUsageKeySchema.shape.journalId, runtimeTaskId: TaskIdSchema, workspaceTaskId: TaskIdSchema, projectId: ProjectIdSchema, podUid: z.string().min(1).max(128) });
 export const DevelopmentUsageAdmissionSchema = z.strictObject({
   intent: DevelopmentStartIntentSchema, key: DevelopmentUsageKeySchema, digestNonce: z.string().regex(/^[a-f0-9]{64}$/),
@@ -86,6 +92,7 @@ export const DevelopmentUsageCommands = [
   z.strictObject({ ...command('stopDevelopmentAgent'), admission: DevelopmentUsageAdmissionSchema, podUid: z.string().min(1).max(128) }),
   z.strictObject({ ...command('developmentUsageInfo'), key: DevelopmentUsageKeySchema.optional() }),
   z.strictObject({ ...command('readDevelopmentUsageEvents'), key: DevelopmentUsageKeySchema, after: sequence, limit: z.number().int().min(1).max(DEVELOPMENT_USAGE_LIMITS.capturesPerPage).default(DEVELOPMENT_USAGE_LIMITS.capturesPerPage) }),
+  z.strictObject({ ...command('readDevelopmentNativePage'), key: DevelopmentUsageKeySchema, passId: z.string().min(1).max(512), ordinal: z.string().regex(/^(0|[1-9]\d*)$/), afterByte: sequence.default(0) }),
   z.strictObject({ ...command('ackDevelopmentUsageEvents'), key: DevelopmentUsageKeySchema, through: sequence }),
 ] as const;
 export type DevelopmentUsageStopReceipt = z.infer<typeof DevelopmentUsageStopReceiptSchema>;

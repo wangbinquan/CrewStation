@@ -1,5 +1,6 @@
 import type { AgentSupervisor } from './agents/agentSupervisor';
 import type { DevelopmentUsageJournal } from './agents/developmentUsageJournal';
+import { readDevelopmentNativePage } from './agents/developmentNativePageReader';
 import { RunnerCommandError } from './commandError';
 import type { TerminalProbes } from './agents/terminalProbe';
 import type { CommandHandlers } from './commandDispatcher';
@@ -50,6 +51,7 @@ export function buildCommandHandlers(targets: CommandTargets): CommandHandlers {
     },
     developmentUsageInfo: async (c) => development().info(c.key),
     readDevelopmentUsageEvents: async (c) => development().read(c.key, c.after, c.limit),
+    readDevelopmentNativePage: async (c) => readDevelopmentNativePage(development(), c.key, c.passId, c.ordinal, c.afterByte),
     ackDevelopmentUsageEvents: async (c) => development().acknowledge(c.key, c.through),
     runtimeInitializationStatus: async () => targets.initialization?.status() ?? { enabled: false, state: 'succeeded', steps: [], checks: [] },
     cancelRuntimeInitialization: async () => targets.initialization ? targets.initialization.cancel() : { enabled: false, state: 'succeeded', steps: [], checks: [] },

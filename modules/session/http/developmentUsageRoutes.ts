@@ -18,6 +18,13 @@ export function developmentUsageRoutes(deps: Pick<SessionUseCaseDeps, 'developme
     if (!found) throw notFound('开发数字副本', input.executionId);
     return c.json(found);
   });
+  r.post('/internal/tasks/:taskId/development-usage/native-page', async (c) => {
+    const input = await parseBody(c, z.strictObject({ key: DevelopmentUsageKeySchema, passId: z.string().min(1).max(512), ordinal: z.string().regex(/^(0|[1-9][0-9]*)$/) }));
+    if (input.key.executionId !== TaskIdSchema.parse(c.req.param('taskId'))) throw notFound('原生页副本', input.key.executionId);
+    const found = await store().nativePage(input.key, input.passId, input.ordinal);
+    if (!found) throw notFound('原生页副本', input.passId);
+    return c.json(found);
+  });
   r.post('/internal/tasks/:taskId/development-usage/drain', async (c) => {
     const input = await parseBody(c, z.strictObject({ key: DevelopmentUsageKeySchema, reason: DevelopmentUsageDrainReasonSchema }));
     return c.json(await store().requestDrain(TaskIdSchema.parse(c.req.param('taskId')), input.key, input.reason));

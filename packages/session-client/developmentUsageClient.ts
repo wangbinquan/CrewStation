@@ -1,10 +1,11 @@
-import type { DevelopmentUsageDrainReason, DevelopmentUsageLookup, DevelopmentUsageKey, DevelopmentUsageLoss, DevelopmentUsageRegistration, StoredDevelopmentUsage, TaskId } from '@crewstation/contracts';
-import { DevelopmentUsageLookupSchema, TaskIdSchema, StoredDevelopmentUsageSchema } from '@crewstation/contracts';
+import type { DevelopmentNativePageEvidence, DevelopmentUsageDrainReason, DevelopmentUsageLookup, DevelopmentUsageKey, DevelopmentUsageLoss, DevelopmentUsageRegistration, StoredDevelopmentUsage, TaskId } from '@crewstation/contracts';
+import { DevelopmentNativePageEvidenceSchema, DevelopmentUsageLookupSchema, TaskIdSchema, StoredDevelopmentUsageSchema } from '@crewstation/contracts';
 
 export interface DevelopmentUsageSessionClient {
   lookupDevelopmentUsage(taskId: TaskId): Promise<DevelopmentUsageLookup>;
   registerDevelopmentUsage(registration: DevelopmentUsageRegistration): Promise<StoredDevelopmentUsage>;
   getDevelopmentUsage(taskId: TaskId, key: DevelopmentUsageKey): Promise<StoredDevelopmentUsage>;
+  readDevelopmentNativePage(key: DevelopmentUsageKey, passId: string, ordinal: string): Promise<DevelopmentNativePageEvidence>;
   requestDevelopmentUsageDrain(taskId: TaskId, key: DevelopmentUsageKey, reason: DevelopmentUsageDrainReason): Promise<StoredDevelopmentUsage>;
   markDevelopmentUsageUnavailable(taskId: TaskId, loss: DevelopmentUsageLoss): Promise<StoredDevelopmentUsage>;
 }
@@ -20,6 +21,14 @@ export function developmentUsageClient(call: <T>(path: string, init?: RequestIni
     },
     registerDevelopmentUsage: (registration) => request('/internal/development-usage/register', registration),
     getDevelopmentUsage: (taskId, key) => request(`${base(taskId)}/read`, key),
+    readDevelopmentNativePage: async (key, passId, ordinal) => {
+      const found = DevelopmentNativePageEvidenceSchema.parse(await call(`${base(TaskIdSchema.parse(key.executionId))}/native-page`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key, passId, ordinal }),
+      }));
+      if (Object.entries(found.key).some(([field, value]) => key[field as keyof DevelopmentUsageKey] !== value) || found.ack.identity.passId !== passId || found.ack.ordinal !== ordinal)
+        throw new Error('Session returned another original native page');
+      return found;
+    },
     requestDevelopmentUsageDrain: (taskId, key, reason) => request(`${base(taskId)}/drain`, { key, reason }),
     markDevelopmentUsageUnavailable: (taskId, loss) => request(`${base(taskId)}/unavailable`, loss),
   };

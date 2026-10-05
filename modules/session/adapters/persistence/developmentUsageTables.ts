@@ -1,5 +1,5 @@
 import { bigint, boolean, index, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
-import type { DevelopmentUsageClosure, DevelopmentUsageDrainReason, DevelopmentUsageEvent, DevelopmentUsageLoss, DevelopmentUsageReceipt, DevelopmentUsageRegistration } from '@crewstation/contracts';
+import type { DevelopmentNativePageEvidence, DevelopmentUsageClosure, DevelopmentUsageDrainReason, DevelopmentUsageEvent, DevelopmentUsageLoss, DevelopmentUsageReceipt, DevelopmentUsageRegistration } from '@crewstation/contracts';
 import { jsonDocument } from '@crewstation/persistence';
 import { sessionSchema } from './schema';
 
@@ -15,7 +15,9 @@ export const developmentUsageStreams = sessionSchema.table('development_usage_st
   polledAt: timestamp('polled_at', { withTimezone: true }).notNull().defaultNow(),
   sourcePolledAt: timestamp('source_polled_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [primaryKey({ columns: [t.taskId] }), index('development_usage_poll').on(t.polledAt, t.taskId), index('development_usage_source_poll').on(t.sourcePolledAt, t.taskId)]);
+/** Raw evidence is stored once on its original first numeric row, outside the public numeric packet. */
+export type StoredDevelopmentUsageEvent = DevelopmentUsageEvent & { nativeEvidence?: DevelopmentNativePageEvidence };
 export const developmentUsageEvents = sessionSchema.table('development_usage_events', {
   taskId: text('task_id').notNull(), sequence: bigint('sequence', { mode: 'number' }).notNull(),
-  digest: text('digest').notNull(), event: jsonDocument('event').$type<DevelopmentUsageEvent>().notNull(),
+  digest: text('digest').notNull(), event: jsonDocument('event').$type<StoredDevelopmentUsageEvent>().notNull(),
 }, (t) => [primaryKey({ columns: [t.taskId, t.sequence] })]);

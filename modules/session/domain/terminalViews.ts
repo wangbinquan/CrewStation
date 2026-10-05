@@ -6,7 +6,7 @@ import { forbidden } from '@crewstation/kernel';
  * 取得控制时的持有人同样只认连接的网关身份：浏览器自带的 `holder` 一律丢弃（2026-09-23）。
  */
 export function terminalViewCommand(command: RunnerCommand, viewId: string, holder?: TerminalHolder): RunnerCommand {
-  if (command.type === 'stopDevelopmentAgent' || command.type === 'developmentUsageInfo' || command.type === 'readDevelopmentUsageEvents' || command.type === 'ackDevelopmentUsageEvents' || (command.type === 'startAgent' && command.developmentUsage !== undefined)) throw forbidden('开发数值受理与确认只能由持久采集服务操作');
+  if (command.type === 'stopDevelopmentAgent' || command.type === 'developmentUsageInfo' || command.type === 'readDevelopmentUsageEvents' || command.type === 'readDevelopmentNativePage' || command.type === 'ackDevelopmentUsageEvents' || (command.type === 'startAgent' && command.developmentUsage !== undefined)) throw forbidden('开发数值受理与确认只能由持久采集服务操作');
   if (command.type === 'startAgentTerminal' || command.type === 'stopAgentTerminal') throw forbidden('请通过开发会话的 CLI 启动／结束接口操作，以保留名册和请求幂等性');
   if (command.type === 'claimTerminalControl') {
     const { holder: _untrusted, ...rest } = command;

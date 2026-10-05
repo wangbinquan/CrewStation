@@ -53,3 +53,21 @@ SOURCE12 有限功能门通过后，实际 typecheck v3 仍发现开发会话内
 2026-10-05 11:58:50Z，本候选唯一一次 `bun run check` 结束：arch、lint、后台类型和控制台类型通过；6189条测试／1205文件中6030 pass、156环境 skip、3 fail、261268次断言。原完整日志与失败终态保留，不记为全仓通过。两条 `modules/platform/tests/runtimeImageReferences.test.ts` 在原 fixture 直接写 catalog 时被共享工作树未提交的 native registry 准入触发器拒绝；一条其他会话已改的 `packages/api-client/tests/projectDeletion.test.ts` 期望尚未提供的 capabilities 方法。未修改或收编这些在制品，原三代码候选指纹始终不变。按 development-rules §3 的共享在制品规则，沿用本会话35条原 journal 用例／36952断言、精确lint和类型／结构结果，发布后以干净确切SHA hosted CI验核。
 
 本片发布三个原页读取代码／测试文件、本文和完整共享STATE；SOURCE4的有限功能PASS复用，本文仅追加实际检查终态，不改原实现。此前452d2fd2六项CI／八组件部署的证据保持，本片的新CI和最终本机部署分别核对。before/final、平台v2持久映射／完整历史投影／seal、producer接线与100K Task／10M usage仍需完成，两个RFC不关闭。
+
+## 原页 Runner 通道与 Session 持久副本（本批）
+
+新增 `readDevelopmentNativePage` 严格命令，绑定原 key/pass/任意精度 ordinal 和字节 offset；原 Runner 的 journal 页按 64 KiB 块读取到实际字节 EOF，metadata 与冻结 ACK 全程不变。该数字只限制一个运输块，不限制原页总字节、原页数量或全部用量人口。未知原 rootCreatedAt 保持 null，结束／普通数字 ACK／重启后均能读同一历史文档；读取不增加当前写入或完整 Token 资格。沿用现有内部采集命令入口，浏览器视图不能发该命令，普通旧命令不变。参见 `runtimes/task/src/agents/developmentNativePageReader.ts:8`、`runtimes/task/src/commandHandlers.ts:54`。
+
+Session 组装原字节到 EOF，核对实际 byte digest、fatal UTF-8、原文内容／累计 digest 和准备 sourceGeneration；原文 SHA 遵循原生产端 JSON 顺序，不替换为排序 JSONB hash。原文仅附在该页原首个数字帧已有 JSONB 的私有 nativeEvidence 中，与原数字 rows 在同一个 PG 事务提交；原 event digest 仍只针对原数字 frame。普通最多五帧／1 MiB outbox 去掉私有文档，原完整页走独立严格内部只读接口；未新增第二份 numeric ledger 或迁移锁。参见 `modules/session/domain/developmentNativeEvidence.ts:7`、`modules/session/adapters/persistence/developmentNativeCopies.ts:8`、`modules/session/adapters/persistence/developmentUsageTables.ts:19`、`modules/session/http/developmentUsageRoutes.ts:21`。
+
+正常采集在 PG 原副本提交之后才发送 Runner ACK；整个已提交范围若仍有任一 v2 原页缺失，则不能完成该数字 stream 或确认 Runner。SQL 的存在性查询只取第一条缺口作为拒绝证据，所有已提交记录都参加判定，不是统计取样或总量上限。原 source 消费 ACK、重启和普通数字删除之后，PG 原文仍可按原 key/pass/ordinal 读取。参见 `modules/session/application/developmentUsageIngestion.ts:31`、`modules/session/adapters/persistence/developmentNativeCopies.ts:32`。
+
+本批相关31用例已实际通过，7.25秒；最后两份测试的类型收窄与原 key 字段顺序 HTTP 回归再验证10用例通过、2491断言，3.76秒。真实1201步骤逐页到EOF，四桶求和精确为输入721801、输出6005、缓存读8407、缓存写15613，实际模型名保留。真实 PG 原文写入异常回滚数字行、不发 ACK；实际 ACK 回复丢失后持久副本与原水位经重启恢复。初次 root 测试错误导入未提供的 drizzle 依赖、错误读取包装异常的顶层 message，以及一个新测试闭包类型收窄失败均保留；分别改用既有 PG client、原 PostgreSQL cause 与固定 capture 后通过，没有弱化原断言或扩大旧预算。当前类型与精确 lint 已通过，结构的前次结果保持；本候选唯一完整门尚待终态，新确切 SHA CI／本机部署分别验核。
+
+CS3447104d 六项确切 CI37307118380已全部成功，固定三镜像本机八组件Ready；原 Pod／卷／数据库／248锁迁移保持。AW本会话 CI 时序修复 c835052b5 已直接提交远端，实际只触发主CI37313859339，Windows路径筛选未触发；不把首次假设两个工作流的查询失败或旧 Windows 成功当作本提交全套绿。浏览器当前连接不可用，尚未验核 CS 新部署的正式页刷新。完整 before/final、平台 v2 映射／历史seal、producer与100K Task／10M usage仍需完成，两个RFC继续 In Progress。
+
+## 2026-10-05 本批检查与直接发布
+
+固定24TS的补跑完整check于13:45:53Z终态exit2，54.03秒，候选首尾字节一致。结构与lint通过；停止于其他会话未提交的packages/filesystem-metrics/buildkit/controlTransport.ts:32 TS2367，未进入整仓测试，不记全量通过。前轮检查因会话中断无终态，原日志和中断回执保留。复用此前31项定向和最后10项回归、精确24TS lint与类型通过，依development-rules §3提交自有文件，以新精确SHA hosted六项CI核对干净提交树。SOURCE25功能复核通过；源文件没有为新HEAD重跑或修改。
+
+AW c835052b5主CI37313859339已终态failure，原日志保留。实际失败为并行RFC370迁移后的旧路径与跨模块架构引用；本批原清理回归未再超时。旧定时布局失败已有后继full/WebKit/visual成功，今天full schedule37318548076正在运行。没有跨会话消息，foreign在制品保持。新CS精确CI、本机部署、生产采集与完整规模验收继续，两RFC保持In Progress。
