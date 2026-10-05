@@ -4,6 +4,7 @@ import { readBuildKitCacheMetadata } from './metadata';
 import type { BuildKitCacheRecord } from './metadata';
 import { readBuildKitResultCache } from './resultCache';
 import { readBuildKitSnapshotMetadata } from './snapshots';
+import { BuildKitCacheGraphSchema, BuildKitResultGraphSchema, BuildKitSnapshotGraphSchema } from './inventory/protocol';
 
 const digest = z.string().regex(/^sha256:[a-f0-9]{64}$/), id = z.string().regex(/^[a-z0-9]{20,40}$/);
 const request = z.strictObject({ workerId: id, projectLayers: z.array(digest), foreignLayers: z.array(digest), foreignResultKeys: z.array(z.string().min(1)),
@@ -43,7 +44,12 @@ function platformInputs(input: BuildKitOwnershipRequest, snapshots: ReturnType<t
  * read-only scope, not permission to prune. Unattributed local inputs remain
  * explicit blockers; neither reuse counts nor generic cache names prove sharing. */
 export function buildKitCacheOwnership(raw: BuildKitOwnershipRequest, bytes: { cache: Uint8Array; results: Uint8Array; snapshots: Uint8Array }) {
-  const input = request.parse(structuredClone(raw)), cache = readBuildKitCacheMetadata(bytes.cache), results = readBuildKitResultCache(bytes.results), snapshots = readBuildKitSnapshotMetadata(bytes.snapshots);
+  return buildKitCacheGraphOwnership(raw, { cache: readBuildKitCacheMetadata(bytes.cache), results: readBuildKitResultCache(bytes.results), snapshots: readBuildKitSnapshotMetadata(bytes.snapshots) });
+}
+/** The authenticated original probe returns safe native graphs, never raw
+ * private database bytes. Both paths use the same strict ownership rules. */
+export function buildKitCacheGraphOwnership(raw: BuildKitOwnershipRequest, graphs: { cache: ReturnType<typeof readBuildKitCacheMetadata>; results: ReturnType<typeof readBuildKitResultCache>; snapshots: ReturnType<typeof readBuildKitSnapshotMetadata> }) {
+  const input = request.parse(structuredClone(raw)), cache = BuildKitCacheGraphSchema.parse(graphs.cache), results = BuildKitResultGraphSchema.parse(graphs.results), snapshots = BuildKitSnapshotGraphSchema.parse(graphs.snapshots);
   if (results.results.some(row => row.workerId !== input.workerId) || input.foreignResultKeys.some(key => !results.keys.includes(key))) throw Error('Native BuildKit result belongs to another original worker or incomplete foreign scope');
   const windows = input.buildWindows.map(row => ({ started: nanoseconds(row.started), finished: nanoseconds(row.finished) }));
   if (windows.some(row => row.finished < row.started)) throw Error('Native BuildKit build window is inverted');

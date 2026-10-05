@@ -33,6 +33,8 @@ export interface LedgerRecordView {
 export interface LedgerObservations {
   /** 持久项目准入共享锁覆盖实际 apply；seal 排他锁须等在途物理写退出。 */
   withProjectAdmission?(projectId: string, work: () => Promise<void>): Promise<boolean>;
+  /** 完整创建 owner 同时保护项目和非项目平台构建；旧项目端口不接 undefined。 */
+  withCreationAdmission?(projectId: string | undefined, work: () => Promise<void>, record: LedgerRecordView): Promise<boolean>;
   readonly taskVolumes?: {
     get(id: string): Promise<TaskVolumeSafetyState>;
     beginProvision(id: string): Promise<void>;

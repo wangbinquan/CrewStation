@@ -44,7 +44,7 @@ import type { RuntimeBuildCredentials } from './ports/buildCredentials';
 import { databaseBuildIntents } from './adapters/persistence/buildIntents';
 import { kubernetesRuntimeImageBuildExecutor } from './adapters/k8s/buildExecutor';
 import { httpRuntimeImageRegistry } from './adapters/registry/runtimeImageRegistry';
-import { runtimeImageBuildSecretValues } from './application/buildSecretValues';
+import { runtimeImageBuildSecretValues, runtimeImageBuildCreationWork } from './application/buildSecretValues';
 import { configuredImageResolver, serviceImageResolver } from './adapters/registry/serviceImage';
 import { runtimeImageSourcePreparation } from './application/sourcePreparation';
 import { runtimeImageReferenceReconciliation } from './application/referenceReconciliation';
@@ -132,6 +132,7 @@ export function createManagedRuntimeEnvironmentModule(deps: ManagedRuntimeEnviro
   const admissions = deps.projectAdmission ? runtimeImageProjectAdmissions({ ...deps.projectAdmission, db: deps.db }) : undefined;
   const secretValues = runtimeImageBuildSecretValues(intents, deps.credentials, uow.read.revisions.get, admissions);
   return { ...mod, pinServiceImage: serviceImageResolver(deps.registry), pinPlatformImage: configuredImageResolver(deps.registry),
+    withBuildCreationAdmission: runtimeImageBuildCreationWork(intents, uow.read.revisions.get, admissions),
     imageBuildSecretValues: async (input: Parameters<typeof secretValues>[0]) => { await deps.assertBuildIsolation(); return secretValues(input); },
     workers: [periodicJob(async () => { await mod.api.reconcileReferences(); }, () => logger.warn('runtime image reference worker failed'), 30000), periodicJob(mod.api.reconcileValidations, () => logger.warn('runtime image validation worker failed'), 2000), periodicJob(mod.api.reconcileBuilds, () => logger.warn('runtime image build worker failed'), 2000)],
   };

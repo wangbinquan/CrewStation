@@ -1,4 +1,4 @@
-import { bindTaskMaintenance } from './adapters/observability/taskMaintenance'; import { clusterMetadata } from './application/cluster/metadata';
+import { bindTaskMaintenance } from './adapters/observability/taskMaintenance'; import { clusterMetadata } from './application/cluster/metadata'; import { registryCreationAdmission } from './adapters/registryCreationAdmission';
 import { resourceCatalogs } from './application/resource-center/resourceCatalogs'; import { sessionDeletionSources } from './application/deletion/sessionSources';
 import { businessRuntimePorts } from './application/deletion/businessSources';
 import { dataDeletionSources } from './application/deletion/dataSources';
@@ -494,7 +494,7 @@ function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCo
     slots: { slotEnvValues: (ref) => release.api.slotEnvValues(ref), slotFailed: (ref, message) => release.api.slotFailed(ref, message) }, jobs: { jobEnvValues: (ref) => release.api.jobEnvValues(ref), imageBuildSecretValues: runtimeImages.imageBuildSecretValues },
     ledger: {
       workloadSafety: ledger.api.workloadSafety, taskVolumes: ledger.api.taskVolumes,
-      withProjectAdmission: (id, work) => ledger.api.projectDeletion.withAdmission(id as ProjectId, work),
+      withCreationAdmission: registryCreationAdmission({ db: deps.db, registry: deps.settings.projectDeletionNative?.registry, resources: ledger.api.projectDeletion, images: runtimeImages, release }),
       observe: (input) => ledger.api.observe(input), claimOf: (child) => ledger.api.claimOf(child), get: (id) => ledger.api.get(id),
       routeCandidates: (host, pathPrefix) => ledger.api.list({ kind: 'route', includeStopped: true, routeMatch: { host, ...(pathPrefix ? { pathPrefix } : {}) } }),
       listLive: () => ledger.api.list({}), changesSince: ledger.api.changesSince, latestChange: ledger.api.latestChange,

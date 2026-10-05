@@ -103,6 +103,18 @@ export async function releaseProjectWork<T>(deps: Pick<ReleaseUseCaseDeps, 'serv
   const projectId = ProjectIdSchema.parse(service.projectId);
   return deps.admission.run(projectId, serviceId, { kind, consumerId, inputDigest: jsonHash(input) }, work);
 }
+/** Retain the original native callback through the complete cluster apply,
+ * including the interval after credential rendering has already returned. */
+export async function releaseResourceCreationWork<T>(deps: ReleaseUseCaseDeps, input: { releaseId: string; recordId: string; kind: 'slot' | 'pipeline'; serviceId?: string }, work: () => Promise<T>): Promise<T> {
+  const id = ResourceIdSchema.parse(input.releaseId) as ReleaseId, original = await deps.uow.read.releases.getById(id);
+  ResourceIdSchema.parse(input.recordId);
+  if (!original || input.serviceId && input.serviceId !== original.serviceId) throw precondition('原发布与资源台账服务归属不符');
+  return releaseProjectWork(deps, original.serviceId, input.kind, id, { ...input, projectId: original.projectId, kind: 'cluster-creation' }, async () => {
+    const actual = await deps.services.resolveServiceById(original.serviceId);
+    if (actual?.projectId !== original.projectId) throw precondition('原发布项目与当前服务归属冲突');
+    await deps.admission?.checkCurrent(); const result = await work(); await deps.admission?.checkCurrent(); return result;
+  });
+}
 export function admittedReleaseApi(deps: ReleaseUseCaseDeps, api: ReleaseModuleApi): ReleaseModuleApi {
   if (!deps.admission) return api;
   const service = <T>(id: ServiceId, input: unknown, work: () => Promise<T>, kind: 'publish' | 'slot' | 'maintenance' = 'slot', consumerId = newResourceId()) => releaseProjectWork(deps, id, kind, consumerId, input, work);

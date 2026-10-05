@@ -9,6 +9,7 @@ import { ConsumerRequestSchema, ConsumerResponseSchema } from './consumersProtoc
 import {RegistryInventoryRequestSchema} from './registry/protocol';
 import {observeRegistryInventory} from './registry/inventory';
 import { garageInventoryResponse } from './garage/server';
+import { buildKitInventoryResponse } from './buildkit/inventory/server';
 
 export function createFilesystemMetricsHandler(options: { token: string; roots: Record<string, string>; timeoutMs?: number; procRoot?: string }) {
   if (options.token.length < 32) throw new Error('A dedicated measurement token of at least 32 characters is required');
@@ -18,12 +19,13 @@ export function createFilesystemMetricsHandler(options: { token: string; roots: 
     if (path === '/healthz' && request.method === 'GET') return Response.json({ ok: true });
     const supplied = Buffer.from(request.headers.get('authorization') ?? '');
     if (credential.length !== supplied.length || !timingSafeEqual(credential, supplied)) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    if (!['/measure', '/absence', '/source', '/consumers','/registry/inventory','/garage/inventory'].includes(path) || request.method !== 'POST') return new Response(null, { status: 404 });
+    if (!['/measure', '/absence', '/source', '/consumers','/registry/inventory','/garage/inventory','/buildkit/inventory'].includes(path) || request.method !== 'POST') return new Response(null, { status: 404 });
     if (busy) return Response.json({ error: 'A measurement is already running' }, { status: 409 });
-    if (Number(request.headers.get('content-length')) > (path === '/garage/inventory' ? 24 * 1024 * 1024 : path === '/consumers'||path==='/registry/inventory' ? 32_768 : 16_384)) return new Response(null, { status: 413 });
+    if (Number(request.headers.get('content-length')) > (path === '/garage/inventory' ? 24 * 1024 * 1024 : path === '/buildkit/inventory' ? 1_048_576 : path === '/consumers'||path==='/registry/inventory' ? 32_768 : 16_384)) return new Response(null, { status: 413 });
     busy = true;
     try {
       if (path === '/garage/inventory') return await garageInventoryResponse(request, options.roots, options.timeoutMs ?? 30_000);
+      if (path === '/buildkit/inventory') return await buildKitInventoryResponse(request, options.roots, options.timeoutMs ?? 30_000);
       if (path === '/consumers') return await consumerResponse(request, options.procRoot ?? '/proc', options.timeoutMs ?? 10_000);
       if(path==='/registry/inventory') {
         const input=RegistryInventoryRequestSchema.parse(JSON.parse(await boundedBody(request,32_768))),root=options.roots[input.rootId];

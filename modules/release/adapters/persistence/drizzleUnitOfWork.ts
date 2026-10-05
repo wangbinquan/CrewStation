@@ -64,7 +64,7 @@ export function releaseProjectAdmissions(input: { db: Database; protectCurrent()
       const prior = callbackScopes.getStore();
       if (prior?.db === input.db) { if (prior.projectId !== projectId || prior.serviceId !== serviceId) throw precondition('不能扩展原发布回调'); await checkCurrent(); return work(); }
       await input.assertAvailable(projectId);
-      return withSharedDatabaseAdmissions(input.db, [NATIVE_REGISTRY_ADMISSION, releaseAdmissionKey(projectId)], async (protectedTx) => {
+      return withSharedDatabaseAdmissions(input.db, [NATIVE_REGISTRY_ADMISSION, releaseAdmissionKey(projectId), 'resources.project-admission:' + projectId], async (protectedTx) => {
         await input.assertNativeRegistryAvailable?.();
         await input.assertAvailable(projectId);
         const sealed = await input.db.execute(sql`SELECT project_id FROM release.deletion_fences WHERE project_id=${projectId} UNION ALL SELECT project_id FROM release.project_admissions WHERE project_id=${projectId} AND sealed`);

@@ -30,7 +30,7 @@ import type { ProjectDeletionContext } from '@crewstation/contracts';
 import type { ReleaseCallbackProcess } from './domain/release';
 import type { ReleaseDeletionPhysics } from './ports/unitOfWork';
 import { releaseDeletionRepository } from './adapters/persistence/projectDeletion';
-import { admittedReleaseApi, protectedReleaseEffects, releaseProjectWork, releaseProjectDeletionOwner } from './application/projectDeletion';
+import { admittedReleaseApi, protectedReleaseEffects, releaseProjectWork, releaseResourceCreationWork, releaseProjectDeletionOwner } from './application/projectDeletion';
 import type { ReleaseModuleApi } from './api/moduleApi';
 import type { ReleaseUseCaseDeps } from './application/dependencies';
 import { pipelineStepUseCase } from './application/pipeline';
@@ -89,6 +89,7 @@ export interface ReleaseModuleDeps {
 export interface ReleaseTimer { start(): void; stop(): Promise<void> }
 
 export interface ReleaseModule {
+  withResourceCreationAdmission<T>(input: { releaseId: string; recordId: string; kind: 'slot' | 'pipeline'; serviceId?: string }, work: () => Promise<T>): Promise<T>;
   readonly api: ReleaseModuleApi;
   readonly http: Hono<AppEnv>[];
   readonly workers: Array<Worker | ReleaseTimer>;
@@ -167,6 +168,7 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
   };
   return {
     api,
+    withResourceCreationAdmission: (input, work) => releaseResourceCreationWork(useCaseDeps, input, work),
     http: [releaseRoutes(api, deps.isAdmin)],
     workers: [createWorker({ db: deps.db, kinds: [PIPELINE_JOB_KIND], owner: deps.settings.workerOwner, concurrency: 4, logger, handler: pipelineJobHandler(api, jobs) }), sweep, periodicJob(() => api.progressHandoffs().then(() => undefined), (error) => logger.warn('execution handoff progress failed', { error: String(error) }), 1000),
       ...(deps.ledger ? [slotLedgerResyncWorker(() => resyncSlotLedger(useCaseDeps.uow, logger, useCaseDeps), logger)] : [])],

@@ -3520,3 +3520,10 @@ TaskRuntime七阶段仅受控停止端口，DevSession的原删除许可/回调f
 2026-10-05 上条“迁入 modules/session/tests”的候选仅目标测试通过，实际结构检查 FAIL：agent-drivers 与 runtimes 的五项依赖方向违规；SOURCE v1 也正式 FAIL，全部失败留证。该候选未提交。当前使用 repository-structure.md 根布局已有的跨单元 tests/contracts；tierOf 对该路径归 module，整个原 e2e 测试文件逐字不变（SHA256 01f527a8fcf35d4be735028cc92cdffdb77897b67ce643f9b1a67e7e92884b74），没有删除防护，也不修改结构或覆盖门槛。新位置的目标运行、结构检查、有限功能复核和 exact-SHA CI 继续验证；原生产不变、CS 开发 producer OFF，两 RFC 仍开放。此处只基于当前文档追加更正，前文与并行输出全部保留。
 
 2026-10-05 跨单元 tests/contracts 的原五个用例实际 5 pass／0 fail／2471 assertions，3.90秒；精确 eslint 和 arch:check 均退出0，结构检查59单元／4429源码无违规。原文件逐字一致，测试分层由现有 tierOf 归 module，生产未改。此前错误目录的检查和 SOURCE v1 FAIL 保留；本候选有限功能复核、后继确切SHA六项CI及本机部署分别留证。
+
+
+## 2026-10-06 RFC-037 原 BuildKit 来源与创建准入兼容
+
+本批完整 v2 四层静态通过，6121 pass／156 skip／2 fail、264763 断言；42 候选路径首尾保持。两项旧路径失败原件保留，事件参考面板异步加载及 Session 关闭后的 CONNECTION_ENDED 定向 10／0、119 断言。第一版已修正的项目专用准入误接平台记录缺陷，真实调和／writer／档位和 PG 回归 8／0。精确发布包括上述42路径与此 STATE，只在门禁后更新交接文档；确切SHA CI／部署接续。原全量红不写绿。
+
+后续在制 Registry 排他 authority／pidfd／进程 guardian／服务 main、完整平台输入摘要、stale-result qualification 和 kubelet emptyDir 来源全部排除在该提交。实际原 Linux 只读输入核对确认两个平台输入与模板一致，项目输入保留，原 Registry 未暂停，原 BuildKit 未 Prune。下一候选还需 Session shutdown 排空修正、实际 work physics、私有 Registry／SCM 安装与完整22方装配，最终管理员两次确认原专用项目彻底回收仍未完成。创建弹窗已上线，永久删除入口 OFF、原项目和共享资源保持；不会把这些来源基础写成删除功能完成。

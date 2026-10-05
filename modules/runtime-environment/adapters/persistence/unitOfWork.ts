@@ -81,7 +81,7 @@ export function runtimeImageProjectAdmissions(input: {
       await check(projects); return work();
     }
     for (const id of projects) await input.assertAvailable(id);
-    return withSharedDatabaseAdmissions(input.db, [NATIVE_REGISTRY_ADMISSION, ...projects.map(runtimeImageAdmissionKey)], async (protectedTx) => {
+    return withSharedDatabaseAdmissions(input.db, [NATIVE_REGISTRY_ADMISSION, ...projects.map(runtimeImageAdmissionKey), ...projects.map(id => 'resources.project-admission:' + id)], async (protectedTx) => {
       await input.assertNativeRegistryAvailable?.();
       for (const id of projects) await input.assertAvailable(id);
       const projectKeys = sql.join(projects.map((id) => sql`${id}`), sql`,`);

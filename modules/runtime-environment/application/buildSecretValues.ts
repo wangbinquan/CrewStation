@@ -5,6 +5,23 @@ import type { RuntimeBuildCredentials } from '../ports/buildCredentials';
 import type { RuntimeBuildIntents } from '../ports/buildLedger';
 import type { RuntimeImageProjectAdmissions } from '../ports/unitOfWork';
 
+/** The controller's complete Secret/Job apply belongs to this original build
+ * callback. A finished credential call must not release native admission. */
+export function runtimeImageBuildCreationWork(intents: RuntimeBuildIntents, getRevision: (id: string) => Promise<ImageRevision | undefined>, admissions?: RuntimeImageProjectAdmissions) {
+  return async <T>(input: { recordId: string; buildId: string; executionEpoch: number }, work: () => Promise<T>): Promise<T> => {
+    const build = await intents.get(input.buildId), revision = build ? await getRevision(build.revisionId) : undefined;
+    if (!build?.resourcePlan || !revision || build.resourceId !== input.recordId || build.executionEpoch !== input.executionEpoch) throw precondition('原镜像构建与资源台账出生不符');
+    const projects = runtimeImageBuildProjects(build, revision), original = jsonHash(build.resourcePlan);
+    const apply = async () => {
+      await admissions?.check(projects);
+      const current = await intents.get(build.id);
+      if (!current?.resourcePlan || current.resourceId !== input.recordId || current.executionEpoch !== input.executionEpoch || jsonHash(current.resourcePlan) !== original) throw precondition('原镜像构建计划在集群写入前变化');
+      const result = await work(); await admissions?.check(projects); return result;
+    };
+    return admissions ? admissions.run(projects, { kind: 'build', id: build.id, inputDigest: jsonHash({ ...input, projects, original, kind: 'cluster-creation' }) }, apply) : apply();
+  };
+}
+
 export function runtimeImageBuildSecretValues(intents: RuntimeBuildIntents, credentials: RuntimeBuildCredentials, getRevision: (id: string) => Promise<ImageRevision | undefined>, admissions?: RuntimeImageProjectAdmissions) {
   return async (input: { recordId: string; buildId: string; executionEpoch: number }): Promise<Readonly<Record<string, string>>> => {
     const build = await intents.get(input.buildId);

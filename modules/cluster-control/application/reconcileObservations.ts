@@ -304,7 +304,8 @@ export async function reconcileRecord(deps: ReconcileDeps, id: string, enqueue: 
       if (current?.desired !== 'present' || current.generation !== record.generation) return;
       await APPLIERS[record.kind]?.(deps, current, enqueue);
     };
-    if (record.projectId && deps.ledger.withProjectAdmission) await deps.ledger.withProjectAdmission(record.projectId, apply);
+    if (deps.ledger.withCreationAdmission) await deps.ledger.withCreationAdmission(record.projectId, apply, record);
+    else if (record.projectId && deps.ledger.withProjectAdmission) await deps.ledger.withProjectAdmission(record.projectId, apply);
     else await apply();
   }
   await reconcileTaskVolume(deps, record, enqueue);
