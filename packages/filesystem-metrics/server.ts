@@ -4,8 +4,12 @@ import type { MeasurementResponse } from './protocol';
 import { measureDirectory } from './measure';
 import { AbsenceRequestSchema, directoryAbsent } from './absence';
 import { SourceRequestSchema, observeFilesystemSource } from './source';
+import { observeFileConsumers } from './consumers';
+import { ConsumerRequestSchema, ConsumerResponseSchema } from './consumersProtocol';
+import {RegistryInventoryRequestSchema} from './registry/protocol';
+import {observeRegistryInventory} from './registry/inventory';
 
-export function createFilesystemMetricsHandler(options: { token: string; roots: Record<string, string>; timeoutMs?: number }) {
+export function createFilesystemMetricsHandler(options: { token: string; roots: Record<string, string>; timeoutMs?: number; procRoot?: string }) {
   if (options.token.length < 32) throw new Error('A dedicated measurement token of at least 32 characters is required');
   const credential = Buffer.from(`Bearer ${options.token}`); let busy = false;
   return async (request: Request): Promise<Response> => {
@@ -13,11 +17,21 @@ export function createFilesystemMetricsHandler(options: { token: string; roots: 
     if (path === '/healthz' && request.method === 'GET') return Response.json({ ok: true });
     const supplied = Buffer.from(request.headers.get('authorization') ?? '');
     if (credential.length !== supplied.length || !timingSafeEqual(credential, supplied)) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    if (!['/measure', '/absence', '/source'].includes(path) || request.method !== 'POST') return new Response(null, { status: 404 });
+    if (!['/measure', '/absence', '/source', '/consumers','/registry/inventory'].includes(path) || request.method !== 'POST') return new Response(null, { status: 404 });
     if (busy) return Response.json({ error: 'A measurement is already running' }, { status: 409 });
-    if (Number(request.headers.get('content-length')) > 16_384) return new Response(null, { status: 413 });
+    if (Number(request.headers.get('content-length')) > (path === '/consumers'||path==='/registry/inventory' ? 32_768 : 16_384)) return new Response(null, { status: 413 });
     busy = true;
     try {
+      if (path === '/consumers') return await consumerResponse(request, options.procRoot ?? '/proc', options.timeoutMs ?? 10_000);
+      if(path==='/registry/inventory') {
+        const input=RegistryInventoryRequestSchema.parse(JSON.parse(await boundedBody(request,32_768))),root=options.roots[input.rootId];
+        if(!root)throw new Error('Unknown root');
+        try {
+          const inventory=await observeRegistryInventory(root,input,AbortSignal.any([request.signal,AbortSignal.timeout(options.timeoutMs??30_000)])),body=JSON.stringify(inventory);
+          if(Buffer.byteLength(body)>8*1024*1024)throw new Error('Complete registry inventory exceeded its response budget');
+          return new Response(body,{headers:{'content-type':'application/json','cache-control':'no-store'}});
+        }catch{return Response.json({error:'Registry native inventory unavailable'},{status:503});}
+      }
       if (path === '/source') {
         const target = SourceRequestSchema.parse(JSON.parse(await boundedBody(request))), root = options.roots[target.rootId];
         if (!root) throw new Error('Unknown root');
@@ -44,6 +58,17 @@ export function createFilesystemMetricsHandler(options: { token: string; roots: 
     finally { busy = false; }
   };
 }
+async function consumerResponse(request: Request, procRoot: string, timeoutMs: number): Promise<Response> {
+  const input = ConsumerRequestSchema.parse(JSON.parse(await boundedBody(request, 32_768)));
+  try {
+    const signal = AbortSignal.any([request.signal, AbortSignal.timeout(timeoutMs)]);
+    const observed = await observeFileConsumers(input.identities, procRoot, signal);
+    if (input.mode === 'observe' && (input.source.bootId !== observed.bootId || input.source.namespace !== observed.namespace)) {
+      return Response.json(ConsumerResponseSchema.parse({ ...observed, complete: false, blockers: [...observed.blockers, { code: 'source-changed' }] }));
+    }
+    return Response.json(ConsumerResponseSchema.parse(observed));
+  } catch { return Response.json({ error: 'Consumer observation unavailable' }, { status: 503 }); }
+}
 function errorCode(error: unknown): string {
   if (error instanceof Error) {
     if ('code' in error) return String(error.code);
@@ -52,11 +77,11 @@ function errorCode(error: unknown): string {
   }
   return 'Directory measurement failed';
 }
-async function boundedBody(request: Request): Promise<string> {
+async function boundedBody(request: Request, limit = 16_384): Promise<string> {
   if (!request.body) return '';
   const reader = request.body.getReader(), chunks: Uint8Array[] = []; let size = 0;
   try {
-    while (true) { const part = await reader.read(); if (part.done) break; size += part.value.byteLength; if (size > 16_384) throw new Error('Request too large'); chunks.push(part.value); }
+    while (true) { const part = await reader.read(); if (part.done) break; size += part.value.byteLength; if (size > limit) throw new Error('Request too large'); chunks.push(part.value); }
     return Buffer.concat(chunks).toString('utf8');
   } finally { await reader.cancel(); reader.releaseLock(); }
 }

@@ -9,6 +9,10 @@ import { adminDeletionWork, deletionScope, loadDeletion } from './access';
 
 export function deletionIntentUseCases(deps: ProjectUseCaseDeps) {
   return {
+    projectDeletionCoordinator: async (id: ProjectId) => {
+      const record = await deps.uow.read.deletions.findOperation(id);
+      return record ? { projectId: record.operation.project.id, operationId: record.operation.id } : undefined;
+    },
     deletionScope: (id: ProjectId) => deletionScope(deps, id),
     prepareDeletionPlan: (actor: Actor, id: ProjectId, reports: readonly ProjectDeletionInventory[]) => adminDeletionWork(deps, actor, () => deps.uow.run(async (scope) => {
       const project = await scope.deletions.lockProject(id);

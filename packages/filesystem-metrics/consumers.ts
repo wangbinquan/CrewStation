@@ -9,8 +9,9 @@ export interface FileConsumer {
 export interface FileConsumerSnapshot {
   readonly version: 1; readonly complete: boolean; readonly bootId: string; readonly namespace: string;
   readonly consumers: readonly FileConsumer[];
-  readonly blockers: readonly { readonly code: 'source-unreadable' | 'process-unreadable' | 'process-changed'; readonly pid?: number }[];
+  readonly blockers: readonly { readonly code: 'source-unreadable' | 'source-changed' | 'process-unreadable' | 'process-changed'; readonly pid?: number }[];
 }
+class ChangedConsumerError extends Error {}
 const identityKey = (device: string, inode: string) => `${device}:${inode}`;
 const startTick = (value: string, id: string) => {
   const end = value.lastIndexOf(') '), tick = end < 0 ? undefined : value.slice(end + 2).trim().split(/\s+/)[19];
@@ -33,10 +34,11 @@ export async function observeFileConsumers(identities: readonly RetainedFileIden
     for (const id of before) {
       signal?.throwIfAborted();
       try { await inspectProcess(procRoot, id, wanted, consumers, signal); }
-      catch (error) { if (signal?.aborted) throw error; blockers.push({ code: 'process-unreadable', pid: Number(id) }); }
+      catch (error) { if (signal?.aborted) throw error; blockers.push({ code: error instanceof ChangedConsumerError ? 'process-changed' : 'process-unreadable', pid: Number(id) }); }
     }
     if (JSON.stringify(before) !== JSON.stringify(await processIds(procRoot)) || bootId !== (await readFile(join(procRoot, 'sys/kernel/random/boot_id'), 'utf8')).trim()
       || namespace !== await readlink(join(procRoot, 'self/ns/pid'))) blockers.push({ code: 'process-changed' });
+    signal?.throwIfAborted();
   } catch (error) { if (signal?.aborted) throw error; blockers.push({ code: 'source-unreadable' }); }
   return { version: 1, complete: blockers.length === 0, bootId, namespace, consumers, blockers };
 }
@@ -48,11 +50,19 @@ async function inspectProcess(root: string, id: string, wanted: ReadonlySet<stri
   if (!before.includes(id)) throw new Error('Original process thread is unavailable');
   for (const tid of before) await inspectThread(join(directory, 'task', tid), id, tid, wanted, observed, signal);
   if (JSON.stringify(before) !== JSON.stringify(await processIds(join(directory, 'task')))
-    || startedTick !== startTick(await readFile(join(directory, 'stat'), 'utf8'), id)) throw new Error('Original process changed');
+    || startedTick !== startTick(await readFile(join(directory, 'stat'), 'utf8'), id)) throw new ChangedConsumerError('Original process changed');
   consumers.push(...observed);
 }
 async function inspectThread(directory: string, id: string, tid: string, wanted: ReadonlySet<string>, consumers: FileConsumer[], signal?: AbortSignal): Promise<void> {
   signal?.throwIfAborted(); const startedTick = startTick(await readFile(join(directory, 'stat'), 'utf8'), tid);
+  const before = await retainedReferences(directory, id, tid, startedTick, wanted, signal);
+  const after = await retainedReferences(directory, id, tid, startedTick, wanted, signal);
+  const keys = (values: readonly FileConsumer[]) => values.map(({ kind, device, inode }) => `${kind}:${device}:${inode}`).sort();
+  if (JSON.stringify(keys(before)) !== JSON.stringify(keys(after))) throw new ChangedConsumerError('Original file consumers changed');
+  if (startedTick !== startTick(await readFile(join(directory, 'stat'), 'utf8'), tid)) throw new ChangedConsumerError('Original thread changed');
+  consumers.push(...before);
+}
+async function retainedReferences(directory: string, id: string, tid: string, startedTick: string, wanted: ReadonlySet<string>, signal?: AbortSignal): Promise<FileConsumer[]> {
   const found = new Map<string, FileConsumer>();
   const record = (kind: FileConsumer['kind'], device: string, inode: string) => {
     if (wanted.has(identityKey(device, inode))) found.set(`${kind}:${device}:${inode}`, { pid: Number(id), tid: Number(tid), startedTick, kind, device, inode });
@@ -72,7 +82,6 @@ async function inspectThread(directory: string, id: string, tid: string, wanted:
     if (!match) throw new Error('Unknown mapping format');
     if (match[3] !== '0') record('mapping', linuxDevice(BigInt(`0x${match[1]}`), BigInt(`0x${match[2]}`)), match[3]!);
   }
-  if (startedTick !== startTick(await readFile(join(directory, 'stat'), 'utf8'), tid)) throw new Error('Original thread changed');
-  consumers.push(...found.values());
+  return [...found.values()];
 }
 const isMissing = (error: unknown) => error instanceof Error && 'code' in error && error.code === 'ENOENT';

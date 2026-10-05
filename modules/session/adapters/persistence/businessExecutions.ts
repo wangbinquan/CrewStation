@@ -1,3 +1,5 @@
+import type { SessionOriginalTaskStorage } from '../../ports/projectDeletion';
+import { sessionStorageKey, sessionStoredTaskId } from './deletion/taskStorage';
 import { appendBusinessUsageSources } from './businessUsageSources';
 import { ordinarySessionTask } from './deletion/admission';
 import { assertBusinessStreamOpen, lockBusinessStream } from './stoppedExecutions';
@@ -12,9 +14,9 @@ import type { BusinessExecutionStore, StoredBusinessExecution } from '../../port
 import { businessExecutionEvents as events, businessExecutions as streams } from './businessTables';
 
 type Row = typeof streams.$inferSelect;
-const key = (taskId: TaskId, executionId: string) => and(eq(streams.taskId, taskId), eq(streams.executionId, executionId));
-const eventKey = (taskId: TaskId, executionId: string) => and(eq(events.taskId, taskId), eq(events.executionId, executionId));
-const snapshot = (row: Row): StoredBusinessExecution => { if (row.expired) throw gone('可靠执行原始日志已过保留期', { code: 'execution_events_expired' }); return ({ taskId: row.taskId as TaskId, receipt: row.receipt, persistedThrough: row.persistedThrough, acknowledgedThrough: row.acknowledgedThrough, complete: row.complete }); };
+const key = (taskId: string, executionId: string, storage?: SessionOriginalTaskStorage) => and(eq(streams.taskId, sessionStorageKey(taskId, storage)), eq(streams.executionId, executionId));
+const eventKey = (taskId: string, executionId: string, storage?: SessionOriginalTaskStorage) => and(eq(events.taskId, sessionStorageKey(taskId, storage)), eq(events.executionId, executionId));
+const snapshot = (row: Row, storage?: SessionOriginalTaskStorage): StoredBusinessExecution => { if (row.expired) throw gone('可靠执行原始日志已过保留期', { code: 'execution_events_expired' }); return ({ taskId: sessionStoredTaskId(row.taskId, storage), receipt: row.receipt, persistedThrough: row.persistedThrough, acknowledgedThrough: row.acknowledgedThrough, complete: row.complete }); };
 
 function sameExecution(prior: RunnerBusinessReceipt, next: RunnerBusinessReceipt): void {
   if (prior.executionId !== next.executionId || prior.attempt !== next.attempt || prior.payloadDigest !== next.payloadDigest || prior.incarnation !== next.incarnation) throw conflict('可靠执行事件的来源或参数已变化');
@@ -41,21 +43,24 @@ async function locked(tx: Executor, taskId: TaskId, executionId: string): Promis
   return row;
 }
 
-/** 每条执行一个短行锁；重复和乱序先落库，只有连续水位才允许 ACK Runner。 */
-export function drizzleBusinessExecutionStore(db: Database): BusinessExecutionStore {
-  return {
-    originals: async (taskId, after) => {
+async function originalBusinessExecutionPage(db: Database, taskKey: string, after: string | null) {
       const rows = await db.select({ executionId: streams.executionId, receipt: streams.receipt }).from(streams)
-        .where(and(eq(streams.taskId, taskId), after === null ? undefined : gt(streams.executionId, after))).orderBy(asc(streams.executionId)).limit(100);
+        .where(and(eq(streams.taskId, taskKey), after === null ? undefined : gt(streams.executionId, after))).orderBy(asc(streams.executionId)).limit(100);
       return rows.map((row) => {
         const receipt = checkedReceipt(row.receipt);
         if (receipt.executionId !== row.executionId) throw precondition('原业务执行行与回执身份冲突');
         return receipt;
       });
-    },
-    completionProof: (taskId, executionId) => readCompletionProof(db, taskId, executionId),
-    ...businessRetention(db),
+}
+
+/** 每条执行一个短行锁；重复和乱序先落库，只有连续水位才允许 ACK Runner。 */
+export function drizzleBusinessExecutionStore(db: Database, storage?: SessionOriginalTaskStorage): BusinessExecutionStore {
+  return {
+    originals: (taskId, after) => originalBusinessExecutionPage(db, sessionStorageKey(taskId, storage), after),
+    completionProof: (taskId, executionId) => readCompletionProof(db, sessionStorageKey(taskId, storage), executionId, storage?.taskId),
+    ...businessRetention(db, storage),
     register: (taskId, raw) => db.transaction(async (tx) => {
+      if (storage) throw precondition('私有原数字适配器不能新增执行');
       const receipt = checkedReceipt(raw);
       await lockBusinessStream(tx, taskId, receipt.executionId);
       await assertBusinessStreamOpen(tx, taskId, receipt.executionId);
@@ -65,6 +70,7 @@ export function drizzleBusinessExecutionStore(db: Database): BusinessExecutionSt
       return snapshot(row);
     }),
     ingest: async (taskId, raw, input) => {
+      if (storage) throw precondition('私有原数字适配器不能新增事件');
       const receipt = checkedReceipt(raw), batch = page(input, receipt);
       return db.transaction(async (tx) => {
         await lockBusinessStream(tx, taskId, receipt.executionId);
@@ -88,10 +94,10 @@ export function drizzleBusinessExecutionStore(db: Database): BusinessExecutionSt
         return snapshot(row!);
       });
     },
-    get: async (taskId, id) => { const [row] = await db.select().from(streams).where(key(taskId, id)); return row ? snapshot(row) : undefined; },
+    get: async (taskId, id) => { const [row] = await db.select().from(streams).where(key(taskId, id, storage)); return row ? snapshot(row, storage) : undefined; },
     list: async (taskId, id, after, limit) => {
       if (!Number.isSafeInteger(after) || after < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw validation('可靠事件游标或分页大小无效');
-      const [stream] = await db.select().from(streams).where(key(taskId, id));
+      const [stream] = await db.select().from(streams).where(key(taskId, id, storage));
       if (!stream) throw notFound('可靠执行', id);
       if (stream.expired) throw gone('可靠执行原始日志已过保留期', { code: 'execution_events_expired' });
       if (after > stream.persistedThrough) throw validation('游标超出连续持久化水位');
@@ -99,25 +105,27 @@ export function drizzleBusinessExecutionStore(db: Database): BusinessExecutionSt
       const rows = await db.execute<{ event: RunnerBusinessEvent }>(sql`SELECT event FROM (
         SELECT event, sequence, sum(octet_length(event::text) + 1) OVER (ORDER BY sequence) AS bytes FROM (
           SELECT event, sequence FROM session.business_execution_events
-          WHERE task_id=${taskId} AND execution_id=${id} AND sequence>${after} AND sequence<=${stream.persistedThrough}
+          WHERE task_id=${sessionStorageKey(taskId, storage)} AND execution_id=${id} AND sequence>${after} AND sequence<=${stream.persistedThrough}
           ORDER BY sequence LIMIT ${limit}
         ) page
       ) bounded WHERE bytes<=1048574 ORDER BY sequence`);
       return rows.map((row) => row.event);
     },
     acknowledge: (taskId, id, through) => db.transaction(async (tx) => {
+      if (storage) throw precondition('私有原数字适配器不能确认 Runner 水位');
       const row = await locked(tx, taskId, id);
       if (!Number.isSafeInteger(through) || through < 0 || through > row.persistedThrough) throw conflict('不能确认尚未连续持久化的事件');
       if (through > row.acknowledgedThrough) await tx.update(streams).set({ acknowledgedThrough: through }).where(key(taskId, id));
     }),
     pending: async (taskIds, limit) => {
+      if (storage) throw precondition('私有原数字适配器不能参与普通轮询');
       if (!taskIds.length) return [];
       if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw validation('可靠执行轮询批次无效');
       return db.transaction(async (tx) => {
         const rows = await tx.select().from(streams).where(and(ordinarySessionTask(sql`${streams.taskId}`), eq(streams.expired, false), sql`NOT EXISTS (SELECT 1 FROM session.business_stopped_executions stopped WHERE stopped.task_id=${streams.taskId} AND stopped.execution_id=${streams.executionId})`, inArray(streams.taskId, taskIds), or(eq(streams.complete, false), lt(streams.acknowledgedThrough, streams.persistedThrough))))
           .orderBy(asc(streams.polledAt)).limit(limit).for('update', { skipLocked: true });
         for (const row of rows) await tx.update(streams).set({ polledAt: sql`clock_timestamp()` }).where(key(row.taskId as TaskId, row.executionId));
-        return rows.map(snapshot);
+        return rows.map((row) => snapshot(row));
       });
     },
   };

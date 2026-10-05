@@ -5,3 +5,10 @@ export { MeasurementRequestSchema, MeasurementResponseSchema } from './protocol'
 export type { MeasurementRequest, MeasurementResponse } from './protocol';
 export { observeFilesystemSource, SourceRequestSchema, SourceResponseSchema } from './source';
 export type { SourceRequest, SourceResponse } from './source';
+export { ConsumerRequestSchema, ConsumerResponseSchema } from './consumersProtocol';
+export type { ConsumerRequest, ConsumerResponse } from './consumersProtocol';
+export { createFileConsumerClient } from './consumerClient';
+export {observeRegistryInventory} from './registry/inventory';
+export {RegistryInventoryRequestSchema,RegistryInventoryResponseSchema} from './registry/protocol';
+export type {RegistryInventoryRequest,RegistryInventoryResponse} from './registry/protocol';
+export {createRegistryInventoryClient} from './registry/client';

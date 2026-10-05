@@ -1,3 +1,21 @@
+## 2026-10-05 RFC-037 提交推送接续
+
+用户再次明确批准提交推送后，Git fetch 已实际成功；main 与新获取 origin/main 同为 a8b5e83bf43cde90c0bfccaca04f485a6eec9895，共享索引空，无跨会话消息。前序 Git 执行拒绝不再作为当前发布前提，历史记录保留。原 GitLab 留存文件观察已接固定 host／私有 handler／SDK，不加载 Rails／Project；实际原实例仓库14文件26986字节、Wiki3文件87字节，指定 design／trace 明确缺失。aarch64 打开标志的实际失败已修正，原 embedded Ruby 独立临时目录的10组正负例通过，没有改动原项目。详见[原文件观察证据](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/scm-retained-files.md)。
+
+本批包含前序清理、原请求排空、22方条件组合、原归属和留存文件来源候选；按117文件精确清单提交固定候选；单次完整检查正在执行，通过后立即推送，结果保留于 `/private/tmp/cs-rfc037-deletion-full-check-v8.log`。创建弹窗已经交付，永久删除尚未开放：SCM／Garage／镜像发布的完整原物理清理、正式装配和管理员原项目完整回收继续，入口与普通 producer 仍 OFF。以下共享输出与历史原样保留。
+
+## 2026-10-05 RFC-037 原 GitLab 当前归属来源候选
+
+原 GitLab 19.2.4 的 Main／CI 只读完整元数据、七类配置根与十一类原生记录已接私有 handler／SDK 和原 Docker host observer；SCM 工厂新增 API／原数据库归属核对，保留旧回调 NULL，已返回未落库 token 也进入明确查询。实际原实例读取、76条 SQL 只读审计、实际 REST与正式adapter的当前witness通过；历史输入取先前原Root留存，不冒充当前生产Root复验。完整相关49／0、314断言，结构／精确lint／两侧类型／host类型通过，官方改动行212／212与host42／42均100%。见[GitLab来源证据](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/scm-native-source.md)。
+
+本批仍未提交／CI／部署，来源只读且物理标志全false。SCM留存字节／写入与消费停止／真实清理、Garage和镜像发布、正式启动及原专用项目完整回收继续，永久删除仍未交付。创建弹窗已上线；上库部署授权足够，跨会话交流不是前提。Git执行的自动审批拒绝策略未变，没有重试绕过，没有部署未提交代码，没有跨会话消息。以下共享输出与历史全文保持。
+
+## 2026-10-05 RFC-037 原 Registry 实例与挂载来源候选
+
+实际文件盘点已绑定原 Namespace／Service／完整 EndpointSlice／唯一 Pod／运行 imageID与containerID／新鲜 Node／PVC／PV／同节点只读探针。实际临时原生文件、HTTP handler和SDK配合受控K8s验证；同名替换、源丢失、陈旧回执、重复分页和盘点期间变化均拒绝。调用者等待期间改写项目数组的真实HTTP反例先红后修；完整来源及文件探针58／0、283断言，整仓静态四层通过，修正后仅补验后端类型与精确lint，来源改动行96／96、100%无违规。详见[原 Registry 来源证据](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/registry-inventory.md)。
+
+这仍是未上库／CI／部署／实机验收的只读候选。正式writer／消费者退出、物理擦除、SCM十一类／Garage／共享缓存和管理员全回收未完成，入口／producer OFF、原项目保持。用户要求最快上线，已有上库部署授权有效；不需要跨会话交流来上库。Git引用写入被自动审批拒绝的执行策略未变，没有绕过或部署未提交源码，也没有发送跨会话消息。以下所有共享输出与历史逐字保持。
+
 ## 2026-10-05 RFC-034 已收到分类用量与人民币候选
 
 本片在同一原 allocation／merge 中保留四桶已知分类、各桶记录覆盖及实际已定价人民币；原全范围有缺口时完整 Token／CNY仍未知，Task／Agent／算力／项目／贡献／attempt／泳道及趋势各自保持原范围资格。四桶全歧义排除也经同一 awaited 原选择回调标回原 attempt，只人口与缺口、不猜值；原全来源 EOF、人口、spool／摘要／CAS不放宽，旧不可变报告及费用可见性撤销保持。页面重复大缺口改为仅总览短状态，新卡片沿用原标准间距。
@@ -5,6 +23,12 @@
 DESIGN v2 与增量 SOURCE1通过，原 SOURCE31唯一测试类型P2及check v1失败保留；修正后的唯一完整check v2被并行filesystem-metrics registry类型停止，31候选稳定，未改其源码、不重复整仓门。依 development-rules §3，全部30自有源码／测试精确lint、console类型及13原测试文件通过：59／0、25,821断言，原prepared10 PostgreSQL身份保持，原人口／损坏拒绝／预算不变。详见 [已记录用量修复](proposal/rfc/RFC-034-runtime-observability/recorded-usage-repair.md)。
 
 本片精确发布／六项CI／本机部署与正式浏览器仍待，尚未称整仓或RFC完成。原native持久owner生产装配、完整before／历史采集与真实100K Task／10M usage继续。共享STATE下方所有并行RFC-037、RFC-036和历史正文逐字保持；提交若包含该文件，明确保留这份并行状态，但不包含其在制代码／迁移。
+
+## 2026-10-05 RFC-037 镜像原字节盘点候选通过
+
+核对Distribution3.1.1源码后，实际底层完整图盘点已接私有探针／SDK，涵盖全部旧revision、tag/index、无tag制品、孤立上传、无链接原历史字节及外国引用；返回原设备／inode／birth与allocated bytes，全树变化／未知布局／混淆manifest类型／越界响应均拒绝。外国只有current tag的漏层引用反例先红后修。完整探针43／0、238断言，整仓静态四层通过，官方改动行253／253、100%无违规。8功能固定、组合86路径、当前28外部在制指纹记录、索引空；详见[镜像底层证据](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/registry-inventory.md)。观测会话已发布bb80，本地与缓存origin同SHA，旧候选保持，没有因HEAD移动取消或重启检查。
+
+这仍是未发布、未部署的文件图候选，不冒充原软件实例身份、全部历史prefix、writer／消费者闭合或物理回收；正式镜像／发布、对象、SCM十一类及其余完整删除验收继续。生产入口／producer OFF、原项目保持、总目标active。Git拒绝策略未变，未重试绕过、未上库部署本候选，也没有跨会话消息；以下所有共享输出及历史全文保持。
 
 ## 2026-10-04 RFC-037 Data 完整对象处理器候选通过
 

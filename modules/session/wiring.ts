@@ -4,6 +4,7 @@ import { developmentUsageWorker } from './workers/developmentUsageWorker';
 import { drizzleBusinessUsageSourceStore } from './adapters/persistence/businessUsageSources';
 import { legacyRunnerIdentity } from './adapters/persistence/legacyRunnerIdentity';
 import { sessionConnectionHistory } from './adapters/persistence/deletion/lifetime';
+import { originalSessionCopies } from './adapters/persistence/deletion/originalCopies';
 import { sessionProjectWork } from './adapters/persistence/deletion/projectWork';
 import { sessionCleanupCommands, originalSessionCleanup } from './application/deletion/cleanupCommands';
 import { sessionCleanupData } from './application/deletion/cleanupData';
@@ -97,7 +98,7 @@ export function createSessionModule(deps: SessionModuleDeps): SessionModule {
     { clock: useCaseDeps.clock, businessExecutions: useCaseDeps.businessExecutions!, developmentUsage: useCaseDeps.developmentUsage!, projectWork }, hub, deps.settings.selfAddress) : undefined;
   const cleanupTransport = cleanup ? sessionCleanupCommandTransport(deps.settings.selfAddress, cleanup, deps.deletionRequest) : undefined;
   const cleanupData = deletionRepository && deps.deletionSources && projectWork ? sessionCleanupData(deletionRepository, deps.deletionSources, projectWork,
-    { business: useCaseDeps.businessExecutions!, development: useCaseDeps.developmentUsage!, businessSources: usageSources, developmentSources }) : undefined;
+    { business: useCaseDeps.businessExecutions!, development: useCaseDeps.developmentUsage!, businessSources: usageSources, developmentSources }, originalSessionCopies(workDb)) : undefined;
   const dispatch = commandDispatch(useCaseDeps, hub);
   const streams = browserStreams(useCaseDeps, hub, dispatch);
   const ingestion = businessIngestionWorker({ store: useCaseDeps.businessExecutions!, send: dispatch.sendLocalOnly, logger: useCaseDeps.logger,

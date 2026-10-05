@@ -1,3 +1,5 @@
+import type { SessionOriginalTaskStorage } from '../../ports/projectDeletion';
+import { originalDevelopmentRow, sessionStorageKey } from './deletion/taskStorage';
 import type { DevelopmentUsageKey, DevelopmentUsageReceipt, DevelopmentUsageRegistration, StoredDevelopmentUsage } from '@crewstation/contracts';
 import { StoredDevelopmentUsageSchema } from '@crewstation/contracts';
 import { conflict, jsonHash, notFound } from '@crewstation/kernel';
@@ -19,8 +21,9 @@ export function assertHeader(registration: DevelopmentUsageRegistration, receipt
   const next = { key: receipt.key, podUid: receipt.podUid, identity: receipt.identity, profileId: receipt.profileId, profileRevision: receipt.profileRevision };
   if (jsonHash(header) !== jsonHash(next)) throw conflict('开发数字回执与原环境归属不同');
 }
-export async function locked(tx: Executor, taskId: string, key: DevelopmentUsageKey): Promise<DevelopmentUsageRow> {
-  const [row] = await tx.select().from(streams).where(eq(streams.taskId, taskId)).for('update');
+export async function locked(tx: Executor, taskId: string, key: DevelopmentUsageKey, storage?: SessionOriginalTaskStorage): Promise<DevelopmentUsageRow> {
+  const [original] = await tx.select().from(streams).where(eq(streams.taskId, sessionStorageKey(taskId, storage))).for('update');
+  const row = original && originalDevelopmentRow(original, storage);
   if (!row) throw notFound('开发数字副本', key.executionId);
   assertKey(row, key); return row;
 }

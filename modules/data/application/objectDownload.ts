@@ -3,15 +3,27 @@ import type { ObjectSource } from '../domain/objectStorage';
 import { storedObjectDto } from '../domain/objectStorage';
 import type { ObjectContentRepository } from '../ports/objectContent';
 import type { ObjectBackendPlane } from '../ports/objectStorage';
-import { objectDownloadStream } from './objectTransfer';
+import { objectDownloadContent } from './objectTransfer';
+import { trackedObjectDownload } from './objects/admittedPlane';
 
 export interface ObjectDownloadDeps { content: ObjectContentRepository; plane: ObjectBackendPlane; owner: string }
 /** Both console and service reads acquire the same durable lease after their own identity check. */
 export async function downloadStoredObject(deps: ObjectDownloadDeps, id: string, source: ObjectSource, input: { signal: AbortSignal; range?: string }) {
+  if (!deps.content.withRead) return originalDownload(deps,id,source,input);
+  const ready = Promise.withResolvers<Awaited<ReturnType<typeof originalDownload>>>();
+  const completed = deps.content.withRead(id,source,async () => {
+    const result = trackedObjectDownload(await originalDownload(deps,id,source,input));
+    ready.resolve({ ...result,completed });
+    return result.completed;
+  });
+  void completed.catch(ready.reject);
+  return ready.promise;
+}
+async function originalDownload(deps: ObjectDownloadDeps, id: string, source: ObjectSource, input: { signal: AbortSignal; range?: string }) {
   const { object, transfer } = await deps.content.acquireRead(id, newResourceId(), deps.owner, source);
   try {
     const download = await deps.plane.get(object, { ...input, expected: { size: object.size, sha256: object.sha256 } });
-    return { object: storedObjectDto(object), ...download, body: objectDownloadStream(deps, object, transfer, download, input.signal) };
+    return { object: storedObjectDto(object), ...download, ...objectDownloadContent(deps, object, transfer, download, input.signal) };
   } catch (error) {
     try {
       if (isPlatformError(error) && (error.kind === 'not_found' || error.details.code === 'object_length_mismatch' || error.details.code === 'object_digest_mismatch')) {

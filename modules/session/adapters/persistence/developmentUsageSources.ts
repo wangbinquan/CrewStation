@@ -1,6 +1,8 @@
+import type { SessionOriginalTaskStorage } from '../../ports/projectDeletion';
+import { sessionStorageKey } from './deletion/taskStorage';
 import { and, asc, eq, gt, lte, sql } from 'drizzle-orm';
 import { DEVELOPMENT_USAGE_LIMITS, DevelopmentUsageKeySchema, DevelopmentUsagePageSchema, RunnerUsageMeasurementSchema, type DevelopmentUsageKey } from '@crewstation/contracts';
-import { conflict, validation } from '@crewstation/kernel';
+import { conflict, precondition, validation } from '@crewstation/kernel';
 import type { Database } from '@crewstation/persistence';
 import type { DevelopmentUsageSourceStore } from '../../ports/developmentUsage';
 import { locked } from './developmentUsageState';
@@ -8,9 +10,9 @@ import { ordinarySessionTask } from './deletion/admission';
 import { developmentUsageEvents as events, developmentUsageStreams as streams } from './developmentUsageTables';
 
 /** Independent fair PG outbox; it keeps original journal keys and has no ordinary text frames. */
-export function drizzleDevelopmentUsageSourceStore(db: Database): DevelopmentUsageSourceStore {
+export function drizzleDevelopmentUsageSourceStore(db: Database, storage?: SessionOriginalTaskStorage): DevelopmentUsageSourceStore {
   const offer = (key?: DevelopmentUsageKey) => db.transaction(async (tx) => {
-      const row = key ? await locked(tx, key.executionId, key) : (await tx.select().from(streams)
+      const row = key ? await locked(tx, key.executionId, key, storage) : (await tx.select().from(streams)
         .where(and(ordinarySessionTask(sql`${streams.taskId}`), gt(streams.persistedThrough, streams.sourceAcknowledgedThrough)))
         .orderBy(asc(streams.sourcePolledAt), asc(streams.taskId)).limit(1).for('update', { skipLocked: true }))[0];
       if (!row || row.persistedThrough <= row.sourceAcknowledgedThrough) return undefined;
@@ -29,14 +31,14 @@ export function drizzleDevelopmentUsageSourceStore(db: Database): DevelopmentUsa
       return page;
     });
   return {
-    next: () => offer(),
+    next: () => { if (storage) throw precondition('私有原数字适配器不能参加开发来源普通轮询'); return offer(); },
     offer: (key) => offer(DevelopmentUsageKeySchema.parse(key)),
     acknowledge: (rawKey, through) => db.transaction(async (tx) => {
-      const key = DevelopmentUsageKeySchema.parse(rawKey), row = await locked(tx, key.executionId, key);
+      const key = DevelopmentUsageKeySchema.parse(rawKey), row = await locked(tx, key.executionId, key, storage);
       if (!Number.isSafeInteger(through) || through < 0) throw validation('开发数字消费水位无效');
       if (through <= row.sourceAcknowledgedThrough) return;
       if (through !== row.offeredThrough) throw conflict('只能确认已提供的完整数字页');
-      await tx.update(streams).set({ sourceAcknowledgedThrough: through }).where(eq(streams.taskId, key.executionId));
+      await tx.update(streams).set({ sourceAcknowledgedThrough: through }).where(eq(streams.taskId, row.taskId));
     }),
     measurement: async (rawKey, recordId, revision) => {
       const key = DevelopmentUsageKeySchema.parse(rawKey);
@@ -44,7 +46,7 @@ export function drizzleDevelopmentUsageSourceStore(db: Database): DevelopmentUsa
       const rows = await db.execute<{ measurement: unknown }>(sql`SELECT DISTINCT item.measurement
         FROM session.development_usage_events e JOIN session.development_usage_streams s ON s.task_id=e.task_id
         CROSS JOIN LATERAL jsonb_array_elements(e.event->'capture'->'measurements') item(measurement)
-        WHERE e.task_id=${key.executionId} AND s.registration->'key'->>'journalId'=${key.journalId}
+        WHERE e.task_id=${sessionStorageKey(key.executionId, storage)} AND s.registration->'key'->>'journalId'=${key.journalId}
           AND s.registration->'key'->>'incarnation'=${key.incarnation} AND s.registration->'key'->>'payloadDigest'=${key.payloadDigest}
           AND e.sequence<=s.persisted_through AND item.measurement->>'recordId'=${recordId}
           AND item.measurement->>'revision'=${String(revision)} LIMIT 2`);

@@ -8,7 +8,7 @@ import type { ArchivePlanRepository } from '../ports/archivePlans';
 import { uploadDto } from '../domain/objectStorage';
 import { transferObject } from './objectTransfer';
 
-export function archiveHelpers(deps: Pick<ObjectServiceDeps, 'catalog' | 'uploads' | 'plane' | 'owner'> & {
+export function archiveHelpers(deps: Pick<ObjectServiceDeps, 'catalog' | 'uploads' | 'plane' | 'owner' | 'requests'> & {
   helpers: ArchiveHelperRepository; bindings: ArchiveBindingRepository; plans: ArchivePlanRepository; secretKeyBase64: string;
 }): ArchiveHelperApi {
   const context = async (caller: ArchiveHelperCaller) => {

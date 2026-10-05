@@ -4,11 +4,12 @@ import { OBJECT_STORAGE_LIMITS } from '@crewstation/contracts';
 import type { Database, Executor } from '@crewstation/persistence';
 import { conflict, isPlatformError, jsonHash, notFound, precondition } from '@crewstation/kernel';
 import { assertObjectDeletable, assertObjectReadable, assertSameStorageRequest, assertStorageRevision } from '../../domain/objectStorage';
-import type { ObjectMutation, ObjectReadTransfer, StoredObjectRecord } from '../../domain/objectStorage';
+import type { ObjectMutation, ObjectReadTransfer, ObjectSource, StoredObjectRecord } from '../../domain/objectStorage';
 import type { ObjectContentRepository } from '../../ports/objectContent';
 import { assertObjectStorageUnfrozen, authorizeObjectWrite, objectStorageTransaction, requireObjectBackend, requireObjectSpace, saveObjectBackend, saveObjectSpace } from './objectCatalog';
 import { objectAttempts, objectMutations, objectReadTransfers, objectReferences, storedObjects } from './objectTables';
 import { assertTransferCapacity, changeTransferCount, DEFAULT_OBJECT_TRANSFER_LIMITS } from './objectUploads';
+import type { ObjectRequestRunner } from '../../ports/deletion/objectWork';
 
 export async function requireStoredObject(db: Executor, id: string): Promise<StoredObjectRecord> {
   const object = (await db.select().from(storedObjects).where(eq(storedObjects.id, id)))[0]?.body;
@@ -30,8 +31,16 @@ async function pendingReads(db: Executor, id: string): Promise<boolean> {
   return (await db.select({ id: objectReadTransfers.id }).from(objectReadTransfers).where(and(eq(objectReadTransfers.objectId, id), sql`${objectReadTransfers.body}->>'endedAt' IS NULL`)).limit(1)).length > 0;
 }
 
-export function objectContentRepository(db: Database): ObjectContentRepository {
+export function objectContentRepository(db: Database, requests?: ObjectRequestRunner): ObjectContentRepository {
   return {
+    ...(requests ? { withRead: async <T>(id: string, source: ObjectSource, effect: () => Promise<T>) => {
+      const object = await db.transaction(async tx => {
+        const original = await requireStoredObject(tx,id), space = await requireObjectSpace(tx,original.spaceId);
+        if (space.projectId !== source.projectId || space.serviceId !== source.serviceId || space.env !== source.env) throw notFound('对象');
+        assertObjectReadable(original); return original;
+      }, { isolationLevel: 'repeatable read',accessMode: 'read only' });
+      return requests.run(object,'get',effect);
+    } } : {}),
     reference: (id, input, desired, authority) => objectStorageTransaction(db, async (tx, now) => {
       const object = await requireStoredObject(tx, id), space = await requireObjectSpace(tx, object.spaceId);
       await authorizeObjectWrite(tx, space, authority.source, authority.fence, now);

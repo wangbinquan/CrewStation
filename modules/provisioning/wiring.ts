@@ -52,7 +52,8 @@ export interface ProvisioningModuleDeps {
   logger?: Logger;
   authorizeRetry?: (actor: Actor, projectId: ProjectId) => Promise<void>;
   /** 仅在全部 owner 接齐后组合；未提供时不开放永久删除 HTTP 或工作器。 */
-  deletion?: { intents: ProjectDeletionIntents; owners: readonly ProjectDeletionOwner[] };
+  deletion?: { intents: ProjectDeletionIntents; owners: readonly ProjectDeletionOwner[] }
+    | ((api: Pick<ProvisioningModuleApi, 'projectDeletionOwner' | 'finalizeProjectDeletion'>) => { intents: ProjectDeletionIntents; owners: readonly ProjectDeletionOwner[] });
   projectWork?: { processes: ProvisioningCallbackProcesses; assertAvailable(id: ProjectId): Promise<void>; assertGrant(context: ProjectDeletionContext): Promise<void> };
 }
 
@@ -77,8 +78,6 @@ export function createProvisioningModule(deps: ProvisioningModuleDeps): Provisio
   const declare = namespaceWithOriginalWork(work, namespaces.declare);
   const reapply = reapplyNamespacesUseCase({ ...deps.steps, ensureNamespace: declare }, logger);
   const enqueue = enqueueWithOriginalWork(work, deps.steps, async (projectId) => { await enqueueJob(deps.db, PROVISION_JOB_KIND, { projectId }, { dedupKey: projectId, maxAttempts: 5 }); });
-  const deletions = deps.deletion ? projectDeletionController({ ...deps.deletion, isAdmin: deps.isAdmin, logger, workerOwner: `${deps.workerOwner}.deletion`, enqueue: deletionEnqueue(deps.db, deps.deletion.intents.coordinate) }) : undefined;
-  const deletionRuntime = deletions ? projectDeletionRuntime(deps.db, deletions, deps.workerOwner, logger) : undefined;
   const api: ProvisioningModuleApi = { name: 'provisioning', deleteNamespace: (actor, id) => deleteNamespace(deps.cleanup, deps.isAdmin, actor, id), provisionProject: provision, retry: enqueue, reapplyNamespaces: reapply,
     projectDeletionOwner: (input) => {
       if (!work || !deps.projectWork) throw precondition('原开通回调与清理许可尚未装配');
@@ -88,6 +87,9 @@ export function createProvisioningModule(deps: ProvisioningModuleDeps): Provisio
     finalizeProjectDeletion: removeDeletionCoordinator,
     reapplyProjectNamespace: async (id) => { const facts = await deps.steps.loadProject(id); if (!facts || facts.state === 'archived' || facts.state === 'deleting') return; await declare(facts); },
   };
+  const deletion = typeof deps.deletion === 'function' ? deps.deletion(api) : deps.deletion;
+  const deletions = deletion ? projectDeletionController({ ...deletion, isAdmin: deps.isAdmin, logger, workerOwner: `${deps.workerOwner}.deletion`, enqueue: deletionEnqueue(deps.db, deletion.intents.coordinate) }) : undefined;
+  const deletionRuntime = deletions ? projectDeletionRuntime(deps.db, deletions, deps.workerOwner, logger) : undefined;
   return {
     migrations, ...(work ? { projectWork: work } : {}),
     api: { ...api, ...(deletions ? { deletions } : {}) },

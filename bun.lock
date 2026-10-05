@@ -684,6 +684,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@crewstation/kernel": "workspace:*",
+        "zod": "4.6.2",
       },
     },
     "packages/http": {

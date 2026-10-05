@@ -1,22 +1,25 @@
+import type { SessionOriginalTaskStorage } from '../../ports/projectDeletion';
+import { originalDevelopmentRow, sessionStorageKey } from './deletion/taskStorage';
 import { and, asc, eq, inArray, lt, or, sql } from 'drizzle-orm';
 import { DevelopmentUsageLookupSchema, TaskIdSchema, DevelopmentUsageDrainReasonSchema, DevelopmentUsageKeySchema, DevelopmentUsageLossSchema, DevelopmentUsagePageSchema, DevelopmentUsageReceiptSchema, DevelopmentUsageRegistrationSchema } from '@crewstation/contracts';
 import type { DevelopmentUsagePage, TaskId } from '@crewstation/contracts';
-import { conflict, jsonHash, validation } from '@crewstation/kernel';
+import { conflict, jsonHash, precondition, validation } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
 import type { DevelopmentUsageStore } from '../../ports/developmentUsage';
 import { assertKey, latestReceipt, locked, snapshot, updateClosure } from './developmentUsageState';
 import { developmentUsageEvents as events, developmentUsageStreams as streams } from './developmentUsageTables';
 
-export function drizzleDevelopmentUsageStore(db: Database): DevelopmentUsageStore {
+export function drizzleDevelopmentUsageStore(db: Database, storage?: SessionOriginalTaskStorage): DevelopmentUsageStore {
   return {
     lookup: async (rawTaskId) => {
       const taskId = TaskIdSchema.parse(rawTaskId);
-      const [row] = await db.select().from(streams).where(eq(streams.taskId, taskId));
+      const [row] = await db.select().from(streams).where(eq(streams.taskId, sessionStorageKey(taskId, storage)));
       // Only an actual successful SQL query with no row can produce explicit absence.
-      return DevelopmentUsageLookupSchema.parse(row ? { version: 1, runtimeTaskId: taskId, kind: 'registered', stored: snapshot(row) }
+      return DevelopmentUsageLookupSchema.parse(row ? { version: 1, runtimeTaskId: taskId, kind: 'registered', stored: snapshot(originalDevelopmentRow(row, storage)) }
         : { version: 1, runtimeTaskId: taskId, kind: 'absent' });
     },
     register: (raw) => db.transaction(async (tx) => {
+      if (storage) throw precondition('私有原数字适配器不能新增开发登记');
       const registration = DevelopmentUsageRegistrationSchema.parse(raw);
       await tx.insert(streams).values({ taskId: registration.runtimeTaskId, registration }).onConflictDoNothing();
       const row = await locked(tx, registration.runtimeTaskId, registration.key);
@@ -25,11 +28,13 @@ export function drizzleDevelopmentUsageStore(db: Database): DevelopmentUsageStor
     }),
     get: async (taskId, rawKey) => {
       const key = DevelopmentUsageKeySchema.parse(rawKey);
-      const [row] = await db.select().from(streams).where(eq(streams.taskId, taskId));
+      const [original] = await db.select().from(streams).where(eq(streams.taskId, sessionStorageKey(taskId, storage)));
+      const row = original && originalDevelopmentRow(original, storage);
       if (!row) return undefined;
       assertKey(row, key); return snapshot(row);
     },
     ingest: (taskId, rawReceipt, rawPage) => db.transaction(async (tx) => {
+      if (storage) throw precondition('私有原数字适配器不能新增开发数字');
       const receipt = DevelopmentUsageReceiptSchema.parse(rawReceipt);
       const page = rawPage ? DevelopmentUsagePageSchema.parse(rawPage) : undefined;
       const row = await locked(tx, taskId, receipt.key);
@@ -47,17 +52,19 @@ export function drizzleDevelopmentUsageStore(db: Database): DevelopmentUsageStor
       return snapshot(await updateClosure(tx, updated!));
     }),
     acknowledgeRunner: (taskId, rawKey, through) => db.transaction(async (tx) => {
+      if (storage) throw precondition('私有原数字适配器不能确认开发 Runner 水位');
       const row = await locked(tx, taskId, DevelopmentUsageKeySchema.parse(rawKey));
       if (!Number.isSafeInteger(through) || through < 0 || through > row.persistedThrough) throw conflict('不能确认尚未连续复制的开发数字');
       if (through > row.runnerAcknowledgedThrough) await tx.update(streams).set({ runnerAcknowledgedThrough: through }).where(eq(streams.taskId, taskId));
     }),
     requestDrain: (taskId, rawKey, rawReason) => db.transaction(async (tx) => {
-      const row = await locked(tx, taskId, DevelopmentUsageKeySchema.parse(rawKey));
+      const row = await locked(tx, taskId, DevelopmentUsageKeySchema.parse(rawKey), storage);
       const reason = DevelopmentUsageDrainReasonSchema.parse(rawReason);
-      const [updated] = await tx.update(streams).set({ drainReason: row.drainReason ?? reason }).where(eq(streams.taskId, taskId)).returning();
-      return snapshot(await updateClosure(tx, updated!));
+      const [updated] = await tx.update(streams).set({ drainReason: row.drainReason ?? reason }).where(eq(streams.taskId, sessionStorageKey(taskId, storage))).returning();
+      return snapshot(originalDevelopmentRow(await updateClosure(tx, updated!), storage));
     }),
     unavailable: (taskId, rawLoss) => db.transaction(async (tx) => {
+      if (storage) throw precondition('私有原数字适配器不能制造开发来源缺口');
       const loss = DevelopmentUsageLossSchema.parse(rawLoss), row = await locked(tx, taskId, loss.key);
       if (loss.podUid !== row.registration.podUid) throw conflict('不可取回证明不属于原开发 Pod');
       if (row.loss && jsonHash(row.loss) !== jsonHash(loss)) throw conflict('不能替换已持久的开发来源缺口');
@@ -65,6 +72,7 @@ export function drizzleDevelopmentUsageStore(db: Database): DevelopmentUsageStor
       return snapshot(await updateClosure(tx, updated!));
     }),
     pending: async (taskIds, limit) => {
+      if (storage) throw precondition('私有原数字适配器不能参加开发普通轮询');
       if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw validation('开发数字轮询批次无效');
       if (!taskIds.length) return [];
       return db.transaction(async (tx) => {

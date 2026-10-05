@@ -6,8 +6,9 @@ import type { ObjectContentRepository } from '../ports/objectContent';
 import type { ObjectSourceResolver } from '../ports/objectSources';
 import { transferObject } from './objectTransfer';
 import { downloadStoredObject } from './objectDownload';
+import type { ObjectRequestRunner } from '../ports/deletion/objectWork';
 
-export interface ObjectServiceDeps { catalog: ObjectCatalogRepository; uploads: ObjectUploadRepository; reads: ObjectReadRepository; content: ObjectContentRepository; plane: ObjectBackendPlane; sources: ObjectSourceResolver; owner: string }
+export interface ObjectServiceDeps { requests?: ObjectRequestRunner; catalog: ObjectCatalogRepository; uploads: ObjectUploadRepository; reads: ObjectReadRepository; content: ObjectContentRepository; plane: ObjectBackendPlane; sources: ObjectSourceResolver; owner: string }
 export function objectService(deps: ObjectServiceDeps): ObjectServiceApi {
   const scope = async (caller: ObjectServiceCaller) => {
     const source = await deps.sources.resolve(caller);

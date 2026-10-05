@@ -1,13 +1,15 @@
+import type { SessionOriginalTaskStorage } from '../../ports/projectDeletion';
+import { sessionStorageKey, sessionStoredTaskId } from './deletion/taskStorage';
 import { and, asc, eq, gt, lte, sql } from 'drizzle-orm';
 import { RunnerUsageMeasurementSchema } from '@crewstation/contracts';
 import type { RunnerBusinessEvent, RunnerBusinessReceipt, TaskId } from '@crewstation/contracts';
-import { conflict, notFound, validation } from '@crewstation/kernel';
+import { conflict, notFound, precondition, validation } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
 import type { BusinessUsageSourceStore } from '../../ports/businessUsageSources';
 import { businessExecutions as streams, businessUsageEvents as events, businessUsageSources as sources } from './businessTables';
 import { ordinarySessionTask } from './deletion/admission';
 
-const key = (taskId: TaskId, executionId: string) => and(eq(sources.taskId, taskId), eq(sources.executionId, executionId));
+const key = (taskId: string, executionId: string) => and(eq(sources.taskId, taskId), eq(sources.executionId, executionId));
 
 /** Called inside the raw event transaction, before the Runner's durable watermark can advance. */
 export async function appendBusinessUsageSources(tx: Executor, taskId: TaskId, receipt: RunnerBusinessReceipt, added: RunnerBusinessEvent[]): Promise<void> {
@@ -20,9 +22,9 @@ export async function appendBusinessUsageSources(tx: Executor, taskId: TaskId, r
   await tx.insert(events).values(rows);
 }
 
-export function drizzleBusinessUsageSourceStore(db: Database): BusinessUsageSourceStore {
+export function drizzleBusinessUsageSourceStore(db: Database, storage?: SessionOriginalTaskStorage): BusinessUsageSourceStore {
   const offer = (selected?: { taskId: TaskId; executionId: string }) => db.transaction(async (tx) => {
-    const [source] = await tx.select().from(sources).where(and(selected ? key(selected.taskId, selected.executionId) : ordinarySessionTask(sql`${sources.taskId}`), sql`EXISTS (
+    const [source] = await tx.select().from(sources).where(and(selected ? key(sessionStorageKey(selected.taskId, storage), selected.executionId) : ordinarySessionTask(sql`${sources.taskId}`), sql`EXISTS (
       SELECT 1 FROM session.business_usage_events e
       JOIN session.business_executions s ON s.task_id=e.task_id AND s.execution_id=e.execution_id
       WHERE e.task_id=${sources.taskId} AND e.execution_id=${sources.executionId}
@@ -37,7 +39,7 @@ export function drizzleBusinessUsageSourceStore(db: Database): BusinessUsageSour
       .orderBy(asc(events.sequence)).limit(5);
     const through = page.at(-1)!.sequence;
     await tx.update(sources).set({ offeredThrough: through, polledAt: sql`clock_timestamp()` }).where(key(source.taskId as TaskId, source.executionId));
-    return { runtimeTaskId: source.taskId as TaskId, executionId: source.executionId, attempt: source.attempt,
+    return { runtimeTaskId: sessionStoredTaskId(source.taskId, storage), executionId: source.executionId, attempt: source.attempt,
       incarnation: source.incarnation, payloadDigest: source.payloadDigest, after: source.acknowledgedThrough, through, events: page };
   });
   return {
@@ -48,23 +50,24 @@ export function drizzleBusinessUsageSourceStore(db: Database): BusinessUsageSour
         JOIN session.business_usage_sources s ON s.task_id=e.task_id AND s.execution_id=e.execution_id
         JOIN session.business_executions b ON b.task_id=e.task_id AND b.execution_id=e.execution_id
         CROSS JOIN LATERAL jsonb_array_elements(e.capture->'measurements') item(measurement)
-        WHERE e.task_id=${source.runtimeTaskId} AND e.execution_id=${source.executionId} AND s.attempt=${source.attempt}
+        WHERE e.task_id=${sessionStorageKey(source.runtimeTaskId, storage)} AND e.execution_id=${source.executionId} AND s.attempt=${source.attempt}
           AND s.incarnation=${source.incarnation} AND s.payload_digest=${source.payloadDigest} AND e.sequence<=b.persisted_through
           AND item.measurement->>'recordId'=${recordId} AND item.measurement->>'revision'=${String(revision)} LIMIT 2`);
       if (rows.length > 1) throw conflict('同一原生修订出现不同数值证据');
       return rows[0] ? RunnerUsageMeasurementSchema.parse(rows[0].measurement) : undefined;
     },
-    next: () => offer(),
+    next: () => { if (storage) throw precondition('私有原数字适配器不能参加普通来源轮询'); return offer(); },
     offer: (taskId, executionId) => offer({ taskId, executionId }),
     acknowledge: (taskId, executionId, through) => db.transaction(async (tx) => {
+      const taskKey = sessionStorageKey(taskId, storage);
       if (!Number.isSafeInteger(through) || through < 0) throw validation('数值来源确认水位无效');
-      const [source] = await tx.select().from(sources).where(key(taskId, executionId)).for('update');
+      const [source] = await tx.select().from(sources).where(key(taskKey, executionId)).for('update');
       if (!source) throw notFound('数值来源', executionId);
       if (through <= source.acknowledgedThrough) return;
       if (through > source.offeredThrough) throw conflict('不能确认尚未读取的数值来源');
-      const [boundary] = await tx.select({ sequence: events.sequence }).from(events).where(and(eq(events.taskId, taskId), eq(events.executionId, executionId), eq(events.sequence, through)));
+      const [boundary] = await tx.select({ sequence: events.sequence }).from(events).where(and(eq(events.taskId, taskKey), eq(events.executionId, executionId), eq(events.sequence, through)));
       if (!boundary) throw conflict('数值来源确认水位不是事件边界');
-      await tx.update(sources).set({ acknowledgedThrough: through }).where(key(taskId, executionId));
+      await tx.update(sources).set({ acknowledgedThrough: through }).where(key(taskKey, executionId));
     }),
   };
 }

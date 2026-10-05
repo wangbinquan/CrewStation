@@ -2,8 +2,14 @@ import { isPlatformError, precondition } from '@crewstation/kernel';
 import type { ObjectContentRepository } from '../ports/objectContent';
 import type { ObjectBackendPlane, ObjectTransferClaim, ObjectUploadRepository } from '../ports/objectStorage';
 import type { StoredObjectRecord } from '../domain/objectStorage';
+import type { ObjectRequestRunner } from '../ports/deletion/objectWork';
+import { runObjectHandler } from './objects/requestHandler';
 
-export async function transferObject(deps: { uploads: ObjectUploadRepository; plane: ObjectBackendPlane }, claim: ObjectTransferClaim, body: ReadableStream<Uint8Array>, signal: AbortSignal): Promise<void> {
+interface ObjectTransferDeps { requests?: ObjectRequestRunner; uploads: ObjectUploadRepository; plane: ObjectBackendPlane }
+export function transferObject(deps: ObjectTransferDeps, claim: ObjectTransferClaim, body: ReadableStream<Uint8Array>, signal: AbortSignal): Promise<void> {
+  return runObjectHandler(deps.requests,claim.attempt,'put',() => originalTransfer(deps,claim,body,signal));
+}
+async function originalTransfer(deps: ObjectTransferDeps, claim: ObjectTransferClaim, body: ReadableStream<Uint8Array>, signal: AbortSignal): Promise<void> {
   const abort = new AbortController(), combined = AbortSignal.any([signal, abort.signal]);
   let receivedBytes = 0;
   let heartbeat: Promise<void> | undefined;
@@ -23,23 +29,24 @@ export async function transferObject(deps: { uploads: ObjectUploadRepository; pl
 }
 
 /** Finish the durable read only after the bounded source has actually completed or cancelled. */
-export function objectDownloadStream(deps: { content: ObjectContentRepository }, object: StoredObjectRecord, transfer: { id: string; owner: string }, download: Awaited<ReturnType<ObjectBackendPlane['get']>>, signal: AbortSignal) {
+export function objectDownloadContent(deps: { content: ObjectContentRepository }, object: StoredObjectRecord, transfer: { id: string; owner: string }, download: Awaited<ReturnType<ObjectBackendPlane['get']>>, signal: AbortSignal) {
   const reader = download.body.getReader();
   const release = () => deps.content.releaseRead(transfer.id, transfer.owner);
   const failed = async (error: unknown) => {
     if (!signal.aborted && isPlatformError(error) && (error.kind === 'not_found' || error.details.code === 'object_digest_mismatch' || error.details.code === 'object_length_mismatch')) await deps.content.markDegraded(object.id, '对象字节缺失或摘要不符');
   };
   // An abandoned downstream must not hide an upstream integrity failure or retain a finished read forever.
-  void download.completed.then(async (result) => {
+  const completed = download.completed.then(async (result) => {
     if (!download.contentRange && (result.size !== object.size || result.sha256 !== object.sha256)) await failed(precondition('对象读回摘要不符', { code: 'object_digest_mismatch' }));
-    await release();
-  }, async (error) => { try { await reader.cancel().catch(() => undefined); await failed(error); } finally { await release(); } }).catch(() => undefined);
-  return new ReadableStream<Uint8Array>({
+    await release(); return result;
+  }, async (error) => { try { await reader.cancel().catch(() => undefined); await failed(error); } finally { await release(); } throw error; });
+  void completed.catch(() => undefined);
+  const body = new ReadableStream<Uint8Array>({
     pull: async (controller) => {
       try {
         const next = await reader.read();
         if (!next.done) { controller.enqueue(next.value); return; }
-        const result = await download.completed;
+        const result = await completed;
         if (!download.contentRange && (result.size !== object.size || result.sha256 !== object.sha256)) throw precondition('对象读回摘要不符', { code: 'object_digest_mismatch' });
         await release(); controller.close(); reader.releaseLock();
       } catch (error) {
@@ -48,4 +55,5 @@ export function objectDownloadStream(deps: { content: ObjectContentRepository },
     },
     cancel: async (reason) => { try { await reader.cancel(reason); } finally { await release(); } },
   }, { highWaterMark: 1 });
+  return { body,completed };
 }

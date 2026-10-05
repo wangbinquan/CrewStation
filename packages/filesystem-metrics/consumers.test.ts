@@ -1,27 +1,8 @@
 import { expect, test } from 'bun:test';
-import { mkdtemp, mkdir, writeFile, symlink, stat, rm, readFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { writeFile, symlink, rm, readFile, open } from 'node:fs/promises';
 import { join } from 'node:path';
 import { observeFileConsumers } from './consumers';
-
-async function fixture(run: (f: { root: string; file: string; identity: { device: string; inode: string }; process: (id: string, tick?: string) => Promise<string>; thread: (pid: string, tid: string) => Promise<string> }) => Promise<void>) {
-  const directory = await mkdtemp(join(tmpdir(), 'cs-file-consumers-')), root = join(directory, 'proc'), file = join(directory, 'original-file');
-  try {
-    await mkdir(join(root, 'sys/kernel/random'), { recursive: true }); await mkdir(join(root, 'self/ns'), { recursive: true });
-    await writeFile(join(root, 'sys/kernel/random/boot_id'), '12345678-1234-1234-1234-123456789abc\n'); await symlink('pid:[701]', join(root, 'self/ns/pid'));
-    await writeFile(file, 'private body must never appear in source output'); const source = await stat(file, { bigint: true });
-    const process = async (id: string, tick = '311') => {
-      const path = join(root, id); await mkdir(join(path, 'fd'), { recursive: true });
-      await writeFile(join(path, 'stat'), `${id} (private process ) name) ${['S', ...Array(18).fill('0'), tick, '0'].join(' ')}\n`);
-      await writeFile(join(path, 'maps'), ''); await mkdir(join(path, 'task')); await symlink(path, join(path, 'task', id)); return path;
-    };
-    const thread = async (pid: string, tid: string) => {
-      const path = join(root, pid, 'task', tid); await mkdir(join(path, 'fd'), { recursive: true });
-      await writeFile(join(path, 'stat'), `${tid} (thread) ${['S', ...Array(18).fill('0'), '811', '0'].join(' ')}\n`); await writeFile(join(path, 'maps'), ''); return path;
-    };
-    await run({ root, file, identity: { device: String(source.dev), inode: String(source.ino) }, process, thread });
-  } finally { await rm(directory, { recursive: true, force: true }); }
-}
+import { consumerFixture as fixture } from './consumerFixture';
 
 test('one original file is retained by an FD and a closed-FD mapping; no path, contents or process name is exposed', () => fixture(async (f) => {
   const first = await f.process('22'), second = await f.process('23', '411');
@@ -68,4 +49,32 @@ test('missing source, wrong source epoch and invalid identities fail closed; can
   await expect(observeFileConsumers([{ device: '-1', inode: '0' }], f.root)).rejects.toThrow('Invalid retained file identity');
   await expect(observeFileConsumers([f.identity], f.root, AbortSignal.abort(new Error('cancelled')))).rejects.toThrow('cancelled');
   expect(await readFile(f.file, 'utf8')).toContain('must never appear');
+}));
+
+test('a retained descriptor opened during a thread scan cannot be reported as complete zero consumers', () => fixture(async (f) => {
+  const path = await f.process('22'), maps = join(path, 'maps');
+  await rm(maps); const fifo = Bun.spawn(['mkfifo', maps], { stdout: 'ignore', stderr: 'pipe' }); expect(await fifo.exited).toBe(0);
+  const observing = observeFileConsumers([f.identity], f.root);
+  // Opening the writer waits for the reader to reach maps, after its first descriptor enumeration.
+  const writer = await open(maps, 'w');
+  try {
+    await symlink(f.file, join(path, 'fd/8')); await rm(maps); await writeFile(maps, '');
+  } finally { await writer.close(); }
+  const result = await observing;
+  expect(result.complete).toBe(false); expect(result.blockers).toEqual([{ code: 'process-changed', pid: 22 }]);
+}));
+
+test('cancellation during the final source recheck remains observable instead of completing the proof', () => fixture(async (f) => {
+  const path = await f.process('22'), maps = join(path, 'maps'), boot = join(f.root, 'sys/kernel/random/boot_id'), controller = new AbortController();
+  await rm(maps); expect(await Bun.spawn(['mkfifo', maps], { stdout: 'ignore', stderr: 'ignore' }).exited).toBe(0);
+  const observing = observeFileConsumers([f.identity], f.root, controller.signal);
+  const first = await open(maps, 'w');
+  try {
+    await rm(boot); expect(await Bun.spawn(['mkfifo', boot], { stdout: 'ignore', stderr: 'ignore' }).exited).toBe(0);
+    await rm(maps); await writeFile(maps, '');
+  } finally { await first.close(); }
+  // The final boot-id read is metadata I/O too; cancellation there must not emit a completed source observation.
+  const last = await open(boot, 'w');
+  try { controller.abort(new Error('cancelled during source recheck')); await last.write('12345678-1234-1234-1234-123456789abc\n'); } finally { await last.close(); }
+  await expect(observing).rejects.toThrow('cancelled during source recheck');
 }));

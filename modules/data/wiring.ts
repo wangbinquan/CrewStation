@@ -5,7 +5,8 @@ import { restoreObjectOperations } from './application/objects/restore';
 import { objectRestoreRepository } from './adapters/persistence/objects/restore';
 import type { ObjectRestorePlane } from './ports/objectRestore';
 import { join } from 'node:path';
-import type { UserId } from '@crewstation/contracts';
+import type { ProjectId, UserId } from '@crewstation/contracts';
+import { ServiceIdSchema } from '@crewstation/contracts';
 import { DomainTopic } from '@crewstation/contracts';
 import type { EventConsumer } from '@crewstation/eventbus';
 import { createEventConsumer } from '@crewstation/eventbus';
@@ -72,8 +73,15 @@ import { fileBackupBundle } from './adapters/filesystem/backupBundle';
 import { readBackupBundle } from './adapters/filesystem/backupRead';
 import { verifyRestoredObjects } from './application/objects/restoreVerification';
 import type { VerifiedBackupBundle } from './ports/objectBackups';
+import type { DataProjectDeletion } from './ports/deletion/projectDeletion';
+import { dataDeletionRepository } from './adapters/persistence/deletionRepository';
+import { dataDeletionOwner } from './application/deletion/owner';
+import type { ObjectRequestProcesses } from './ports/deletion/objectWork';
+import { objectRequestWork } from './adapters/persistence/objects/requestWork';
+import { admittedObjectPlane } from './application/objects/admittedPlane';
 
 export interface DataModuleDeps {
+  deletion?: DataProjectDeletion;
   productionTasks?: ProductionAccessTasks;
   /** 申请人／审批人名字来源；缺省时绑定 DTO 只带 ID。 */
   users?: UserDirectory;
@@ -96,7 +104,7 @@ export interface DataModuleDeps {
    */
   credentials?: DataCredentials;
   provisioningTiming?: { waitMs?: number; pollMs?: number };
-  objects?: { inputApiUrl?: string; transferOwners?: ObjectTransferOwners; plane: ObjectBackendPlane; history?: ObjectStorageHistory; exporterToken: string; sources?: ObjectSourceResolver; tasks?: ArchiveTaskDirectory; provisioning?: { deploymentMode: 'local' | 'production'; apiUrl: string } };
+  objects?: { inputApiUrl?: string; transferOwners?: ObjectTransferOwners; work?: { processes: ObjectRequestProcesses; assertAvailable(projectId: ProjectId): Promise<void> }; plane: ObjectBackendPlane; history?: ObjectStorageHistory; exporterToken: string; sources?: ObjectSourceResolver; tasks?: ArchiveTaskDirectory; provisioning?: { deploymentMode: 'local' | 'production'; apiUrl: string } };
 }
 
 /** 到期绑定每分钟收一次。 */
@@ -147,17 +155,20 @@ export function createDataModule(deps: DataModuleDeps): DataModule {
   const bindings = { ...taskBindingUseCases(useCaseDeps), ...productionResourceAccess(useCaseDeps, deps.productionTasks, deps.isAdmin) };
   const storedObjects = objectCatalogRepository(deps.db, { requireContract: true }), objectProjection = deps.ledger ? objectLedgerProjection(storedObjects, deps.ledger, deps.clock ?? systemClock, logger) : undefined;
   const objectCatalog = objectProjection?.catalog ?? storedObjects, objectUploads = objectUploadRepository(deps.db);
-  const objectOwner = `${deps.objects?.transferOwners?.podUid ? deps.objects.transferOwners.podUid + ':' : ''}${newResourceId()}`, objectContent = objectContentRepository(deps.db);
-  const inputs = deps.objects?.provisioning ? taskInputUseCases({ inputs: taskInputRepository(deps.db), content: objectContent, plane: deps.objects.plane, owner: objectOwner, apiUrl: deps.objects.inputApiUrl ?? deps.objects.provisioning.apiUrl, secretKeyBase64: deps.settings.secretKeyBase64 }) : undefined;
-  const objects = deps.objects ? objectAdministration({ catalog: objectCatalog, reads: objectReadRepository(deps.db), plane: deps.objects.plane, authorizer: deps.authorizer, backups: objectBackupRepository(deps.db), rotations: objectCredentialRotations(deps.db), services: deps.services, downloads: { content: objectContent, owner: objectOwner }, ...(deps.objects.history ? { history: deps.objects.history } : {}) }) : undefined;
-  const objectWorkers = deps.objects ? objectMaintenanceWorkers({ ...(deps.objects.transferOwners ? { transferOwners: deps.objects.transferOwners, recoverReads: (uid, digest) => recoverStoppedReads(deps.db, uid, digest) } : {}), catalog: objectCatalog, uploads: objectUploads, content: objectContent, recovery: objectRecoveryRepository(deps.db), plane: deps.objects.plane, owner: objectOwner, logger }) : [];
-  const objectBusiness = deps.objects?.sources ? objectService({ catalog: objectCatalog, reads: objectReadRepository(deps.db), uploads: objectUploads, content: objectContent, plane: deps.objects.plane, sources: deps.objects.sources, owner: objectOwner }) : undefined;
+  const objectOwner = `${deps.objects?.transferOwners?.podUid ? deps.objects.transferOwners.podUid + ':' : ''}${newResourceId()}`;
+  const requests = deps.objects?.work ? objectRequestWork({ db: deps.db,...deps.objects.work,serviceProject: async id => (await deps.services.resolveServiceById(ServiceIdSchema.parse(id)))?.projectId }) : undefined;
+  const objectPlane = deps.objects ? requests ? admittedObjectPlane(deps.objects.plane,requests) : deps.objects.plane : undefined;
+  const objectContent = objectContentRepository(deps.db,requests);
+  const inputs = deps.objects?.provisioning ? taskInputUseCases({ inputs: taskInputRepository(deps.db), content: objectContent, plane: objectPlane!, owner: objectOwner, apiUrl: deps.objects.inputApiUrl ?? deps.objects.provisioning.apiUrl, secretKeyBase64: deps.settings.secretKeyBase64 }) : undefined;
+  const objects = deps.objects ? objectAdministration({ catalog: objectCatalog, reads: objectReadRepository(deps.db), plane: objectPlane!, authorizer: deps.authorizer, backups: objectBackupRepository(deps.db), rotations: objectCredentialRotations(deps.db), services: deps.services, downloads: { content: objectContent, owner: objectOwner }, ...(deps.objects.history ? { history: deps.objects.history } : {}) }) : undefined;
+  const objectWorkers = deps.objects ? objectMaintenanceWorkers({ ...(requests ? { requests,sweepRequests: requests.sweep } : {}), ...(deps.objects.transferOwners ? { transferOwners: deps.objects.transferOwners, recoverReads: (uid, digest) => recoverStoppedReads(deps.db, uid, digest) } : {}), catalog: objectCatalog, uploads: objectUploads, content: objectContent, recovery: objectRecoveryRepository(deps.db), plane: objectPlane!, owner: objectOwner, logger }) : [];
+  const objectBusiness = deps.objects?.sources ? objectService({ ...(requests ? { requests } : {}), catalog: objectCatalog, reads: objectReadRepository(deps.db), uploads: objectUploads, content: objectContent, plane: objectPlane!, sources: deps.objects.sources, owner: objectOwner }) : undefined;
   const archives = deps.objects?.sources && deps.objects.tasks ? archiveService({ plans: archivePlanRepository(deps.db), sources: deps.objects.sources, tasks: deps.objects.tasks, catalog: objectCatalog }) : undefined;
   const helperStore = archiveHelperRepository(deps.db);
-  const helper = deps.objects ? archiveHelpers({ helpers: helperStore, bindings: archiveBindingRepository(deps.db), plans: archivePlanRepository(deps.db), catalog: objectCatalog, uploads: objectUploads, plane: deps.objects.plane, owner: objectOwner, secretKeyBase64: deps.settings.secretKeyBase64 }) : undefined;
+  const helper = deps.objects ? archiveHelpers({ ...(requests ? { requests } : {}), helpers: helperStore, bindings: archiveBindingRepository(deps.db), plans: archivePlanRepository(deps.db), catalog: objectCatalog, uploads: objectUploads, plane: objectPlane!, owner: objectOwner, secretKeyBase64: deps.settings.secretKeyBase64 }) : undefined;
   const archiveApi = deps.objects?.tasks ? archiveFinalization(archiveBindingRepository(deps.db), deps.objects.tasks, { plans: archivePlanRepository(deps.db), reads: objectReadRepository(deps.db), helpers: helperStore }) : undefined;
   const archiveAdmin = deps.objects?.tasks ? archiveAdministration({ plans: archivePlanRepository(deps.db), catalog: objectCatalog, tasks: deps.objects.tasks, authorizer: deps.authorizer, bindings: archiveBindingRepository(deps.db), loss: archiveLossRepository(deps.db) }) : undefined;
-  const api: DataModuleApi = { nativePostgresHistory: nativeHistory, taskStorageStatus: taskStorageStatus(objectCatalog, storageContractRepository(deps.db)), ...(inputs ? { taskInputs: inputs } : {}), storageContract: storageContractRepository(deps.db), ...(archiveAdmin ? { archiveAdministration: archiveAdmin } : {}), ...(archives ? { archiveService: archives } : {}), ...(helper ? { archiveHelper: helper } : {}), ...(archiveApi ? { archiveFinalization: archiveApi } : {}), name: 'data', applyObjectWriteControl: objectCatalog.applyWriteControl, ensureServiceData: service.ensureServiceData, envFor: service.envFor, listResources: service.listResources, rotateCredential: rotateCredentialUseCase(useCaseDeps), ...bindings, ...(objects ? { objects } : {}), ...(objectBusiness ? { objectService: objectBusiness } : {}), ...(deps.objects?.provisioning ? { objectEnv: objectProvisioning(objectCatalog, deps.services, deps.objects.provisioning) } : {}) };
+  const api: DataModuleApi = { ...(requests ? { objectRequestHistory: requests.history } : {}), ...(deps.deletion ? { deletionOwner: dataDeletionOwner(dataDeletionRepository(deps.db,deps.deletion),deps.deletion) } : {}), nativePostgresHistory: nativeHistory, taskStorageStatus: taskStorageStatus(objectCatalog, storageContractRepository(deps.db)), ...(inputs ? { taskInputs: inputs } : {}), storageContract: storageContractRepository(deps.db), ...(archiveAdmin ? { archiveAdministration: archiveAdmin } : {}), ...(archives ? { archiveService: archives } : {}), ...(helper ? { archiveHelper: helper } : {}), ...(archiveApi ? { archiveFinalization: archiveApi } : {}), name: 'data', applyObjectWriteControl: objectCatalog.applyWriteControl, ensureServiceData: service.ensureServiceData, envFor: service.envFor, listResources: service.listResources, rotateCredential: rotateCredentialUseCase(useCaseDeps), ...bindings, ...(objects ? { objects } : {}), ...(objectBusiness ? { objectService: objectBusiness } : {}), ...(deps.objects?.provisioning ? { objectEnv: objectProvisioning(objectCatalog, deps.services, deps.objects.provisioning) } : {}) };
   let timer: ReturnType<typeof setInterval> | undefined, expiring = false;
   const expireTick = () => {
     if (expiring) return;

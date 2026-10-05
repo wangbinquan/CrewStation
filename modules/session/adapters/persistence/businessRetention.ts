@@ -1,26 +1,30 @@
+import type { SessionOriginalTaskStorage } from '../../ports/projectDeletion';
+import { sessionStorageKey } from './deletion/taskStorage';
 import { consumeStoppedStream, expireStoppedStreams, lockBusinessStream } from './stoppedExecutions';
 import { and, eq, sql } from 'drizzle-orm';
 import type { Database } from '@crewstation/persistence';
-import { conflict, notFound } from '@crewstation/kernel';
+import { conflict, notFound, precondition } from '@crewstation/kernel';
 import type { BusinessExecutionStore } from '../../ports/businessExecutions';
 import { businessExecutions as streams } from './businessTables';
 import { persistCompletionProof } from './completionProofs';
 import { ordinarySessionTask } from './deletion/admission';
 
-export function businessRetention(db: Database): Pick<BusinessExecutionStore, 'consume' | 'expire'> {
+export function businessRetention(db: Database, storage?: SessionOriginalTaskStorage): Pick<BusinessExecutionStore, 'consume' | 'expire'> {
   return {
     consume: (taskId, executionId, through, stopped) => db.transaction(async (tx) => {
-      await lockBusinessStream(tx, taskId, executionId);
-      if (stopped) { await consumeStoppedStream(tx, taskId, executionId); return; }
-      const key = and(eq(streams.taskId, taskId), eq(streams.executionId, executionId));
+      const taskKey = sessionStorageKey(taskId, storage);
+      await lockBusinessStream(tx, taskKey, executionId);
+      if (stopped) { await consumeStoppedStream(tx, taskKey, executionId); return; }
+      const key = and(eq(streams.taskId, taskKey), eq(streams.executionId, executionId));
       const row = (await tx.select().from(streams).where(key).for('update'))[0];
       if (!row) throw notFound('可靠执行', executionId);
       if (!row.complete || through !== row.persistedThrough || through !== row.receipt.lastSequence) throw conflict('只能确认已完整投影的终态执行');
-      await persistCompletionProof(tx, row);
+      await persistCompletionProof(tx, row, storage?.taskId);
       if (row.expired) return;
       if (!row.consumedAt) await tx.update(streams).set({ consumedAt: sql`clock_timestamp()` }).where(key);
     }),
     expire: async () => db.transaction(async (tx) => {
+      if (storage) throw precondition('私有原数字适配器不能过期普通日志');
       const rows = await tx.execute<{ task_id: string; execution_id: string }>(sql`SELECT task_id, execution_id FROM session.business_executions
         WHERE consumed_at < clock_timestamp()-interval '7 days' AND complete=true AND ${ordinarySessionTask(sql`business_executions.task_id`)} ORDER BY consumed_at LIMIT 20 FOR UPDATE SKIP LOCKED`);
       let count = await expireStoppedStreams(tx);

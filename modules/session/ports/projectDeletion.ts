@@ -35,6 +35,8 @@ export interface SessionDeletionScope {
   readonly digest: string; readonly count: number;
   readonly compacted: boolean;
 }
+/** Private sealed-data adapter only: the physical SQL key is never a protocol TaskId. */
+export interface SessionOriginalTaskStorage { readonly taskId: TaskId; readonly taskKey: string }
 export interface SessionDeletionRepository {
   inspect(target: ProjectDeletionTarget): Promise<{ inventory: ProjectDeletionInventory; scope: SessionDeletionScope }>;
   seal(context: ProjectDeletionContext): Promise<boolean>;

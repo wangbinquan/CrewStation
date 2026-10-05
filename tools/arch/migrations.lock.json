@@ -79,6 +79,8 @@
     "modules/data/adapters/persistence/migrations/0004_resource_identity.identity.json": "9ae1ed7fd35b480bfd709a6b59ed8e8ffeef9f6b3499d9339c30476a48dbdb58",
     "modules/data/adapters/persistence/migrations/0005_object_storage.sql": "5814659634cf2b08f0d885111c9865d3e8000bc4b1bb3d95c88b411a9e1dc25f",
     "modules/data/adapters/persistence/migrations/0006_resource_allocations.sql": "c2aeeae42712e2adc953ce3037d30bd418defd96257b95268f087e3a34a3d380",
+    "modules/data/adapters/persistence/migrations/0007_project_deletion.sql": "dfeba1f017262916ffa3c6e18a6ef942f50826a1bb14bef0b93c7e70caade54d",
+    "modules/data/adapters/persistence/migrations/0008_project_object_work.sql": "35485efe7693090f6e99f564b9de4f052d19e8be3b0f885e833d9c89dc96901f",
     "modules/dev-session/adapters/persistence/migrations/0001_create_schema.sql": "8eae783328d4a5261529da962b1c771a76fd9f520ebcb29ac8d57e14a65720be",
     "modules/dev-session/adapters/persistence/migrations/0002_idle_reminders.sql": "b8c0f754981a2376bfd0c10b8cc9f911664536087d40454e6973e0a194543c96",
     "modules/dev-session/adapters/persistence/migrations/0003_native_terminal_starts.sql": "3272003ed3d1002fa5e08651f818b3c04363fe3146f9433ffebffc81cb371bad",

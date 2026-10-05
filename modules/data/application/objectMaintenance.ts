@@ -1,5 +1,7 @@
 import { isPlatformError } from '@crewstation/kernel';
 import type { ObjectBackendPlane, ObjectCatalogRepository, ObjectTransferClaim, ObjectUploadRepository } from '../ports/objectStorage';
+import type { ObjectRequestRunner } from '../ports/deletion/objectWork';
+import { runObjectHandler } from './objects/requestHandler';
 
 /** Observations are read-only at the backend; revisions fence a delayed probe after rotation. */
 export async function probeObjectBackends(catalog: ObjectCatalogRepository, plane: ObjectBackendPlane, signal: AbortSignal): Promise<void> {
@@ -11,10 +13,14 @@ export async function probeObjectBackends(catalog: ObjectCatalogRepository, plan
   }
 }
 
-export async function verifyNextObject(deps: { uploads: ObjectUploadRepository; plane: ObjectBackendPlane; owner: string; heartbeatMs?: number }, signal: AbortSignal): Promise<boolean> {
+interface ObjectVerificationDeps { requests?: ObjectRequestRunner; uploads: ObjectUploadRepository; plane: ObjectBackendPlane; owner: string; heartbeatMs?: number }
+export async function verifyNextObject(deps: ObjectVerificationDeps, signal: AbortSignal): Promise<boolean> {
   if (signal.aborted) return false;
   const claim = await deps.uploads.claimVerification(deps.owner);
   if (!claim) return false;
+  return runObjectHandler(deps.requests,claim.attempt,'verify',() => verifyClaim(deps,claim,signal));
+}
+async function verifyClaim(deps: ObjectVerificationDeps, claim: ObjectTransferClaim, signal: AbortSignal): Promise<boolean> {
   const controller = new AbortController(), combined = AbortSignal.any([signal, controller.signal]);
   let heartbeat: Promise<void> | undefined;
   const timer = setInterval(() => {
