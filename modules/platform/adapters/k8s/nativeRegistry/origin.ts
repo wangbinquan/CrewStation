@@ -13,7 +13,7 @@ interface Status {podIP?:string;conditions?:Array<{type:string;status:string}>;c
 const slices:ResourceRef={apiVersion:'discovery.k8s.io/v1',kind:'EndpointSlice',plural:'endpointslices',namespaced:true};
 export const registryUnavailable=(message:string)=>precondition(message,{code:'native_registry_source_unavailable'});
 const unsupported=(message:string)=>precondition(message,{code:'native_registry_source_unsupported'});
-export async function completeRegistryObjects(k8s:K8sClient,ref:ResourceRef,namespace:string,selector:string,signal:AbortSignal) {
+export async function completeRegistryObjects(k8s:K8sClient,ref:ResourceRef,namespace:string|undefined,selector:string,signal:AbortSignal) {
   const result:K8sObject[]=[],cursors=new Set<string>();let cursor:string|undefined,version:string|undefined;
   do {
     const page=await k8s.listPage(ref,namespace,{labelSelector:selector,limit:100,signal,...(cursor?{continue:cursor}:{})});

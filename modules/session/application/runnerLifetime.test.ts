@@ -65,6 +65,16 @@ test('service shutdown closes existing connections, waits for a pending handshak
   expect(await opening).toContain('服务正在停止'); expect(f.hub.connections.size).toBe(0); expect(original.closed).toBe(true);
   expect(f.exited).toHaveLength(2); await expect(f.connect()).rejects.toThrow('服务正在停止');
 });
+test('service shutdown also awaits a disconnect whose durable birth exited before its original registry release finished', async () => {
+  const f = fixture(), connection = await f.connect(), entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
+  f.deps.registry.release = async () => { entered.resolve(); await release.promise; };
+  const disconnect = f.hub.onClose(connection); await entered.promise;
+  expect(f.hub.connections.size).toBe(0); expect(f.exited).toEqual([f.born[0]!.id]);
+  let stopped = false; const shutdown = f.hub.shutdown().then(() => { stopped = true; });
+  try { await Bun.sleep(0); expect(stopped).toBe(false); }
+  finally { release.resolve(); await disconnect; await shutdown; }
+  expect(stopped).toBe(true);
+});
 
 test('concurrent hello for one task cannot close a connection before its durable original birth has finished', async () => {
   const f = fixture(), entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();

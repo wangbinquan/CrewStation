@@ -1,5 +1,6 @@
 import { createRuntimeImageSetup } from './application/catalog/createSetup';
 export { runtimeImageRegistryDeletionPhysics as createRuntimeImageRegistryDeletionPhysics } from './adapters/registry/deletionPhysics';
+export { nativeRuntimeImageWorkPhysics as createNativeRuntimeImageWorkPhysics } from './adapters/native/projectWork';
 import { projectImagePolicy } from './application/projectImagePolicy';
 import { imageResourceAllocationUseCases } from './application/resourceAllocation';
 import { projectImagePolicyRoutes } from './http/projectImagePolicyRoutes';

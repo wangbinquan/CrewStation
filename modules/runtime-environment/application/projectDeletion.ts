@@ -66,7 +66,7 @@ export function runtimeImageProjectDeletionOwner(input: { repository: RuntimeIma
     const scope = physicalScope(stored.scope.physical, context.target);
     if (previous) {
       if (context.phase === 'verify') {
-        const result = physicalResult(scope, await input.physics.prove(scope)); await input.assertGrant(context);
+        const result = physicalResult(scope, await input.physics.prove(scope, context)); await input.assertGrant(context);
         if (result.kind !== 'done') return result;
         await input.repository.advance(context, previous);
       }
@@ -77,7 +77,7 @@ export function runtimeImageProjectDeletionOwner(input: { repository: RuntimeIma
       const result = done(context.phase === 'seal' ? 'metadata' : 'not-applicable', jsonHash({ operationId: context.operationId, phase: context.phase, revision: context.confirmed.revision }), context.phase === 'seal' ? stored.scope.content.rows.length : 0);
       if (result.kind === 'done') await input.repository.advance(context, result.evidence); return result;
     }
-    const proof = context.phase === 'stop' ? await input.physics.stop(context, scope) : context.phase === 'purge' ? await input.physics.purge(context, scope) : await input.physics.prove(scope);
+    const proof = context.phase === 'stop' ? await input.physics.stop(context, scope) : context.phase === 'purge' ? await input.physics.purge(context, scope) : await input.physics.prove(scope, context);
     await input.assertGrant(context);
     const result = physicalResult(scope, proof, context.phase === 'stop');
     if (result.kind !== 'done') return result;

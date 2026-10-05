@@ -3,10 +3,11 @@ export interface NativeDeletionSettings {
     readonly instance: { readonly id: string; readonly image: string; readonly startedAt: string; readonly epoch: string } };
   readonly grantToken: string;
   readonly registry?: { readonly baseUrl: string; readonly token: string; readonly sourceIdentity: string; readonly journalIdentity: string };
+  readonly work?: NativeWorkSettings;
 }
 /** A missing source stays disabled; a partially configured source fails at startup. */
 export function nativeDeletionSettings(env: Record<string, string | undefined>): NativeDeletionSettings | undefined {
-  if (!env.CS_PROJECT_DELETION_GITLAB_SOURCE && !env.CS_PROJECT_DELETION_SOURCE_TOKEN && !env.CS_PROJECT_DELETION_GRANT_TOKEN && !env.CS_PROJECT_DELETION_REGISTRY_SOURCE && !env.CS_PROJECT_DELETION_REGISTRY_TOKEN) return undefined;
+  if (!env.CS_PROJECT_DELETION_GITLAB_SOURCE && !env.CS_PROJECT_DELETION_SOURCE_TOKEN && !env.CS_PROJECT_DELETION_GRANT_TOKEN && !env.CS_PROJECT_DELETION_REGISTRY_SOURCE && !env.CS_PROJECT_DELETION_REGISTRY_TOKEN && !env.CS_PROJECT_DELETION_WORK_SOURCES) return undefined;
   try {
     const source: unknown = JSON.parse(env.CS_PROJECT_DELETION_GITLAB_SOURCE ?? '');
     if (!source || typeof source !== 'object' || Array.isArray(source)) throw Error();
@@ -32,6 +33,10 @@ export function nativeDeletionSettings(env: Record<string, string | undefined>):
       if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw Error();
       registry = { baseUrl: url.toString(), sourceIdentity: row['sourceIdentity'], journalIdentity: row['journalIdentity'], token: registryToken };
     }
-    return { gitlab: { baseUrl: base.toString(), instance: { id, image, startedAt, epoch }, token }, grantToken, ...(registry ? { registry } : {}) };
+    const work = nativeWorkSettings(env.CS_PROJECT_DELETION_WORK_SOURCES);
+    if (work && !registry) throw Error();
+    return { gitlab: { baseUrl: base.toString(), instance: { id, image, startedAt, epoch }, token }, grantToken, ...(registry ? { registry } : {}), ...(work ? { work } : {}) };
   } catch { throw Error('永久删除 GitLab 原安装、独立来源凭据与控制器许可配置不完整'); }
 }
+import { nativeWorkSettings } from './nativeWork';
+import type { NativeWorkSettings } from './nativeWork';

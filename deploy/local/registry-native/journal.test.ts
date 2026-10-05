@@ -73,3 +73,16 @@ test('an existing unknown schema or writable journal parent is rejected', async 
   await rm(file); await chmod(join(file, '..'), 0o777);
   expect(() => nativeRegistryJournal(file, sourceIdentity)).toThrow('protected directory');
 }));
+test('interrupted callbacks recover only from the independent original kernel exit, while retaining their full original journal record', async () => fixture(async (file, history) => {
+  const birth = { bootId: randomUUID(), namespace: '1000', pid: 101, startTicks: '123' }; let exited = false;
+  const runtime = { original: birth, proveExit: async (original: typeof birth) => { expect(original).toEqual(birth); return exited ? jsonHash({ original, kernelExit: true }) : undefined; } };
+  const original = nativeRegistryJournal(file, history.sourceIdentity, runtime); original.begin(context, history); const identity = original.identity; original.close();
+  const replacement = nativeRegistryJournal(file, history.sourceIdentity, { ...runtime, original: { ...birth, pid: 102 } });
+  try {
+    await replacement.recoverInterrupted(); expect(replacement.status()).toMatchObject({ active: 1, total: 1 });
+    exited = true; await replacement.recoverInterrupted(); expect(replacement.identity).toBe(identity); expect(replacement.status()).toMatchObject({ active: 0, total: 1 });
+    const db = new Database(file);
+    try { expect(db.query('SELECT state,operator_birth FROM registry_work').get()).toEqual({ state: 'interrupted', operator_birth: JSON.stringify(birth) }); } finally { db.close(); }
+    const next = replacement.begin(context, history); next.finish(); expect(replacement.status()).toMatchObject({ active: 0, total: 2 });
+  } finally { replacement.close(); }
+}));

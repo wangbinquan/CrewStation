@@ -37,7 +37,7 @@ export function nodeFileConsumerSource(k8s: K8sClient, raw: { namespace: string;
   return { capture: (node: { uid: string; name: string }, identities: ConsumerRequest['identities']) => read(node, identities),
     observe: (source: NodeConsumerOrigin, identities: ConsumerRequest['identities']) => read({ uid: source.nodeUid, name: source.nodeName }, identities, source) };
 }
-async function originalNodeProbe(k8s: K8sClient, namespace: string, node: { uid: string; name: string }, signal: AbortSignal): Promise<K8sObject> {
+export async function originalNodeProbe(k8s: K8sClient, namespace: string, node: { uid: string; name: string }, signal: AbortSignal): Promise<K8sObject> {
   const candidates = (await completeRegistryObjects(k8s, Resources.Pod!, namespace, 'app=cs-storage-probe', signal)).filter(pod => {
     const spec = pod['spec'] as Spec, status = pod['status'] as { podIP?: string; conditions?: Array<{ type: string; status: string }>; containerStatuses?: Array<{ name: string; containerID?: string; imageID?: string; ready?: boolean; state?: { running?: unknown } }> };
     const container = spec.containers?.find(row => row.name === 'probe'), security = container?.securityContext;

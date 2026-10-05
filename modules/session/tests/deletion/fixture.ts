@@ -60,7 +60,8 @@ export async function sessionDeletionFixture(processes?: SessionCallbackProcesse
     await database.db.execute(sql`INSERT INTO session.development_usage_events(task_id,sequence,digest,event) VALUES(${id},1,${jsonHash('development')},'{"private":"development"}')`);
   };
   const drop = async () => {
-    for (const server of servers) server.stop(true);
+    for (const server of servers) void server.stop(true);
+    await Promise.all([first, second].map(replica => replica.module.workers[0]!.stop()));
     const deadline = Date.now() + 3000;
     while ((await database.db.execute('SELECT id FROM session.connection_births WHERE exited_at IS NULL')).length && Date.now() < deadline) await Bun.sleep(10);
     await database.drop();

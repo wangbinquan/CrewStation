@@ -78,8 +78,8 @@ export function runtimeImageRegistryDeletionPhysics(input: { work: RuntimeImageD
       if (work.storageRemaining) return { kind: 'waiting', reason: '原运行镜像构建缓存或临时文件仍未回收' };
       validateRegistryHistoryObservation(original.registry, await input.artifacts.inspect(original.registry)); await input.assertGrant(context);
       await client.reclaim(context, original.registry);
-      const result = await observe(original.scope, await input.work.prove(original.work)); await input.assertGrant(context); return result;
+      const result = await observe(original.scope, await input.work.prove(original.work, context)); await input.assertGrant(context); return result;
     },
-    prove: async raw => { const original = materials(raw); return observe(original.scope, await input.work.prove(original.work)); },
+    prove: async (raw, context) => { const original = materials(raw); return observe(original.scope, await input.work.prove(original.work, context)); },
   };
 }

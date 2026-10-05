@@ -30,7 +30,7 @@ export interface RuntimeImageDeletionPhysics {
   inspect(scope: RuntimeImagePhysicalScope): Promise<RuntimeImagePhysicalReport>;
   stop(context: ProjectDeletionContext, scope: RuntimeImagePhysicalScope): Promise<RuntimeImagePhysicalProof>;
   purge(context: ProjectDeletionContext, scope: RuntimeImagePhysicalScope): Promise<RuntimeImagePhysicalProof>;
-  prove(scope: RuntimeImagePhysicalScope): Promise<RuntimeImagePhysicalProof>;
+  prove(scope: RuntimeImagePhysicalScope, context?: ProjectDeletionContext): Promise<RuntimeImagePhysicalProof>;
 }
 export interface RuntimeImageDeletionScope {
   readonly version: 1; readonly target: { projectId: string; namespace: string; serviceId?: string };

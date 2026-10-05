@@ -88,6 +88,7 @@ const releaseContentSchema = z.object({
   callbacks: z.array(ReleaseCallbackRecordSchema),
   /** Original registered release destinations, independent of the current slot. */
   artifacts: z.array(z.strictObject({ releaseId: ResourceIdSchema, reference: z.string().min(1).max(1024) })).optional(),
+  buildInputs: z.array(z.strictObject({ releaseId: ResourceIdSchema, serviceId: ResourceIdSchema, commit: z.string().min(1).max(128) })).optional(),
 }).strict();
 export const ReleasePhysicalScopeSchema = z.object({
   version: z.literal(1), projectId: ProjectIdSchema, originDigest: deletionHash,

@@ -1,5 +1,6 @@
 export type { RuntimeEnvironmentModuleApi } from './api/moduleApi';
 export { createRuntimeEnvironmentModule, runtimeEnvironmentMigrations } from './wiring';
+export { createNativeRuntimeImageWorkPhysics } from './wiring';
 export type { RuntimeEnvironmentModule, RuntimeEnvironmentModuleDeps } from './wiring';
 export { createManagedRuntimeEnvironmentModule } from './wiring';
 export type { ManagedRuntimeEnvironmentDeps } from './wiring';

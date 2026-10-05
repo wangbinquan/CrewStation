@@ -157,15 +157,20 @@ spec:
             - name: CS_STORAGE_PROBE_TOKEN
               valueFrom: { secretKeyRef: { name: crewstation-metrics, key: CS_STORAGE_PROBE_TOKEN } }
             - { name: CS_STORAGE_PROBE_ROOT, value: /volumes }
+            - { name: CS_STORAGE_PROBE_POD_ROOT, value: /kubelet-pods }
+            - { name: CS_STORAGE_PROBE_TEMPLATE_ROOT, value: /app/templates/minimal-sample }
           securityContext: { runAsUser: 0, runAsGroup: 0, allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL], add: [DAC_READ_SEARCH, SYS_PTRACE] } }
           resources: { requests: { cpu: 10m, memory: 32Mi }, limits: { cpu: 200m, memory: 256Mi } }
           readinessProbe: { httpGet: { path: /healthz, port: 8095 }, periodSeconds: 5 }
           livenessProbe: { httpGet: { path: /healthz, port: 8095 }, periodSeconds: 15 }
           volumeMounts:
             - { name: local-volumes, mountPath: /volumes, readOnly: true }
+            - { name: kubelet-pods, mountPath: /kubelet-pods, readOnly: true }
       volumes:
         - name: local-volumes
           hostPath: { path: /var/local-path-provisioner, type: Directory }
+        - name: kubelet-pods
+          hostPath: { path: /var/lib/kubelet/pods, type: Directory }
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

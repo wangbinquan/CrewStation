@@ -3527,3 +3527,16 @@ TaskRuntime七阶段仅受控停止端口，DevSession的原删除许可/回调f
 本批完整 v2 四层静态通过，6121 pass／156 skip／2 fail、264763 断言；42 候选路径首尾保持。两项旧路径失败原件保留，事件参考面板异步加载及 Session 关闭后的 CONNECTION_ENDED 定向 10／0、119 断言。第一版已修正的项目专用准入误接平台记录缺陷，真实调和／writer／档位和 PG 回归 8／0。精确发布包括上述42路径与此 STATE，只在门禁后更新交接文档；确切SHA CI／部署接续。原全量红不写绿。
 
 后续在制 Registry 排他 authority／pidfd／进程 guardian／服务 main、完整平台输入摘要、stale-result qualification 和 kubelet emptyDir 来源全部排除在该提交。实际原 Linux 只读输入核对确认两个平台输入与模板一致，项目输入保留，原 Registry 未暂停，原 BuildKit 未 Prune。下一候选还需 Session shutdown 排空修正、实际 work physics、私有 Registry／SCM 安装与完整22方装配，最终管理员两次确认原专用项目彻底回收仍未完成。创建弹窗已上线，永久删除入口 OFF、原项目和共享资源保持；不会把这些来源基础写成删除功能完成。
+
+## 2026-10-06 RFC-034 原生原页读取口组合
+
+`native-platform-page-read-v2.md` 有限设计PASS，现有 Session 的原 key/pass/ordinal PG 原页读取接入 platform source 与 observability 自有可选来源口；不触发数字写入或ACK、不重建document，不改变现有v2拒绝与producer OFF。原真实1201 SQLite/WAL→FULL/WAL journal→PG→HTTP回归扩展到platform读取口并验证普通ACK后仍保留，原5用例、四桶总量、未知rootbirth null、失败回滚与丢ACK等断言/预算保持。自有候选验证、有限实现门、确切CI和本机部署另验，父链引用／完整v2投影／全入口producer／规模等两RFC余项继续。
+
+2026-10-06 本片SOURCE1真实12项回归通过，但完整本机门在类型检查确认正式Session root缺少原页方法（非并行错误），有限实现门保留FAIL。修正新增SessionModuleApi签名和wiring原store读取，回归改为真实createSessionModule.api而非仅HTTP代理；缺页和错误key仍走原错误，原四桶/ACK/EOF/预算不变。修正候选重新核对，旧失败不写绿。
+
+
+## 2026-10-06 RFC-037 正式删除 Root 与原生工作
+
+100功能路径装配完整22方，原工作Pod／凭据、kubelet emptyDir、全主机进程及 inode 消费者、原BuildKit精确缓存和history、Registry pidfd／独立guardian／真实PG排他与journal恢复、Session shutdown排空完成候选。定向77 pass／1环境skip／0 fail、505断言，额外原持有进程7 pass／33断言；改动行1107／1118、99.0%，无违规。2026-10-06 完整本地检查自然通过：6175 pass／157 skip／0 fail；四层静态通过，冻结的100功能路径首尾摘要全部一致。回执 `/private/tmp/cs-rfc037-native-next-full-v2-receipt.json`。此前失败日志保留。精确提交、确切SHA六项CI、本机部署和原专用项目全部22方永久回收继续，当前不能写作删除功能已交付。
+
+发布只包含100功能路径、此共享STATE全文和本RFC两份证据文档，保留并行RFC-034交接与全部批外开发。无跨会话消息、无分支/worktree/stash或历史重写。镜像及两类私有来源按确切已提交源码构建；八组件与探针先部署，实际来源就绪后只向五个Root进程下发清理配置并补齐Pod UID／探针配置。原项目仍保持，入口OFF；最终管理员两层确认与原资源独立归零接续。见 `proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/native-work-root.md`。

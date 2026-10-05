@@ -2,7 +2,7 @@ import { bindTaskMaintenance } from './adapters/observability/taskMaintenance'; 
 import { resourceCatalogs } from './application/resource-center/resourceCatalogs'; import { sessionDeletionSources } from './application/deletion/sessionSources';
 import { businessRuntimePorts } from './application/deletion/businessSources';
 import { dataDeletionSources } from './application/deletion/dataSources';
-import { assembleProjectDeletion } from './application/deletion/assembly';
+import { assembleProjectDeletion } from './application/deletion/assembly'; import { prepareInstalledNativeDeletion } from './adapters/k8s/nativeProjectWork/dependencies';
 import { projectDeletionGrantRoutes } from './http/projectDeletionGrants';
 import { infrastructureOriginSources } from './application/infrastructure/origins';
 import { projectHosts, provisioningRetry, provisioningProjects } from './application/provisioningPorts';
@@ -32,7 +32,7 @@ import { imageValidationPorts } from './application/imageValidationPorts';
 import { businessExecutionPorts, executionHandoffPorts } from './application/businessExecutionPorts';
 import { developmentImagePorts, imageOwnerPorts } from './application/developmentImagePorts';
 import { executionRecords } from './application/executionRecords';
-import { createManagedRuntimeEnvironmentModule, imageAllocationRevision } from '@crewstation/module-runtime-environment';
+import { createManagedRuntimeEnvironmentModule, createNativeRuntimeImageWorkPhysics, createRuntimeImageRegistryDeletionPhysics, imageAllocationRevision } from '@crewstation/module-runtime-environment';
 import { runtimeImagePlatformPorts } from './application/runtimeImagePorts';
 import { assertRuntimeImageBuildIsolation } from './adapters/k8s/runtimeImageIsolation';
 import { projectHostAccess } from './application/projectHostAccess';
@@ -60,8 +60,8 @@ import { createIdentityModule } from '@crewstation/module-identity';
 import { createObservabilityModule, type ObservabilityModuleApi } from '@crewstation/module-observability';
 import { createProvisioningModule } from '@crewstation/module-provisioning';
 import { createProjectModule, readProjectObservationName, serviceAllocationRevision, namespaceQuotaRevision, executionQuotaRevision, type ProjectModuleApi, type ResolvedService } from '@crewstation/module-project';
-import { createReleaseModule, type ReleaseModuleApi } from '@crewstation/module-release';
-import { createScmModule } from '@crewstation/module-scm';
+import { createReleaseModule, createNativeReleaseWorkPhysics, createReleaseRegistryDeletionPhysics, type ReleaseModuleApi } from '@crewstation/module-release';
+import { createScmModule, gitLabDeletionPhysicsAdapter, gitLabNativeOriginsAdapter } from '@crewstation/module-scm';
 import { createSessionModule } from '@crewstation/module-session';
 import { createTaskRuntimeModule, type TaskRuntimeModuleApi } from '@crewstation/module-task-runtime';
 import { queueMigrations } from '@crewstation/queue';
@@ -70,7 +70,6 @@ import type { PlatformSettings } from '@crewstation/settings'; import type { App
 import type { Lifecycle, PlatformApi } from './api/moduleApi';
 /** 组合根的对外形状：各进程只挑选自己角色的入口；模块实例也暴露出来供 CLI 与测试直接使用。 */
 export type PlatformModuleApi = PlatformApi<Hono<AppEnv>, MigrationSet>;
-
 export interface PlatformModuleDeps {
   /** Explicit independent physical sources; missing configuration keeps permanent deletion off. */
   deletion?: {
@@ -94,12 +93,9 @@ export interface PlatformModule {
 }
 /** 平台内部调用用的管理员身份：不经成员关系检查的用例入口。 */
 export const SYSTEM_ACTOR: Actor = { userId: BUILTIN_RESOURCES.systemActor as UserId, isAdmin: true };
-
 const consumerLifecycle = (consumer: EventConsumer): Lifecycle => ({ start: () => consumer.start(), stop: () => consumer.stop() });
 interface Late { clusterManagement?: ReturnType<typeof createClusterManagementModule>['api']; resourceAccess?: ReturnType<typeof createResourceAccessModule>['api']; observability?: ObservabilityModuleApi; objectHistory?: NonNullable<NonNullable<Parameters<typeof createDataModule>[0]['objects']>['history']>; businessTask?: BusinessTaskModuleApi; events?: EventsModuleApi; project?: ProjectModuleApi; gateway?: GatewayModuleApi; taskRuntime?: TaskRuntimeModuleApi; release?: ReleaseModuleApi; resources?: ResourcesModuleApi; dataControl?: DataControlModuleApi; clusterControl?: ClusterControlModuleApi }
-
 type CompositionDeps = PlatformModuleDeps & { identities: ResourceIdentityDirectory };
-
 function dataPorts(settings: PlatformSettings, late: Late, sources: ReturnType<typeof objectStorageSources>, k8s: PlatformModuleDeps['k8s']): Pick<Parameters<typeof createDataModule>[0], 'ledger' | 'credentials' | 'objects' | 'nativePostgres'> {
   const ledger = () => { if (!late.resources) throw new Error('resources 尚未装配'); return late.resources; };
   const dataControl = () => { if (!late.dataControl) throw new Error('data-control 尚未装配'); return late.dataControl; };
@@ -124,7 +120,6 @@ function dataPorts(settings: PlatformSettings, late: Late, sources: ReturnType<t
     } } : {}),
   };
 }
-
 function composeCore(deps: CompositionDeps, late: Late) {
   const { db, settings, logger } = deps;
   const hosts = projectHosts(settings);
@@ -133,7 +128,6 @@ function composeCore(deps: CompositionDeps, late: Late) {
   // 装配期间（迁移、CLI）读到 0 而不是抛错，因为那时本来就没有任务在跑。
   const runningTasks = async (projectId: ProjectId): Promise<number> => (late.taskRuntime ? late.taskRuntime.runningTaskCount(projectId) : 0);
   const gatewayApi = (): GatewayModuleApi => { if (!late.gateway) throw new Error('gateway 尚未装配'); return late.gateway; };
-
   const identity = createIdentityModule({
     db, logger, legacyIds: deps.identities,
     settings: {
@@ -168,7 +162,6 @@ function composeCore(deps: CompositionDeps, late: Late) {
   // 申请人／审批人在申请、绑定列表里显示可辨识名字；查不到就让界面回退到 ID。
   const userDirectory = { displayName: async (userId: UserId) => (await identity.api.getUser(userId))?.name };
   const resolveById = (serviceId: ServiceId) => project.api.resolveServiceById(serviceId);
-
   const config = createConfigModule({ db, project: project.api, settings: { secretKeyBase64: settings.secretKeyBase64 } });
   // 算力档位（RFC-006、ADR-0005）：测试执行在 task-runtime（L4）、已上线引用在 release（L4）、资源套餐在 project（L2），都由这里回填。
   const agentRuntime = createAgentRuntimeModule({
@@ -210,7 +203,6 @@ function composeCore(deps: CompositionDeps, late: Late) {
   });
   return { identity, project, config, data, scm, apiCatalog, agentRuntime, hosts, isAdmin, resolveById };
 }
-
 function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeCore>, late: Late, resources: ReturnType<typeof composeLedger>, images: ReturnType<typeof createManagedRuntimeEnvironmentModule>) {
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, scm, apiCatalog, hosts, isAdmin, resolveById } = core;
@@ -295,7 +287,6 @@ function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeC
   late.release = release.api;
   return { release, gateway };
 }
-
 function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, late: Late, resources: ReturnType<typeof composeLedger>, runtimeImages: ReturnType<typeof createManagedRuntimeEnvironmentModule>) {
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, scm, isAdmin, resolveById } = core;
@@ -384,7 +375,6 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
   late.businessTask = businessTask.api;
   return { taskRuntime, devSession, businessTask, events, session, sessionClient: runner };
 }
-
 function composeAggregates(deps: CompositionDeps, late: Late, core: ReturnType<typeof composeCore>, delivery: ReturnType<typeof composeDelivery>, runtime: ReturnType<typeof composeRuntime>, resources: ReturnType<typeof composeLedger>, images: ReturnType<typeof createManagedRuntimeEnvironmentModule>) {
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, apiCatalog, isAdmin } = core;
@@ -462,7 +452,6 @@ function composeAggregates(deps: CompositionDeps, late: Late, core: ReturnType<t
   });
   return { observability, capabilities, provisioning, resourceAccess };
 }
-
 /**
  * RFC-025 资源中心：台账（L1）只依赖 project 的额度与授权，装在领域模块之前，之后各期的所属模块在构造时就能拿到写入口；
  * 调和器（L2）要按旧标签查任务环境做收编空跑，装在 runtime 之后。
@@ -476,7 +465,6 @@ function composeLedger(deps: CompositionDeps, core: ReturnType<typeof composeCor
     authorizer: { projectAccess: async (actor, projectId) => ({ operate: (await project.authorize(actor, projectId, 'view')) !== 'tester' }) },
   });
 }
-
 function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCore>, ledger: ReturnType<typeof composeLedger>, runtime: ReturnType<typeof composeRuntime>, { gateway, release }: ReturnType<typeof composeDelivery>, runtimeImages: ReturnType<typeof createManagedRuntimeEnvironmentModule>) {
   return createClusterControlModule({
     ...(runtime.taskRuntime.api.archiveExecution ? { archives: runtime.taskRuntime.api.archiveExecution } : {}),
@@ -530,8 +518,19 @@ function composeDataControl(deps: CompositionDeps, ledger: ReturnType<typeof com
     },
   });
 }
+function productionDeletion(deps: CompositionDeps, late: Late, core: () => ReturnType<typeof composeCore>) {
+  const native = prepareInstalledNativeDeletion({ ...deps, project: () => core().project.api, scm: () => core().scm.api, resources: () => late.resources!, cluster: () => late.clusterControl! }); if (!native) return undefined;
+  const { db, identities, settings } = deps, { assertGrant, scmSources, artifacts } = native, scm = gitLabDeletionPhysicsAdapter(scmSources.sources);
+  return { scm: { ...scm, stop: (context: Parameters<typeof scm.stop>[0], scope: Parameters<typeof scm.stop>[1]) => scmSources.run(context, scope.retained, () => scm.stop(context, scope)), purge: (context: Parameters<typeof scm.purge>[0], scope: Parameters<typeof scm.purge>[1]) => scmSources.run(context, scope.retained, () => scm.purge(context, scope)) },
+    currentRepositoryOrigins: gitLabNativeOriginsAdapter(scmSources.rest, scmSources.sources.native),
+    images: createRuntimeImageRegistryDeletionPhysics({ artifacts, transport: settings.projectDeletionNative!.registry!, assertGrant, work: createNativeRuntimeImageWorkPhysics({ db, assertGrant, source: native.images }) }),
+    release: createReleaseRegistryDeletionPhysics({ artifacts, transport: settings.projectDeletionNative!.registry!, assertGrant, registryBase: settings.registryBase, work: createNativeReleaseWorkPhysics({ db, identities, assertGrant, services: { resolveServiceById: id => core().project.api.resolveServiceById(id) }, source: native.release }) }),
+    objects: createDataObjectDeletionPhysics(db, native.objects(createObjectDeletionTransport(db, settings.secretKeyBase64), createGarageDeletionTransport), assertGrant),
+  };
+}
 function composeModules(deps: CompositionDeps) {
   const late: Late = {};
+  deps = { ...deps, deletion: deps.deletion ?? productionDeletion(deps, late, () => core) };
   const core = composeCore(deps, late);
   const resources = composeLedger(deps, core);
   late.resources = resources.api;

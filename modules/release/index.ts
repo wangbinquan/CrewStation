@@ -2,3 +2,4 @@ export type { ActiveEndpoint, PhysicalSlot, ReleaseModuleApi, ReleaseProjectCont
 export { createReleaseModule, releaseMigrations } from './wiring';
 export type { ReleaseModule, ReleaseModuleDeps } from './wiring';
 export { createReleaseRegistryDeletionPhysics } from './wiring';
+export { createNativeReleaseWorkPhysics } from './wiring';

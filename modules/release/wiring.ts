@@ -1,5 +1,6 @@
 import { releaseImageHistory } from './adapters/persistence/drizzleRepositories';
 export { releaseRegistryDeletionPhysics as createReleaseRegistryDeletionPhysics } from './adapters/registry/deletionPhysics';
+export { nativeReleaseWorkPhysics as createNativeReleaseWorkPhysics } from './adapters/native/projectWork';
 import { releaseProjectContent } from './adapters/persistence/projectContent';
 import { releaseInfrastructureOrigin } from './adapters/persistence/infrastructureOrigins';
 import type { ReleaseContentDirectory } from './ports/repositories';

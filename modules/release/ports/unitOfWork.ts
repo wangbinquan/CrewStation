@@ -56,7 +56,7 @@ export interface ReleaseDeletionPhysics {
   inspect(scope: ReleasePhysicalScope): Promise<ReleasePhysicalReport>;
   stop(context: ProjectDeletionContext, scope: ReleasePhysicalScope): Promise<ReleasePhysicalProof>;
   purge(context: ProjectDeletionContext, scope: ReleasePhysicalScope): Promise<ReleasePhysicalProof>;
-  prove(scope: ReleasePhysicalScope): Promise<ReleasePhysicalProof>;
+  prove(scope: ReleasePhysicalScope, context?: ProjectDeletionContext): Promise<ReleasePhysicalProof>;
 }
 export interface ReleaseDeletionStored {
   scope: ReleaseDeletionScope; verified: boolean; phaseIndex: number;

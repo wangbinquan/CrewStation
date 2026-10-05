@@ -23,6 +23,7 @@ function originalCallback<T>(raw: SessionConnectionBirth, address: string, conne
 export function runnerLifetime(deps: Pick<SessionUseCaseDeps, 'connectionHistory' | 'taskAccess' | 'registry' | 'settings'>, connections: Map<TaskId, RunnerConnection>, subscribers: Map<TaskId, Set<EventSink>>) {
   const births = new WeakMap<RunnerConnection, { original: SessionConnectionBirth; privateKey: string }>();
   const finishing = new WeakMap<RunnerConnection, Promise<void>>();
+  const exiting = new Set<Promise<void>>();
   const closing = new Map<string, Promise<void>>(), retiring = new Map<string, RunnerConnection>();
   const opening = new Set<Promise<RunnerOpenResult>>();
   const bindings = new Map<TaskId, Promise<void>>();
@@ -43,7 +44,8 @@ export function runnerLifetime(deps: Pick<SessionUseCaseDeps, 'connectionHistory
       if (callbackFailure) throw callbackFailure;
     })();
     finishing.set(connection, pending);
-    void pending.catch(() => finishing.delete(connection));
+    exiting.add(pending);
+    void pending.then(() => exiting.delete(pending), () => { exiting.delete(pending); finishing.delete(connection); });
     return pending;
   };
   const drain = (original: SessionConnectionBirth): Promise<boolean> => {
@@ -89,6 +91,9 @@ export function runnerLifetime(deps: Pick<SessionUseCaseDeps, 'connectionHistory
       await Promise.all([...connections.values()].map(async (connection) => {
         connections.delete(connection.hello.taskId); await finish(connection, '会话服务正在停止', true);
       }));
+      // onClose removes its connection before the private finally and
+      // registry release complete. Service shutdown owns those exits too.
+      await Promise.all([...exiting]);
     }, register: async (connection: RunnerConnection, now: Date) => {
     if (!deps.connectionHistory) { await deps.registry.claim(connection.hello.taskId, deps.settings.selfAddress, now); return; }
     const privateKey = Array.from(crypto.getRandomValues(new Uint8Array(32)), (value) => value.toString(16).padStart(2, '0')).join('');

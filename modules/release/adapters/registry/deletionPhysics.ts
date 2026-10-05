@@ -80,8 +80,8 @@ export function releaseRegistryDeletionPhysics(input: { work: ReleaseDeletionPhy
       const work = workProof(original.work, await input.work.purge(context, original.work)); if (work.kind !== 'done') return work;
       if (work.storageRemaining) return { kind: 'waiting', reason: '原发布构建缓存或临时文件仍未回收' };
       validateRegistryHistoryObservation(original.registry, await input.artifacts.inspect(original.registry)); await input.assertGrant(context); await client.reclaim(context, original.registry);
-      const result = await observe(original.scope, await input.work.prove(original.work)); await input.assertGrant(context); return result;
+      const result = await observe(original.scope, await input.work.prove(original.work, context)); await input.assertGrant(context); return result;
     },
-    prove: async raw => { const original = materials(raw); return observe(original.scope, await input.work.prove(original.work)); },
+    prove: async (raw, context) => { const original = materials(raw); return observe(original.scope, await input.work.prove(original.work, context)); },
   };
 }

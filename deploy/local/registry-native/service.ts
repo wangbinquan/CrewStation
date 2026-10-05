@@ -16,7 +16,7 @@ export function nativeRegistryService(input: { token: string; root: string; sour
   journal: NativeRegistryJournal;
   assertGrant(context: ProjectDeletionContext, signal: AbortSignal): Promise<void>;
   assertOriginalSource(history: RegistryDeletionHistory, signal: AbortSignal): Promise<void>;
-  authority(context: ProjectDeletionContext, history: RegistryDeletionHistory): RegistryReclamationAuthority;
+  authority(context: ProjectDeletionContext, history: RegistryDeletionHistory, signal: AbortSignal): RegistryReclamationAuthority;
 }) {
   if (input.token.length < 32 || !input.root.startsWith('/') || !/^[a-f0-9]{64}$/.test(input.sourceIdentity) || input.journal.sourceIdentity !== input.sourceIdentity) throw Error('Registry native source configuration is incomplete');
   const root = input.root, fixedIdentity = input.sourceIdentity, assertGrant = input.assertGrant, assertOriginalSource = input.assertOriginalSource, createAuthority = input.authority;
@@ -51,7 +51,7 @@ export function nativeRegistryService(input: { token: string; root: string; sour
         || origin['rootEpoch'] !== history.original.rootIdentity || origin['volumeEpoch'] !== history.original.volumeIdentity
         || !context.confirmed.resources.some(row => row.kind === kind && row.id === 'registry-history:' + history.projectId
           && row.identity === registryHistoryIdentity(history) && row.sourceIdentity === sourceIdentity && row.scope === 'physical')) throw Error('Registry original native materials were not confirmed by this owner');
-      const authority = createAuthority(structuredClone(context), structuredClone(history));
+      const authority = createAuthority(structuredClone(context), structuredClone(history), signal);
       const revalidate = async () => { signal.throwIfAborted(); await assertGrant(structuredClone(context), signal); await assertOriginalSource(structuredClone(history), signal); signal.throwIfAborted(); };
       await revalidate();
       const result = await reclaimRegistryInventory(root, { query: history.query, original: history.original }, {

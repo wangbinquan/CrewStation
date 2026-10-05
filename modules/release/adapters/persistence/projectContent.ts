@@ -91,7 +91,8 @@ function report(rows: readonly Row[], target: ProjectDeletionTarget, blockers: P
   if (bindings.length) resources.push({ kind: 'release-identity-scope', id: target.id, identity: jsonHash(bindings), sourceIdentity: jsonHash({ projectId: target.id, kind: 'release-identity-scope' }), scope: 'metadata', count: 0 });
   const material = { participant: 'release' as const, complete: !blockers.length && !references.length, resources, references, blockers };
   const artifacts=own.filter(row=>row.table==='releases'&&string(row.body.image)).map(row=>({releaseId:String(row.body.id),reference:String(row.body.image)})).sort((a,b)=>a.releaseId.localeCompare(b.releaseId));
-  return { inventory: ProjectDeletionInventorySchema.parse({ ...material, revision: jsonHash({ ...material, artifacts }) }), rows: content, consumers, artifacts, callbacks: callbacks.sort((a,b)=>a.id.localeCompare(b.id)),
+  const buildInputs=own.filter(row=>row.table==='releases').map(row=>({releaseId:String(row.body.id),serviceId:String(row.body.service_id),commit:String(row.body.commit_sha)})).sort((a,b)=>a.releaseId.localeCompare(b.releaseId));
+  return { inventory: ProjectDeletionInventorySchema.parse({ ...material, revision: jsonHash({ ...material, artifacts, buildInputs }) }), rows: content, consumers, artifacts, buildInputs, callbacks: callbacks.sort((a,b)=>a.id.localeCompare(b.id)),
     identityLinks: bindings.map(([key, id]) => { const [kind, ...keys] = JSON.parse(key) as string[]; return { kind: kind!, keys, id }; }) };
 }
 async function schemaComplete(db: Executor): Promise<boolean> {

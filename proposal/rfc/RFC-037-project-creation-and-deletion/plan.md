@@ -285,3 +285,6 @@ TaskRuntime 57功能/锁的单次完整门禁已终止5603 pass／143环境skip�
 实际 SDK→私有 HTTP→固定原来源协议的组合回归已走通 capture／stop／purge／independent proof，另以真实 PG 的正式 Root 验证伪造 operation 被持久 owner 拒绝且没有创建操作。受控命令替身证明调用与守卫，不能计作真实项目销毁；本机原 GitLab 和 Garage 的本轮核对均只读。
 
 完整 v5 门禁 5924 pass、143 环境 skip、1 fail，223780 断言、1177 文件、2034.73 秒。唯一失败为既有 TaskRuntime 归档／原卷回收复合 PG 用例默认 5 秒预算；定向两用例 2 pass／0 fail、30 断言，首例 4671.77 毫秒。未把重跑当成全仓通过；全部行为断言保留，为该串行真实 PG 集成用例设置 15 秒预算，最终包含正式服务入口的候选重新进行一次完整门禁。日志：/private/tmp/cs-rfc037-scm-native-full-check-v5.log、/private/tmp/cs-rfc037-scm-gate-timeout-target-v1.log。
+
+
+2026-10-06 正式22方 Root 与原生工作回收候选完成，100功能路径冻结；新增回归77 pass／1环境skip／0 fail、505断言，实际PG，改动行99.0%无违规。唯一完整门禁在途；精确提交、六项CI、八组件部署、固定SCM／Registry服务安装和管理员原专用项目彻底回收接续。详见[正式装配与原生工作](acceptance/native-work-root.md)。来源只读证明不算最终删除，原项目保持，入口仍OFF。

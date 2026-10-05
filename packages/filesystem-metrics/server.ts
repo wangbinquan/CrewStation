@@ -10,20 +10,32 @@ import {RegistryInventoryRequestSchema} from './registry/protocol';
 import {observeRegistryInventory} from './registry/inventory';
 import { garageInventoryResponse } from './garage/server';
 import { buildKitInventoryResponse } from './buildkit/inventory/server';
+import { createBuildKitInputHandler } from './buildkit/qualification/transport';
+import { createBuildKitManifestHandler } from './buildkit/qualification/manifests';
+import { createPodWorkspaceHandler } from './pod-workspace/server';
+import { processOwnerHttp } from './process-owners/transport';
 
-export function createFilesystemMetricsHandler(options: { token: string; roots: Record<string, string>; timeoutMs?: number; procRoot?: string }) {
+export function createFilesystemMetricsHandler(options: { token: string; roots: Record<string, string>; timeoutMs?: number; procRoot?: string; podWorkspaceRoot?: string; buildkitTemplateRoot?: string }) {
   if (options.token.length < 32) throw new Error('A dedicated measurement token of at least 32 characters is required');
+  if (options.buildkitTemplateRoot && !options.roots['local']) throw new Error('Native BuildKit input installation requires its local root');
   const credential = Buffer.from(`Bearer ${options.token}`); let busy = false;
+  const workspaces = options.podWorkspaceRoot ? createPodWorkspaceHandler({ token: options.token, root: options.podWorkspaceRoot }) : undefined;
+  const inputs = options.buildkitTemplateRoot ? createBuildKitInputHandler({ token: options.token, root: options.roots['local']!, templateRoot: options.buildkitTemplateRoot }) : undefined;
+  const manifests = options.roots['local'] ? createBuildKitManifestHandler({ token: options.token, root: options.roots['local'] }) : undefined;
   return async (request: Request): Promise<Response> => {
     const path = new URL(request.url).pathname;
     if (path === '/healthz' && request.method === 'GET') return Response.json({ ok: true });
     const supplied = Buffer.from(request.headers.get('authorization') ?? '');
     if (credential.length !== supplied.length || !timingSafeEqual(credential, supplied)) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    if (!['/measure', '/absence', '/source', '/consumers','/registry/inventory','/garage/inventory','/buildkit/inventory'].includes(path) || request.method !== 'POST') return new Response(null, { status: 404 });
+    if (!['/measure', '/absence', '/source', '/consumers','/process-owners','/registry/inventory','/garage/inventory','/buildkit/inventory', ...(workspaces ? ['/pod-workspace/inventory'] : []), ...(inputs ? ['/buildkit/platform-inputs'] : []), ...(manifests ? ['/buildkit/manifests'] : [])].includes(path) || request.method !== 'POST') return new Response(null, { status: 404 });
     if (busy) return Response.json({ error: 'A measurement is already running' }, { status: 409 });
-    if (Number(request.headers.get('content-length')) > (path === '/garage/inventory' ? 24 * 1024 * 1024 : path === '/buildkit/inventory' ? 1_048_576 : path === '/consumers'||path==='/registry/inventory' ? 32_768 : 16_384)) return new Response(null, { status: 413 });
+    if (Number(request.headers.get('content-length')) > (path === '/garage/inventory' ? 24 * 1024 * 1024 : path === '/buildkit/platform-inputs' ? 8_388_608 : ['/buildkit/inventory', '/buildkit/manifests'].includes(path) ? 1_048_576 : ['/consumers','/process-owners','/registry/inventory'].includes(path) ? 32_768 : 16_384)) return new Response(null, { status: 413 });
     busy = true;
     try {
+      if (path === '/pod-workspace/inventory') return await workspaces!(request);
+      if (path === '/buildkit/platform-inputs') return await inputs!(request);
+      if (path === '/buildkit/manifests') return await manifests!(request);
+      if (path === '/process-owners') return await processOwnerHttp(request, options.procRoot ?? '/proc', options.timeoutMs ?? 10_000);
       if (path === '/garage/inventory') return await garageInventoryResponse(request, options.roots, options.timeoutMs ?? 30_000);
       if (path === '/buildkit/inventory') return await buildKitInventoryResponse(request, options.roots, options.timeoutMs ?? 30_000);
       if (path === '/consumers') return await consumerResponse(request, options.procRoot ?? '/proc', options.timeoutMs ?? 10_000);
