@@ -3510,3 +3510,13 @@ TaskRuntime七阶段仅受控停止端口，DevSession的原删除许可/回调f
 下一批 Session/停止依赖基础 21 源码路径：原连接 private finally 与受限停止/数字命令定向15／0、142断言；停止依赖、只观测原终结 Pod、资源 sealed 许可及恢复定向29／0、343断言。原业务等待时提前关闭 Session 的反例先红；新增测试两处夹具误用保留17／2红记录后修正，生产严格许可不放宽。精确427cc提交树叠加21路径类型0错，精确lint0；首次完整门禁接续，21源码及原Session接线/迁移锁依赖冻结，不重复在途门禁。资源 stop 要求全部前序消费者持久证明，观测不能产生资源 stop 回执、发起活动 Pod 删除或回收卷。正式清理数字通道、停止后完整快照/CAS、22方装配/SCM物理来源和原专用项目永久回收仍在进行。已停止本会话主动跨会话发送，使用共享锁和 STATE 交接。
 
 本批首次完整门禁已自然终止：5660 pass／143 环境 skip／3 fail、221177 断言、1116 文件、1610.61秒，21源码与2依赖首尾摘要保持。失败是并行观测在制 `completeRuntimeFacts.test.ts` 两个 quality 页预期正数而实际0，以及 `RuntimeSources.tsx` 的 `runtime.source.facts` 文案键；不修改该会话输出，不把该次完整门禁写绿。回执 `/private/tmp/cs-rfc037-session-stop-full-v1.json`。正式持久命令/清理回调、受限数字通道和停止后快照/CAS继续补齐后形成下一候选；本批尚未提交部署，实际环境仍427cc8c6，入口与producer OFF。
+
+
+### 2026-10-05 RFC-034 原页副本模块测试分层修正
+
+13532669 的五个正式 CI 作业通过，gate 因 164／232 新增行覆盖（70.7%）失败，原失败保留。真实 SQLite→Runner journal→PG／HTTP 的五个受控 transport 用例归到 modules/session/tests，原断言／预算不变；本机 5 pass／2471 assertions，原遗漏 68 行全命中、与原 CI 合并 232／232（100%）。生产代码不改，后继 exact-SHA 六项 CI 和本机部署仍待验证；开发 producer OFF、两 RFC In Progress，原共享全文逐字保留。
+
+
+2026-10-05 上条“迁入 modules/session/tests”的候选仅目标测试通过，实际结构检查 FAIL：agent-drivers 与 runtimes 的五项依赖方向违规；SOURCE v1 也正式 FAIL，全部失败留证。该候选未提交。当前使用 repository-structure.md 根布局已有的跨单元 tests/contracts；tierOf 对该路径归 module，整个原 e2e 测试文件逐字不变（SHA256 01f527a8fcf35d4be735028cc92cdffdb77897b67ce643f9b1a67e7e92884b74），没有删除防护，也不修改结构或覆盖门槛。新位置的目标运行、结构检查、有限功能复核和 exact-SHA CI 继续验证；原生产不变、CS 开发 producer OFF，两 RFC 仍开放。此处只基于当前文档追加更正，前文与并行输出全部保留。
+
+2026-10-05 跨单元 tests/contracts 的原五个用例实际 5 pass／0 fail／2471 assertions，3.90秒；精确 eslint 和 arch:check 均退出0，结构检查59单元／4429源码无违规。原文件逐字一致，测试分层由现有 tierOf 归 module，生产未改。此前错误目录的检查和 SOURCE v1 FAIL 保留；本候选有限功能复核、后继确切SHA六项CI及本机部署分别留证。

@@ -71,3 +71,15 @@ CS3447104d 六项确切 CI37307118380已全部成功，固定三镜像本机八�
 固定24TS的补跑完整check于13:45:53Z终态exit2，54.03秒，候选首尾字节一致。结构与lint通过；停止于其他会话未提交的packages/filesystem-metrics/buildkit/controlTransport.ts:32 TS2367，未进入整仓测试，不记全量通过。前轮检查因会话中断无终态，原日志和中断回执保留。复用此前31项定向和最后10项回归、精确24TS lint与类型通过，依development-rules §3提交自有文件，以新精确SHA hosted六项CI核对干净提交树。SOURCE25功能复核通过；源文件没有为新HEAD重跑或修改。
 
 AW c835052b5主CI37313859339已终态failure，原日志保留。实际失败为并行RFC370迁移后的旧路径与跨模块架构引用；本批原清理回归未再超时。旧定时布局失败已有后继full/WebKit/visual成功，今天full schedule37318548076正在运行。没有跨会话消息，foreign在制品保持。新CS精确CI、本机部署、生产采集与完整规模验收继续，两RFC保持In Progress。
+
+
+### 2026-10-05 原页副本测试分层与正式 CI 后继
+
+135326699ec7792577046b444a72d02c26111156 的正式 CI 37320693366 已终态 failure：static、unit、module、console、实机 e2e 五项 success，gate 的新增可执行行覆盖仅 164／232（70.7%），原失败日志保留。本片将本会话的 developmentNativePageCopy.test.ts 从 tests/e2e 移至 modules/session/tests：它使用真实 SQLite、Runner 原 journal、PostgreSQL 和 HTTP，但 transport 为受控 port，没有部署网关／浏览器，依仓库单一分层规则属于 module。仅更新相对 import 深度，原五个用例、全部断言和 20s／15s 预算原样保留，不修改生产代码或防护阈值。
+
+本机原数据库必需环境下，这五个用例 5 pass／0 fail／2471 assertions，约 3.75s。新增 module LCOV 命中原 CI 遗漏的全部 68 行，和原 CI 164 行合并覆盖同一未变化生产候选的 232／232 行（100%）。这项对拍不代替新 exact-SHA hosted CI；部署仍须新六项 success。AW 生产 before/final／历史修订、CS 托管 v2 consumer／producer、真实规模和正式页面验收继续，两 RFC 不关闭，CS 开发 producer 保持 OFF。
+
+
+2026-10-05 上条“迁入 modules/session/tests”的候选仅目标测试通过，实际结构检查 FAIL：agent-drivers 与 runtimes 的五项依赖方向违规；SOURCE v1 也正式 FAIL，全部失败留证。该候选未提交。当前使用 repository-structure.md 根布局已有的跨单元 tests/contracts；tierOf 对该路径归 module，整个原 e2e 测试文件逐字不变（SHA256 01f527a8fcf35d4be735028cc92cdffdb77897b67ce643f9b1a67e7e92884b74），没有删除防护，也不修改结构或覆盖门槛。新位置的目标运行、结构检查、有限功能复核和 exact-SHA CI 继续验证；原生产不变、CS 开发 producer OFF，两 RFC 仍开放。此处只基于当前文档追加更正，前文与并行输出全部保留。
+
+2026-10-05 跨单元 tests/contracts 的原五个用例实际 5 pass／0 fail／2471 assertions，3.90秒；精确 eslint 和 arch:check 均退出0，结构检查59单元／4429源码无违规。原文件逐字一致，测试分层由现有 tierOf 归 module，生产未改。此前错误目录的检查和 SOURCE v1 FAIL 保留；本候选有限功能复核、后继确切SHA六项CI及本机部署分别留证。
