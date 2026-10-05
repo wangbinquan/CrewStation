@@ -1,3 +1,9 @@
+## 2026-10-05 RFC-034 原启动意图用例版本修复
+
+00ef7dc0 的确切 CI 37293646743：static／console 已通过，unit 的原严格 nativeSource 用例仍将已允许显式选择的 version2 当作非法。只修正测试预言，保留 undefined 不默认选择与原 v1 roundtrip，增加明确 v2 roundtrip；非法版本改为3，v1/v2 的额外 path 字段均拒绝。原 hello/source v1 与投影前拒绝 v2 的生产行为不变，producer 仍关闭。
+
+原目标6用例通过，45断言，目标lint退出0。已完成16源候选的有限功能门与类型／PG／journal检查继续复用；未变更候选的全仓检查不重复，旧CI失败保持，后继确切SHA CI和本机部署继续核对。两个RFC、完整生产before/final／platform v2／seal以及100K Task／10M usage验收仍未完成。下方共享正文与并行输出全部保留。
+
 ## 2026-10-05 RFC-034 原 native v2 journal 与内部合同贯通
 
 SOURCE12与SOURCE5增量均独立有限PASS，16个源码／测试／设计路径，原journal FULL/WAL提交后分页ACK、完整parent／membership／EOF／replay及原数字帧保持。取消64MiB累计outbox截止，仅保留运输包界限；真实12002步骤／80层父链及超过64MiB原outbox到EOF，39 pass／0 fail／36989断言。原开发受理PG用例同一断言分别覆盖v1和v2，12 pass／0 fail／108断言。v2只是稳定原意图的明确版本选择，旧平台仍在任何写入／ACK前拒绝未实现v2，producer OFF。

@@ -31,3 +31,9 @@
 SOURCE12 有限功能门通过后，实际 typecheck v3 仍发现开发会话内部 DevelopmentUsageResolved 未同步 v2，不能记作其他会话错误。v4 继续指出平台组合端口仍为 v1。后继补齐 dev-session 的内部端口、公开 API 和 platform 的组合端口为显式 version 1|2；原 consumer 在投影前仍拒绝 v2，未启用 producer。原 owner 的冻结选择、namespace、独立 key、价格与元数据过滤回归同时覆盖 v1/v2：真实验收 PostgreSQL 12 pass、0 fail、108 断言。typecheck v5 实际退出0，四目标文件 lint 通过。
 
 本批唯一完整 check v1 在其他会话未提交的 Garage deletionPhysics 函数行数86>80处停止，候选未漂移；原失败保留，不称全仓通过，也不修改该外部文件。原 SOURCE12 的11代码／测试／设计文件保持，本文仅追加实际补验记录；精确发布必须包含上述四个必要类型／测试依赖。完整有效检查、确切 hosted CI 与本机部署分开核对，剩余 producer/platform v2/seal/全规模不关闭。
+
+## 原严格启动意图用例的版本补验
+
+00ef7dc05686ab1224c4dbf8390a8e9ed4e9e2f6 的确切 hosted CI（37293646743）中，unit 原 `nativeSource.test.ts` 仍将 `{version:2}` 判为非法，与本批已实现的显式、不可变 v2 选择不一致。后继只修正该用例的版本预言：undefined 继续不默认选择，v1 原 roundtrip 保留，明确验证 v2 roundtrip；非法版本改为3，v1/v2 的未知 path 字段都继续拒绝。原 hello/source v1、普通事件严格形状和投影前拒绝 v2 的保护不变，不启用 producer，不调整生产代码。原失败运行保留，目标用例、目标 lint 与后继确切提交 CI 的实际结果分别留证。
+
+本次原目标用例实际 6 pass、0 fail、45 次断言；原目标 eslint 退出0。没有重跑未变更的全仓检查，也不将目标结果当成新确切 SHA CI 通过。

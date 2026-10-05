@@ -49,6 +49,10 @@ test('source capability requires development numeric capability and omission pre
 });
 test('source selection is an optional strict immutable intent field, never a default from current hello', () => {
   const option = DevelopmentStartIntentSchema.shape.nativeSource;
-  expect(option.parse(undefined)).toBeUndefined(); expect(option.parse({ version: 1 })).toEqual({ version: 1 });
-  for (const value of [{}, { version: 2 }, { version: 1, path: '/private' }]) expect(option.safeParse(value).success).toBe(false);
+  expect(option.parse(undefined)).toBeUndefined();
+  expect(option.parse({ version: 1 })).toEqual({ version: 1 });
+  expect(option.parse({ version: 2 })).toEqual({ version: 2 });
+  for (const value of [{}, { version: 3 }, { version: 1, path: '/private' }, { version: 2, path: '/private' }]) {
+    expect(option.safeParse(value).success).toBe(false);
+  }
 });
