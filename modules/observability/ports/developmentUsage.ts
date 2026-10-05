@@ -6,7 +6,7 @@ import type { UsageLedgerTransaction, UsageTaskScope, UsageMeasurementRef } from
 
 export interface DevelopmentUsageResolved {
   registration: DevelopmentUsageRegistration; price: AcceptedExecutionPrice;
-  nativeSelection?: DevelopmentNativeSelection;
+  nativeSelection?: Omit<DevelopmentNativeSelection, 'version'> & { version: 1 | 2 };
 }
 /** Owner and Session are independent persisted sources; never compare an owner to itself. */
 export interface DevelopmentUsageSource {

@@ -1,3 +1,17 @@
+## 2026-10-05 RFC-034 原 native v2 journal 与内部合同贯通
+
+SOURCE12与SOURCE5增量均独立有限PASS，16个源码／测试／设计路径，原journal FULL/WAL提交后分页ACK、完整parent／membership／EOF／replay及原数字帧保持。取消64MiB累计outbox截止，仅保留运输包界限；真实12002步骤／80层父链及超过64MiB原outbox到EOF，39 pass／0 fail／36989断言。原开发受理PG用例同一断言分别覆盖v1和v2，12 pass／0 fail／108断言。v2只是稳定原意图的明确版本选择，旧平台仍在任何写入／ACK前拒绝未实现v2，producer OFF。
+
+本会话最初遗漏dev-session与platform三处version接口，真实typecheck v1～v4失败原样留证；修正后v5和控制台类型检查均通过，自有14TS精确lint通过，结构及contracts锁检查通过。16候选唯一完整check于09:38:07Z因其他会话未提交Garage deletion函数86>80在整仓lint停止，候选字节稳定；明确不是完整门通过。按development-rules §3保留其在制品，使用自有精确检查，并继续确切提交的hosted全仓CI。没有修改、收编或删除它们的源码。
+
+本批只发布16候选加完整共享STATE，以下全部RFC-036／037并行输出逐字保持。before/final、platform v2原来源与持久人口／历史seal、producer实际装配、100K Task／10M usage以及本次确切CI／本机部署继续，RFC保持In Progress。前7b07ad8d确切六项CI与八组件部署证据保持，不替代本候选的新验收。
+
+## 2026-10-05 RFC-037 SCM 完整范围与物理工厂固定候选
+
+原完整文件 prefix、Gitaly 留存目录出生、按原UID全线程消费者、原生在途/后台排空已接入 SCM 工厂；原材料在既有不可变jsonb中持久保存，公开盘点只含摘要。正常项目销毁及原独占无引用LFS原生清理、OID替换保护和排空后再盘点已接；未创建仓库的项目空范围阻塞已先红后修。实际原 GitLab HTTP/SDK/工厂只读验证11类/31身份通过，原项目仍存在故正确 waiting；原容器Linux临时消费者8组、完整prefix14组通过。SDK/host90/0、653断言，全部SCM101/0、670断言，四层静态及host类型通过。
+
+当前 main与新origin同步7b07ad8d，保留并行开发与全部共享STATE历史，没有跨会话消息。固定本批源/测试后只跑一次完整门禁，接续精确提交、六项CI；创建弹窗已上线，永久删除入口未开放，完整Garage/镜像发布/剩余兼容/22方生产安装和管理员双确认原项目回收继续，目标active。详见[原生清理证据](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/scm-native-reclamation.md)。下方全部共享及历史逐字保持。
+
 ## 2026-10-05 RFC-034 原生 owner 持久分页与根出生回执
 
 原 runtime driver 的读取器新增中立 owner 分页泵：每一页的原准入、身份、顺序、游标、累计计数、digest、原生 EOF 与 source watermark 都在持久回执核对后才释放。原 SQLite 快照中的 rootCreatedAt 传到原 owner 准入；实际页边界只约束传输，原树、层数、步骤与总记录数不设截断。快照关闭或 owner 失败仍记录中断，不把中断扫描当完成；原 source 契约、数据库迁移、journal 与正式 producer 不在本片改变。

@@ -13,7 +13,7 @@ const context = { runtimeTaskId: TaskIdSchema.parse(resource(3)), workspaceTaskI
 const directories: string[] = [], journals: DevelopmentUsageJournal[] = [];
 const at = '2026-09-30T00:00:00.000Z';
 const capture: RunnerUsageCapture = { version: 1, measurements: [], diagnostics: ['not-measured'] };
-const limits = { eventBytes: 4096, pageBytes: 8192, spoolBytes: 65536 };
+const limits = { eventBytes: 4096, pageBytes: 8192 };
 async function directory() { const path = await mkdtemp(join(tmpdir(), 'cs-development-usage-')); directories.push(path); return path; }
 function open(path: string, incarnation = randomUUID(), bounds: DevelopmentJournalLimits = limits, owner = context) { const journal = new DevelopmentUsageJournal(path, owner, incarnation, bounds); journals.push(journal); return journal; }
 function admission(journal: DevelopmentUsageJournal): DevelopmentUsageAdmission {
@@ -73,8 +73,8 @@ describe('RFC-034 development numeric journal', () => {
     expect(journal.read(original.key, 8).events.map((event) => event.sequence)).toEqual([9, 10]);
     expect(() => journal.acknowledge(original.key, 11)).toThrow();
   });
-  test('spool/response byte limits are explicit partial status, not ordinary execution failures', async () => {
-    const journal = open(await directory(), randomUUID(), { eventBytes: 4096, pageBytes: 8192, spoolBytes: 1 }), original = admission(journal); journal.reserve(original);
+  test('per-frame/response byte limits are explicit partial status, not ordinary execution failures', async () => {
+    const journal = open(await directory(), randomUUID(), { eventBytes: 24, pageBytes: 8192 }), original = admission(journal); journal.reserve(original);
     expect(() => journal.capture(original.key, capture, at)).not.toThrow();
     expect(journal.info(original.key).receipt).toMatchObject({ interruption: 'journal-limit', lastSequence: 0, finalThrough: null });
     journal.finish(original.key, 'completed');
@@ -126,7 +126,7 @@ describe('RFC-034 development numeric journal', () => {
     expect(journal.acknowledge(original.key, 1).acknowledgedSequence).toBe(1);
   });
   test('the page byte bound splits a tail without deleting, skipping or overconfirming it', async () => {
-    const journal = open(await directory(), randomUUID(), { eventBytes: 700, pageBytes: 700, spoolBytes: 65536 }), original = admission(journal); journal.reserve(original);
+    const journal = open(await directory(), randomUUID(), { eventBytes: 700, pageBytes: 700 }), original = admission(journal); journal.reserve(original);
     for (let n = 0; n < 5; n++) journal.capture(original.key, capture, at);
     const page = journal.read(original.key, 0);
     expect(page.events.length).toBeGreaterThan(0); expect(page.events.length).toBeLessThan(5);
@@ -141,7 +141,7 @@ describe('RFC-034 development numeric journal', () => {
     expect(() => journal.read(original.key, 0, 6)).toThrow('读取范围');
     const storage = new Database(join(path, 'executions.sqlite')); storage.exec('DELETE FROM events'); storage.close();
     expect(() => journal.read(original.key, 0)).toThrow('无法读取');
-    expect(() => open(path, randomUUID(), { eventBytes: 10, pageBytes: 1, spoolBytes: 1 })).toThrow('配置无效');
+    expect(() => open(path, randomUUID(), { eventBytes: 10, pageBytes: 1 })).toThrow('配置无效');
   });
 
   test('a rejected finish write keeps the known terminal in this process while restart remains unknown', async () => {

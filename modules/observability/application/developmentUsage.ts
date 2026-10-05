@@ -24,6 +24,7 @@ export function prepareDevelopmentUsagePage(raw: DevelopmentUsagePage, owner: De
       owner.price.profile?.id !== registration.profileId || owner.price.profile.revision !== registration.profileRevision ||
       !Number.isSafeInteger(owner.price.priceBookRevision) || owner.price.priceBookRevision < 0 || !Number.isFinite(Date.parse(owner.price.acceptedAt))) throw precondition('开发来源必须沿用原执行的档位与人民币受理');
   const choice = owner.nativeSelection;
+  if (choice?.version === 2) throw precondition('原生 v2 尚未装配平台投影，不能确认或丢弃原数字页');
   if (choice && (choice.version !== 1 || !choice.expectedNamespace || choice.expectedNamespace.length > 512)) throw precondition('开发原生来源原选择无效');
   const streamSourceId = developmentStreamId(registration), context: DevelopmentNativeContext = {
     registration, streamSourceId, ...(choice ? { selection: { version: choice.version, expectedNamespace: choice.expectedNamespace } } : {}),
@@ -31,6 +32,7 @@ export function prepareDevelopmentUsagePage(raw: DevelopmentUsagePage, owner: De
   const events: UsageSourcePage['events'] = [], models: DevelopmentModelEvidence[] = [];
   for (const event of source.events) {
     const frame = event.capture;
+    if (frame.version !== 1) throw precondition('原生 v2 尚未装配平台投影，不能确认或丢弃原数字页');
     if (frame.nativeSource && !choice || choice && [frame.nativeProof?.lineageKey, frame.nativeBaseline?.lineageKey].some((ns) => ns !== undefined && ns !== choice.expectedNamespace)) throw conflict('开发原生来源与冻结选择不符');
     for (const [index, { actualModel, ...rawMeasurement }] of frame.measurements.entries()) {
       const sourceId = developmentCaptureSourceId(streamSourceId, rawMeasurement.scope?.turn ?? null, rawMeasurement.scope?.turnIndex ?? null);
@@ -60,7 +62,10 @@ export function developmentUsageIngestion(store: DevelopmentUsageLedgerStore) {
       await tx.developmentModel(page.models[index]!);
       if (await appendUsageEvidence(tx, event)) applied++;
     }
-    for (const event of page.source.events) await tx.developmentCapture(page.context, event.capture);
+    for (const event of page.source.events) {
+      if (event.capture.version !== 1) throw precondition('原生 v2 尚未装配平台投影');
+      await tx.developmentCapture(page.context, event.capture);
+    }
     await tx.advance(page.nextCursor, page.fingerprint);
     return { cursor: page.nextCursor, applied, duplicate: page.events.length - applied };
   });

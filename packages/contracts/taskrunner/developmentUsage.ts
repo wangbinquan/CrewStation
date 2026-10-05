@@ -5,9 +5,11 @@ import { DevelopmentUsageIdentitySchema } from '../api/observability/usageLedger
 import { AgentPermissionSchema } from '../manifest/tasks';
 import { LaunchSpecSchema } from './launch';
 import { DevelopmentRunnerUsageCaptureSchema } from './development/nativeSource';
+import { DevelopmentNativePageCaptureSchema } from './development/nativePages';
+export * from './development/nativePages';
 
 const sequence = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
-export const DEVELOPMENT_USAGE_LIMITS = { capturesPerPage: 5, pageBytes: 1024 * 1024, spoolBytes: 64 * 1024 * 1024 } as const;
+export const DEVELOPMENT_USAGE_LIMITS = { capturesPerPage: 5, pageBytes: 1024 * 1024 } as const;
 export const DEVELOPMENT_USAGE_DIRECTORY = '/run/crewstation/development-usage';
 export const DEVELOPMENT_USAGE_BINDING_DIRECTORY = '/run/crewstation/development-usage-binding';
 /** Explicit new-execution layout selection; omission preserves every legacy render. */
@@ -39,7 +41,7 @@ export const DevelopmentStartIntentSchema = z.strictObject({
   initialPrompt: z.string().nullable(), cwd: z.string().nullable(), resumeSessionId: z.string().nullable(), systemPrompt: z.string().nullable(),
   mcp: z.array(z.strictObject({ name: z.string().min(1), url: z.url() })).max(100),
   nativeUsageLineageKey: z.string().min(1).max(512),
-  nativeSource: z.strictObject({ version: z.literal(1) }).optional(),
+  nativeSource: z.discriminatedUnion('version', [z.strictObject({ version: z.literal(1) }), z.strictObject({ version: z.literal(2) })]).optional(),
 });
 export const DevelopmentUsageKeySchema = z.strictObject({
   executionId: ResourceIdSchema, journalId: z.uuid(), incarnation: z.uuid(), payloadDigest: z.string().regex(/^[a-f0-9]{64}$/),
@@ -71,7 +73,10 @@ export const DevelopmentUsageStopReceiptSchema = z.strictObject({
 export const DevelopmentUsageInfoSchema = z.strictObject({
   version: z.literal(1), runtimeTaskId: TaskIdSchema, podUid: z.string().min(1).max(128), journalId: z.uuid(), incarnation: z.uuid(), receipt: DevelopmentUsageReceiptSchema.nullable(),
 });
-export const DevelopmentUsageEventSchema = z.strictObject({ sequence: sequence.refine((value) => value > 0), occurredAt: z.iso.datetime().max(64), capture: DevelopmentRunnerUsageCaptureSchema });
+export const DevelopmentUsageEventSchema = z.strictObject({ sequence: sequence.refine((value) => value > 0), occurredAt: z.iso.datetime().max(64), capture: z.union([DevelopmentRunnerUsageCaptureSchema, DevelopmentNativePageCaptureSchema]) }).superRefine((event, ctx) => {
+  if (event.capture.version === 2 && event.sequence !== event.capture.nativeSource.sequence)
+    ctx.addIssue({ code: 'custom', message: '原生帧序号必须等于原日志数字序号' });
+});
 export const DevelopmentUsagePageSchema = z.strictObject({ key: DevelopmentUsageKeySchema, after: sequence, through: sequence, events: z.array(DevelopmentUsageEventSchema).max(DEVELOPMENT_USAGE_LIMITS.capturesPerPage) }).superRefine((value, ctx) => {
   if (new TextEncoder().encode(JSON.stringify(value)).byteLength > DEVELOPMENT_USAGE_LIMITS.pageBytes) ctx.addIssue({ code: 'custom', message: '数值页超过字节上限' });
   if (value.through !== value.after + value.events.length || value.events.some((event, index) => event.sequence !== value.after + index + 1)) ctx.addIssue({ code: 'custom', message: '数值页必须连续，不能跳过记录' });

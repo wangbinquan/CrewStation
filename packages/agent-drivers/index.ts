@@ -109,3 +109,7 @@ export { compareSemver, extractVersion } from './process/semver';
 export { DEFAULT_VERSION_PROBE_TIMEOUT_MS, spawnVersionProbe } from './process/versionProbe';
 export { MAX_STDERR_TAIL_CHARS, createBoundedTail } from './process/boundedTail';
 export { RUN_DIR_PREFIX, createRunDirectory, defaultRunDir } from './process/runDirectory';
+
+export type { NativeUsagePassOwner, PersistableNativeUsagePassReader } from './drivers/usage/nativeUsageOwner';
+export { openNativeUsagePass } from './drivers/usage/nativeUsagePass';
+export { persistNativeUsagePass } from './drivers/usage/persistNativeUsagePass';

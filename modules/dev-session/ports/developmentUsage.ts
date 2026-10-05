@@ -36,7 +36,7 @@ export interface DevelopmentUsageOwnerStore {
 export interface DevelopmentUsageResolved {
   registration: DevelopmentUsageRegistration;
   price: DevelopmentAcceptedPrice;
-  nativeSelection?: { version: 1; expectedNamespace: string };
+  nativeSelection?: { version: 1 | 2; expectedNamespace: string };
 }
 /** Closing this admission is NOT authorization to delete a Pod: Session closure is still required. */
 export interface DevelopmentUsageOwner {

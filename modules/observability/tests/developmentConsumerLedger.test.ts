@@ -246,3 +246,18 @@ describe.skipIf(!available)('RFC-034 development consumer private PG ledger', ()
     expect(rows[0]!.nativeKey).toStartWith('development-pending:');
   });
 });
+
+// The new journal is intentionally not selected by a v1 platform consumer.
+// Preserve the original numeric ledger and cursor until the actual v2 projection is assembled.
+test.skipIf(!available)('an explicit v2 admission cannot be acknowledged or projected by the legacy platform', async () => {
+  const f = await fixture(), frame = numeric('original-held-number', '11'), raw = {
+    key: f.registration.key, after: 0, through: 1, events: [{ sequence: 1, occurredAt: at, capture: frame }],
+  };
+  const before = await f.ledger.snapshot(f.scope, { limit: 20 }, Date.parse(at), 0);
+  expect(() => prepareDevelopmentUsagePage(raw, { ...f.owner,
+    nativeSelection: { version: 2, expectedNamespace: 'frozen-native' } }, f.registration, f.owner.price))
+    .toThrow('原生 v2 尚未装配平台投影，不能确认或丢弃原数字页');
+  const { snapshotId: beforeId, ...beforeLedger } = before;
+  const { snapshotId: afterId, ...afterLedger } = await f.ledger.snapshot(f.scope, { limit: 20 }, Date.parse(at), 0);
+  expect(afterId).not.toBe(beforeId); expect(afterLedger).toEqual(beforeLedger);
+});

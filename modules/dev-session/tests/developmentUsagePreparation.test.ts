@@ -102,12 +102,12 @@ describe.skipIf(!available)('开发 owner 稳定意图与人民币原受理', ()
     await expect(f.owner.bind(f.child.id, { ...f.info, podUid: 'replaced-pod' })).rejects.toMatchObject({ kind: 'conflict' }); expect(await f.owner.get(f.child.id)).toEqual(bound);
   });
 
-  test('consumer resolves only the originally selected native source without private intent or current configuration', async () => {
+  test.each([1, 2] as const)('consumer resolves only the originally selected native v%i source without private intent or current configuration', async (version) => {
     const f = await developmentUsageFixture(database.db);
-    const preparation = { ...f.preparation, intent: { ...f.preparation.intent, nativeSource: { version: 1 as const } } };
+    const preparation = { ...f.preparation, intent: { ...f.preparation.intent, nativeSource: { version } } };
     const prepared = await f.owner.prepare(preparation), bound = await f.owner.bind(f.child.id, f.info);
     const expected = { registration: bound.binding!, price: prepared.price,
-      nativeSelection: { version: 1 as const, expectedNamespace: preparation.intent.nativeUsageLineageKey } };
+      nativeSelection: { version, expectedNamespace: preparation.intent.nativeUsageLineageKey } };
     // A consumer must verify the frozen choice before trusting any Runner source frame.
     expect(await f.owner.resolve(bound.binding!.key)).toEqual(expected);
     f.controls.priceRevision = 99;

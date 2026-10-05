@@ -1,4 +1,7 @@
 import type { Database } from 'bun:sqlite';
+import type { NativeUsagePassOwner } from '@crewstation/agent-drivers';
+import type { DevelopmentNativePreparation } from '@crewstation/contracts';
+import { DevelopmentNativeJournal } from './developmentNativeJournal';
 import { DevelopmentStartControls } from './developmentStartControls';
 import { developmentIntentDigest } from './developmentStartIntent';
 import { DevelopmentUsageStopReceiptSchema, type DevelopmentUsageStopReceipt } from '@crewstation/contracts';
@@ -9,26 +12,37 @@ import { openJournalStorage } from '../exec/journalStorage';
 import { bindDevelopmentJournal } from './developmentJournalBinding';
 
 export interface DevelopmentJournalContext { runtimeTaskId: TaskId; workspaceTaskId: TaskId; projectId: ProjectId; podUid: string }
-export interface DevelopmentJournalLimits { eventBytes: number; pageBytes: number; spoolBytes: number }
+export interface DevelopmentJournalLimits { eventBytes: number; pageBytes: number }
 interface Row { execution_id: string; incarnation: string; payload_digest: string; phase: DevelopmentUsageReceipt['phase']; last_sequence: number; acknowledged_sequence: number; result: string | null; spool_bytes: number; header: string }
 interface EventRow { sequence: number; occurred_at: string; body: string }
 function invalid(message: string): never { throw new RunnerCommandError('development_usage_invalid', message); }
-const defaultLimits: DevelopmentJournalLimits = { eventBytes: DEVELOPMENT_USAGE_LIMITS.pageBytes, pageBytes: DEVELOPMENT_USAGE_LIMITS.pageBytes, spoolBytes: DEVELOPMENT_USAGE_LIMITS.spoolBytes };
+const defaultLimits: DevelopmentJournalLimits = { eventBytes: DEVELOPMENT_USAGE_LIMITS.pageBytes, pageBytes: DEVELOPMENT_USAGE_LIMITS.pageBytes };
 
 /** Numeric evidence has its own FULL/WAL store and cursor; ordinary text never enters it. */
 export class DevelopmentUsageJournal {
   private readonly db: Database;
   private readonly trusted = new Map<string, DevelopmentUsageReceipt>();
   private readonly starts: DevelopmentStartControls;
+  private readonly native: DevelopmentNativeJournal;
   readonly journalId: string;
   constructor(directory: string, readonly context: DevelopmentJournalContext, readonly incarnation: string, private readonly limits = defaultLimits) {
-    if (!context.podUid || context.podUid.length > 128 || Object.values(limits).some((n) => !Number.isSafeInteger(n) || n < 1) || limits.eventBytes > limits.pageBytes || limits.pageBytes > DEVELOPMENT_USAGE_LIMITS.pageBytes || limits.spoolBytes > DEVELOPMENT_USAGE_LIMITS.spoolBytes) invalid('开发日志配置无效');
+    if (!context.podUid || context.podUid.length > 128 || Object.values(limits).some((n) => !Number.isSafeInteger(n) || n < 1) || limits.eventBytes > limits.pageBytes || limits.pageBytes > DEVELOPMENT_USAGE_LIMITS.pageBytes) invalid('开发日志配置无效');
     TaskIdSchema.parse(context.runtimeTaskId); TaskIdSchema.parse(context.workspaceTaskId); ProjectIdSchema.parse(context.projectId); DevelopmentUsageKeySchema.shape.incarnation.parse(incarnation);
     this.db = openJournalStorage(directory);
     try {
       this.journalId = bindDevelopmentJournal(this.db, directory, context.podUid);
       this.db.exec('CREATE TABLE IF NOT EXISTS development_admissions (execution_id TEXT PRIMARY KEY, header TEXT NOT NULL);');
       this.starts = new DevelopmentStartControls(this.db);
+      this.native = new DevelopmentNativeJournal(this.db, { incarnation, journalId: this.journalId, podUid: context.podUid,
+        eventBytes: limits.eventBytes, pageBytes: limits.pageBytes,
+        original: (key) => {
+          if (bindDevelopmentJournal(this.db, directory, context.podUid) !== this.journalId) invalid('原生 journal marker 与原受理不同');
+          const original = this.require(key), known = this.trusted.get(key.executionId) ?? this.receipt(original);
+          return { header: original.header, incarnation: original.incarnation, phase: known.phase,
+            interruption: known.interruption, lastSequence: original.last_sequence, acknowledgedSequence: original.acknowledged_sequence };
+        },
+        committed: (key) => { this.remember(this.receipt(this.require(key))); },
+      });
       const row = this.row(context.runtimeTaskId);
       const admitted = this.db.query<{ count: number }, []>('SELECT count(*) AS count FROM executions').get()!.count;
       if (admitted > 1 || (admitted === 1 && !row)) throw new RunnerCommandError('development_journal_lost', '已受理开发日志的身份头或执行归属丢失');
@@ -77,6 +91,7 @@ export class DevelopmentUsageJournal {
   private admission(raw: DevelopmentUsageAdmission): DevelopmentUsageAdmission {
     const admission = DevelopmentUsageAdmissionSchema.parse(raw);
     this.key(admission.key);
+    if (admission.intent.nativeSource?.version === 2 && developmentIntentDigest(admission) !== admission.key.payloadDigest) invalid('原生 v2 受理摘要与原启动意图不同');
     if (admission.intent.identity.projectId !== this.context.projectId || admission.intent.identity.taskId !== this.context.workspaceTaskId) invalid('开发受理不属于当前项目和父工作区');
     return admission;
   }
@@ -85,7 +100,7 @@ export class DevelopmentUsageJournal {
     const identity = admission.intent.identity, prior = this.row(identity.executionId);
     if (prior) { this.match(prior, admission.key); return { created: false, receipt: this.receipt(prior) }; }
     if (admission.key.incarnation !== this.incarnation) invalid('新受理必须绑定当前 Runner 实例');
-    const header = JSON.stringify({ identity, profileId: admission.intent.profileId, profileRevision: admission.intent.profileRevision, ...(admission.intent.nativeSource ? { nativeSource: admission.intent.nativeSource } : {}) });
+    const header = JSON.stringify({ identity, profileId: admission.intent.profileId, profileRevision: admission.intent.profileRevision, ...(admission.intent.nativeSource ? { nativeSource: admission.intent.nativeSource } : {}), ...(admission.intent.nativeSource?.version === 2 ? { nativeAdmission: { lineageKey: admission.intent.nativeUsageLineageKey, resumeSessionId: admission.intent.resumeSessionId } } : {}) });
     this.db.query('INSERT INTO executions(execution_id,attempt,payload_digest,incarnation,phase) VALUES(?,?,?,?,?)').run(identity.executionId, 1, admission.key.payloadDigest, this.incarnation, 'registered');
     this.db.query('INSERT INTO development_admissions(execution_id,header) VALUES(?,?)').run(identity.executionId, header);
     this.starts.register(identity.executionId);
@@ -124,8 +139,9 @@ export class DevelopmentUsageJournal {
       this.db.transaction(() => {
         const row = this.require(key);
         if (row.incarnation !== this.incarnation || !['registered', 'running'].includes(row.phase)) invalid('不能向旧实例或已结束执行追加数值');
+        if (parsed.data.capture.version !== 1) throw new RunnerCommandError('development_usage_invalid_capture', '原生 v2 帧只能由持久 owner 同事务追加');
         if (parsed.data.capture.nativeSource && JSON.parse(row.header).nativeSource?.version !== 1) throw new RunnerCommandError('development_usage_invalid_capture', '原意图未选择开发实际来源');
-        if (bytes > this.limits.eventBytes || row.spool_bytes + bytes > this.limits.spoolBytes || Buffer.byteLength(JSON.stringify({ key, after: row.last_sequence, through: row.last_sequence + 1, events: [parsed.data] })) > this.limits.pageBytes) throw new RunnerCommandError('development_usage_limit', '开发数值日志达到上限');
+        if (bytes > this.limits.eventBytes || Buffer.byteLength(JSON.stringify({ key, after: row.last_sequence, through: row.last_sequence + 1, events: [parsed.data] })) > this.limits.pageBytes) throw new RunnerCommandError('development_usage_limit', '开发数值日志达到上限');
         this.db.query('INSERT INTO events(execution_id,sequence,occurred_at,body,bytes) VALUES(?,?,?,?,?)').run(key.executionId, row.last_sequence + 1, occurredAt, body, bytes);
         this.db.query('UPDATE executions SET last_sequence=last_sequence+1,spool_bytes=spool_bytes+? WHERE execution_id=?').run(bytes, key.executionId);
       }).immediate();
@@ -191,6 +207,10 @@ export class DevelopmentUsageJournal {
     return this.remember(this.receipt(this.row(key.executionId)!));
   }
 
+  nativeOwner(key: DevelopmentUsageKey, prepared: DevelopmentNativePreparation): NativeUsagePassOwner {
+    this.key(key); return this.native.owner(key, prepared);
+  }
+
   close(): void { this.db.close(); }
   private key(raw: DevelopmentUsageKey): void {
     const key = DevelopmentUsageKeySchema.parse(raw);
@@ -214,7 +234,7 @@ export class DevelopmentUsageJournal {
   private receipt(row: Row): DevelopmentUsageReceipt {
     const result = row.result ? JSON.parse(row.result) as { result: DevelopmentUsageReceipt['result']; interruption: DevelopmentUsageInterruption | null } : { result: null, interruption: null };
     const interrupted = result.interruption ?? (row.phase !== 'finished' && row.incarnation !== this.incarnation ? 'runner-restarted' : null);
-    const { nativeSource: _nativeSource, ...header } = JSON.parse(row.header) as Pick<DevelopmentUsageReceipt, 'identity' | 'profileId' | 'profileRevision'> & { nativeSource?: { version: 1 } };
+    const { nativeSource: _nativeSource, nativeAdmission: _nativeAdmission, ...header } = JSON.parse(row.header) as Pick<DevelopmentUsageReceipt, 'identity' | 'profileId' | 'profileRevision'> & { nativeSource?: { version: 1 | 2 }; nativeAdmission?: { lineageKey: string; resumeSessionId: string | null } };
     if (header.identity.projectId !== this.context.projectId || header.identity.taskId !== this.context.workspaceTaskId || header.identity.executionId !== this.context.runtimeTaskId) throw new RunnerCommandError('development_journal_lost', '开发日志已绑定不同环境归属');
     return DevelopmentUsageReceiptSchema.parse({ ...header, key: { executionId: row.execution_id, journalId: this.journalId, incarnation: row.incarnation, payloadDigest: row.payload_digest }, podUid: this.context.podUid,
       phase: row.phase !== 'finished' && row.incarnation !== this.incarnation ? 'unknown' : row.phase,
