@@ -14,6 +14,15 @@ export { createGitLabStorageHandler } from './native/storage/server';
 export { GitLabStorageRequestSchema, GitLabStorageRootsSchema, GitLabStorageInventorySchema } from './native/storage/protocol';
 export type { GitLabStorageRequest, GitLabStorageRoots, GitLabStorageInventory } from './native/storage/protocol';
 export type { GitLabStorageObserver } from './native/storage/server';
+export { createGitLabFenceClient, parseGitLabFenceOutput } from './native/fence/client';
+export { createGitLabFenceHandler } from './native/fence/server';
+export { GitLabFenceRequestSchema, GitLabFenceReceiptSchema } from './native/fence/protocol';
+export type { GitLabFenceRequest, GitLabFenceReceipt } from './native/fence/protocol';
+export type { GitLabFenceObserver } from './native/fence/server';
+export { createGitLabStorageRemovalClient, parseGitLabStorageRemovalOutput, GitLabStorageRemovalRequestSchema, GitLabStorageRemovalReceiptSchema } from './native/storage/removal';
+export type { GitLabStorageRemovalRequest, GitLabStorageRemovalReceipt } from './native/storage/removal';
+export { createGitLabStorageRemovalHandler } from './native/storage/removalServer';
+export type { GitLabStorageRemovalObserver } from './native/storage/removalServer';
 export type {
   AddWebhookInput, CreateProjectAccessTokenInput, CreateProjectInput, CreateTagInput, DeleteProjectOptions, GitLabAccessLevel, GitLabAccessToken, GitLabBranch,
   GitLabCommit, GitLabCompareResult, GitLabCreatedAccessToken, GitLabGroup, GitLabProject, GitLabProjectArchivalState, GitLabProjectDeletionState, GitLabProjectRef, GitLabProtectedTag, GitLabRepositoryStorage,

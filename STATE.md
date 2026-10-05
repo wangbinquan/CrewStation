@@ -1,3 +1,11 @@
+## 2026-10-05 RFC-037 原生封写与实际文件清理候选
+
+前批 c9a4c71a05bbb04d4195157dd70ac92a768ec4a3 已真实提交推送，六项精确 CI 成功，八组件部署 Ready，248 迁移安装校验一致；创建弹窗已上线。旧 Git 执行限制已解除，当前 main／origin 同步，索引空，其他会话在制品保持，无跨会话消息。
+
+本批已加入原 GitLab 固定管理员的正常删除封写、完整专属机器人／令牌核对与撤销、流水线停止，以及原描述符清单实际 unlink／rmdir 和重放；许可与独立停止校验均必需。SDK／host 68／0、467断言、静态四层通过；原当前身份只读验证、独立执行逻辑10组、原 Linux临时目录实际删除12组通过，原项目保持。单次固定候选完整检查已通过：5888／143环境skip／0 fail、223503断言、1170文件、2210.00秒；所有19条候选指纹保持。按精确清单发布并核对六项CI继续。详见[原生清理证据](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/scm-native-reclamation.md)。
+
+完整目标不缩减：仍接 SCM 完整物理 owner、Garage、镜像发布、剩余执行兼容、全部生产装配及管理员二次确认完整回收。两个底层回执的完整物理标志均 false，永久删除入口／普通 producer OFF，不声明 RFC完成。下方全部共享及历史正文原样保留。
+
 ## 2026-10-05 RFC-037 提交推送接续
 
 用户再次明确批准提交推送后，Git fetch 已实际成功；main 与新获取 origin/main 同为 a8b5e83bf43cde90c0bfccaca04f485a6eec9895，共享索引空，无跨会话消息。前序 Git 执行拒绝不再作为当前发布前提，历史记录保留。原 GitLab 留存文件观察已接固定 host／私有 handler／SDK，不加载 Rails／Project；实际原实例仓库14文件26986字节、Wiki3文件87字节，指定 design／trace 明确缺失。aarch64 打开标志的实际失败已修正，原 embedded Ruby 独立临时目录的10组正负例通过，没有改动原项目。详见[原文件观察证据](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/scm-retained-files.md)。
