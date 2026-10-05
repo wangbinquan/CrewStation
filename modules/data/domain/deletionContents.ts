@@ -37,6 +37,9 @@ export const DATA_CONTENT: readonly DataContentTable[] = [
   { table: 'task_input_grants', keys: ['id'], from: 'data.task_input_grants r LEFT JOIN data.task_object_inputs p ON p.task_id=r.task_id', project: "p.body->>'projectId'", service: "p.body->>'serviceId'", task: 'r.task_id', origin: 'input-grant', physical: true, invalid: "p.task_id IS NULL OR r.body->>'taskId' IS DISTINCT FROM r.task_id" },
 ];
 export const DATA_SHARED = ['object_backends','object_plans','object_credential_rotations','object_storage_freezes','object_backups','object_transfer_stops','storage_contract','resource_identity_aliases'] as const;
+/** Every platform byte request holds this shared admission. Native exclusive
+ * block reclamation closes it briefly, including foreign-project requests. */
+export const DATA_NATIVE_BLOCK_ADMISSION = 'data.native-block-admission';
 /** Children are removed before parents; no shared owner record is deleted. */
 export const DATA_REMOVAL = ['archive_helper_closures','archive_file_results','archive_binding_revisions','archive_helper_grants','task_input_grants','task_object_inputs','object_references','object_read_transfers','object_mutations','object_work','object_upload_attempts','objects','object_uploads','archive_plans','finalization_bindings','object_write_control','resource_allocations','object_project_policies','task_bindings','resources','object_spaces'] as const;
 
@@ -45,7 +48,9 @@ export const DataDeletionScopeSchema = z.object({
   contents: z.array(z.object({ table: z.enum(DATA_REMOVAL), key: z.string().min(1), digest }).strict()),
   origins: z.array(z.object({ kind: z.string().min(1), key: z.string().min(1), id: z.string().min(1), projectId: ProjectIdSchema }).strict()),
   locations: z.array(z.object({ backendId: z.string().min(1), placementRevision: z.number().int().positive(), key: z.string().min(1), size: count }).strict()),
+  placements: z.array(z.object({ spaceId: z.uuid(), backendId: z.uuid(), placementRevision: z.number().int().positive() }).strict()).optional(),
   backendReleases: z.array(z.object({ backendId: z.string().min(1), bytes: count, transfers: count }).strict()),
   objectsPresent: z.boolean(), digest, count, compacted: z.boolean(),
+  nativeHistory: z.object({ version: z.literal(1), identity: digest, digest, body: z.json() }).strict().optional(),
 }).strict();
 export const DataDeletionProofsSchema = z.partialRecord(z.enum(PROJECT_DELETION_PHASES), ProjectDeletionEvidenceSchema);

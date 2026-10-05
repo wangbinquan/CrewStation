@@ -1,6 +1,8 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Database, Transaction } from './databaseTypes';
 import { sql } from 'drizzle-orm';
+import { captureExclusiveAuthority } from './exclusiveAuthority';
+import type { DatabaseAdmissionAuthority } from './exclusiveAuthority';
 
 interface Scope { readonly database: Database; readonly key: string; readonly keys: readonly string[]; readonly backend: number; readonly transaction: Transaction; active: boolean }
 const scopes = new AsyncLocalStorage<Scope>();
@@ -93,4 +95,21 @@ export function withExclusiveDatabaseAdmission<T>(db: Database, key: string, wor
     await transaction.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${key},0))`);
     return work(transaction);
   });
+}
+
+/** External native effects require fresh original-lock checks throughout their
+ * callback. Driver rejection invalidates this authority immediately, while the
+ * native owner remains responsible for durably recording its actual exit. */
+export function withExclusiveDatabaseAdmissionAuthority<T>(db: Database, key: string, work: (authority: DatabaseAdmissionAuthority) => Promise<T>): Promise<T> {
+  const current = scopes.getStore();
+  if (!key.length || current?.active && current.database === db && current.keys.includes(key)) throw Error('Cannot obtain an exclusive authority inside an active shared admission');
+  const guard = guards.get(db); if (!guard) throw new Error('Database admission requires connectDatabase');
+  let active = true;
+  return admissionTransaction(guard(), async transaction => {
+    await transaction.execute(sql`SET LOCAL lock_timeout = '30s'`);
+    await transaction.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${key},0))`);
+    const authority = await captureExclusiveAuthority(db, transaction, key, () => active);
+    try { await authority.assertActive(); return await work(authority); }
+    finally { active = false; }
+  }, () => { active = false; });
 }

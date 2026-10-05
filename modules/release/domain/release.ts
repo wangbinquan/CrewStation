@@ -86,17 +86,21 @@ const releaseContentSchema = z.object({
   rows: z.array(z.object({ table: z.string().min(1), key: z.string().min(1), identity: deletionHash }).strict()),
   consumers: z.array(z.object({ kind: z.enum(['release', 'slot', 'handoff', 'maintenance', 'callback']), id: z.string().min(1), serviceId: ResourceIdSchema, identity: deletionHash, state: z.string().min(1), aliases: z.array(z.string().min(1)) }).strict()),
   callbacks: z.array(ReleaseCallbackRecordSchema),
+  /** Original registered release destinations, independent of the current slot. */
+  artifacts: z.array(z.strictObject({ releaseId: ResourceIdSchema, reference: z.string().min(1).max(1024) })).optional(),
 }).strict();
 export const ReleasePhysicalScopeSchema = z.object({
   version: z.literal(1), projectId: ProjectIdSchema, originDigest: deletionHash,
   source: z.object({ identity: deletionHash, epoch: deletionHash, version: z.string().min(1) }).strict(),
+  nativeHistory: z.strictObject({ version: z.literal(1), identity: deletionHash, digest: deletionHash, body: z.json() }).optional(),
   bindings: z.array(z.object({ kind: z.enum(['release', 'slot', 'handoff', 'maintenance', 'callback']), id: z.string().min(1), identity: deletionHash }).strict()),
   objects: z.array(z.object({ kind: z.enum(RELEASE_PHYSICAL_KINDS), id: z.string().min(1).max(512), identity: z.string().min(1).max(1024), sourceIdentity: deletionHash, count: z.number().int().nonnegative() }).strict()),
   coverage: z.array(z.object({ kind: z.enum(RELEASE_PHYSICAL_KINDS), identity: deletionHash, complete: z.literal(true) }).strict()),
 }).strict().superRefine((scope, context) => {
   if (scope.coverage.length !== RELEASE_PHYSICAL_KINDS.length || new Set(scope.coverage.map((entry) => entry.kind)).size !== scope.coverage.length
     || new Set(scope.objects.map((entry) => JSON.stringify([entry.kind, entry.id]))).size !== scope.objects.length
-    || new Set(scope.bindings.map((entry) => JSON.stringify([entry.kind, entry.id]))).size !== scope.bindings.length) context.addIssue({ code: 'custom', message: '发布独立来源覆盖不全或原身份重复' });
+    || new Set(scope.bindings.map((entry) => JSON.stringify([entry.kind, entry.id]))).size !== scope.bindings.length
+    || scope.nativeHistory && (scope.nativeHistory.identity !== scope.source.identity || scope.nativeHistory.digest !== jsonHash(scope.nativeHistory.body))) context.addIssue({ code: 'custom', message: '发布独立来源覆盖不全、原身份重复或留存物理材料变化' });
 });
 export const ReleaseDeletionScopeSchema = z.object({
   version: z.literal(1), target: z.object({ projectId: ProjectIdSchema, namespace: z.string().min(1), serviceId: ResourceIdSchema.optional() }).strict(),

@@ -1,3 +1,9 @@
+## 2026-10-05 RFC-037 原存储与管理员删除入口修订候选
+
+管理员目录与生命周期已接统一双确认；实际 admin／capability 控制入口，默认完整删除 OFF。原 46 项界面协议、2 项生命周期、4 项正式 Root 通过；旧闭门用例已增加实际 capability=false 与删除 POST 404，6 pass／45 断言。Garage 原来源／实际请求、Registry 原 SQLite journal／真实 PG 全局准入、原执行兼容及 selected Pod stop 形成 199 路径候选。正式 runtime owner 的原生许可包装衔接已修复，Linux 独立临时文件实际 unlink／重建重放／正式许可 9 pass／60 断言，原 Registry 与专用项目保持。
+
+原 BuildKit 完整 50 历史 EOF／35 manifest／全部外部层及前端全目录已核对；原物理 storage 134 是唯一专属缓存，平台 equalMutable 别名保留，8 个旧缺失 cache 的 result 继续阻断，不报回收完成。14 项缓存图／别名回归通过。173 原精确 lint、工作台类型／结构与 159 自有类型通过。v7 终态 6051 pass／156 环境 skip／1 fail（旧闭门断言，已定向修正）；v8 被其他会话 developmentUsage 的84行函数 lint 阻断，原日志保持。依开发规则§3，自有174精确lint／160类型／修订回归通过后精确发布，确切SHA六项CI／八组件部署继续。完整原工作缓存／独占服务／22 方生产安装／管理员原项目全资源回收继续，目标 active。外部在制输出保持，无跨会话消息。详见[本批验收](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/native-storage-and-entry.md)。以下全部共享历史正文保持。
+
 ## 2026-10-05 RFC-034 原页历史读取与实际门禁终态
 
 原journal只读入口返回同事务持久的raw page／冻结ACK／preparation／admission／rootCreatedAt，并核对原Pod/key、父链、membership和未确认数字；普通ACK、结束或重启后原历史仍可读，不增加owner、终态或完整资格。三个代码／测试候选及原设计文SOURCE4有限功能PASS，35 pass／0 fail／36952断言；精确lint、类型和结构通过。唯一完整check于11:58:50Z终态6030 pass／156环境skip／3 fail，原失败日志保留，候选无漂移；共享未提交的registry准入触发器导致两个旧fixture失败，永久删除capability在制用例另失败，未改或收编这些文件。依development-rules §3精确发布本会话原页读取和实际记录，以干净确切SHA hosted CI验核，不声称全仓绿。

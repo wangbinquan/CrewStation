@@ -51,14 +51,16 @@ export const RUNTIME_IMAGE_PHYSICAL_KINDS = ['builder', 'validation', 'artifact'
 const deletionHash = z.string().regex(/^[a-f0-9]{64}$/);
 export const RuntimeImagePhysicalScopeSchema = z.object({ version: z.literal(1), projectId: ProjectIdSchema, originDigest: deletionHash,
   source: z.object({ identity: deletionHash, epoch: deletionHash, version: z.string().min(1).max(80) }).strict(),
+  nativeHistory: z.strictObject({ version: z.literal(1), identity: deletionHash, digest: deletionHash, body: z.json() }).optional(),
   objects: z.array(z.object({ kind: z.enum(RUNTIME_IMAGE_PHYSICAL_KINDS), id: z.string().min(1).max(512), identity: deletionHash, sourceIdentity: deletionHash, count: z.number().int().nonnegative(),
     consumerId: ResourceIdSchema.optional(), consumerIdentity: deletionHash.optional() }).strict().refine((entry) => !!entry.consumerId === !!entry.consumerIdentity, '原消费者绑定必须成对提供')),
   coverage: z.array(z.object({ kind: z.enum(RUNTIME_IMAGE_PHYSICAL_KINDS), identity: deletionHash, complete: z.literal(true) }).strict()) }).strict().refine((scope) => {
   const coverage = scope.coverage.map((entry) => entry.kind), objects = scope.objects.map((entry) => entry.kind + ':' + entry.id);
-  return new Set(coverage).size === coverage.length && jsonHash([...coverage].sort()) === jsonHash([...RUNTIME_IMAGE_PHYSICAL_KINDS].sort()) && new Set(objects).size === objects.length;
+  return new Set(coverage).size === coverage.length && jsonHash([...coverage].sort()) === jsonHash([...RUNTIME_IMAGE_PHYSICAL_KINDS].sort()) && new Set(objects).size === objects.length
+    && (!scope.nativeHistory || scope.nativeHistory.identity === scope.source.identity && scope.nativeHistory.digest === jsonHash(scope.nativeHistory.body));
 }, '运行镜像原生产者、制品、凭据或回调范围不完整／重复');
 export const RuntimeImageCallbackRecordSchema = z.object({ id: ResourceIdSchema, kind: z.enum(['build', 'validation', 'source', 'initializer']), consumerId: ResourceIdSchema,
-  projectIds: z.array(ProjectIdSchema).min(1), originalProjectIds: z.array(ProjectIdSchema).min(1), backendPid: z.number().int().positive(), callbackPid: z.number().int().positive(),
+  projectIds: z.array(ProjectIdSchema), originalProjectIds: z.array(ProjectIdSchema), backendPid: z.number().int().positive(), callbackPid: z.number().int().positive(),
   callbackStartedAt: z.iso.datetime(), inputDigest: deletionHash, exitKeyDigest: deletionHash, identity: deletionHash,
   process: z.object({ podUid: z.uuid(), containerId: z.string().regex(/^[a-z0-9]+:\/\/[a-f0-9]{64}$/), nodeUid: z.uuid(), nodeName: z.string().min(1).max(253) }).strict(),
   exited: z.boolean(), exitDigest: z.string().regex(/^[a-f0-9]{64}$/).optional(), recoveryDigest: z.string().regex(/^[a-f0-9]{64}$/).optional() }).strict().refine((entry) =>

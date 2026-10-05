@@ -1,4 +1,4 @@
-import { AcceptProjectDeletionSchema, ProjectDeletionLookupSchema, ProjectIdSchema, ResourceIdSchema } from '@crewstation/contracts';
+import { AcceptProjectDeletionSchema, ProjectDeletionCapabilitiesSchema, ProjectDeletionLookupSchema, ProjectIdSchema, ResourceIdSchema } from '@crewstation/contracts';
 import type { Actor, UserId } from '@crewstation/contracts';
 import { actorFrom, parseBody, parseParams } from '@crewstation/http';
 import type { AppEnv } from '@crewstation/http';
@@ -6,6 +6,17 @@ import { forbidden } from '@crewstation/kernel';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { ProjectDeletionController } from '../api/deletion';
+
+export function projectDeletionCapabilitiesRoutes(available: boolean, isAdmin: (id: UserId) => Promise<boolean>): Hono<AppEnv> {
+  const r = new Hono<AppEnv>();
+  r.get('/v1/project-deletions/capabilities', async (c) => {
+    const actor = await actorFrom(c, id => isAdmin(id as UserId));
+    if (!actor.isAdmin) throw forbidden('只有管理员可以读取项目删除能力');
+    c.header('cache-control', 'no-store');
+    return c.json(ProjectDeletionCapabilitiesSchema.parse({ available }));
+  });
+  return r;
+}
 
 export function projectDeletionRoutes(api: ProjectDeletionController, isAdmin: (id: UserId) => Promise<boolean>): Hono<AppEnv> {
   const r = new Hono<AppEnv>(), projectParams = z.object({ projectId: ProjectIdSchema }), operationParams = z.object({ operationId: ResourceIdSchema });

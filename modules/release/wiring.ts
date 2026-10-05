@@ -1,4 +1,5 @@
 import { releaseImageHistory } from './adapters/persistence/drizzleRepositories';
+export { releaseRegistryDeletionPhysics as createReleaseRegistryDeletionPhysics } from './adapters/registry/deletionPhysics';
 import { releaseProjectContent } from './adapters/persistence/projectContent';
 import { releaseInfrastructureOrigin } from './adapters/persistence/infrastructureOrigins';
 import type { ReleaseContentDirectory } from './ports/repositories';
@@ -49,7 +50,7 @@ import type { SlotLedger } from './ports/ledger';
 export interface ReleaseModuleDeps {
   /** Only old retained identities use this directory; normal release commands keep their UUID boundary. */
   deletionIdentities?: ReleaseContentDirectory;
-  projectAdmission?: { protectCurrent(): Promise<ReleaseCallbackProcess>; assertAvailable(projectId: string): Promise<void> };
+  projectAdmission?: { protectCurrent(): Promise<ReleaseCallbackProcess>; assertAvailable(projectId: string): Promise<void>; assertNativeRegistryAvailable?: () => Promise<void> };
   deletion?: { physics: ReleaseDeletionPhysics; assertGrant(context: ProjectDeletionContext): Promise<void> };
   executionHandoff?: ExecutionHandoff;
   runtimeImages?: ReleaseRuntimeImages;

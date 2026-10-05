@@ -27,7 +27,7 @@ import { namespaceReapplyTask } from './workers/namespaceReapply';
 import type { ProjectDeletionOwner } from '@crewstation/contracts';
 import type { ProjectDeletionIntents } from './ports/projectDeletions';
 import { projectDeletionController } from './application/deletion/controller';
-import { projectDeletionRoutes } from './http/projectDeletionRoutes';
+import { projectDeletionCapabilitiesRoutes, projectDeletionRoutes } from './http/projectDeletionRoutes';
 import { deletionEnqueue, projectDeletionRuntime } from './workers/projectDeletionRuntime';
 import { provisioningProjectWork } from './adapters/persistence/projectAdmission';
 import type { ProvisioningCallbackProcesses, ProvisioningProjectWork } from './ports/projectWork';
@@ -93,7 +93,7 @@ export function createProvisioningModule(deps: ProvisioningModuleDeps): Provisio
   return {
     migrations, ...(work ? { projectWork: work } : {}),
     api: { ...api, ...(deletions ? { deletions } : {}) },
-    http: [provisioningRoutes(api, deps.isAdmin, deps.authorizeRetry), ...(deletions ? [projectDeletionRoutes(deletions, deps.isAdmin)] : [])],
+    http: [provisioningRoutes(api, deps.isAdmin, deps.authorizeRetry), projectDeletionCapabilitiesRoutes(!!deletions, deps.isAdmin), ...(deletions ? [projectDeletionRoutes(deletions, deps.isAdmin)] : [])],
     workers: [createWorker({ db: deps.db, kinds: [PROVISION_JOB_KIND], owner: deps.workerOwner, concurrency: 2, leaseSeconds: 600, logger, handler: provisionJobHandler(api) }), ...(deletionRuntime ? [deletionRuntime.worker] : [])],
     startupTasks: [namespaceReapplyTask(reapply, logger), ...(work ? [projectWorkObserver(work, logger)] : []), ...(deletionRuntime ? [deletionRuntime.recovery] : [])],
     subscriptions: (() => {

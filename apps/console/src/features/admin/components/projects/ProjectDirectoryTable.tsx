@@ -12,11 +12,13 @@ import { DefinitionList } from '../../../../shared/ui/DefinitionList';
 import { ActionRow } from '../../../../shared/ui/ActionRow';
 import { ButtonLink } from '../../../../shared/ui/navigation/ButtonLink';
 import styles from '../../../../shared/ui/CapabilityCatalog.module.css';
+import { useOpenProjectDeletion } from '../../../../shared/admin/ProjectDeletionSlot';
 
 export function ProjectDirectoryTable({ items, available, integration, onOwner }: {
   readonly items: readonly ProjectPageEntry[]; readonly available: boolean; readonly integration: boolean; readonly onOwner?: (item: ProjectPageEntry) => void;
 }) {
   const t = useT(), date = useDateText(), [selected, setSelected] = useState<string>();
+  const openDeletion = useOpenProjectDeletion();
   const columns = integration ? ['project', 'kind', 'owner', 'state', 'actions'] : ['project', 'owner', 'state', 'created', 'actions'];
   const detail = items.find((item) => item.project.id === selected);
   return <><DataTable className={styles.catalogTable} columns={columns.map((key) => key === 'created' ? t('catalog.created') : t(`admin.directory.${key}`))}>
@@ -29,7 +31,8 @@ export function ProjectDirectoryTable({ items, available, integration, onOwner }
       <td><ActionRow>{available ? p.state === 'failed' || p.state === 'provisioning'
         ? <ButtonLink size="small" to="/admin/projects/$projectId/provisioning" params={{ projectId: p.id }}>{t('admin.directory.provision')}</ButtonLink>
         : <ButtonLink size="small" to={integration ? '/admin/integrations/$projectId' : '/admin/projects/$projectId/resources'} params={{ projectId: p.id }}>{t(integration ? 'catalog.openProject' : 'catalog.resources')}</ButtonLink> : null}
-        <Button size="small" onClick={() => setSelected(p.id)}>{t('catalog.more')}</Button></ActionRow></td>
+        <Button size="small" onClick={() => setSelected(p.id)}>{t('catalog.more')}</Button>
+        {available && openDeletion ? <Button size="small" variant="danger" onClick={event => openDeletion(p, event.currentTarget)}>{t(p.state === 'deleting' ? 'projects.delete.progressTitle' : 'projects.delete.confirmTitle')}</Button> : null}</ActionRow></td>
     </tr>; })}
   </DataTable>{detail ? <DirectoryDetails item={detail} available={available} onClose={() => setSelected(undefined)} /> : null}</>;
 }

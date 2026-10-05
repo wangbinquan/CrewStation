@@ -4,3 +4,4 @@ export type { RuntimeEnvironmentModule, RuntimeEnvironmentModuleDeps } from './w
 export { createManagedRuntimeEnvironmentModule } from './wiring';
 export type { ManagedRuntimeEnvironmentDeps } from './wiring';
 export { imageAllocationRevision } from './api/allocationRevision';
+export { createRuntimeImageRegistryDeletionPhysics } from './wiring';

@@ -5,7 +5,7 @@ import { restoreObjectOperations } from './application/objects/restore';
 import { objectRestoreRepository } from './adapters/persistence/objects/restore';
 import type { ObjectRestorePlane } from './ports/objectRestore';
 import { join } from 'node:path';
-import type { ProjectId, UserId } from '@crewstation/contracts';
+import type { ProjectDeletionContext, ProjectId, UserId } from '@crewstation/contracts';
 import { ServiceIdSchema } from '@crewstation/contracts';
 import { DomainTopic } from '@crewstation/contracts';
 import type { EventConsumer } from '@crewstation/eventbus';
@@ -79,6 +79,15 @@ import { dataDeletionOwner } from './application/deletion/owner';
 import type { ObjectRequestProcesses } from './ports/deletion/objectWork';
 import { objectRequestWork } from './adapters/persistence/objects/requestWork';
 import { admittedObjectPlane } from './application/objects/admittedPlane';
+import { garageObjectDeletionPhysics } from './adapters/garage/deletionPhysics';
+import type { GarageDeletionDependencies } from './adapters/garage/deletionPhysics';
+import { nativeObjectDeletionAdmission } from './adapters/persistence/objects/nativeDeletionAdmission';
+
+/** Production byte cleanup uses the same durable grants and admissions as the
+ * actual object request factory, including foreign writes during block purge. */
+export function createDataObjectDeletionPhysics(db: Database, deps: Omit<GarageDeletionDependencies, 'authorize' | 'closed' | 'exclusive'>, assertGrant: (context: ProjectDeletionContext) => Promise<void>) {
+  return garageObjectDeletionPhysics({ ...deps, ...nativeObjectDeletionAdmission(db, assertGrant) });
+}
 
 export interface DataModuleDeps {
   deletion?: DataProjectDeletion;

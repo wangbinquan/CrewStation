@@ -7,6 +7,7 @@ import { runMigrations } from '@crewstation/persistence';
 import { loadPlatformSettings } from '@crewstation/settings';
 import { createTestDatabase, testDatabaseAvailable, type TestDatabase } from '@crewstation/testkit';
 import { createPlatformModule, type PlatformModule } from '../wiring';
+import { runtimeImageUnitOfWork } from '../../runtime-environment/adapters/persistence/unitOfWork';
 
 const available = await testDatabaseAvailable();
 let db: TestDatabase, platform: PlatformModule;
@@ -31,7 +32,8 @@ async function seedReferences(ownerType = 'task') {
   await db.db.execute(sql`INSERT INTO runtime_environment.images (id, name, default_visible, enabled, payload) VALUES (${imageId}, 'tools', false, true, '{}'::jsonb)`);
   await db.db.execute(sql`INSERT INTO runtime_environment.revisions VALUES (${revision.id}, ${imageId}, ${revision.revision}, ${JSON.stringify(revision)}::jsonb)`);
   await db.db.execute(sql`INSERT INTO runtime_environment.builds VALUES (${buildId}, ${imageId}, ${projectId}, ${createdBy}, 'seed', 'succeeded', NULL, ${JSON.stringify(build)}::jsonb)`);
-  await db.db.execute(sql`INSERT INTO runtime_environment.versions (id, image_id, build_id, repository, digest, state, payload) VALUES (${version.id}, ${imageId}, ${buildId}, ${version.repository}, ${version.digest}, 'available', ${JSON.stringify(version)}::jsonb)`);
+  // Catalog pins participate in the same real Registry admission as production writes.
+  await runtimeImageUnitOfWork(db.db).run(({ versions }) => versions.insert(version));
   const owners = [newResourceId(), newResourceId()];
   for (const ownerId of owners) {
     const reference = { id: newResourceId(), versionId: version.id, projectId, ownerType, ownerId, state: 'confirmed', expiresAt: null, createdAt: version.createdAt };

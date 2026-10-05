@@ -1,4 +1,5 @@
 import { createRuntimeImageSetup } from './application/catalog/createSetup';
+export { runtimeImageRegistryDeletionPhysics as createRuntimeImageRegistryDeletionPhysics } from './adapters/registry/deletionPhysics';
 import { projectImagePolicy } from './application/projectImagePolicy';
 import { imageResourceAllocationUseCases } from './application/resourceAllocation';
 import { projectImagePolicyRoutes } from './http/projectImagePolicyRoutes';
@@ -57,7 +58,7 @@ export const runtimeEnvironmentMigrations: MigrationSet = { module: 'runtime-env
 
 export interface RuntimeEnvironmentModuleDeps {
   /** Callback admission requires the original process source and project availability port. */
-  readonly projectAdmission?: { protectCurrent(): Promise<RuntimeImageCallbackProcess>; assertAvailable(projectId: string): Promise<void> };
+  readonly projectAdmission?: { protectCurrent(): Promise<RuntimeImageCallbackProcess>; assertAvailable(projectId: string): Promise<void>; assertNativeRegistryAvailable?: () => Promise<void> };
   readonly deletion?: { physics: RuntimeImageDeletionPhysics; assertGrant(context: ProjectDeletionContext): Promise<void> };
   readonly executionHistory?: RuntimeImageExecutionHistory;
   readonly referenceOwners?: RuntimeImageReferenceOwners;
@@ -85,13 +86,13 @@ export function createRuntimeEnvironmentModule(deps: RuntimeEnvironmentModuleDep
   const projectAdmissions = deps.projectAdmission ? runtimeImageProjectAdmissions({ ...deps.projectAdmission, db: deps.db }) : undefined;
   const sources: RuntimeImageSourceResolver = { prepare: async (actor, projectId, source) => {
     const prepare = () => deps.sources.prepare(actor, projectId, source);
-    return projectAdmissions && projectId ? projectAdmissions.run([projectId], { kind: 'source', id: newResourceId(), inputDigest: jsonHash({ projectId, source }) }, prepare) : prepare();
+    return projectAdmissions ? projectAdmissions.run(projectId ? [projectId] : [], { kind: 'source', id: newResourceId(), inputDigest: jsonHash({ projectId, source }) }, prepare) : prepare();
   } };
   const initializationSecrets: RuntimeInitializationSecrets | undefined = deps.initializationSecrets && { render: async (projectId, stamps) => {
     const render = () => deps.initializationSecrets!.render(projectId, stamps);
     return projectAdmissions ? projectAdmissions.run([projectId], { kind: 'initializer', id: newResourceId(), inputDigest: jsonHash({ projectId, stamps }) }, render) : render();
   } };
-  const useCases = { ...deps, sources, initializationSecrets, projectAdmissions, uow: runtimeImageUnitOfWork(deps.db), clock: deps.clock ?? systemClock, logger: deps.logger ?? noopLogger };
+  const useCases = { ...deps, sources, initializationSecrets, projectAdmissions, uow: runtimeImageUnitOfWork(deps.db, deps.projectAdmission?.assertNativeRegistryAvailable), clock: deps.clock ?? systemClock, logger: deps.logger ?? noopLogger };
   const api: RuntimeEnvironmentModuleApi = { name: 'runtime-environment',
     ...(deps.deletion ? { deletionOwner: runtimeImageProjectDeletionOwner({ ...deps.deletion, repository: runtimeImageDeletionRepository({ db: deps.db, assertGrant: deps.deletion.assertGrant }) }) } : {}),
     ...projectImagePolicy(useCases), ...imageResourceAllocationUseCases(useCases), createSetup: createRuntimeImageSetup(useCases), imageHistory: runtimeImageExecutionHistory(useCases), reconcileReferences: runtimeImageReferenceReconciliation(useCases), ...developmentImagePolicy(useCases), ...runtimeImageValidationController(useCases, deps.validationExecutor), ...runtimeImageCatalog(useCases), ...runtimeImageBuilds(useCases), ...runtimeImageValidations(useCases), ...runtimeImageReferences(useCases), ...runtimeImageVersionLifecycle(useCases), ...runtimeImageBuildController(useCases, deps.buildExecutor) };
@@ -111,7 +112,7 @@ export interface ManagedRuntimeEnvironmentDeps extends Omit<RuntimeEnvironmentMo
 /** Kubernetes／资源台账装配；源码授权和凭据权限继续由各自所属模块提供。 */
 export function createManagedRuntimeEnvironmentModule(deps: ManagedRuntimeEnvironmentDeps) {
   const clock = deps.clock ?? systemClock, logger = deps.logger ?? noopLogger;
-  const registry = httpRuntimeImageRegistry(deps.registry), uow = runtimeImageUnitOfWork(deps.db);
+  const registry = httpRuntimeImageRegistry(deps.registry), uow = runtimeImageUnitOfWork(deps.db, deps.projectAdmission?.assertNativeRegistryAvailable);
   const intents = databaseBuildIntents(deps.db, deps.ledger, clock);
   const executor = kubernetesRuntimeImageBuildExecutor({ ...deps, intents, registry, registryBase: deps.registry.pullBase, holder: deps.instance,
     plan: async (build, revision) => { await deps.assertBuildIsolation(); return runtimeImageBuildPlan(build, revision, await deps.buildContext(build, revision), deps.builder, clock.now()); },

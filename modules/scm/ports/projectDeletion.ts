@@ -19,6 +19,9 @@ export interface ScmDeletionScope {
   readonly repositories: readonly { remoteProjectId: string; pathWithNamespace: string; createdAt: string; identity: string }[];
   readonly objects: readonly { repositoryId: string; kind: ScmStorageKind; id: string; identity: string; sourceIdentity: string; count: number }[];
   readonly coverage: readonly { repositoryId: string; kind: ScmStorageKind; identity: string; complete: true }[];
+  /** Durable adapter material, independent of mutable parent associations. The
+   * adapter validates both contents and identity before every native operation. */
+  readonly retained?: readonly { repositoryId: string; identity: string; contents: string }[];
 }
 export interface ScmDeletionSourceReport {
   readonly complete: boolean;

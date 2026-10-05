@@ -4,7 +4,7 @@ import { jsonHash, precondition } from '@crewstation/kernel';
 import type { Executor } from '@crewstation/persistence';
 import { sql } from 'drizzle-orm';
 import { DATA_CONTENT, DATA_SHARED } from '../../domain/deletionContents';
-import type { DataDeletionContent, DataDeletionIdentity, DataDeletionLocation, DataDeletionOrigin, DataDeletionScope, DataDeletionSources } from '../../ports/deletion/projectDeletion';
+import type { DataDeletionContent, DataDeletionIdentity, DataDeletionLocation, DataDeletionOrigin, DataDeletionPlacement, DataDeletionScope, DataDeletionSources } from '../../ports/deletion/projectDeletion';
 
 export async function registeredDataContent(db: Executor) {
   const rows = await db.execute<{ table_name: string }>(sql`SELECT table_name FROM information_schema.tables WHERE table_schema='data' AND table_type='BASE TABLE'`);
@@ -31,6 +31,7 @@ export async function inspectDataContent(db: Executor, sources: DataDeletionSour
   };
   const contents: DataDeletionContent[] = [], resources: ProjectDeletionInventory['resources'] = [], locations = new Map<string, DataDeletionLocation>();
   const releases = new Map<string, { backendId: string; bytes: number; transfers: number }>();
+  const placements = new Map<string, DataDeletionPlacement>();
   await origin('project', target.id);
   if (target.serviceId && (await origin('service',target.serviceId)).projectId !== target.id) throw precondition('data target service ownership conflicts');
   let objectsPresent = false;
@@ -51,6 +52,13 @@ export async function inspectDataContent(db: Executor, sources: DataDeletionSour
           selected.push({ table: entry.table, key: row.key, digest: row.digest });
           if (entry.origin) origins.set(entry.origin + ':' + row.key, { kind: entry.origin, key: String(JSON.parse(row.key)[0]), id: String(JSON.parse(row.key)[0]), projectId: target.id });
           objectsPresent ||= Boolean(entry.physical);
+          if (entry.table === 'object_spaces') {
+            const body = (row.body as { body: Record<string, unknown> }).body;
+            const spaceId = ResourceIdSchema.parse(body['id']), backendId = ResourceIdSchema.parse(body['backendId']);
+            if (!Number.isSafeInteger(body['backendPlacementRevision']) || Number(body['backendPlacementRevision']) < 1) throw precondition('data original empty space placement is invalid');
+            const item = { spaceId, backendId, placementRevision: Number(body['backendPlacementRevision']) };
+            placements.set(JSON.stringify(item), item);
+          }
           if (entry.table === 'objects' || entry.table === 'object_upload_attempts' || entry.table === 'object_work') addLocation(locations, row.body,entry.table);
           if (entry.table === 'object_upload_attempts' || entry.table === 'object_read_transfers') addReservation(releases,entry.table,row.body);
           if (entry.table === 'object_references') await assertReference(db,sources, row.body, target.id);
@@ -65,7 +73,7 @@ export async function inspectDataContent(db: Executor, sources: DataDeletionSour
   const backups = await db.execute(sql`SELECT id FROM data.object_backups LIMIT 1`);
   if (backups.length) throw precondition('shared full database backups require scoped project erasure evidence');
   const digest = jsonHash({ project: target.id, contents });
-  const scope: DataDeletionScope = { contents, origins: [...origins.values()], locations: [...locations.values()], backendReleases: [...releases.values()], objectsPresent, digest, count: contents.length, compacted: false };
+  const scope: DataDeletionScope = { contents, origins: [...origins.values()], locations: [...locations.values()], placements: [...placements.values()], backendReleases: [...releases.values()], objectsPresent, digest, count: contents.length, compacted: false };
   return { inventory: { participant: 'data', revision: jsonHash({ project: target.id, resources }), complete: true, resources, references: [], blockers: [] }, scope };
 }
 function requireKey(value: string | null) { if (!value) throw precondition('data original ownership key is missing'); return value; }

@@ -27,6 +27,7 @@ export * from './api/project';
 export * from './api/projectDeletion/values';
 export * from './api/projectDeletion/responses';
 export * from './api/projectDeletion/owner';
+export * from './api/projectDeletion/nativeStorage';
 export * from './api/projectDeletion/sessionData';
 export * from './api/compute/computeProfile';
 export * from './api/release';

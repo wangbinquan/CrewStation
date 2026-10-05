@@ -5,6 +5,15 @@ import { installedSystemComponents } from '../../../modules/platform/domain/syst
 
 interface Doc { kind: string; metadata: { name: string; namespace?: string }; data?: Record<string, string>; spec?: Record<string, unknown> }
 const docs = (file: string) => (Bun.YAML.parse(readFileSync(join(import.meta.dir, file), 'utf8')) as Doc[]).filter(Boolean);
+test('native consumer source observes the whole node PID namespace through a private read-only probe', () => {
+  const metrics = docs('38-cluster-metrics.yaml'), daemon = metrics.find(row => row.metadata.name === 'cs-storage-probe')!;
+  const pod = (daemon.spec!.template as { spec: { hostPID?: boolean; automountServiceAccountToken: boolean; containers: Array<{ securityContext: { readOnlyRootFilesystem: boolean; allowPrivilegeEscalation: boolean; capabilities: { add: string[]; drop: string[] } }; volumeMounts: Array<{ readOnly: boolean }> }> } }).spec;
+  expect(pod.hostPID).toBe(true); expect(pod.automountServiceAccountToken).toBe(false);
+  expect(pod.containers[0]!.securityContext).toMatchObject({ readOnlyRootFilesystem: true, allowPrivilegeEscalation: false, capabilities: { drop: ['ALL'], add: ['DAC_READ_SEARCH', 'SYS_PTRACE'] } });
+  expect(pod.containers[0]!.volumeMounts.every(row => row.readOnly)).toBe(true);
+  const policy = metrics.find(row => row.metadata.name === 'crewstation-storage-probe')!;
+  expect(policy.spec!.policyTypes).toEqual(['Ingress', 'Egress']);
+});
 test('every installed Garage resource and both retained claims exist in the system ownership inventory', () => {
   const garage = docs('39-object-storage.yaml'), catalog = new Set(installedSystemComponents().map((item) => `${item.kind}/${item.name}`));
   for (const item of garage) { expect(item.metadata.namespace).toBe('crewstation-system'); expect(catalog.has(`${item.kind}/${item.metadata.name}`)).toBe(true); }
@@ -40,7 +49,7 @@ test('object metric counters are scraped per Pod, and user routes do not expose 
 test('large object bodies use an authenticated dedicated listener without consuming ordinary API inflight slots', () => {
   const gateway = docs('40-gateway.yaml'), inventory = new Set(installedSystemComponents().map((item) => `${item.kind}/${item.name}`));
   const spec = (name: string) => gateway.find((item) => item.metadata.name === name)!.spec!;
-  const route = (name: string) => (spec(name).routes as Array<{ match: string; middlewares: Array<{ name: string }>; services: Array<{ port: number }> }>)[0]!;
+  const route = (name: string) => (spec(name).routes as Array<{ match: string; middlewares: Array<{ name: string }>; services: Array<{ name: string; port: number }> }>)[0]!;
   for (const name of ['platform-object-storage', 'console-object-download']) {
     expect(inventory.has(`IngressRoute/${name}`)).toBe(true);
     expect(route(name).middlewares[0]!.name).toBe('drop-identity-headers');

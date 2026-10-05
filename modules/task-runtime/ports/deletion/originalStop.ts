@@ -11,4 +11,7 @@ export interface RuntimeOriginalStopSources {
   development(context: ProjectDeletionContext): DevelopmentCleanupParticipant;
   digital(context: ProjectDeletionContext, environment: TaskEnvironment): Promise<{ kind: 'ready' } | { kind: 'waiting'; reason: string }>;
   stopped(context: ProjectDeletionContext, environment: TaskEnvironment): Promise<{ digest: string } | undefined>;
+  /** Legacy rows may lack a UID. Only the complete confirmed Root inventory,
+   * never a current name lookup, may supply the original deletion UID. */
+  originalPodUid?(context: ProjectDeletionContext, environment: TaskEnvironment): Promise<string | undefined>;
 }

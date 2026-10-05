@@ -10,6 +10,46 @@ import type { ScmDeletionProof } from '../ports/projectDeletion';
 
 const available = await testDatabaseAvailable();
 describe.skipIf(!available)('SCM 正式 owner 的持久原范围与阶段（真实 PostgreSQL；物理来源为受控端口）', () => {
+  test('仓库尚未创建的项目仍可按完整空范围清理，不调用缺少原仓库的当前归属恢复', async () => {
+    let reads = 0;
+    const f = await scmDeletionFixture({ currentOrigins: { read: async () => { reads++; throw Error('no original repository'); } } });
+    try {
+      f.state.nativeRemaining = 0; f.state.storageRemaining = 0;
+      const confirmed = await f.owner.inspect(f.context().target);
+      expect(confirmed.complete).toBe(true); expect(reads).toBe(0);
+      for (const phase of ['seal', 'stop', 'purge', 'prove', 'namespace', 'metadata', 'verify'] as const)
+        expect((await f.owner.run({ ...f.context(), confirmed, phase })).kind).toBe('done');
+      expect(await f.database.db.execute(sql`SELECT project_id FROM scm.deletion_scopes`)).toHaveLength(0);
+      expect((await f.writes().history(f.projectId)).metadataCount).toBe(0);
+    } finally { await f.database.drop(); }
+  });
+  test('保留原生出生、空出生与 uint64 文件身份经过真实 jsonb 落库和重放保持，公开盘点不泄漏正文', async () => {
+    const f = await scmDeletionFixture();
+    const contents = JSON.stringify({ birth: '2026-09-30T16:00:35.872286Z', childBirth: null, inode: '18446744073709551615', note: 'private native retained fixture' });
+    f.state.transformScope = scope => ({ ...scope, retained: scope.repositories.map(repo => ({ repositoryId: repo.remoteProjectId, identity: jsonHash(contents), contents })) });
+    try {
+      const context = await f.prepare(); expect(context.confirmed.resources.filter(row => row.kind === 'gitlab-retained-source')).toHaveLength(1);
+      expect(JSON.stringify(context.confirmed)).not.toContain('private native retained fixture'); expect((await f.run('seal')).kind).toBe('done');
+      const [row] = await f.database.db.execute<{ original: { retained: { contents: string }[] } }>(sql`SELECT original FROM scm.deletion_scopes`);
+      expect(row?.original.retained[0]?.contents).toBe(contents);
+      for (const phase of ['stop', 'purge', 'prove', 'metadata', 'verify'] as const) expect((await f.run(phase)).kind).toBe('done');
+      expect(f.calls.every(call => call.scope.retained?.[0]?.contents === contents)).toBe(true);
+    } finally { await f.database.drop(); }
+  });
+  test('保留材料缺失、重复、其他仓库或超预算不能成为完整确认范围', async () => {
+    const f = await scmDeletionFixture();
+    try {
+      await f.ensure();
+      for (const mode of ['missing', 'duplicate', 'foreign', 'budget']) {
+        f.state.transformScope = scope => {
+          const row = { repositoryId: scope.repositories[0]!.remoteProjectId, identity: jsonHash('retained fixture'), contents: mode === 'budget' ? 'x'.repeat(8_388_609) : '{}' };
+          return { ...scope, retained: mode === 'missing' ? [] : mode === 'duplicate' ? [row, row] : mode === 'foreign' ? [{ ...row, repositoryId: '999' }] : [row] };
+        };
+        await expect(f.owner.inspect(f.context().target)).rejects.toThrow();
+      }
+      expect(await f.database.db.execute(sql`SELECT project_id FROM scm.deletion_scopes`)).toHaveLength(0);
+    } finally { await f.database.drop(); }
+  });
   test('全部阶段清除本项目全部内容与别名，只留最小墓碑；最终仍读原物理范围', async () => {
     const f = await scmDeletionFixture();
     try {

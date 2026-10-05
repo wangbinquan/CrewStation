@@ -41,7 +41,7 @@ export interface FakeSession {
   /** 发命令并等待同 id 的 result／error；error 抛 CommandFailure。返回 unknown，调用方用 RunnerResultPayloads 解析。 */
   call(command: { id: string; type: string } & Record<string, unknown>, timeoutMs?: number): Promise<unknown>;
   /** 强制关闭所有连接并停止监听。 */
-  stop(): void;
+  stop(): Promise<void>;
 }
 
 export function startFakeSession(options: FakeSessionOptions = {}): FakeSession {
@@ -111,7 +111,7 @@ export function startFakeSession(options: FakeSessionOptions = {}): FakeSession 
       return (reply as { payload: unknown }).payload;
     },
     stop() {
-      server.stop(true);
+      return server.stop(true);
     },
   };
   return session;

@@ -5,4 +5,5 @@ export { ProjectSettingsSection } from './pages/ProjectSettingsSection';
 export { ProjectOverviewPage } from './pages/ProjectOverviewPage';
 export { TesterProjectPage } from './pages/TesterProjectPage';
 export { CreateProjectForm } from './components/CreateProjectForm';
+export { ProjectDeletionWorkflow } from './components/ProjectDeletionWorkflow';
 export { ProjectProvisioningPage } from './pages/ProjectProvisioningPage';

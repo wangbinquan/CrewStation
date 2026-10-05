@@ -179,7 +179,8 @@ function taskRuntimeParticipants(deps: TaskRuntimeModuleDeps) {
       deleteVolume: async () => { throw new Error('项目停止阶段禁止提前回收工作卷'); } }, }, work),
     nativeCluster: guardedRuntimePort(nativeCluster, work),
   }, work, guardedRuntimePort(runtimeOriginalJobs(deps.db, deps.deletionWorkSources), work), {
-    ...guardedRuntimePort({ digital: deps.deletionStops.digital, stopped: deps.deletionStops.stopped }, work),
+    ...guardedRuntimePort({ digital: deps.deletionStops.digital, stopped: deps.deletionStops.stopped,
+      ...(deps.deletionStops.originalPodUid ? { originalPodUid: deps.deletionStops.originalPodUid } : {}) }, work),
     development: (context) => guardedRuntimePort(deps.deletionStops!.development(context), work),
   }) : undefined;
   const query = developmentRemovalLookup(executionDeps);

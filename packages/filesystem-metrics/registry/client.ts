@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
 import {RegistryInventoryRequestSchema,RegistryInventoryResponseSchema,registryRequestIdentity} from './protocol';
 import type {RegistryInventoryRequest} from './protocol';
-import {registryDirectory,registryFile} from './graph';
+import {registryDirectory,registryFile,registryOwnsRepository} from './graph';
 
 export function createRegistryInventoryClient(options:{baseUrl:string;token:string;timeoutMs?:number;fetch?:(input:URL,init:RequestInit)=>Promise<Response>}) {
   const endpoint=new URL('/registry/inventory',options.baseUrl);
@@ -14,7 +14,7 @@ export function createRegistryInventoryClient(options:{baseUrl:string;token:stri
     if(!response.ok)throw new Error(`Registry source HTTP ${response.status}`);
     const result=RegistryInventoryResponseSchema.parse(JSON.parse(await boundedReply(response)));
     if(result.key!==input.key||result.requestIdentity!==registryRequestIdentity(input))throw new Error('Registry source returned another original scope');
-    const owns=(name:string)=>input.exact.includes(name)||input.prefixes.some(prefix=>name===prefix||name.startsWith(prefix+'/'));
+    const owns=(name:string)=>registryOwnsRepository(input,name);
     if(result.repositories.some(name=>!owns(name))||new Set(result.repositories).size!==result.repositories.length)throw new Error('Registry source returned foreign repositories');
     if(new Set(result.entries.map(e=>e.path)).size!==result.entries.length||new Set(result.blobs.map(b=>b.digest)).size!==result.blobs.length)throw new Error('Registry source returned duplicate native identities');
     for(const entry of result.entries) {

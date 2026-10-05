@@ -3,6 +3,7 @@ import { resourceCatalogs } from './application/resource-center/resourceCatalogs
 import { businessRuntimePorts } from './application/deletion/businessSources';
 import { dataDeletionSources } from './application/deletion/dataSources';
 import { assembleProjectDeletion } from './application/deletion/assembly';
+import { projectDeletionGrantRoutes } from './http/projectDeletionGrants';
 import { infrastructureOriginSources } from './application/infrastructure/origins';
 import { projectHosts, provisioningRetry, provisioningProjects } from './application/provisioningPorts';
 import { developmentDeletionSources, developmentSourceControl } from './application/deletion/developmentSources';
@@ -23,6 +24,7 @@ import { webhookAwareAllowlist } from './application/webhookIngress';
 import { objectStorageSources } from './application/objectStorageSources';
 import { nativeWorkloadOwnership, originalGatewayPodProject } from './adapters/k8s/workloadOwnership';
 import { nativePostgresSource } from './adapters/k8s/nativePostgresSource';
+import { nativeProjectObjectSources } from './adapters/k8s/nativeGarage/objectSources'; import { nativeRegistryWriterAdmission } from '@crewstation/filesystem-metrics';
 import { assertStorageConsumers } from './adapters/k8s/storageContract'; import { objectTransferOwners } from './adapters/k8s/objectTransferOwners';
 import { releaseImagePorts } from './application/releaseImagePorts';
 import { eventDeliveryOwners, projectCallbackOwners, provisioningWorkPorts } from './adapters/k8s/eventDeliveryOwners';
@@ -49,8 +51,8 @@ import { createApiCatalogModule, apiAllocationRevision } from '@crewstation/modu
 import { createBusinessTaskModule, readBusinessObservationTaskPage, readBusinessObservationAttemptPage, type BusinessTaskModuleApi } from '@crewstation/module-business-task';
 import { createCapabilitiesModule } from '@crewstation/module-capabilities';
 import { createConfigModule } from '@crewstation/module-config';
-import { createDataModule, objectPlanAllocationRevision, objectSpaceAllocationRevision } from '@crewstation/module-data';
-import { createDataControlModule, type DataControlModuleApi } from '@crewstation/module-data-control';
+import { createDataModule, createDataObjectDeletionPhysics, objectPlanAllocationRevision, objectSpaceAllocationRevision } from '@crewstation/module-data';
+import { createDataControlModule, createObjectDeletionTransport, createGarageDeletionTransport, type DataControlModuleApi } from '@crewstation/module-data-control';
 import { createDevSessionModule, readDevelopmentObservationTaskPage, readDevelopmentObservationAttemptPage } from '@crewstation/module-dev-session';
 import { createEventsModule, type EventsModuleApi } from '@crewstation/module-events';
 import { createGatewayModule, gatewayAllocationRevision, projectRateLimitValues, UNAVAILABLE_PATH, type GatewayModuleApi } from '@crewstation/module-gateway';
@@ -64,9 +66,7 @@ import { createSessionModule } from '@crewstation/module-session';
 import { createTaskRuntimeModule, type TaskRuntimeModuleApi } from '@crewstation/module-task-runtime';
 import { queueMigrations } from '@crewstation/queue';
 import { createProjectDeletionSessionClient, createSessionClient } from '@crewstation/session-client';
-import type { PlatformSettings } from '@crewstation/settings';
-import type { AppEnv } from '@crewstation/http';
-import type { Hono } from 'hono';
+import type { PlatformSettings } from '@crewstation/settings'; import type { AppEnv } from '@crewstation/http'; import type { Hono } from 'hono';
 import type { Lifecycle, PlatformApi } from './api/moduleApi';
 /** 组合根的对外形状：各进程只挑选自己角色的入口；模块实例也暴露出来供 CLI 与测试直接使用。 */
 export type PlatformModuleApi = PlatformApi<Hono<AppEnv>, MigrationSet>;
@@ -96,7 +96,6 @@ export interface PlatformModule {
 export const SYSTEM_ACTOR: Actor = { userId: BUILTIN_RESOURCES.systemActor as UserId, isAdmin: true };
 
 const consumerLifecycle = (consumer: EventConsumer): Lifecycle => ({ start: () => consumer.start(), stop: () => consumer.stop() });
-
 interface Late { clusterManagement?: ReturnType<typeof createClusterManagementModule>['api']; resourceAccess?: ReturnType<typeof createResourceAccessModule>['api']; observability?: ObservabilityModuleApi; objectHistory?: NonNullable<NonNullable<Parameters<typeof createDataModule>[0]['objects']>['history']>; businessTask?: BusinessTaskModuleApi; events?: EventsModuleApi; project?: ProjectModuleApi; gateway?: GatewayModuleApi; taskRuntime?: TaskRuntimeModuleApi; release?: ReleaseModuleApi; resources?: ResourcesModuleApi; dataControl?: DataControlModuleApi; clusterControl?: ClusterControlModuleApi }
 
 type CompositionDeps = PlatformModuleDeps & { identities: ResourceIdentityDirectory };
@@ -186,7 +185,7 @@ function composeCore(deps: CompositionDeps, late: Late) {
     settings: { defaultTaskProfile: settings.defaultTaskProfile, secretKeyBase64: settings.secretKeyBase64, registry: { pullBase: settings.registryBase, pushHost: settings.registryPushHost, baseRepository: settings.baseImage.repository, runtimePrefix: 'runtime/', scheme: settings.registryScheme, baseTag: settings.baseImage.tag } },
   });
   const data = createDataModule({
-    deletion: { physics: deps.deletion?.objects, sources: dataDeletionSources(project.api, () => { if (!late.taskRuntime || !late.businessTask) throw precondition('data 原任务 owner 尚未装配'); return { taskRuntime: late.taskRuntime, businessTask: late.businessTask }; }) },
+    deletion: { physics: deps.deletion?.objects ?? (settings.projectDeletionNative && settings.clusterMetrics && settings.clusterMetrics.probeToken.length >= 32 && settings.platformPodUid ? createDataObjectDeletionPhysics(db, nativeProjectObjectSources(deps.k8s, settings.systemNamespace, settings.clusterMetrics, createObjectDeletionTransport(db, settings.secretKeyBase64), createGarageDeletionTransport), project.api.assertProjectDeletionGrant) : undefined), sources: dataDeletionSources(project.api, () => { if (!late.taskRuntime || !late.businessTask) throw precondition('data 原任务 owner 尚未装配'); return { taskRuntime: late.taskRuntime, businessTask: late.businessTask }; }) },
     db, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, users: userDirectory,
     productionTasks: { get: async (id) => { const env = await late.taskRuntime?.getEnvironment(id); return env ? { taskId: id, projectId: env.projectId, serviceId: env.serviceId as ServiceId, kind: env.kind, state: env.state, podUid: (await late.taskRuntime!.resourceWorkload(SYSTEM_ACTOR, id)).podUid } : undefined; }, list: async (id) => { const env = await late.taskRuntime?.findDevSession(id); return env ? [env.id] : []; } },
     services: { resolveServiceById: async (id) => { const r = await resolveById(id); return r ? { projectId: r.projectId, slug: r.slug } : undefined; } },
@@ -216,8 +215,9 @@ function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeC
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, scm, apiCatalog, hosts, isAdmin, resolveById } = core;
   const release = createReleaseModule({
-    ...(deps.deletion ? { deletion: { physics: deps.deletion.release, assertGrant: project.api.assertProjectDeletionGrant }, deletionIdentities: deps.identities,
-      projectAdmission: { protectCurrent: projectCallbackOwners(k8s, settings.systemNamespace, settings.platformPodUid, 'crewstation.io/release-project-stop').protectCurrentProcess, assertAvailable: (id: string) => project.api.assertProjectAvailable(id as ProjectId) } } : {}),
+    ...(deps.deletion ? { deletion: { physics: deps.deletion.release, assertGrant: project.api.assertProjectDeletionGrant }, deletionIdentities: deps.identities } : {}),
+    ...(settings.platformPodUid ? { projectAdmission: { protectCurrent: projectCallbackOwners(k8s, settings.systemNamespace, settings.platformPodUid, 'crewstation.io/release-project-stop').protectCurrentProcess, assertAvailable: (id: string) => project.api.assertProjectAvailable(id as ProjectId),
+      ...(settings.projectDeletionNative?.registry ? { assertNativeRegistryAvailable: nativeRegistryWriterAdmission(settings.projectDeletionNative.registry).assertAvailable } : {}) } } : {}),
     executionHandoff: { observeMigrationStopped: migrationWriterObserver(deps.k8s, core.project.api.resolveServiceById), observeWritersStopped: executionWriterObserver(deps.k8s, core.project.api.resolveServiceById), ...executionHandoffPorts(() => { if (!late.businessTask) throw new Error('business-task 尚未装配'); return late.businessTask; }, () => { if (!late.gateway) throw new Error('gateway 尚未装配'); return late.gateway; }, () => { if (!late.release) throw new Error('release 尚未装配'); return late.release; }) },
     runtimeImages: releaseImagePorts(images.api, { isAdmin, pinServiceImage: images.pinServiceImage, resolveProfile: (projectId, selector) => core.agentRuntime.api.resolveForProject(projectId, selector, 'subtask') }),
     // 服务槽投影进资源台账（RFC-025 第三期）：在 release 自己的事务里写期望与领域条件。T8：槽与构建、迁移 Job 由资源中心建出（CS_RELEASE_CREATION=owner
@@ -536,8 +536,9 @@ function composeModules(deps: CompositionDeps) {
   const resources = composeLedger(deps, core);
   late.resources = resources.api;
   const runtimeEnvironment = createManagedRuntimeEnvironmentModule({
-    ...(deps.deletion ? { deletion: { physics: deps.deletion.images, assertGrant: core.project.api.assertProjectDeletionGrant },
-      projectAdmission: { protectCurrent: projectCallbackOwners(deps.k8s, deps.settings.systemNamespace, deps.settings.platformPodUid, 'crewstation.io/image-project-stop').protectCurrent, assertAvailable: (id: string) => core.project.api.assertProjectAvailable(id as ProjectId) } } : {}),
+    ...(deps.deletion ? { deletion: { physics: deps.deletion.images, assertGrant: core.project.api.assertProjectDeletionGrant } } : {}),
+    ...(deps.settings.platformPodUid ? { projectAdmission: { protectCurrent: projectCallbackOwners(deps.k8s, deps.settings.systemNamespace, deps.settings.platformPodUid, 'crewstation.io/image-project-stop').protectCurrent, assertAvailable: (id: string) => core.project.api.assertProjectAvailable(id as ProjectId),
+      ...(deps.settings.projectDeletionNative?.registry ? { assertNativeRegistryAvailable: nativeRegistryWriterAdmission(deps.settings.projectDeletionNative.registry).assertAvailable } : {}) } } : {}),
     ...imageOwnerPorts(() => late),
     validationExecutor: imageValidationPorts({ authorize: core.project.api.authorize, isAdmin: core.isAdmin, launchMaterial: core.agentRuntime.api.launchMaterial, runtime: () => { if (!late.taskRuntime) throw new Error('task-runtime 尚未装配'); return late.taskRuntime; } }),
     ...runtimeImagePlatformPorts({ project: core.project.api, scm: core.scm.api, config: core.config.api, compute: core.agentRuntime.api, isAdmin: core.isAdmin }, deps.settings), db: deps.db, k8s: deps.k8s, logger: deps.logger, instance: deps.instance, isAdmin: core.isAdmin,
@@ -565,7 +566,7 @@ export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
     name: 'platform', storageContract: { ...m.data.api.storageContract, enable: async () => { await assertStorageConsumers(deps.k8s, deps.settings.systemNamespace, m.data.api.storageContract.version); await m.data.api.storageContract.enable(); } },
     initializePlatformRoles: () => m.identity.api.initializePlatformRoles(), bootstrapAdmin: (raw) => m.identity.api.bootstrapAdmin(raw),
     routers: {
-      controller: [...m.cluster.internalHttp, ...m.data.internalHttp],
+      controller: [...m.cluster.internalHttp, ...m.data.internalHttp, ...projectDeletionGrantRoutes(deps.settings.projectDeletionNative, m.project.api.assertProjectDeletionGrant)],
       transfers: [...m.identity.http.devSessionGate, ...m.data.transferHttp],
       // devSessionGate 只挂中间件不占路径，必须排在最前：Hono 按注册顺序执行，晚于业务路由就来不及改判身份。
       api: [...m.identity.http.devSessionGate, ...m.project.http, ...m.identity.http.users, ...m.config.http, ...m.agentRuntime.http, ...m.runtimeEnvironment.http, ...m.data.http, ...m.scm.http, ...m.apiCatalog.http, ...m.release.http, ...m.gateway.http, ...m.taskRuntime.http, ...m.devSession.http, m.businessTask.http.service, m.businessTask.http.user, ...m.events.http.query, ...m.observability.http, ...m.cluster.http, ...m.capabilities.http, ...m.provisioning.http, ...m.clusterControl.http, ...m.resources.http, ...m.resourceAccess.http],

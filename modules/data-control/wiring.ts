@@ -26,6 +26,8 @@ import { objectEndpointStore } from './adapters/persistence/objectEndpoints';
 import { probeObjectBucket } from './adapters/http/objectProbe';
 import { observeGarage } from './adapters/http/garageObservation';
 import { s3ObjectPlane } from './adapters/http/s3Objects';
+import { objectDeletionTransport } from './adapters/http/objectDeletion';
+import { garageDeletionTransport } from './adapters/http/garageDeletion';
 import { objectEndpointUseCases } from './application/objectEndpoints';
 import { objectTransferMetrics } from './application/objectMetrics';
 import { prepareObjectCredentialRotation } from './application/objectCredentialRotation';
@@ -137,4 +139,13 @@ function createObjectPlane(db: Database, cipher: ReturnType<typeof secretboxCiph
 /** Trusted operational composition, using the same encrypted endpoint registry as the platform. */
 export function createObjectStoragePlane(db: Database, secretKeyBase64: string) {
   return createObjectPlane(db, secretboxCipher(secretKeyBase64));
+}
+/** Private operational composition; retains historical placement credentials
+ * within data-control and exposes no secrets to the deletion source. */
+export function createObjectDeletionTransport(db: Database, secretKeyBase64: string, fetcher: typeof fetch = fetch) {
+  const endpoints = objectEndpointUseCases({ store: objectEndpointStore(db), cipher: secretboxCipher(secretKeyBase64), probe: probeObjectBucket });
+  return objectDeletionTransport(endpoints.resolve, fetcher);
+}
+export function createGarageDeletionTransport(config: { endpoint: string; token: string }, fetcher: typeof fetch = fetch) {
+  return garageDeletionTransport(config, fetcher);
 }

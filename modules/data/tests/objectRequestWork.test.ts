@@ -14,6 +14,8 @@ import { objectArchiveFixture } from './objectArchiveFixture';
 import { objectUploadRepository } from '../adapters/persistence/objectUploads';
 import { transferObject } from '../application/objectTransfer';
 import { verifyNextObject } from '../application/objectMaintenance';
+import { nativeObjectDeletionAdmission } from '../adapters/persistence/objects/nativeDeletionAdmission';
+import { DATA_NATIVE_BLOCK_ADMISSION } from '../domain/deletionContents';
 
 const available = await testDatabaseAvailable(), digest = 'a'.repeat(64);
 const native = { podUid: Bun.randomUUIDv7(),containerId: 'containerd://' + 'c'.repeat(64),nodeUid: Bun.randomUUIDv7(),nodeName: 'controlled-node',pid: 123,startTicks: '456',pidNamespace: '789',bootId: Bun.randomUUIDv7() };
@@ -61,6 +63,28 @@ async function waitFinished(f: Awaited<ReturnType<typeof fixture>>) {
 }
 
 describe.skipIf(!available)('actual Data original byte callbacks (controlled byte plane, real PG)', () => {
+  test('native block purge holds the actual global admission until foreign byte requests finish', async () => {
+    const f = await fixture(), entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
+    let effects = 0;
+    const request = f.work.run(f.foreign.object, 'verify', async () => { entered.resolve(); await release.promise; });
+    let purging: Promise<number | undefined> | undefined;
+    try {
+      await entered.promise;
+      const ctx = { ...await context(f), phase: 'purge' as const };
+      const admission = nativeObjectDeletionAdmission(f.db.db, async original => { expect(original.operationId).toBe(ctx.operationId); });
+      purging = admission.exclusive(ctx, async () => { effects++; await admission.authorize(ctx); return effects; });
+      const deadline = Date.now() + 2000;
+      for (;;) {
+        const row = (await f.db.db.execute<{ waiting: boolean }>(sql`SELECT EXISTS(SELECT 1 FROM pg_locks WHERE locktype='advisory' AND mode='ExclusiveLock' AND NOT granted
+          AND classid=((hashtextextended(${DATA_NATIVE_BLOCK_ADMISSION},0)>>32)&4294967295)::oid AND objid=(hashtextextended(${DATA_NATIVE_BLOCK_ADMISSION},0)&4294967295)::oid) AS waiting`))[0];
+        if (row?.waiting) break; if (Date.now() > deadline) throw Error('native original admission did not wait'); await Bun.sleep(10);
+      }
+      expect(effects).toBe(0);
+      expect((await f.work.history.read(f.foreign.source.projectId)).records[0]?.state).toBe('running');
+      release.resolve(); await request; expect(await purging).toBe(1);
+      expect((await f.work.history.read(f.foreign.source.projectId)).records[0]?.state).toBe('finished');
+    } finally { release.resolve(); await request; await purging?.catch(() => undefined); await f.db.drop(); }
+  });
   for (const phase of ['put','verify'] as const) test(`${phase} includes the real upload metadata finalization and nested bytes use one original birth`, async () => {
     const f = await fixture(), entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
     let pending: Promise<unknown> | undefined;
@@ -214,6 +238,10 @@ describe.skipIf(!available)('actual Data original byte callbacks (controlled byt
       expect((await f.db.db.execute<{ stopped: boolean }>(sql`SELECT pg_terminate_backend(${row.backend_pid}) AS stopped`))[0]?.stopped).toBe(true);
       expect(await rejected).toBe(true);
       expect(await withExclusiveDatabaseAdmission(f.db.db,'data.project-admission:' + f.target.id,async () => 'lock released')).toBe('lock released');
+      let nativeEffects = 0;
+      const nativeAdmission = nativeObjectDeletionAdmission(f.db.db, async () => undefined);
+      expect(await nativeAdmission.exclusive({ ...ctx, phase: 'purge' }, async () => { nativeEffects++; return 1; })).toBeUndefined();
+      expect(nativeEffects).toBe(0);
       f.close(); expect((await f.data.api.deletionOwner!.run(ctx)).kind).toBe('waiting');
       expect((await f.work.history.read(f.target.id)).records[0]?.state).toBe('running');
       expect(await f.db.db.execute(sql`SELECT project_id FROM data.project_deletions`)).toHaveLength(0);

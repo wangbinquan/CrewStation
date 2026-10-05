@@ -7,32 +7,39 @@ import { runtimeHistoricalStop } from './runtimeStopHistory';
 export function runtimeProjectStops<Selection, Result>(project: RuntimeStopProject,
   development: (context: ProjectDeletionContext, selection: Selection) => Promise<Result>, receipts: RuntimeStopReceipts,
   digital: (context: ProjectDeletionContext, environment: RuntimeStoppedEnvironment) => Promise<{ kind: 'ready' } | { kind: 'waiting'; reason: string }>, history?: RuntimeStopHistory) {
+  const originalPod = async (context: ProjectDeletionContext, environment: RuntimeStoppedEnvironment) => {
+    await project.assertProjectDeletionGrant(context);
+    const grant = await project.projectDeletionParticipantContext(context, 'resources');
+    const pods = grant.confirmed.resources.filter(row => {
+      if (row.kind !== 'protected:Pod' || row.scope === 'metadata') return false;
+      const key = JSON.parse(row.id) as { kind?: string; namespace?: string; name?: string };
+      return key.kind === 'Pod' && key.namespace === environment.namespace && key.name === environment.podName;
+    });
+    if (!pods.length) return undefined;
+    if (pods.length !== 1) throw precondition('原执行 Pod 的完整确认范围不唯一');
+    const pod = pods[0]!, selected = JSON.parse(pod.identity) as { uid?: unknown; nodeUid?: unknown; nodeName?: unknown; specDigest?: unknown }, uid = selected.uid;
+    if (typeof uid !== 'string' || !uid || pod.sourceIdentity !== undefined && pod.sourceIdentity !== uid
+      || typeof selected.specDigest !== 'string' || !/^[a-f0-9]{64}$/.test(selected.specDigest)
+      || selected.nodeUid !== null && typeof selected.nodeUid !== 'string' || selected.nodeName !== null && typeof selected.nodeName !== 'string'
+      || !!selected.nodeUid !== !!selected.nodeName) throw precondition('原执行 Pod 的独立确认 UID 或节点无效');
+    for (const expected of [environment.podUid, environment.native?.podUid]) if (expected !== undefined && expected !== uid) throw precondition('原执行与确认 Pod 实例冲突');
+    await project.assertProjectDeletionGrant(context);
+    return { grant, pod, selected, uid };
+  };
   return {
     development: (context: ProjectDeletionContext) => ({ advance: async (selection: Selection) => {
       const grant = await project.projectDeletionParticipantContext(context, 'dev-session');
       return development(grant, selection);
     } }),
     digital,
+    originalPodUid: async (context: ProjectDeletionContext, environment: RuntimeStoppedEnvironment) => (await originalPod(context, environment))?.uid,
     stopped: async (context: ProjectDeletionContext, environment: RuntimeStoppedEnvironment) => {
-      await project.assertProjectDeletionGrant(context);
-      const grant = await project.projectDeletionParticipantContext(context, 'resources');
-      const pods = grant.confirmed.resources.filter((row) => {
-        if (row.kind !== 'protected:Pod' || row.scope === 'metadata') return false;
-        const key = JSON.parse(row.id) as { kind?: string; namespace?: string; name?: string };
-        return key.kind === 'Pod' && key.namespace === environment.namespace && key.name === environment.podName;
-      });
-      if (pods.length === 0) {
+      const original = await originalPod(context, environment);
+      if (!original) {
         const proof = history ? await runtimeHistoricalStop(history, environment) : undefined;
         await project.assertProjectDeletionGrant(context); return proof;
       }
-      if (pods.length !== 1) throw precondition('原执行 Pod 的完整确认范围不唯一');
-      const pod = pods[0]!, selected = JSON.parse(pod.identity) as { uid?: unknown; nodeUid?: unknown; nodeName?: unknown; specDigest?: unknown }, uid = selected.uid;
-      if (typeof uid !== 'string' || !uid || pod.sourceIdentity !== undefined && pod.sourceIdentity !== uid
-        || typeof selected.specDigest !== 'string' || !/^[a-f0-9]{64}$/.test(selected.specDigest)
-        || selected.nodeUid !== null && typeof selected.nodeUid !== 'string' || selected.nodeName !== null && typeof selected.nodeName !== 'string'
-        || !!selected.nodeUid !== !!selected.nodeName) throw precondition('原执行 Pod 的独立确认 UID 或节点无效');
-      for (const expected of [environment.podUid, environment.native?.podUid])
-        if (expected !== undefined && expected !== uid) throw precondition('原执行与确认 Pod 实例冲突');
+      const { grant, pod, selected, uid } = original;
       const proof = await receipts.get(grant, pod.id, uid);
       await project.assertProjectDeletionGrant(context);
       if (!proof) return undefined;

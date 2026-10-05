@@ -25,6 +25,7 @@ const scopeSchema = z.object({ version: z.literal(1), plan: planSchema, source: 
   repositories: z.array(original.extend({ createdAt: timestamp, identity: hash })),
   objects: z.array(z.object({ repositoryId: remoteId, kind: z.enum(SCM_STORAGE_KINDS), id: z.string().min(1).max(1024), identity: hash, sourceIdentity: hash, count: z.number().int().nonnegative() }).strict()),
   coverage: z.array(z.object({ repositoryId: remoteId, kind: z.enum(SCM_STORAGE_KINDS), identity: hash, complete: z.literal(true) }).strict()),
+  retained: z.array(z.object({ repositoryId: remoteId, identity: hash, contents: z.string().min(1).refine(value => Buffer.byteLength(value) <= 8_388_608) }).strict()).optional(),
 }).strict();
 const blocker = (code: string, message: string, resourceId?: string) => ({ participant: 'scm' as const, code, message, ...(resourceId ? { resourceId } : {}) });
 const historyReferences = (history: ScmWriteHistory) => history.foreignRepositoryReferences.map((entry) => ({ kind: 'gitlab-project-reference', id: entry.remoteProjectId + ':' + entry.projectId, projectId: entry.projectId, description: '其他项目的绑定、原沿革或回调仍引用此原远端仓库' }));
@@ -62,6 +63,8 @@ function validateScope(raw: ScmDeletionScope, plan?: ScmDeletionPlan): ScmDeleti
   if (new Set(keys).size !== keys.length || jsonHash(keys.sort()) !== jsonHash(all.sort())) throw precondition('代码仓库存储类别未独立完整覆盖');
   const objects = scope.objects.map((entry) => entry.repositoryId + ':' + entry.kind + ':' + entry.id);
   if (new Set(objects).size !== objects.length || scope.objects.some((entry) => !all.includes(entry.repositoryId + ':' + entry.kind))) throw precondition('代码仓库文件范围重复或引用了其他仓库');
+  if (scope.retained && (new Set(scope.retained.map(row => row.repositoryId)).size !== scope.retained.length
+    || jsonHash(scope.retained.map(row => row.repositoryId).sort()) !== jsonHash(scope.repositories.map(row => row.remoteProjectId).sort()))) throw precondition('代码仓库保留来源遗漏、重复或属于其他仓库');
   return scope;
 }
 function physicalResources(scope: ScmDeletionScope): ProjectDeletionInventory['resources'] {
@@ -69,6 +72,7 @@ function physicalResources(scope: ScmDeletionScope): ProjectDeletionInventory['r
   if (scope.plan.currentOrigins) resources.push({ kind: 'gitlab-current-origins', id: scope.plan.projectId, identity: scope.plan.currentOrigins.digest, sourceIdentity: scope.plan.currentOrigins.source.identity, scope: 'physical', count: 0 });
   for (const entry of scope.objects) resources.push({ kind: 'gitlab-storage:' + entry.kind, id: jsonHash([entry.repositoryId, entry.kind, entry.id]), identity: entry.identity, sourceIdentity: entry.sourceIdentity, scope: 'physical', count: entry.count });
   for (const entry of scope.coverage) resources.push({ kind: 'gitlab-coverage:' + entry.kind, id: entry.repositoryId, identity: entry.identity, sourceIdentity: jsonHash(scope.source), scope: 'physical', count: 0 });
+  for (const entry of scope.retained ?? []) resources.push({ kind: 'gitlab-retained-source', id: entry.repositoryId, identity: entry.identity, sourceIdentity: scope.source.identity, scope: 'physical', count: 0 });
   return resources.sort((a, b) => (a.kind + ':' + a.id).localeCompare(b.kind + ':' + b.id));
 }
 function inventory(target: ProjectDeletionTarget, history: ScmWriteHistory, scope: ScmDeletionScope | null, report: ScmDeletionSourceReport): ProjectDeletionInventory {
@@ -100,7 +104,7 @@ export function scmProjectDeletionOwner(input: Input): ProjectDeletionOwner {
     }
     const prepared = deletionPlan(target, history);
     const recoverable = new Set(['scm-origin-unrecorded', 'scm-credential-history-incomplete']);
-    if (input.currentOrigins && prepared.blockers.every((entry) => recoverable.has(entry.code))) {
+    if (input.currentOrigins && prepared.plan.repositories.length && prepared.blockers.every((entry) => recoverable.has(entry.code))) {
       const historyHash = jsonHash(history), raw = await input.currentOrigins.read(target, history);
       const after = await input.writes.history(target.id);
       if (jsonHash(history) !== historyHash || after.revision !== history.revision) return { report: inventory(target, after, null, { complete: false, blockers: [blocker('scm-source-history-changed', '当前归属读取期间原历史变化，需重新核对')], references: historyReferences(after) }), scope: null };

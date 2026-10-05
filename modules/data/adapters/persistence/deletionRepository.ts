@@ -10,6 +10,14 @@ import { inspectDataContent, registeredDataContent } from './deletionInspection'
 
 async function inspection(db: Executor, deps: DataProjectDeletion, target: ProjectDeletionTarget) {
   const current = await inspectDataContent(db,deps.sources,target);
+  const retained = (await db.execute<{ body: unknown }>(sql`SELECT body FROM data.project_deletions WHERE project_id=${target.id}`))[0];
+  if (retained) {
+    const previous = DataDeletionScopeSchema.parse(retained.body);
+    if (previous.nativeHistory) {
+      if (previous.nativeHistory.digest !== jsonHash(previous.nativeHistory.body)) throw precondition('data retained native history is corrupt');
+      current.scope = { ...current.scope, objectsPresent: true, nativeHistory: previous.nativeHistory };
+    }
+  }
   let sourceIdentity: string | null = null;
   if (current.scope.objectsPresent) {
     if (!deps.physics) {
@@ -18,10 +26,16 @@ async function inspection(db: Executor, deps: DataProjectDeletion, target: Proje
     } else {
       const source = await deps.physics.inspect(target,current.scope);
       if (!/^[a-f0-9]{64}$/.test(source.identity)) throw precondition('data physical source identity is invalid');
+      if (source.nativeHistory) {
+        const captured = DataDeletionScopeSchema.parse({ ...current.scope, nativeHistory: source.nativeHistory });
+        if (captured.nativeHistory?.identity !== source.identity || captured.nativeHistory.digest !== jsonHash(captured.nativeHistory.body)) throw precondition('data retained native history does not bind the original source');
+        current.scope = captured;
+      }
       sourceIdentity = source.identity; current.inventory.complete &&= source.complete;
       current.inventory.references.push(...source.references); current.inventory.blockers.push(...source.blockers);
-      current.inventory.resources.push({ kind: 'data-object-source', id: target.id, identity: source.identity, sourceIdentity: source.identity, count: current.scope.locations.length, scope: 'physical' });
-      current.inventory.revision = jsonHash({ metadata: current.inventory.revision, sourceIdentity });
+      if (source.count !== undefined && (!Number.isSafeInteger(source.count) || source.count < 0)) throw precondition('data physical source count is invalid');
+      current.inventory.resources.push({ kind: 'data-object-source', id: target.id, identity: source.identity, sourceIdentity: source.identity, count: source.count ?? current.scope.locations.length, scope: 'physical' });
+      current.inventory.revision = jsonHash({ metadata: current.inventory.revision, sourceIdentity, ...(source.nativeHistory ? { nativeRevision: source.nativeHistory.digest } : {}) });
     }
   }
   return { ...current, sourceIdentity };

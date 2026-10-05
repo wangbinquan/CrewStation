@@ -10,6 +10,7 @@ function fixture() {
   const calls: string[] = [], sent: AcceptProjectDeletion[] = [], retained = new Map<string, PendingDeletionRequest>();
   const plan = deletionPlan(), operation = deletionOperation(); let found: ProjectDeletionOperation | undefined; let now = Date.now();
   const api: ProjectDeletionsResource = {
+    capabilities: async () => ({ available: true }),
     find: async () => { calls.push('find'); return found; }, prepare: async () => { calls.push('prepare'); return plan; },
     accept: async (_id, input) => { calls.push('accept'); sent.push(structuredClone(input)); return operation; },
     get: async () => { calls.push('get'); return operation; }, retry: async () => { calls.push('retry'); return operation; },

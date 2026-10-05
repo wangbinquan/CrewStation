@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@crewstation/contracts": "workspace:*",
+    "@crewstation/filesystem-metrics": "workspace:*",
     "@crewstation/eventbus": "workspace:*",
     "@crewstation/http": "workspace:*",
     "@crewstation/k8s": "workspace:*",

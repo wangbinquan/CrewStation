@@ -23,6 +23,17 @@ export { createGitLabStorageRemovalClient, parseGitLabStorageRemovalOutput, GitL
 export type { GitLabStorageRemovalRequest, GitLabStorageRemovalReceipt } from './native/storage/removal';
 export { createGitLabStorageRemovalHandler } from './native/storage/removalServer';
 export type { GitLabStorageRemovalObserver } from './native/storage/removalServer';
+export { createGitLabDestructionClient, parseGitLabDestructionOutput } from './native/destruction/client';
+export { createGitLabDestructionHandler } from './native/destruction/server';
+export { GitLabDestructionRequestSchema, GitLabDestructionReceiptSchema } from './native/destruction/protocol';
+export type { GitLabDestructionRequest, GitLabDestructionReceipt } from './native/destruction/protocol';
+export type { GitLabDestructionObserver } from './native/destruction/server';
+export { createGitLabFootprintClient, createGitLabFootprintHandler, parseGitLabFootprintOutput, GitLabFootprintRequestSchema, GitLabFootprintSchema } from './native/storage/footprint';
+export type { GitLabFootprint, GitLabFootprintObserver } from './native/storage/footprint';
+export { createGitLabActivityClient, createGitLabActivityHandler, parseGitLabActivityOutput } from './native/activity/transport';
+export { GitLabActivityRequestSchema, GitLabActivityReceiptSchema, GitLabConsumerManifestSchema, GitLabConsumerGroupSchema } from './native/activity/protocol';
+export type { GitLabActivityRequest, GitLabActivityReceipt } from './native/activity/protocol';
+export type { GitLabActivityObserver } from './native/activity/transport';
 export type {
   AddWebhookInput, CreateProjectAccessTokenInput, CreateProjectInput, CreateTagInput, DeleteProjectOptions, GitLabAccessLevel, GitLabAccessToken, GitLabBranch,
   GitLabCommit, GitLabCompareResult, GitLabCreatedAccessToken, GitLabGroup, GitLabProject, GitLabProjectArchivalState, GitLabProjectDeletionState, GitLabProjectRef, GitLabProtectedTag, GitLabRepositoryStorage,

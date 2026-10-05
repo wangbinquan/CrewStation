@@ -44,7 +44,9 @@ test('同一 Runner 重连仍使用原 seq 续传，不重复基移或改变事�
   link.start(); await link.whenReady();
   expect(link.emit({ kind: 'runnerState', state: 'ready' })).toBe(11);
   await session.waitForEvent('runnerState');
-  session.stop();
+  // Wait for the original listener and connections to stop before rebinding
+  // its port; ignoring Bun's shutdown promise races the reconnect handshake.
+  await session.stop();
   expect(link.emit({ kind: 'fileChanged', path: 'next.ts' })).toBe(12);
   const next = startFakeSession({ port: session.port, resumeFromSeq: () => 11 });
   cleanups.push(() => next.stop());

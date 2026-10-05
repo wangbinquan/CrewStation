@@ -9,7 +9,7 @@ import {freshPlatformNode} from '../platformPodTermination';
 import {registryProbe,registryServer,registryStorage,registryUnavailable} from './origin';
 import type {RegistrySourceOptions} from './origin';
 
-export type RegistryInventoryQuery=Pick<RegistryInventoryRequest,'exact'|'prefixes'|'retainedDigests'|'retainedManifests'>;
+export type RegistryInventoryQuery=Pick<RegistryInventoryRequest,'exact'|'prefixes'|'retainedDigests'|'retainedManifests'|'protectedRepositories'>;
 /** Read-only bridge to the actual service, runtime image, volume and node probe; no writer/erasure claim. */
 export function nativeRegistrySource(k8s:K8sClient,raw:RegistrySourceOptions,fetcher:typeof fetch=fetch) {
   const options={...raw};

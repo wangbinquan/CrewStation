@@ -1,9 +1,10 @@
-import { AcceptProjectDeletionSchema, ProjectDeletionLookupSchema, ProjectDeletionOperationSchema, ProjectDeletionPlanSchema } from '@crewstation/contracts';
-import type { AcceptProjectDeletion, ProjectDeletionOperation, ProjectDeletionPlan } from '@crewstation/contracts';
+import { AcceptProjectDeletionSchema, ProjectDeletionCapabilitiesSchema, ProjectDeletionLookupSchema, ProjectDeletionOperationSchema, ProjectDeletionPlanSchema } from '@crewstation/contracts';
+import type { AcceptProjectDeletion, ProjectDeletionCapabilities, ProjectDeletionOperation, ProjectDeletionPlan } from '@crewstation/contracts';
 import type { Transport } from '../../httpTransport';
 import { segment } from '../../requestUrl';
 
 export interface ProjectDeletionsResource {
+  capabilities(): Promise<ProjectDeletionCapabilities>;
   prepare(projectId: string): Promise<ProjectDeletionPlan>;
   accept(projectId: string, input: AcceptProjectDeletion): Promise<ProjectDeletionOperation>;
   get(operationId: string): Promise<ProjectDeletionOperation>;
@@ -15,6 +16,7 @@ export interface ProjectDeletionsResource {
 export function projectDeletionsResource(transport: Transport): ProjectDeletionsResource {
   const project = (id: string) => `/v1/projects/${segment(id)}`, operation = (id: string) => `/v1/project-deletions/${segment(id)}`;
   return {
+    capabilities: async () => ProjectDeletionCapabilitiesSchema.parse(await transport.request('GET', '/v1/project-deletions/capabilities')),
     prepare: async (id) => ProjectDeletionPlanSchema.parse(await transport.request('POST', `${project(id)}/deletion-plans`, { body: {} })),
     accept: async (id, input) => ProjectDeletionOperationSchema.parse(await transport.request('POST', `${project(id)}/deletions`, { body: AcceptProjectDeletionSchema.parse(input) })),
     get: async (id) => ProjectDeletionOperationSchema.parse(await transport.request('GET', operation(id))),

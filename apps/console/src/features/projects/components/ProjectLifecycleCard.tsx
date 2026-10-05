@@ -9,6 +9,8 @@ import { Button } from '../../../shared/ui/Button';
 import { Card } from '../../../shared/ui/Card';
 import { ConfirmDialog } from '../../../shared/ui/dialog/ConfirmDialog';
 import { ProjectStateBadge } from './ProjectStateBadge';
+import { useOpenProjectDeletion } from '../../../shared/admin/ProjectDeletionSlot';
+import { Stack } from '../../../shared/ui/Stack';
 
 /**
  * 仅接既有归档动作；同步状态与异步路由处理分开说明。归档没有恢复入口，确认走弹窗并输入 archive
@@ -16,6 +18,7 @@ import { ProjectStateBadge } from './ProjectStateBadge';
  */
 export function ProjectLifecycleCard({ project, isAdmin, unavailable }: { readonly project: ProjectDto; readonly isAdmin: boolean; readonly unavailable: boolean }) {
   const t = useT(), lock = useRef(false), [confirming, setConfirming] = useState(false);
+  const openDeletion = useOpenProjectDeletion();
   const archive = useApiMutation(() => api.projects.archive(project.id), { invalidate: [queryKeys.projects(), ['market'], queryKeys.gateway()] });
   const canArchive = ['active', 'failed'].includes(project.state);
   const submit = async () => {
@@ -26,7 +29,7 @@ export function ProjectLifecycleCard({ project, isAdmin, unavailable }: { readon
   };
   // 对象卡片：「归档项目」在底部操作条，危险动作红色描边（2026-09-23 裁定）；不能归档时只在正文说明原因。
   const archivable = project.state !== 'archived' && isAdmin && canArchive;
-  return <Card stacked compact title={t('projects.lifecycle.archive')}
+  return <Stack><Card stacked compact title={t('projects.lifecycle.archive')}
     actions={archivable ? <Button variant="danger" disabled={unavailable || archive.isPending} onClick={() => { archive.reset(); setConfirming(true); }}>{archive.isPending ? t('projects.lifecycle.archiving') : t('projects.lifecycle.archive')}</Button> : undefined}>
     <p><ProjectStateBadge state={project.state} /> {project.message}</p>
     <p>{t('projects.lifecycle.effect')}</p>
@@ -43,5 +46,8 @@ export function ProjectLifecycleCard({ project, isAdmin, unavailable }: { readon
     </ConfirmDialog> : null}
     {archive.isError ? <ActionNote tone="error">{t('projects.lifecycle.error', { message: errorMessage(archive.error) })}</ActionNote> : null}
     {archive.isSuccess ? <ActionNote tone="success">{t('projects.lifecycle.saved', { state: t(`projects.state.${archive.data.state}`) })}</ActionNote> : null}
-  </Card>;
+  </Card>{isAdmin && openDeletion ? <Card stacked compact title={t('projects.delete.confirmTitle')}
+    actions={<Button variant="danger" disabled={unavailable || archive.isPending} onClick={event => openDeletion(project, event.currentTarget)}>{t(project.state === 'deleting' ? 'projects.delete.progressTitle' : 'projects.delete.confirmTitle')}</Button>}>
+    <p>{t('projects.delete.consequence')}</p><p>{t('projects.delete.irreversible')}</p>
+  </Card> : null}</Stack>;
 }

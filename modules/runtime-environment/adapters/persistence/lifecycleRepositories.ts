@@ -164,6 +164,20 @@ export async function runtimeImageProjectContent(db: Executor, rawProjectId: str
     resources.push({ kind: 'runtime-image:' + consumer.kind, id: consumer.id, scope: 'physical', identity, sourceIdentity: identity, count: 1 });
   }
   resources.sort((a, b) => (a.kind + ':' + a.id).localeCompare(b.kind + ':' + b.id));
+  const artifacts: NonNullable<RuntimeImageProjectContent['artifacts']>[number][] = [];
+  for(const row of all) {
+    if(row.table==='builds'&&ownBuildIds.has(String(row.body.id))) {
+      const payload=document(row.body.payload),plan=document(payload.resourcePlan),repository=field(plan.repository);
+      if(repository)artifacts.push({kind:'build',id:String(row.body.id),repository,projectOwned:projectOwners(row).length===1&&projectOwners(row)[0]===projectId&&plan.projectId===projectId});
+    }
+    if(row.table==='versions') {
+      const repository=field(row.body.repository),digest=field(row.body.digest);
+      // Versions are platform catalog content. Project build/credential/log
+      // records may be removed after minimal provenance has been transferred.
+      if(repository&&digest)artifacts.push({kind:'version',id:String(row.body.id),repository,digest,projectOwned:false});
+    }
+  }
+  artifacts.sort((a,b)=>(a.kind+':'+a.id).localeCompare(b.kind+':'+b.id));
   const material = { participant: 'runtime-environment' as const, complete: blockers.length === 0 && references.length === 0, resources, references, blockers };
-  return { inventory: ProjectDeletionInventorySchema.parse({ ...material, revision: jsonHash({ ...material, consumers, callbacks, dependencies }) }), rows, consumers, callbacks, dependencies };
+  return { inventory: ProjectDeletionInventorySchema.parse({ ...material, revision: jsonHash({ ...material, consumers, callbacks, dependencies, artifacts }) }), rows, consumers, callbacks, dependencies, artifacts };
 }

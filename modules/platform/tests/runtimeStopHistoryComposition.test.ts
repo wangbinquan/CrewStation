@@ -7,7 +7,7 @@ import { runtimeProjectStops } from '../application/deletion/runtimeStops';
 
 const available = await testDatabaseAvailable();
 /** Actual resource factory and persisted history; Root grants and the original observer fact are controlled. */
-async function fixture() {
+async function fixture(admit = true) {
   const database = await createTestDatabase([resourcesMigrations]);
   const resources = createResourcesModule({ db: database.db, quotas: { limitFor: async () => undefined },
     authorizer: { projectAccess: async () => ({ operate: true }) }, isAdmin: async () => true });
@@ -23,8 +23,8 @@ async function fixture() {
     namespace, podName, volumeUid, purpose: 'business', finalization: null });
   const permit = { podUid: crypto.randomUUID(), nodeName: 'controlled-original-node', nodeUid: crypto.randomUUID() };
   const safety = resources.api.workloadSafety;
-  await safety.register(consumer); await safety.grantStart(consumer.id, permit);
-  const env = { id: taskId, kind: 'business', namespace, podName, podUid: permit.podUid,
+  await safety.register(consumer); if (admit) await safety.grantStart(consumer.id, permit);
+  const env = { id: taskId, kind: 'business', namespace, podName, ...(admit ? { podUid: permit.podUid } : {}),
     businessWorkspace: { volumeUid }, render: { start: 1, workloadConsumerId: consumer.id } };
   const context = ProjectDeletionContextSchema.parse({ operationId: newResourceId(), generation: 1, phase: 'stop',
     target: { id: projectId, serviceId: newResourceId(), name: 'Historical original', slug: 'historical-original', namespace, kind: 'DigitalWorker',
@@ -40,6 +40,17 @@ async function fixture() {
   return { database, resources, env, context, ports, safety, consumer, stopped, loseGrantDuringRead: () => { invalidateRead = true; } };
 }
 describe.skipIf(!available)('historical runtime STOP composition (actual PostgreSQL/resources; controlled Root and original observer)', () => {
+  test('a never-admitted original is proved by its closed durable writer, without inventing a Pod identity or deleting by name', async () => {
+    const f = await fixture(false);
+    try {
+      expect(await f.ports.originalPodUid(f.context, f.env)).toBeUndefined();
+      expect(await f.ports.stopped(f.context, f.env)).toBeUndefined();
+      await f.safety.closeConsumer(f.consumer.id);
+      expect((await f.ports.stopped(f.context, f.env))?.digest).toMatch(/^[a-f0-9]{64}$/);
+      expect((await f.safety.get(f.consumer.id))?.startPermit).toBeNull();
+      await expect(f.safety.grantStart(f.consumer.id, { podUid: crypto.randomUUID(), nodeName: 'late', nodeUid: crypto.randomUUID() })).rejects.toMatchObject({ kind: 'precondition' });
+    } finally { await f.database.drop(); }
+  });
   test('a reopened resource factory retains the original stop fact after its live Pod is gone; absence or closure alone cannot finish', async () => {
     const f = await fixture();
     try {

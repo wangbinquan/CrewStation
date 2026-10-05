@@ -5,6 +5,22 @@ import { TARGET, deletionObject } from './projectDeletionFixture';
 import { podProtectionFixture } from './projectPodProtectionFixture';
 
 describe('原项目 Pod 保护与物理停止（有状态 API Server 替身）', () => {
+  test('selected build consumers use the complete original grant and preserve every other protected Pod', async () => {
+    const f = await podProtectionFixture(false);
+    await f.put(deletionObject('Pod', 'other', { spec: { containers: [{ name: 'other' }] } }));
+    const plan = await f.plan(); expect(plan.resources).toHaveLength(2);
+    const original = plan.resources.find(row => JSON.parse(row.id).name === 'original')!;
+    await f.source.seal(f.context('seal'));
+    const before = (await f.k8s.get(Resources.Pod!, 'other', TARGET.namespace))!;
+    await expect(f.source.stopSelected(f.context('stop'), ['unknown'])).rejects.toThrow('确认范围');
+    await expect(f.source.stopSelected(f.context('stop'), [original.id, original.id])).rejects.toThrow('确认范围');
+    expect(f.calls).not.toContain('delete');
+    expect(await f.source.stopSelected(f.context('stop'), [original.id])).toMatchObject({ kind: 'done', evidence: { kind: 'physical', count: 1 } });
+    const after = (await f.k8s.get(Resources.Pod!, 'other', TARGET.namespace))!;
+    expect(after).toEqual(before); expect(f.receipts.size).toBe(1);
+    expect(f.context('stop').confirmed.resources).toEqual(plan.resources);
+    expect(await f.source.stopSelected(f.context('stop'), [])).toMatchObject({ kind: 'done', evidence: { count: 0 } });
+  });
   test('原节点、普通/init/临时容器皆有终止证明且持久 ACK 后，才释放自己的保护', async () => {
     const f = await podProtectionFixture(); const report = await f.plan();
     expect(report.resources).toHaveLength(1); expect(JSON.stringify(report)).not.toContain('Running');

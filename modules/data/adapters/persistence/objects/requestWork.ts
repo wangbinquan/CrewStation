@@ -4,11 +4,12 @@ import type { ProjectId } from '@crewstation/contracts';
 import { ProjectIdSchema, ResourceIdSchema } from '@crewstation/contracts';
 import { jsonHash, newResourceId, precondition } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
-import { assertSharedDatabaseAdmissionActive, withSharedDatabaseAdmission } from '@crewstation/persistence';
+import { assertSharedDatabaseAdmissionActive, withSharedDatabaseAdmissions } from '@crewstation/persistence';
 import { sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { ObjectRequestOrigin, ObjectRequestProcesses, ObjectRequestRunner } from '../../../ports/deletion/objectWork';
 import type { ObjectByteLocation } from '../../../ports/objectStorage';
+import { DATA_NATIVE_BLOCK_ADMISSION } from '../../../domain/deletionContents';
 
 const uuid = z.string().uuid(), identity = z.string().min(1), decimal = z.string().regex(/^[0-9]+$/);
 const processSchema = z.object({ podUid: uuid,containerId: z.string().regex(/^[a-z0-9]+:\/\/[a-f0-9]{64}$/),nodeUid: uuid,nodeName: identity,
@@ -48,7 +49,7 @@ export function objectRequestWork(input: { db: Database; processes: ObjectReques
       return effect(current.origin);
     }
     const origin = await originalLocation(db,location);
-    return withSharedDatabaseAdmission(db,keyFor(origin.projectId),async guard => {
+    return withSharedDatabaseAdmissions(db,[keyFor(origin.projectId), DATA_NATIVE_BLOCK_ADMISSION],async guard => {
       await assertOpen(guard,origin.projectId,input.assertAvailable);
       if (await input.serviceProject(origin.serviceId) !== origin.projectId) throw precondition('object byte request service belongs to another project');
       const process = processSchema.parse(await input.processes.protectCurrent()), id = newResourceId(), exitKey = randomBytes(32).toString('hex');

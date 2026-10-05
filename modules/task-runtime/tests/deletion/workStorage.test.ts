@@ -73,7 +73,7 @@ describe.skipIf(!available)('original TaskRuntime storage work (actual factory a
       expect(history.some((row) => row.kind === 'effect')).toBe(true); expect(history.every((row) => row.exited)).toBe(true);
       expect(JSON.stringify(history)).not.toContain('controlled-private-archive-token');
     } finally { f.release.resolve(); await f.drop(); }
-  });
+  }, 15_000); // Serial real-PG fixture, archive, volume permit and teardown; no product deadline is relaxed.
 
   test('a detached archive credential request holds the project seal until its real finally; sealed nested APIs issue no new resource writes', async () => {
     const f = await fixture(); let issuing: Promise<unknown> | undefined, sealing: Promise<unknown> | undefined;

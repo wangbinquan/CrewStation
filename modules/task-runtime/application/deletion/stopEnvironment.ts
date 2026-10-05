@@ -47,8 +47,19 @@ export async function stopOriginalEnvironment(deps: NativeExecutionDeps, sources
     await cleanupDevelopmentWorkload({ ...deps, developmentCleanup: sources.development(context) }, env, heartbeat, identity);
   } else if (env.native?.state !== 'finished' && env.state !== 'released') {
     await closeStorageAdmission(deps, env); await fence();
-    if (env.native) await deps.nativeCluster.cleanup(env);
-    else await deps.cluster.deletePod(env);
+    const missingUid = !env.podUid && !env.native?.podUid;
+    const alreadyStopped = missingUid ? await sources.stopped(context, env) : undefined;
+    if (!alreadyStopped) {
+      if (missingUid) {
+        const uid = await sources.originalPodUid?.(context, env);
+        if (!uid) return { waiting: '原执行没有启动或停止历史，不能按名字删除 Pod' };
+        await fence();
+        // Preserve the original NULL UID in the durable environment. This
+        // local selection is independently bound to the confirmed Root scope.
+        await deps.cluster.deletePod({ ...env, podUid: uid });
+      } else if (env.native) await deps.nativeCluster.cleanup(env);
+      else await deps.cluster.deletePod(env);
+    }
     await fence();
     if ((await deps.cluster.podPhase(env)).phase !== 'Missing') return { waiting: '等待原执行 Pod 完整退出' };
     if (!await storageStopProved(deps, env)) return { waiting: '等待原工作卷消费者停止证明' };

@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { sql } from 'drizzle-orm';
-import { withSharedDatabaseAdmission } from '@crewstation/persistence';
+import { withSharedDatabaseAdmissions } from '@crewstation/persistence';
 import { releaseAdmissionKey } from '../adapters/persistence/drizzleUnitOfWork';
 import { eventbusMigrations } from '@crewstation/eventbus';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import { jsonHash, newResourceId } from '@crewstation/kernel';
-import { PROJECT_DELETION_PHASES, ProjectDeletionTargetSchema, type ProjectDeletionContext, type ProjectId, type ServiceId, type ReleaseId, type UserId } from '@crewstation/contracts';
+import { NATIVE_REGISTRY_ADMISSION, PROJECT_DELETION_PHASES, ProjectDeletionTargetSchema, type ProjectDeletionContext, type ProjectId, type ServiceId, type ReleaseId, type UserId } from '@crewstation/contracts';
 import { releaseMigrations } from '../wiring';
 import { drizzleUnitOfWork, releaseProjectAdmissions } from '../adapters/persistence/drizzleUnitOfWork';
 import { releaseDeletionRepository } from '../adapters/persistence/projectDeletion';
@@ -122,7 +122,7 @@ describe.skipIf(!available)('发布持久删除原范围与阶段',()=>{
  test('原范围缺少新存储面时不清元数据，错误来源和原回调出生不能补造恢复',async()=>{
   const x=await setup(),id=newResourceId();
   // Controlled legacy row: its process has stopped, but the old callback did not record a private finally.
-  await withSharedDatabaseAdmission(x.db,releaseAdmissionKey(x.project),async(protectedTx)=>{
+  await withSharedDatabaseAdmissions(x.db,[NATIVE_REGISTRY_ADMISSION,releaseAdmissionKey(x.project)],async(protectedTx)=>{
    const backend=Number((await protectedTx.execute<{pid:number}>(sql`SELECT pg_backend_pid() AS pid`))[0]!.pid);
    await x.db.transaction(tx=>tx.execute(sql`INSERT INTO release.deletion_callbacks(id,kind,consumer_id,project_id,service_id,backend_pid,original_process,input_digest,exit_key_hash)
     VALUES(${id},'pipeline',${x.own.id},${x.project},${x.service},${backend},${JSON.stringify({podUid:'91754092-388a-4131-a452-f9d4b75f0766',nodeUid:'8acdd9b0-3dd8-4a8a-afdf-a1d90a17cf1a',nodeName:'controlled-legacy-exit',containerId:'containerd://'+ 'a'.repeat(64),pid:987321,pidNamespace:'1000',bootId:'8acdd9b0-3dd8-4a8a-afdf-a1d90a17cf1a',startTicks:'123'})}::jsonb,${jsonHash('legacy')},${jsonHash('old-exit-key')})`));

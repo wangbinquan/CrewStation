@@ -2,6 +2,10 @@ import { z } from 'zod';
 import { ProjectIdSchema, ResourceIdSchema, SlugSchema, UserIdSchema } from '../../ids';
 import { ProjectDeletionBlockerSchema, ProjectDeletionDigestSchema, ProjectDeletionInventorySchema, ProjectDeletionPhaseSchema, ProjectDeletionReceiptSchema, ProjectDeletionStateSchema, ProjectDeletionTargetSchema } from './values';
 
+/** Available only when the complete cleanup controller is installed. */
+export const ProjectDeletionCapabilitiesSchema = z.object({ available: z.boolean() }).strict();
+export type ProjectDeletionCapabilities = z.infer<typeof ProjectDeletionCapabilitiesSchema>;
+
 export const ProjectDeletionPlanSchema = z.object({
   id: ResourceIdSchema, target: ProjectDeletionTargetSchema, digest: ProjectDeletionDigestSchema, expiresAt: z.iso.datetime(),
   complete: z.boolean(), participants: z.array(ProjectDeletionInventorySchema), blockers: z.array(ProjectDeletionBlockerSchema),

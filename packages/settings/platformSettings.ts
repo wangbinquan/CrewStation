@@ -1,4 +1,7 @@
+import { nativeDeletionSettings } from './nativeDeletion';
+import type { NativeDeletionSettings } from './nativeDeletion';
 export interface PlatformSettings {
+  projectDeletionNative?: NativeDeletionSettings;
   objectStorage?: { deploymentMode: 'local' | 'production'; apiUrl?: string };
   clusterMetrics?: { enabled: boolean; exporterToken: string; prometheusUrl: string; prometheusToken: string; probeToken: string; probeRoot: string; probePort: number };
   platformPodUid?: string;
@@ -65,6 +68,7 @@ export function loadPlatformSettings(env: Record<string, string | undefined> = p
   const visible = new URL(env.CS_DATA_POSTGRES_VISIBLE_URL ?? dataAdminUrl);
   if (env.CS_OBJECT_STORAGE_MODE && !['local', 'production'].includes(env.CS_OBJECT_STORAGE_MODE)) throw new Error('CS_OBJECT_STORAGE_MODE 必须是 local 或 production');
   return {
+    projectDeletionNative: nativeDeletionSettings(env),
     objectStorage: { deploymentMode: env.CS_OBJECT_STORAGE_MODE === 'local' ? 'local' : 'production', apiUrl: env.CS_OBJECT_API_URL ?? `http://api.${serviceDomain}:8088` },
     clusterMetrics: { enabled: env.CS_CLUSTER_METRICS_ENABLED === 'true', exporterToken: env.CS_CLUSTER_METRICS_TOKEN ?? '', prometheusUrl: env.CS_PROMETHEUS_URL ?? `http://prometheus.${systemNamespace}.svc.cluster.local:9090`, prometheusToken: env.CS_PROMETHEUS_TOKEN ?? '', probeToken: env.CS_STORAGE_PROBE_TOKEN ?? '', probeRoot: env.CS_STORAGE_PROBE_HOST_ROOT ?? '', probePort: num(env.CS_STORAGE_PROBE_PORT, 8095) },
     ...(env.CS_PLATFORM_POD_UID ? { platformPodUid: env.CS_PLATFORM_POD_UID } : {}),

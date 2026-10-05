@@ -145,6 +145,7 @@ spec:
     spec:
       automountServiceAccountToken: false
       nodeSelector: { kubernetes.io/os: linux }
+      hostPID: true
       tolerations: [{ operator: Exists }]
       containers:
         - name: probe
@@ -156,7 +157,7 @@ spec:
             - name: CS_STORAGE_PROBE_TOKEN
               valueFrom: { secretKeyRef: { name: crewstation-metrics, key: CS_STORAGE_PROBE_TOKEN } }
             - { name: CS_STORAGE_PROBE_ROOT, value: /volumes }
-          securityContext: { runAsUser: 0, runAsGroup: 0, allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL], add: [DAC_READ_SEARCH] } }
+          securityContext: { runAsUser: 0, runAsGroup: 0, allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL], add: [DAC_READ_SEARCH, SYS_PTRACE] } }
           resources: { requests: { cpu: 10m, memory: 32Mi }, limits: { cpu: 200m, memory: 256Mi } }
           readinessProbe: { httpGet: { path: /healthz, port: 8095 }, periodSeconds: 5 }
           livenessProbe: { httpGet: { path: /healthz, port: 8095 }, periodSeconds: 15 }

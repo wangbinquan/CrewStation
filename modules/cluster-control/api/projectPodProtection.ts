@@ -11,5 +11,7 @@ export interface ProjectPodProtection {
   /** 只保存已终结原 Pod 的停止证明并释放本操作的保护；不发起 Pod 删除。 */
   observeTerminating(context: ProjectDeletionContext): Promise<void>;
   stop(context: ProjectDeletionContext): Promise<ProjectDeletionStepResult>;
+  /** Stop selected confirmed consumers without inventing a smaller grant or stopping unrelated Pods. */
+  stopSelected(context: ProjectDeletionContext, keys: readonly string[]): Promise<ProjectDeletionStepResult>;
   verify(context: ProjectDeletionContext): Promise<ProjectDeletionStepResult>;
 }

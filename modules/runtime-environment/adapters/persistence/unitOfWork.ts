@@ -2,7 +2,7 @@ import { allocationReceipts, imageCreationRequests, projectImagePolicies } from 
 import { conflict, jsonHash, newResourceId, precondition } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
 import { assertSharedDatabaseAdmissionActive, withSharedDatabaseAdmissions } from '@crewstation/persistence';
-import { ProjectIdSchema, ResourceIdSchema } from '@crewstation/contracts';
+import { NATIVE_REGISTRY_ADMISSION, ProjectIdSchema, ResourceIdSchema } from '@crewstation/contracts';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
@@ -39,7 +39,10 @@ export function imageRepositoryScope(db: Executor): RepositoryScope {
     },
   };
 }
-export const runtimeImageUnitOfWork = (db: Database): UnitOfWork => ({ read: imageRepositoryScope(db), run: (fn) => db.transaction((tx) => fn(imageRepositoryScope(tx))) });
+export const runtimeImageUnitOfWork = (db: Database, assertNativeRegistryAvailable?: () => Promise<void>): UnitOfWork => ({ read: imageRepositoryScope(db),
+  run: (fn) => withSharedDatabaseAdmissions(db, [NATIVE_REGISTRY_ADMISSION], async () => {
+    await assertNativeRegistryAvailable?.(); return db.transaction((tx) => fn(imageRepositoryScope(tx)));
+  }) });
 
 function lockUnavailable(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
@@ -53,12 +56,13 @@ const callbackScopes = new AsyncLocalStorage<{ db: Database; ids: readonly strin
 
 /** Independent journal commits survive an outer SQL connection closing while the original callback still runs. */
 export function runtimeImageProjectAdmissions(input: {
-  db: Database; protectCurrent(): Promise<RuntimeImageCallbackProcess>; assertAvailable(projectId: string): Promise<void>;
+  db: Database; protectCurrent(): Promise<RuntimeImageCallbackProcess>; assertAvailable(projectId: string): Promise<void>; assertNativeRegistryAvailable?: () => Promise<void>;
 }): RuntimeImageProjectAdmissions {
   const ids = (values: readonly string[]) => [...new Set(values.map((value) => ProjectIdSchema.parse(value)))].sort();
   const assertActive = (values: readonly string[]) => {
     const current = callbackScopes.getStore();
     if (!current?.active || current.db !== input.db || ids(values).some((id) => !current.ids.includes(id))) throw precondition('原运行镜像回调已退出或来源范围变化');
+    assertSharedDatabaseAdmissionActive(input.db, NATIVE_REGISTRY_ADMISSION);
     for (const id of ids(values)) assertSharedDatabaseAdmissionActive(input.db, runtimeImageAdmissionKey(id));
   };
   const check = async (values: readonly string[]) => {
@@ -69,7 +73,6 @@ export function runtimeImageProjectAdmissions(input: {
   };
   return { assertActive, check, run: async (values, callback, work) => {
     const projects = ids(values);
-    if (!projects.length) return work();
     if (!ResourceIdSchema.safeParse(callback.id).success || !/^[a-f0-9]{64}$/.test(callback.inputDigest)) throw precondition('运行镜像回调缺少原输入身份');
     const current = callbackScopes.getStore();
     if (current?.db === input.db) {
@@ -78,11 +81,12 @@ export function runtimeImageProjectAdmissions(input: {
       await check(projects); return work();
     }
     for (const id of projects) await input.assertAvailable(id);
-    return withSharedDatabaseAdmissions(input.db, projects.map(runtimeImageAdmissionKey), async (protectedTx) => {
+    return withSharedDatabaseAdmissions(input.db, [NATIVE_REGISTRY_ADMISSION, ...projects.map(runtimeImageAdmissionKey)], async (protectedTx) => {
+      await input.assertNativeRegistryAvailable?.();
       for (const id of projects) await input.assertAvailable(id);
       const projectKeys = sql.join(projects.map((id) => sql`${id}`), sql`,`);
-      const sealed = await input.db.execute(sql`SELECT project_id FROM runtime_environment.deletion_fences WHERE project_id IN (${projectKeys})
-        UNION ALL SELECT project_id FROM runtime_environment.project_admissions WHERE sealed AND project_id IN (${projectKeys})`);
+      const sealed = projects.length ? await input.db.execute(sql`SELECT project_id FROM runtime_environment.deletion_fences WHERE project_id IN (${projectKeys})
+        UNION ALL SELECT project_id FROM runtime_environment.project_admissions WHERE sealed AND project_id IN (${projectKeys})`) : [];
       if (sealed.length) throw precondition('运行镜像项目准入已永久封闭');
       const original = callbackProcessSchema.parse(await input.protectCurrent());
       for (const id of projects) assertSharedDatabaseAdmissionActive(input.db, runtimeImageAdmissionKey(id));

@@ -6,6 +6,9 @@ const digest = z.string().regex(/^sha256:[a-f0-9]{64}$/), descriptor = z.object(
 const image = z.object({schemaVersion:z.literal(2),mediaType:z.enum(['application/vnd.oci.image.manifest.v1+json','application/vnd.docker.distribution.manifest.v2+json']).optional(),config:descriptor,layers:z.array(descriptor).max(4096),manifests:z.never().optional(),subject:descriptor.optional()});
 const index = z.object({schemaVersion:z.literal(2),mediaType:z.enum(['application/vnd.oci.image.index.v1+json','application/vnd.docker.distribution.manifest.list.v2+json']).optional(),manifests:z.array(descriptor).max(4096),config:z.never().optional(),layers:z.never().optional(),subject:descriptor.optional()});
 const repository = /^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)*$/;
+export function registryOwnsRepository(query: { exact: readonly string[]; prefixes: readonly string[]; protectedRepositories?: readonly string[] }, name: string): boolean {
+  return !query.protectedRepositories?.includes(name) && (query.exact.includes(name) || query.prefixes.some(prefix => name === prefix || name.startsWith(prefix + '/')));
+}
 export function registryDirectory(path:string) {
   if (path==='repositories'||path==='blobs'||path==='blobs/sha256') return;
   if (/^blobs\/sha256\/[a-f0-9]{2}$/.test(path)) return;

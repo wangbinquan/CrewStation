@@ -16,7 +16,8 @@ const contentSchema = z.object({ inventory: ProjectDeletionInventorySchema,
   rows: z.array(z.object({ table: z.enum(contentTables), key: z.string().min(1), identity: hash }).strict()),
   consumers: z.array(z.object({ kind: z.enum(['build', 'validation']), id: ResourceIdSchema, state: z.string().min(1), identity: hash,
     resourceId: ResourceIdSchema.optional(), executionEpoch: z.number().int().positive().optional(), podUid: z.string().min(1).optional(), planIdentity: hash.optional() }).strict()),
-  callbacks: z.array(RuntimeImageCallbackRecordSchema), dependencies: z.array(z.object({ kind: z.enum(['source', 'initializer']), revisionId: ResourceIdSchema, imageId: ResourceIdSchema }).strict()) }).strict();
+  callbacks: z.array(RuntimeImageCallbackRecordSchema), dependencies: z.array(z.object({ kind: z.enum(['source', 'initializer']), revisionId: ResourceIdSchema, imageId: ResourceIdSchema }).strict()),
+  artifacts: z.array(z.strictObject({ kind: z.enum(['build', 'version']), id: ResourceIdSchema, repository: z.string().min(1).max(512), digest: z.string().regex(/^sha256:[a-f0-9]{64}$/).optional(), projectOwned: z.boolean() })).optional() }).strict();
 const storedSchema = z.object({ version: z.literal(1), target: z.object({ projectId: ProjectIdSchema, namespace: z.string().min(1), serviceId: ResourceIdSchema.optional() }).strict(),
   inventory: ProjectDeletionInventorySchema, content: contentSchema, physical: RuntimeImagePhysicalScopeSchema.nullable() }).strict();
 type Fence = { operation_id: string; generation: number; revision: string; original: RuntimeImageDeletionScope; scope_verified: boolean; phase_index: number; receipts: RuntimeImageDeletionStored['receipts'] };

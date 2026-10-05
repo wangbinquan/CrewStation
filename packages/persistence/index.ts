@@ -1,6 +1,7 @@
 export type { Database, DatabaseHandle, Executor, Transaction } from './connection';
 export { SESSION_OPTIONS, connectDatabase, databaseReady, withDatabaseName, withSessionDefaults } from './connection';
-export { withSharedDatabaseAdmission, withSharedDatabaseAdmissions, withExclusiveDatabaseAdmission, assertSharedDatabaseAdmissionActive } from './transactionContext';
+export { withSharedDatabaseAdmission, withSharedDatabaseAdmissions, withExclusiveDatabaseAdmission, withExclusiveDatabaseAdmissionAuthority, assertSharedDatabaseAdmissionActive } from './transactionContext';
+export type { DatabaseAdmissionAuthority } from './exclusiveAuthority';
 export type { MigrationFile, MigrationSet } from './migrations';
 export { readMigrationDir, runMigrations } from './migrations';
 export { platformInfraSchema } from './infraSchema';

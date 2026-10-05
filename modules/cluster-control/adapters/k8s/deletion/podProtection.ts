@@ -57,6 +57,13 @@ export function kubernetesProjectPodProtection(k8s: K8sClient, ledger: Pick<Ledg
     seal: async (context) => { if (context.phase !== 'seal') throw precondition('Pod 保护许可阶段不符'); await authorize(context); for (const entry of expectedPods(context)) { const original = originalPodIdentity(entry.identity), pod = await currentPod(k8s, entry.id, original.uid); if (!pod || jsonHash(pod['spec'] ?? {}) !== original.specDigest) throw precondition('原 Pod 在保护前变化或消失'); await authorize(context); await protect(k8s, pod, context); } return done(context, 'seal'); },
     observeTerminating: async (context) => { if (context.phase !== 'stop') throw precondition('Pod 观测许可阶段不符'); await stopPods(k8s, context, store, authorize, now, false); },
     stop: async (context) => { if (context.phase !== 'stop') throw precondition('Pod 停止许可阶段不符'); return stopPods(k8s, context, store, authorize, now, true); },
+    stopSelected: async (context, keys) => {
+      if (context.phase !== 'stop') throw precondition('Pod 停止许可阶段不符');
+      const selected = new Set(keys);
+      if (selected.size !== keys.length || keys.some(key => !expectedPods(context).some(row => row.id === key))) throw precondition('所选消费者不属于完整的原 Pod 确认范围');
+      const result = await stopPods(k8s, context, store, authorize, now, true, selected);
+      return result.kind === 'done' ? { ...result, evidence: { ...result.evidence, count: selected.size, digest: jsonHash({ proof: result.evidence.digest, selected: [...selected].sort() }), description: '所选原 Pod 的实际停止证明已持久确认；其余 Pod 保持原保护' } } : result;
+    },
     verify: async (context) => {
       if (!['prove', 'verify'].includes(context.phase)) throw precondition('Pod 物理证明许可阶段不符');
       await authorize(context);
@@ -70,10 +77,10 @@ export function kubernetesProjectPodProtection(k8s: K8sClient, ledger: Pick<Ledg
     },
   };
 }
-async function stopPods(k8s: K8sClient, context: ProjectDeletionContext, store: ClusterPodStopReceipts, authorize: (context: ProjectDeletionContext) => Promise<void>, now: () => Date, initiate: boolean): Promise<ProjectDeletionStepResult> {
+async function stopPods(k8s: K8sClient, context: ProjectDeletionContext, store: ClusterPodStopReceipts, authorize: (context: ProjectDeletionContext) => Promise<void>, now: () => Date, initiate: boolean, selected?: ReadonlySet<string>): Promise<ProjectDeletionStepResult> {
   await authorize(context);
   let waiting = false;
-  for (const entry of expectedPods(context)) {
+  for (const entry of expectedPods(context).filter(row => !selected || selected.has(row.id))) {
     const original = originalPodIdentity(entry.identity); let pod = await currentPod(k8s, entry.id, original.uid);
     const saved = await store.get(context, entry.id, original.uid);
     if (saved) { await authorize(context); await release(k8s, context, entry.id, original); continue; }

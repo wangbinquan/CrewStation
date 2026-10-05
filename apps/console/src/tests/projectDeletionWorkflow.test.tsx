@@ -16,6 +16,7 @@ const project = { id: deletionProjectId, name: '列表项目', slug: 'list-proje
 function fixture() {
   const calls: string[] = [], sent: AcceptProjectDeletion[] = [], plan = deletionPlan(); let found: ProjectDeletionOperation | undefined;
   const api: ProjectDeletionsResource = {
+    capabilities: async () => ({ available: true }),
     find: async () => { calls.push('find'); return found; }, prepare: async () => { calls.push('prepare'); return plan; },
     accept: async (_id, input) => { calls.push('accept'); sent.push(structuredClone(input)); throw new Error('private lost response'); },
     get: async () => deletionOperation(), retry: async () => { calls.push('retry'); return deletionOperation(); },

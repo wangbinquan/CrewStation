@@ -6,6 +6,8 @@ export { RUNTIME_IMAGE_PHYSICAL_KINDS } from '../domain/records';
 export interface RuntimeImagePhysicalScope {
   readonly version: 1; readonly projectId: string; readonly originDigest: string;
   readonly source: { readonly identity: string; readonly epoch: string; readonly version: string };
+  /** Retained original native graph survives catalog removal and worker restart. */
+  readonly nativeHistory?: { readonly version: 1; readonly identity: string; readonly digest: string; readonly body: unknown };
   /** Native identities stay independent; known builders/validations/journals also bind their immutable input identity. */
   readonly objects: readonly { kind: typeof RUNTIME_IMAGE_PHYSICAL_KINDS[number]; id: string; identity: string; sourceIdentity: string; count: number; consumerId?: string; consumerIdentity?: string }[];
   /** Even an empty category requires a complete independent scan. */

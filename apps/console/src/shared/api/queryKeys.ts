@@ -5,6 +5,7 @@
 export const queryKeys = {
   cluster: (part: string, query?: unknown) => ['cluster', part, query] as const,
   me: () => ['me'] as const,
+  projectDeletionCapabilities: (userId: string) => ['project-deletion-capabilities', userId] as const,
   users: () => ['users'] as const,
   loginPolicy: () => ['auth', 'login-policy'] as const,
   authProviders: () => ['auth', 'providers'] as const,

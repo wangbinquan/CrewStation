@@ -6,6 +6,7 @@ import { DeveloperGuard } from './DeveloperGuard';
 import type { ReactElement } from 'react';
 import { AppShell } from './AppShell';
 import { WorkbenchNav } from './WorkbenchNav';
+import { ProjectDeletionProvider } from '../project/ProjectDeletionProvider';
 
 /** 应用向所有登录用户开放；项目开发需要当前平台角色。 */
 export function WorkbenchLayout(): ReactElement {
@@ -13,5 +14,5 @@ export function WorkbenchLayout(): ReactElement {
   const { projectId } = useParams({ strict: false });
   const me = useApiQuery(queryKeys.me(), () => api.me.get());
   const eligible = !me.error && (me.data?.platformRole === 'developer' || me.data?.platformRole === 'admin');
-  return <AppShell nav={developing && projectId && eligible ? <WorkbenchNav projectId={projectId} /> : null}>{developing ? <DeveloperGuard key={path}><Outlet /></DeveloperGuard> : <Outlet />}</AppShell>;
+  return <AppShell nav={developing && projectId && eligible ? <WorkbenchNav projectId={projectId} /> : null}>{developing ? <DeveloperGuard key={path}><ProjectDeletionProvider><Outlet /></ProjectDeletionProvider></DeveloperGuard> : <Outlet />}</AppShell>;
 }

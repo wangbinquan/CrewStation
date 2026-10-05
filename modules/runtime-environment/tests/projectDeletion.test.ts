@@ -215,7 +215,7 @@ test('已发布版本移交最小沿革后真实清理原构建、日志、凭�
 
 test('既有平台版本沿革回填依据原构建和配方，内容私有字段不进入最小记录',async()=>{
   const f=await previousFixture();fixtures.push(f);const version=await builtVersion(f);
-  expect(await runMigrations(f.tdb.db, [runtimeEnvironmentMigrations])).toEqual(['runtime-environment/0007_project_deletion.sql']);
+  expect(await runMigrations(f.tdb.db, [runtimeEnvironmentMigrations])).toEqual(['runtime-environment/0007_project_deletion.sql','runtime-environment/0008_native_registry_admission.sql']);
   const minimum=await f.tdb.db.execute(sql`SELECT * FROM runtime_environment.build_provenance`);
   expect(minimum).toHaveLength(1);expect(minimum[0]).toEqual({id:version.buildId,image_id:version.imageId,revision_id:version.revisionId});
   expect((await f.uow.read.projectContent(f.project)).inventory).toMatchObject({complete:true,blockers:[],references:[]});

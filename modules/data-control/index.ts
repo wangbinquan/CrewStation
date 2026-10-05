@@ -5,4 +5,6 @@ export type { NativePostgresSource, NativePostgresStorageSource, NativePostgresV
 export { createDataControlModule, dataControlMigrations } from './wiring';
 export type { DataControlModule, DataControlModuleDeps } from './wiring';
 export { createObjectStoragePlane } from './wiring';
+export { createObjectDeletionTransport } from './wiring';
+export { createGarageDeletionTransport } from './wiring';
 export type { NativeDeletionHistory } from './api/moduleApi';

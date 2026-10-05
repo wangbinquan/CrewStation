@@ -12,6 +12,18 @@ const operation = ProjectDeletionOperationSchema.parse({ id: operationId, projec
   receipts: [], blockers: [], canRetry: true, createdAt: timestamp, updatedAt: timestamp });
 const input = { planId, requestKey: operationId, confirm: 'delete' as const };
 const reconfirmation = ProjectDeletionPlanSchema.parse({ ...plan, operationId, supersedes: digest });
+test('permanent-deletion availability is an uncached read contract; malformed or unauthorized responses stay unavailable', async () => {
+  const calls: Array<{ path: string; method: string }> = []; let body: unknown = { available: false }, status = 200;
+  const client = createApiClient({ fetch: async (raw, init) => {
+    calls.push({ path: new URL(String(raw), 'https://test.invalid').pathname, method: init!.method! }); return Response.json(body, { status });
+  } });
+  expect(await client.projectDeletions.capabilities()).toEqual({ available: false });
+  body = { available: true }; expect(await client.projectDeletions.capabilities()).toEqual({ available: true });
+  for (const invalid of [{}, { available: 'true' }, { available: true, force: true }]) { body = invalid; await expect(client.projectDeletions.capabilities()).rejects.toThrow(); }
+  status = 403; body = { error: 'forbidden', message: 'Admin only', details: {} };
+  await expect(client.projectDeletions.capabilities()).rejects.toMatchObject({ status: 403 });
+  for (const call of calls) expect(call).toEqual({ path: '/v1/project-deletions/capabilities', method: 'GET' });
+});
 test('永久删除客户端严格匹配六条路由，202 仍是 accepted，重新确认仍绑定原操作', async () => {
   const calls: Array<{ path: string; method: string; body: unknown }> = [];
   const client = createApiClient({ baseUrl: 'https://console.test.invalid', fetch: async (raw, init) => {

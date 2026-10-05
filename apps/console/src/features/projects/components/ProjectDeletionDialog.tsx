@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ReactElement } from 'react';
+import type { ReactElement, RefObject } from 'react';
 import type { ProjectDeletionOperation, ProjectDeletionPlan } from '@crewstation/contracts';
 import { useT } from '../../../shared/lib/useT';
 import { ActionNote } from '../../../shared/ui/ActionNote';
@@ -20,6 +20,7 @@ export interface ProjectDeletionDialogProps {
   loading?: boolean;
   pending?: boolean;
   error?: string;
+  returnFocusTo?: RefObject<HTMLElement | null>;
   /** Caller retains the server plan/request key; automatic progress reads never start a deletion. */
   onConfirm(plan: ProjectDeletionPlan): Promise<void>;
   onRetry?(): void;
@@ -29,7 +30,7 @@ export interface ProjectDeletionDialogProps {
 }
 
 /** Two shared modal layers; mounted only by the administrator flow after all backend owners are available. */
-export function ProjectDeletionDialog({ project, plan, operation, loading = false, pending = false, error, onConfirm, onRetry, onRecover, onReview, onClose }: ProjectDeletionDialogProps): ReactElement {
+export function ProjectDeletionDialog({ project, plan, operation, loading = false, pending = false, error, returnFocusTo, onConfirm, onRetry, onRecover, onReview, onClose }: ProjectDeletionDialogProps): ReactElement {
   const t = useT(), inFlight = useRef(false), active = useRef(true);
   const [confirmation, setConfirmation] = useState<string>(), [busy, setBusy] = useState(false), [localError, setLocalError] = useState<string>();
   const [now, refreshTime] = useState(() => Date.now());
@@ -51,7 +52,7 @@ export function ProjectDeletionDialog({ project, plan, operation, loading = fals
     finally { inFlight.current = false; if (active.current) setBusy(false); }
   };
   return <>
-    <Dialog title={t(reviewing && !pending ? 'projects.delete.reviewTitle' : 'projects.delete.progressTitle')} size="large" busy={busy || loading} onClose={onClose}
+    <Dialog title={t(reviewing && !pending ? 'projects.delete.reviewTitle' : 'projects.delete.progressTitle')} size="large" busy={busy || loading} onClose={onClose} returnFocusTo={returnFocusTo}
       footer={<ActionRow>
         {pending ? onRecover ? <Button variant="primary" disabled={loading || busy} onClick={onRecover}>{t('projects.delete.recover')}</Button> : null
           : reviewing ? <><Button variant="danger" disabled={!ready || busy} onClick={() => { if (ready && deletionPlanReady(plan, project.id)) setConfirmation(plan!.id); }}>{t('projects.delete.next')}</Button>{onReview ? <Button variant="secondary" disabled={loading || busy} onClick={onReview}>{t('projects.delete.refresh')}</Button> : null}</>

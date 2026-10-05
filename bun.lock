@@ -11,6 +11,7 @@
         "eslint-plugin-react-hooks": "7.1.1",
         "typescript": "6",
         "typescript-eslint": "8.70.0",
+        "zod": "4.6.2",
       },
     },
     "apps/cli": {
@@ -274,6 +275,7 @@
       "dependencies": {
         "@crewstation/contracts": "workspace:*",
         "@crewstation/eventbus": "workspace:*",
+        "@crewstation/filesystem-metrics": "workspace:*",
         "@crewstation/http": "workspace:*",
         "@crewstation/kernel": "workspace:*",
         "@crewstation/module-project": "workspace:*",
@@ -417,6 +419,7 @@
         "@crewstation/contracts": "workspace:*",
         "@crewstation/eventbus": "workspace:*",
         "@crewstation/filesystem-metrics": "workspace:*",
+        "@crewstation/gitlab-client": "workspace:*",
         "@crewstation/http": "workspace:*",
         "@crewstation/k8s": "workspace:*",
         "@crewstation/kernel": "workspace:*",
@@ -448,6 +451,7 @@
         "@crewstation/session-client": "workspace:*",
         "@crewstation/settings": "workspace:*",
         "hono": "4.13.7",
+        "zod": "4.6.2",
       },
       "devDependencies": {
         "@crewstation/secretbox": "workspace:*",
@@ -501,6 +505,7 @@
       "dependencies": {
         "@crewstation/contracts": "workspace:*",
         "@crewstation/eventbus": "workspace:*",
+        "@crewstation/filesystem-metrics": "workspace:*",
         "@crewstation/http": "workspace:*",
         "@crewstation/k8s": "workspace:*",
         "@crewstation/kernel": "workspace:*",
@@ -561,6 +566,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@crewstation/contracts": "workspace:*",
+        "@crewstation/filesystem-metrics": "workspace:*",
         "@crewstation/http": "workspace:*",
         "@crewstation/k8s": "workspace:*",
         "@crewstation/kernel": "workspace:*",

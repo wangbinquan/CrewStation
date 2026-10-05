@@ -74,4 +74,7 @@ export interface RuntimeImageProjectContent {
   readonly callbacks: readonly RuntimeImageCallbackRecord[];
   /** Platform definitions remain platform-owned; source/config dependencies must be sealed as well. */
   readonly dependencies: readonly { kind: 'source' | 'initializer'; revisionId: string; imageId: string }[];
+  /** Original destinations, including unfinished attempts and catalog versions.
+   * A platform-owned version remains a foreign storage reference. */
+  readonly artifacts?: readonly { kind: 'build' | 'version'; id: string; repository: string; digest?: string; projectOwned: boolean }[];
 }

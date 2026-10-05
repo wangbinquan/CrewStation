@@ -23,4 +23,32 @@
 - `/private/tmp/cs-rfc037-scm-remover-ruby-v1.log`：原 Linux/aarch64 embedded Ruby 在独立临时目录中实际删除；12 组覆盖清理、重放、部分删除恢复、同名替换、改变／新增内容、硬链接、符号链接、原缺失位置变化、重叠及根替换。只清理由用例创建的目录，原项目／外项目均保留。CI 的 Linux host 用例运行同一 Ruby 文件；macOS host 验证 Ruby 语法，实际 Linux 行为以上述证据为准。
 - 全 GitLab SDK 与 host 组合：68 pass、0 fail、467 断言、11 文件；结构、lint、后端及工作台类型全部通过。相关七个新增 TS 生产文件的执行行全部命中（214／214）；Ruby 行单独验证，不计入 TS 覆盖率。
 
-当前生产基线为 `c9a4c71a05bbb04d4195157dd70ac92a768ec4a3`：六项精确 CI 成功、八组件 Ready、248 项迁移安装并核对，原项目／共享资源保持。创建弹窗已经上线。本批固定候选完整检查已通过：5888 pass／143环境skip／0 fail、223503断言、1170文件、2210.00秒（`/private/tmp/cs-rfc037-scm-mutations-full-check-v1.log`），所有19条候选指纹保持；源码／测试未改变，仅回填本文、STATE及计划。host专项类型已通过（v1临时配置缺少仓库typeRoots的失败记录保留，v2修正后通过），提交／推送状态继续回填；全删除依然需要 SCM 完整物理适配器、Garage、镜像发布、剩余 legacy／未启动兼容、全部生产装配和管理员二次确认实机回收，目标保持 active，入口和普通 producer OFF。
+上一生产基线为 `c9a4c71a05bbb04d4195157dd70ac92a768ec4a3`：六项精确 CI 成功、八组件 Ready、248 项迁移安装并核对，原项目／共享资源保持。创建弹窗已经上线。本批固定候选完整检查已通过：5888 pass／143环境skip／0 fail、223503断言、1170文件、2210.00秒（`/private/tmp/cs-rfc037-scm-mutations-full-check-v1.log`），所有19条候选指纹保持；源码／测试未改变，仅回填本文、STATE及计划。host专项类型已通过（v1临时配置缺少仓库typeRoots的失败记录保留，v2修正后通过），提交／推送状态继续回填；全删除依然需要 SCM 完整物理适配器、Garage、镜像发布、剩余 legacy／未启动兼容、全部生产装配和管理员二次确认实机回收，目标保持 active，入口和普通 producer OFF。
+
+## 2026-10-05 实际发布与下一批接线
+
+封写与实际文件清理19文件已提交推送为 `d10eb3e33393d3241b8d3edf790580c1baa2edd9`，索引清空、main／origin同步，32个外部在制文件没有被提交或改写。六项精确 CI 全部成功：[37256763733](https://github.com/wangbinquan/CrewStation/actions/runs/37256763733)。固定提交通过 Git archive 流入 Docker 构建，没有另建开发 checkout。控制面镜像 `sha256:7a7166dbaa0d1b694878a6ae673d05649df2683dfce6fc92e49e521a69b53c31`、console `sha256:2631c799c4a1357ca0d2081c5925b2c0f6daf13da5f93bd8491b164db2294cdd` 已在 2026-10-05T03:13:33.456Z 部署；八组件全部 Ready，实际 Pod 镜像与节点 OCI source revision 核对，248迁移一致，原 namespace／卷／项目Pod／数据库角色／GitLab身份及固定Runner保持。回执 `/private/tmp/cs-rfc037-d10eb3e33393-deletion-release-v9-deployment-receipt.json`。这是本批真实部署，不代表全删除已经完成。
+
+下一批 `native/destruction/` 与 host 已实现：固定原管理员和原项目身份，在项目锁内复核封写与停止状态后执行正常 `Projects::DestroyService#execute`。独立 Main／CI 盘点直接按原项目、已捕获记录、原机器人、原构建／流水线 ID 查询，父项目消失后仍可读取残留；晚到旧构建的 trace／制品及原机器人的新令牌不会因为关联消失而漏计。只读查询使用 count／pluck 与限定父字段，避免 SecureFile 的初始化写密钥副作用。没有出生字段的子行保留未知并仍计为残留，不删捕获ID对应的子行；实际删除沿核对过的原父项目正常关系执行。
+
+私有请求严格拒绝调用者账号、共享LFS／机器人和已知出生替换，销毁前必需真实许可与独立停止核验；observe 不执行这些变更。原专用项目的实际只读结果为父1、凭据6、流水线2、trace9，nativeRemaining18，原修订前后保持，原项目没有调用 fence／destroy。该新批局部组合80／0、547断言和两侧类型／结构／lint、host类型通过；Ruby14组覆盖父消失仍有子、晚到旧关联、替换、共享、未封写、未停流水线、权限／原生失败及重放。macOS Ruby2.6的测试语法失败已修正并保留日志。
+
+新接线仍是未提交候选，未运行自己的完整本地门禁、无新CI或部署；共享树已有另一个完整check，未重复争用。完整目标继续：实际SCM物理owner与留存搬移／原消费者、Garage及镜像发布、剩余兼容、全部生产装配、二次确认与原项目完整回收。三个物理完整标志始终false，入口与普通producer OFF，不把元数据零或正常原生删除ACK冒充完整回收。
+
+
+## 2026-10-05 完整范围、消费者和 SCM 工厂接线
+
+原完整 prefix 包括 SQL 行已经消失的文件、捕获的旧月份、Gitaly 删除留存目录；同 basename 的项目/snippet 碰撞只凭原目录出生区分。完整原生和文件材料在既有不可变 jsonb 中持久保存，微秒出生和 uint64 inode 保持，公开盘点不泄露正文。新的固定 `gitLabDeletionPhysicsAdapter` 导出并通过实际私有 HTTP/SDK/原实例读取调用链，正式22方生产安装仍待。
+
+实际源码回执 `/private/tmp/cs-rfc037-scm-physics-readonly-v1.json`：1原仓库、11覆盖、1保留材料、31文件身份，独立 inspect 完整，父仍存在故 prove 正确 waiting；没有 fence/destroy/remove。`/private/tmp/cs-rfc037-scm-activity-readonly-v2.json`：原31身份，全线程消费者0、Workhorse/Gitaly/Sidekiq活跃与本项目队列均0；Rails UID 不能读所有账号 FD 的实际 v1失败保持，v2按原账号只读路由解决，未改账号配置或重启原容器。`/private/tmp/cs-rfc037-scm-consumer-ruby-v1.json`：实际 Linux 8组开FD、已unlink但仍持有、关闭、mmap、munmap、cwd/exe与出生替换通过，仅清理自己的临时文件。完整 prefix 的14组 Linux 临时目录用例见 `/private/tmp/cs-rfc037-scm-footprint-ruby-green-v3.json`。
+
+LFS OID 被新 ID 重建且其他项目引用的真实逻辑回归先红后修，正常销毁后只对原 ID/OID/出生且无引用的记录调用 GitLab 原生 LfsObject.destroy!；正常GC ACK仍不代表文件清理。Ruby18组通过；SDK/host90 pass/0 fail、653断言（`/private/tmp/cs-rfc037-scm-native-tests-v3.log`）。真实 PostgreSQL 的原材料持久化、严格范围和未创建仓库空范围回归以及全部 SCM 模块101 pass/0 fail、670断言（`/private/tmp/cs-rfc037-scm-owner-tests-v4.log`）；最后原查询 v4仍18记录、外引用0、原项目保持。四层静态和host专项类型通过。独立完整门、提交/六项CI和实际部署继续补充，不把受控协议端口当原项目销毁实机验收。
+
+
+## 正式 SCM 来源与控制器许可入口（2026-10-05）
+
+私有原生服务已以固定原容器、镜像、启动时间、原目录和服务 actor 组合现有读／封写／销毁／文件回收端口；每次 mutation 携带已持久确认的原 SCM retained 材料，来源端向正式 project owner 重新核对当前 operation、generation、phase 与 lease。普通 SDK 写请求或来源 bearer 本身不能取得销毁许可；跨端点写入串行，controller permit 不缓存。平台后台已装配专用许可路由，未配置完整来源时不创建该路由；完整 22 owner 删除仍未启用。
+
+实际 SDK→私有 HTTP→固定原来源协议的组合回归已走通 capture／stop／purge／independent proof，另以真实 PG 的正式 Root 验证伪造 operation 被持久 owner 拒绝且没有创建操作。受控命令替身证明调用与守卫，不能计作真实项目销毁；本机原 GitLab 和 Garage 的本轮核对均只读。
+
+完整 v5 门禁 5924 pass、143 环境 skip、1 fail，223780 断言、1177 文件、2034.73 秒。唯一失败为既有 TaskRuntime 归档／原卷回收复合 PG 用例默认 5 秒预算；定向两用例 2 pass／0 fail、30 断言，首例 4671.77 毫秒。未把重跑当成全仓通过；全部行为断言保留，为该串行真实 PG 集成用例设置 15 秒预算，最终包含正式服务入口的候选重新进行一次完整门禁。日志：/private/tmp/cs-rfc037-scm-native-full-check-v5.log、/private/tmp/cs-rfc037-scm-gate-timeout-target-v1.log。

@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { IDENTITY_HEADERS } from '@crewstation/contracts';
+import { createApp } from '@crewstation/http';
 import { newId, noopLogger } from '@crewstation/kernel';
 import { runMigrations } from '@crewstation/persistence';
 import { enqueueJob, getJobState, queueMigrations } from '@crewstation/queue';
@@ -50,14 +52,23 @@ describe.skipIf(!available)('持久删除工作器与完整装配门（真实 PG
     let stopped = false; const stopping = runtime.recovery.stop().then(() => { stopped = true; });
     await Promise.resolve(); expect(stopped).toBe(false); finish(); await stopping; expect(stopped).toBe(true); expect(calls).toBe(1);
   });
-  test('不提供全参与者装配时，没有永久删除 HTTP、工作器或恢复扫描；完整配置才开放', () => {
+  test('全参与者装配前只返回能力关闭，不开放删除操作、工作器或恢复扫描；完整配置才开放', async () => {
     const deps = { db: f.database.db, steps: { loadProject: async () => undefined, listProjects: async () => [], ensureRepository: async () => {}, ensureData: async () => {},
       reconcileRoutes: async () => {}, ensureFirstRelease: async () => {}, setProjectState: async () => {} },
     ledger: { declare: async () => ({ id: newId('record') }), get: async () => undefined }, namespaces: { systemNamespace: 'system' }, workerOwner: 'composition', consumerName: 'composition', isAdmin: async () => true };
     const closed = createProvisioningModule(deps);
-    expect(closed.api.deletions).toBeUndefined(); expect(closed.http).toHaveLength(1); expect(closed.workers).toHaveLength(1); expect(closed.startupTasks).toHaveLength(1);
+    expect(closed.api.deletions).toBeUndefined(); expect(closed.http).toHaveLength(2); expect(closed.workers).toHaveLength(1); expect(closed.startupTasks).toHaveLength(1);
+    const app = createApp({ name: 'closed-project-deletion' });
+    for (const route of closed.http) app.route('/', route);
+    const headers = { [IDENTITY_HEADERS.userId]: f.admin.userId };
+    const capabilities = await app.request('/v1/project-deletions/capabilities', { headers });
+    expect(capabilities.status).toBe(200); expect(await capabilities.json()).toEqual({ available: false });
+    expect(capabilities.headers.get('cache-control')).toBe('no-store');
+    for (const path of [`/v1/projects/${newId('project')}/deletion-plans`, `/v1/projects/${newId('project')}/deletions`, `/v1/project-deletions/${newId('resource')}/retry`]) {
+      expect((await app.request(path, { method: 'POST', headers, body: '{}' })).status).toBe(404);
+    }
     expect(() => createProvisioningModule({ ...deps, deletion: { intents: f.intents, owners: f.external.owners.slice(1) } })).toThrow();
     const complete = createProvisioningModule({ ...deps, deletion: { intents: f.intents, owners: f.external.owners } });
-    expect(complete.api.deletions).toBeDefined(); expect(complete.http).toHaveLength(2); expect(complete.workers).toHaveLength(2); expect(complete.startupTasks).toHaveLength(2);
+    expect(complete.api.deletions).toBeDefined(); expect(complete.http).toHaveLength(3); expect(complete.workers).toHaveLength(2); expect(complete.startupTasks).toHaveLength(2);
   });
 });

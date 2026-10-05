@@ -31,6 +31,7 @@ import type { ScmCallbackProcesses } from './ports/repositoryWrites';
 import type { ScmDeletionPhysics } from './ports/projectDeletion';
 import type { ScmCurrentRepositoryOriginsSource } from './ports/currentRepositoryOrigins';
 export { gitLabNativeOriginsAdapter } from './adapters/gitlab/nativeOrigins';
+export { gitLabDeletionPhysicsAdapter } from './adapters/gitlab/deletionPhysics';
 
 const DEFAULT_BOT_EMAIL = 'bot@crewstation.local';
 

@@ -31,6 +31,42 @@ async function originalStopFixture(finishedChild = false) {
   return { ...f, state, pod, pvc, owner, context, child };
 }
 describe.skipIf(!available)('production runtime STOP composition (actual PG/factory, controlled independent evidence)', () => {
+  test('a missing original UID waits for independent history, then finishes an unstarted execution without a Pod DELETE', async () => {
+    let proved = false, deletes = 0;
+    const f = await runtimeWorkModuleFixture(async (_original, k8s) => ({ cluster: { ...kubernetesTaskCluster(k8s, 10001), deletePod: async () => { deletes++; throw Error('must not delete by name'); } },
+      deletionStops: { development: () => ({ advance: async () => ({ kind: 'waiting', reason: 'unused development' }) }), digital: async () => ({ kind: 'ready' }), stopped: async () => proved ? { digest: jsonHash('controlled never-admitted independent history') } : undefined } }));
+    try {
+      await f.database.db.execute(sql`UPDATE task_runtime.environments SET state='creating',pod_uid=NULL WHERE id=${f.parent}`);
+      const owner = f.module.api.deletionOwner!, base = await f.context(), confirmed = await owner.inspect(f.target);
+      const context = (phase: 'seal' | 'stop') => ProjectDeletionContextSchema.parse({ ...base, phase, confirmed });
+      expect((await owner.run(context('seal'))).kind).toBe('done');
+      expect((await owner.run(context('stop'))).kind).toBe('waiting'); expect(deletes).toBe(0);
+      proved = true;
+      expect((await owner.run(context('stop'))).kind).toBe('done'); expect(deletes).toBe(0);
+      expect((await f.module.api.getEnvironment(f.parent))?.state).toBe('released');
+      expect((await f.database.db.execute<{ pod_uid: string | null }>(sql`SELECT pod_uid FROM task_runtime.environments WHERE id=${f.parent}`))[0]?.pod_uid).toBeNull();
+    } finally { await f.drop(); }
+  });
+  test('a legacy NULL UID uses the confirmed original UID; a same-name replacement is retained', async () => {
+    let uid: string | undefined;
+    const f = await runtimeWorkModuleFixture(async (_original, k8s) => ({ cluster: kubernetesTaskCluster(k8s, 10001), deletionStops: {
+      development: () => ({ advance: async () => ({ kind: 'waiting', reason: 'unused development' }) }), digital: async () => ({ kind: 'ready' }), stopped: async () => undefined,
+      originalPodUid: async () => uid,
+    } }));
+    try {
+      await f.database.db.execute(sql`UPDATE task_runtime.environments SET state='running',pod_uid=NULL WHERE id=${f.parent}`);
+      const env = (await f.module.api.getEnvironment(f.parent))!;
+      const original = await f.k8s.create({ apiVersion: 'v1', kind: 'Pod', metadata: { name: env.podName, namespace: f.project, uid: crypto.randomUUID() } }); uid = original.metadata.uid!;
+      const owner = f.module.api.deletionOwner!, base = await f.context(), confirmed = await owner.inspect(f.target);
+      const context = (phase: 'seal' | 'stop') => ProjectDeletionContextSchema.parse({ ...base, phase, confirmed });
+      expect((await owner.run(context('seal'))).kind).toBe('done');
+      await f.k8s.delete(Resources.Pod!, env.podName, f.project);
+      const replacement = await f.k8s.create({ apiVersion: 'v1', kind: 'Pod', metadata: { name: env.podName, namespace: f.project, uid: crypto.randomUUID() } });
+      await expect(owner.run(context('stop'))).rejects.toMatchObject({ kind: 'conflict' });
+      expect((await f.k8s.get(Resources.Pod!, env.podName, f.project))?.metadata.uid).toBe(replacement.metadata.uid);
+      expect((await f.database.db.execute<{ pod_uid: string | null }>(sql`SELECT pod_uid FROM task_runtime.environments WHERE id=${f.parent}`))[0]?.pod_uid).toBeNull();
+    } finally { await f.drop(); }
+  });
   test('digital copy precedes Pod DELETE; missing Pod alone cannot finish STOP; follow-container storage survives completion', async () => {
     const f = await originalStopFixture();
     try {
