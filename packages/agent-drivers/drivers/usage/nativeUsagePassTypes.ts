@@ -49,6 +49,8 @@ export interface NativeUsagePassPage {
 export interface NativeUsagePassReader {
   readonly identity: NativeUsagePassIdentity
   readonly initialCursor: string
+  /** Original root creation time in this exact read snapshot; absence remains unknown. */
+  readonly rootCreatedAt: number | null
   /** One frozen page may be retried. No next page is read until its original owner ACK. */
   next(cursor: string): NativeUsagePassPage
   acknowledge(ordinal: string, payloadDigest: string): void

@@ -7,20 +7,27 @@ export class NativeUsagePassStore {
   private readonly db: Database;
   private closed = false;
   readonly root: NativePassSessionRow;
+  readonly rootCreatedAt: number | null;
 
   constructor(path: string, rootId: string) {
     this.db = new Database(path, { readonly: true });
-    try { this.root = this.initialize(rootId); }
+    try {
+      const original = this.initialize(rootId);
+      this.root = original.root;
+      this.rootCreatedAt = original.rootCreatedAt;
+    }
     catch (error) { this.close(); throw error; }
   }
 
-  private initialize(rootId: string): NativePassSessionRow {
+  private initialize(rootId: string): { root: NativePassSessionRow; rootCreatedAt: number | null } {
     this.db.query<unknown, []>('PRAGMA busy_timeout=0').get();
     this.db.query<unknown, []>('PRAGMA temp_store=FILE').get();
     this.db.query<unknown, []>('PRAGMA temp.cache_size=-8192').get();
     this.db.query<unknown, []>('BEGIN').get();
-    const root = this.db.query<NativePassSessionRow, [string]>(
-      'SELECT id,parent_id FROM session WHERE id=?',
+    const hasBirth = this.db.query<{ name: string }, []>('PRAGMA table_info(session)').all()
+      .some((column) => column.name === 'time_created');
+    const root = this.db.query<NativePassSessionRow & { time_created: unknown }, [string]>(
+      `SELECT id,parent_id,${hasBirth ? 'time_created' : 'NULL AS time_created'} FROM session WHERE id=?`,
     ).get(rootId);
     if (!root || !nativePassIdentifier(root.id)) throw new Error('Native root unavailable');
     this.db.query<unknown, []>(`CREATE TEMP TABLE native_pass_queue (
@@ -34,7 +41,11 @@ export class NativeUsagePassStore {
     this.db.query<unknown, [string, string | null]>(
       'INSERT INTO temp.native_pass_queue(id,parent) VALUES (?,?)',
     ).get(root.id, null);
-    return root;
+    // Original root row and birth are read in the same immutable native snapshot.
+    const born = root.time_created;
+    const rootCreatedAt = typeof born === 'number' && Number.isSafeInteger(born)
+      && born >= 0 && born < 253402300800000 ? born : null;
+    return { root, rootCreatedAt };
   }
 
   queue(): NativePassQueueRow | null {

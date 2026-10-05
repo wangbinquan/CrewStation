@@ -1,3 +1,17 @@
+## 2026-10-05 RFC-034 原生 owner 持久分页与根出生回执
+
+原 runtime driver 的读取器新增中立 owner 分页泵：每一页的原准入、身份、顺序、游标、累计计数、digest、原生 EOF 与 source watermark 都在持久回执核对后才释放。原 SQLite 快照中的 rootCreatedAt 传到原 owner 准入；实际页边界只约束传输，原树、层数、步骤与总记录数不设截断。快照关闭或 owner 失败仍记录中断，不把中断扫描当完成；原 source 契约、数据库迁移、journal 与正式 producer 不在本片改变。
+
+独立 SOURCE8 v4 功能复核 PASS，原 v2 FAIL 保留。23 项定向用例、79,821 断言通过；12001 步骤、40010 原始无关 part、1073 会话和深度80真实固定源均按原 EOF 对账。第一遍完整 check 因默认本机 PostgreSQL max_prepared_transactions=0 触发原 prepared-transaction 用例失败；原失败保持，不跳过或修改断言。改用本会话已存在、同 PostgreSQL17.11 且 prepared=10 的 55334 验收数据库，原18用例先全通过，唯一有效环境重试完整 check 于04:37:54Z结束：5900 pass、143 环境 skip、0 fail、223584 断言、1172 文件；全部8候选指纹保持。原共享数据库与容器未替换，未启动重复门禁。
+
+本片按8源码／测试／设计路径加共享STATE精确发布，六项确切 SHA CI 与固定提交本机部署继续，不用本机检查替代远端结论。正式原生 journal 正向 durable ACK、完整 before／历史修订写入、producer 接线和100K Task／10M usage实测仍开放，RFC-034 不宣称完成。下方原共享STATE与并行RFC-036／RFC-037全文逐字保留，未收编它们的在制源码。
+
+## 2026-10-05 RFC-037 本批推送部署完成与正常GitLab销毁候选
+
+19文件已真实提交推送 d10eb3e33393d3241b8d3edf790580c1baa2edd9，六项精确CI全部成功；固定源码镜像八组件在03:13:33Z全部Ready，248迁移一致，所有原namespace／卷／项目Pod／数据库角色／原GitLab／Runner保持。无跨会话消息；创建弹窗已上线，完整删除仍未交付。见[原生清理证据](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/scm-native-reclamation.md)。
+
+下一批正常native destroy与父消失后的Main／CI独立查询已实现，保留晚到旧构建／流水线／机器人关联，许可与独立停止来源必需。原专用项目只读盘点仍18条原记录，没有原项目变更；局部80／0、547断言、静态四层与host类型通过，独立Ruby14组通过。新10功能文件尚未提交／新CI／部署，自己的完整门禁未运行；已发现另一完整check，没有重启或争用。继续完整SCM物理owner、Garage、镜像发布、剩余兼容及全部22方生产组合／管理员双确认实机回收；入口／producer OFF，目标active。下方共享与历史全文保持。
+
 ## 2026-10-05 RFC-037 原生封写与实际文件清理候选
 
 前批 c9a4c71a05bbb04d4195157dd70ac92a768ec4a3 已真实提交推送，六项精确 CI 成功，八组件部署 Ready，248 迁移安装校验一致；创建弹窗已上线。旧 Git 执行限制已解除，当前 main／origin 同步，索引空，其他会话在制品保持，无跨会话消息。
