@@ -23,6 +23,8 @@ const localInput = (date: Date) => { const pad = (n: number) => String(n).padSta
 // RFC-021 M4、M6、M7、M13、B1：三个开关默认全开，原因必填，预计恢复时间要晚于现在；临时放行的人按账号精确查询加入。
 test('进入维护：默认三个开关全开，原因必填、时间不能早于现在；带上临时放行的人与版本 0', async () => {
   const f = slotLifecycleFixture(); page = await renderApp(`/projects/${projectId}/release`);
+  // 等实际懒加载与查询落地；固定三拍只保证路由开始解析，不能证明维护入口已出现。
+  for (let attempt = 0; attempt < 8 && !button('进入维护'); attempt++) await page.settle();
   await click('进入维护');
   expect(['users', 'services', 'events'].map((key) => box(key).checked)).toEqual([true, true, true]);
   await click('确认进入维护'); expect(page.text()).toContain('请填写维护原因。'); expect(document.activeElement).toBe(reason()); expect(f.writes).toHaveLength(0);

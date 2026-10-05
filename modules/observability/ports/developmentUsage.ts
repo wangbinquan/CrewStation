@@ -1,4 +1,4 @@
-import type { DevelopmentUsageKey, DevelopmentUsagePage, DevelopmentUsageRegistration, DevelopmentRunnerUsageCapture } from '@crewstation/contracts';
+import type { DevelopmentUsageKey, DevelopmentUsagePage, DevelopmentUsageRegistration, DevelopmentRunnerUsageCapture, DevelopmentNativePageEvidence } from '@crewstation/contracts';
 import type { DevelopmentNativeContext, DevelopmentNativeSelection } from '../domain/developmentNative';
 import type { DevelopmentModelEvidence } from "../domain/developmentNative";
 import type { AcceptedExecutionPrice } from './tokenPricing';
@@ -14,6 +14,8 @@ export interface DevelopmentUsageSource {
   registration(key: DevelopmentUsageKey): Promise<DevelopmentUsageRegistration | undefined>;
   resolve(key: DevelopmentUsageKey): Promise<DevelopmentUsageResolved | undefined>;
   acknowledge(key: DevelopmentUsageKey, through: number): Promise<void>;
+  /** Optional for legacy sources; v2 must never replace a missing original page with zero. */
+  nativePage?(key: DevelopmentUsageKey, passId: string, ordinal: string): Promise<DevelopmentNativePageEvidence>;
 }
 export interface DevelopmentUsageTransaction extends UsageLedgerTransaction {
   developmentModel(value: DevelopmentModelEvidence): Promise<void>;

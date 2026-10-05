@@ -21,7 +21,8 @@ import { drizzleDevelopmentUsageSourceStore } from '../../modules/session/adapte
 import { ingestDevelopmentUsage } from '../../modules/session/application/developmentUsageIngestion';
 import { readDevelopmentNativePage } from '../../modules/session/application/developmentNativePageRead';
 import { developmentUsageRoutes } from '../../modules/session/http/developmentUsageRoutes';
-import { sessionMigrations } from '../../modules/session/wiring';
+import { createSessionModule, sessionMigrations } from '../../modules/session/wiring';
+import { developmentObservationSource } from '../../modules/platform/application/developmentObservationPorts';
 import { developmentRegistration } from '../../modules/session/tests/developmentUsageFixtures';
 
 const available = await testDatabaseAvailable(), cleanups: Array<() => Promise<void> | void> = [];
@@ -57,6 +58,11 @@ async function setup(steps = 1201) {
   const reader = openNativeUsagePass(path, identity, { pageRows: 1000, pageBytes: 512 * 1024 });
   const ack = await persistNativeUsagePass(reader, journal.nativeOwner(r.key, preparation)); reader.close(); journal.finish(r.key, 'completed');
   const store = drizzleDevelopmentUsageStore(tdb.db), source = drizzleDevelopmentUsageSourceStore(tdb.db); await store.register(r);
+  const sessionModule = createSessionModule({ db: tdb.db,
+    runnerAuth: { verifyRunnerToken: async () => ({ ok: false, reason: 'unused raw-copy transport' }) },
+    taskAccess: { canOpenStream: async () => false, onRunnerConnected: async () => true, onRunnerDisconnected: async () => {} }, isAdmin: async () => false,
+    settings: { selfAddress: 'http://127.0.0.1', commandTimeoutMs: 10000, runnerStaleMs: 30000, replayLimit: 100 },
+  });
   const references = new Set<string>();
   const send = async (_taskId: typeof r.runtimeTaskId, command: RunnerCommand) => {
     if (command.type === 'developmentUsageInfo') return journal.info(command.key);
@@ -72,7 +78,7 @@ async function setup(steps = 1201) {
   };
   const app = createApp({ name: 'native-page-copy' }); app.route('/', developmentUsageRoutes({ developmentUsage: store }));
   const client = createSessionClient('http://session', Object.assign(async (url: string | URL | Request, init?: RequestInit) => app.request(new Request(url, init)), { preconnect: fetch.preconnect }));
-  return { tdb, journal, r, preparation, identity, ack, store, source, send, client, references };
+  return { tdb, journal, r, preparation, identity, ack, store, source, send, client, references, sessionModule };
 }
 async function drain(f: Awaited<ReturnType<typeof setup>>, send = f.send, store = f.store) {
   for (;;) {
@@ -87,11 +93,17 @@ async function drain(f: Awaited<ReturnType<typeof setup>>, send = f.send, store 
 describe.skipIf(!available)('all original native page bytes copied before Runner ACK', () => {
   test('every page and Unicode byte reaches durable PG, bounded outbox, strict HTTP and restart through original EOF', async () => {
     const f = await setup(); expect((await drain(f)).complete).toBe(true);
+    const platformSource = developmentObservationSource({ resolve: async () => { throw new Error('Raw page read cannot resolve a new numeric owner'); } }, {
+      ...f.sessionModule.api,
+      getDevelopmentUsage: async () => { throw new Error('Raw page read must use the original independent key'); },
+      acknowledgeDevelopmentUsageSource: async () => { throw new Error('Raw page read cannot acknowledge numeric evidence'); },
+    });
     let population = 0, ordinal = 0n; const tokens = { input: 0n, output: 0n, cacheRead: 0n, cacheWrite: 0n };
     for (;;) {
       const copy = (await f.source.nativePage!(f.r.key, f.identity.passId, String(ordinal)))!;
       expect(copy.document).toBe(f.journal.nativePage(f.r.key, f.identity.passId, String(ordinal)).document);
       expect(await f.client.readDevelopmentNativePage(f.r.key, f.identity.passId, String(ordinal))).toEqual(copy);
+      expect(await platformSource.nativePage(f.r.key, f.identity.passId, String(ordinal))).toEqual(copy);
       const { executionId, journalId, incarnation, payloadDigest } = f.r.key;
       expect(await f.client.readDevelopmentNativePage({ payloadDigest, incarnation, journalId, executionId }, f.identity.passId, String(ordinal))).toEqual(copy);
       expect(copy.rootCreatedAt).toBeNull();
@@ -116,10 +128,15 @@ describe.skipIf(!available)('all original native page bytes copied before Runner
     expect(packets).toBe(Number(f.ack.sourceWatermark));
     const original = await f.store.nativePage(f.r.key, f.identity.passId, '0');
     expect(await drizzleDevelopmentUsageStore(f.tdb.db).nativePage(f.r.key, f.identity.passId, '0')).toEqual(original);
+    expect(original).toBeDefined();
+    expect(await platformSource.nativePage(f.r.key, f.identity.passId, '0')).toEqual(original!);
+    expect(await platformSource.next()).toBeUndefined();
     expect((await f.store.get(f.r.runtimeTaskId, f.r.key))!.persistedThrough).toBe(frozen!.persistedThrough);
     expect(f.journal.read(f.r.key, Number(f.ack.sourceWatermark)).events).toEqual([]);
     await expect(f.client.readDevelopmentNativePage({ ...f.r.key, journalId: crypto.randomUUID() }, f.identity.passId, '0')).rejects.toMatchObject({ kind: 'conflict' });
     await expect(f.client.readDevelopmentNativePage(f.r.key, f.identity.passId, '99999999999999999999999')).rejects.toMatchObject({ kind: 'not_found' });
+    await expect(platformSource.nativePage({ ...f.r.key, journalId: crypto.randomUUID() }, f.identity.passId, '0')).rejects.toMatchObject({ kind: 'conflict' });
+    await expect(platformSource.nativePage(f.r.key, f.identity.passId, '99999999999999999999999')).rejects.toMatchObject({ kind: 'not_found' });
   }, 20000);
 
   test('actual PG raw-copy commit failure rolls back numeric rows and never sends a Runner ACK', async () => {

@@ -21,7 +21,7 @@ import type { ServerWebSocket } from 'bun';
 import type { UserId } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import type { Clock, Logger } from '@crewstation/kernel';
-import { noopLogger, systemClock } from '@crewstation/kernel';
+import { noopLogger, systemClock, notFound } from '@crewstation/kernel';
 import type { Database, MigrationSet } from '@crewstation/persistence';
 import { readMigrationDir } from '@crewstation/persistence';
 import type { Hono } from 'hono';
@@ -120,6 +120,10 @@ export function createSessionModule(deps: SessionModuleDeps): SessionModule {
     registerDevelopmentUsage: useCaseDeps.developmentUsage!.register, getDevelopmentUsage: useCaseDeps.developmentUsage!.get,
     requestDevelopmentUsageDrain: useCaseDeps.developmentUsage!.requestDrain, markDevelopmentUsageUnavailable: useCaseDeps.developmentUsage!.unavailable,
     nextDevelopmentUsageSource: developmentSources.next, readDevelopmentUsageMeasurement: developmentSources.measurement, acknowledgeDevelopmentUsageSource: developmentSources.acknowledge,
+    readDevelopmentNativePage: async (key, passId, ordinal) => {
+      const found = await useCaseDeps.developmentUsage!.nativePage(key, passId, ordinal);
+      if (!found) throw notFound('原生页副本', passId); return found;
+    },
     readBusinessUsageMeasurement: usageSources.measurement, nextBusinessUsageSource: usageSources.next, acknowledgeBusinessUsageSource: usageSources.acknowledge,
     getExecutionCompletionProof: (taskId, executionId) => useCaseDeps.businessExecutions!.completionProof(taskId, executionId),
     consumeBusinessExecution: (taskId, executionId, through, stopped) => useCaseDeps.businessExecutions!.consume(taskId, executionId, through, stopped),

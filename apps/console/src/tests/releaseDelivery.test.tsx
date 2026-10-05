@@ -127,6 +127,8 @@ test('切流受理后工作树对正式版本的比较与详情重新读取', as
 test('其他发布进行中保留当前部署信息并阻止切换，可精确定位该发布', async () => {
   const f = releaseDeliveryFixture(); f.releases[2]!.status = 'building';
   page = await renderApp(`/projects/${projectId}/release`);
+  // 以真实发布信息落地为条件，沿用首个懒加载回归和共享 click 的八拍预算。
+  for (let attempt = 0; attempt < 8 && !page.text().includes('发布 v0.9.0 正在进行'); attempt++) await page.settle();
   expect(page.text()).toContain('发布 v0.9.0 正在进行'); expect(action()?.disabled).toBe(true);
   await click('查看进行中的发布'); expect(page.search().release).toBe(historyId); expect(f.writes).toHaveLength(0);
 });

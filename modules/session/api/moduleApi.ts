@@ -1,4 +1,4 @@
-import type { DevelopmentUsageDrainReason, DevelopmentUsageLookup, DevelopmentUsageKey, DevelopmentUsageLoss, DevelopmentUsagePage, DevelopmentUsageRegistration, StoredDevelopmentUsage } from '@crewstation/contracts';
+import type { DevelopmentUsageDrainReason, DevelopmentUsageLookup, DevelopmentUsageKey, DevelopmentUsageLoss, DevelopmentUsagePage, DevelopmentUsageRegistration, StoredDevelopmentUsage, DevelopmentNativePageEvidence } from '@crewstation/contracts';
 import type { ExecutionCompletionProof, RunnerUsageMeasurement, RunnerUsageSourceIdentity, RunnerUsageSourcePage, RunnerBusinessEvent, StoredBusinessExecutionDto, RunnerCommand, RunnerEvent, RunnerHello, TaskId } from '@crewstation/contracts';
 import type { ProjectDeletionContext, ProjectDeletionOwner, ProjectDeletionSessionData } from '@crewstation/contracts';
 
@@ -18,6 +18,7 @@ export interface SessionModuleApi {
   requestDevelopmentUsageDrain(taskId: TaskId, key: DevelopmentUsageKey, reason: DevelopmentUsageDrainReason): Promise<StoredDevelopmentUsage>;
   markDevelopmentUsageUnavailable(taskId: TaskId, loss: DevelopmentUsageLoss): Promise<StoredDevelopmentUsage>;
   nextDevelopmentUsageSource(): Promise<DevelopmentUsagePage | undefined>;
+  readDevelopmentNativePage(key: DevelopmentUsageKey, passId: string, ordinal: string): Promise<DevelopmentNativePageEvidence>;
   readDevelopmentUsageMeasurement(key: DevelopmentUsageKey, recordId: string, revision: number): Promise<RunnerUsageMeasurement | undefined>;
   acknowledgeDevelopmentUsageSource(key: DevelopmentUsageKey, through: number): Promise<void>;
   nextBusinessUsageSource(): Promise<RunnerUsageSourcePage | undefined>;
