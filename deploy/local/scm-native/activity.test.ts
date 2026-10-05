@@ -1,8 +1,23 @@
-import { describe, expect, test } from 'bun:test';
-import { spawnSync } from 'node:child_process';
+import { afterEach, describe, expect, test } from 'bun:test';
 import { jsonHash } from '../../../packages/kernel';
 import { nativeFixture } from '../../../packages/gitlab-client/native/fixture';
 import { originalDockerGitlabActivityObserver } from './activity';
+
+const rubyChildren = new Set<ReturnType<typeof Bun.spawn>>();
+afterEach(async () => {
+  for (const child of rubyChildren) { child.kill(); await child.exited; rubyChildren.delete(child); }
+});
+async function rubyFixture(argv: string[]) {
+  const child = Bun.spawn(['ruby', ...argv], { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
+  rubyChildren.add(child);
+  try {
+    const [status, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
+    return { status, stdout, stderr };
+  } finally {
+    if (child.exitCode === null) { child.kill(); await child.exited; }
+    rubyChildren.delete(child);
+  }
+}
 
 function fixture(change?: (material: { source: { bootId: string; namespace: string }; processes: { pid: number; uid: string; startedTick: string }[] }, stage: string) => void) {
   const f = nativeFixture(), source = { bootId: f.inventory.runtime.bootId, namespace: f.inventory.runtime.namespace };
@@ -25,13 +40,13 @@ function fixture(change?: (material: { source: { bootId: string; namespace: stri
   return { ...f, request, observer, commands, inputs };
 }
 describe('native process account routing', () => {
-  test('fixed producer parsing never turns unavailable or inconsistent counters into zero', () => {
-    const result = spawnSync('ruby', [import.meta.dir + '/../../../packages/gitlab-client/native/activity/runner.test.rb'], { encoding: 'utf8' });
-    expect(result.status).toBe(0); expect(JSON.parse(result.stdout)).toEqual({ standaloneActivityCases: 8, originalProjectTouched: false });
+  test('fixed producer parsing never turns unavailable or inconsistent counters into zero', async () => {
+    const result = await rubyFixture([import.meta.dir + '/../../../packages/gitlab-client/native/activity/runner.test.rb']);
+    expect(result.status, result.stderr).toBe(0); expect(JSON.parse(result.stdout)).toEqual({ standaloneActivityCases: 8, originalProjectTouched: false });
   });
-  test('Linux temporary descriptors, unlinked bytes, mappings, cwd, executable and birth changes are checked', () => {
-    const result = spawnSync('ruby', [...(process.platform === 'linux' ? [] : ['-c']), import.meta.dir + '/../../../packages/gitlab-client/native/activity/consumers.test.rb'], { encoding: 'utf8' });
-    expect(result.status).toBe(0);
+  test('Linux temporary descriptors, unlinked bytes, mappings, cwd, executable and birth changes are checked', async () => {
+    const result = await rubyFixture([...(process.platform === 'linux' ? [] : ['-c']), import.meta.dir + '/../../../packages/gitlab-client/native/activity/consumers.test.rb']);
+    expect(result.status, result.stderr).toBe(0);
     if (process.platform === 'linux') expect(JSON.parse(result.stdout)).toEqual({ standaloneConsumerCases: 8, originalProjectTouched: false });
     else expect(result.stdout).toContain('Syntax OK');
   });
