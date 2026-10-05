@@ -1,3 +1,9 @@
+## 2026-10-05 RFC-034 原页历史读取与实际门禁终态
+
+原journal只读入口返回同事务持久的raw page／冻结ACK／preparation／admission／rootCreatedAt，并核对原Pod/key、父链、membership和未确认数字；普通ACK、结束或重启后原历史仍可读，不增加owner、终态或完整资格。三个代码／测试候选及原设计文SOURCE4有限功能PASS，35 pass／0 fail／36952断言；精确lint、类型和结构通过。唯一完整check于11:58:50Z终态6030 pass／156环境skip／3 fail，原失败日志保留，候选无漂移；共享未提交的registry准入触发器导致两个旧fixture失败，永久删除capability在制用例另失败，未改或收编这些文件。依development-rules §3精确发布本会话原页读取和实际记录，以干净确切SHA hosted CI验核，不声称全仓绿。
+
+AW本会话19路径已独立推送62c00f516f58f63e84bf047deee9252c58ee1c4c，主CI37306478315与Windows37306478427正在运行，无跨会话消息。此前CS452d2fd2六项CI和本机八组件Ready，16148四桶与人民币¥0.011368／两Agent泳道正式刷新可见。producer／before-final／platform v2／seal、100K Task／10M usage和两个RFC继续开放。本片仅三个代码／测试、原设计文和整个共享STATE，以下原共享正文与全部并行历史逐字保持。
+
 ## 2026-10-05 RFC-034 原启动意图用例版本修复
 
 00ef7dc0 的确切 CI 37293646743：static／console 已通过，unit 的原严格 nativeSource 用例仍将已允许显式选择的 version2 当作非法。只修正测试预言，保留 undefined 不默认选择与原 v1 roundtrip，增加明确 v2 roundtrip；非法版本改为3，v1/v2 的额外 path 字段均拒绝。原 hello/source v1 与投影前拒绝 v2 的生产行为不变，producer 仍关闭。

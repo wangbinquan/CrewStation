@@ -6,7 +6,7 @@ import {
   DevelopmentNativePreparationSchema, DevelopmentNativePageCaptureSchema, DevelopmentUsageEventSchema,
   NativeUsagePassIdentitySchema, NativeUsagePassPageSchema, NativeUsagePassAckSchema, NativeUsagePassAdmissionSchema,
   type DevelopmentNativePreparation, type DevelopmentUsageKey, type DevelopmentUsageReceipt,
-  type NativeUsagePassIdentity, type NativeUsagePassPage, type NativeUsagePassAck,
+  type NativeUsagePassIdentity, type NativeUsagePassPage, type NativeUsagePassAck, type NativeUsagePassAdmission,
 } from '@crewstation/contracts';
 
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -28,6 +28,25 @@ interface PassRow {
 }
 interface ParentRow { session_id: string; parent_id: string | null; depth: string; path_digest: string }
 interface PageRow { document: string; ack: string; sequence_from: number; sequence_through: number }
+
+/** Retained original facts; reading does not grant launch, ACK, or completion authority. */
+export interface DevelopmentNativePageEvidence {
+  readonly key: DevelopmentUsageKey;
+  readonly podUid: string;
+  readonly preparation: DevelopmentNativePreparation;
+  readonly baselineKind: 'fresh' | 'resume';
+  readonly admission: NativeUsagePassAdmission;
+  readonly rootCreatedAt: number | null;
+  readonly document: string;
+  readonly ack: NativeUsagePassAck;
+}
+function pageDigests(raw: Parameters<NativeUsagePassOwner['persist']>[0]) {
+  const body = { identity: raw.identity, ordinal: raw.ordinal, scanPositionBefore: raw.scanPositionBefore,
+    scanPositionAfter: raw.scanPositionAfter, scannedRawRows: raw.scannedRawRows, counts: raw.counts,
+    sessions: raw.sessions, steps: raw.steps, issues: raw.issues, eof: raw.eof };
+  const payload = hash(body);
+  return { payload, cumulative: hash([raw.previousDigest, payload]) };
+}
 
 /** Original accepted FULL/WAL connection. Tables retain evidence; none is a numeric ledger. */
 export class DevelopmentNativeJournal {
@@ -115,6 +134,41 @@ export class DevelopmentNativeJournal {
         }).immediate();
       },
     };
+  }
+
+  /** Read committed raw bytes and all retained relations, including after numeric ACK/restart. */
+  readPage(key: DevelopmentUsageKey, passId: string, ordinal: string): DevelopmentNativePageEvidence {
+    this.outer();
+    const original = this.binding.original(key), pass = this.pass(passId);
+    if (!pass || pass.execution_id !== key.executionId || !/^(0|[1-9][0-9]*)$/.test(ordinal))
+      throw new Error('Original native pass or page is unavailable');
+    const stored = this.db.query<{ document: string }, [string, string]>(
+      'SELECT document FROM development_native_preparations WHERE execution_id=? AND turn=?').get(key.executionId, pass.turn);
+    const saved = this.db.query<PageRow, [string, string]>(
+      'SELECT document,ack,sequence_from,sequence_through FROM development_native_pages WHERE pass_id=? AND ordinal=?').get(passId, ordinal);
+    if (!stored || !saved) throw new Error('Original native preparation or page is unavailable');
+    const { key: preparedKey, podUid, lineageKey, baselineKind, ...rawPreparation } = JSON.parse(stored.document);
+    const prepared = DevelopmentNativePreparationSchema.parse(rawPreparation);
+    const header = JSON.parse(original.header) as { nativeSource?: { version: number }; nativeAdmission?: { lineageKey: string; resumeSessionId: string | null } };
+    const identity = NativeUsagePassIdentitySchema.parse(JSON.parse(pass.identity_json));
+    const admission = NativeUsagePassAdmissionSchema.parse(JSON.parse(pass.admission_json));
+    const raw = JSON.parse(saved.document) as NativeUsagePassPage, page = NativeUsagePassPageSchema.parse(raw);
+    const ack = NativeUsagePassAckSchema.parse(JSON.parse(saved.ack)), digests = pageDigests(raw);
+    if (pass.root_created_at !== null && (!Number.isSafeInteger(pass.root_created_at) || pass.root_created_at < 0 || pass.root_created_at >= 253402300800000))
+      throw new Error('Retained native original root birth is invalid');
+    if (!same(preparedKey, key) || podUid !== this.binding.podUid || original.incarnation !== key.incarnation ||
+        header.nativeSource?.version !== 2 || !header.nativeAdmission ||
+        lineageKey !== header.nativeAdmission.lineageKey || baselineKind !== (header.nativeAdmission.resumeSessionId === null ? 'fresh' : 'resume') ||
+        (baselineKind === 'resume' && prepared.rootSessionId !== header.nativeAdmission.resumeSessionId) ||
+        identity.turn !== prepared.turn || identity.lineageKey !== lineageKey || identity.rootSessionId !== prepared.rootSessionId ||
+        identity.nativeSource !== 'opencode:' + prepared.store.actualPathDigest || identity.sourceGeneration !== hash(prepared.store) ||
+        identity.epoch !== prepared.store.sourceEpoch || !same(admission.identity, identity) || !same(page.identity, identity) ||
+        page.ordinal !== ordinal || page.payloadDigest !== digests.payload || page.cumulativeDigest !== digests.cumulative ||
+        ack.ownerReceiptId !== admission.ownerReceiptId || Number(ack.sourceWatermark) > original.lastSequence)
+      throw new Error('Retained native original page binding or digest changed');
+    this.retained(key, prepared, page, saved, ack);
+    return { key: structuredClone(key), podUid, preparation: prepared, baselineKind, admission,
+      rootCreatedAt: pass.root_created_at, document: saved.document, ack };
   }
 
   private persist(key: DevelopmentUsageKey, prepared: DevelopmentNativePreparation, rawPage: Parameters<NativeUsagePassOwner['persist']>[0],
@@ -214,10 +268,7 @@ export class DevelopmentNativeJournal {
   }
   private progress(pass: PassRow, page: NativeUsagePassPage, raw: Parameters<NativeUsagePassOwner['persist']>[0]): void {
     const counts = JSON.parse(pass.counts_json) as NativeUsagePassPage['counts'];
-    const body = { identity: raw.identity, ordinal: raw.ordinal, scanPositionBefore: raw.scanPositionBefore,
-      scanPositionAfter: raw.scanPositionAfter, scannedRawRows: raw.scannedRawRows, counts: raw.counts,
-      sessions: raw.sessions, steps: raw.steps, issues: raw.issues, eof: raw.eof };
-    const payload = hash(body), cumulative = hash([page.previousDigest, payload]);
+    const { payload, cumulative } = pageDigests(raw);
     if (pass.state !== 'walking' || page.ordinal !== pass.ordinal || page.cursor !== pass.next_cursor ||
         page.scanPositionBefore !== pass.scan_position || page.previousDigest !== pass.previous_digest ||
         page.payloadDigest !== payload || page.cumulativeDigest !== cumulative ||

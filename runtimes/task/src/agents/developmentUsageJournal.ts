@@ -1,7 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import type { NativeUsagePassOwner } from '@crewstation/agent-drivers';
 import type { DevelopmentNativePreparation } from '@crewstation/contracts';
-import { DevelopmentNativeJournal } from './developmentNativeJournal';
+import { DevelopmentNativeJournal, type DevelopmentNativePageEvidence } from './developmentNativeJournal';
 import { DevelopmentStartControls } from './developmentStartControls';
 import { developmentIntentDigest } from './developmentStartIntent';
 import { DevelopmentUsageStopReceiptSchema, type DevelopmentUsageStopReceipt } from '@crewstation/contracts';
@@ -209,6 +209,10 @@ export class DevelopmentUsageJournal {
 
   nativeOwner(key: DevelopmentUsageKey, prepared: DevelopmentNativePreparation): NativeUsagePassOwner {
     this.key(key); return this.native.owner(key, prepared);
+  }
+
+  nativePage(key: DevelopmentUsageKey, passId: string, ordinal: string): DevelopmentNativePageEvidence {
+    this.key(key); return this.native.readPage(key, passId, ordinal);
   }
 
   close(): void { this.db.close(); }

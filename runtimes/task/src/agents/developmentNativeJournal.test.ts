@@ -177,3 +177,64 @@ test('the original numeric outbox persists beyond 64MiB without a cumulative pop
   expect(events.length).toBe(count); expect(events[0]?.capture).toEqual(frame); expect(events.at(-1)?.sequence).toBe(count);
   f.journal.finish(f.admission.key, 'completed'); expect(f.journal.info(f.admission.key).receipt?.finalThrough).toBe(count);
 }, 120000);
+
+
+test('retained native page reads exact original bytes and ACK after normal pruning and finish', async () => {
+  const f = fixture(251), owner = f.owner(), page = f.reader.next(f.reader.initialCursor);
+  await owner.admit(f.identity, f.reader.initialCursor, f.reader.rootCreatedAt);
+  const ack = await owner.persist(page), before = f.journal.info(f.admission.key);
+  const evidence = f.journal.nativePage(f.admission.key, f.identity.passId, page.ordinal);
+  expect(evidence.document).toBe(JSON.stringify(page)); expect(evidence.ack).toEqual(ack);
+  expect(evidence).toMatchObject({ key: f.admission.key, podUid: context.podUid,
+    preparation: f.prepared, baselineKind: 'fresh', rootCreatedAt: 1234 });
+  expect(evidence.admission).toMatchObject({ identity: f.identity, initialCursor: f.reader.initialCursor, ownerReceiptId: ack.ownerReceiptId });
+  expect(f.journal.info(f.admission.key)).toEqual(before);
+  f.journal.acknowledge(f.admission.key, Number(ack.sourceWatermark)); f.journal.finish(f.admission.key, 'completed');
+  const finished = f.journal.info(f.admission.key);
+  expect(f.journal.nativePage(f.admission.key, f.identity.passId, page.ordinal)).toEqual(evidence);
+  expect(f.journal.info(f.admission.key)).toEqual(finished);
+});
+test('native read remains historical after a real restart, without manufacturing current ownership', async () => {
+  const f = fixture(), owner = f.owner(), page = f.reader.next(f.reader.initialCursor);
+  await owner.admit(f.identity, f.reader.initialCursor, f.reader.rootCreatedAt); await owner.persist(page);
+  const evidence = f.journal.nativePage(f.admission.key, f.identity.passId, page.ordinal);
+  const restarted = new DevelopmentUsageJournal(f.directory, context, randomUUID()); cleanup.push(() => restarted.close());
+  expect(restarted.nativePage(f.admission.key, f.identity.passId, page.ordinal)).toEqual(evidence);
+  expect(restarted.info(f.admission.key).receipt).toMatchObject({ phase: 'unknown', interruption: 'runner-restarted', finalThrough: null });
+  expect(() => restarted.nativeOwner(f.admission.key, f.prepared)).toThrow('current original');
+});
+test.each(['membership', 'parent', 'pending-frame', 'preparation', 'page'] as const)('native reads refuse missing original %s', async (kind) => {
+  const f = fixture(), owner = f.owner(), page = f.reader.next(f.reader.initialCursor);
+  await owner.admit(f.identity, f.reader.initialCursor, f.reader.rootCreatedAt); await owner.persist(page);
+  f.storage.exec('DELETE FROM ' + ({ membership: 'development_native_steps', parent: 'development_native_parents',
+    'pending-frame': 'events', preparation: 'development_native_preparations', page: 'development_native_pages' }[kind]));
+  expect(() => f.journal.nativePage(f.admission.key, f.identity.passId, page.ordinal)).toThrow(/missing|changed|unavailable/);
+});
+test('native reads refuse changed raw bytes, original key or another pass rather than returning current data', async () => {
+  const f = fixture(), owner = f.owner(), page = f.reader.next(f.reader.initialCursor);
+  await owner.admit(f.identity, f.reader.initialCursor, f.reader.rootCreatedAt); await owner.persist(page);
+  for (const [key, pass, ordinal] of [[{ ...f.admission.key, payloadDigest: 'b'.repeat(64) }, f.identity.passId, page.ordinal],
+    [f.admission.key, 'other-pass', page.ordinal], [f.admission.key, f.identity.passId, '01']] as const)
+    expect(() => f.journal.nativePage(key, pass, ordinal)).toThrow();
+  const altered = { ...page, steps: page.steps.map((step) => ({ ...step, usage: { ...step.usage, input: '999' } })) };
+  f.storage.query('UPDATE development_native_pages SET document=? WHERE pass_id=? AND ordinal=?').run(JSON.stringify(altered), f.identity.passId, page.ordinal);
+  expect(() => f.journal.nativePage(f.admission.key, f.identity.passId, page.ordinal)).toThrow('digest changed');
+});
+
+test('all retained pages remain readable through actual EOF and unknown root birth stays unknown', async () => {
+  const f = fixture(2501, 0, true, null), final = await persistNativeUsagePass(f.reader, f.owner());
+  f.journal.acknowledge(f.admission.key, Number(final.sourceWatermark));
+  let ordinal = 0n, steps = 0n, input = 0n;
+  for (;;) {
+    const original = f.journal.nativePage(f.admission.key, f.identity.passId, String(ordinal));
+    expect(original.rootCreatedAt).toBeNull(); expect(original.ack.ordinal).toBe(String(ordinal));
+    const page = JSON.parse(original.document);
+    for (const step of page.steps) { steps++; input += BigInt(step.usage.input); }
+    if (original.ack.eof !== null) { expect(original.ack).toEqual(final); break; }
+    ordinal++;
+  }
+  expect(ordinal).toBeGreaterThan(0n); expect(steps).toBe(2501n); expect(input).toBe(2501n * 2502n / 2n);
+  expect(f.storage.query<{ count: number }, []>('SELECT COUNT(*) AS count FROM events').get()?.count).toBe(0);
+  f.storage.exec('UPDATE development_native_passes SET root_created_at=-1');
+  expect(() => f.journal.nativePage(f.admission.key, f.identity.passId, '0')).toThrow('root birth is invalid');
+});

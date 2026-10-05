@@ -37,3 +37,19 @@ SOURCE12 有限功能门通过后，实际 typecheck v3 仍发现开发会话内
 00ef7dc05686ab1224c4dbf8390a8e9ed4e9e2f6 的确切 hosted CI（37293646743）中，unit 原 `nativeSource.test.ts` 仍将 `{version:2}` 判为非法，与本批已实现的显式、不可变 v2 选择不一致。后继只修正该用例的版本预言：undefined 继续不默认选择，v1 原 roundtrip 保留，明确验证 v2 roundtrip；非法版本改为3，v1/v2 的未知 path 字段都继续拒绝。原 hello/source v1、普通事件严格形状和投影前拒绝 v2 的保护不变，不启用 producer，不调整生产代码。原失败运行保留，目标用例、目标 lint 与后继确切提交 CI 的实际结果分别留证。
 
 本次原目标用例实际 6 pass、0 fail、45 次断言；原目标 eslint 退出0。没有重跑未变更的全仓检查，也不将目标结果当成新确切 SHA CI 通过。
+
+## 平台接线所需的原页只读入口（开发中）
+
+在原 journal 内补 `nativePage(key, passId, ordinal)`，返回原 preparation、原 admission、同 BEGIN rootCreatedAt、原序列化页与冻结 ACK。读取核对当前实际 Pod/journal、原 accepted key/header/source/turn、原页 digest、member/完整 parent 和原 pending 数字 source；数字 ACK 后继续验证留存关系。已结束或重启的原数据可以作为历史证据读取，但不授予当前 owner、启动许可、process终态或完整统计资格。原数字水位不前进，不构造第二份 numeric ledger，不回读另一份 native 快照。
+
+该内部 primitive 仍需接原 Runner/Session/platform 的严格分页通道和完整投影，producer 保持 OFF。本批新增真实 journal 的原字节、普通ACK后、结束后、真实重启及缺证据/变更内容回归；尚未运行的检查不能当成通过，两个RFC继续开放。
+
+本批原 journal 两测试文件最终35 pass、0 fail、36,952断言；实际2501步骤的全部留存页到原EOF、普通ACK后零数字events及未知rootCreatedAt均复核。typecheck v1 中本会话 pageDigests 的 mutable/readonly 参数问题真实失败留证；改为原 owner.persist 的入参类型后，v2 typecheck、arch:check和三个自有TS的精确lint均退出0。新候选只有一次完整 check 正在运行，结果尚未结束，不声明全仓通过。
+
+此前452d2fd22a90e4f86d4d9a254477bcc0b8437779确切CI37296983040六项全部成功，固定来源镜像本机八组件Ready，248条锁定迁移已校验。正式页面刷新后原两Agent任务仍为16148=276输入+15488缓存读取+0缓存写入+384输出，人民币¥0.011368，两原执行泳道28.0s/29.4s，所属项目与算力名称可见。这不表示本批尚未发布的原页读取已部署，也不替代完整producer/platform v2与规模验收。
+
+## 本批唯一完整检查的实际终态
+
+2026-10-05 11:58:50Z，本候选唯一一次 `bun run check` 结束：arch、lint、后台类型和控制台类型通过；6189条测试／1205文件中6030 pass、156环境 skip、3 fail、261268次断言。原完整日志与失败终态保留，不记为全仓通过。两条 `modules/platform/tests/runtimeImageReferences.test.ts` 在原 fixture 直接写 catalog 时被共享工作树未提交的 native registry 准入触发器拒绝；一条其他会话已改的 `packages/api-client/tests/projectDeletion.test.ts` 期望尚未提供的 capabilities 方法。未修改或收编这些在制品，原三代码候选指纹始终不变。按 development-rules §3 的共享在制品规则，沿用本会话35条原 journal 用例／36952断言、精确lint和类型／结构结果，发布后以干净确切SHA hosted CI验核。
+
+本片发布三个原页读取代码／测试文件、本文和完整共享STATE；SOURCE4的有限功能PASS复用，本文仅追加实际检查终态，不改原实现。此前452d2fd2六项CI／八组件部署的证据保持，本片的新CI和最终本机部署分别核对。before/final、平台v2持久映射／完整历史投影／seal、producer接线与100K Task／10M usage仍需完成，两个RFC不关闭。
