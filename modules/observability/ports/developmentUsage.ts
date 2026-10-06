@@ -2,6 +2,7 @@ import type { DevelopmentUsageKey, DevelopmentUsagePage, DevelopmentUsageRegistr
 import type { DevelopmentNativeContext, DevelopmentNativeSelection } from '../domain/developmentNative';
 import type { DevelopmentModelEvidence } from "../domain/developmentNative";
 import type { AcceptedExecutionPrice } from './tokenPricing';
+import type { DevelopmentNativePacket } from '../domain/developmentUsage/packet';
 import type { UsageLedgerTransaction, UsageTaskScope, UsageMeasurementRef } from './usageLedger';
 
 export interface DevelopmentUsageResolved {
@@ -18,6 +19,8 @@ export interface DevelopmentUsageSource {
   nativePage?(key: DevelopmentUsageKey, passId: string, ordinal: string): Promise<DevelopmentNativePageEvidence>;
 }
 export interface DevelopmentUsageTransaction extends UsageLedgerTransaction {
+  developmentPaths(passKey: string): Promise<{ state: 'source-pending' | 'incomplete' | 'complete'; issues: string[]; sessions?: string; sourceNamespace?: string }>;
+  developmentPacket(packet: DevelopmentNativePacket): Promise<{ passKey: string; duplicate: boolean; sourceComplete: boolean }>;
   developmentModel(value: DevelopmentModelEvidence): Promise<void>;
   developmentCapture(context: DevelopmentNativeContext, frame: DevelopmentRunnerUsageCapture): Promise<void>;
 }

@@ -7,6 +7,8 @@ import type { DevelopmentRunnerUsageCapture, DevelopmentNativeSource } from '@cr
 import type { DevelopmentUsageLedgerStore, DevelopmentUsageTransaction } from '../../ports/developmentUsage';
 import { developmentCaptureSourceId, developmentNativePrefix, developmentNativeState, developmentNativeRootUsable, type DevelopmentNativeContext } from '../../domain/developmentNative';
 import { persistDevelopmentModel, readDevelopmentModel } from './developmentUsageModels';
+import { retainDevelopmentNativePacket } from './developmentUsage/packets';
+import { qualifyDevelopmentNativePaths } from './developmentUsage/paths';
 import type { Database, Executor } from '@crewstation/persistence';
 import type { ExecutionValuationRequest, ExecutionValuationStore, UsageMeasurementRef, UsageLedgerStore, UsageTaskScope } from '../../ports/usageLedger';
 import { costVisibility } from "./tables";
@@ -26,6 +28,8 @@ function transaction(db: Executor, taskKey: string, sourceId: string, head: numb
   let sequence = head;
   const repairKeys = new Set<string>();
   return {
+    developmentPaths: (passKey) => qualifyDevelopmentNativePaths(db, taskKey, sourceId, passKey),
+    developmentPacket: (packet) => retainDevelopmentNativePacket(db, taskKey, sourceId, packet),
     developmentModel: (value) => persistDevelopmentModel(db, value),
     developmentCapture: async (context, frame) => { sequence = await persistDevelopmentFrame(db, taskKey, context, frame, sequence); },
     cursor: () => sourceCursor(db, taskKey, sourceId),

@@ -153,6 +153,7 @@
     "modules/observability/adapters/persistence/migrations/0018_complete_usage_admission.sql": "52942cd54aec6fa8cef03972356c661aa582a72fd49f3df284e496c2e5b925c0",
     "modules/observability/adapters/persistence/migrations/0019_original_usage_drain.sql": "882675343fd687a3fb8381e6189d56221a616fc6eca25b4d035d2674ab750309",
     "modules/observability/adapters/persistence/migrations/0020_original_usage_task_binding.sql": "66febff87b2fae69ab8b78153de63c8f722274d4203fb436c0261afb388ad852",
+    "modules/observability/adapters/persistence/migrations/0021_native_development_consumption.sql": "573693939eaf85b956716756fcd00e8cae67c869d1d665541f29dbea56fd5506",
     "modules/project/adapters/persistence/migrations/0001_create_schema.sql": "8cb29f5022308ccafceedb3e0b1130e8bc13fc2d831e5146d9dd34abe30b8abe",
     "modules/project/adapters/persistence/migrations/0002_core_tables.sql": "29e544627de379d3f7ab195cbacf8959f234b7c661a2ed5402ab29ffc8483f22",
     "modules/project/adapters/persistence/migrations/0003_compute_profiles.sql": "1ca73704b0fa919337946e02244842673141e27d337033c111478a9405f82ba6",

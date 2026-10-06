@@ -6,3 +6,8 @@ export function jsonHash(value: unknown): string {
     ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) : item);
   return createHash('sha256').update(serialized).digest('hex');
 }
+
+/** Exact UTF-8 text digest; preserves original JSON ordering and whitespace. */
+export function textHash(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}

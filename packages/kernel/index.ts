@@ -10,4 +10,4 @@ export { createJsonLogger, noopLogger } from './logger';
 export type { Brand } from './brand';
 export { brand } from './brand';
 
-export { jsonHash } from './jsonHash';
+export { jsonHash, textHash } from './jsonHash';

@@ -9,6 +9,12 @@ import {runtimeReportAdmissionKey} from '../../ports/completeRuntimeReportCache'
 import type { ObservabilityReportLifecycle, ObservabilityDeletionRepository, ObservabilityDeletionTasks, ObservabilityProjectDirectory } from '../../ports/projectDeletion';
 
 const columns: Readonly<Record<string, readonly string[]>> = {
+  development_native_paths: ["depth", "parent_session_id", "pass_key", "path_digest", "project_id", "session_id", "source_namespace", "task_id", "task_key"],
+  development_native_passes: ["document", "fingerprint", "pass_key", "progress", "project_id", "source_id", "state", "task_id", "task_key", "work_cursor", "work_state"],
+  development_native_pages: ["complete", "document", "fingerprint", "ordinal", "packet_count", "pass_key", "project_id", "task_id", "task_key"],
+  development_native_packets: ["fingerprint", "ordinal", "packet_index", "pass_key", "project_id", "sequence", "source_id", "task_id", "task_key"],
+  development_native_sessions: ["document", "fingerprint", "original_id", "pass_key", "project_id", "task_id", "task_key"],
+  development_native_steps: ["document", "fingerprint", "original_id", "pass_key", "project_id", "task_id", "task_key"],
   runtime_report_clock:['revision','singleton'],
   runtime_report_revisions:['revision'],
   runtime_reports:['created_at','id','lease_until','manifest','owner','report','request','request_key','state'],
