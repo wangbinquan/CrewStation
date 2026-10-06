@@ -1,5 +1,5 @@
 import postgres from 'postgres';
-import { jsonHash, precondition } from '@crewstation/kernel';
+import { isPlatformError, jsonHash, precondition } from '@crewstation/kernel';
 import type { Clock } from '@crewstation/kernel';
 import type { DatabaseReclamationReader, OriginalPostgresDatabase, PostgresDatabaseDirectory } from '../../api/databaseReclamation';
 import type { NativeDdlConnection } from '../../api/databaseRemoval';
@@ -161,6 +161,23 @@ async function absentRoles(connection: NativeDdlConnection, scope: NativeDeletio
   }
   return true;
 }
+/** Current baseline reads share one budget; a busy sampler never substitutes original identity proof. */
+function currentObservationSource(source: NativePostgresSource): NativePostgresSource {
+  const deadline = Date.now() + 60_000;
+  const observe = async <T>(connection: NativeDdlConnection, read: () => Promise<T>): Promise<T> => {
+    let delay = 50;
+    for (;;) {
+      await connection.assertHeld();
+      try { return await read(); }
+      catch (error) {
+        if (!isPlatformError(error) || error.details['code'] !== 'native_postgres_source_busy' || Date.now() >= deadline) throw error;
+        await Bun.sleep(Math.min(delay, deadline - Date.now())); delay = Math.min(delay * 2, 1000);
+      }
+    }
+  };
+  return { capture: (connection) => observe(connection, () => source.capture(connection)),
+    verify: (connection, original) => observe(connection, () => source.verify(connection, original)) };
+}
 /** Complete original-backend physics for the internal owner. No orphan directory unlink or FORCE. */
 export function postgresNativeDeletionPhysics(input: { adminUrl: string; source: NativePostgresSource; reader: DatabaseReclamationReader; assertGrant(context: ProjectDeletionContext): Promise<void> }): NativeDeletionPhysics {
   const held = <T>(scope: NativeDeletionScope, work: (connection: NativeDdlConnection) => Promise<T>) => {
@@ -182,11 +199,12 @@ export function postgresNativeDeletionPhysics(input: { adminUrl: string; source:
   });
   return {
     captureCurrent: (plan) => plan.names.length ? withNativePostgresNames(input.adminUrl, plan.names.map((entry) => entry.name), async (connection) => {
-      const storage = NativePostgresStorageSourceSchema.parse(await input.source.capture(connection)), catalog = await nativeCatalog(connection, plan.names);
+      const source = currentObservationSource(input.source);
+      const storage = NativePostgresStorageSourceSchema.parse(await source.capture(connection)), catalog = await nativeCatalog(connection, plan.names);
       // Existing genuine v1 sources and OIDs remain binding; only missing historical birth is replaced by the reviewed current baseline.
       if (plan.catalog.some((original) => !catalog.some((current) => jsonHash(original) === jsonHash(current)))) throw precondition('已有原生历史 OID 与当前实际对象不符');
       const currentPlan = { ...plan, catalog, sources: [...new Map([...plan.sources, storage].map((entry) => [entry.identity, entry])).values()] };
-      const scope = await captureScope(connection, currentPlan, input.source, input.reader, input.adminUrl);
+      const scope = await captureScope(connection, currentPlan, source, input.reader, input.adminUrl);
       if (await actualConsumers(connection, scope, input.adminUrl)) throw precondition('当前或原 backend 消费者、预备事务、复制槽尚未停止');
       return scope;
     }, { tryOnly: true }) : Promise.reject(precondition('当前确权不能仅凭空名字或 absent 受理')),

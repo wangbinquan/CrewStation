@@ -183,3 +183,10 @@ SCM 的 `retained` 材料在既有不可变原范围 jsonb 中保留完整原生
 PostgreSQL 当前基线覆盖全部注册旧名字与当前 OID/服务器/data-dir/实际独立存储身份。14条旧 journal NULL 保持；新事实不作为其 before/after。原 history.references、snapshot.foreignKeys/unownedCredentials、角色外部依赖、共享卷/目录和原实际停止仍验证。scope 的新许可仅替代批准的旧出生前提，实际 stop/purge/prove/metadata/verify 保持。
 
 测试：纯规则拒绝全部未知/额外字段和错误双摘要；真实 PG 的管理员 HTTP 成功、401/403/400、重新读取/重启/重放、源变化失效、新行/共享/未知或目标活跃阻断及并行 seal、确证外项目 Running 完整保留和 UID/容器变化失效；console 长列表末行弹窗、上下层 Esc、草稿/焦点/上下文、保存零删除、两次确认保留；原生沿原 UID/OID/容器/卷验证真实清理及独立 after。
+
+
+### I36-T11：当前原生基线等待采样（2026-10-07）
+
+实际884b13a管理员界面已逐项保存76条严格保留，唯一PostgreSQL当前基线在确认及多次重读中被独立探针409拒绝。冻结源码完整77项只读复现确认`native_postgres_source_busy`；单独原生读取成功且原Pod／容器、PVC／PV、目录和OID保持。探针与30秒定时全量度量共享互斥入口，普通度量可占用55秒，不能用反复点击碰运气或放宽身份核对结束验收。
+
+仅在`modules/data-control/adapters/postgres/databaseReclamation.ts`的`captureCurrent`内对独立来源capture／verify采用同一个60秒总等待预算，指数退避50ms至1秒，且每次尝试前核对原名字锁仍持有。只重试PlatformError的`native_postgres_source_busy`；其他错误、身份变化、源不可用及超时继续失败。历史出生、原SQL范围／角色依赖／消费者核对、普通capture和正式阶段均保持。复用既有nativeWork同样的采样等待语义；不停止平台采样、不改探针或外项目资源。真实PostgreSQL回归应先红后绿：capture与verify暂忙恢复后完整身份一致、非忙错误不重试、等待期间原卷替换仍拒绝；针对性防护及确切提交树六CI后部署并续原77项／22方／独立AFTER。现有完整check中的两项并行观测WIP失败继续保留，依§3单独检查本增量，不把旧候选全门记为新候选通过。
