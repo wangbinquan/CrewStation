@@ -1,7 +1,8 @@
 import { ProjectIdSchema, ResourceIdSchema } from '@crewstation/contracts';
+import type { ProjectId } from '@crewstation/contracts';
 import { jsonHash, precondition } from '@crewstation/kernel';
 import { z } from 'zod';
-import { infrastructureOriginReferences } from '../domain/infrastructureOrigins';
+import { infrastructureOriginReferences, isPlatformMaintenanceKind } from '../domain/infrastructureOrigins';
 import type { InfrastructureOriginDocument, InfrastructureOriginReference } from '../domain/infrastructureOrigins';
 import type { InfrastructureOriginSources } from '../ports/infrastructureOrigins';
 
@@ -14,6 +15,9 @@ const origin = z.object({ complete:z.literal(true),id:ResourceIdSchema,scope:z.e
 /** Source witnesses identify content ownership; they do not establish physical stopping or a deletion phase receipt. */
 export async function resolveInfrastructureOwnership(document: InfrastructureOriginDocument, sources: InfrastructureOriginSources) {
   const references = infrastructureOriginReferences(document);
+  if (isPlatformMaintenanceKind(document)) return {scope:'platform' as const,projectIds:[] as ProjectId[],origins:[],
+    digest:jsonHash({contract:'platform-maintenance/v1',name:document.name,payload:document.payload,
+      legacy:document.legacyPayload ?? null,provenance:document.identityProvenance ?? null})};
   const resolve = async (reference: InfrastructureOriginReference, representation: 'current'|'legacy') => {
     const raw = await sources.resolve(document,reference,representation);
     if (!raw) throw precondition('基础设施原对象或历史归属不可读取');

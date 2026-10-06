@@ -43,4 +43,13 @@ describe('infrastructure source reference extraction; ownership still requires p
     expect(infrastructureOriginReferences(document('queue','cluster-management.operation',{operationId:operation,resumeCount:1})).current).toEqual([{kind:'cluster-operation',key:operation}]);
     expect(() => infrastructureOriginReferences(document('queue','cluster-management.operation',{operationId:operation,resumeCount:-1}))).toThrow();
   });
+  test('global maintenance legacy bodies have only a nonblank requestId, even when their migration digests match', () => {
+    for (const name of ['cluster-management.refresh','cluster-management.metrics','cluster-management.storage']) {
+      const input = document('queue',name,{requestId:operation});
+      for (const legacy of [{requestId:'old-id',projectId:project},{requestId:'old-id',extra:null},{requestId:''},{requestId:' '},{requestId:1},{},[]]) {
+        const proof = {version:'resource-identity/v1',sourceColumn:'legacy_payload',originalHash:jsonHash(legacy),normalizedHash:jsonHash(input.payload)};
+        expect(() => infrastructureOriginReferences({...input,legacyPayload:legacy,identityProvenance:proof})).toThrow();
+      }
+    }
+  });
 });

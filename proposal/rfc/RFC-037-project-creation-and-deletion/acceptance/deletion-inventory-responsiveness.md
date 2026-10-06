@@ -86,3 +86,17 @@ v7于2026-10-06T00:32:06.850807Z开始，01:03:14.440042Z自然结束，退出0�
 接续审计读取平台登记备份元数据及当前PostgreSQL设置：object_backups无记录、archive_mode=off、WAL备份标记0。archiveCommandConfigured字段仅表示SHOW值非空，不能作为归档已启用的证明。缺失业务任务的当前ID与旧tsk键在business_task.recovery_requests、business_task.recovery_audit和task_runtime.development_parent_recovery_sweep中均未找到记录。只读启动参数和20秒statement_timeout均已固定，未修改任何历史或执行删除；操作数仍为0。原件`/private/tmp/cs-rfc037-original-history-recovery-audit-v1.json`与`/private/tmp/cs-rfc037-original-history-recovery-links-v1.json`。
 
 该范围不包含外部持有的备份，不能推断它们不存在。I35仍待作者裁定，批准它也不会自动修复业务、网关及原生PostgreSQL的三类缺失原来源。已批准的原身份、未知归属拒绝和完整after合同保持；完整项目回收仍未完成。
+
+
+## 2026-10-06 已批准的全平台巡检边界候选
+
+作者回复“批准”，采用 I35 的三个确切队列任务合同，见[全平台巡检边界](../platform-maintenance-boundary.md)。严格验证当前单字段 UUIDv7 正文、旧单字段非空 requestId、原迁移版本和两侧摘要后，以 platform-maintenance/v1 及完整原正文计算归属证据；平台队列任务全部保留，不调用过期 collector 原来源。其他任务与事件继续解析当前/旧原归属，未知类型、项目操作来源缺失、额外字段和坏迁移记录均拒绝。队列出生/内容摘要、原一致快照和完整 EOF 保持，不合成停止或回收证明。
+
+TDD 红记录 cs-rfc037-platform-maintenance-red-v1.log 保留：原代码在万条分页与新边界矩阵失败。修复后真实PG及八个相关文件定向 32 pass／0 fail、405断言，cs-rfc037-platform-maintenance-green-v1.log；官方 evaluatePatch 原件 8／8 新增可执行行、100%，无违规。实际PG 10001条全平台任务分52页读至EOF，实际 metadata remove 后全部原行摘要保持，其他项目队列仍在；带正确迁移摘要但多余项目字段的尾行继续阻断。这里的 metadata 用例不能作为原生资源回收验收。
+
+五个功能文件冻结于 cs-rfc037-platform-maintenance-candidate-v1.json，04:24:21.688617Z 启动一次完整 check，原专用PG容器和配置复用；确切终态、发布/CI、八组件安装及原专用项目新计划分别记录。其他会话的 Session/RFC-036 在制输出保持，不发跨会话消息。
+
+补充只读备份审计已实际导出最早和最新部署备份的指定原来源表：业务任务根、受理任务与原运行环境仍无匹配，仅原迁移别名和子任务引用保留；两份各17个服务Pod缺少原来源。随后核对中间归档，11份完成后下一份触发原120秒截止时间，完整归档审计未通过；已读的真实 journal_version/storage 字段仍有14个旧回调缺口。本机未安装或恢复数据库，未回填历史，也未执行删除。v1选择器空导出无效、v2错误列名的原生计数无效，均保留并由 cs-rfc037-original-history-local-backups-v3-incomplete.json 明确更正。此范围不能排除外部持有的原备份；另外三类历史问题继续按原合同阻断。
+
+
+2026-10-06 I35巡检边界候选的唯一完整门禁自然结束，2026-10-06T04:24:21.688617+00:00至2026-10-06T04:59:41.193304+00:00，退出0：6208 pass／157环境skip／0 fail；四层静态通过，五个功能文件指纹首尾保持，原专用PG配置不变。日志SHA256 05b8f23b1e424d17870ea944a644ecdbe6e782ba73c9f3682265dbaf8a99982d，回执 cs-rfc037-platform-maintenance-full-v1-receipt.json。仅五功能路径与七对应基线/验收/共享STATE文档共12路径进入精确发布；定向32／0、405断言及官方改动行8／8防护通过。确切SHA六项CI、本机八组件安装、原项目新预检和最终全资源回收分别留证，其他三类原历史合同不放宽；全部批外Session/RFC-036在制品与共享STATE全文保持。

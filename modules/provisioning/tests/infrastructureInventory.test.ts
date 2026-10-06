@@ -10,6 +10,7 @@ import { queueMigrations } from '@crewstation/queue';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import { sql } from 'drizzle-orm';
 import { infrastructureContentSource } from '../adapters/persistence/infrastructureContents';
+import { infrastructureContentRemoval } from '../adapters/persistence/infrastructureRemoval';
 import { inspectInfrastructureContents } from '../application/infrastructureInventory';
 import type { InfrastructureContentSource } from '../ports/infrastructureContents';
 import type { InfrastructureOriginSources } from '../ports/infrastructureOrigins';
@@ -45,6 +46,38 @@ async function fixture() {
   return { database, project, own, other, source, origins, seed, inspect };
 }
 describe.skipIf(!available)('infrastructure EOF inventory (actual PostgreSQL, package readers and public Project origins)', () => {
+  test('10001 global maintenance jobs reach EOF and survive actual metadata removal; a malformed migrated tail remains a blocker', async () => {
+    const f = await fixture(), requestId = Bun.randomUUIDv7(), names = ['cluster-management.refresh','cluster-management.metrics','cluster-management.storage'];
+    try {
+      await f.database.db.execute(sql`INSERT INTO platform_infra.jobs(id,kind,payload)
+        SELECT 10000+i,(ARRAY['cluster-management.refresh','cluster-management.metrics','cluster-management.storage'])[1+i%3],jsonb_build_object('requestId',${requestId}::text)
+        FROM generate_series(1,10001) i`);
+      await f.database.db.execute(sql`INSERT INTO platform_infra.jobs(id,kind,payload)
+        VALUES(9007199254740994,'project.provision',jsonb_build_object('projectId',${f.own.id}::text)),(9007199254740995,'project.provision',jsonb_build_object('projectId',${f.other.id}::text))`);
+      const legacy = {requestId:'retained-original-collector'},payload = {requestId};
+      const proof = {version:'resource-identity/v1',sourceColumn:'legacy_payload',originalHash:jsonHash(legacy),normalizedHash:jsonHash(payload)};
+      await f.database.db.execute(sql`UPDATE platform_infra.jobs SET legacy_payload=${JSON.stringify(legacy)}::jsonb,identity_provenance=${JSON.stringify(proof)}::jsonb WHERE id=20001`);
+      const platformSnapshot = async () => (await f.database.db.execute<{ count:number; digest:string }>(sql`SELECT count(*)::integer AS count,md5(jsonb_agg(to_jsonb(j) ORDER BY j.id)::text) AS digest
+        FROM platform_infra.jobs j WHERE j.kind IN ('cluster-management.refresh','cluster-management.metrics','cluster-management.storage')`))[0]!;
+      const before = await platformSnapshot(),calls:string[] = [],pages:(string|null)[] = [];
+      const counted: InfrastructureContentSource = {withSnapshot: (read) => f.source.withSnapshot((reader) => read({...reader,
+        queue: (after) => {pages.push(after);return reader.queue(after);}}))};
+      const result = await f.inspect(counted,{resolve: (doc,ref,representation) => {calls.push(doc.name);return f.origins.resolve(doc,ref,representation);}});
+      expect(result.inventory.complete).toBe(true); expect(result.traversal).toMatchObject({queue:true,event:true,orphanErrors:true,scanned:{queue:10003,event:2,orphanErrors:0}});
+      expect(pages).toHaveLength(52); expect(pages.at(-1)).toBe('9007199254740995');
+      expect(calls.some((name) => names.includes(name))).toBe(false); expect(calls).toHaveLength(4);
+      expect(result.contents.filter((row) => row.channel==='queue').map((row) => row.id)).toEqual(['9007199254740994']);
+      expect(await infrastructureContentRemoval(f.database.db).remove(result.contents)).toBe(true);
+      expect(await platformSnapshot()).toEqual(before); expect(before.count).toBe(10001);
+      expect((await f.database.db.execute<{id:string}>(sql`SELECT id::text AS id FROM platform_infra.jobs WHERE kind='project.provision' ORDER BY id`)).map((r) => r.id)).toEqual(['9007199254740995']);
+      const corrupt = {...legacy,projectId:f.own.id};
+      await f.database.db.execute(sql`UPDATE platform_infra.jobs SET legacy_payload=${JSON.stringify(corrupt)}::jsonb,identity_provenance=${JSON.stringify({...proof,originalHash:jsonHash(corrupt)})}::jsonb WHERE id=20001`);
+      const blocked = await f.inspect();
+      expect(blocked.inventory.complete).toBe(false); expect(blocked.traversal.queue).toBe(false); expect(blocked.traversal.scanned.queue).toBe(10002);
+      expect(blocked.inventory.blockers).toContainEqual({participant:'provisioning',code:'infrastructure-origin-unavailable',message:'任务或事件的原归属不完整，恢复来源后重新盘点',resourceId:'queue:20001'});
+      expect((await platformSnapshot()).count).toBe(10001);
+    } finally {await f.database.drop();}
+  },20_000);
   test('reads every page, legacy aliases and dead letters; preserves unrelated content and returns only minimum origins', async () => {
     const f = await fixture();
     try {

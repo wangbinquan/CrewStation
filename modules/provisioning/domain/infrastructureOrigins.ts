@@ -10,6 +10,12 @@ export interface InfrastructureOriginDocument {
   readonly channel: 'queue' | 'event'; readonly name: string; readonly payload: unknown; readonly legacyPayload: unknown; readonly identityProvenance: unknown;
 }
 type Fields = Readonly<Record<string, InfrastructureOriginKind>>;
+const platformMaintenanceKinds = new Set(['cluster-management.refresh','cluster-management.metrics','cluster-management.storage']);
+const legacyMaintenance = z.object({requestId:z.string().min(1).refine((value) => value.trim().length > 0)}).strict();
+
+/** Name classification only; the caller must still validate the complete original document. */
+export const isPlatformMaintenanceKind = (document: InfrastructureOriginDocument) => document.channel === 'queue' && platformMaintenanceKinds.has(document.name);
+
 const queue: Readonly<Record<string, Fields>> = {
   'project.provision': { projectId:'project' }, 'events.deliver': { deliveryId:'delivery' }, 'release.pipeline': { releaseId:'release' },
   'agent-runtime.profile-test': { testId:'profile-test' }, 'task-runtime.rebuild': { requestId:'rebuild' },
@@ -50,7 +56,7 @@ const references = (body: Record<string,unknown>, fields: Fields): Infrastructur
   return { kind,key };
 });
 
-/** Extracts source references only. Public owner ports must resolve every current/legacy key and establish complete original ownership. */
+/** Extracts keys and verifies migration provenance; original owner witnesses are required outside the explicit global maintenance contract. */
 export function infrastructureOriginReferences(document: InfrastructureOriginDocument) {
   const registered = document.channel === 'queue' ? queue : document.channel === 'event' ? events : undefined;
   if (!registered || !Object.hasOwn(registered,document.name)) throw precondition('基础设施内容类型尚未登记，不能视为空范围');
@@ -62,6 +68,7 @@ export function infrastructureOriginReferences(document: InfrastructureOriginDoc
     return { current:original,legacy:[] as InfrastructureOriginReference[] };
   }
   const source = provenance.parse(document.identityProvenance),legacy = object(document.legacyPayload);
+  if (isPlatformMaintenanceKind(document)) legacyMaintenance.parse(legacy);
   if (source.originalHash !== jsonHash(legacy) || source.normalizedHash !== jsonHash(document.payload)) throw precondition('基础设施原内容与迁移摘要不符');
   return { current:original,legacy:references(legacy,fields) };
 }

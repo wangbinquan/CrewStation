@@ -3578,3 +3578,6 @@ TaskRuntime七阶段仅受控停止端口，DevSession的原删除许可/回调f
 实际部署factory只读诊断以及管理员唯一一次新计划均确认runtime-environment与release盘点完整。原项目`01a0f30b-c652-7000-8d6f-553e3b5f6135`的计划`01a10f3a-1b2d-7000-abaa-c8056ae36ed2`历时219.007秒，22方中18方完整，57阻塞；business-task、data-control、gateway、provisioning仍不完整。全平台删除操作数0、原项目仍存在、最终确认不可用，尚无物理回收或after证明。创建弹窗、最终正式/预览域名及模板用途再次实机核对；取消和关闭恢复列表末行焦点与scrollTop 1163.5。
 
 接续只读恢复审计确认平台登记的object_backups为空、当前PostgreSQL archive_mode=off且WAL备份标记0；缺失业务任务的当前和旧键在三个已登记恢复表中均无记录。原件`/private/tmp/cs-rfc037-original-history-recovery-audit-v1.json`与`/private/tmp/cs-rfc037-original-history-recovery-links-v1.json`。此检查不证明外部持有的备份不存在，也不把父引用、当前同名对象或缺失行作为原历史。I35全平台巡检边界仍待作者裁定；业务、网关、原生PostgreSQL的缺失原来源还需恢复或另行明确批准相应合同。全部批外WIP与STATE历史保持，没有跨会话消息或新增Agent。
+
+
+2026-10-06 I35巡检边界候选的唯一完整门禁自然结束，2026-10-06T04:24:21.688617+00:00至2026-10-06T04:59:41.193304+00:00，退出0：6208 pass／157环境skip／0 fail；四层静态通过，五个功能文件指纹首尾保持，原专用PG配置不变。日志SHA256 05b8f23b1e424d17870ea944a644ecdbe6e782ba73c9f3682265dbaf8a99982d，回执 cs-rfc037-platform-maintenance-full-v1-receipt.json。仅五功能路径与七对应基线/验收/共享STATE文档共12路径进入精确发布；定向32／0、405断言及官方改动行8／8防护通过。确切SHA六项CI、本机八组件安装、原项目新预检和最终全资源回收分别留证，其他三类原历史合同不放宽；全部批外Session/RFC-036在制品与共享STATE全文保持。
