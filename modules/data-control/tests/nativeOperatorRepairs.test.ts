@@ -28,6 +28,37 @@ async function legacyCallback(f: Fixture, bind = true) {
   return work;
 }
 const actor: Actor = { userId: newResourceId() as Actor['userId'], isAdmin: true };
+test.skipIf(!available)('explicit current registered-name baseline handles missing resource versions without rewriting legacy history and still completes physical cleanup', () => nativeOwnerFixture(async (f) => {
+  const work = await legacyCallback(f), original = [...await f.database.db.execute(sql`SELECT to_jsonb(r) AS body FROM data_control.deletion_work r WHERE work_id=${work}`)];
+  f.historyValue.complete = false;
+  f.historyValue.blockers = [{ participant: 'data-control', code: 'native-revisions-unavailable', message: '原资源旧版本正文未保留', resourceId: f.origin.resourceId }];
+  Object.assign(f.historyValue, { currentRecordsComplete: true });
+  const owner = () => f.owner(), [item] = await owner().repairs!.inspect(f.target);
+  expect(item!.allowedDecisions).toEqual(['reclaim']);
+  expect(item!.facts.some((fact) => fact.label === '旧资源版本' && fact.value.includes('未恢复'))).toBe(true);
+  expect((await owner().inspect(f.target)).complete).toBe(false);
+  await owner().repairs!.confirm(f.target, actor, { owner: item!.owner, key: item!.key, originalDigest: item!.originalDigest, evidenceDigest: item!.evidenceDigest, decision: 'reclaim' });
+  expect(f.historyValue.complete).toBe(false);
+  expect([...await f.database.db.execute(sql`SELECT to_jsonb(r) AS body FROM data_control.deletion_work r WHERE work_id=${work}`)]).toEqual(original);
+  const report = await owner().inspect(f.target); expect(report.complete).toBe(true);
+  for (const phase of ['seal', 'stop', 'purge', 'prove', 'namespace', 'metadata', 'verify'] as const) expect(await owner().run(f.context(report, phase))).toMatchObject({ kind: 'done' });
+  expect(await f.catalog()).toHaveLength(0);
+}));
+test.skipIf(!available)('current name completeness cannot excuse invalid aliases, foreign endpoints, compacted identities or an incomplete source', () => nativeOwnerFixture(async (f) => {
+  await legacyCallback(f); f.historyValue.complete = false;
+  for (const code of ['native-identity-compacted', 'native-declaration-invalid', 'native-owner-unknown', 'legacy-endpoint-unverified', 'native-name-unregistered']) {
+    Object.assign(f.historyValue, { currentRecordsComplete: true });
+    f.historyValue.blockers = [{ participant: 'data-control', code, message: code }];
+    const [item] = await f.owner().repairs!.inspect(f.target); expect(item!.allowedDecisions).toEqual([]);
+  }
+  f.historyValue.blockers = [{ participant: 'data-control', code: 'native-revisions-unavailable', message: 'missing original versions' }];
+  for (const currentRecordsComplete of [false, undefined]) {
+    Object.assign(f.historyValue, { currentRecordsComplete });
+    expect((await f.owner().repairs!.inspect(f.target))[0]!.allowedDecisions).toEqual([]);
+    expect((await f.owner().inspect(f.target)).complete).toBe(false);
+  }
+  expect(await f.catalog()).toHaveLength(2);
+}));
 test.skipIf(!available)('current native baseline survives timestamp-only rereads/restarts, preserves legacy NULL and still requires all physical phases and directory proof', () => nativeOwnerFixture(async (f) => {
   const work = await legacyCallback(f), original = [...await f.database.db.execute(sql`SELECT to_jsonb(r) AS body FROM data_control.deletion_work r WHERE work_id=${work}`)];
   const owner = () => f.owner(), repair = () => owner().repairs!;

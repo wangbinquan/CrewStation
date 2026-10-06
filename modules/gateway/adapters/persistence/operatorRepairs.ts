@@ -69,7 +69,7 @@ export function gatewayOperatorRepairs(db: Database, input: Input, unknown: {
   pod(db: Executor, body: Record<string, unknown>): Promise<boolean>;
   document(db: Executor, document: AllowlistDocument): Promise<boolean>;
 }): ProjectDeletionRepairOwner {
-  const inspect = async (target: ProjectDeletionTarget, executor: Executor = db) => {
+  const inspect = async (target: ProjectDeletionTarget, executor: Executor) => {
     const items: ProjectDeletionRepairItem[] = [];
     await readTransactionPages<Record<string, unknown> & { body: Record<string, unknown> }>(executor, sql`SELECT to_jsonb(r) AS body FROM gateway.pod_identities r ORDER BY namespace,pod_name`, async (rows) => {
       for (const row of rows) if (await unknown.pod(executor, row.body)) items.push(await gatewayPodRepair(executor, input, target, row.body));
@@ -79,7 +79,10 @@ export function gatewayOperatorRepairs(db: Database, input: Input, unknown: {
     });
     return items;
   };
-  return { inspect, confirm: (target, actor, raw) => withExclusiveDatabaseAdmission(db, 'gateway.project-admission:' + target.id, async (tx) => {
+  return { inspect: (target) => db.transaction(async (tx) => {
+    await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`);
+    return inspect(target, tx);
+  }), confirm: (target, actor, raw) => withExclusiveDatabaseAdmission(db, 'gateway.project-admission:' + target.id, async (tx) => {
     const input = ConfirmProjectDeletionRepairSchema.parse(raw), item = (await inspect(target, tx)).find((item) => item.key === input.key);
     if (!actor.isAdmin || !item || input.owner !== 'gateway' || item.originalDigest !== input.originalDigest || item.evidenceDigest !== input.evidenceDigest || !item.allowedDecisions.includes(input.decision)) throw precondition('网关确权候选已变化或不能作此决定');
     await appendContentConfirmation(tx, 'gateway', { context: target.id, key: item.key, source: item.originalDigest, evidence: item.evidenceDigest, decision: input.decision, actor: actor.userId, at: new Date().toISOString(), value: { version: 'operator-confirmed/v1', item } });

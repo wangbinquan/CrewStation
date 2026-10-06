@@ -47,3 +47,15 @@ test('physical current witness binds every regular/init/ephemeral container, lab
   expect((await reader.inspect(target, query)).pods![0]!.terminating).toBe(true);
   expect(k8s.deleted).toEqual([]);
 });
+
+test('nested Pod configuration references select otherwise unlabelled consumers and detect shared target bindings; spec changes invalidate evidence', async () => {
+  const k8s = createFakeK8sClient(), raw = pod('nested-consumer', {}, 'Succeeded');
+  raw['spec'] = { containers: [{ name: 'worker', env: [{ name: 'OLD_EXECUTION', value: 'https://example/' + target.id + '/orphan-id' }] }] };
+  await k8s.apply(raw);
+  const reader = deletionCurrentAssets(k8s), query = { ids: ['orphan-id'] }, first = await reader.inspect(target, query);
+  expect(first.activeConsumers).toEqual([]); expect(first.targetReferences).toEqual(['foreign/nested-consumer@nested-consumer-uid']);
+  raw['spec'] = { containers: [{ name: 'worker', env: [{ name: 'OLD_EXECUTION', value: 'orphan-id' }] }] };
+  await k8s.apply(raw); const second = await reader.inspect(target, query);
+  expect(second.targetReferences).toEqual([]); expect(second.digest).not.toBe(first.digest);
+  expect(second.pods).toHaveLength(1); expect(k8s.deleted).toEqual([]);
+});

@@ -62,3 +62,19 @@ test('capability or current identity failure removes deletion actions; ordinary 
   const before = f.calls.length; page = await renderApp('/admin/projects');
   expect(page.text()).toContain('仅平台管理员可见'); expect(f.calls).toHaveLength(before);
 });
+
+test.each(['/admin/projects', '/admin/integrations'])('%s restores the current last-row trigger and original scroll after a background capability loss rebuilds its action', async route => {
+  const f = fixture(); f.state.available = true; page = await renderApp(`${route}?q=managed`); await page.click('下一页');
+  const main = document.querySelector('main')!, trigger = [...document.querySelectorAll('tbody tr')].at(-1)!.querySelectorAll('button');
+  const original = [...trigger].find(button => button.textContent === '永久删除项目')!;
+  main.scrollTop = 700; await act(async () => { original.focus(); original.click(); }); await page.settle();
+  f.state.available = false; await page.reread(); expect(document.querySelectorAll('dialog[open]')).toHaveLength(0); expect(original.isConnected).toBe(false);
+  // A real scroll viewport clamps when its actions shrink; happy-dom has no layout engine.
+  main.scrollTop = 0;
+  f.state.available = true; await page.reread(); expect(document.querySelectorAll('dialog[open]')).toHaveLength(1);
+  const current = [...document.querySelectorAll('tbody tr')].at(-1)!.querySelectorAll('button'), restored = [...current].find(button => button.textContent === '永久删除项目')!;
+  expect(restored === original).toBe(false); await page.click('关闭'); await page.settle();
+  expect(document.activeElement === restored).toBe(true); expect(main.scrollTop).toBe(700);
+  expect(page.search()).toMatchObject({ q: 'managed', cursor: '20' }); expect(document.querySelectorAll('tbody tr')).toHaveLength(20);
+  expect(f.calls.filter(call => call.path.endsWith('/deletions'))).toHaveLength(0);
+});

@@ -16,10 +16,11 @@ const scopeSchema = z.object({ version: z.literal(1), plan: planSchema, storage:
 type History = Awaited<ReturnType<NativeDeletionHistory['read']>>;
 const blocker = (code: string, message: string, resourceId?: string) => ({ participant: 'data-control' as const, code, message, ...(resourceId ? { resourceId } : {}) });
 const unique = <T>(values: readonly T[]) => [...new Map(values.map((value) => [jsonHash(value), value])).values()].sort((a, b) => jsonHash(a).localeCompare(jsonHash(b)));
+const currentHistoryReady = (history: History) => history.complete || history.currentRecordsComplete === true && history.blockers.every((gap) => gap.code === 'native-revisions-unavailable');
 
 function deletionPlan(history: History, snapshot: NativeDeletionSnapshot, currentBaseline = false) {
   const names: NativeDeletionPlan['names'][number][] = [], catalogEntries: NativeDeletionPlan['catalog'][number][] = [], sources: NativeDeletionPlan['sources'][number][] = [], sessions: NativeDeletionPlan['sessions'][number][] = [];
-  const blockers = [...history.blockers];
+  const blockers = history.blockers.filter((gap) => !(currentBaseline && history.currentRecordsComplete === true && gap.code === 'native-revisions-unavailable'));
   const keys = unique([...snapshot.entities, ...snapshot.credentials.map((row) => row.resourceId), ...history.records.flatMap((row) => [row.resourceId, ...row.aliases])]);
   for (const row of history.records) for (const declared of row.names) {
     names.push({ kind: declared.kind, name: declared.name });
@@ -90,9 +91,9 @@ const currentScopeDigest = (scope: NativeDeletionScope) => {
 async function nativeRepairCandidate(input: NativeOwnerInput, target: ProjectDeletionTarget, history?: History, snapshot?: NativeDeletionSnapshot) {
   history ??= await input.history.read(target.id);
   snapshot ??= await input.repository.snapshot(target.id, history.records.flatMap((row) => [row.resourceId, ...row.aliases]));
-  if (!snapshot.journal.some((row) => row.journalVersion === null)) return undefined;
+  if (!snapshot.journal.some((row) => row.journalVersion === null) && !history.blockers.some((gap) => gap.code === 'native-revisions-unavailable')) return undefined;
   const prepared = deletionPlan(history, snapshot, true), blockers = prepared.blockers.map((entry) => entry.message);
-  if (!history.complete || history.references.length) blockers.push('原数据归属/分页不完整或仍有其他项目引用');
+  if (!currentHistoryReady(history) || history.references.length) blockers.push('原数据归属/分页不完整或仍有其他项目引用');
   const originalDigest = jsonHash({ target: target.id, history, snapshot }); let scope: NativeDeletionScope | undefined;
   if (!blockers.length) {
     try {
@@ -107,6 +108,7 @@ async function nativeRepairCandidate(input: NativeOwnerInput, target: ProjectDel
   if (saved && currentScopeDigest(validateScope(saved.scope)) !== currentScopeDigest(scope!)) throw precondition('当前原生基线确认正文与实际完整范围不符');
   const item: ProjectDeletionRepairItem = ProjectDeletionRepairItemSchema.parse({ owner: 'data-control', key: 'postgres-current', title: 'PostgreSQL 当前完整资源基线', originalDigest, evidenceDigest,
     facts: [{ label: '旧历史', value: String(snapshot.journal.filter((row) => row.journalVersion === null).length) + ' 条 before/after 仍为 NULL；不会补写' },
+      ...(history.blockers.some((gap) => gap.code === 'native-revisions-unavailable') ? [{ label: '旧资源版本', value: history.blockers.filter((gap) => gap.code === 'native-revisions-unavailable').length + ' 份旧版本正文未恢复；本次只确认当前实际基线，不补写历史' }] : []),
       ...prepared.plan.names.map((row) => ({ label: '已登记原名字', value: row.kind + ': ' + row.name })),
       ...(scope?.databases ?? []).map((row) => ({ label: '当前实际数据库', value: row.name + ' · OID ' + row.oid + ' · 来源 ' + row.source })),
       ...(scope?.roles ?? []).map((row) => ({ label: '当前实际角色', value: row.name + ' · OID ' + row.oid })),
@@ -146,7 +148,7 @@ export function nativePostgresDeletionOwner(input: NativeOwnerInput): ProjectDel
     const snapshot = await input.repository.snapshot(target.id, history.records.flatMap((row) => [row.resourceId, ...row.aliases]));
     const prepared = deletionPlan(history, snapshot);
     if (!history.complete || prepared.blockers.length) {
-      const current = history.complete && operator ? await operator.baseline(target, history, snapshot) : undefined;
+      const current = currentHistoryReady(history) && operator ? await operator.baseline(target, history, snapshot) : undefined;
       if (current) return { report: inventory(snapshot, current, [], history.references, true, history.revision), scope: current };
       return { report: inventory(snapshot, null, prepared.blockers, history.references, false, history.revision), scope: null };
     }

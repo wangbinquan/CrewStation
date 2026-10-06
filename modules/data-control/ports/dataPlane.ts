@@ -52,6 +52,8 @@ export interface DataPlaneWriter {
 export interface NativeDeletionHistory {
   read(projectId: ProjectId): Promise<{
     readonly complete: boolean; readonly revision: string;
+    /** All retained current rows/names were read; only unavailable historical resource versions may remain. Never a historical completeness claim. */
+    readonly currentRecordsComplete?: boolean;
     readonly records: readonly { resourceId: string; aliases: readonly string[]; names: readonly { kind: 'database' | 'role'; name: string; oid?: string }[] }[];
     readonly blockers: ProjectDeletionInventory['blockers']; readonly references: ProjectDeletionInventory['references'];
   }>;

@@ -32,7 +32,7 @@ export function ProjectDirectoryTable({ items, available, integration, onOwner }
         ? <ButtonLink size="small" to="/admin/projects/$projectId/provisioning" params={{ projectId: p.id }}>{t('admin.directory.provision')}</ButtonLink>
         : <ButtonLink size="small" to={integration ? '/admin/integrations/$projectId' : '/admin/projects/$projectId/resources'} params={{ projectId: p.id }}>{t(integration ? 'catalog.openProject' : 'catalog.resources')}</ButtonLink> : null}
         <Button size="small" onClick={() => setSelected(p.id)}>{t('catalog.more')}</Button>
-        {available && openDeletion ? <Button size="small" variant="danger" onClick={event => openDeletion(p, event.currentTarget)}>{t(p.state === 'deleting' ? 'projects.delete.progressTitle' : 'projects.delete.confirmTitle')}</Button> : null}</ActionRow></td>
+        {available && openDeletion ? <Button id={`project-deletion-directory:${integration ? 'integrations' : 'projects'}:${p.id}`} size="small" variant="danger" onClick={event => openDeletion(p, event.currentTarget)}>{t(p.state === 'deleting' ? 'projects.delete.progressTitle' : 'projects.delete.confirmTitle')}</Button> : null}</ActionRow></td>
     </tr>; })}
   </DataTable>{detail ? <DirectoryDetails item={detail} available={available} onClose={() => setSelected(undefined)} /> : null}</>;
 }

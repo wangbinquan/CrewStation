@@ -47,7 +47,7 @@ export function ProjectLifecycleCard({ project, isAdmin, unavailable }: { readon
     {archive.isError ? <ActionNote tone="error">{t('projects.lifecycle.error', { message: errorMessage(archive.error) })}</ActionNote> : null}
     {archive.isSuccess ? <ActionNote tone="success">{t('projects.lifecycle.saved', { state: t(`projects.state.${archive.data.state}`) })}</ActionNote> : null}
   </Card>{isAdmin && openDeletion ? <Card stacked compact title={t('projects.delete.confirmTitle')}
-    actions={<Button variant="danger" disabled={unavailable || archive.isPending} onClick={event => openDeletion(project, event.currentTarget)}>{t(project.state === 'deleting' ? 'projects.delete.progressTitle' : 'projects.delete.confirmTitle')}</Button>}>
+    actions={<Button id={`project-deletion-lifecycle:${project.id}`} variant="danger" disabled={unavailable || archive.isPending} onClick={event => openDeletion(project, event.currentTarget)}>{t(project.state === 'deleting' ? 'projects.delete.progressTitle' : 'projects.delete.confirmTitle')}</Button>}>
     <p>{t('projects.delete.consequence')}</p><p>{t('projects.delete.irreversible')}</p>
   </Card> : null}</Stack>;
 }

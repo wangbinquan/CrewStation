@@ -34,5 +34,5 @@ export interface NativeDeletionHistoryInputs {
   }> } };
 }
 export interface NativeDeletionHistoryPort {
-  read(id: ProjectId): Promise<{ readonly complete: boolean; readonly revision: string; readonly records: readonly { resourceId: string; aliases: readonly string[]; names: readonly { kind: 'database' | 'role'; name: string; oid?: string }[] }[]; readonly blockers: ProjectDeletionInventory['blockers']; readonly references: ProjectDeletionInventory['references'] }>;
+  read(id: ProjectId): Promise<{ readonly complete: boolean; readonly currentRecordsComplete?: boolean; readonly revision: string; readonly records: readonly { resourceId: string; aliases: readonly string[]; names: readonly { kind: 'database' | 'role'; name: string; oid?: string }[] }[]; readonly blockers: ProjectDeletionInventory['blockers']; readonly references: ProjectDeletionInventory['references'] }>;
 }

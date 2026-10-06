@@ -6,4 +6,4 @@ export { claimOriginalCleanupJob } from './cleanupOriginal';
 export type { JobContext, JobHandler, Worker, WorkerOptions } from './worker';
 export { createWorker } from './worker';
 export type { QueueContentIdentity, QueueContentItem } from './content';
-export { readQueueContents, removeQueueContents } from './content';
+export { readQueueContents, removeQueueContents, queueContentContains } from './content';

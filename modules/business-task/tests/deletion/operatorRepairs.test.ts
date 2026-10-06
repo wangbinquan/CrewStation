@@ -8,6 +8,22 @@ import { businessDeletionRepository } from '../../adapters/persistence/deletion/
 import { businessWorkFixture } from './workFixture';
 
 const available = await testDatabaseAvailable();
+test.skipIf(!available)('administrator review reaches every foreign child beyond the SQL cursor threshold while preserving original contents', async () => {
+  const f = await businessWorkFixture(), task = newResourceId(), runtime = newResourceId(), ids = Array.from({ length: 601 }, () => newResourceId()).sort();
+  const assets: ProjectDeletionCurrentAssets = { inspect: async () => ({ complete: true, digest: jsonHash('full-original-child-source'), activeConsumers: [], targetReferences: [] }) };
+  try {
+    await f.database.db.execute(sql`INSERT INTO business_task.tasks(id,service_id,project_id,caller_identity,state,trace_id,volume_mode,profile,labels,created_at,updated_at)
+      VALUES(${task},${f.otherService},${f.otherProject},'foreign','closed','trace','persistent','profile','{}',now(),now())`);
+    await f.database.db.execute(sql`INSERT INTO business_task.subtasks(id,task_id,name,kind,state,attempt,spec,created_at)
+      SELECT value,${task},'unknown-runtime','agent','failed',1,${JSON.stringify({ execution: { taskId: runtime } })}::jsonb,now() FROM jsonb_array_elements_text(${JSON.stringify(ids)}::jsonb)`);
+    const read = () => f.database.db.execute(sql`SELECT to_jsonb(r) AS body FROM business_task.subtasks r ORDER BY id`), original = [...await read()];
+    const items = await businessOperatorRepairs(f.database.db, f.sources, assets).inspect(f.context().target);
+    expect(items.map((item) => item.key)).toEqual(ids.map((id) => 'subtasks:' + JSON.stringify([id])));
+    expect(items.every((item) => item.allowedDecisions.join() === 'retain' && item.confirmed === null)).toBe(true);
+    expect([...await read()]).toEqual(original);
+  } finally { await f.drop(); }
+}, 30_000);
+
 test.skipIf(!available)('reviewed whole foreign child is retained without restoring its missing runtime; receipts are immutable, target/content/evidence bound and restartable', async () => {
   const f = await businessWorkFixture(), id = newResourceId(), task = newResourceId(), runtime = newResourceId();
   let active = false;

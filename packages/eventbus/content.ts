@@ -45,6 +45,19 @@ export async function readEventContents(executor: Executor, after: string | null
     birthDigest: row.birth_digest,contentDigest: row.content_digest }));
 }
 
+/** Guard the whole unchanged event and all original errors without exposing private trace/error text. */
+export async function eventContentContains(executor: Executor, original: EventContentIdentity, fragments: readonly string[]): Promise<boolean> {
+  assertOrigins([original]);
+  if (fragments.length > 200 || fragments.some(value => typeof value !== 'string' || !value.length)) throw precondition('Invalid event content guard');
+  await assertShape(executor);
+  const [row] = await executor.execute<{ stable: boolean; matched: boolean }>(sql`SELECT ${eventBirthDigest()}=${original.birthDigest} AND ${content()}=${original.contentDigest} AS stable,
+    EXISTS(SELECT 1 FROM jsonb_array_elements_text(${JSON.stringify(fragments)}::jsonb) value WHERE strpos(to_jsonb(e)::text,value)>0 OR EXISTS(
+      SELECT 1 FROM platform_infra.event_dead_letters d WHERE d.event_id=e.id AND strpos(to_jsonb(d)::text,value)>0)) AS matched
+    FROM platform_infra.domain_events e WHERE id=${original.id}::bigint`);
+  if (row?.stable !== true || typeof row.matched !== 'boolean') throw precondition('Event content changed during guard');
+  return row.matched;
+}
+
 /** Historical errors without an event have no recoverable payload origin; callers must report them instead of overlooking them. */
 export async function readOrphanEventDeadLetters(executor: Executor, after: { readonly eventId: string; readonly consumer: string } | null = null, limit = 200) {
   if (after && (!validId(after.eventId) || typeof after.consumer !== 'string') || !Number.isInteger(limit) || limit < 1 || limit > 200) throw precondition('Invalid orphan error cursor');

@@ -8,6 +8,24 @@ import { sql } from 'drizzle-orm';
 import { gatewayContent, gatewayDeletionFixture } from './gatewayDeletionFixture';
 
 const available = await testDatabaseAvailable();
+test.skipIf(!available)('gateway administrator review reads every historical Pod beyond the cursor threshold without changing any original row', async () => {
+  const f = await gatewayDeletionFixture({ beforeUpgrade: async (db) => {
+    await db.execute(sql`INSERT INTO gateway.pod_identities(namespace,pod_name,ip,project,service,workload,physical_slot,version,updated_at)
+      SELECT 'cs-old-pagination','pod-' || lpad(n::text,4,'0'),'10.0.0.8','old-foreign','worker','service','blue',1,now() FROM generate_series(1,601) n`);
+  } });
+  const currentAssets: ProjectDeletionCurrentAssets = { inspect: async () => ({ complete: true, digest: jsonHash('original-pagination-source'), activeConsumers: [], targetReferences: [] }) };
+  try {
+    const original = await gatewayContent(f.db.db), target = await f.project.api.deletionScope(f.own.id);
+    const items = await f.application({ currentAssets }).api.deletionOwner!.repairs!.inspect(target);
+    expect(items).toHaveLength(601);
+    expect(new Set(items.map((item) => item.key)).size).toBe(601);
+    expect(items[0]!.key).toBe('pod:["cs-old-pagination","pod-0001"]');
+    expect(items.at(-1)!.key).toBe('pod:["cs-old-pagination","pod-0601"]');
+    expect(items.every((item) => item.allowedDecisions.join() === 'retain' && item.confirmed === null)).toBe(true);
+    expect(await gatewayContent(f.db.db)).toEqual(original);
+  } finally { await f.db.drop(); }
+}, 30_000);
+
 test.skipIf(!available)('gateway explicit decisions preserve full unknown historical Pod/documents; latest, target references and changed consumers block', async () => {
   const f = await gatewayDeletionFixture({ beforeUpgrade: async (db) => {
     await db.execute(sql`INSERT INTO gateway.pod_identities(namespace,pod_name,ip,project,service,workload,physical_slot,version,updated_at) VALUES('cs-old-foreign','old-pod','10.0.0.8','old-foreign','worker','service','blue',1,now())`);

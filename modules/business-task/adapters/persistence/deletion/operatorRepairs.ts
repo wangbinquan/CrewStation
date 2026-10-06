@@ -50,7 +50,10 @@ export async function retainedBusinessChild(db: Executor, sources: BusinessDelet
 }
 
 export function businessOperatorRepairs(db: Database, sources: BusinessDeletionSources, assets: ProjectDeletionCurrentAssets): ProjectDeletionRepairOwner {
-  const inspect = (target: ProjectDeletionTarget) => businessRepairItems(db, sources, assets, target);
+  const inspect = (target: ProjectDeletionTarget) => db.transaction(async (tx) => {
+    await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`);
+    return businessRepairItems(tx, sources, assets, target);
+  });
   return { inspect, confirm: (target, actor: Actor, raw) => withExclusiveDatabaseAdmission(db, 'business-task.project-admission:' + target.id, async (tx) => {
     const input = ConfirmProjectDeletionRepairSchema.parse(raw), items = await businessRepairItems(tx, sources, assets, target);
     const item = items.find((item) => item.key === input.key);

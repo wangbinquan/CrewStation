@@ -38,6 +38,17 @@ export async function readQueueContents(executor: Executor, after: string | null
   });
 }
 
+/** Read-only substring guard over the entire unchanged row, including private errors and lease fields. No private text leaves this package. */
+export async function queueContentContains(executor: Executor, original: QueueContentIdentity, fragments: readonly string[]): Promise<boolean> {
+  if (!validId(original.id) || !/^[a-f0-9]{64}$/.test(original.birthDigest) || !/^[a-f0-9]{64}$/.test(original.contentDigest) || fragments.length > 200 || fragments.some(value => typeof value !== 'string' || !value.length)) throw precondition('Invalid queue content guard');
+  await assertShape(executor);
+  const [row] = await executor.execute<{ stable: boolean; matched: boolean }>(sql`SELECT ${birth()}=${original.birthDigest} AND ${content()}=${original.contentDigest} AS stable,
+    EXISTS(SELECT 1 FROM jsonb_array_elements_text(${JSON.stringify(fragments)}::jsonb) value WHERE strpos(to_jsonb(j)::text,value)>0) AS matched
+    FROM platform_infra.jobs j WHERE id=${original.id}::bigint`);
+  if (row?.stable !== true || typeof row.matched !== 'boolean') throw precondition('Queue content changed during guard');
+  return row.matched;
+}
+
 /** Only confirmed row identities are accepted. One statement locks, rechecks and deletes all-or-none; absence permits replay. */
 export async function removeQueueContents(executor: Executor, identities: readonly QueueContentIdentity[]): Promise<{ readonly stable: boolean; readonly removed: number }> {
   if (identities.length > 200 || new Set(identities.map((item) => item.id)).size !== identities.length || identities.some((item) =>

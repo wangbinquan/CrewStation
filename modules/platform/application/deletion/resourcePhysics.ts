@@ -70,6 +70,7 @@ export function nativeDeletionRetainedHistory(data: NativeDeletionHistoryInputs[
       for (const child of row.observed) addName(names, child.kind === 'PostgresDatabase' ? 'database' : 'role', child.name, row.id, child.uid);
       records.push({ resourceId: row.id, aliases: row.owner.ref && row.owner.ref !== row.id ? [row.owner.ref] : [], names });
     }
-    return { complete: blockers.length === 0, revision: jsonHash({ projectId, data: legacy.revision, resources: ledger.revision }), records, blockers, references: [] };
+    return { complete: blockers.length === 0, currentRecordsComplete: blockers.every((gap) => gap.code === 'native-revisions-unavailable'),
+      revision: jsonHash({ projectId, data: legacy.revision, resources: ledger.revision }), records, blockers, references: [] };
   } };
 }
