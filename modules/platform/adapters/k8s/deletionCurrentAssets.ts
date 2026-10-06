@@ -21,9 +21,8 @@ function physicalPod(pod: K8sObject): ProjectDeletionCurrentPod {
     terminating: !!pod.metadata.deletionTimestamp, containersComplete, containers };
 }
 
-/** Full current Pod EOF: a negative current match is a guard on a reviewed retention decision, never an old exit proof. */
-export function deletionCurrentAssets(k8s: K8sClient): ProjectDeletionCurrentAssets {
-  return { inspect: async (target, selectors) => {
+/** Complete current Pod snapshot and its matched original objects share the same EOF and digest. */
+export async function inspectDeletionCurrentAssets(k8s: K8sClient, target: Parameters<ProjectDeletionCurrentAssets['inspect']>[0], selectors: Parameters<ProjectDeletionCurrentAssets['inspect']>[1]) {
     const pods: K8sObject[] = [], cursors = new Set<string>(); let cursor = '', revision: string | undefined;
     for (;;) {
       const page = await k8s.listPage(Resources.Pod!, undefined, { limit: 500, ...(cursor ? { continue: cursor } : {}), signal: AbortSignal.timeout(30_000) });
@@ -32,7 +31,7 @@ export function deletionCurrentAssets(k8s: K8sClient): ProjectDeletionCurrentAss
       if (!page.continue) break;
       cursors.add(page.continue); cursor = page.continue;
     }
-    const activeConsumers: string[] = [], targetReferences: string[] = [], evidence: ProjectDeletionCurrentPod[] = [], bindings: unknown[] = [];
+    const activeConsumers: string[] = [], targetReferences: string[] = [], evidence: ProjectDeletionCurrentPod[] = [], bindings: unknown[] = [], matched: K8sObject[] = [];
     for (const pod of pods) {
       const labels = pod.metadata.labels ?? {}, selector = selectors.pods?.find((entry) => entry.namespace === pod.metadata.namespace && entry.name === pod.metadata.name);
       const binding = { labels, annotations: pod.metadata.annotations, owners: pod.metadata.ownerReferences, name: pod.metadata.name, namespace: pod.metadata.namespace, spec: pod['spec'] };
@@ -42,11 +41,16 @@ export function deletionCurrentAssets(k8s: K8sClient): ProjectDeletionCurrentAss
       const status = pod['status'] as { phase?: string; containerStatuses?: { name: string; containerID?: string; state?: unknown }[] } | undefined;
       const key = `${pod.metadata.namespace}/${pod.metadata.name}@${pod.metadata.uid}`;
       evidence.push(physicalPod(pod));
+      matched.push(pod);
       bindings.push(binding);
       if (selector && selector.uid !== pod.metadata.uid || status?.phase !== 'Succeeded' && status?.phase !== 'Failed') activeConsumers.push(key);
       const targetIds = [target.id, target.serviceId, target.namespace, target.prodHost, target.previewHost, target.serviceHost].filter((id): id is string => !!id);
       if (labels[LABELS.project] === target.slug || mentions(binding, targetIds)) targetReferences.push(key);
     }
-    return { complete: true, digest: jsonHash({ target: target.id, selectors, evidence: evidence.sort((a, b) => jsonHash(a).localeCompare(jsonHash(b))), bindings: bindings.sort((a, b) => jsonHash(a).localeCompare(jsonHash(b))) }), activeConsumers: activeConsumers.sort(), targetReferences: targetReferences.sort(), pods: evidence };
-  } };
+    return { assets: { complete: true as const, digest: jsonHash({ target: target.id, selectors, evidence: evidence.sort((a, b) => jsonHash(a).localeCompare(jsonHash(b))), bindings: bindings.sort((a, b) => jsonHash(a).localeCompare(jsonHash(b))) }), activeConsumers: activeConsumers.sort(), targetReferences: targetReferences.sort(), pods: evidence }, pods: matched };
+}
+
+/** A negative current match guards a reviewed retention decision, never an old exit proof. */
+export function deletionCurrentAssets(k8s: K8sClient): ProjectDeletionCurrentAssets {
+  return { inspect: async (target, selectors) => (await inspectDeletionCurrentAssets(k8s, target, selectors)).assets };
 }

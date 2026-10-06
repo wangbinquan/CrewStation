@@ -1,6 +1,6 @@
 import { ProjectDeletionRepairItemSchema, ResourceIdSchema } from '@crewstation/contracts';
 import type { ProjectDeletionTarget } from '@crewstation/contracts';
-import { jsonHash } from '@crewstation/kernel';
+import { jsonHash, precondition } from '@crewstation/kernel';
 import { readContentConfirmation } from '@crewstation/persistence';
 import type { Executor } from '@crewstation/persistence';
 import type { QueueContentItem } from '@crewstation/queue';
@@ -9,7 +9,9 @@ import { queueContentContains } from '@crewstation/queue';
 import { eventContentContains } from '@crewstation/eventbus';
 import { z } from 'zod';
 import { hasRetentionTarget, retainableDocument, retentionReferences } from '../../domain/retentionScope';
+import { historicalReleaseReferences } from '../../domain/historicalReleaseInventory';
 import type { InfrastructureContentRow } from '../../domain/infrastructureContents';
+import type { InfrastructureOriginDocument } from '../../domain/infrastructureOrigins';
 import type { InfrastructureOriginSources } from '../../ports/infrastructureOrigins';
 
 export const queueRepairRow = (row: QueueContentItem): InfrastructureContentRow => ({ ...row, deadLetters: 0,
@@ -20,11 +22,22 @@ const hash = z.string().regex(/^[a-f0-9]{64}$/);
 const profileEvidence = z.object({ complete: z.literal(true), id: ResourceIdSchema, retired: z.boolean(), active: z.boolean(), aliases: z.array(z.string().min(1)), digest: hash }).strict();
 const assetEvidence = z.object({ complete: z.literal(true), digest: hash, activeConsumers: z.array(z.string()), targetReferences: z.array(z.string()) }).passthrough();
 
+async function repairReferences(document: InfrastructureOriginDocument, origins: InfrastructureOriginSources) {
+  try { return { ...retentionReferences(document), reproduced: false }; }
+  catch (error) {
+    if (!origins.historicalReleaseNormalization) throw error;
+    const references = historicalReleaseReferences(document);
+    if (jsonHash(await origins.historicalReleaseNormalization(document)) !== jsonHash(document.payload))
+      throw precondition('历史发布事件与完整原迁移重新推导不符');
+    return { ...references, reproduced: true };
+  }
+}
+
 /** Explicit negative retention only. No missing source is assigned project/platform ownership. */
 export async function provisionRepairCandidate(db: Executor, origins: InfrastructureOriginSources, target: ProjectDeletionTarget, row: InfrastructureContentRow, state?: string) {
   const document = row.document;
   if (!retainableDocument(document) || !origins.currentAssets) return undefined;
-  const references = retentionReferences(document), blockers: string[] = [];
+  const references = await repairReferences(document, origins), blockers: string[] = [];
   const witnesses = await Promise.all([...references.current.map(async ref => ({ representation: 'current', ref, source: await origins.resolve(document, ref, 'current') ?? null })),
     ...references.legacy.map(async ref => ({ representation: 'legacy', ref, source: await origins.resolve(document, ref, 'legacy') ?? null }))]);
   if (witnesses.some(witness => witness.source !== null)) return undefined;
@@ -34,7 +47,7 @@ export async function provisionRepairCandidate(db: Executor, origins: Infrastruc
     profile = profileEvidence.parse(await origins.currentProfileTestEvidence(references.current[0]!.key));
     if (profile.id !== references.current[0]!.key || profile.active || !profile.retired && profile.aliases.length) blockers.push('尚有当前测试或未知标识关系，不能使用来源消失的保留决定');
     if (references.legacy.some(ref => !profile!.aliases.includes(ref.key))) blockers.push('旧测试键与当前保留身份不一致');
-  } else if (references.legacy.some((ref, index) => ref.kind !== references.current[index]?.kind || ref.key !== references.current[index]?.key)) {
+  } else if (!references.reproduced && references.legacy.some((ref, index) => ref.kind !== references.current[index]?.kind || ref.key !== references.current[index]?.key)) {
     blockers.push('旧引用缺少与当前标识相同的原来源，不能确认原迁移关系');
   }
   const ids = [...new Set([...references.current, ...references.legacy].map(ref => ref.key).concat(profile?.aliases ?? []))];
@@ -47,7 +60,8 @@ export async function provisionRepairCandidate(db: Executor, origins: Infrastruc
   const key = document.channel + ':' + row.id;
   const targetIdentity = { id: target.id, serviceId: target.serviceId, slug: target.slug, namespace: target.namespace,
     prodHost: target.prodHost, previewHost: target.previewHost, serviceHost: target.serviceHost };
-  const evidenceDigest = jsonHash({ version: 'operator-confirmed/v1', target: targetIdentity, birth: row.birthDigest, witnesses, profile, current });
+  const evidenceDigest = jsonHash({ version: 'operator-confirmed/v1', target: targetIdentity, birth: row.birthDigest, witnesses, profile, current,
+    ...(references.reproduced ? { historicalReproduction: jsonHash(document.payload) } : {}) });
   const saved = await readContentConfirmation(db, 'provisioning', { context: target.id, key, source: row.contentDigest, evidence: evidenceDigest });
   return ProjectDeletionRepairItemSchema.parse({ owner: 'provisioning', key, title: document.channel === 'queue' ? '旧任务完整保留 ' + row.id : '旧事件完整保留 ' + row.id,
     originalDigest: row.contentDigest, evidenceDigest, facts: [

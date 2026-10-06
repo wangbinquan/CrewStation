@@ -1,4 +1,4 @@
-import type { AllowlistDocument, DomainPayload, DomainTopicName, MaintenanceEventKind, MaintenanceSwitches, ProjectDeletionContext, ProjectDeletionInventory, ProjectDeletionTarget, ProjectId, RouteEntry, ServiceId, UserId } from '@crewstation/contracts';
+import type { AllowlistDocument, DomainPayload, DomainTopicName, MaintenanceEventKind, MaintenanceSwitches, ProjectDeletionContext, ProjectDeletionCurrentAssets, ProjectDeletionInventory, ProjectDeletionTarget, ProjectId, RouteEntry, ServiceId, UserId } from '@crewstation/contracts';
 import type { Maintenance } from '../domain/maintenance';
 import type { PodIdentityRecord } from '../domain/podIdentity';
 import type { DirectoryService } from './directories';
@@ -9,6 +9,14 @@ export interface GatewayOriginalDirectory {
   service(key: string): Promise<DirectoryService | undefined>;
   operation(key: string): Promise<ProjectId | undefined>;
   pod(record: PodIdentityRecord): Promise<ProjectId | undefined>;
+  /** Explicit current retention witness only. It never replaces a historical Pod birth or ownership. */
+  currentDevelopment?(target: ProjectDeletionTarget, taskId: string, original: { namespace: string; name: string }): Promise<GatewayCurrentDevelopment | undefined>;
+}
+export interface GatewayCurrentDevelopment {
+  taskId: string; projectId: ProjectId; serviceId: ServiceId; namespace: string; podName: string; podUid: string;
+  kind: 'dev-session'; state: 'running'; originalAbsent: true; taskDigest: string;
+  volumes: readonly { namespace: string; name: string; uid: string; pvName: string; pvUid: string; digest: string }[];
+  assets: Awaited<ReturnType<ProjectDeletionCurrentAssets['inspect']>>;
 }
 export interface GatewayProcess { readonly podUid: string; readonly containerId: string; readonly nodeUid: string; readonly nodeName: string }
 export interface GatewayProcessOwners {

@@ -1,11 +1,11 @@
-import { ConfirmProjectDeletionRepairSchema, ProjectDeletionRepairItemSchema } from '@crewstation/contracts';
+import { ConfirmProjectDeletionRepairSchema, ProjectDeletionRepairItemSchema, TaskIdSchema } from '@crewstation/contracts';
 import type { AllowlistDocument, ProjectDeletionCurrentAssets, ProjectDeletionRepairItem, ProjectDeletionRepairOwner, ProjectDeletionTarget } from '@crewstation/contracts';
 import { jsonHash, precondition } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
 import { appendContentConfirmation, readContentConfirmation, readTransactionPages, withExclusiveDatabaseAdmission } from '@crewstation/persistence';
 import { sql } from 'drizzle-orm';
 import type { GatewayOriginalDirectory } from '../../ports/repositories';
-import { verifiedActiveForeignPod } from './foreignPodRetention';
+import { verifiedActiveForeignDevelopment, verifiedActiveForeignPod } from './foreignPodRetention';
 
 const object = (raw: unknown): Record<string, unknown> => {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw precondition('网关完整原记录不可读取');
@@ -26,17 +26,26 @@ async function finishItem(db: Executor, target: ProjectDeletionTarget, key: stri
 export async function gatewayPodRepair(db: Executor, input: Input, target: ProjectDeletionTarget, raw: Record<string, unknown>): Promise<ProjectDeletionRepairItem> {
   const namespace = String(raw['namespace']), name = String(raw['pod_name']), uid = typeof raw['pod_uid'] === 'string' ? raw['pod_uid'] : null;
   const known = await input.originals.service(String(raw['project']) + '/' + String(raw['service']));
-  const current = await input.currentAssets.inspect(target, { ids: [...(raw['task_id'] ? [String(raw['task_id'])] : [])], pods: [{ namespace, name, uid }] });
+  const task = TaskIdSchema.safeParse(raw['task_id']);
+  const development = raw['workload'] === 'dev-session' && raw['pod_uid'] === null && task.success
+    ? await input.originals.currentDevelopment?.(target, task.data, { namespace, name }) : undefined;
+  const current = development?.assets ?? await input.currentAssets.inspect(target, { ids: [...(raw['task_id'] ? [String(raw['task_id'])] : [])], pods: [{ namespace, name, uid }] });
   const blockers: string[] = [];
   if (known?.projectId === target.id || hasTarget(raw, target) || current.targetReferences.length) blockers.push('网关记录存在目标项目的当前反向引用');
   const activeForeign = verifiedActiveForeignPod(target, raw, known, current);
-  if (current.activeConsumers.length && !activeForeign) blockers.push('原名字或原 UID 仍有无法确证为外项目的活跃消费者，不能作历史保留确认');
+  const activeDevelopment = verifiedActiveForeignDevelopment(target, raw, known, development);
+  if (current.activeConsumers.length && !activeForeign && !activeDevelopment) blockers.push('原名字或原 UID 仍有无法确证为外项目的活跃消费者，不能作历史保留确认');
   // This is a reviewed negative disposition, not a replacement service_source or Pod birth.
-  return finishItem(db, target, 'pod:' + JSON.stringify([namespace, name]), '旧网关 Pod ' + namespace + '/' + name, raw, { current, known: known ?? null },
+  return finishItem(db, target, 'pod:' + JSON.stringify([namespace, name]), '旧网关 Pod ' + namespace + '/' + name, raw, { current, known: known ?? null, ...(development ? { development } : {}) },
     [{ label: '实际 Pod UID', value: uid ?? '历史未记录' }, { label: '旧项目/服务', value: String(raw['project']) + '/' + String(raw['service']) },
       { label: '当前公开服务项目', value: known?.projectId ?? '未知，保留原未知状态' },
       ...(activeForeign ? [{ label: '本次严格保留', value: '当前公开归属为外项目；完整原记录及运行 Pod 均保留，不停止或回收，不补写旧出生' },
-        ...current.pods!.flatMap((pod) => [{ label: '当前实际 Pod / UID', value: `${pod.namespace}/${pod.name} / ${pod.uid}` }, ...pod.containers.map((c) => ({ label: '当前实际容器', value: c.name + ' / ' + c.id }))])] : []), { label: '决定的影响', value: '本项目不回收该完整旧记录；不补写 service_source 或推断原进程停止' }], blockers);
+        ...current.pods!.flatMap((pod) => [{ label: '当前实际 Pod / UID', value: `${pod.namespace}/${pod.name} / ${pod.uid}` }, ...pod.containers.map((c) => ({ label: '当前实际容器', value: c.name + ' / ' + c.id }))])] : []),
+      ...(activeDevelopment ? [{ label: '开发任务当前基线', value: `旧 UID 未记录，原名字当前不存在；保留同一外项目任务 ${development!.taskId} 的当前重建实体，不补作历史出生或退出` },
+        { label: '当前公开任务项目 / 服务', value: `${development!.projectId} / ${development!.serviceId}` },
+        ...current.pods!.flatMap(pod => [{ label: '当前实际 Pod / UID', value: `${pod.namespace}/${pod.name} / ${pod.uid}` }, ...pod.containers.map(c => ({ label: '当前实际容器', value: c.name + ' / ' + c.id }))]),
+        ...development!.volumes.map(v => ({ label: '当前实际 PVC / PV', value: `${v.namespace}/${v.name} / ${v.uid}；${v.pvName} / ${v.pvUid}` }))] : []),
+      { label: '决定的影响', value: '本项目不回收该完整旧记录及已核实的外项目当前资源；不补写旧来源或推断原进程停止' }], blockers);
 }
 
 export async function gatewayDocumentRepair(db: Executor, input: Input, target: ProjectDeletionTarget, raw: Record<string, unknown>): Promise<ProjectDeletionRepairItem> {

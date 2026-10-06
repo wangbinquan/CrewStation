@@ -88,7 +88,7 @@ export async function gatewayDeletionFixture(options: { versions?: number; befor
   } catch (error) { await db.drop(); throw error; }
 }
 
-function fixturePermit(project: ReturnType<typeof createProjectModule>['api'], owner: NonNullable<ReturnType<typeof createGatewayModule>['api']['deletionOwner']>, admin: Actor, projectId: ProjectId) {
+export function fixturePermit(project: ReturnType<typeof createProjectModule>['api'], owner: NonNullable<ReturnType<typeof createGatewayModule>['api']['deletionOwner']>, admin: Actor, projectId: ProjectId) {
   const begin = async () => {
     const target = await project.deletionScope(projectId), report = await owner.inspect(target), metadata = await project.inspectProjectDeletionMetadata(projectId);
     // 其他 owner 空范围只供本模块许可测试，不代表实际平台清理通过。

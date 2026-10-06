@@ -89,3 +89,23 @@
 6. 新用例必须覆盖两类成功保留及重启、29条记录本身不被清理、管理员权限、完整正文／出生／来源变化、目标／共享／活跃／未结束／读取失败和全部非法格式拒绝。原实际回收范围、双确认、原UID/OID、22方七阶段及独立after条件保持。
 
 此节已获作者明确批准，按上述条件实现逐项确认并补齐回归。既有提交、推送、本机部署和原专用项目自主验收授权继续有效；完整保留确认不替代实际删除的双确认及独立after。
+
+## 外项目开发任务重建后的旧网关记录（补充裁定已批准）
+
+2026-10-06T11:46:31Z 在原实际 API 容器内，以强制只读数据库连接调用 Root 装配的公开 TaskRuntime／Project API 和当前 K8s 来源，核实一条此前全量网关诊断中的阻断：`cs-rfc025-rebuild-verify/task-01a0e04471207000bfcc51c08a8cc253`。其完整旧记录为 dev-session，原 taskId 为 `01a0e044-7120-7000-bfcc-51c08a8cc253`；原 Pod 名当前不存在，旧 `pod_uid`、`service_source`、`development_source` 均为 NULL。不存在不能代替原停止证明，旧历史保持原样。
+
+同一任务的公开当前环境为 running，属于外项目 `01a0e044-4976-7000-90df-8b9c0f0dabaf`／服务 `01a0e044-4976-7001-bcee-aef287ba0ff9`。公开原任务最小归属、当前服务目录和原生 workload owner 均明确为该外项目；当前环境指向重建后的 Pod `task-r-01a0e0664f9670009a1cbc2273046ff6`，真实 UID 为 `a0afa0a3-14e3-4f75-ba89-bf6f68335268`，真实容器 ID 为 `containerd://8c57690baf215f0c92e2c7d9f83cf07fff788a969bf065dc4f4628525daf8ec2`。TaskRuntime 未保留这个环境的 native Pod UID，不能将当前读取补作历史出生。
+
+当前完整 Pod 绑定与 spec 未含目标项目、服务、namespace 或 slug；挂载 PVC `task-01a0e04471207000bfcc51c08a8cc253-work`，UID `98fd7cb5-43be-4dca-840e-daa32bf2d175`，PV UID `35f19d70-2a25-4200-a2e2-065094785275`；实际 PV claimRef 明确为该外项目 namespace 和相同 PVC UID。私有只读证据为 `cs-rfc037-i36-foreign-development-current-v2.jsonl`、`cs-rfc037-i36-foreign-development-volume-v1.json`。这条旧行不能使用已批准的活跃服务 Pod 规则：原 UID 没有记录，当前 Pod 名也不同，因而继续阻断。
+
+作者已明确回复“允许按当前身份逐项保留（推荐）”，批准仅扩展如下**逐项完整保留**条件：
+
+1. 只覆盖 dev-session 旧网关记录，原 task UUID 必须可由公开 TaskRuntime 确证属于一个当前外项目；当前环境与公开服务的项目、服务、namespace、身份及 workload 类型均一致。仅名称、旧 alias、父任务或当前目录仍不足；原 task UUID 不同、公开 owner 缺失／错误／冲突一律拒绝。
+2. 原 Pod 名当前确实不存在，旧 UID 原本缺失；只读取当前环境明确指向的同一任务重建 Pod，不把该 Pod 替换成旧出生。全量当前来源须绑定实际 namespace／name／UID、全部正规／init／临时容器、完整 Pod 绑定／spec 与挂载 PVC／PV 的当前 UID 和 claimRef。任何目标关联、共享反向引用、读取不完整或多义消费者仍拒绝。
+3. 管理员逐项看到旧 UID 未记录、原名字不存在、当前外项目归属、当前实际 Pod／容器／卷以及完整旧正文摘要，再明确选择 retain。新确认只表达本次目标不回收旧完整行与当前外项目实体；不补写旧 UID／development_source，不推断原容器退出，不授予任何物理回收资格。
+4. 原正文、公开任务／服务、当前实际 Pod／容器／卷身份与关联均绑定到新的独立确认摘要；保存和删除各阶段在原 owner 准入内重读。任何身份、正文或归属变化使确认失效；不能沿用旧服务 Pod 的确认或使所有开发任务自动豁免。
+5. 用例覆盖严格逐项保留与完整原文保持；目标任务、未知 owner、跨项目／服务／namespace／label／task 不一致、原名字仍存在、已有旧 UID、当前 UID／容器／卷变化、共享目标引用及读取失败全部拒绝。实际删除后的独立 after 另核对本外项目的原完整网关行、当前 Pod UID／全部容器／spec、PVC／PV UID／claimRef 保持。
+
+本裁定仅涉及保留完整记录和外项目当前资源。既有代码上库、本机部署和原验收项目授权继续有效；原目标删除仍须双确认、22 方七阶段和完整独立 after。
+
+补充公开当前身份：2026-10-06T11:53:25Z 的 TaskRuntime `listClusterTasks` 已公开保留当前重建 Pod UID `a0afa0a3-14e3-4f75-ba89-bf6f68335268`（它是环境的独立当前 podUid，不是 DTO 的 native 字段）。实现必须同时核对该公开当前 UID 与实际完整 Pod 来源，不接受仅凭当前名字。原网关行的旧 UID 仍保持 NULL。证据为 `cs-rfc037-i36-foreign-development-current-v3.jsonl`。

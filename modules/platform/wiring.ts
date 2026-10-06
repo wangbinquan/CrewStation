@@ -1,6 +1,6 @@
 import { bindTaskMaintenance } from './adapters/observability/taskMaintenance'; import { clusterMetadata } from './application/cluster/metadata'; import { registryCreationAdmission } from './adapters/registryCreationAdmission';
 import { resourceCatalogs } from './application/resource-center/resourceCatalogs'; import { sessionDeletionSources } from './application/deletion/sessionSources';
-import { businessRuntimePorts } from './application/deletion/businessSources'; import { deletionCurrentAssets } from './adapters/k8s/deletionCurrentAssets';
+import { businessRuntimePorts } from './application/deletion/businessSources'; import { deletionCurrentAssets } from './adapters/k8s/deletionCurrentAssets'; import { gatewayDevelopmentRetention } from './adapters/k8s/gatewayDevelopmentRetention';
 import { dataDeletionSources } from './application/deletion/dataSources';
 import { assembleProjectDeletion } from './application/deletion/assembly'; import { prepareInstalledNativeDeletion } from './adapters/k8s/nativeProjectWork/dependencies';
 import { projectDeletionGrantRoutes } from './http/projectDeletionGrants';
@@ -261,7 +261,7 @@ function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeC
     originals: {
       service: async (key) => { const id = ServiceIdSchema.safeParse(key).success ? key : key.includes('/') ? undefined : await deps.identities?.resolve('service', [key]); const source = id ? await resolveById(id as ServiceId) : await project.api.resolveServiceIdentity(key); return source ? directoryService(source) : undefined; },
       operation: apiCatalog.api.originalOperationProject,
-      pod: (record) => originalGatewayPodProject(record, () => project.api, () => release.api, () => late.taskRuntime, (kind, key) => deps.identities?.resolve(kind, [key]) ?? Promise.resolve(undefined)),
+      pod: (record) => originalGatewayPodProject(record, () => project.api, () => release.api, () => late.taskRuntime, (kind, key) => deps.identities?.resolve(kind, [key]) ?? Promise.resolve(undefined)), currentDevelopment: gatewayDevelopmentRetention(k8s, { project: project.api, tasks: () => late.taskRuntime }),
     },
     // RFC-025 第三期后半：服务的路由投影成 route 记录（IngressRoute 仍由 gateway 建删）。
     ledger: resources.api.owner('gateway'),
