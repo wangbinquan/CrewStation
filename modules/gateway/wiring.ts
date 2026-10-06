@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import type { ProjectDeletionContext, ProjectId, ServiceId, UserId } from '@crewstation/contracts';
+import type { ProjectDeletionContext, ProjectDeletionCurrentAssets, ProjectId, ServiceId, UserId } from '@crewstation/contracts';
 import { DomainTopic, TaskIdSchema } from '@crewstation/contracts';
 import type { EventConsumer } from '@crewstation/eventbus';
 import { createEventConsumer } from '@crewstation/eventbus';
@@ -41,6 +41,7 @@ import { routeLedgerResyncWorker } from './workers/routeLedgerResync';
 import type { LedgerReader, RouteLedger } from './ports/ledger';
 
 export interface GatewayModuleDeps {
+  currentAssets?: ProjectDeletionCurrentAssets;
   originals?: GatewayOriginalDirectory;
   processes?: GatewayProcessOwners;
   projects?: { assertProjectAvailable(id: ProjectId): Promise<void>; assertProjectDeletionGrant(context: ProjectDeletionContext): Promise<void>; available?(id: ProjectId): Promise<boolean>; availableMany?(ids: readonly ProjectId[]): Promise<readonly ProjectId[]> };
@@ -94,7 +95,7 @@ function originalsOf(deps: GatewayModuleDeps): GatewayOriginalDirectory {
 
 export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
   const logger = deps.logger ?? noopLogger;
-  const deletion = gatewayDeletionRepository(deps.db, { originals: originalsOf(deps), assertGrant: deps.projects?.assertProjectDeletionGrant, assertAvailable: deps.projects?.assertProjectAvailable, available: deps.projects?.available, availableMany: deps.projects?.availableMany, processes: deps.processes });
+  const deletion = gatewayDeletionRepository(deps.db, { originals: originalsOf(deps), assertGrant: deps.projects?.assertProjectDeletionGrant, assertAvailable: deps.projects?.assertProjectAvailable, available: deps.projects?.available, availableMany: deps.projects?.availableMany, processes: deps.processes, currentAssets: deps.currentAssets });
   const useCaseDeps: GatewayUseCaseDeps = {
     admission: deletion,
     normalizeTaskId: async (value) => TaskIdSchema.safeParse(value).success ? value : deps.identities?.resolve('task', [value]),
@@ -121,7 +122,7 @@ export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
   const allowlist = allowlistUseCases(useCaseDeps, maintenance.serviceCallBlock);
   const pods = podIdentityUseCases(useCaseDeps);
   const api: GatewayModuleApi = {
-    ...(deps.projects ? { deletionOwner: gatewayDeletionOwner(deletion, deps.projects.assertProjectDeletionGrant) } : {}),
+    ...(deps.projects ? { deletionOwner: { ...gatewayDeletionOwner(deletion, deps.projects.assertProjectDeletionGrant), ...(deletion.repairs ? { repairs: deletion.repairs } : {}) } } : {}),
     name: 'gateway', ...routes, ...allowlist, evaluate: allowlist.evaluate, lookupByIp: pods.lookupByIp, purgeIdentityTombstones: pods.purgeTombstones, ...maintenance, ...limits, ...resourceRateLimitUseCases(useCaseDeps, deps.isAdmin),
     checkAllowlist: () => checkAllowlist(useCaseDeps, allowlist.verifyAllowlist),
     syncObservedPod: (pod, gone) => pods.syncPod(observedPodOf(pod, gone)),

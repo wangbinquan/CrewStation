@@ -29,7 +29,7 @@ async function inspection(db: Executor, sources: BusinessWorkSources, target: Pr
   }
   const origin = BusinessWorkOriginSchema.parse(source);
   if (origin.id !== target.serviceId || origin.projectIds[0] !== target.id) throw precondition('业务清理的原服务项目不符');
-  const current = await inspectBusinessContent(db, sources, target.id), callbacks = await businessWorkHistory(db, target.id);
+  const current = await inspectBusinessContent(db, sources, target.id, target), callbacks = await businessWorkHistory(db, target.id);
   const service = { kind: 'service' as const, key: target.serviceId, id: target.serviceId, projectId: target.id };
   return { ...current, origins: [...current.origins, { ...service, identity: jsonHash(service) }],
     scope: BusinessDeletionScopeSchema.parse({ contents: current.contents, callbacks, digest: current.traversal.digest, count: current.contents.length, compacted: false }) };

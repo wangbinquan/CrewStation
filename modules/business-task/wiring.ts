@@ -91,6 +91,7 @@ import { scopedFinalizationPorts } from './application/execution/deletion/finali
 import { guardedBusinessPort, scopedBusinessPorts } from './application/execution/deletion/projectWork';
 import { scopedBusinessServiceApi } from './application/execution/deletion/serviceApi';
 import { businessDeletionOwner } from './application/execution/deletion/owner';
+import { businessOperatorRepairs } from './adapters/persistence/deletion/operatorRepairs';
 import { businessDeletionRepository } from './adapters/persistence/deletion/repository';
 import { scopedBusinessOperatorApi } from './application/execution/deletion/operatorApi';
 import { scopedBusinessHandoff } from './application/execution/deletion/handoffApi';
@@ -140,7 +141,8 @@ export function createBusinessTaskModule(deps: BusinessTaskModuleDeps): Business
   const unavailable = async (): Promise<never> => { throw precondition('业务清理的原来源或进程观察器尚未装配'); };
   const deletionSources: BusinessWorkSources = deps.deletionWorkSources ?? { resolve: async () => undefined, assertAvailable: unavailable, assertGrant: unavailable,
     processes: { protectCurrent: unavailable, sweep: unavailable } };
-  const deletionOwner = businessDeletionOwner(businessDeletionRepository(deps.db, deletionSources), deletionSources);
+  const deletionOwner = { ...businessDeletionOwner(businessDeletionRepository(deps.db, deletionSources), deletionSources),
+    ...(deletionSources.currentAssets ? { repairs: businessOperatorRepairs(deps.db, deletionSources, deletionSources.currentAssets) } : {}) };
   const useCaseDeps: BusinessTaskUseCaseDeps & { projectWork?: BusinessProjectWork } = {
     ...(deps.deletionWorkSources ? { projectWork: businessProjectWork(deps.db, deps.deletionWorkSources) } : {}),
     uow: drizzleUnitOfWork(deps.db), environments: deps.environments, runner: deps.runner, directory: deps.directory, authorizer: deps.authorizer,

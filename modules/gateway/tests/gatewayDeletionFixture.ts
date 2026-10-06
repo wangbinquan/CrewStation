@@ -51,7 +51,7 @@ async function seedHistory(db: Database, admin: Actor, own: ProjectDto, other: P
   await db.execute(sql`INSERT INTO gateway.rate_limits(scope,body,revision,updated_at,updated_by) VALUES ('platform','{"private":"retain-platform"}'::jsonb,1,now(),${admin.userId})`);
 }
 
-export async function gatewayDeletionFixture(options: { versions?: number; beforeUpgrade?: (db: Database) => Promise<void> } = {}) {
+export async function gatewayDeletionFixture(options: { versions?: number; beforeUpgrade?: (db: Database) => Promise<void>; application?: Partial<GatewayModuleDeps> } = {}) {
   const db = await createTestDatabase([eventbusMigrations, identityMigrations, projectMigrations, { ...gatewayMigrations, files: gatewayMigrations.files.filter((file) => file.name < '0011_') }]);
   try {
   const identity = createIdentityModule({ db: db.db, settings: { adminEmails: ['gateway-delete@test.invalid'] } });
@@ -83,7 +83,7 @@ export async function gatewayDeletionFixture(options: { versions?: number; befor
     settings: { systemNamespace: 'system', serviceDomain: 'svc.test', userAuthMiddleware: 'user', serviceAuthMiddleware: 'service', dropIdentityHeadersMiddleware: 'drop', allowlistMaxStaleSeconds: 300, consumerName: 'gateway-delete-test' },
     ...extra,
   });
-  const gateway = application(), permit = fixturePermit(project.api, gateway.api.deletionOwner!, admin, own.id);
+  const gateway = application(options.application), permit = fixturePermit(project.api, gateway.api.deletionOwner!, admin, own.id);
   return { db, identity, project, admin, own, other, ids, before, create, originals, admission, process, application, gateway, ...permit };
   } catch (error) { await db.drop(); throw error; }
 }

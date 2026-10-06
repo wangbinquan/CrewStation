@@ -1,5 +1,5 @@
 import { ProjectIdSchema, ResourceIdSchema } from '@crewstation/contracts';
-import type { ProjectDeletionInventory, ProjectId } from '@crewstation/contracts';
+import type { ProjectDeletionInventory, ProjectDeletionTarget, ProjectId } from '@crewstation/contracts';
 import { jsonHash, precondition } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
 import { readTransactionPages } from '@crewstation/persistence';
@@ -8,6 +8,7 @@ import { z } from 'zod';
 import type { BusinessContentOrigin, BusinessDeletionContent } from '../../../domain/deletion/content';
 import type { BusinessDeletionSources } from '../../../ports/deletion/sources';
 import { BUSINESS_CONTENT } from './contentTables';
+import { retainedBusinessChild } from './operatorRepairs';
 
 const originSchema = z.object({ complete: z.literal(true), id: ResourceIdSchema, scope: z.enum(['project', 'platform']),
   projectIds: z.array(ProjectIdSchema), revision: z.string().regex(/^[a-f0-9]{64}$/) }).strict().superRefine((value, context) => {
@@ -18,7 +19,7 @@ interface Row extends Record<string, unknown> { key: string; digest: string; ser
   old_runtime: string | null }
 
 export async function registeredBusinessContent(db: Executor): Promise<void> {
-  const known = new Set([...BUSINESS_CONTENT.map(({ table }) => table), 'resource_identity_aliases', 'project_admissions', 'callback_pod_stops', 'content_origins', 'project_deletions']);
+  const known = new Set([...BUSINESS_CONTENT.map(({ table }) => table), 'resource_identity_aliases', 'project_admissions', 'callback_pod_stops', 'content_origins', 'project_deletions', 'operator_confirmations']);
   const tables = await db.execute<{ table_name: string }>(sql`SELECT table_name FROM information_schema.tables WHERE table_schema='business_task' AND table_type='BASE TABLE'`);
   if (tables.some((row) => !known.has(row.table_name)) || BUSINESS_CONTENT.some(({ table }) => !tables.some((row) => row.table_name === table)))
     throw precondition('业务任务存在未登记或缺失的内容表，不能确认全部清理范围');
@@ -33,30 +34,10 @@ export async function registeredBusinessContent(db: Executor): Promise<void> {
   if (aliases.length) throw precondition('业务当前对象的原标识目录冲突');
 }
 
-/** One actual read-only snapshot; all content is traversed to EOF, but only hashes and minimum identity links leave PostgreSQL. */
-export async function inspectBusinessContent(db: Executor, sources: BusinessDeletionSources, rawProject: ProjectId) {
-  const project = ProjectIdSchema.parse(rawProject), contents: BusinessDeletionContent[] = [], resources: ProjectDeletionInventory['resources'] = [];
-  const origins = new Map<string, BusinessContentOrigin>();
-  const cache = new Map<string, Promise<{ project: ProjectId | null; digest: string }>>(), counts: Record<string, number> = {};
+type OriginalSource = (kind: 'service' | 'task', key: string, representation?: 'current' | 'legacy') => Promise<{ project: ProjectId | null; digest: string }>;
+function taskSource(db: Executor, source: OriginalSource, project: ProjectId, origins: Map<string, BusinessContentOrigin>) {
   const tasks = new Map<string, Promise<{ project: ProjectId | null; digest: string }>>();
-  await registeredBusinessContent(db);
-  const source = (kind: 'service' | 'task', key: string, representation: 'current' | 'legacy' = ResourceIdSchema.safeParse(key).success ? 'current' : 'legacy') => {
-    const cacheKey = JSON.stringify([kind, key, representation]);
-    let value = cache.get(cacheKey);
-    if (!value) {
-      value = (async () => {
-        const original = await sources.resolve(kind, key, representation);
-        if (!original) throw precondition('业务历史' + (kind === 'service' ? '服务 ' : '任务 ') + key + ' 缺少原项目归属记录，请恢复来源后重新盘点');
-        const origin = originSchema.parse(original);
-        if (representation === 'current' && origin.id !== key) throw precondition('业务内容与原对象 ID 不符');
-        if (origin.projectIds[0] === project) origins.set(cacheKey, { kind, key, id: origin.id, projectId: project, identity: jsonHash({ kind, key, id: origin.id, projectId: project }) });
-        return { project: origin.projectIds[0] ?? null, digest: jsonHash(origin) };
-      })();
-      cache.set(cacheKey, value);
-    }
-    return value;
-  };
-  const task = (id: string) => {
+  return (id: string) => {
     const current = tasks.get(id); if (current) return current;
     const pending = (async () => {
       ResourceIdSchema.parse(id);
@@ -74,6 +55,32 @@ export async function inspectBusinessContent(db: Executor, sources: BusinessDele
     })();
     tasks.set(id, pending); return pending;
   };
+}
+
+/** One actual read-only snapshot; all content is traversed to EOF, but only hashes and minimum identity links leave PostgreSQL. */
+export async function inspectBusinessContent(db: Executor, sources: BusinessDeletionSources, rawProject: ProjectId, target?: ProjectDeletionTarget) {
+  const project = ProjectIdSchema.parse(rawProject), contents: BusinessDeletionContent[] = [], resources: ProjectDeletionInventory['resources'] = [];
+  const origins = new Map<string, BusinessContentOrigin>();
+  const retained: string[] = [];
+  const cache = new Map<string, Promise<{ project: ProjectId | null; digest: string }>>(), counts: Record<string, number> = {};
+  await registeredBusinessContent(db);
+  const source = (kind: 'service' | 'task', key: string, representation: 'current' | 'legacy' = ResourceIdSchema.safeParse(key).success ? 'current' : 'legacy') => {
+    const cacheKey = JSON.stringify([kind, key, representation]);
+    let value = cache.get(cacheKey);
+    if (!value) {
+      value = (async () => {
+        const original = await sources.resolve(kind, key, representation);
+        if (!original) throw precondition('业务历史' + (kind === 'service' ? '服务 ' : '任务 ') + key + ' 缺少原项目归属记录，请恢复来源后重新盘点');
+        const origin = originSchema.parse(original);
+        if (representation === 'current' && origin.id !== key) throw precondition('业务内容与原对象 ID 不符');
+        if (origin.projectIds[0] === project) origins.set(cacheKey, { kind, key, id: origin.id, projectId: project, identity: jsonHash({ kind, key, id: origin.id, projectId: project }) });
+        return { project: origin.projectIds[0] ?? null, digest: jsonHash(origin) };
+      })();
+      cache.set(cacheKey, value);
+    }
+    return value;
+  };
+  const task = taskSource(db, source, project, origins);
   for (const entry of BUSINESS_CONTENT) {
     let after: string | null = null; const selected: BusinessDeletionContent[] = []; counts[entry.table] = 0;
     const field = (value?: string) => sql.raw(value ?? 'NULL::text');
@@ -86,6 +93,10 @@ export async function inspectBusinessContent(db: Executor, sources: BusinessDele
         ORDER BY ${key} COLLATE "C"`, async (rows) => {
       for (const row of rows) {
         if (row.invalid || after !== null && Buffer.compare(Buffer.from(row.key), Buffer.from(after)) <= 0) throw precondition('业务原内容关系或完整分页不符');
+        if (entry.table === 'subtasks' && target) {
+          const decision = await retainedBusinessChild(db, sources, sources.currentAssets, target, row.key, row.digest);
+          if (decision) { retained.push(decision); counts[entry.table]!++; after = row.key; continue; }
+        }
         const facts = [];
         if (row.service !== null) facts.push(await source('service', row.service));
         else if (entry.service) throw precondition('业务子内容的原父记录缺失');
@@ -110,7 +121,7 @@ export async function inspectBusinessContent(db: Executor, sources: BusinessDele
     }
   }
   const inventory: ProjectDeletionInventory = { participant: 'business-task', complete: true, resources, references: [], blockers: [],
-    revision: jsonHash({ project, resources }) };
+    revision: jsonHash({ project, resources, retained }) };
   return { inventory, contents, origins: [...origins.values()].sort((a, b) => Buffer.compare(Buffer.from(JSON.stringify([a.kind, a.key])), Buffer.from(JSON.stringify([b.kind, b.key])))),
     traversal: { complete: true as const, counts, digest: jsonHash({ project, contents }) } };
 }

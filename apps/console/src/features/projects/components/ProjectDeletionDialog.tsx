@@ -26,11 +26,12 @@ export interface ProjectDeletionDialogProps {
   onRetry?(): void;
   onRecover?(): void;
   onReview?(): void;
+  onRepair?(): void;
   onClose(): void;
 }
 
 /** Two shared modal layers; mounted only by the administrator flow after all backend owners are available. */
-export function ProjectDeletionDialog({ project, plan, operation, loading = false, pending = false, error, returnFocusTo, onConfirm, onRetry, onRecover, onReview, onClose }: ProjectDeletionDialogProps): ReactElement {
+export function ProjectDeletionDialog({ project, plan, operation, loading = false, pending = false, error, returnFocusTo, onConfirm, onRetry, onRecover, onReview, onRepair, onClose }: ProjectDeletionDialogProps): ReactElement {
   const t = useT(), inFlight = useRef(false), active = useRef(true);
   const [confirmation, setConfirmation] = useState<string>(), [busy, setBusy] = useState(false), [localError, setLocalError] = useState<string>();
   const [now, refreshTime] = useState(() => Date.now());
@@ -58,6 +59,7 @@ export function ProjectDeletionDialog({ project, plan, operation, loading = fals
         {pending ? onRecover ? <Button variant="primary" disabled={loading || busy} onClick={onRecover}>{t('projects.delete.recover')}</Button> : null
           : reviewing ? <><Button variant="danger" disabled={!ready || busy} onClick={() => { if (ready && deletionPlanReady(plan, project.id)) setConfirmation(plan!.id); }}>{t('projects.delete.next')}</Button>{onReview ? <Button variant="secondary" disabled={loading || busy} onClick={onReview}>{t('projects.delete.refresh')}</Button> : null}</>
           : <>{operation?.canRetry && onRetry ? <Button variant="primary" disabled={loading || busy} onClick={onRetry}>{t('projects.delete.retry')}</Button> : null}{operation?.state === 'needs-attention' && onReview ? <Button variant="secondary" disabled={loading || busy} onClick={onReview}>{t('projects.delete.reconfirm')}</Button> : null}</>}
+        {onRepair && plan && !plan.complete ? <Button variant="secondary" disabled={loading || busy} onClick={onRepair}>{t('projects.repair.title')}</Button> : null}
         <Button variant="ghost" disabled={closingLocked} onClick={onClose}>{t('projects.delete.close')}</Button>
       </ActionRow>}>
       <Stack><DefinitionList layout="grid" items={[{ label: t('projects.delete.project'), value: target.name }, { label: t('projects.delete.slug'), value: target.slug }]} />

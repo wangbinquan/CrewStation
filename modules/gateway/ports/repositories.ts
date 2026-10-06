@@ -2,6 +2,7 @@ import type { AllowlistDocument, DomainPayload, DomainTopicName, MaintenanceEven
 import type { Maintenance } from '../domain/maintenance';
 import type { PodIdentityRecord } from '../domain/podIdentity';
 import type { DirectoryService } from './directories';
+import type { ProjectDeletionRepairOwner } from '@crewstation/contracts';
 
 export interface AllowlistOwnership { readonly kind: 'caller' | 'operation'; readonly key: string; readonly projectId: ProjectId }
 export interface GatewayOriginalDirectory {
@@ -22,6 +23,7 @@ export interface GatewayProjectAdmission {
   rememberPod(record: Omit<PodIdentityRecord, 'version'>): Promise<void>;
 }
 export interface GatewayDeletionRepository extends GatewayProjectAdmission {
+  readonly repairs?: ProjectDeletionRepairOwner;
   inspect(target: ProjectDeletionTarget): Promise<ProjectDeletionInventory>;
   seal(context: ProjectDeletionContext): Promise<'sealed' | 'changed' | 'waiting'>;
   assertSealed(context: ProjectDeletionContext): Promise<void>;

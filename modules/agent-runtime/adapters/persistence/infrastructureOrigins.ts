@@ -27,3 +27,16 @@ export async function profileTestInfrastructureOrigin(db: Database, key: string,
       revision: jsonHash({ kind: 'profile-test', id, profileId, revision: row.revision, namespace: context.data.kind }) };
   });
 }
+
+/** Current retained identity evidence for explicit operator review. It deliberately supplies no original project/platform ownership. */
+export async function currentProfileTestEvidence(db: Database, key: string) {
+  const id = ResourceIdSchema.parse(key);
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`);
+    const retired = await tx.execute(sql`SELECT id FROM agent_runtime.retired_test_identities WHERE id=${id}`);
+    const current = await tx.execute(sql`SELECT to_jsonb(t) AS body FROM agent_runtime.profile_tests t WHERE test_id=${id}`);
+    const aliases = await tx.execute<{ key: string }>(sql`SELECT key FROM agent_runtime.resource_identity_aliases WHERE kind='profile-test' AND id=${id} ORDER BY key`);
+    const keys = aliases.flatMap(({ key }) => { const value: unknown = JSON.parse(key); if (!Array.isArray(value) || value.length !== 1 || typeof value[0] !== 'string') throw precondition('档位测试保留标识不完整'); return value as string[]; });
+    return { complete: true as const, id, retired: retired.length === 1 && current.length === 0, active: current.length !== 0, aliases: keys, digest: jsonHash({ id, retired, current, aliases }) };
+  });
+}

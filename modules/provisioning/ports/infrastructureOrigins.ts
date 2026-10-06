@@ -1,4 +1,4 @@
-import type { ProjectId } from '@crewstation/contracts';
+import type { ProjectDeletionCurrentAssets, ProjectId } from '@crewstation/contracts';
 import type { InfrastructureOriginDocument, InfrastructureOriginReference } from '../domain/infrastructureOrigins';
 
 export interface OriginalInfrastructureOrigin {
@@ -7,5 +7,9 @@ export interface OriginalInfrastructureOrigin {
   readonly revision: string;
 }
 export interface InfrastructureOriginSources {
+  readonly currentAssets?: ProjectDeletionCurrentAssets;
+  currentProfileTestEvidence?(id: string): Promise<{ complete: true; id: string; retired: boolean; active: boolean; aliases: readonly string[]; digest: string }>;
+  /** Inventory only; re-derive the whole original event through its actual immutable migration and existing aliases. */
+  historicalReleaseNormalization?(document: InfrastructureOriginDocument): Promise<unknown>;
   resolve(document: InfrastructureOriginDocument, reference: InfrastructureOriginReference, representation: 'current'|'legacy'): Promise<OriginalInfrastructureOrigin | undefined>;
 }

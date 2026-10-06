@@ -36,6 +36,7 @@ import { projectWorkObserver } from './workers/projectWorkObserver';
 import { provisioningDeletionOwner } from './application/projectDeletion';
 import { provisioningDeletionRepository } from './adapters/persistence/projectDeletion';
 import { infrastructureContentSource } from './adapters/persistence/infrastructureContents';
+import { provisioningOperatorRepairs, retainedProvisionContent } from './adapters/persistence/operatorRepairs';
 import { infrastructureContentRemoval } from './adapters/persistence/infrastructureRemoval';
 import { removeDeletionCoordinator } from './adapters/persistence/deletionCoordinator';
 
@@ -81,8 +82,8 @@ export function createProvisioningModule(deps: ProvisioningModuleDeps): Provisio
   const api: ProvisioningModuleApi = { name: 'provisioning', deleteNamespace: (actor, id) => deleteNamespace(deps.cleanup, deps.isAdmin, actor, id), provisionProject: provision, retry: enqueue, reapplyNamespaces: reapply,
     projectDeletionOwner: (input) => {
       if (!work || !deps.projectWork) throw precondition('原开通回调与清理许可尚未装配');
-      return provisioningDeletionOwner({ ...input, work, source: infrastructureContentSource(deps.db), removal: infrastructureContentRemoval(deps.db),
-        repository: provisioningDeletionRepository(deps.db, deps.projectWork.assertGrant), assertGrant: deps.projectWork.assertGrant });
+      return { ...provisioningDeletionOwner({ ...input, work, retain: (target, row) => retainedProvisionContent(deps.db, input.origins, target, row), source: infrastructureContentSource(deps.db), removal: infrastructureContentRemoval(deps.db),
+        repository: provisioningDeletionRepository(deps.db, deps.projectWork.assertGrant), assertGrant: deps.projectWork.assertGrant }), repairs: provisioningOperatorRepairs(deps.db, input.origins) };
     },
     finalizeProjectDeletion: removeDeletionCoordinator,
     reapplyProjectNamespace: async (id) => { const facts = await deps.steps.loadProject(id); if (!facts || facts.state === 'archived' || facts.state === 'deleting') return; await declare(facts); },

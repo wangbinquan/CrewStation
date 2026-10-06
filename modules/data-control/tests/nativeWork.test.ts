@@ -144,7 +144,8 @@ test.skipIf(!available)('旧口令库真实升级保留全部密文原文；原�
   try {
     await old.db.execute("INSERT INTO data_control.credentials(resource_id,role,secret_box) VALUES ('" + id + "','cs_upgrade_original','" + boxed + "')");
     const before = await old.db.execute('SELECT * FROM data_control.credentials');
-    expect(await runMigrations(old.db, [dataControlMigrations])).toEqual(['data_control/0004_native_work.sql', 'data_control/0005_native_identity_journal.sql', 'data_control/0006_project_native_deletion.sql']);
+    expect(await runMigrations(old.db, [dataControlMigrations])).toEqual(['data_control/0004_native_work.sql', 'data_control/0005_native_identity_journal.sql', 'data_control/0006_project_native_deletion.sql', 'data_control/0007_operator_confirmations.sql']);
+    expect(await old.db.execute('SELECT * FROM data_control.operator_confirmations')).toHaveLength(0);
     expect(await old.db.execute('SELECT * FROM data_control.credentials')).toEqual(before);
     expect(await old.db.execute('SELECT * FROM data_control.deletion_entities')).toHaveLength(0);
     const ledger = { get: async () => undefined, listLive: async () => [], latestChange: async () => 0, changesSince: async () => [], observe: async () => ({ status: 'unchanged' as const }) };

@@ -1,3 +1,4 @@
+import type { ProjectDeletionCurrentAssets } from '@crewstation/contracts';
 import { jsonHash, precondition } from '@crewstation/kernel';
 import type { InfrastructureSourceModules } from '../../ports/infrastructureOrigins';
 import type { SessionProcessObservers, SessionProjectAdmission } from '../../ports/sessionDeletion';
@@ -5,9 +6,9 @@ import type { SessionProcessObservers, SessionProjectAdmission } from '../../por
 /** The same runtime owns finalization and original task witnesses; physical observers are supplied by wiring. */
 export function businessRuntimePorts<Archive, Administration, Preflight, Runtime extends InfrastructureSourceModules['taskRuntime']>(
   data: { archiveFinalization?: Archive; archiveAdministration?: Administration; archiveService?: { preflight: Preflight } }, runtime: Runtime,
-  project: Parameters<typeof businessDeletionSources>[0], business: Parameters<typeof businessDeletionSources>[2], observers?: SessionProcessObservers) {
+  project: Parameters<typeof businessDeletionSources>[0], business: Parameters<typeof businessDeletionSources>[2], observers?: SessionProcessObservers, currentAssets?: ProjectDeletionCurrentAssets) {
   return { finalizationPreparation: data.archiveFinalization ? { operatorArchive: data.archiveAdministration, preflight: data.archiveService?.preflight, archive: data.archiveFinalization, runtime } : undefined,
-    ...(observers ? { deletionWorkSources: businessDeletionSources(project, runtime, business, observers) } : {}) };
+    ...(observers ? { deletionWorkSources: { ...businessDeletionSources(project, runtime, business, observers), ...(currentAssets ? { currentAssets } : {}) } } : {}) };
 }
 
 /** Public original owner witnesses are joined only after their project and canonical identity agree. */

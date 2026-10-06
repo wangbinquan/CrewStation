@@ -165,3 +165,15 @@ SCM 的 `retained` 材料在既有不可变原范围 jsonb 中保留完整原生
 原容器 Linux 进程清单由 root 读取，再以每个原进程的实际服务 UID 只读核对全部线程 FD、mmap、cwd/root/exe 和 PID/TID 出生，前后完整进程清单不变。Workhorse/Gitaly 实际在途计数、Sidekiq 活跃和本项目队列是独立排空来源；读取失败不算零。停止调用正常 Projects::DestroyService，清理阶段只对原独占且未引用 LFS 调用其正常 model destroy，OID 同内容替换也阻断。实际文件移除仍要持久许可、独立停止与原文件身份。最后一次排空后重新盘点原生和文件，不能采用排空前的缺失证明。未创建仓库的项目通过完整空历史回收，不向当前归属恢复请求不存在的仓库。
 
 当前实机证据只读、原项目保持；完整22方生产装配、Garage和镜像发布回收及管理员原专用项目全部资源验收继续，永久删除入口尚未开放。
+
+## I36：重新确权与历史盘点基线（作者已批准）
+
+[方案 B](./legacy-recovery-options.md)的七条约束为正式基线。结构按 repository-structure §3/§4：跨进程形状放 packages/contracts/api/projectDeletion；project/provisioning 组合公开 owner API，业务/网关/原生/队列 owner 在自己的 schema 持久化事实，application 通过 ports 注入，不跨 schema 事务、不深层 import。UI 复用 shared/ui/dialog/FormDialog，api-client 提供正式管理员路由。
+
+每一项以目标 UUID、owner、原完整键与正文摘要、当前引用及原消费者完整证据形成候选摘要；管理员提交候选摘要与逐项决定，owner 在原准入锁内重读、比对并保存 actor/time/operator-confirmed/v1。保存回执可幂等读取，当前候选变化后必须重新确认。保留事实仅是目标项目的否定回收决定，未知历史 owner 不被改写。final seal 重读同一决定及证据；共享、目标关联、未知活跃消费者和来源不全不能保存或使用决定。作者追加批准的外项目活跃保留仅适用于公开 owner、旧完整记录和当前实际 Pod namespace/name/UID、project/service 标签一致、Running 且未终止、全部普通/init/ephemeral 容器身份完整、唯一活跃消费者对应该 Pod 且没有目标/共享引用的条目。明确 retain 后完整旧行及该运行资源保留；原未知出生不补写，原回收范围内的实际停止条件保持。
+
+历史事件：当前 `modules/provisioning/domain/infrastructureOrigins.ts:47` 的严格生产解析保持；新增独立 inventory-only release 解析。冻结可核实原源码 fc833a01 的所有 Manifest 子对象为 strict；原前缀 ID 和 trace 按原格式检查。eventbus 通过 persistence 公开的只读原迁移重推导基元处理其现有 0003 声明，解析后的原正文只供检查，实际变换使用完整未剥字段的原正文。规范化结果全摘要必须等于实际 payload；provenance 双摘要与 current/legacy project/service/release 原见证全部相符才可识别。当前事件 producer、Manifest、投递和重放不接兼容路径。
+
+PostgreSQL 当前基线覆盖全部注册旧名字与当前 OID/服务器/data-dir/实际独立存储身份。14条旧 journal NULL 保持；新事实不作为其 before/after。原 history.references、snapshot.foreignKeys/unownedCredentials、角色外部依赖、共享卷/目录和原实际停止仍验证。scope 的新许可仅替代批准的旧出生前提，实际 stop/purge/prove/metadata/verify 保持。
+
+测试：纯规则拒绝全部未知/额外字段和错误双摘要；真实 PG 的管理员 HTTP 成功、401/403/400、重新读取/重启/重放、源变化失效、新行/共享/未知或目标活跃阻断及并行 seal、确证外项目 Running 完整保留和 UID/容器变化失效；console 长列表末行弹窗、上下层 Esc、草稿/焦点/上下文、保存零删除、两次确认保留；原生沿原 UID/OID/容器/卷验证真实清理及独立 after。

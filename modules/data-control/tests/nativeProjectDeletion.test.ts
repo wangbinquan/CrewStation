@@ -244,11 +244,12 @@ test.skipIf(!available)('原生 owner 迁移：旧密文/待轮换材料和 NULL
     await work.withResource(origin, () => old.db.transaction(async (tx) => { await tx.execute(sql`INSERT INTO data_control.credentials(resource_id,role,secret_box,pending_box) VALUES (${origin.resourceId},'cs_upgrade_role','original-box','original-pending-box')`); }));
     await work.native.run(origin, ['cs_upgrade_role'], async () => undefined);
     const before = { credentials: [...await old.db.execute('SELECT * FROM data_control.credentials')], work: [...await old.db.execute('SELECT * FROM data_control.deletion_work')] };
-    expect(await runMigrations(old.db, [dataControlMigrations])).toEqual(['data_control/0006_project_native_deletion.sql']);
+    expect(await runMigrations(old.db, [dataControlMigrations])).toEqual(['data_control/0006_project_native_deletion.sql', 'data_control/0007_operator_confirmations.sql']);
     expect([...await old.db.execute('SELECT * FROM data_control.credentials')]).toEqual(before.credentials);
     expect([...await old.db.execute('SELECT * FROM data_control.deletion_work')]).toEqual(before.work);
     expect((await work.journal.read(origin.projectId)).records[0]).toMatchObject({ before: { storage: null }, after: { storage: null } });
     expect([...await old.db.execute('SELECT * FROM data_control.deletion_scopes')]).toHaveLength(0);
+    expect([...await old.db.execute('SELECT * FROM data_control.operator_confirmations')]).toHaveLength(0);
   } finally { await old.drop(); }
 });
 

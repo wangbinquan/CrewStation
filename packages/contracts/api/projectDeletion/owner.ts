@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ResourceIdSchema } from '../../ids';
 import { ProjectDeletionBlockerSchema, ProjectDeletionEvidenceSchema, ProjectDeletionInventorySchema, ProjectDeletionPhaseSchema, ProjectDeletionTargetSchema } from './values';
 import type { ProjectDeletionParticipant } from './values';
+import type { ProjectDeletionRepairOwner } from './repair';
 
 /** 仅由持久清理工作器构造；owner 必须经反转端口验证许可及自己收到的原身份摘要。 */
 export const ProjectDeletionContextSchema = z.object({
@@ -16,6 +17,7 @@ export const ProjectDeletionStepResultSchema = z.discriminatedUnion('kind', [
 export type ProjectDeletionContext = z.infer<typeof ProjectDeletionContextSchema>;
 export type ProjectDeletionStepResult = z.infer<typeof ProjectDeletionStepResultSchema>;
 export interface ProjectDeletionOwner {
+  readonly repairs?: ProjectDeletionRepairOwner;
   readonly participant: ProjectDeletionParticipant;
   inspect(target: z.infer<typeof ProjectDeletionTargetSchema>): Promise<z.infer<typeof ProjectDeletionInventorySchema>>;
   run(context: ProjectDeletionContext): Promise<ProjectDeletionStepResult>;

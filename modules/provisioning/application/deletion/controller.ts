@@ -5,6 +5,7 @@ import type { ProjectDeletionController } from '../../api/deletion';
 import type { ProjectDeletionIntents, ProjectDeletionStopOwner } from '../../ports/projectDeletions';
 import { assertDeletionOwners, collectDeletionInventory } from './inventory';
 import { advanceProjectDeletion } from './advance';
+import { deletionOperatorRepairs } from './operatorRepairs';
 
 export interface DeletionControllerDeps {
   readonly intents: ProjectDeletionIntents; readonly owners: readonly ProjectDeletionStopOwner[]; readonly workerOwner: string;
@@ -15,6 +16,7 @@ export function projectDeletionController(deps: DeletionControllerDeps): Project
   const admin = async (actor: Actor) => { if (!(await deps.isAdmin(actor.userId))) throw forbidden('只有管理员可以永久删除项目'); };
   const bestEffortQueue = async (id: string) => { try { await deps.enqueue(id); } catch { deps.logger.warn('project deletion queue delayed; persistent recovery will retry', { operationId: id }); } };
   return {
+    repairs: deletionOperatorRepairs(deps.intents, deps.owners, deps.isAdmin),
     prepare: async (actor, id) => { await admin(actor); return deps.intents.prepare(actor, id, await collectDeletionInventory(deps.intents, deps.owners, id)); },
     accept: async (actor, id, input) => {
       await admin(actor); const previous = await deps.intents.replay(actor, id, input); if (previous) return previous;

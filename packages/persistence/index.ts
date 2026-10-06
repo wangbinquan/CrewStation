@@ -10,6 +10,9 @@ export { keyedLock } from './keyedLock';
 export { readTransactionPages } from './transactionPages';
 export { resourceIdentityDirectory } from './identity/identityDirectory';
 export type { ResourceIdentityDirectory } from './identity/identityDirectory';
+export { reproduceIdentityDocument } from './identity/documentReproduction';
+export { readContentConfirmation, appendContentConfirmation } from './confirmations/content';
+export type { ContentConfirmation } from './confirmations/content';
 
 export { originalReportSnapshotSession } from './reportSnapshot';
 export type { OriginalReportSnapshot, ReportSnapshotSession } from './reportSnapshot';

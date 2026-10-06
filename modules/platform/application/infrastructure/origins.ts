@@ -4,7 +4,7 @@ import type { InfrastructureSourceModules, InfrastructureOriginSources, Original
 
 /** Composes public owner witnesses. No module reads another module's schema or interprets missing rows as platform scope. */
 export function infrastructureOriginSources(modules: InfrastructureSourceModules): InfrastructureOriginSources {
-  return { resolve: async (document, reference, representation) => {
+  return { ...(modules.currentAssets ? { currentAssets: modules.currentAssets } : {}), ...(modules.agentRuntime.currentProfileTestEvidence ? { currentProfileTestEvidence: modules.agentRuntime.currentProfileTestEvidence } : {}), ...(modules.historicalReleaseNormalization ? { historicalReleaseNormalization: (document: Parameters<InfrastructureOriginSources['resolve']>[0]) => modules.historicalReleaseNormalization!(document.legacyPayload) } : {}), resolve: async (document, reference, representation) => {
     const { kind, key } = reference;
     if ((kind === 'project' || kind === 'service') && document.channel === 'event'
       && (document.name === DomainTopic.taskCreated || document.name === DomainTopic.taskReleased)) {

@@ -5,12 +5,14 @@ import { provisioningCallbackIdentity } from '../domain/projectWork';
 import type { InfrastructureCoordinator } from '../domain/infrastructureCoordinator';
 import { ProvisioningDeletionScopeSchema } from '../domain/projectDeletion';
 import type { InfrastructureContentSource } from '../ports/infrastructureContents';
+import type { InfrastructureContentRow } from '../domain/infrastructureContents';
 import type { InfrastructureOriginSources } from '../ports/infrastructureOrigins';
 import type { InfrastructureContentRemoval, ProvisioningDeletionRepository } from '../ports/projectDeletion';
 import type { ProvisioningProjectWork } from '../ports/projectWork';
 import { inspectInfrastructureContents } from './infrastructureInventory';
 
 interface Deps {
+  retain?(target: ProjectDeletionTarget, row: InfrastructureContentRow): Promise<string | undefined>;
   readonly work: ProvisioningProjectWork; readonly source: InfrastructureContentSource; readonly origins: InfrastructureOriginSources;
   readonly removal: InfrastructureContentRemoval; readonly repository: ProvisioningDeletionRepository;
   assertGrant(context: ProjectDeletionContext): Promise<void>;
@@ -19,7 +21,7 @@ interface Deps {
 export function provisioningDeletionOwner(deps: Deps): ProjectDeletionOwner {
   const collect = async (target: ProjectDeletionTarget, coordinator?: InfrastructureCoordinator) => {
     await deps.repository.registered();
-    const infrastructure = await inspectInfrastructureContents(target.id, deps.source, deps.origins, coordinator);
+    const infrastructure = await inspectInfrastructureContents(target.id, deps.source, deps.origins, coordinator, deps.retain ? (row) => deps.retain!(target, row) : undefined);
     const callbacks = (await deps.work.history(target.id)).map((row) => ({ id: row.id, identity: provisioningCallbackIdentity(row) }));
     const resources = [...infrastructure.inventory.resources, ...callbacks.map((row) => ({ kind: 'original-callback', ...row, count: 1, scope: 'metadata' as const }))];
     const material = { ...infrastructure.inventory, resources };

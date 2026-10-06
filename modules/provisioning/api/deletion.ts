@@ -1,6 +1,11 @@
 import type { AcceptProjectDeletion, Actor, ProjectDeletionOperation, ProjectDeletionPlan, ProjectId } from '@crewstation/contracts';
+import type { ConfirmProjectDeletionRepair, ProjectDeletionRepairItem, ProjectDeletionRepairList } from '@crewstation/contracts';
 
 export interface ProjectDeletionController {
+  readonly repairs?: {
+    inspect(actor: Actor, id: ProjectId): Promise<ProjectDeletionRepairList>;
+    confirm(actor: Actor, id: ProjectId, input: ConfirmProjectDeletionRepair): Promise<ProjectDeletionRepairItem>;
+  };
   prepare(actor: Actor, projectId: ProjectId): Promise<ProjectDeletionPlan>;
   accept(actor: Actor, projectId: ProjectId, input: AcceptProjectDeletion): Promise<ProjectDeletionOperation>;
   read(actor: Actor, operationId: string): Promise<ProjectDeletionOperation>;

@@ -26,7 +26,8 @@ function afterError(value: InfrastructureOrphanError, previous: Pick<Infrastruct
 }
 
 /** Complete content ownership only: EOF and source digests do not prove any original process stopped. */
-export async function inspectInfrastructureContents(rawProjectId: ProjectId, source: InfrastructureContentSource, origins: InfrastructureOriginSources, coordinator?: InfrastructureCoordinator): Promise<InfrastructureContentInventory> {
+export async function inspectInfrastructureContents(rawProjectId: ProjectId, source: InfrastructureContentSource, origins: InfrastructureOriginSources, coordinator?: InfrastructureCoordinator,
+  retain?: (row: InfrastructureContentRow) => Promise<string | undefined>): Promise<InfrastructureContentInventory> {
   const projectId = ProjectIdSchema.parse(rawProjectId), contents: OwnedInfrastructureContent[] = [], resources: ProjectDeletionInventory['resources'] = [];
   if (coordinator && coordinator.projectId !== projectId) throw precondition('删除协调保留范围与盘点项目不符');
   const blockers: ProjectDeletionBlocker[] = [], blockerKeys = new Set<string>(), evidence: string[] = [];
@@ -52,6 +53,12 @@ export async function inspectInfrastructureContents(rawProjectId: ProjectId, sou
       resources.push({ kind: channel === 'queue' ? 'queued-job' : 'event-outbox', id: key, identity, sourceIdentity, scope: 'metadata', count: 1 });
       if (row.deadLetters) resources.push({ kind: 'event-errors', id: key, identity, sourceIdentity, scope: 'metadata', count: row.deadLetters });
     } catch {
+      let retained: string | undefined;
+      try { retained = await retain?.(row); } catch { /* Failed current evidence cannot suppress an unknown origin. */ }
+      if (retained) {
+        evidence.push(jsonHash({ channel, id: row.id, birth: row.birthDigest, content: row.contentDigest, retained }));
+        resources.push({ kind: 'operator-retained-history', id: key, identity: retained, scope: 'metadata', count: 0 }); return;
+      }
       evidence.push(jsonHash({ channel, id: row.id, birth: row.birthDigest, content: row.contentDigest, unknown: true }));
       blocked('infrastructure-origin-unavailable', '任务或事件的原归属不完整，恢复来源后重新盘点', key);
     }

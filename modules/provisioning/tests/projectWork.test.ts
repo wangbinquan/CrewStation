@@ -122,7 +122,8 @@ describe.skipIf(!available)('正式开通原工作（真实 PG；容器来源为
       }
       const before = await f.work.history(value.projectId);
       await expect(f.database.db.execute(sql`UPDATE provisioning.original_callbacks SET input_digest=${jsonHash('rewrite')} WHERE project_id=${value.projectId}`).then(() => undefined)).rejects.toThrow();
-      expect(await runMigrations(f.database.db,[f.module.migrations])).toEqual(['provisioning/0002_pod_work_stop.sql','provisioning/0003_database_admission.sql','provisioning/0004_project_deletion.sql']);
+      expect(await runMigrations(f.database.db,[f.module.migrations])).toEqual(['provisioning/0002_pod_work_stop.sql','provisioning/0003_database_admission.sql','provisioning/0004_project_deletion.sql','provisioning/0005_operator_confirmations.sql']);
+      expect(await f.database.db.execute('SELECT * FROM provisioning.operator_confirmations')).toHaveLength(0);
       expect(await f.work.history(value.projectId)).toEqual(before);
       await f.work.observe(); expect((await f.work.history(value.projectId)).every((row) => !row.exited)).toBe(true);
       f.wholeStopped(true); f.podIdentity({ podUid: f.native.podUid,nodeUid: newResourceId(),nodeName: f.native.nodeName });

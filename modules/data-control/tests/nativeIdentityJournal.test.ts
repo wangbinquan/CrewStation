@@ -136,7 +136,8 @@ test.skipIf(!available)('原生身份：迁移保留旧回调所有原字段，�
       await old.db.transaction((tx) => tx.execute("INSERT INTO data_control.deletion_work(work_id,resource_id,project_id,backend_pid,names) VALUES ('original-work','" + origin.resourceId + "','" + origin.projectId + "'," + backend!.pid + ",'[\"" + name + "\"]'::jsonb)"));
     });
     const before = await old.db.execute<Record<string, unknown>>('SELECT * FROM data_control.deletion_work');
-    expect(await runMigrations(old.db, [dataControlMigrations])).toEqual(['data_control/0005_native_identity_journal.sql', 'data_control/0006_project_native_deletion.sql']);
+    expect(await runMigrations(old.db, [dataControlMigrations])).toEqual(['data_control/0005_native_identity_journal.sql', 'data_control/0006_project_native_deletion.sql', 'data_control/0007_operator_confirmations.sql']);
+    expect(await old.db.execute('SELECT * FROM data_control.operator_confirmations')).toHaveLength(0);
     const [after] = await old.db.execute<Record<string, unknown>>('SELECT * FROM data_control.deletion_work');
     const { catalog_before, catalog_after, storage_before, storage_after, journal_version, ...original } = after!;
     expect(original).toEqual(before[0]!);

@@ -33,6 +33,7 @@ import { objectTransferMetrics } from './application/objectMetrics';
 import { prepareObjectCredentialRotation } from './application/objectCredentialRotation';
 import { prepareObjectRestore } from './application/objectRestore';
 import { nativeDeletionRepository } from './adapters/persistence/projectDeletion';
+import { nativeOperatorConfirmations } from './adapters/persistence/operatorConfirmations';
 import { nativePostgresDeletionOwner } from './application/projectDeletion';
 import { postgresNativeDeletionPhysics } from './adapters/postgres/databaseReclamation';
 
@@ -115,7 +116,7 @@ export function createDataControlModule(deps: DataControlModuleDeps): DataContro
     ...(deps.db && deps.adminUrl && deps.nativePostgresSource && databaseReclamation?.using ? { projectDeletion: { owner: ({ history, assertGrant }: Parameters<NonNullable<DataControlModuleApi['projectDeletion']>['owner']>[0]) => {
       const repository = nativeDeletionRepository(deps.db!, assertGrant);
       const physics = postgresNativeDeletionPhysics({ adminUrl: deps.adminUrl!, source: deps.nativePostgresSource!, reader: databaseReclamation, assertGrant: async (context) => { await assertGrant(context); await repository.assert(context); } });
-      return nativePostgresDeletionOwner({ history, repository, physics, assertGrant });
+      return nativePostgresDeletionOwner({ history, repository, physics, confirmations: nativeOperatorConfirmations(deps.db!), assertGrant });
     } } } : {}),
     stageRotation: async (id, transaction) => forResource(await originOf(id), async (guard) => { if (guard) await markNativeCredentialTransaction(transaction as Executor, guard); return stageCredentialRotation({ ledger: deps.ledger, ...rotationVault(transaction) }, id); }),
     finishRotation: async (id, transaction) => forResource(await originOf(id), async (guard) => { if (guard) await markNativeCredentialTransaction(transaction as Executor, guard); return finishCredentialRotation({ ledger: deps.ledger, plane, ...rotationVault(transaction) }, id); }),

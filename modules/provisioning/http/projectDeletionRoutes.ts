@@ -1,4 +1,4 @@
-import { AcceptProjectDeletionSchema, ProjectDeletionCapabilitiesSchema, ProjectDeletionLookupSchema, ProjectIdSchema, ResourceIdSchema } from '@crewstation/contracts';
+import { AcceptProjectDeletionSchema, ConfirmProjectDeletionRepairSchema, ProjectDeletionCapabilitiesSchema, ProjectDeletionLookupSchema, ProjectIdSchema, ResourceIdSchema } from '@crewstation/contracts';
 import type { Actor, UserId } from '@crewstation/contracts';
 import { actorFrom, parseBody, parseParams } from '@crewstation/http';
 import type { AppEnv } from '@crewstation/http';
@@ -25,6 +25,15 @@ export function projectDeletionRoutes(api: ProjectDeletionController, isAdmin: (
     if (!result.isAdmin) throw forbidden('只有管理员可以永久删除项目或读取清理材料');
     c.header('cache-control', 'no-store'); return { ...result, userId: result.userId as UserId };
   };
+  if (api.repairs) {
+    r.get('/v1/projects/:projectId/deletion-repairs', async (c) => {
+      const user = await actor(c); return c.json(await api.repairs!.inspect(user, parseParams(c, projectParams).projectId));
+    });
+    r.post('/v1/projects/:projectId/deletion-repairs', async (c) => {
+      const user = await actor(c), input = await parseBody(c, ConfirmProjectDeletionRepairSchema);
+      return c.json(await api.repairs!.confirm(user, parseParams(c, projectParams).projectId, input));
+    });
+  }
   r.post('/v1/projects/:projectId/deletion-plans', async (c) => {
     const user = await actor(c); await parseBody(c, z.object({}).strict());
     return c.json(await api.prepare(user, parseParams(c, projectParams).projectId));

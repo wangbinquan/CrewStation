@@ -38,6 +38,12 @@ describe.skipIf(!available)('profile-test public infrastructure origins (actual 
       const retired = newResourceId();
       await f.database.db.execute(sql`INSERT INTO agent_runtime.retired_test_identities(id) VALUES(${retired})`);
       expect(await read(retired)).toBeUndefined();
+      await directory.bind('agent_runtime', 'profile-test', ['retained-old-key'], retired);
+      const evidence = await f.compute.api.currentProfileTestEvidence(retired);
+      expect(evidence).toMatchObject({ complete: true, id: retired, retired: true, active: false, aliases: ['retained-old-key'] });
+      expect(await f.compute.api.currentProfileTestEvidence(retired)).toEqual(evidence);
+      expect(await f.compute.api.currentProfileTestEvidence(id)).toMatchObject({ retired: false, active: true });
+      expect(await f.compute.api.currentProfileTestEvidence(newResourceId())).toMatchObject({ retired: false, active: false, aliases: [] });
       await directory.bind('agent_runtime', 'profile-test', [id], newResourceId());
       await expect(read(id)).rejects.toThrow('目录冲突');
     } finally { await f.database.drop(); }

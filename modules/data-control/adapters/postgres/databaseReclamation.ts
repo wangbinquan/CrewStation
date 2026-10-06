@@ -181,6 +181,15 @@ export function postgresNativeDeletionPhysics(input: { adminUrl: string; source:
     return { kind: 'done', digest: jsonHash({ scope: physicalScopeIdentity(scope), drained: true, gone }), count: scopeCount(scope) };
   });
   return {
+    captureCurrent: (plan) => plan.names.length ? withNativePostgresNames(input.adminUrl, plan.names.map((entry) => entry.name), async (connection) => {
+      const storage = NativePostgresStorageSourceSchema.parse(await input.source.capture(connection)), catalog = await nativeCatalog(connection, plan.names);
+      // Existing genuine v1 sources and OIDs remain binding; only missing historical birth is replaced by the reviewed current baseline.
+      if (plan.catalog.some((original) => !catalog.some((current) => jsonHash(original) === jsonHash(current)))) throw precondition('已有原生历史 OID 与当前实际对象不符');
+      const currentPlan = { ...plan, catalog, sources: [...new Map([...plan.sources, storage].map((entry) => [entry.identity, entry])).values()] };
+      const scope = await captureScope(connection, currentPlan, input.source, input.reader, input.adminUrl);
+      if (await actualConsumers(connection, scope, input.adminUrl)) throw precondition('当前或原 backend 消费者、预备事务、复制槽尚未停止');
+      return scope;
+    }, { tryOnly: true }) : Promise.reject(precondition('当前确权不能仅凭空名字或 absent 受理')),
     capture: (plan) => plan.names.length ? withNativePostgresNames(input.adminUrl, plan.names.map((entry) => entry.name), (connection) => captureScope(connection, plan, input.source, input.reader, input.adminUrl), { tryOnly: true }) : Promise.resolve({ version: 1, plan, storage: null, databases: [], roles: [], absent: [] }),
     stop: (scope) => observe(scope, false), prove: (scope) => observe(scope, true),
     purge: async (context, scope) => {

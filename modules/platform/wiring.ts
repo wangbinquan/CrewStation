@@ -1,6 +1,6 @@
 import { bindTaskMaintenance } from './adapters/observability/taskMaintenance'; import { clusterMetadata } from './application/cluster/metadata'; import { registryCreationAdmission } from './adapters/registryCreationAdmission';
 import { resourceCatalogs } from './application/resource-center/resourceCatalogs'; import { sessionDeletionSources } from './application/deletion/sessionSources';
-import { businessRuntimePorts } from './application/deletion/businessSources';
+import { businessRuntimePorts } from './application/deletion/businessSources'; import { deletionCurrentAssets } from './adapters/k8s/deletionCurrentAssets';
 import { dataDeletionSources } from './application/deletion/dataSources';
 import { assembleProjectDeletion } from './application/deletion/assembly'; import { prepareInstalledNativeDeletion } from './adapters/k8s/nativeProjectWork/dependencies';
 import { projectDeletionGrantRoutes } from './http/projectDeletionGrants';
@@ -43,7 +43,7 @@ import { createClusterControlModule, type ClusterControlModuleApi, type SlotSpec
 import { createResourcesModule, type ResourcesModuleApi } from '@crewstation/module-resources';
 import { installedSystemComponents } from './domain/systemComponents';
 import { BUILTIN_RESOURCES, ServiceIdSchema, type Actor, type ComputeProfileSelector, type ComputeUsage, type ProjectId, type ServiceId, type TaskId, type UserId } from '@crewstation/contracts';
-import { eventbusMigrations, type EventConsumer } from '@crewstation/eventbus';
+import { eventbusMigrations, reproduceHistoricalRelease, type EventConsumer } from '@crewstation/eventbus';
 import { secretObject, type K8sClient } from '@crewstation/k8s';
 import { precondition, type Logger } from '@crewstation/kernel';
 import { createAgentRuntimeModule, readProfileObservationName, computeAllocationRevision, taskProfileAllocationRevision } from '@crewstation/module-agent-runtime';
@@ -253,6 +253,7 @@ function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeC
   // 否则 `project.archived` 到达网关时服务已经查不到，那个项目的路由就永远留在集群里。
   const listServices = async () => (await project.api.listServices()).map(directoryService);
   const gateway = createGatewayModule({
+    currentAssets: deletionCurrentAssets(k8s),
     identities: deps.identities,
     db, k8s, hosts, logger, isAdmin: (id) => isAdmin(id),
     projects: { assertProjectAvailable: project.api.assertProjectAvailable, assertProjectDeletionGrant: project.api.assertProjectDeletionGrant, availableMany: project.api.availableProjectIds },
@@ -334,7 +335,7 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
     compute: computeCatalog,
     settings: { idleMinutes: settings.idleMinutes, userDomain: settings.userDomain, mcp, defaultPreviewPort: 3000 },
   });
-  const businessTask = createBusinessTaskModule({ ...businessRuntimePorts(core.data.api, taskRuntime.api, project.api, () => late.businessTask, settings.platformPodUid ? projectCallbackOwners(k8s, settings.systemNamespace, settings.platformPodUid, 'crewstation.io/business-project-stop') : undefined), taskStorageStatus: (id) => settings.workloadCreation === 'ledger' ? core.data.api.taskStorageStatus(id) : Promise.resolve({ available: false, reason: 'workload_safety_unavailable' }), taskInputs: core.data.api.taskInputs, executionObservations: businessObservationAdmission(() => late.observability), storageControl: { apply: core.data.api.applyObjectWriteControl }, legacyRecoveryProof: legacyOwnerObserver(deps.k8s, settings.systemNamespace), ...businessExecutionPorts(runtimeImages.api, core.config.api, core.identity.api, SYSTEM_ACTOR),
+  const businessTask = createBusinessTaskModule({ ...businessRuntimePorts(core.data.api, taskRuntime.api, project.api, () => late.businessTask, settings.platformPodUid ? projectCallbackOwners(k8s, settings.systemNamespace, settings.platformPodUid, 'crewstation.io/business-project-stop') : undefined, deletionCurrentAssets(k8s)), taskStorageStatus: (id) => settings.workloadCreation === 'ledger' ? core.data.api.taskStorageStatus(id) : Promise.resolve({ available: false, reason: 'workload_safety_unavailable' }), taskInputs: core.data.api.taskInputs, executionObservations: businessObservationAdmission(() => late.observability), storageControl: { apply: core.data.api.applyObjectWriteControl }, legacyRecoveryProof: legacyOwnerObserver(deps.k8s, settings.systemNamespace), ...businessExecutionPorts(runtimeImages.api, core.config.api, core.identity.api, SYSTEM_ACTOR),
     identities: deps.identities,
     db, logger, isAdmin: (id) => isAdmin(id), environments: taskRuntime.api, runner, authorizer: project.api,
     directory: { resolveServiceIdentity: async (identity) => { const r = await project.api.resolveServiceIdentity(identity); return r ? { serviceId: r.serviceId, projectId: r.projectId } : undefined; } },
@@ -428,7 +429,7 @@ function composeAggregates(deps: CompositionDeps, late: Late, core: ReturnType<t
       owners: [project.api.deletionOwner, config.api.deletionOwner, core.agentRuntime.api.deletionOwner, data.api.deletionOwner, core.scm.api.deletionOwner, apiCatalog.api.deletionOwner, images.api.deletionOwner, delivery.release.api.deletionOwner, delivery.gateway.api.deletionOwner,
         runtime.taskRuntime.api.deletionOwner, runtime.devSession.api.deletionOwner, runtime.businessTask.api.deletionOwner, runtime.events.api.deletionOwner, runtime.session.api.deletionOwner, observability.api.deletionOwner, resourceAccess.api.deletionOwner, late.clusterManagement?.deletionOwner],
       resources: resources.api, cluster: late.clusterControl!, data: data.api, dataControl: late.dataControl?.projectDeletion, adminUrl: settings.dataPostgres.adminUrl,
-      origins: infrastructureOriginSources({ project: project.api, events: runtime.events.api, release: delivery.release.api, resourceAccess: resourceAccess.api, apiCatalog: apiCatalog.api, agentRuntime: core.agentRuntime.api, taskRuntime: runtime.taskRuntime.api, businessTask: runtime.businessTask.api, clusterManagement: late.clusterManagement!, identities: deps.identities }) }, provisioning) } : {}),
+      origins: infrastructureOriginSources({ currentAssets: deletionCurrentAssets(k8s), historicalReleaseNormalization: (original) => reproduceHistoricalRelease(original, deps.identities), project: project.api, events: runtime.events.api, release: delivery.release.api, resourceAccess: resourceAccess.api, apiCatalog: apiCatalog.api, agentRuntime: core.agentRuntime.api, taskRuntime: runtime.taskRuntime.api, businessTask: runtime.businessTask.api, clusterManagement: late.clusterManagement!, identities: deps.identities }) }, provisioning) } : {}),
     db, logger, ...provisioningWorkPorts(k8s, settings.systemNamespace, settings.platformPodUid, project.api), workerOwner: `${deps.instance}.provisioning`, consumerName: 'provisioning', isAdmin: (id) => isAdmin(id),
     authorizeRetry: provisioningRetry(project.api),
     // 命名空间、额度与网络策略写成台账记录（RFC-025 第四期），由 cluster-control 的调和器建出、被改或被删就补回。

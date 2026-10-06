@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { infrastructureOriginReferences, isPlatformMaintenanceKind } from '../domain/infrastructureOrigins';
 import type { InfrastructureOriginDocument, InfrastructureOriginReference } from '../domain/infrastructureOrigins';
 import type { InfrastructureOriginSources } from '../ports/infrastructureOrigins';
+import { historicalReleaseReferences } from '../domain/historicalReleaseInventory';
 
 const origin = z.object({ complete:z.literal(true),id:ResourceIdSchema,scope:z.enum(['project','platform']),
   projectIds:z.array(ProjectIdSchema),revision:z.string().regex(/^[a-f0-9]{64}$/) }).strict().superRefine((value,context) => {
@@ -14,7 +15,14 @@ const origin = z.object({ complete:z.literal(true),id:ResourceIdSchema,scope:z.e
 
 /** Source witnesses identify content ownership; they do not establish physical stopping or a deletion phase receipt. */
 export async function resolveInfrastructureOwnership(document: InfrastructureOriginDocument, sources: InfrastructureOriginSources) {
-  const references = infrastructureOriginReferences(document);
+  let references;
+  try { references = infrastructureOriginReferences(document); }
+  catch (error) {
+    if (!sources.historicalReleaseNormalization) throw error;
+    references = historicalReleaseReferences(document);
+    const reproduced = await sources.historicalReleaseNormalization(document);
+    if (jsonHash(reproduced) !== jsonHash(document.payload)) throw precondition('历史发布事件与完整原迁移重新推导不符');
+  }
   if (isPlatformMaintenanceKind(document)) return {scope:'platform' as const,projectIds:[] as ProjectId[],origins:[],
     digest:jsonHash({contract:'platform-maintenance/v1',name:document.name,payload:document.payload,
       legacy:document.legacyPayload ?? null,provenance:document.identityProvenance ?? null})};

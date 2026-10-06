@@ -22,5 +22,6 @@ export function currentOpener(): FocusTarget | null {
 export function returnFocus(target: FocusTarget | null): void {
   if (!target?.isConnected) return;
   target.focus();
-  if (document.activeElement !== target) setTimeout(() => { if (target.isConnected && (document.activeElement === document.body || document.activeElement === null)) target.focus(); }, 0);
+  // Removing a nested modal later in the same commit can blur a successful immediate return.
+  setTimeout(() => { if (target.isConnected && (document.activeElement === document.body || document.activeElement === null)) target.focus(); }, 0);
 }

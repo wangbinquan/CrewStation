@@ -1,6 +1,6 @@
 import type { DataPlaneSnapshot } from '../domain/dataPlane';
 import type { ProjectId } from '@crewstation/contracts';
-import type { ProjectDeletionContext, ProjectDeletionInventory } from '@crewstation/contracts';
+import type { Actor, ProjectDeletionContext, ProjectDeletionInventory } from '@crewstation/contracts';
 
 interface NativePostgresCatalogIdentity { readonly kind: 'database' | 'role'; readonly name: string; readonly oid: string }
 interface NativePostgresStorageSource {
@@ -81,10 +81,16 @@ export interface NativeDeletionScope {
 }
 export type NativeDeletionProof = { readonly kind: 'done'; readonly digest: string; readonly count: number } | { readonly kind: 'waiting'; readonly reason: string };
 export interface NativeDeletionPhysics {
+  /** Operator candidate only: captures current actual OIDs/storage under original native name admission. No old-history write. */
+  captureCurrent?(plan: NativeDeletionPlan): Promise<NativeDeletionScope>;
   capture(plan: NativeDeletionPlan): Promise<NativeDeletionScope>;
   stop(scope: NativeDeletionScope): Promise<NativeDeletionProof>;
   purge(context: ProjectDeletionContext, scope: NativeDeletionScope): Promise<NativeDeletionProof>;
   prove(scope: NativeDeletionScope): Promise<NativeDeletionProof>;
+}
+export interface NativeDeletionConfirmations {
+  read(projectId: ProjectId, source: string, evidence: string): Promise<{ scope: NativeDeletionScope; actor: string; at: string } | undefined>;
+  save(projectId: ProjectId, actor: Actor, source: string, evidence: string, scope: NativeDeletionScope, verify: () => Promise<void>): Promise<{ actor: string; at: string }>;
 }
 export interface NativeDeletionRepository {
   snapshot(projectId: ProjectId, keys: readonly string[]): Promise<NativeDeletionSnapshot>;

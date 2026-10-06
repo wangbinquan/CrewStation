@@ -22,14 +22,15 @@ async function assertShape(executor: Executor) {
 }
 
 /** Keyset scan retains bigint IDs exactly; the caller must finish every page and classify every returned origin. */
-export async function readQueueContents(executor: Executor, after: string | null = null, limit = 200): Promise<readonly QueueContentItem[]> {
+export async function readQueueContents(executor: Executor, after: string | null = null, limit = 200, kind?: string): Promise<readonly QueueContentItem[]> {
   if (after !== null && !validId(after) || !Number.isInteger(limit) || limit < 1 || limit > 200) throw precondition('Invalid queue content cursor');
+  if (kind !== undefined && (typeof kind !== 'string' || !kind.length || kind.length > 200)) throw precondition('Invalid queue content kind');
   await assertShape(executor);
   const rows = await executor.execute<{ id: string; kind: string; payload: unknown; legacy_payload: unknown; identity_provenance: unknown;
     dedup_key: string | null; state: string; birth_digest: string; content_digest: string }>(sql`
     SELECT j.id::text AS id,j.kind,j.payload,j.legacy_payload,j.identity_provenance,j.dedup_key,j.state,
       ${birth()} AS birth_digest,${content()} AS content_digest FROM platform_infra.jobs j
-    WHERE (${after}::bigint IS NULL OR j.id>${after}::bigint) ORDER BY j.id LIMIT ${limit}`);
+    WHERE (${after}::bigint IS NULL OR j.id>${after}::bigint) AND (${kind ?? null}::text IS NULL OR j.kind=${kind ?? null}) ORDER BY j.id LIMIT ${limit}`);
   return rows.map((row) => {
     if (!validId(row.id)) throw precondition('Queue content original ID is unknown');
     return { id: row.id, kind: row.kind, payload: row.payload, legacyPayload: row.legacy_payload, identityProvenance: row.identity_provenance,

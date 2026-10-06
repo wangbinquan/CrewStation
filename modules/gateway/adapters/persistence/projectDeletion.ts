@@ -4,11 +4,13 @@ import type { Database, Executor } from '@crewstation/persistence';
 import { withExclusiveDatabaseAdmission, withSharedDatabaseAdmissions } from '@crewstation/persistence';
 import { sql } from 'drizzle-orm';
 import type { PodIdentityRecord } from '../../domain/podIdentity';
+import type { ProjectDeletionCurrentAssets } from '@crewstation/contracts';
+import { gatewayDocumentRepair, gatewayOperatorRepairs, gatewayPodRepair } from './operatorRepairs';
 import type { AllowlistOwnership, GatewayDeletionRepository, GatewayOriginalDirectory, GatewayProcess, GatewayProcessOwners } from '../../ports/repositories';
 
 const CONTENT = ['pod_identities', 'routes', 'service_maintenance', 'maintenance_events', 'rate_limits', 'rate_limit_receipts'] as const;
 const CONTENT_KEYS: Record<typeof CONTENT[number], readonly string[]> = { pod_identities: ['namespace', 'pod_name'], routes: ['service_id'], service_maintenance: ['service_id'], maintenance_events: ['id'], rate_limits: ['scope'], rate_limit_receipts: ['operation_id'] };
-const FACTS = ['resource_identity_aliases', 'deletion_fences', 'deletion_entities', 'deletion_document_owners', 'deletion_work', 'deletion_process_stops', 'allowlists'] as const;
+const FACTS = ['resource_identity_aliases', 'deletion_fences', 'deletion_entities', 'deletion_document_owners', 'deletion_work', 'deletion_process_stops', 'allowlists', 'operator_confirmations'] as const;
 const admissionKey = (id: string) => `gateway.project-admission:${id}`;
 const podKey = (row: Pick<PodIdentityRecord, 'podUid' | 'source' | 'developmentSource' | 'namespace' | 'podName'>) => row.podUid ?? row.source?.podUid ?? row.developmentSource?.podUid ?? `legacy:${row.namespace}/${row.podName}`;
 const value = <T>(body: unknown): T => (typeof body === 'string' ? JSON.parse(body) : body) as T;
@@ -85,8 +87,9 @@ function fingerprint(body: Record<string, unknown>, table: typeof CONTENT[number
   const { version: _version, updated_at: _updated, deleted_at: _deleted, ...rest } = body;
   return { ...rest, service_source: body['service_source'] ? { ...body['service_source'] as object, ready: undefined } : null, development_source: body['development_source'] ? { ...body['development_source'] as object, ready: undefined } : null };
 }
-async function scan(db: Executor, target: ProjectDeletionTarget, originals: GatewayOriginalDirectory, seed = false): Promise<ProjectDeletionInventory> {
+async function scan(db: Executor, target: ProjectDeletionTarget, originals: GatewayOriginalDirectory, seed = false, currentAssets?: ProjectDeletionCurrentAssets): Promise<ProjectDeletionInventory> {
   await registered(db); const resources: ProjectDeletionInventory['resources'] = [], blockers: ProjectDeletionInventory['blockers'] = [], references = new Map<string, ProjectDeletionInventory['references'][number]>();
+  const retained: string[] = [];
   for (const table of CONTENT) {
     let cursor: unknown[] | undefined, count = 0, hash = jsonHash([]);
     const pageKey = sql`jsonb_build_array(${sql.join(CONTENT_KEYS[table].map((key) => sql`c.${sql.identifier(key)}`), sql`,`)})`;
@@ -94,6 +97,10 @@ async function scan(db: Executor, target: ProjectDeletionTarget, originals: Gate
       const rows = await db.execute<{ body: Record<string, unknown>; page_key: unknown[] }>(sql`SELECT to_jsonb(c) AS body,${pageKey} AS page_key FROM gateway.${sql.identifier(table)} c WHERE ${cursor ? sql`${pageKey}>${JSON.stringify(cursor)}::jsonb` : sql`true`} ORDER BY ${pageKey} LIMIT 500`);
       for (const { body } of rows) {
         const owner = await rowOwner(db, table, body, originals);
+        if (!owner && table === 'pod_identities' && body['workload'] !== 'platform' && currentAssets) {
+          const item = await gatewayPodRepair(db, { originals, currentAssets }, target, body);
+          if (item.confirmed?.decision === 'retain') { retained.push(jsonHash(item)); continue; }
+        }
         if (!owner && !(table === 'pod_identities' && body['workload'] === 'platform') && !(table === 'rate_limits' && body['scope'] === 'platform')) blockers.push({ participant: 'gateway', code: 'ownership-unknown', message: '网关历史内容的原项目身份无法核实', resourceId: jsonHash(body) });
         if (owner !== target.id) continue;
         if (seed && table === 'pod_identities') await remember(db, 'pod', podKey(podRecord(body)), owner);
@@ -117,12 +124,23 @@ async function scan(db: Executor, target: ProjectDeletionTarget, originals: Gate
           references.set(projectId, { kind: 'allowlist-incoming-caller', id: projectId, projectId, description: '本项目接口关闭后，该项目在共享放行表中的相关授权关系会移除，其他授权保留' });
         }
       }
-      catch { blockers.push({ participant: 'gateway', code: 'document-ownership-unknown', message: '历史放行文档结构或原归属无法核实', resourceId: String(row.version) }); }
+      catch {
+        let confirmed = false;
+        if (currentAssets) {
+          try {
+            const [original] = await db.execute<{ body: Record<string, unknown> }>(sql`SELECT to_jsonb(r) AS body FROM gateway.allowlists r WHERE version=${row.version}`);
+            const item = original && await gatewayDocumentRepair(db, { originals, currentAssets }, target, original.body);
+            if (item?.confirmed?.decision === 'retain') { retained.push(jsonHash(item)); confirmed = true; }
+          } catch { /* An unverifiable candidate remains an ordinary blocker. */ }
+        }
+        if (!confirmed) blockers.push({ participant: 'gateway', code: 'document-ownership-unknown', message: '历史放行文档结构或原归属无法核实', resourceId: String(row.version) });
+      }
       after = row.version;
     }
     if (rows.length < 100) break;
   }
   resources.push({ kind: 'allowlist-project-parts', id: target.id, identity: jsonHash({ count, hash }), count, scope: 'metadata' });
+  if (retained.length) resources.push({ kind: 'operator-retained-history', id: target.id, identity: jsonHash(retained), count: 0, scope: 'metadata' });
   const work = await db.execute<{ id: string; kind: string; backend_pid: number; pod_uid: string | null; container_id: string | null; node_uid: string | null; node_name: string | null }>(sql`SELECT id,kind,backend_pid,pod_uid,container_id,node_uid,node_name FROM gateway.deletion_work WHERE project_id=${target.id} ORDER BY id`);
   for (const row of work) resources.push({ kind: 'gateway-callback', id: row.id, identity: jsonHash(row), sourceIdentity: jsonHash(row), count: 1, scope: 'physical' });
   return { participant: 'gateway', revision: jsonHash({ resources, references: [...references.values()] }), complete: blockers.length === 0, resources, references: [...references.values()], blockers };
@@ -156,6 +174,7 @@ async function recoverProcess(db: Database, process: GatewayProcess, digest: str
   });
 }
 export interface GatewayDeletionDependencies {
+  currentAssets?: ProjectDeletionCurrentAssets;
   originals: GatewayOriginalDirectory;
   assertGrant?: (context: ProjectDeletionContext) => Promise<void>;
   assertAvailable?: (id: ProjectId) => Promise<void>;
@@ -169,7 +188,11 @@ export function gatewayDeletionRepository(db: Database, deps: GatewayDeletionDep
     && (deps.availableMany ? (await deps.availableMany([id])).includes(id) : await deps.available?.(id) ?? true);
   const recover = async () => deps.processes?.sweep({ stopped: (process, digest) => recoverProcess(db, process, digest), releasable: async (uid) => (await db.execute<{ pending: boolean }>(sql`SELECT EXISTS(SELECT 1 FROM gateway.deletion_work WHERE pod_uid=${uid} AND state='running') AS pending`))[0]?.pending === false });
   return {
-    inspect: (target) => scan(db, target, deps.originals), available, recover: async () => { await recover(); await rememberCurrentOwners(db, deps.originals); },
+    ...(deps.currentAssets ? { repairs: gatewayOperatorRepairs(db, { originals: deps.originals, currentAssets: deps.currentAssets }, {
+      pod: async (tx, body) => body['workload'] !== 'platform' && !await rowOwner(tx, 'pod_identities', body, deps.originals),
+      document: async (tx, doc) => { try { await ownersOf(tx, doc, deps.originals); return false; } catch { return true; } },
+    }) } : {}),
+    inspect: (target) => scan(db, target, deps.originals, false, deps.currentAssets), available, recover: async () => { await recover(); await rememberCurrentOwners(db, deps.originals); },
     callerAvailable: async (identity, version) => {
       const [row] = await db.execute<{ project_id: ProjectId }>(sql`SELECT project_id FROM gateway.deletion_document_owners WHERE version=${version} AND kind='caller' AND entity_key=${identity}`);
       const id = row?.project_id ?? (await deps.originals.service(identity))?.projectId;
@@ -201,9 +224,9 @@ export function gatewayDeletionRepository(db: Database, deps: GatewayDeletionDep
         if (row.operation_id && !renewed) return !row.scope_verified ? 'changed' : await pending(tx, context.target.id) ? 'waiting' : 'sealed';
         await tx.execute(sql`UPDATE gateway.deletion_fences SET operation_id=${context.operationId},generation=${context.generation},confirmed_revision=${context.confirmed.revision},scope_verified=false WHERE project_id=${context.target.id}`);
         const verified = await tx.transaction(async (scope) => {
-          const current = await scan(scope, context.target, deps.originals);
+          const current = await scan(scope, context.target, deps.originals, false, deps.currentAssets);
           if (!current.complete || current.revision !== context.confirmed.revision) return false;
-          await scan(scope, context.target, deps.originals, true); return true;
+          await scan(scope, context.target, deps.originals, true, deps.currentAssets); return true;
         }).catch(() => false);
         if (!verified) return 'changed';
         await tx.execute(sql`UPDATE gateway.deletion_fences SET scope_verified=true WHERE project_id=${context.target.id}`);
@@ -217,7 +240,7 @@ export function gatewayDeletionRepository(db: Database, deps: GatewayDeletionDep
       for (const table of CONTENT) await tx.execute(sql`DELETE FROM gateway.${sql.identifier(table)} c WHERE gateway.content_owner(${table},to_jsonb(c))=${context.target.id}`);
       await tx.execute(sql`UPDATE gateway.allowlists SET document=gateway.strip_document(document,version,ARRAY[${context.target.id}]) WHERE document IS DISTINCT FROM gateway.strip_document(document,version,ARRAY[${context.target.id}])`);
       await tx.execute(sql`DELETE FROM gateway.deletion_work WHERE project_id=${context.target.id}`);
-      const report = await scan(tx, context.target, deps.originals);
+      const report = await scan(tx, context.target, deps.originals, false, deps.currentAssets);
       if (!report.complete || report.resources.some((r) => r.count !== 0)) throw precondition('网关项目内容清理没有归零或存在未知内容');
     }),
   };
