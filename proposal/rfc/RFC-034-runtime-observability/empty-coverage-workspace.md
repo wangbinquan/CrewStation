@@ -23,3 +23,12 @@
 ## 同一候选的完整检查与精确发布
 
 修正候选的完整检查v3自然结束：6196 pass、157 skip、1 fail，285220个expect，6354项用例／1257个文件。结构、lint、后端与工作台类型检查及本会话全部观测用例均通过；唯一失败是并行未提交 `packages/filesystem-metrics/registry/inventory.test.ts` 的 stalled successful body timeout，Expected Error／Received deadline escaped，不属于本次12文件清单。原失败日志与回执保留，不称全门绿色；不修改或收编该并行用例，也不重跑内容未变的全门。按开发规则§3对并行在制品的归因约定，以已通过的19项针对性回归与精确lint提交本会话文件，实际提交的全仓判定交远端exact-SHA六个CI作业。100K／10M另行固定人口验收，不能用本结果代替。
+
+
+## 2026-10-06 精确 CI 与本机部署完成
+
+本片随本会话12文件提交 `52c8eb74fd8354f15c9f1254106cb38d08b0949d` 独立推送，未收编并行内容盘点用例。提交树的 [CI 37394722389](https://github.com/wangbinquan/CrewStation/actions/runs/37394722389) 六个作业全部成功；上述本地完整检查的一项并行失败继续保留，不追记为本地全绿。
+
+2026-10-06T01:11:55.370Z 本机八组件均 Ready，实际 Pod imageID 与节点 OCI 源码匹配该提交，250 项原已发布迁移逐项核对。原资源 UID、数据库/角色、native 存储、既有执行镜像保持；新默认 Runner 使用同 SHA 构建镜像。部署前检查最初误用更早快照而遗漏当前已经存在的 cs-session/cs-auth Pod UID 来源，未执行任何集群变更；修正后保留并核对全部现存来源，再完成实际升级。
+
+固定100000物理任务/10000000用量的 [全规模 37395130449](https://github.com/wangbinquan/CrewStation/actions/runs/37395130449) 与部署后正式页面复验分别待闭合，开发 native v2 producer 继续 OFF。此部署和六项 CI 不代表全规模、生产原生采集或 RFC 全部完成。
