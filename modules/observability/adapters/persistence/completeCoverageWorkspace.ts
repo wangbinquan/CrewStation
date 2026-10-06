@@ -6,16 +6,28 @@ export function completeCoverageWorkspace(rows: CompleteWorkingRows, namespace: 
   const roots = new Map<string,Root>(), nodes = new Map<string,CoverageIntervalNode>();
   const dirtyRoots = new Map<string,Root>(), dirtyNodes = new Map<string,CoverageIntervalNode>();
   let sequence = 0n;
+  // Only an affirmative original TEMP EOF can prove the entire root relation empty.
+  let originalRootsEmpty: boolean | undefined;
   const remember = <T>(cache:Map<string,T>,key:string,value:T) => { cache.delete(key); cache.set(key,value); if (cache.size > 4096) cache.delete(cache.keys().next().value!); };
   const flushRows = async <T>(space:string,dirty:Map<string,T>) => { if (!dirty.size) return; const batch: CompleteWorkingRow<T>[] = [...dirty].map(([key,document]) => ({key,document})); await rows.upsert(space,batch); dirty.clear(); };
   const rootSpace = `${namespace}/roots`, nodeSpace = `${namespace}/nodes`;
   const nodeKey = (tree:string,id:string) => keyOf(JSON.stringify([tree,id]));
   const coverage:CoverageIntervalStore = {
     async root(tree) {
-      const key = keyOf(tree), hit = roots.get(key) ?? dirtyRoots.get(key), row = hit ?? await rows.get<Root>(rootSpace,key);
+      const key = keyOf(tree);
+      let hit = roots.get(key) ?? dirtyRoots.get(key);
+      // Retain the first original point read; only subsequent proven-empty reads are skipped.
+      if (!hit && originalRootsEmpty === true) return null;
+      if (!hit && originalRootsEmpty === undefined) {
+        const first = await rows.page<Root>(rootSpace,null,1);
+        // setRoot may have run while this bounded read was awaiting its original snapshot.
+        if (originalRootsEmpty === undefined) originalRootsEmpty = first.items.length === 0 && first.nextCursor === null;
+        hit = roots.get(key) ?? dirtyRoots.get(key);
+      }
+      const row = hit ?? await rows.get<Root>(rootSpace,key);
       if (!row) { remember(roots,key,{tree,id:null}); return null; } if (row.tree !== tree) throw new Error('Coverage root key identity conflict'); remember(roots,key,row); return row.id;
     },
-    async setRoot(tree,id) { const key = keyOf(tree), row = {tree,id}; remember(roots,key,row); dirtyRoots.set(key,row); if (dirtyRoots.size === 500) await flushRows(rootSpace,dirtyRoots); },
+    async setRoot(tree,id) { originalRootsEmpty = false; const key = keyOf(tree), row = {tree,id}; remember(roots,key,row); dirtyRoots.set(key,row); if (dirtyRoots.size === 500) await flushRows(rootSpace,dirtyRoots); },
     async node(tree,id) {
       const key = nodeKey(tree,id), row = nodes.get(key) ?? dirtyNodes.get(key) ?? await rows.get<CoverageIntervalNode>(nodeSpace,key);
       if (!row || row.id !== id) throw new Error('Coverage interval node missing'); remember(nodes,key,row); return {...row};

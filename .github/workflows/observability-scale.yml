@@ -1,0 +1,75 @@
+name: observability-scale
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact 40-character source commit to qualify
+        required: true
+        type: string
+concurrency:
+  group: observability-scale-${{ github.run_id }}
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  qualify:
+    name: Original complete population (${{ matrix.scenario }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [full-report, self-total]
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_USER: crewstation
+          POSTGRES_PASSWORD: crewstation-dev
+          POSTGRES_DB: crewstation
+          POSTGRES_INITDB_ARGS: '--set=max_prepared_transactions=10'
+        ports: ['55432:5432']
+        options: >-
+          --health-cmd "pg_isready -U crewstation" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      CS_TEST_DATABASE_URL: postgres://crewstation:crewstation-dev@127.0.0.1:55432/crewstation
+      CS_TEST_REQUIRE: database
+      CS_OBSERVABILITY_SCALE_MODE: ${{ matrix.scenario }}
+    steps:
+      - name: Check out the exact source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_sha }}
+      - name: Verify exact source
+        env:
+          REQUESTED_SHA: ${{ inputs.target_sha }}
+        run: |
+          python3 - <<'PY'
+          import os, re, subprocess
+          source = os.environ['REQUESTED_SHA']
+          assert re.fullmatch('[a-f0-9]{40}', source)
+          assert subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() == source
+          with open(os.environ['GITHUB_ENV'], 'a') as target:
+              target.write('CS_OBSERVABILITY_SCALE_SHA=' + source + '\n')
+          PY
+      - uses: ./.github/actions/setup-workspace
+      - name: Verify actual interrupted Bun measurements
+        run: python3 tests/scale/observability/observe-runtime-population.py --verify-interruptions --output test-results/rfc034-interruption-${{ matrix.scenario }}
+      - name: Qualify the entire original population
+        env:
+          CS_OBSERVABILITY_SCALE_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: python3 tests/scale/observability/observe-runtime-population.py --output test-results/rfc034-scale-${{ matrix.scenario }}
+      - name: Preserve original measurements and failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rfc034-full-scale-${{ matrix.scenario }}-${{ github.run_id }}
+          path: |
+            test-results/rfc034-scale-${{ matrix.scenario }}/observer.json
+            test-results/rfc034-scale-${{ matrix.scenario }}/resource-samples.jsonl
+            test-results/rfc034-scale-${{ matrix.scenario }}/process-time.txt
+            test-results/rfc034-scale-${{ matrix.scenario }}/qualification.log
+            test-results/rfc034-scale-${{ matrix.scenario }}/case/qualification.json
+            test-results/rfc034-scale-${{ matrix.scenario }}/case/original-database.json
+            test-results/rfc034-interruption-${{ matrix.scenario }}/*
+          if-no-files-found: error
