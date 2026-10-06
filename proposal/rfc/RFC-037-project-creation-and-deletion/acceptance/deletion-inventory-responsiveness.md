@@ -100,3 +100,21 @@ TDD 红记录 cs-rfc037-platform-maintenance-red-v1.log 保留：原代码在万
 
 
 2026-10-06 I35巡检边界候选的唯一完整门禁自然结束，2026-10-06T04:24:21.688617+00:00至2026-10-06T04:59:41.193304+00:00，退出0：6208 pass／157环境skip／0 fail；四层静态通过，五个功能文件指纹首尾保持，原专用PG配置不变。日志SHA256 05b8f23b1e424d17870ea944a644ecdbe6e782ba73c9f3682265dbaf8a99982d，回执 cs-rfc037-platform-maintenance-full-v1-receipt.json。仅五功能路径与七对应基线/验收/共享STATE文档共12路径进入精确发布；定向32／0、405断言及官方改动行8／8防护通过。确切SHA六项CI、本机八组件安装、原项目新预检和最终全资源回收分别留证，其他三类原历史合同不放宽；全部批外Session/RFC-036在制品与共享STATE全文保持。
+
+
+## I35 确切提交、实际部署与完整巡检队列验证
+
+五个功能文件及七个对应基线/验收文件共12路径已发布 `94131c5995d1b745211bdce6cdb87465964dff79`；[CI37416373091](https://github.com/wangbinquan/CrewStation/actions/runs/37416373091)六项终态成功。实际八组件Ready，Pod imageID及节点OCI revision逐项对应该源码；250项已安装迁移保持，没有迁移作业。原项目、Namespace、项目Pod、PV/PVC、PG目录/OID/角色及原生Registry/SCM配置保持；Runner仍52c8eb74、正式Probe仍4e26b38f原Pod UID，producer OFF、无新模型任务。原部署回执为 `cs-rfc037-94131c5995d1-platform-maintenance-v1-deployment-receipt.json`；后继文档提交不作为部署源码。
+
+2026-10-06T05:35:11.802Z至05:35:21.390Z，实际部署的公共队列reader在启动default_transaction_read_only=on及REPEATABLE READ READ ONLY快照中走完773页、154282条至EOF。refresh45459、metrics84983、storage21733，共152175条全平台巡检均通过完整正文/旧正文/迁移摘要校验，没有调用过期collector来源，invalid=0；refresh其中1497条带真实legacy正文。其他任务仅记录实际名称/数量，本证明不把它们认领为平台范围。前后删除操作数0。原件 `cs-rfc037-94131c5995d1-platform-maintenance-queue-eof-v1.jsonl`，这9.588秒不是整项目预检耗时或项目回收完成证明。
+
+唯一新管理员计划 `01a10fac-93d4-7000-aa56-60e42d691549` 在05:21:54.043Z开始、05:25:30.387Z保存，216.344秒；22方中17方完整、59阻塞、complete=false。provisioning25个主键与c597计划相同。直接读取实际完整原行确认queue:625–645全为agent-runtime.profile-test，全部正文及迁移摘要有效；原profile_tests/context均不存在，仅retired_test_identities及对应别名，不扩大I35豁免。event:12、18、37、54均release.registered，正文/旧正文摘要正确，但旧Manifest含driver/model且没有compute，当前严格领域事件Schema拒绝。原件为 `cs-rfc037-94131c5995d1-profile-test-original-facts-v1.json` 及 `cs-rfc037-94131c5995d1-platform-maintenance-live-owner-diagnosis-v2.jsonl`。
+
+release本计划新增source-unavailable；随后05:32:11Z启动的实际factory单独读取68.010秒通过、15条资源、无阻塞。初次失败原因没有复现，不能把单独成功重写为原计划完整或称其稳定性问题已修复。业务、网关及原生PG历史缺口保持。原项目仍active、删除操作数0、继续删除按钮禁用，无物理回收或after证明；浏览器截图 `cs-rfc037-94131c59-blocked-plan-20261006.jpg`，实际弹窗880×688、坐标200/16、footer处于1280×720视口内。
+
+旧恢复审计v3在11份后超时的原失败保留；v4通过原内容摘要核对的私有seekable副本完整读完其余10份，21份当时保留的备份的指定表审计完成，临时副本删除，无SQL恢复/生产写入。未恢复业务根/受理/原环境；读出的网关17服务原来源及14旧原生日志缺口仍在。部署941新增第22份后，最早及这份新增备份另导出agent_runtime三张指定表：21个原测试均未恢复，只剩淘汰身份和别名。原件 `cs-rfc037-original-history-local-backups-v4.json` 与 `cs-rfc037-profile-test-earliest-latest-backups-v2.json`。v1选择器错误、v2旧列错误、profile备份v1因数量断言在读取前失败均不作为不存在的证据；不排除外部原件，不声称审计全部22份的所有表。
+
+[I36恢复方案](../legacy-recovery-options.md)已按新鲜实际条目补齐，管理员逐项重新确权及历史事件专用只读合同待作者裁定，尚未实施；完整22方预检、原项目真正回收及独立after仍待完成。本批已授权发布部署保持，未再次申请Git/部署许可，未发送跨会话消息。
+
+
+实际94131c59浏览器补充：关闭删除预检后末行“永久删除项目”按钮重新获得焦点，main.scrollTop仍1163.5、window.scrollY为0，原列表筛选/分页保持；原件 `cs-rfc037-94131c59-browser-close-proof-v1.json`。新建入口打开既有统一FormDialog，模板目录载入后默认基础应用，页面解释模板用于初始页面/API/发布配置，资源设置默认折叠。仅填写“团队助手”与team-assistant后，按实际平台配置渲染正式地址team-assistant.cs.localhost及待验证地址preview.team-assistant.cs.localhost；说明标识创建后不能修改、正式地址需手动上线、待验证地址用于先验收。实际880×688弹窗与footer在1280×720视口内。截图 `cs-rfc037-94131c59-project-creation-20261006.jpg` 在域名加载完毕后保存，原件 `cs-rfc037-94131c59-project-creation-browser-proof-v1.json`。点击取消后dialog为0、焦点回到“新建数字人”，未受理新项目；该入口位于列表顶部，关闭时main.scrollTop为0，不混同末行删除操作的1163.5。

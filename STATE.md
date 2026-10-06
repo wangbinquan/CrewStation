@@ -3581,3 +3581,12 @@ TaskRuntime七阶段仅受控停止端口，DevSession的原删除许可/回调f
 
 
 2026-10-06 I35巡检边界候选的唯一完整门禁自然结束，2026-10-06T04:24:21.688617+00:00至2026-10-06T04:59:41.193304+00:00，退出0：6208 pass／157环境skip／0 fail；四层静态通过，五个功能文件指纹首尾保持，原专用PG配置不变。日志SHA256 05b8f23b1e424d17870ea944a644ecdbe6e782ba73c9f3682265dbaf8a99982d，回执 cs-rfc037-platform-maintenance-full-v1-receipt.json。仅五功能路径与七对应基线/验收/共享STATE文档共12路径进入精确发布；定向32／0、405断言及官方改动行8／8防护通过。确切SHA六项CI、本机八组件安装、原项目新预检和最终全资源回收分别留证，其他三类原历史合同不放宽；全部批外Session/RFC-036在制品与共享STATE全文保持。
+
+
+## 2026-10-06 RFC-037 I35 已部署与剩余历史缺口
+
+12路径已精确提交推送 `94131c5995d1b745211bdce6cdb87465964dff79`；[CI37416373091](https://github.com/wangbinquan/CrewStation/actions/runs/37416373091)六项终态成功。实际八组件全部Ready、Pod imageID和节点OCI源码对应94131c59；250安装迁移及原项目/Namespace/PV/PVC/原生PG目录/OID/角色/原Registry和SCM身份保持，Runner与正式Probe原进程未替换、producer OFF、无新模型任务。原件 `cs-rfc037-94131c5995d1-platform-maintenance-v1-deployment-receipt.json`。
+
+独立只读PG快照读尽154282条实际队列、773页至EOF，152175条确切三种全平台巡检全部严格校验通过、invalid=0，未调用旧collector归属来源、没有清理任务；耗时9.588秒，不是管理员整项目计划耗时。原件 `cs-rfc037-94131c5995d1-platform-maintenance-queue-eof-v1.jsonl`。管理员新计划 `01a10fac-93d4-7000-aa56-60e42d691549` 耗时216.344秒、17/22方完整、59阻塞；provisioning25个主键与旧计划相同，实际为21个原上下文已淘汰的档位测试和4个旧Manifest发布事件，不是已批准的三种巡检。release本计划读取失败；随后同部署factory独立读取68.010秒通过15条，前次失败原因尚未复现，原失败仍保留。业务/网关/原生PG历史缺口继续阻断。删除操作数0、原项目仍active、最终确认禁用，独立after尚未发生。
+
+先前21份部署备份指定表审计已完整结束，v4使用原摘要核对的私有归档副本、仅stdout导出、无SQL恢复；业务根/受理/原环境未恢复，网关缺17原服务来源及旧原生日志缺14独立历史仍在。新增第22份与最早备份另核对了档位测试，21个原测试均只有淘汰身份和别名，没有恢复原context；临时副本已移除、原专用PG未重建。来源范围不包括外部持有的备份，也不是全部22份备份的所有表审计。I36方案已补全至当前真实缺口，管理员重新确权及专用历史事件盘点合同待作者裁定，未启用。验收见 acceptance/deletion-inventory-responsiveness.md；目标active、完整删除未交付。保留全部并行Session/RFC-034/RFC-036在制输出和STATE全文，无跨会话消息、无新增Agent。
