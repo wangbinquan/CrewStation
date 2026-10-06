@@ -523,7 +523,7 @@ function productionDeletion(deps: CompositionDeps, late: Late, core: () => Retur
   const { db, identities, settings } = deps, { assertGrant, scmSources, artifacts } = native, scm = gitLabDeletionPhysicsAdapter(scmSources.sources);
   return { scm: { ...scm, stop: (context: Parameters<typeof scm.stop>[0], scope: Parameters<typeof scm.stop>[1]) => scmSources.run(context, scope.retained, () => scm.stop(context, scope)), purge: (context: Parameters<typeof scm.purge>[0], scope: Parameters<typeof scm.purge>[1]) => scmSources.run(context, scope.retained, () => scm.purge(context, scope)) },
     currentRepositoryOrigins: gitLabNativeOriginsAdapter(scmSources.rest, scmSources.sources.native),
-    images: createRuntimeImageRegistryDeletionPhysics({ artifacts, transport: settings.projectDeletionNative!.registry!, assertGrant, work: createNativeRuntimeImageWorkPhysics({ db, assertGrant, source: native.images }) }),
+    images: createRuntimeImageRegistryDeletionPhysics({ artifacts, transport: settings.projectDeletionNative!.registry!, registryBase: settings.registryBase, assertGrant, work: createNativeRuntimeImageWorkPhysics({ db, assertGrant, source: native.images }) }),
     release: createReleaseRegistryDeletionPhysics({ artifacts, transport: settings.projectDeletionNative!.registry!, assertGrant, registryBase: settings.registryBase, work: createNativeReleaseWorkPhysics({ db, identities, assertGrant, services: { resolveServiceById: id => core().project.api.resolveServiceById(id) }, source: native.release }) }),
     objects: createDataObjectDeletionPhysics(db, native.objects(createObjectDeletionTransport(db, settings.secretKeyBase64), createGarageDeletionTransport), assertGrant),
   };

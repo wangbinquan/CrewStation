@@ -43,8 +43,16 @@ function originalContext(raw: Parameters<RuntimeImageDeletionPhysics['purge']>[0
 /** Compose the actual native work/cache source with retained Registry files.
  * Neither a catalog retirement nor a private DELETE acknowledgement is proof. */
 export function runtimeImageRegistryDeletionPhysics(input: { work: RuntimeImageDeletionPhysics; artifacts: NativeRegistryDeletionSource;
+  registryBase: string;
   transport: Parameters<typeof createRegistryReclamationClient>[0]; assertGrant(context: Parameters<RuntimeImageDeletionPhysics['purge']>[0]): Promise<void>;
 }): RuntimeImageDeletionPhysics {
+  if (!input.registryBase || /[\s/?#@]/.test(input.registryBase)) throw precondition('运行镜像原 Registry 基址无效');
+  const repositoryPath = (repository: string) => {
+    if (!repository.startsWith(input.registryBase + '/')) throw precondition('运行镜像原制品不属于受管 Registry');
+    const path = repository.slice(input.registryBase.length + 1);
+    if (!/^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)*$/.test(path)) throw precondition('运行镜像原 Registry 仓库路径无效');
+    return path;
+  };
   const client = createRegistryReclamationClient(input.transport);
   const observe = async (scope: RuntimeImagePhysicalScope, proof: RuntimeImagePhysicalProof, stopOnly = false): Promise<RuntimeImagePhysicalProof> => {
     const original = materials(scope), checked = workProof(original.work, proof); if (checked.kind !== 'done') return checked;
@@ -59,8 +67,9 @@ export function runtimeImageRegistryDeletionPhysics(input: { work: RuntimeImageD
       const target = ProjectDeletionTargetSchema.parse(rawTarget), content = structuredClone(rawContent), captured = await input.work.capture(target, content);
       if (!captured.scope) return captured;
       const work = RuntimeImagePhysicalScopeSchema.parse(captured.scope), prefix = 'runtime/projects/' + target.id;
-      if (work.projectId !== target.id || content.artifacts?.some(row => row.projectOwned && !row.repository.startsWith(prefix + '/'))) throw precondition('运行镜像原制品不属于本项目前缀');
-      const own = content.artifacts?.filter(row => row.projectOwned) ?? [], protectedRepositories = [...new Set(content.artifacts?.filter(row => !row.projectOwned).map(row => row.repository) ?? [])].sort();
+      const artifacts = content.artifacts?.map(row => ({ ...row, repository: repositoryPath(row.repository) })) ?? [];
+      if (work.projectId !== target.id || artifacts.some(row => row.projectOwned && !row.repository.startsWith(prefix + '/'))) throw precondition('运行镜像原制品不属于本项目前缀');
+      const own = artifacts.filter(row => row.projectOwned), protectedRepositories = [...new Set(artifacts.filter(row => !row.projectOwned).map(row => row.repository))].sort();
       const query = { exact: [], prefixes: [prefix], retainedDigests: [], retainedManifests: [...new Set(own.flatMap(row => row.digest ? [row.digest] : []))].sort(), protectedRepositories };
       const registry = captureRegistryHistory(await input.artifacts.capture(target.id, query) as RegistryDeletionHistory);
       const { key: _key, rootId: _root, directory: _directory, ...actualQuery } = registry.query;

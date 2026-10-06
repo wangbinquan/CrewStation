@@ -45,7 +45,9 @@ export async function inspectBusinessContent(db: Executor, sources: BusinessDele
     let value = cache.get(cacheKey);
     if (!value) {
       value = (async () => {
-        const origin = originSchema.parse(await sources.resolve(kind, key, representation));
+        const original = await sources.resolve(kind, key, representation);
+        if (!original) throw precondition('业务历史' + (kind === 'service' ? '服务 ' : '任务 ') + key + ' 缺少原项目归属记录，请恢复来源后重新盘点');
+        const origin = originSchema.parse(original);
         if (representation === 'current' && origin.id !== key) throw precondition('业务内容与原对象 ID 不符');
         if (origin.projectIds[0] === project) origins.set(cacheKey, { kind, key, id: origin.id, projectId: project, identity: jsonHash({ kind, key, id: origin.id, projectId: project }) });
         return { project: origin.projectIds[0] ?? null, digest: jsonHash(origin) };

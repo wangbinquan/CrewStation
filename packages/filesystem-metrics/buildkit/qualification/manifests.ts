@@ -3,6 +3,7 @@ import { constants } from 'node:fs';
 import { lstat, open } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
+import { readProbeResponse } from '../../probeRead';
 import { filesystemSourceEpoch } from '../../source';
 
 const hash = (raw: unknown) => createHash('sha256').update(JSON.stringify(raw)).digest('hex');
@@ -70,10 +71,14 @@ export function createBuildKitManifestClient(options: { baseUrl: string; token: 
   const url = new URL(endpoint, options.baseUrl), request = options.fetch ?? fetch;
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || options.token.length < 32) throw Error('Original native manifest installation is incomplete');
   return { observe: async (raw: z.infer<typeof query>, signal = AbortSignal.timeout(30_000)) => {
-    const input = query.parse(raw), result = await request(url, { method: 'POST', redirect: 'error', signal, headers: { authorization: 'Bearer ' + options.token }, body: JSON.stringify(input) });
+    const input = query.parse(raw), observeDeadline = () => {};
+    signal.addEventListener('abort', observeDeadline, { once: true });
+    try {
+    const result = await readProbeResponse(request, url, { method: 'POST', redirect: 'error', headers: { authorization: 'Bearer ' + options.token }, body: JSON.stringify(input) }, signal);
     if (!result.ok) throw Error('Original native manifest source is unavailable'); const observed = responseSchema.parse(await boundedBody(result, 16_777_216, signal));
     const { identity, ...material } = observed;
     if (input.key !== observed.key || hash(material) !== identity || new Set(observed.manifests.map(r => r.digest)).size !== observed.manifests.length || input.digests.some(d => !observed.manifests.some(r => r.digest === d))) throw Error('Original native manifest graph or complete roots changed');
     return observed;
+    } finally { signal.removeEventListener('abort', observeDeadline); }
   } };
 }

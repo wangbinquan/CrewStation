@@ -15,8 +15,13 @@ test('actual native manifest bytes, recursive descriptor EOF and authenticated p
     const manifest = await put({ schemaVersion: 2, mediaType: 'application/vnd.oci.image.manifest.v1+json', config: { digest: config, size: 9 }, layers: [{ digest: layer, size: 10 }], annotations: { private: 'private-project-annotation' } });
     const index = await put({ schemaVersion: 2, mediaType: 'application/vnd.oci.image.index.v1+json', manifests: [manifest] });
     const query = { key: 'original', directory, digests: [index.digest] }, handler = createFilesystemMetricsHandler({ token, roots: { local: root } });
-    const client = createBuildKitManifestClient({ baseUrl: 'http://original', token, fetch: (url, init) => handler(new Request(url, init)) });
-    const actual = await client.observe(query); expect(actual.complete).toBe(true); expect(actual.manifests).toHaveLength(2);
+    const signal = AbortSignal.timeout(1000), signals: AbortSignal[] = [], requests: string[] = [];
+    const client = createBuildKitManifestClient({ baseUrl: 'http://original', token, fetch: async (url, init) => {
+      signals.push(init.signal!); requests.push(String(init.body));
+      return signals.length === 1 ? Response.json({ error: 'A measurement is already running' }, { status: 409 }) : handler(new Request(url, init));
+    } });
+    const actual = await client.observe(query, signal); expect(actual.complete).toBe(true); expect(actual.manifests).toHaveLength(2);
+    expect(signals).toEqual([signal, signal]); expect(new Set(requests).size).toBe(1);
     expect(actual.manifests.find(row => row.digest === manifest.digest)).toMatchObject({ layers: [layer], config });
     expect(JSON.stringify(actual)).not.toContain('private-project-annotation'); expect((await observeBuildKitManifests(root, query)).identity).toBe(actual.identity);
     expect((await handler(new Request('http://original/buildkit/manifests', { method: 'POST', body: JSON.stringify(query) }))).status).toBe(401);
@@ -29,4 +34,15 @@ test('a native manifest body that never reaches EOF is cancelled by its original
   let cancelled = false;
   const client = createBuildKitManifestClient({ baseUrl: 'http://original', token: 'original-manifest-token'.repeat(2), fetch: async () => new Response(new ReadableStream({ cancel: () => { cancelled = true; } })) });
   await expect(client.observe({ key: 'original', directory: 'cache', digests: [] }, AbortSignal.timeout(20))).rejects.toThrow(); expect(cancelled).toBe(true);
+});
+test('native manifest contention cannot extend the original deadline or disguise another conflict', async () => {
+  const token = 'original-manifest-token'.repeat(2), query = { key: 'original', directory: 'cache', digests: [] };
+  for (const error of [{ error: 'another conflict' }, { error: 'A measurement is already running', changed: true }]) {
+    let reads = 0;
+    await expect(createBuildKitManifestClient({ baseUrl: 'http://original', token, fetch: async () => { reads++; return Response.json(error, { status: 409 }); } }).observe(query)).rejects.toThrow('unavailable');
+    expect(reads).toBe(1);
+  }
+  let reads = 0;
+  await expect(createBuildKitManifestClient({ baseUrl: 'http://original', token, fetch: async () => { reads++; return Response.json({ error: 'A measurement is already running' }, { status: 409 }); } }).observe(query, AbortSignal.timeout(10))).rejects.toThrow();
+  expect(reads).toBe(1);
 });

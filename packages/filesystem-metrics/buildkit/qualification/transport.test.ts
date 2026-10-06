@@ -17,8 +17,13 @@ async function fixture(work: (root: string, templateRoot: string) => Promise<voi
 }
 test('the installed authenticated handler binds complete native inputs and the independent template without exposing bytes', () => fixture(async (root, templateRoot) => {
   const handler = createBuildKitInputHandler({ root, templateRoot, token });
-  const client = createBuildKitInputClient({ baseUrl: 'http://original', token, fetch: (url, init) => handler(new Request(url, init)) });
-  const result = await client.observe(query);
+  const signal = AbortSignal.timeout(1000), signals: AbortSignal[] = [], requests: string[] = [];
+  const client = createBuildKitInputClient({ baseUrl: 'http://original', token, fetch: async (url, init) => {
+    signals.push(init.signal!); requests.push(String(init.body));
+    return signals.length === 1 ? Response.json({ error: 'A measurement is already running' }, { status: 409 }) : handler(new Request(url, init));
+  } });
+  const result = await client.observe(query, signal);
+  expect(signals).toEqual([signal, signal]); expect(new Set(requests).size).toBe(1);
   expect(result.inputs[0]!.sharedPlatformContentsProven).toBe(true); expect(result.inputs[0]!.files[0]!.path).toBe('.gitignore');
   expect(result.physicalReclamationProven).toBe(false); expect(JSON.stringify(result)).not.toContain('private-template-bytes');
   await writeFile(join(root, 'cache/runc-overlayfs/snapshots/snapshots/1/fs/project'), 'project-private-bytes');
@@ -27,6 +32,17 @@ test('the installed authenticated handler binds complete native inputs and the i
   const forbidden = await handler(new Request('http://original/buildkit/platform-inputs', { method: 'POST', headers: { authorization: 'Bearer ' + token }, body: JSON.stringify({ ...query, templateRoot: '/caller' }) }));
   expect(forbidden.status).toBe(503);
 }));
+
+test('native input contention obeys the original deadline and refuses unrelated conflicts', async () => {
+  for (const error of [{ error: 'another conflict' }, { error: 'A measurement is already running', changed: true }]) {
+    let reads = 0;
+    await expect(createBuildKitInputClient({ baseUrl: 'http://original', token, fetch: async () => { reads++; return Response.json(error, { status: 409 }); } }).observe(query)).rejects.toThrow('unavailable');
+    expect(reads).toBe(1);
+  }
+  let reads = 0;
+  await expect(createBuildKitInputClient({ baseUrl: 'http://original', token, fetch: async () => { reads++; return Response.json({ error: 'A measurement is already running' }, { status: 409 }); } }).observe(query, AbortSignal.timeout(10))).rejects.toThrow();
+  expect(reads).toBe(1);
+});
 test('a complete original input transport rejects substitution, omitted storage, digest tampering and incomplete EOF', () => fixture(async (root, templateRoot) => {
   const handler = createBuildKitInputHandler({ root, templateRoot, token });
   const original = await (await handler(new Request('http://original/buildkit/platform-inputs', { method: 'POST', headers: { authorization: 'Bearer ' + token }, body: JSON.stringify(query) }))).json();

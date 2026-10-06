@@ -31,3 +31,23 @@ test('native process transport cancels incomplete response bodies and refuses ov
   await expect(client.observe({ owners }, signal)).rejects.toThrow(); expect(cancelled).toBe(true);
   await expect(createProcessOwnerClient({ baseUrl: 'http://original', token, fetch: async () => new Response('{}', { headers: { 'content-length': '8388609' } }) }).observe({ owners })).rejects.toThrow('budget');
 });
+
+test('original native process reads retry only the probe measurement lock within the same deadline and owner scope', () => consumerFixture(async f => {
+  await symlink('cgroup:[901]', join(f.root, 'self/ns/cgroup'));
+  await writeFile(join(await f.process('22'), 'cgroup'), '0::/native\n');
+  const token = 'original-native-source-'.repeat(3), owners: ProcessOwnerRequest['owners'] = [], signal = AbortSignal.timeout(1000);
+  const handler = createFilesystemMetricsHandler({ token, roots: {}, procRoot: f.root }), signals: AbortSignal[] = [], requests: string[] = [];
+  const client = createProcessOwnerClient({ baseUrl: 'http://original', token, fetch: async (url, init) => {
+    signals.push(init.signal!); requests.push(String(init.body));
+    return signals.length === 1 ? Response.json({ error: 'A measurement is already running' }, { status: 409 }) : handler(new Request(url, init));
+  } });
+  expect((await client.observe({ owners }, signal)).complete).toBe(true); expect(signals).toEqual([signal, signal]); expect(new Set(requests).size).toBe(1);
+  for (const error of [{ error: 'another conflict' }, { error: 'A measurement is already running', changed: true }]) {
+    let reads = 0;
+    await expect(createProcessOwnerClient({ baseUrl: 'http://original', token, fetch: async () => { reads++; return Response.json(error, { status: 409 }); } }).observe({ owners })).rejects.toThrow('unavailable');
+    expect(reads).toBe(1);
+  }
+  let reads = 0;
+  await expect(createProcessOwnerClient({ baseUrl: 'http://original', token, fetch: async () => { reads++; return Response.json({ error: 'A measurement is already running' }, { status: 409 }); } }).observe({ owners }, AbortSignal.timeout(10))).rejects.toThrow();
+  expect(reads).toBe(1);
+}));

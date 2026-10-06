@@ -47,10 +47,10 @@ export async function nativeRegistryOwnerFixture(procRoot: string, mode: 'runtim
     inspect: async raw => { const current = await f.source.inspect(captureRegistryHistory(raw as RegistryDeletionHistory)); return controls.malformed ? { ...current, native: 0, storage: 0 } : current; } };
   const transport = { baseUrl: 'http://private-registry', token: 'private-registry-original-token-1234567890', fetch: async (url: URL, init: RequestInit) => {
     controls.reclaimed++; if (!handler) throw Error('Private original source is unavailable'); return handler(new Request(url, init)); } };
-  const runtimeContent: RuntimeImageProjectContent = { inventory, rows: [], consumers: [], callbacks: [], dependencies: [], artifacts: [{ kind: 'version', id: newResourceId(), repository, digest: f.manifest, projectOwned: true }] };
+  const runtimeContent: RuntimeImageProjectContent = { inventory, rows: [], consumers: [], callbacks: [], dependencies: [], artifacts: [{ kind: 'version', id: newResourceId(), repository: `${registryBase}/${repository}`, digest: f.manifest, projectOwned: true }] };
   const releaseContent: ReleaseDeletionContent = { inventory, rows: [], consumers: [], callbacks: [], identityLinks: [], artifacts: [{ releaseId: newResourceId(), reference: `${registryBase}/${repository}@${f.manifest}` }] };
   const rebuild = () => {
-    const image = createRuntimeImageRegistryDeletionPhysics({ work: runtimeWork(projectId, controls), artifacts, transport, assertGrant });
+    const image = createRuntimeImageRegistryDeletionPhysics({ work: runtimeWork(projectId, controls), artifacts, transport, registryBase, assertGrant });
     const release = createReleaseRegistryDeletionPhysics({ work: releaseWork(projectId, controls), artifacts, transport, registryBase, assertGrant });
     return mode === 'runtime-environment' ? { runtimePhysics: image,
     capture: () => image.capture(target, runtimeContent), inspect: (raw: unknown) => image.inspect(RuntimeImagePhysicalScopeSchema.parse(raw)),

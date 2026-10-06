@@ -9,6 +9,39 @@ import { nativeRegistryOwnerFixture } from './nativeRegistryOwnerFixture';
 import { runtimeImageProjectDeletionOwner } from '../../runtime-environment/application/projectDeletion';
 import { RuntimeImagePhysicalScopeSchema } from '../../runtime-environment/domain/records';
 
+test('runtime Registry inventory translates original pull addresses and preserves platform pins within the project prefix', async () => {
+  await consumerFixture(async proc => {
+    const f = await nativeRegistryOwnerFixture(proc.root, 'runtime-environment'); await f.prepareProc(); await proc.process('101');
+    try {
+      const owned = f.runtimeContent.artifacts![0]!, repository = owned.repository.slice('registry.test:5000/'.length);
+      const content = { ...f.runtimeContent, artifacts: [owned,
+        { ...owned, id: newResourceId(), projectOwned: false },
+        { ...owned, id: newResourceId(), repository: 'registry.test:5000/runtime/platform/tools', projectOwned: false },
+        { ...owned, id: newResourceId(), repository: 'registry.test:5000/runtime/platform/tools', projectOwned: false }] };
+      const captured = await f.api.runtimePhysics.capture(f.target, content);
+      expect(captured.complete).toBe(true);
+      expect(f.history().query.protectedRepositories).toEqual(['runtime/platform/tools', repository].sort());
+      expect(f.history().original.repositories).toEqual([]); expect(f.history().original.entries).toEqual([]);
+      expect(await f.exists(f.layer)).toBe(true); expect(await f.exists(f.manifest)).toBe(true); expect(f.controls.reclaimed).toBe(0);
+      expect((await f.api.inspect(captured.scope)).complete).toBe(true);
+    } finally { await f.drop(); }
+  });
+});
+
+test('runtime deletion rejects another registry, malformed paths and an owned artifact outside the original project prefix', async () => {
+  await consumerFixture(async proc => {
+    const f = await nativeRegistryOwnerFixture(proc.root, 'runtime-environment'); await f.prepareProc(); await proc.process('101');
+    try {
+      const original = f.runtimeContent.artifacts![0]!;
+      for (const repository of ['foreign.test:5000/runtime/platform/tools', 'registry.test:5000/../tools', 'registry.test:5000/runtime/platform/tools']) {
+        await expect(f.api.runtimePhysics.capture(f.target, { ...f.runtimeContent, artifacts: [{ ...original, repository }] })).rejects.toThrow();
+      }
+      await expect(f.api.runtimePhysics.capture(f.target, { ...f.runtimeContent, artifacts: [{ ...original, projectOwned: false, repository: 'foreign.test:5000/runtime/platform/tools' }] })).rejects.toThrow();
+      expect(f.controls.reclaimed).toBe(0); expect(await f.exists(f.layer)).toBe(true);
+    } finally { await f.drop(); }
+  });
+});
+
 test('the actual runtime owner publishes the source binding accepted by the native factory and private service', async () => {
   await consumerFixture(async proc => {
     const f = await nativeRegistryOwnerFixture(proc.root, 'runtime-environment'); await f.prepareProc(); await proc.process('101');

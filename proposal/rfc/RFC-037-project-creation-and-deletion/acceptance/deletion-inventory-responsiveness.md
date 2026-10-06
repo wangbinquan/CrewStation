@@ -45,3 +45,26 @@ v7于2026-10-06T00:32:06.850807Z开始，01:03:14.440042Z自然结束，退出0�
 与23个功能路径直接对应的12文件专项覆盖实际78 pass／0 fail、497断言；127／127新增可执行行命中，作用范围为本批，不替代确切SHA hosted CI。原5秒STOP预算、未知归属拒绝和正式Probe容量保持。
 
 门禁期间并行RFC-034独立提交`52c8eb74fd8354f15c9f1254106cb38d08b0949d`已在本地和远端同步，本批23个功能文件未变；不为该无关HEAD推进重启完整检查。精确发布允许清单为23功能路径及本验收文档、待批准平台边界方案、I35登记、共享STATE共27路径，批外Session和RFC-036在制品不纳入。实际提交、hosted CI及部署继续分别留证，原项目仍未删除。
+
+## 响应修复的确切提交、部署及实机结果
+
+27路径已精确发布为`ed95520f10403263d0a8da67707b8bf41e96fcef`；[CI37397276418](https://github.com/wangbinquan/CrewStation/actions/runs/37397276418)六项均终态成功。2026-10-06T01:39:10.646Z本机八组件就绪，实际Pod imageID及节点OCI revision与该提交一致；250项已安装迁移checksum保持，无迁移作业。API实际uid/gid1000完成报告目录独占创建、fsync、回读和删除本证明文件。原Namespace、项目Pod、PV/PVC、数据库和角色OID、GitLab及专用Registry/SCM原生配置身份均保持；默认Runner仍是52c8eb74原摘要，正式Probe仍为4e26b38f原Pod UID。回执`/private/tmp/cs-rfc037-ed95520f1040-deletion-read-v2-deployment-receipt.json`。第一次部署预检因错误的挂载检查在任何变更前失败，原失败回执保留；第二次核对既有批准的两个只读挂载后通过。
+
+新鲜管理员实机读取证明最初只读盘点可以关闭；Esc恢复末行删除按钮焦点及原列表scrollTop 1163.5。重新打开会产生另一只读盘点，关闭界面没有宣称服务器盘点已经取消。两份实际计划分别为`01a10ee1-f4df-7000-880b-707cd8ca1175`和`01a10ee3-0dba-7000-bdbe-23e1e33b38e3`；第一份自首次打开到保存为215.391秒，不能把两次读取累计287.301秒写成一个请求的耗时。第二份包含22方、61项阻塞、complete=false，最终确认不可用；全部删除操作数仍为0。原件`/private/tmp/cs-rfc037-ed95520-live-plan-v1.json`，截图`/private/tmp/cs-rfc037-ed95520-blocked-plan-20261006.jpg`。dev-session和task-runtime本次盘点完整，但仍不构成项目全量清理成功。
+
+## 正式原生读取的剩余故障与修复候选
+
+2026-10-06T01:59:41Z至02:00:01Z，只读诊断直接装配实际部署的模块factory、原配置、Kubernetes和数据库，PG启动参数明确default_transaction_read_only=on；未启动服务器、后台工作或迁移，前后删除操作数均为0。原件`/private/tmp/cs-rfc037-ed95520-live-owner-diagnosis-v2.jsonl`。运行镜像的14个保护制品是完整的受管Registry拉取地址，旧适配器将它们直接当相对仓库路径校验；发布读取kubelet工作目录时，正式Probe的全局测量锁返回精确409忙碌应答，旧客户端立即拒绝。
+
+本批14个功能路径修复上述已有合同的读取错误：运行镜像按实际settings.registryBase验证并转换制品地址，保留所有平台保护仓库，包含同项目物理前缀内的保护项；外部Registry、畸形路径、错误项目所有权仍拒绝。kubelet工作目录、进程归属、BuildKit平台输入和原生manifest复用原readProbeResponse，仅精确单字段忙碌应答在原截止时间内重试；认证、原对象范围、响应预算及完整EOF要求保持。HTTP成功后的挂起kubelet正文也由原截止时间取消。业务原归属不存在时显示中文对象与原因，严格拒绝不放宽。
+
+红用例原件`cs-rfc037-native-read-red-v1.log`、`cs-rfc037-native-read-extra-red-v1.log`及`cs-rfc037-native-qualification-read-red-v1.log`保留。最终专项30 pass／4 Linux环境skip／0 fail、220断言、7文件；实际生产Root装配用例1 pass／0 fail、10断言。仅合并本批两份新鲜LCOV，7个生产文件40／40新增可执行行命中，无违规；原件`cs-rfc037-native-inventory-read-patch-preview-v1.json`。14个功能路径冻结于`cs-rfc037-native-inventory-read-candidate-v1.json`；完整门禁在02:09:22Z实际开始，按自然终态另记，未因HEAD推进重跑。
+
+业务缺口另经原注册表及21个实际内容投影只读核实：缺失任务`01a0c12a-de2e-7015-b669-bf7cfb7caf6e`仅有业务迁移别名和旧子任务引用；原business task、accepted create-task intent、runtime environment、work_origins、content_origins，以及旧键对应的runtime沿革均不存在。子任务父业务任务实际属于另一项目`01a0c12a-de0c-700f-ac1a-b01ede8e33f4`，但当前严格来源合同不允许把父引用补造为缺失执行环境的归属证明；未修改任何业务历史或其他项目。原件`cs-rfc037-business-missing-original-readonly-v1.json`、`cs-rfc037-business-missing-original-links-readonly-v1.json`和`cs-rfc037-business-missing-original-parent-readonly-v1.json`。I35全平台巡检方案仍待作者批准，也不豁免该业务缺口、网关或数据库原生历史缺口；原专用项目尚未受理删除。
+
+
+## 本批原生读取候选完整门禁终态
+
+14路径候选单次完整门禁于2026-10-06T02:09:22.472006Z开始，02:43:32.588241Z自然结束，退出0；结构、lint、后端类型和控制台类型四层通过，6204 pass／157环境skip／0 fail、285278断言、1257文件。Bun用例耗时1962.46秒，完整检查首尾包含静态检查，未中途取消或重启。14个功能文件首尾指纹保持，真实PG原配置保持；原件`/private/tmp/cs-rfc037-native-inventory-read-full-v1-receipt.json`，日志SHA256 `8cc48a056a257f452c49f8183a59b09e2099e276db110a6031a61fb907e11b99`。环境skip不算正式原生清理验收。
+
+本批允许清单仅14功能路径与本验收记录、STATE共16路径；精确提交、确切SHA六项hosted CI和本机部署分别记录终态。原专用项目仍存在且删除操作数0；I35等待作者裁定及真正历史缺口不由本次读取修复消除。

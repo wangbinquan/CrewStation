@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { BuildKitInputRequestSchema, observeBuildKitPlatformInputs } from './platformInputs';
+import { readProbeResponse } from '../../probeRead';
 
 const hash = z.string().regex(/^[a-f0-9]{64}$/), path = z.string().min(1).max(8192), digest = z.string().regex(/^sha256:[a-f0-9]{64}$/);
 const files = z.array(z.strictObject({ path, kind: z.enum(['file', 'directory']), digest: digest.optional() })).max(200_000);
@@ -37,11 +38,15 @@ export function createBuildKitInputClient(options: { baseUrl: string; token: str
   const url = new URL(endpoint, options.baseUrl), request = options.fetch ?? fetch;
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || options.token.length < 32) throw Error('Native BuildKit input transport configuration is incomplete');
   return { observe: async (raw: z.infer<typeof BuildKitInputRequestSchema>, signal = AbortSignal.timeout(30_000)) => {
-    const input = BuildKitInputRequestSchema.parse(raw), response = await request(url, { method: 'POST', redirect: 'error', signal, headers: { authorization: 'Bearer ' + options.token, 'content-type': 'application/json' }, body: JSON.stringify(input) });
+    const input = BuildKitInputRequestSchema.parse(raw), observeDeadline = () => {};
+    signal.addEventListener('abort', observeDeadline, { once: true });
+    try {
+    const response = await readProbeResponse(request, url, { method: 'POST', redirect: 'error', headers: { authorization: 'Bearer ' + options.token, 'content-type': 'application/json' }, body: JSON.stringify(input) }, signal);
     if (!response.ok) throw Error('Native BuildKit input source is unavailable'); const observed = responseSchema.parse(await body(response, 67_108_864, signal));
     const { identity, physicalReclamationProven: _proof, observedAt: _at, ...material } = observed;
     if (observed.key !== input.key || new Set(observed.inputs.map(row => row.storageId)).size !== input.storageIds.length
       || observed.inputs.some(row => !input.storageIds.includes(row.storageId)) || createHash('sha256').update(JSON.stringify(material)).digest('hex') !== identity) throw Error('Native BuildKit input original identity or complete scope changed');
     return observed;
+    } finally { signal.removeEventListener('abort', observeDeadline); }
   } };
 }

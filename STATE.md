@@ -3559,3 +3559,14 @@ TaskRuntime七阶段仅受控停止端口，DevSession的原删除许可/回调f
 - 全平台巡检边界提问仍待作者批准，已登记implementation-open-questions I35。网关和原数据库的真实历史缺口不能补造或当成清理成功。先完成已授权响应修复的精确发布与部署，项目全部回收未完成；不发跨会话消息。
 
 2026-10-06 本批v7完整门禁自然通过：6198 pass／157环境skip／0 fail，285225断言、1257文件，静态四层通过；23功能文件首尾及终态复核摘要全部保持，专用真实PG配置不变。回执`/private/tmp/cs-rfc037-deletion-read-full-v7-receipt.json`。本批专项78 pass／0 fail、497断言；127／127新增可执行行防护，无违规。门禁期间并行观测52c8eb74已精确同步，未因移动HEAD重跑。本批仅23功能路径及四份对应交接/设计文档共27路径进入已授权提交，全部批外在制品保持；确切SHA CI、部署与原专用项目真正清理继续独立验收。
+
+## 2026-10-06 RFC-037 盘点读取实机接续
+
+上述27路径已精确发布ed95520f10403263d0a8da67707b8bf41e96fcef，CI37397276418六项终态成功；01:39:10.646Z本机八组件就绪，实际Pod/节点OCI与该源码一致，250项安装迁移checksum不变、未跑迁移。API实际uid/gid1000报告目录写入/fsync/回读完成；默认Runner仍为52c8eb74原摘要，正式Probe仍为4e26b38f原Pod UID。原项目、Namespace/Pod/PV/PVC、PG数据库/角色OID、GitLab及专用Registry/SCM配置身份保持，producer OFF、无模型新任务。回执`/private/tmp/cs-rfc037-ed95520f1040-deletion-read-v2-deployment-receipt.json`。
+
+管理员实机只读盘点关闭/Esc已恢复末行按钮焦点与原滚动位置。两次实际只读计划保留，第二份22方/61阻塞/complete=false，最终确认不可用；全部删除操作数仍为0，不能称为已回收。实际factory只读诊断确认运行制品完整地址误作相对仓库名、Probe忙碌立即拒绝，及业务旧执行任务原归属确实缺失。本批14功能路径修复前两类读取并给缺失归属明确中文原因；保持所有平台pin、原读取范围/认证/截止时间/预算/EOF与未知来源拒绝。
+
+定向30 pass／4 Linux环境skip／0 fail、220断言，正式生产装配1／0、10断言，40／40新增可执行行防护。14功能路径冻结于`/private/tmp/cs-rfc037-native-inventory-read-candidate-v1.json`，02:09:22Z开始单次完整check，首尾及终态另记；不是旧native-source-full日志。业务旧引用来自另一项目子任务，但原执行环境和沿革均缺失，不能由父引用补造归属。I35仍待作者批准，网关/原生PG历史缺口仍在。已授权精确提交/确切SHA CI/部署与原专用项目全回收接续；不发跨会话消息，不建新会话或子Agent，全部批外WIP和共享STATE历史保留。
+
+
+2026-10-06 本批14路径原生读取候选完整check自然结束，02:09:22.472006Z至02:43:32.588241Z，退出0：6204 pass／157环境skip／0 fail、285278断言、1257文件；四层静态通过、14功能指纹首尾保持、原专用PG配置不变。回执`/private/tmp/cs-rfc037-native-inventory-read-full-v1-receipt.json`，日志SHA256 `8cc48a056a257f452c49f8183a59b09e2099e276db110a6031a61fb907e11b99`。精确发布允许清单为14功能路径及此共享STATE、本RFC验收记录共16路径；批外Session/RFC-036输出保留。确切SHA六项CI、本机部署与原专用项目全回收继续独立验收；I35仍待作者批准，未以跳过/缺失历史伪称删除成功。

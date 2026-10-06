@@ -145,7 +145,7 @@ describe.skipIf(!available)('business content inspection (actual PG; controlled 
     const f = await fixture();
     try {
       const task = await f.seedTask();
-      f.origins.delete('service:' + f.service); await expect(f.inspect()).rejects.toThrow(); f.bind('service', f.service);
+      f.origins.delete('service:' + f.service); await expect(f.inspect()).rejects.toThrow('业务历史服务 ' + f.service + ' 缺少原项目归属记录'); f.bind('service', f.service);
       await f.database.db.execute(sql`INSERT INTO business_task.subtasks(id,task_id,name,kind,state,attempt,spec,created_at)
         VALUES(${newResourceId()},${newResourceId()},'orphan','agent','failed',1,'{}',now())`);
       await expect(f.inspect()).rejects.toThrow('原任务根');
@@ -155,6 +155,8 @@ describe.skipIf(!available)('business content inspection (actual PG; controlled 
       await f.database.db.execute(sql`INSERT INTO business_task.cluster_commands(id,body,legacy_body)
         VALUES(${newResourceId()},${JSON.stringify({ operation: { target: { taskId: task } } })}::jsonb,${JSON.stringify({ operation: { target: { taskId: 'wrong-old-task' } } })}::jsonb)`);
       await expect(f.inspect()).rejects.toThrow('同一原对象');
+      f.origins.delete('task:wrong-old-task');
+      await expect(f.inspect()).rejects.toThrow('业务历史任务 wrong-old-task 缺少原项目归属记录');
     } finally { await f.database.drop(); }
   });
 

@@ -1,6 +1,7 @@
 import { ProcessOwnerRequestSchema, ProcessOwnerResponseSchema } from './protocol';
 import type { ProcessOwnerRequest } from './protocol';
 import { observeProcessOwners } from './inventory';
+import { readProbeResponse } from '../probeRead';
 
 async function body(value: Request | Response, maximum: number, signal: AbortSignal) {
   if (!value.body || Number(value.headers.get('content-length')) > maximum) throw Error('Native process owner transport budget');
@@ -24,11 +25,15 @@ export function createProcessOwnerClient(options: { baseUrl: string; token: stri
   const url = new URL('/process-owners', options.baseUrl), fetcher = options.fetch ?? fetch;
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || options.token.length < 32) throw Error('Original process owner transport installation is incomplete');
   return { observe: async (raw: ProcessOwnerRequest, signal = AbortSignal.timeout(15_000)) => {
-    const query = ProcessOwnerRequestSchema.parse(raw), response = await fetcher(url, { method: 'POST', redirect: 'error', signal, headers: { authorization: 'Bearer ' + options.token, 'content-type': 'application/json' }, body: JSON.stringify(query) });
+    const query = ProcessOwnerRequestSchema.parse(raw), observeDeadline = () => {};
+    signal.addEventListener('abort', observeDeadline, { once: true });
+    try {
+    const response = await readProbeResponse(fetcher, url, { method: 'POST', redirect: 'error', headers: { authorization: 'Bearer ' + options.token, 'content-type': 'application/json' }, body: JSON.stringify(query) }, signal);
     if (!response.ok) throw Error('Original native process owner source is unavailable'); const observed = ProcessOwnerResponseSchema.parse(await body(response, 8_388_608, signal));
     if (observed.owners.length !== query.owners.length || new Set(observed.owners.map(row => row.key)).size !== query.owners.length
       || observed.owners.some(row => !query.owners.some(wanted => wanted.key === row.key))
       || observed.complete && query.source && (observed.bootId !== query.source.bootId || observed.namespace !== query.source.namespace || observed.cgroupNamespace !== query.source.cgroupNamespace)) throw Error('Original native process owner response changed its scope or namespace');
     return observed;
+    } finally { signal.removeEventListener('abort', observeDeadline); }
   } };
 }
