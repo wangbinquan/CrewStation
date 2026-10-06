@@ -262,6 +262,7 @@ export const messages = {
   "runtime.reason.retained-report-page-unverified": "The original report detail could not be fully verified. Read the report again.",
   "runtime.receivedValue": "Recorded · incomplete",
   "runtime.recordedCostSuffix": " (recorded)",
+  "runtime.partialPricingCoverage": "Incomplete estimate · {priced} fully priced, {partial} partially priced, {records} records total",
   "runtime.pricingCoverage": "{priced}/{records} records priced",
   "runtime.report.usageGap": "Token usage has gaps",
   "runtime.report.factsAvailable": "Received Token and valuation values remain visible; missing records are never counted as zero.",

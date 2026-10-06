@@ -17,7 +17,10 @@ import {completeRuntimeLedgerSources} from './adapters/persistence/completeRunti
 import {jsonHash} from '@crewstation/kernel';
 import {completeRuntimeReportRoutes} from './http/completeRuntimeReportRoutes';
 import {completeUsageWorkspace} from './adapters/persistence/completeUsageWorkspace';
+import { completeDevelopmentNativeScopeSource } from './adapters/persistence/completeDevelopmentNativeScopeSource';
 import {completeExternalSort} from './application/completeExternalSort';
+import {completeWorkingCache} from './application/completeWorkingCache';
+import type {CompleteNativeCacheFactory} from './ports/completeNativeScope';
 import type {CompleteUsageWorkspaceFactory} from './ports/completeUsageWorkspace';
 import { developmentUsageReconciliation } from './application/developmentUsage';
 import { valueDevelopmentUsagePage } from './application/developmentValuations';
@@ -167,8 +170,11 @@ function completeRuntimeReports(deps:ObservabilityModuleDeps) {
    const started=Date.now(),query={...report.request.filters,...(report.request.taskId?{taskId:report.request.taskId}:{}),...(report.request.projectId?{projectId:report.request.projectId}:{} )};
    return session.run(async(snapshot)=>{
     const identity=await originalRuntimeReportIdentity(snapshot.executor),facts=factory(snapshot.executor,query,snapshot.snapshotId),namespace='complete-report/'+report.id;
-    const build=await buildCompleteRuntimeCohort({query,facts,snapshotId:snapshot.snapshotId,asOf:snapshot.asOf,rows:snapshot.workspace,namespace,keyOf:jsonHash,system:report.request.projectId===null,usageWorkspace:completeStatisticsWorkspace,signal,
-      task:(task,privateNamespace)=>buildCompleteRuntimeTask({task,snapshotId:snapshot.snapshotId,asOf:snapshot.asOf,rows:snapshot.workspace,namespace:privateNamespace,keyOf:jsonHash,system:report.request.projectId===null,usageWorkspace:completeStatisticsWorkspace,signal,attempts:facts.attempts(task),ledger:completeRuntimeLedgerSources(snapshot.executor,task,snapshot.snapshotId)}),
+    const nativeCache:CompleteNativeCacheFactory=<T>(space:string)=>completeWorkingCache<T>(snapshot.workspace,space,signal);
+    const nativeSource=completeDevelopmentNativeScopeSource({db:snapshot.executor,rows:snapshot.workspace,namespace:namespace+'/original-native-source',keyOf:jsonHash,cache:nativeCache,signal});
+    const usageWorkspace:CompleteUsageWorkspaceFactory=(candidate)=>completeStatisticsWorkspace({...candidate,nativeSource,nativeCache});
+    const build=await buildCompleteRuntimeCohort({query,facts,snapshotId:snapshot.snapshotId,asOf:snapshot.asOf,rows:snapshot.workspace,namespace,keyOf:jsonHash,system:report.request.projectId===null,usageWorkspace,signal,
+      task:(task,privateNamespace)=>buildCompleteRuntimeTask({task,snapshotId:snapshot.snapshotId,asOf:snapshot.asOf,rows:snapshot.workspace,namespace:privateNamespace,keyOf:jsonHash,system:report.request.projectId===null,usageWorkspace,signal,attempts:facts.attempts(task),ledger:completeRuntimeLedgerSources(snapshot.executor,task,snapshot.snapshotId)}),
     });
     if(report.request.taskId&&build.summary.tasks!=='1')throw precondition('原任务不存在或原受理身份不唯一');
     const header={reportId:report.id,projectionVersion:2 as const,scope:report.request.projectId===null?'system' as const:'project' as const,projectId:report.request.projectId,filters:report.request.filters,asOf:snapshot.asOf,snapshotId:snapshot.snapshotId,generation:identity.generation,sourceRevision:identity.revision,...(report.request.taskId?{taskId:report.request.taskId}:{}),coverage:build.summary.metrics.state==='not-ready'?'complete-facts' as const:'complete' as const,buildMs:Date.now()-started};

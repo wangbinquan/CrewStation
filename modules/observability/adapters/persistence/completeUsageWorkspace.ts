@@ -5,6 +5,8 @@ import { completeOrdinalKey } from '../../domain/completeOrdinal'
 import { compareCompleteUsage } from '../../domain/completeUsageOrder'
 import { completeCoverageWorkspace } from './completeCoverageWorkspace'
 import { completeAncestryWorkspace } from './completeAncestryWorkspace'
+import { completeNativeScopeWorkspace } from './completeNativeScopeWorkspace'
+import type { CompleteNativeScopeSource, CompleteNativeCacheFactory } from '../../ports/completeNativeScope'
 import { completeUsagePrefetch } from './completeUsagePrefetch'
 import { completeCoverageRootReads } from '../../domain/complete-usage/coverageKeys'
 
@@ -49,12 +51,16 @@ interface UsageWorkspaceInput<T extends UsageContributionEvidence> {
   readonly identity: (record: T) => string
   readonly signal?: AbortSignal
   readonly order: CompleteUsageOrdering<T>
+  readonly nativeSource?: CompleteNativeScopeSource
+  readonly nativeCache?: CompleteNativeCacheFactory
 }
 
 export function completeUsageWorkspace<T extends UsageContributionEvidence>(input: UsageWorkspaceInput<T>) {
   const space = (suffix: string) => `${input.namespace}/${suffix}`
   const coverage = completeCoverageWorkspace(input.rows, space('coverage'), input.keyOf)
   const ancestry = completeAncestryWorkspace(input.rows, space('ancestry'), input.keyOf, input.signal)
+  if (input.nativeSource && !input.nativeCache) throw new Error('Paged native scope requires the original derived-row cache')
+  const native = input.nativeSource ? completeNativeScopeWorkspace({ rows: input.rows, namespace: space('native-ancestry'), keyOf: input.keyOf, source: input.nativeSource, cache: input.nativeCache!, legacyPath: ancestry.retained, signal: input.signal }) : undefined
   const pendingAllocations: CompleteWorkingRow[] = []
   let count = 0n,
     allocations = 0n,
@@ -71,6 +77,7 @@ export function completeUsageWorkspace<T extends UsageContributionEvidence>(inpu
     })
   const workspace: CompleteUsageWorkspace<T> = {
     coverage: coverage.coverage,
+    ...(native ? { native } : {}),
     records: () => completeUsagePrefetch(records(), ancestry.prefetch, input.signal),
     orderedRecords: async function* () {
       sort ??= input.order({

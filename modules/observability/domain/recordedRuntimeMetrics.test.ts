@@ -31,12 +31,16 @@ describe('received usage inside incomplete original scope',()=>{
   const metrics=completeRuntimeMetrics(fold);expect(metrics).toMatchObject({state:'not-ready',gaps:['coverage-incomplete'],recordedUsage:{records:'2',tokens:{...contribution,total:'95'},bucketRecords:{input:'1',cacheRead:'1',cacheWrite:'1',output:'1'}},costCoverage:{records:'2',pricedRecords:'1',visibility:'visible'},recordedCost:{currency:'CNY',amount:'0.25',records:'2',pricedRecords:'1'}});
  });
  test('stale and partial valuations stay in the record population, hiding never carries an amount, actual zero needs a priced record',()=>{
-  for(const value of [undefined,{...priced(),usageRevision:6},{...priced(),completeness:'partial' as const}]){
+  for(const value of [undefined,{...priced(),usageRevision:6}]){
    const fold=emptyCompleteRuntimeFold(true,'1');addCompleteRuntimeAllocation(fold,contribution,priced(),true,7);addCompleteRuntimeAllocation(fold,contribution,value,true,7);completeRuntimeGap(fold,'native-capture-incomplete');
    expect(completeRuntimeMetrics(fold)).toMatchObject({costCoverage:{records:'2',pricedRecords:'1',visibility:'visible'},recordedCost:{currency:'CNY',amount:'0.25',records:'2',pricedRecords:'1'}});
   }
   const hidden=emptyCompleteRuntimeFold(false,'1');addCompleteRuntimeAllocation(hidden,contribution,priced(),true,7);completeRuntimeGap(hidden,'usage-missing');expect(completeRuntimeMetrics(hidden)).toMatchObject({costCoverage:{records:'1',pricedRecords:'1',visibility:'hidden'}});expect(completeRuntimeMetrics(hidden)).not.toHaveProperty('recordedCost');
   const zero=emptyCompleteRuntimeFold(true,'1');addCompleteRuntimeAllocation(zero,contribution,{...priced(),amountDecimal:'0'},true,7);completeRuntimeGap(zero,'usage-missing');expect(completeRuntimeMetrics(zero)).toMatchObject({recordedCost:{amount:'0',pricedRecords:'1'}});
+ });
+ test('the original partial valuation amount is recorded once without becoming a full priced record or full total',()=>{
+  const fold=emptyCompleteRuntimeFold(true,'1');addCompleteRuntimeAllocation(fold,contribution,priced(),true,7);addCompleteRuntimeAllocation(fold,contribution,{...priced(),completeness:'partial'},true,7);completeRuntimeGap(fold,'native-capture-incomplete');
+  const metrics=completeRuntimeMetrics(fold);expect(metrics).toMatchObject({state:'not-ready',costCoverage:{records:'2',pricedRecords:'1',partiallyPricedRecords:'1',visibility:'visible'},recordedCost:{currency:'CNY',amount:'0.5',records:'2',pricedRecords:'1',partiallyPricedRecords:'1'}});expect(metrics).not.toHaveProperty('cost');expect(CompleteRuntimeMetricsSchema.parse(metrics)).toEqual(metrics);
  });
  test('received contracts reject count mismatches, invented null zeroes, wrong sums and hidden amounts',()=>{
   const fold=emptyCompleteRuntimeFold(true,'1');addCompleteRuntimeAllocation(fold,contribution,priced(),true,7);completeRuntimeGap(fold,'usage-missing');

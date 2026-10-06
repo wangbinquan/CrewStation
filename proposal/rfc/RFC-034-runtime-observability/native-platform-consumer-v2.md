@@ -58,3 +58,9 @@ CS完整本机门只对最终同一候选运行一次；中途纯domain/原PG定
 N1 原页 packet 准备已实现；N2 将原 pass/page/packet/session/step 引用与普通游标保留在同一个 ledger 事务。实际 SQLite WAL 的 1,201 条步骤、71 个会话与 70 层深度已完成原 EOF 核对；真实 PG 回滚、重放、缺片和 121 个待处理 pass 的续页验证通过。初次定向测试暴露的后页抢先问题已修复，失败证据保留。
 
 N3 当前完成持久父链接与流式 path digest，实际 PG 的缺父、环、父引用冲突以及 Unicode 标识均已有回归。此阶段尚未接入内部 paged UsageRecord scope、数值投影、live / 删除 drain 和完整报告，因此 producer 仍 OFF，开发数值仍不声明可用或完整。N3 后续 scope/workspace、N4 至 N6 按上节继续；不能用这次领域或 PG 测试替代真实开发任务、原规模、exact-SHA CI 与本机部署验收。
+
+## N3 scope 阶段接续（2026-10-07）
+
+接续上节的父链阶段，N3 内部 paged UsageRecord scope、完整 NativeSource／父链 workspace 与所有桶分配前的原 EOF 核验已实现，原业务 executionObservations V1／V2 严格旧合同保持。实际 1,201 步、71 会话、70 层，以及缺父／父晚到／环／旧新格式覆盖与 Unicode 回归已核验；详见 [N3 内部范围](native-paged-scope.md)。
+
+N3、部分 CNY、静默刷新同一固定候选的一次完整门为6,327 pass／0 fail、157原环境skip，38候选和11原控制首末稳定。旧失败、原人口／预算／迁移保持；新 exact-SHA CI 与部署另验。N4唯一数字投影／历史owner、N5 live与删除恢复、N6实际开发任务和原规模仍开放，producer OFF；本条不宣称原生数值生产消费者已完成。

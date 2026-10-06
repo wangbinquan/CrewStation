@@ -9,12 +9,14 @@ import {createTestDatabase} from '@crewstation/testkit';
 import {UserIdSchema,type Actor,type RuntimeTaskHeaderFact,type RuntimeCompleteReport,type ProjectId} from '@crewstation/contracts';
 import {createObservabilityModule,observabilityMigrations} from '../wiring';
 import {completeCohortFixture,completeCohortWindow,seedCompleteCohort} from './completeCohortFixture';
+import {preparePartialCnyCohort,partialCnyValuation} from './partial-cny/fixture';
 import {seedCompleteSibling} from './completeSiblingFixture';
-export async function completeFactsFixture(options:{completeSibling?:boolean;feePolicyCohort?:boolean}={}) {
+export async function completeFactsFixture(options:{completeSibling?:boolean;feePolicyCohort?:boolean;partialCnyCohort?:boolean}={}) {
  const tdb=await createTestDatabase([observabilityMigrations]),f=completeCohortFixture();
  // The fee-setting regression has its own complete three-Task population; the original 201/1001 EOF cohort is unchanged by default.
- if(options.feePolicyCohort){f.tasks.splice(3);f.attempts.splice(1);f.records.splice(1);f.captures.length=0;}
- await seedCompleteCohort(tdb,f,true);
+ if(options.partialCnyCohort)preparePartialCnyCohort(f);
+ else if(options.feePolicyCohort){f.tasks.splice(3);f.attempts.splice(1);f.records.splice(1);f.captures.length=0;}
+ await seedCompleteCohort(tdb,f,true,options.partialCnyCohort?partialCnyValuation:undefined);
  const sibling=options.completeSibling?await seedCompleteSibling(tdb,f):undefined;
  const root=mkdtempSync(join(tmpdir(),'cs-sealed-facts-')),actor:Actor={userId:UserIdSchema.parse(newResourceId()),isAdmin:true},controls={broken:false};
  const module=createObservabilityModule({db:tdb.db,reportSnapshot:originalReportSnapshotSession(tdb.handle),reportDataRoot:root,

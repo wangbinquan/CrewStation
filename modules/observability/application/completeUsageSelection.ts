@@ -8,12 +8,14 @@ import { modelPartition, modelAnyProvider, treeKey } from '../domain/complete-us
 const endOf = (record: UsageContributionEvidence, bucket: TokenBucket) =>
   record.coveredThrough?.[bucket] ?? record.measurement.coveredThroughTurn ?? record.measurement.scope!.turnIndex
 
-async function coverageRelation(store: CoverageIntervalStore, record: UsageContributionEvidence, bucket: TokenBucket) {
+async function coverageRelation<T extends UsageContributionEvidence>(workspace: CompleteUsageWorkspace<T>, record: T, bucket: TokenBucket) {
+  const store = workspace.coverage
   const scope = record.measurement.scope!,
     model = record.measurement.model,
     group = groupOf(record),
     end = endOf(record, bucket)
-  const sessions = [{ id: scope.session, treeOnly: false }, ...scope.ancestors.map((id) => ({ id, treeOnly: true }))]
+  const sessions = 'ancestors' in scope ? [{ id: scope.session, treeOnly: false }, ...scope.ancestors.map((id) => ({ id, treeOnly: true }))] : workspace.native?.sessions(record)
+  if (!sessions) throw new Error('Paged native scope requires the complete original workspace')
   const coverModels = ['null', ...(model === null ? [] : [modelPartition(model.id, model.provider)])]
   const overlapModels =
     model === null
@@ -25,7 +27,7 @@ async function coverageRelation(store: CoverageIntervalStore, record: UsageContr
         ]
   let covered = false,
     overlapping = false
-  for (const session of sessions) {
+  for await (const session of sessions) {
     for (const partition of coverModels) {
       const maximum = await coveragePrefixMaximum(store, treeKey(group, bucket, session.id, session.treeOnly, partition), Math.min(scope.turnIndex, end))
       if (maximum !== null && maximum >= Math.max(scope.turnIndex, end)) covered = true
@@ -49,10 +51,11 @@ async function rememberSummary(store: CoverageIntervalStore, record: UsageContri
         end: endOf(record, bucket),
       })
 }
-async function bucketSelection(store: CoverageIntervalStore, record: UsageContributionEvidence, bucket: TokenBucket) {
+async function bucketSelection<T extends UsageContributionEvidence>(workspace: CompleteUsageWorkspace<T>, record: T, bucket: TokenBucket) {
+  const store = workspace.coverage
   const scope = record.measurement.scope
   if (!scope) return { excluded: false, ambiguous: false, unavailable: false }
-  const relation = await coverageRelation(store, record, bucket)
+  const relation = await coverageRelation(workspace, record, bucket)
   if (relation.covered) return { excluded: true, ambiguous: false, unavailable: false }
   if (relation.overlapping) return { excluded: true, ambiguous: true, unavailable: false }
   const summary = scope.level !== 'request',
@@ -75,11 +78,17 @@ export async function selectCompleteUsage<T extends UsageContributionEvidence>(
     signal?.throwIfAborted()
     const scope = record.measurement.scope
     if (!scope) continue
+    if ('native' in scope) {
+      if (!workspace.native) throw new Error('Paged native scope requires the complete original workspace')
+      await workspace.native.bind(record)
+      continue
+    }
     const path = [...scope.ancestors, scope.session]
     if (new Set(path).size !== path.length) throw new Error('Cyclic observation session ancestry')
     if (path[0] !== scope.root || (scope.ancestors.at(-1) ?? null) !== scope.parentSession) throw new Error('Incomplete observation session ancestry')
     for (let i = 0; i < path.length; i++) await workspace.bindAncestry(groupOf(record), path[i]!, path.slice(0, i))
   }
+  await workspace.native?.qualifyMixed()
   const totals = { input: 0n, cacheRead: 0n, cacheWrite: 0n, output: 0n }
   const unknown = { input: 0n, cacheRead: 0n, cacheWrite: 0n, output: 0n }
   let selected = 0n,
@@ -103,7 +112,7 @@ export async function selectCompleteUsage<T extends UsageContributionEvidence>(
       unavailable = false
     for (const bucket of TOKEN_BUCKETS) {
       const value = record.contribution[bucket]
-      const decision = await bucketSelection(workspace.coverage, record, bucket)
+      const decision = await bucketSelection(workspace, record, bucket)
       ambiguous ||= decision.ambiguous
       unavailable ||= decision.unavailable
       if (decision.excluded) continue

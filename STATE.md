@@ -1,3 +1,9 @@
+## 2026-10-07 RFC-034 原生完整父链、部分CNY与静默刷新完整门
+
+本批同一固定候选的一次 `bun run check` 已正式 PASS：6327 pass／0 fail、157原环境skip，345197断言、1288文件，测试2396.71秒；38候选和11原控制首末稳定，专用非生产PG，无生产模型调用。N3原75／0与1201步骤／71会话／70层真实来源对账、CNY＋刷新原37／0及1977断言保持。旧N3完整门两项原预算超时与早期类型失败均保留；新完整门由真实CNY／刷新源内容变化产生，没有重跑同一个候选或放宽预算。
+
+原账本已知部分人民币、四桶与互斥估值人口继续显示；真实报告hook使用同scope已受理缓存，在后台building期间保持页面和滚动，事实撤回仍清空数字。内部分页scope不改旧业务V1／V2公开合同，也不将原页metadata当作数值。确切SHA六CI、提交上库、本机部署和正式页面分别接续；producer OFF，N4～N6与两个RFC未完成。详见[N3范围](proposal/rfc/RFC-034-runtime-observability/native-paged-scope.md)、[部分CNY](proposal/rfc/RFC-034-runtime-observability/known-partial-cny.md)、[静默刷新](proposal/rfc/RFC-034-runtime-observability/silent-report-refresh.md)。以下共享STATE与并行RFC037／RFC036输出全部逐字保留，不收编其在制源文件。
+
 ## 2026-10-06 RFC-037 管理员完整盘点 HTTP 闲置超时修订
 
 994e5d1b 已完成六CI和八组件部署。1224449c 并行部署包含本任务全部代码，当前八组件源码／OCI和六CI一致；默认Runner随之更新，原Runner镜像、原Probe generation11、原生删除配置／Secret及原项目资源保持。本任务没有回退他人部署。

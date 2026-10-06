@@ -23,8 +23,10 @@ export function* completeCoverageRootReads(records: readonly UsageContributionEv
             ...(model.provider === null ? [] : [modelPartition(model.id, null)]),
           ]
     for (const bucket of TOKEN_BUCKETS) {
-      for (let i = -1; i < scope.ancestors.length; i++) {
-        const session = i < 0 ? scope.session : scope.ancestors[i]!,
+      // Native parents are read in full by the qualified async source; this is only a self cache warm-up.
+      const ancestors = 'ancestors' in scope ? scope.ancestors : []
+      for (let i = -1; i < ancestors.length; i++) {
+        const session = i < 0 ? scope.session : ancestors[i]!,
           treeOnly = i >= 0
         for (const partition of cover) yield treeKey(group, bucket, session, treeOnly, partition)
         for (const partition of overlap) yield treeKey(group, bucket, session, treeOnly, partition)

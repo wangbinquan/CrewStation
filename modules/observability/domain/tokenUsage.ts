@@ -70,7 +70,8 @@ export function subtractTokenBaseline(current: TokenUsage, baseline: TokenUsage)
 
 
 class NativeCoverageConflict extends Error {}
-type ScopedUsage<T extends UsageRecord = UsageRecord> = T & { scope: NonNullable<T['scope']> };
+type LegacyUsageScope = Extract<NonNullable<UsageRecord['scope']>, { ancestors: unknown }>;
+type ScopedUsage<T extends UsageRecord = UsageRecord> = T & { scope: LegacyUsageScope };
 export interface SelectedRuntimeUsage<T extends UsageRecord = UsageRecord> { record: T; contribution: TokenUsage; whole: boolean }
 function coverageRelation(a: ScopedUsage, b: ScopedUsage, bucket: TokenBucket) {
   const x = a.scope, y = b.scope;
@@ -118,6 +119,7 @@ export function selectRuntimeUsage<T extends UsageRecord>(records: T[]): { selec
   const groups = new Map<string, ScopedUsage<T>[]>(), selected: SelectedRuntimeUsage<T>[] = [];
   let incomplete = false, conflicts = 0;
   for (const record of records) {
+    if (record.scope && 'native' in record.scope) throw new Error('Paged native scope requires the complete original workspace');
     if (!record.scope) { selected.push({ record, contribution: record.projection.contribution, whole: true }); continue; }
     const key = JSON.stringify([record.sourceId, record.identity, record.scope.root]);
     const group = groups.get(key) ?? []; group.push(record as ScopedUsage<T>); groups.set(key, group);

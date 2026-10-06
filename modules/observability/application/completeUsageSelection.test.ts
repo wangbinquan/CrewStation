@@ -181,13 +181,15 @@ describe('persistent exact coverage selection', () => {
         },
       },
     })
+    const originalScope = a.measurement.scope;
+    if (!originalScope || !('ancestors' in originalScope)) throw new Error('Original oracle requires its complete legacy path');
     const d = record('wildcard', {
       measurement: {
         ...a.measurement,
         recordId: 'wildcard',
         model: null,
         coveredThroughTurn: 3,
-        scope: { ...a.measurement.scope!, level: 'tree-total' },
+        scope: { ...originalScope, level: 'tree-total' },
       },
       contribution: { input: null, cacheRead: '8', cacheWrite: '9', output: '10' },
     })

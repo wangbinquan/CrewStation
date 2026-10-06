@@ -116,6 +116,7 @@ export function nativeRepairCandidate(owner: NativeCaptureDocument, source: Nati
       owner.proof.lineageKey !== source.proof.lineageKey || owner.proof.root !== source.proof.root ||
       usage.basis.kind !== 'invocation' || usage.reporting !== 'delta' || usage.inclusion !== 'self' || usage.scope?.level !== 'request') return;
   const scope = usage.scope;
+  if (!('ancestors' in scope)) return;
   if (scope.turn !== owner.proof.turn || scope.turnIndex !== owner.proof.turnIndex) return;
   for (const step of [before, after]) {
     if (nativeRecordId(step) !== usage.recordId || scope.root !== owner.proof.root || scope.session !== step.sessionId ||

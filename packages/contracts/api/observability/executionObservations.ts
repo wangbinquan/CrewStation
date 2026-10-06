@@ -11,16 +11,19 @@ export const ExecutionObservationIdentitySchema = z.strictObject({
   executionId: ResourceIdSchema, executionGeneration: revision,
 });
 const envelope = { identity: ExecutionObservationIdentitySchema, sourceId: key, recordId: key, revision, occurredAt: z.iso.datetime().nullable(), observedAt: z.iso.datetime() };
-/** Reuse every usage invariant for owner-specific internal identities. */
-export function executionUsageSchema<I extends z.ZodType>(identity: I) {
+export const ExecutionObservationScopeSchema = z.strictObject({ root: key, session: key, parentSession: key.nullable(), ancestors: z.array(key).max(64),
+  turn: key, turnIndex: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), level: z.enum(['request', 'self-total', 'tree-total']) });
+type UsageScopeFields = Omit<z.infer<typeof ExecutionObservationScopeSchema>, 'ancestors'>;
+/** Reuse numerical invariants; the default public scope keeps its original strict contract. */
+export function executionUsageSchema<I extends z.ZodType, S extends z.ZodType<UsageScopeFields> = typeof ExecutionObservationScopeSchema>(identity: I, selectedScope?: S) {
+  const scopeSchema = selectedScope ?? ExecutionObservationScopeSchema;
   return z.strictObject({
     ...envelope, identity, kind: z.literal('usage'), adapterVersion: key,
     modelRef: key.nullable(), reporting: z.enum(['delta', 'cumulative']),
     inclusion: z.enum(['self', 'includes-descendants', 'unknown']),
     coverage: z.enum(['partial', 'complete', 'unknown']),
     validity: z.enum(['valid', 'correction', 'invalid-final']),
-    scope: z.strictObject({ root: key, session: key, parentSession: key.nullable(), ancestors: z.array(key).max(64),
-      turn: key, turnIndex: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), level: z.enum(['request', 'self-total', 'tree-total']) }).nullable(),
+    scope: scopeSchema.nullable(),
     coveredThroughTurn: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).nullable(),
     usage: ExecutionObservationUsageSchema,
     /** CS's committed reconciliation result. Snapshot import replaces this state;
@@ -55,9 +58,11 @@ export function executionUsageSchema<I extends z.ZodType>(identity: I) {
     }
     const scope = value.scope;
     if (!scope) return;
-    const path = [...scope.ancestors, scope.session];
-    if (path[0] !== scope.root || new Set(path).size !== path.length || (scope.ancestors.at(-1) ?? null) !== scope.parentSession)
-      ctx.addIssue({ code: 'custom', path: ['scope', 'ancestors'], message: '祖先路径必须完整且无环' });
+    if ('ancestors' in scope) {
+      const ancestors = scope.ancestors as string[], path = [...ancestors, scope.session];
+      if (path[0] !== scope.root || new Set(path).size !== path.length || (ancestors.at(-1) ?? null) !== scope.parentSession)
+        ctx.addIssue({ code: 'custom', path: ['scope', 'ancestors'], message: '祖先路径必须完整且无环' });
+    }
     if (scope.level === 'tree-total' && value.coveredThroughTurn === null)
       ctx.addIssue({ code: 'custom', path: ['coveredThroughTurn'], message: '整树汇总必须给出原生轮次水位' });
     if (value.coveredThroughTurn !== null && value.coveredThroughTurn < scope.turnIndex)

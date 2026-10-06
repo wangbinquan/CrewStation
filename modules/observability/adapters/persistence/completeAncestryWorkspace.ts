@@ -28,13 +28,28 @@ export function completeAncestryWorkspace(rows: CompleteWorkingRows, namespace: 
     const actual = new Map(found.map((row) => [row.key, row.document]))
     for (const key of keys) if (!pending.has(key) && !cache.has(key)) remember(key, actual.get(key))
   }
+  async function retained(group: string, session: string) {
+    const key = keyOf(JSON.stringify([group, session]))
+    let previous = pending.get(key) ?? cache.get(key)
+    while (!pending.has(key) && !cache.has(key)) {
+      const before = writes
+      const found = await rows.get<string>(namespace, key)
+      previous = pending.get(key) ?? cache.get(key)
+      if (!pending.has(key) && !cache.has(key) && before !== writes) continue
+      if (!pending.has(key) && !cache.has(key)) previous = found
+      break
+    }
+    remember(key, previous)
+    return previous
+  }
   return {
     flush,
+    retained,
     async prefetch(records: readonly UsageContributionEvidence[]) {
       const keys = new Set<string>()
       for (const record of records) {
         const scope = record.measurement.scope
-        if (!scope) continue
+        if (!scope || !('ancestors' in scope)) continue
         const group = completeUsageGroup(record)
         for (const session of [...scope.ancestors, scope.session]) {
           const key = keyOf(JSON.stringify([group, session]))
@@ -51,15 +66,7 @@ export function completeAncestryWorkspace(rows: CompleteWorkingRows, namespace: 
     async bind(group: string, session: string, ancestors: readonly string[]) {
       const key = keyOf(JSON.stringify([group, session])),
         path = JSON.stringify(ancestors)
-      let previous = pending.get(key) ?? cache.get(key)
-      while (!pending.has(key) && !cache.has(key)) {
-        const before = writes
-        const retained = await rows.get<string>(namespace, key)
-        previous = pending.get(key) ?? cache.get(key)
-        if (!pending.has(key) && !cache.has(key) && before !== writes) continue
-        if (!pending.has(key) && !cache.has(key)) previous = retained
-        break
-      }
+      const previous = await retained(group, session)
       if (previous !== undefined && previous !== path) throw new Error('Conflicting observation session ancestry')
       writes++
       if (previous === undefined) pending.set(key, path)

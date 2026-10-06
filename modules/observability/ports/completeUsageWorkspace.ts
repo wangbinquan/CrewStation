@@ -2,9 +2,16 @@ import type { UsageContributionEvidence } from '../domain/completeUsageEvidence'
 import type { TokenUsage } from '../domain/tokenUsage'
 import type { CoverageIntervalStore } from '../domain/coverageIntervalIndex'
 import type { CompleteWorkingRows } from './completeWorkingRows'
+import type { CompleteNativeScopeSource, CompleteCoverageSession, CompleteNativeCacheFactory } from './completeNativeScope'
 
 export interface CompleteUsageWorkspace<T extends UsageContributionEvidence> {
   readonly coverage: CoverageIntervalStore
+  /** Qualify paged scopes before any bucket; all parents come from the original snapshot. */
+  readonly native?: {
+    bind(record: T): Promise<void>
+    qualifyMixed(): Promise<void>
+    sessions(record: T): AsyncIterable<CompleteCoverageSession>
+  }
   /** Replay the fully retained input to validate all ancestry before allocating any bucket. */
   records(): AsyncIterable<T>
   /** Original JS localeCompare ordering, externally merged; no SQL collation substitution. */
@@ -32,6 +39,8 @@ export interface CompleteUsageRetentionInput<T extends UsageContributionEvidence
   readonly keyOf:(value:string)=>string;
   readonly identity:(record:T)=>string;
   readonly signal?:AbortSignal;
+  readonly nativeSource?: CompleteNativeScopeSource;
+  readonly nativeCache?: CompleteNativeCacheFactory;
 }
 export type CompleteUsageWorkspaceFactory=<T extends UsageContributionEvidence>(input:CompleteUsageRetentionInput<T>)=>CompleteUsageRetention<T>;
 export type CompleteUsageOrdering<T>= (input:{ readonly workspace:CompleteWorkingRows;readonly namespace:string;readonly records:AsyncIterable<T>;readonly compare:(a:T,b:T)=>number;readonly signal?:AbortSignal })=>Promise<{records():AsyncIterable<T>}>;

@@ -1,13 +1,17 @@
 import {useRef} from 'react';
-import type {RuntimeCompleteReport} from '@crewstation/contracts';
+import {useQueryClient} from '@tanstack/react-query';
+import {runtimeCompleteReportContent,type RuntimeCompleteReport} from '@crewstation/contracts';
 import {api} from '../../../shared/api/client';
 import {useApiQuery} from '../../../shared/api/useApi';
-/** Poll a building report by identity; request a new complete source revision only after it settles. */
+/** Poll the actual pending report while keeping accepted content in place during a same-query refresh. */
 export function useRuntimeReport(key:readonly unknown[],request:()=>Promise<RuntimeCompleteReport>,projectId?:string,pinnedId?:string,enabled=true) {
-  const version='recorded-scope-metrics/3',identity=JSON.stringify([version,...key]),active=useRef<{key:string;report:RuntimeCompleteReport}|undefined>(undefined);
-  return useApiQuery<RuntimeCompleteReport>(['runtime-complete',version,...key,pinnedId],async()=>{
-    const previous=active.current?.key===identity?active.current.report:undefined;
+  const version='recorded-scope-metrics/3',queryKey=['runtime-complete',version,...key,pinnedId],identity=JSON.stringify(queryKey),client=useQueryClient(),active=useRef<{key:string;report:RuntimeCompleteReport|undefined}|undefined>(undefined);
+  return useApiQuery<RuntimeCompleteReport>(queryKey,async()=>{
+    const previous=active.current?.key===identity?active.current.report:undefined,pending={key:identity,report:previous};
+    active.current=pending;
     const result=pinnedId?await api.observability.runtimeReportStatus(projectId,pinnedId):previous?.state==='building'?await api.observability.runtimeReportStatus(projectId,previous.reportId):await request();
-    active.current={key:identity,report:result};return result;
-  },{enabled,refetchIntervalMs:data=>data?.state==='building'?1000:30000,refetchOnWindowFocus:true});
+    pending.report=result;
+    const accepted=client.getQueryData<RuntimeCompleteReport>(queryKey);
+    return result.state==='building'&&accepted&&runtimeCompleteReportContent(accepted)?accepted:result;
+  },{enabled,refetchIntervalMs:data=>active.current?.key===identity&&active.current.report?.state==='building'||data?.state==='building'?1000:30000,refetchOnWindowFocus:true});
 }

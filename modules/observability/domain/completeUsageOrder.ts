@@ -7,6 +7,12 @@ export const completeUsageGroup = (record: UsageContributionEvidence) =>
     record.measurement.invocationId,
     record.measurement.scope?.root ?? null,
   ])
+function compareDepth(x: NonNullable<UsageContributionEvidence['measurement']['scope']>, y: NonNullable<UsageContributionEvidence['measurement']['scope']>) {
+  if ('ancestors' in x && 'ancestors' in y) return x.ancestors.length - y.ancestors.length
+  const a = 'native' in x ? BigInt(x.native.depth) : BigInt(x.ancestors.length)
+  const b = 'native' in y ? BigInt(y.native.depth) : BigInt(y.ancestors.length)
+  return a < b ? -1 : a > b ? 1 : 0
+}
 /** Used by the external sort and checked again while consuming its final merge. */
 export function compareCompleteUsage(a: UsageContributionEvidence, b: UsageContributionEvidence) {
   const grouped = completeUsageGroup(a).localeCompare(completeUsageGroup(b))
@@ -20,7 +26,7 @@ export function compareCompleteUsage(a: UsageContributionEvidence, b: UsageContr
     )
   return (
     rank[x.level] - rank[y.level] ||
-    x.ancestors.length - y.ancestors.length ||
+    compareDepth(x, y) ||
     x.turnIndex - y.turnIndex ||
     a.measurement.recordId.localeCompare(b.measurement.recordId)
   )

@@ -114,7 +114,9 @@ describe.skipIf(!available)('RFC-034 internal development ledger compatibility',
     const f = fixture(), capture = numeric(step('unknown', '10'));
     capture.measurements[0]!.usage.output = null; capture.measurements[0]!.coverage = 'partial';
     const input = await f.page([capture]);
-    const invalid = structuredClone(input); invalid.events[0]!.measurement.scope!.ancestors = ['missing'];
+    const invalid = structuredClone(input), originalScope = invalid.events[0]!.measurement.scope;
+    if (!originalScope || !('ancestors' in originalScope)) throw new Error('Original development fixture requires its complete legacy path');
+    originalScope.ancestors = ['missing'];
     await expect(f.ingest(invalid)).rejects.toThrow();
     expect(await f.ledger.cursor(f.scope, input.sourceId)).toBeNull();
     await f.ingest(input);

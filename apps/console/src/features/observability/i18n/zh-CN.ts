@@ -262,6 +262,7 @@ export const messages = {
   "runtime.reason.retained-report-page-unverified": "原报告明细未能完整核对，请重新读取报告",
   "runtime.receivedValue": "已记录 · 不完整",
   "runtime.recordedCostSuffix": "（已记录）",
+  "runtime.partialPricingCoverage": "估值不完整 · 完整估值 {priced} 条，部分估值 {partial} 条，共 {records} 条",
   "runtime.pricingCoverage": "已定价 {priced}/{records} 条记录",
   "runtime.report.usageGap": "Token 用量存在缺口",
   "runtime.report.factsAvailable": "已收到的 Token 和估值分别显示；缺失记录不按零计入。",
