@@ -16,6 +16,14 @@
 
 桌面实测 1280×720，无横向溢出，相关卡片间距为 16 px，应用时间范围控件与输入底边对齐，返回按钮约 90×26 px。请求 390 px 的工具 viewport override 后实际视口仍为 1280 px，因此该次操作不能计作窄屏通过；已撤销 override 并关闭临时验收页签。英文、暗色、窄屏及完整键盘矩阵仍待实际复验。
 
+## 基本键盘导航补验
+
+第一次具体序列为对“任务明细”页签按 Enter、对顺序双 Agent 任务按 Enter、对“返回统计列表”按 Enter。之后核对实际镜像发现 console 已升级到后继 `c597d7e60323b49a1c94ee97c82ab6fab568e4f6`；Pod 的 source-sha 注解仍为 `a500a3e0`，不能用该注解判定实际代码。实际 console imageID 为 `sha256:eb358128677fccd8b9ac95b21952a7c8ce54c2c94e41ac4158f332b7460bb674`，节点镜像 OCI revision 为 c597d7e6；其继承的 Bun image.source 标签也不能当作 CS 仓库来源。52c8eb74 到 c597d7e6 的 console 观测文件未变化，但不据此声称全平台所有依赖或组件版本相同。
+
+已在该实际后继部署刷新原页面，再对真实顺序双 Agent 任务及“返回统计列表”分别按 Enter。使用原 dev-admin、原固定时间范围，详情仍显示原项目名称、16,148 Token 及 276 / 15,488 / 0 / 384 四桶；返回后仍选中任务明细，保留原 from/to，当前页 8 条、总计 8 条。只做页面导航，没有创建业务执行或修改费用政策。
+
+第一次原始回执 `/private/tmp/observability-cs-52c8eb74-keyboard-acceptance-20261006-v1.json` 与截图保留，其中 sourceCommit 的 52c8eb74 标注不准确。后继刷新复验及修正版本证据为 `/private/tmp/observability-cs-current-keyboard-acceptance-20261006-v2.json`、`/private/tmp/observability-cs-current-keyboard-detail-20261006-v2.png`；镜像证明位于 `/private/tmp/observability-cs-keyboard-doc-update-20261006-v1/{live-console,current-console-oci}.json`。这些证据只补充基本 Enter 导航，不代表完整键盘矩阵、焦点恢复、对话框 Escape、英文、暗色或窄屏已经验收；这些项继续保留。
+
 ## 证据与剩余边界
 
 本机原截图位于 `/private/tmp/observability-cs-52c8eb74-{overview,trend,lanes,lanes-detail,project-compute,project}-formal-20261006-v1.png`；原项目页面文本和 viewport 回执同时保留。截图是本次具体版本与时间范围的证据，不声明后继版本已重新验收。
