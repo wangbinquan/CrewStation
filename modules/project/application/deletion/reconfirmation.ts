@@ -31,12 +31,13 @@ export function deletionReconfirmationUseCases(deps: ProjectUseCaseDeps) {
       }
       const current = await loadDeletion(scope, id, true); assertReconfirmable(current);
       const previous = await scope.deletions.getPlan(current.planId), stored = await scope.deletions.getPlan(input.planId), now = deps.clock.now();
-      if (!previous || !stored || stored.plan.operationId !== id || stored.plan.supersedes !== current.operation.confirmationDigest) throw conflict('计划不属于原操作的当前确认');
-      if (new Date(stored.plan.expiresAt) <= now) throw conflict('重新确认计划已过期，请重新盘点');
+      const rejected = { code: 'project_deletion_confirmation_rejected', planId: input.planId, requestKey: input.requestKey };
+      if (!previous || !stored || stored.plan.operationId !== id || stored.plan.supersedes !== current.operation.confirmationDigest) throw conflict('计划不属于原操作的当前确认', rejected);
+      if (new Date(stored.plan.expiresAt) <= now) throw conflict('重新确认计划已过期，请重新盘点', rejected);
       await scope.deletions.lockProject(current.operation.project.id);
       const target = await deletionScope(deps, current.operation.project.id, scope), fresh = reconfirmationInventory(target, previous.plan, current, reports);
-      if (!stored.plan.complete || !fresh.complete) throw precondition('新盘点尚有阻塞，不能接受新清理范围', { blockers: fresh.blockers });
-      if (stored.plan.digest !== fresh.digest) throw conflict('重新确认材料又发生变化，请重新盘点');
+      if (!stored.plan.complete || !fresh.complete) throw precondition('新盘点尚有阻塞，不能接受新清理范围', { ...rejected, blockers: fresh.blockers });
+      if (stored.plan.digest !== fresh.digest) throw conflict('重新确认材料又发生变化，请重新盘点', rejected);
       const confirmations = current.operation.confirmations ?? [{ planId: current.planId, requestKey: current.requestKey, digest: current.operation.confirmationDigest,
         confirmedBy: current.requestedBy, confirmedAt: current.operation.createdAt }];
       const operation = { ...current.operation, state: 'accepted' as const, confirmationDigest: stored.plan.digest, blockers: [], canRetry: true, updatedAt: now.toISOString(),

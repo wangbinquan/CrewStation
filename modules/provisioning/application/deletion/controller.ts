@@ -20,7 +20,7 @@ export function projectDeletionController(deps: DeletionControllerDeps): Project
     prepare: async (actor, id) => { await admin(actor); return deps.intents.prepare(actor, id, await collectDeletionInventory(deps.intents, deps.owners, id)); },
     accept: async (actor, id, input) => {
       await admin(actor); const previous = await deps.intents.replay(actor, id, input); if (previous) return previous;
-      const operation = await deps.intents.accept(actor, id, input, await collectDeletionInventory(deps.intents, deps.owners, id));
+      const operation = await deps.intents.accept(actor, id, input);
       await bestEffortQueue(operation.id); return operation;
     },
     read: async (actor, id) => { await admin(actor); return deps.intents.read(actor, id); },

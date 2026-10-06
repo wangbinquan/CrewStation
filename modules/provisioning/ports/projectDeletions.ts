@@ -10,7 +10,7 @@ export interface DeletionLease { readonly operationId: string; readonly owner: s
 export interface ProjectDeletionIntents {
   scope(id: ProjectId): Promise<ProjectDeletionTarget>;
   prepare(actor: Actor, id: ProjectId, inventory: readonly ProjectDeletionInventory[]): Promise<ProjectDeletionPlan>;
-  accept(actor: Actor, id: ProjectId, input: AcceptProjectDeletion, inventory: readonly ProjectDeletionInventory[]): Promise<ProjectDeletionOperation>;
+  accept(actor: Actor, id: ProjectId, input: AcceptProjectDeletion, inventory?: readonly ProjectDeletionInventory[]): Promise<ProjectDeletionOperation>;
   replay(actor: Actor, id: ProjectId, input: AcceptProjectDeletion): Promise<ProjectDeletionOperation | undefined>;
   read(actor: Actor, id: string): Promise<ProjectDeletionOperation>;
   find(actor: Actor, id: ProjectId): Promise<ProjectDeletionOperation | undefined>;

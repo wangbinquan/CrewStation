@@ -199,3 +199,13 @@ PostgreSQL 当前基线覆盖全部注册旧名字与当前 OID/服务器/data-d
 候选新增 `execution_subtasks`／`execution_session_homes`，每个完整主键、原正文摘要仍单独确认。对执行／会话／卷标识做关联闭包，读尽25张原登记内容表的匹配记录；每个原父根、公开 task/service 来源、完整关联摘要及实际完整 Pod 来源一起绑定。原生执行必须已结束且 runtime_released、无owner／lease；home必须idle且无执行租约，并有完整业务执行关联。关联含未知、冲突、其他父任务、目标、共享或活跃引用继续阻断。读取错误不得解释为不存在。一个批次内共用同一关联及公开来源快照，保存前后的重读各自重新建立，不能将缓存跨请求作为证明。
 
 业务正式 metadata purge 也须传入原 `context.target` 重读已保存决定；先前只传项目ID会在最终阶段重新碰到未知外项目历史。修复保持清理范围和原七阶段，不能改变目标主键／正文数量比对、原消费者停止或物理UID/OID条件。真实PG用例须覆盖两类逐项保留、原正文不变、跨重启／幂等、全部七阶段清理、来源／正文／关联变化失效、目标／活跃／未结束／共享／畸形／读取失败拒绝，以及601条前页后的实际cursor。部署后从管理员界面逐项核对六条新候选，原目标实际删除及所有独立AFTER通过前不关闭T6。
+
+## I36-T13：原子受理与原实例身份（2026-10-07）
+
+首次确认由 project 锁定请求键及项目，验证持久计划的完整22方、期限、规范摘要和当前项目身份，再原子写 operation、deleting 和 outbox。provisioning 不在关闭项目准入前再次读尽全部来源；实际 owner 的 seal 仍完整重读并严格匹配确认范围，全部22个 seal 回执齐全之前没有 stop/purge。内部直接调用若提供实时 inventory 仍执行原严格比较。封存差异只进入原操作 needs-attention，重新确认沿用其身份与已完成回执。
+
+release 原生工作区的 full identity 继续绑定完整消费者/回调选择、原缓存、文件和实际来源，持久物理范围与证明不可替换。公开对象 sourceIdentity 绑定原 source epoch 与该对象的 kind/id/identity；coverage sourceIdentity 绑定原 epoch/version/覆盖种类。后台追加已结束回调只改变完整盘点修订；真实 Pod UID、配置、卷、原探针/容器出生、BuildKit 选择或计数变化仍阻断。Registry 原 byte graph、实例和文件身份校验保持。
+
+只有事务写入前的确定拒绝返回 details.code=project_deletion_confirmation_rejected，并绑定原 planId/requestKey。console 仅在该明确409/412及请求绑定吻合后重新读取原操作：发现操作继续显示原回执；读取为空或原重新确认仍阻塞、且持久键与本请求一致时才清除本键并展示 plan-invalid。其他错误、读取失败、换操作或另一窗口键保持未知结果，不自动发新请求。既有统一两层确认、取消/Esc及列表上下文保持。
+
+回归包括真实PG无二次前置扫描/原子deleting/同键重放、封存前身份变化零清理、过期与不完整拒绝标记；原生回调新增与真实对象/缓存出生边界；console确定拒绝恢复、未知错误和跨窗口键保留。实际原项目仍需154个回执及全部独立AFTER，不能以替身通过关闭RFC。

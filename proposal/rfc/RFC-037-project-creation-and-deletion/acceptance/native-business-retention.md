@@ -33,3 +33,12 @@
 独立源码复核另补充关联运行环境的公开原归属：即使外项目记录未含目标UUID，只要关联runtime的公开owner指向目标／冲突项目仍拒绝，且所有已知runtime原来源摘要进入确认。新增真实PG隐藏目标引用回归后，最终冻结相关15文件46项／0失败、427断言，51.92秒；4个生产文件126条新增可执行行、125条覆盖（99.21%），0防护违规。新增边界后自有lint与全局typecheck通过，功能摘要保持。最终原件为 `cs-rfc037-i36-business-native-repair-targeted-v2.json`、`cs-rfc037-i36-business-native-repair-patch-v2.json`。前一45项结果只适用于先前候选，不作为最终候选全部通过的替代。
 
 最终冻结候选实际强制只读复核于19:16:08Z通过，六条原摘要保持、完整30条关联及全部已知runtime公开原归属一致，允许逐项retain且0阻断；候选统一关联摘要f18e070b6f30fb61371da5e0bd741cd84edeb4d8c24ebff8a62660cf6a97f793。`cs-rfc037-i36-native-business-live-candidate-v3.jsonl`。原77份确认及0删除操作保持。另以实际运行镜像owner工厂只读重核19:13:00Z完整6条资源、0阻断（`cs-rfc037-i36-runtime-environment-last-plan-diagnostic-v1.jsonl`）；先前计划该owner失败的具体原因尚未复现，不据此改写旧计划或宣称稳定性问题解决。
+
+
+## 精确发布、部署及删除前独立核验（2026-10-07）
+
+本批10个自有路径精确提交并推送 `f277e6695303bc8a4fa3486a7bb2e0ee9cbe8f02`，索引为空、远端0／0，当前54个并行在制路径未纳入。确切[CI 37517882826](https://github.com/wangbinquan/CrewStation/actions/runs/37517882826)六作业全部终态success。本机control与console镜像独立构建后部署，八组件Ready／实际Pod imageID与节点OCI源码标签均核对；256项原迁移无DDL变化，原native配置、存储和4e26探针身份保持，默认TaskRunner仍是原共享f75fd473。原件：`cs-rfc037-i36-business-native-repair-publication-v1.json`、`cs-rfc037-f277e6695303-i36-business-native-repair-exact-ci-v1.json`、`cs-rfc037-f277e6695303-i36-business-native-repair-v1-deployment-receipt.json`。
+
+删除前另以独立静态25表SQL、完整原正文SHA、原父create-task操作、公开task／service／全部已知runtime端口和集群完整Pod／PVC／PV清单核对通过：30条关联、原六行摘要保持，无匹配Pod；外项目原PVC与PV各1个。完整原父任务的9条native执行另全部留作对照。原件 `cs-rfc037-i36-native-business-independent-before-v1.json`；从早期原始BEFORE接续，均未覆盖。actual00的release和runtime-environment来源连续两轮分别15／6资源、0阻断；`cs-rfc037-i36-native-owner-sequential-diagnostic-v2.jsonl`，先前来源失败未复现，不把独立检查代替当前全22方计划。
+
+19:54Z从管理员长列表末行打开同一原目标，f277版本完整盘点在途。剩余六项界面确认、两层确认实际删除及全部独立AFTER尚未通过，RFC继续实施中。

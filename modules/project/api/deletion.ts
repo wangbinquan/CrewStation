@@ -12,7 +12,8 @@ export interface ProjectDeletionApi {
   projectDeletionParticipantContext(context: ProjectDeletionContext, participant: ProjectDeletionParticipant): Promise<ProjectDeletionContext>;
   deletionScope(projectId: ProjectId): Promise<ProjectDeletionTarget>;
   prepareDeletionPlan(actor: Actor, projectId: ProjectId, inventory: readonly ProjectDeletionInventory[]): Promise<ProjectDeletionPlan>;
-  acceptProjectDeletion(actor: Actor, projectId: ProjectId, input: AcceptProjectDeletion, inventory: readonly ProjectDeletionInventory[]): Promise<ProjectDeletionOperation>;
+  /** Atomically closes admission for the stored complete plan; physical owners revalidate every scope in seal before any cleanup. */
+  acceptProjectDeletion(actor: Actor, projectId: ProjectId, input: AcceptProjectDeletion, inventory?: readonly ProjectDeletionInventory[]): Promise<ProjectDeletionOperation>;
   replayProjectDeletion(actor: Actor, projectId: ProjectId, input: AcceptProjectDeletion): Promise<ProjectDeletionOperation | undefined>;
   readProjectDeletion(actor: Actor, operationId: string): Promise<ProjectDeletionOperation>;
   findProjectDeletion(actor: Actor, projectId: ProjectId): Promise<ProjectDeletionOperation | undefined>;

@@ -10,6 +10,46 @@ const available = await testDatabaseAvailable(); let f: DeletionFixture;
 beforeAll(async () => { if (available) f = await deletionFixture(); });
 afterAll(async () => { await f?.database.drop(); });
 describe.skipIf(!available)('删除编排（真实 PG＋有状态外部替身）', () => {
+  test('完整确认先原子关闭项目准入，来源故障不触发第二轮前置盘点，同键返回原受理', async () => {
+    const value = await f.create(), plan = await f.controller.prepare(f.admin, value.id), input = f.input(plan);
+    f.external.unavailable.add('release');
+    try {
+      // Real production confirmation previously spent six minutes rescanning a growing callback history before closing admission.
+      const operation = await f.controller.accept(f.admin, value.id, input);
+      expect(operation).toMatchObject({ state: 'accepted', phase: 'seal', receipts: [] });
+      expect((await f.api.getProject(f.admin, value.id)).state).toBe('deleting');
+      await expect(f.api.assertProjectAvailable(value.id)).rejects.toMatchObject({ kind: 'precondition' });
+      expect(f.external.calls.filter(row => row.projectId === value.id)).toHaveLength(0);
+      expect(f.queued).toContain(operation.id);
+      expect(await f.controller.accept(f.admin, value.id, input)).toEqual(operation);
+    } finally { f.external.unavailable.delete('release'); }
+  });
+  test('确认前替换的物理身份仍在seal阻断，全部seal之前目标和外项目均没有stop或purge', async () => {
+    const foreign = await f.create(), value = await f.create(), plan = await f.controller.prepare(f.admin, value.id);
+    f.external.state('resources', value.id).uid = 'replacement-before-accept';
+    const operation = await f.controller.accept(f.admin, value.id, f.input(plan));
+    await f.controller.advance(operation.id);
+    expect(await f.controller.read(f.admin, operation.id)).toMatchObject({ state: 'needs-attention', phase: 'seal' });
+    expect(f.external.calls.filter(row => row.projectId === value.id).every(row => row.phase === 'seal')).toBe(true);
+    for (const id of [value.id, foreign.id]) expect(f.external.state('resources', id)).toMatchObject({ exists: true, storage: true, running: true, metadata: true });
+  });
+  test('过期或不完整确认在事务写入前明确拒绝并绑定原计划和请求，根保留原状态且没有operation', async () => {
+    const value = await f.create(), plan = await f.controller.prepare(f.admin, value.id), input = f.input(plan);
+    f.elapse(600_001);
+    await expect(f.controller.accept(f.admin, value.id, input)).rejects.toMatchObject({ kind: 'conflict', details: {
+      code: 'project_deletion_confirmation_rejected', planId: input.planId, requestKey: input.requestKey,
+    } });
+    expect(await f.controller.find(f.admin, value.id)).toBeUndefined();
+    expect((await f.api.getProject(f.admin, value.id)).state).toBe(value.state);
+    f.external.unavailable.add('data');
+    try {
+      const blocked = await f.controller.prepare(f.admin, value.id), request = f.input(blocked);
+      await expect(f.controller.accept(f.admin, value.id, request)).rejects.toMatchObject({ kind: 'precondition', details: {
+        code: 'project_deletion_confirmation_rejected', planId: request.planId, requestKey: request.requestKey,
+      } });
+      expect(await f.controller.find(f.admin, value.id)).toBeUndefined();
+    } finally { f.external.unavailable.delete('data'); }
+  });
   test('缺少或重复 owner 拒绝构造；未登记来源不能开放部分删除', () => {
     for (const owners of [f.external.owners.slice(1), [...f.external.owners, f.external.owners[0]!]]) {
       expect(() => projectDeletionController({ intents: f.intents, owners, workerOwner: 'test', isAdmin: async () => true, enqueue: async () => {}, logger: noopLogger })).toThrow();

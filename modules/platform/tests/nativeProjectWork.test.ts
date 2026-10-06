@@ -34,6 +34,25 @@ test('empty runtime work still uses a complete original host; replaced, unknown 
 }));
 const available = await testDatabaseAvailable();
 describe.skipIf(!available)('native release work with real PostgreSQL writer exclusion', () => {
+  test('finished callback selectors change the full snapshot while original object births stay fixed; same-UID credential changes still change birth binding', async () => {
+    const db = await createTestDatabase();
+    try { await withNativeWork(async f => {
+      await f.installWork('release'); const source = nativeReleaseProjectWork(f.buildOptions);
+      const content = { consumers: [{ id: f.consumerId, aliases: [] }], callbacks: [] };
+      const before = await source.capture(f.target, content);
+      const after = await source.capture(f.target, { ...content, consumers: [...content.consumers, { id: 'finished-callback', aliases: [] }] });
+      // Public native source identity previously included every finished callback selector and made safe reconfirmation impossible.
+      expect(after.native.identity).not.toBe(before.native.identity);
+      expect(after.native.epoch).toBe(before.native.epoch);
+      expect(after.native.objects).toEqual(before.native.objects);
+      await f.k8s.mergePatch(Resources.Secret!, 'credential', 'project', { data: { token: 'private-changed' } });
+      const changed = await source.capture(f.target, content);
+      expect(changed.native.epoch).toBe(before.native.epoch);
+      const original = before.native.objects.find(row => row.kind === 'credential')!;
+      expect(changed.native.objects.find(row => row.id === original.id)?.sourceIdentity).not.toBe(original.sourceIdentity);
+      await expect(source.inspect(before.native)).rejects.toThrow('替换');
+    }, db.db); } finally { await db.drop(); }
+  }, 30_000);
   test('native exact history deletion and exact cache prune leave independent native files, original leases and inode users at zero', async () => {
     const db = await createTestDatabase();
     try { await withNativeWork(async f => {

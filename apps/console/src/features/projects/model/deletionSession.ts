@@ -1,4 +1,5 @@
 import type { ProjectDeletionsResource } from '@crewstation/api-client';
+import { isApiClientError } from '@crewstation/api-client';
 import { AcceptProjectDeletionSchema, ProjectDeletionDigestSchema, ProjectDeletionOperationSchema, ProjectDeletionPlanSchema, ProjectIdSchema, ResourceIdSchema } from '@crewstation/contracts';
 import type { AcceptProjectDeletion, ProjectDeletionOperation, ProjectDeletionPlan } from '@crewstation/contracts';
 import { deletionPlanReady } from './deletionReview';
@@ -111,7 +112,7 @@ export class ProjectDeletionSession {
     } catch { this.update({ error: 'cannot-retain-request' }); return; }
     this.pending = request; this.update({ pending: true, loading: true, plan: undefined, error: undefined });
     try { await this.sendRetained(); }
-    catch { this.update({ error: 'request-unknown' }); }
+    catch (error) { await this.rejectedOrUnknown(error); }
     finally { this.update({ loading: false }); }
   }
   private async sendRetained(): Promise<void> {
@@ -120,11 +121,27 @@ export class ProjectDeletionSession {
     if (!this.receiptMatches(request, operation)) throw new Error('Confirmation receipt not observed');
     this.accepted(operation);
   }
+  private async rejectedOrUnknown(error: unknown): Promise<void> {
+    const request = this.pending;
+    try {
+      if (!request || !isApiClientError(error) || !(error.status === 409 && error.kind === 'conflict' || error.status === 412 && error.kind === 'precondition')
+        || error.details.code !== 'project_deletion_confirmation_rejected' || error.details.planId !== request.input.planId || error.details.requestKey !== request.input.requestKey) throw error;
+      const operation = await this.read();
+      if (!this.pending) return;
+      if (operation && (operation.id !== request.operationId || operation.state !== 'needs-attention' || operation.phase !== 'seal')) throw error;
+      const stored = this.store.read(this.projectId);
+      if (!stored || typeof stored !== 'object' || !('projectId' in stored) || stored.projectId !== this.projectId || !('input' in stored) || !('digest' in stored)
+        || stored.digest !== request.digest || AcceptProjectDeletionSchema.safeParse(stored.input).data?.requestKey !== request.input.requestKey
+        || AcceptProjectDeletionSchema.safeParse(stored.input).data?.planId !== request.input.planId) throw error;
+      this.store.write(this.projectId, undefined); this.pending = undefined;
+      this.update({ pending: false, plan: undefined, error: 'plan-invalid' });
+    } catch { this.update({ error: 'request-unknown' }); }
+  }
   async recover(): Promise<void> {
     if (this.state.loading || !this.pending) return;
     this.update({ loading: true, error: undefined });
     try { await this.read(); if (this.pending) await this.sendRetained(); }
-    catch { this.update({ error: 'request-unknown' }); }
+    catch (error) { await this.rejectedOrUnknown(error); }
     finally { this.update({ loading: false }); }
   }
   async retry(): Promise<void> {

@@ -27,7 +27,8 @@ function physicalResources(scope: ReleasePhysicalScope | null): ProjectDeletionI
   if (!scope) return [];
   return [...scope.objects.map((entry) => ({ kind: 'release-native:' + entry.kind, id: entry.id, identity: entry.identity,
     sourceIdentity: entry.sourceIdentity, scope: 'physical' as const, count: entry.count })),
-    ...scope.coverage.map((entry) => ({ kind: 'release-coverage:' + entry.kind, id: scope.projectId, identity: entry.identity, sourceIdentity: jsonHash(scope.source), scope: 'physical' as const, count: 0 }))]
+    ...scope.coverage.map((entry) => ({ kind: 'release-coverage:' + entry.kind, id: scope.projectId, identity: entry.identity,
+      sourceIdentity: jsonHash({ epoch: scope.source.epoch, version: scope.source.version, kind: entry.kind }), scope: 'physical' as const, count: 0 }))]
     .sort((a, b) => (a.kind + ':' + a.id).localeCompare(b.kind + ':' + b.id));
 }
 const done = (kind: 'physical' | 'metadata' | 'not-applicable', digest: string, count: number): ProjectDeletionStepResult => ({ kind: 'done', evidence: { kind, digest, count,

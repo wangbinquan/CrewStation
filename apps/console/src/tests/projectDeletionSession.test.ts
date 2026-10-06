@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
 import type { ProjectDeletionsResource } from '@crewstation/api-client';
+import { ApiClientError } from '@crewstation/api-client';
 import { AcceptProjectDeletionSchema, ProjectDeletionOperationSchema, ProjectIdSchema } from '@crewstation/contracts';
 import type { AcceptProjectDeletion, ProjectDeletionOperation, ProjectDeletionPlan } from '@crewstation/contracts';
 import { ProjectDeletionSession } from '../features/projects/model/deletionSession';
@@ -24,6 +25,66 @@ function fixture() {
   return { api, calls, sent, retained, plan, operation, store, session, elapse: (ms: number) => { now += ms; }, now: () => now,
     found: (value?: ProjectDeletionOperation) => { found = value; } };
 }
+
+test('确定的原确认拒绝经再次查询查无操作才解除本键，重新盘点仍需另一次显式确认', async () => {
+  for (const status of [409, 412]) {
+    const f = fixture(), session = f.session(); await session.open();
+    f.api.accept = async (_id, input) => { f.sent.push(input); throw new ApiClientError(status, { error: status === 409 ? 'conflict' : 'precondition', message: 'confirmation rejected',
+      details: { code: 'project_deletion_confirmation_rejected', planId: input.planId, requestKey: input.requestKey } }); };
+    await session.confirm(f.plan);
+    // Expired original production requests were permanently stuck in unknown even after the server definitively rejected admission.
+    expect(session.getSnapshot()).toMatchObject({ pending: false, error: 'plan-invalid', plan: undefined });
+    expect(f.retained.size).toBe(0); expect(f.sent).toHaveLength(1);
+    await session.review(); expect(session.getSnapshot().plan).toEqual(f.plan); expect(f.sent).toHaveLength(1);
+  }
+});
+
+test('确定拒绝的重开恢复只重放原键；查到原操作则展示它并保留其他窗口的键', async () => {
+  const f = fixture(), first = f.session(); await first.open();
+  f.api.accept = async (_id, input) => { f.sent.push(input); throw new Error('original transport lost'); };
+  await first.confirm(f.plan); const retained = structuredClone(f.retained.get(deletionProjectId))!;
+  const reopened = f.session(); await reopened.open();
+  f.api.accept = async (_id, input) => { f.sent.push(input); throw new ApiClientError(409, { error: 'conflict', message: 'expired',
+    details: { code: 'project_deletion_confirmation_rejected', planId: input.planId, requestKey: input.requestKey } }); };
+  await reopened.recover(); expect(f.sent).toEqual([retained.input, retained.input]);
+  expect(reopened.getSnapshot()).toMatchObject({ pending: false, error: 'plan-invalid' });
+  const second = f.session(); await second.open();
+  f.api.accept = async (_id, input) => { f.sent.push(input); f.found(f.operation); throw new ApiClientError(409, { error: 'conflict', message: 'rejected',
+    details: { code: 'project_deletion_confirmation_rejected', planId: input.planId, requestKey: input.requestKey } }); };
+  await second.confirm(f.plan); expect(second.getSnapshot().operation).toEqual(f.operation);
+});
+
+test('未绑定拒绝、未知服务错误、核对读取失败或其他窗口的持久键均保留原请求', async () => {
+  for (const reason of ['no-code', 'wrong-key', 'server-error', 'reader-error', 'new-window'] as const) {
+    const f = fixture(), session = f.session(); await session.open();
+    f.api.accept = async (_id, input) => {
+      f.sent.push(input);
+      if (reason === 'reader-error') f.api.find = async () => { throw new Error('authoritative lookup unavailable'); };
+      if (reason === 'new-window') f.retained.set(deletionProjectId, { projectId: deletionProjectId, digest: 'd'.repeat(64), input: { ...input, requestKey: f.operation.id } });
+      throw new ApiClientError(reason === 'server-error' ? 503 : 409, { error: reason === 'server-error' ? 'unavailable' : 'conflict', message: 'rejected', details: {
+        ...(reason === 'no-code' ? {} : { code: 'project_deletion_confirmation_rejected' }), planId: input.planId,
+        requestKey: reason === 'wrong-key' ? f.operation.id : input.requestKey,
+      } });
+    };
+    await session.confirm(f.plan);
+    expect(session.getSnapshot()).toMatchObject({ pending: true, error: 'request-unknown' });
+    expect(f.retained.size).toBe(1); await session.review(); expect(f.sent).toHaveLength(1);
+  }
+});
+
+test('原操作的重新确认明确被拒绝时保留原operation和回执；运行中的未匹配确认继续核对原键', async () => {
+  for (const state of ['needs-attention', 'running'] as const) {
+    const f = fixture(); f.found({ ...deletionOperation('needs-attention'), phase: 'seal' });
+    const session = f.session(); await session.open(); await session.review(); const plan = session.getSnapshot().plan!;
+    f.api.reconfirm = async (_id, input) => { f.sent.push(input); f.found({ ...deletionOperation(state), phase: 'seal' }); throw new ApiClientError(412, { error: 'precondition', message: 'original reconfirmation rejected',
+      details: { code: 'project_deletion_confirmation_rejected', planId: input.planId, requestKey: input.requestKey } }); };
+    await session.confirm(plan);
+    expect(session.getSnapshot().operation?.id).toBe(f.operation.id);
+    expect(session.getSnapshot().operation?.confirmationDigest).toBe(f.operation.confirmationDigest);
+    expect(session.getSnapshot()).toMatchObject({ pending: state === 'running', error: state === 'running' ? 'request-unknown' : 'plan-invalid' });
+    expect(f.retained.size).toBe(state === 'running' ? 1 : 0);
+  }
+});
 
 test('打开先查询原操作；已有操作不创建新计划，轮询只读且同一次读取不会重入', async () => {
   const f = fixture(), session = f.session(); await session.open(); expect(f.calls).toEqual(['find', 'prepare']);

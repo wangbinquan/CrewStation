@@ -30,9 +30,22 @@ async function setup() {
   const owner = releaseProjectDeletionOwner({ repository, physics, assertGrant });
   const admissions = releaseProjectAdmissions({ db: tdb.db, assertAvailable: async () => {}, protectCurrent: async () => ({ podUid: '91754092-388a-4131-a452-f9d4b75f0766', nodeUid: '8acdd9b0-3dd8-4a8a-afdf-a1d90a17cf1a', nodeName: 'original-node', containerId: 'containerd://' + 'a'.repeat(64), pid: process.pid, pidNamespace: '1000', bootId: '8acdd9b0-3dd8-4a8a-afdf-a1d90a17cf1a', startTicks: '123' }) });
   await admissions.run(project, service, { kind: 'pipeline', consumerId: newResourceId(), inputDigest: jsonHash('original input') }, async () => {});
-  return { tdb, controls, repository, physics, owner, target, context, confirm: async () => { confirmed = await owner.inspect(target); return confirmed; } };
+  return { tdb, controls, repository, physics, owner, target, context, native, admissions, project, service, confirm: async () => { confirmed = await owner.inspect(target); return confirmed; } };
 }
 describe.skipIf(!available)('native release work factory with actual durable module ownership', () => {
+  test('complete callback growth updates coverage revision but preserves original epoch; replacing native epoch remains visible', async () => {
+    const x = await setup(), before = await x.confirm();
+    await x.admissions.run(x.project, x.service, { kind: 'ledger', consumerId: newResourceId(), inputDigest: jsonHash('next original input') }, async () => {});
+    x.native.identity = jsonHash('next full selector');
+    const after = await x.confirm();
+    expect(after.revision).not.toBe(before.revision);
+    for (const previous of before.resources.filter(row => row.kind.startsWith('release-coverage:'))) {
+      expect(after.resources.find(row => row.kind === previous.kind)?.sourceIdentity).toBe(previous.sourceIdentity);
+    }
+    x.native.epoch = jsonHash('replacement native origin'); const replaced = await x.confirm();
+    expect(replaced.resources.find(row => row.kind.startsWith('release-coverage:'))?.sourceIdentity)
+      .not.toBe(after.resources.find(row => row.kind.startsWith('release-coverage:'))?.sourceIdentity);
+  });
   test('actual finally and all durable phases survive factory reconstruction; native resources still block replay after metadata', async () => {
     const x = await setup(); expect((await x.confirm()).complete).toBe(true);
     for (const phase of PROJECT_DELETION_PHASES) expect((await x.owner.run(x.context(phase))).kind).toBe('done');

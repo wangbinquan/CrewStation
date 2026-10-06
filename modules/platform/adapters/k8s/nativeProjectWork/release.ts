@@ -31,10 +31,12 @@ export function nativeReleaseProjectWork(options: BuildKitWorkOptions): ReleaseW
       const body: Original = { version: 1, projectId: target.id,
         pods: await pods.capture({ mode: 'release', target, consumerIds: content.consumers.flatMap(row => [row.id, ...row.aliases]) }, content.callbacks.map(row => row.process)),
         cache: await cache.capture(target, content) };
-      const sourceIdentity = identity(body), objects = body.pods.catalog.objects.map(row => ({ kind: row.kind === 'Secret' || row.kind === 'ConfigMap' ? 'credential' as const : 'builder' as const,
-        id: 'native-object:' + row.uid, identity: row.identity, sourceIdentity, count: 1 }));
-      objects.push({ kind: 'builder', id: 'buildkit-work:' + target.id, identity: body.cache.selectionIdentity, sourceIdentity, count: body.cache.cacheIds.length + body.cache.selection.histories.length + body.cache.originalFiles.length });
-      return { ...report, native: { identity: sourceIdentity, epoch: epoch(body), body, objects } };
+      const sourceIdentity = identity(body), sourceEpoch = epoch(body);
+      const objects = body.pods.catalog.objects.map(row => ({ kind: row.kind === 'Secret' || row.kind === 'ConfigMap' ? 'credential' as const : 'builder' as const,
+        id: 'native-object:' + row.uid, identity: row.identity, sourceIdentity: jsonHash({ epoch: sourceEpoch, kind: row.kind, uid: row.uid, identity: row.identity }), count: 1 }));
+      objects.push({ kind: 'builder', id: 'buildkit-work:' + target.id, identity: body.cache.selectionIdentity,
+        sourceIdentity: jsonHash({ epoch: sourceEpoch, projectId: target.id, selection: body.cache.selectionIdentity }), count: body.cache.cacheIds.length + body.cache.selection.histories.length + body.cache.originalFiles.length });
+      return { ...report, native: { identity: sourceIdentity, epoch: sourceEpoch, body, objects } };
     },
     inspect: async raw => { const body = original(raw); await pods.inspect(body.pods); await cache.inspect(body.cache); return report; },
     stop: async (context, raw) => { const body = original(raw), result = await pods.stop(context, body.pods); return result.kind === 'done' ? proof(context, raw) : result; },

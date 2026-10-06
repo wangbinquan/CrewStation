@@ -23,7 +23,7 @@ export function deletionIntentUseCases(deps: ProjectUseCaseDeps) {
       const plan = ProjectDeletionPlanSchema.parse({ id: newId('pdp'), target, ...inventory, expiresAt: new Date(now.getTime() + 600_000).toISOString() });
       await scope.deletions.insertPlan({ plan, requestedBy: actor.userId, createdAt: now }); return plan;
     })),
-    acceptProjectDeletion: (actor: Actor, id: ProjectId, request: AcceptProjectDeletion, reports: readonly ProjectDeletionInventory[]) => adminDeletionWork(deps, actor, () => deps.uow.run(async (scope) => {
+    acceptProjectDeletion: (actor: Actor, id: ProjectId, request: AcceptProjectDeletion, reports?: readonly ProjectDeletionInventory[]) => adminDeletionWork(deps, actor, () => deps.uow.run(async (scope) => {
       const input = AcceptProjectDeletionSchema.parse(request);
       await scope.deletions.lockRequest(input.requestKey);
       const project = await scope.deletions.lockProject(id);
@@ -35,11 +35,12 @@ export function deletionIntentUseCases(deps: ProjectUseCaseDeps) {
       if (existing) throw conflict('项目已有清理操作，不能再次受理', { operationId: existing.operation.id });
       if (!project) throw notFound('项目', id);
       const stored = await scope.deletions.getPlan(input.planId), now = deps.clock.now();
-      if (!stored || stored.plan.target.id !== id || stored.plan.operationId) throw conflict('删除计划不属于当前项目的首次确认');
-      if (new Date(stored.plan.expiresAt) <= now) throw conflict('删除计划已过期，请重新盘点并确认');
-      const current = deletionInventory(await deletionScope(deps, id, scope), reports);
-      if (!stored.plan.complete || !current.complete) throw precondition('删除盘点尚有阻塞，不能销毁项目', { blockers: current.blockers });
-      if (stored.plan.digest !== current.digest) throw conflict('项目或资源盘点已改变，请重新确认');
+      const rejected = { code: 'project_deletion_confirmation_rejected', planId: input.planId, requestKey: input.requestKey };
+      if (!stored || stored.plan.target.id !== id || stored.plan.operationId) throw conflict('删除计划不属于当前项目的首次确认', rejected);
+      if (new Date(stored.plan.expiresAt) <= now) throw conflict('删除计划已过期，请重新盘点并确认', rejected);
+      const current = deletionInventory(await deletionScope(deps, id, scope), reports ?? stored.plan.participants);
+      if (!stored.plan.complete || !current.complete) throw precondition('删除盘点尚有阻塞，不能销毁项目', { ...rejected, blockers: current.blockers });
+      if (stored.plan.digest !== current.digest) throw conflict('项目或资源盘点已改变，请重新确认', rejected);
       const operation = ProjectDeletionOperationSchema.parse({ id: newId('pdo'), project: { id, slug: project.slug, name: project.name }, state: 'accepted', phase: 'seal',
         confirmationDigest: stored.plan.digest, receipts: [], blockers: [], canRetry: true, createdAt: now.toISOString(), updatedAt: now.toISOString() });
       await scope.deletions.insertOperation({ operation, planId: input.planId, requestKey: input.requestKey, requestedBy: actor.userId, generation: 0 });
