@@ -10,6 +10,22 @@ import { developmentContentFixture, seedDevelopmentContent } from './contentFixt
 
 const available = await testDatabaseAvailable();
 describe.skipIf(!available)('development content inventory (actual read-only PG; controlled original public identities)', () => {
+  test('migrated UUIDv4 workspace, agent and operation aliases retain all original content', async () => {
+    const f = await developmentContentFixture();
+    try {
+      const seeded = await seedDevelopmentContent(f), before = await f.inspect();
+      const directory = resourceIdentityDirectory(f.database.db, () => [devSessionMigrations]);
+      const aliases = [
+        ['task', '49ecbb6a-611e-4d26-82d9-f12be88c57a8', f.workspace],
+        ['agent', '8a6ec5d0-8e33-4c81-b095-3200fd4f0a86', seeded.cli.agentId],
+        ['cluster-operation', '63f6ff57-0e0b-4e40-b986-6b0f4c6af653', seeded.operation],
+      ] as const;
+      for (const [kind, legacy, id] of aliases) await directory.bind('dev_session', kind, [legacy], id);
+      expect(await f.inspect()).toEqual(before);
+      for (const [kind, legacy, id] of aliases) expect(await directory.resolve(kind, [legacy])).toBe(id);
+    } finally { await f.database.drop(); }
+  });
+
   test('traverses all 13 content families and the original callback catalog, retains foreign history and exports no private payload', async () => {
     const f = await developmentContentFixture();
     try {

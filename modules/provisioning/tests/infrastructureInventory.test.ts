@@ -98,7 +98,7 @@ describe.skipIf(!available)('infrastructure EOF inventory (actual PostgreSQL, pa
       expect(fresh.contents.filter((entry) => entry.id === '9007199254740995')).toHaveLength(2);
     } finally { resume.resolve(); await Promise.allSettled([pending]); await f.database.drop(); }
   }, 20_000);
-  test('unknown columns, a late-page unclassified job and all orphan-error pages block completeness without deleting anything', async () => {
+  test('unknown columns and late-page unclassified jobs promptly block; unvisited orphan-error pages remain incomplete and intact', async () => {
     const f = await fixture();
     try {
       await f.seed();
@@ -106,8 +106,8 @@ describe.skipIf(!available)('infrastructure EOF inventory (actual PostgreSQL, pa
       await f.database.db.execute(sql`INSERT INTO platform_infra.event_dead_letters(consumer,event_id,error)
         SELECT 'private-orphan-'||lpad(i::text,4,'0'),9007199254740996,'private orphan error' FROM generate_series(1,203) i`);
       const result = await f.inspect(); expect(result.inventory.complete).toBe(false);
-      expect(result.traversal).toMatchObject({ queue: true, event: true, orphanErrors: true, scanned: { queue: 207, event: 208, orphanErrors: 203 } });
-      expect(result.inventory.blockers.filter((entry) => entry.code === 'infrastructure-orphan-error')).toHaveLength(203);
+      expect(result.traversal).toMatchObject({ queue: false, event: true, orphanErrors: false, scanned: { queue: 207, event: 208, orphanErrors: 200 } });
+      expect(result.inventory.blockers.filter((entry) => entry.code === 'infrastructure-orphan-error')).toHaveLength(200);
       expect(result.inventory.blockers.find((entry) => entry.code === 'infrastructure-origin-unavailable')?.resourceId).toBe('queue:9007199254740995');
       expect(JSON.stringify(result)).not.toContain('private-orphan'); expect(JSON.stringify(result)).not.toContain('private orphan error');
       await f.database.db.execute(sql`ALTER TABLE platform_infra.jobs ADD COLUMN future_private_content text`);

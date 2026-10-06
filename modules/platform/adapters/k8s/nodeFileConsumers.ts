@@ -18,7 +18,7 @@ export function nodeFileConsumerSource(k8s: K8sClient, raw: { namespace: string;
     const signal = AbortSignal.timeout(60_000), probe = await originalNodeProbe(k8s, options.namespace, node, signal);
     const address = (probe['status'] as { podIP: string }).podIP;
     const runtime = (probe['status'] as { containerStatuses: Array<{ name: string; containerID: string; imageID: string }> }).containerStatuses.find(row => row.name === 'probe')!;
-    const client = createFileConsumerClient({ baseUrl: `http://${isIP(address) === 6 ? '[' + address + ']' : address}:${options.port}`, token: options.token, fetch: (url, init) => fetcher(url, init) });
+    const client = createFileConsumerClient({ baseUrl: `http://${isIP(address) === 6 ? '[' + address + ']' : address}:${options.port}`, token: options.token, timeoutMs: 60_000, fetch: (url, init) => fetcher(url, init) });
     let source = original, count = 0; const digests: string[] = [];
     const unique = [...new Map(identities.map(row => [row.device + ':' + row.inode, row])).values()];
     for (let offset = 0; offset < Math.max(1, unique.length); offset += 256) {

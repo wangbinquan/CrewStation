@@ -5,6 +5,30 @@ import { observeBuildKitInventory } from './inventory';
 import { createFilesystemMetricsHandler } from '../../server';
 
 const token = 'original-buildkit-probe-token'.repeat(3);
+test('a stalled success body cannot outlive the caller deadline after the HTTP reply', async () => {
+  const f = await buildKitFilesFixture(); let cancelled = false, guard: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const client = createBuildKitInventoryClient({ baseUrl: 'http://probe.test/', token,
+      fetch: async () => new Response(new ReadableStream({ cancel() { cancelled = true; } })) });
+    const result = await Promise.race([client.observe(f.request, AbortSignal.timeout(20)).catch((error: unknown) => error),
+      new Promise((resolve) => { guard = setTimeout(() => resolve('deadline escaped'), 250); })]);
+    expect(result).toBeInstanceOf(Error); expect(cancelled).toBe(true);
+  } finally { clearTimeout(guard); await f.drop(); }
+});
+
+test('the original probe busy response waits within one caller deadline and then reads the actual inventory', async () => {
+  const f = await buildKitFilesFixture(), handler = createFilesystemMetricsHandler({ token, roots: { local: f.root } });
+  const signals: AbortSignal[] = [], bodies: unknown[] = [];
+  try {
+    const client = createBuildKitInventoryClient({ baseUrl: 'http://probe.test/', token, fetch: async (url, init) => {
+      signals.push(init.signal!); bodies.push(JSON.parse(String(init.body)));
+      return signals.length === 1 ? Response.json({ error: 'A measurement is already running' }, { status: 409 }) : handler(new Request(url, init));
+    } });
+    const result = await client.observe(f.request);
+    expect(result.complete).toBe(true); expect(result.files).toHaveLength(4);
+    expect(signals).toHaveLength(2); expect(signals[0] === signals[1]).toBe(true); expect(bodies).toEqual([f.request, f.request]);
+  } finally { await f.drop(); }
+});
 test('the actual authenticated probe and strict client consume full native EOF with fixed query and explicit absence', async () => {
   const f = await buildKitFilesFixture(), handler = createFilesystemMetricsHandler({ token, roots: { local: f.root } });
   const requests: Request[] = [];

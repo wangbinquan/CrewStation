@@ -37,13 +37,15 @@ describe('infrastructure EOF inventory (controlled content and original sources;
     expect(result.inventory.resources[0]).toMatchObject({ id: 'queue:9007199254740993', scope: 'metadata', count: 1 });
     expect(JSON.stringify(result)).not.toContain('project.provision'); expect(JSON.stringify(result)).not.toContain('payload');
   });
-  test('unknown content and unreadable originals block even if all traversals reach EOF; private source errors stay private', async () => {
+  test('unknown content and unreadable originals promptly reject the page without claiming EOF; private source errors stay private', async () => {
     const rows = [row('1'), { ...row('2'), document: { ...row('2').document, name: 'future-job' } }];
-    const result = await inspectInfrastructureContents(project, source(async (after) => after === null ? rows : []), {
+    let pagesRead = 0;
+    const result = await inspectInfrastructureContents(project, source(async (after) => { pagesRead++; return after === null ? rows : []; }), {
       resolve: async () => { throw new Error('private credential and source body'); },
     });
     expect(result.inventory.complete).toBe(false); expect(result.inventory.blockers).toHaveLength(2);
-    expect(result.traversal.queue).toBe(true); expect(JSON.stringify(result)).not.toContain('credential');
+    expect(pagesRead).toBe(1);
+    expect(result.traversal.queue).toBe(false); expect(JSON.stringify(result)).not.toContain('credential');
     const missing = await inspectInfrastructureContents(project, source(async (after) => after === null ? [row('1')] : []), { resolve: async () => undefined });
     expect(missing.inventory.blockers[0]?.code).toBe('infrastructure-origin-unavailable');
   });
@@ -62,10 +64,10 @@ describe('infrastructure EOF inventory (controlled content and original sources;
   });
   test('orphan errors are paged using UTF-8 C order and never silently become platform-owned or leak consumer names', async () => {
     const error = (consumer: string): InfrastructureOrphanError => ({ eventId: '9007199254740993', consumer, digest: jsonHash(consumer) });
-    const pages = [[error('\uE000')], [error('\u{10000}')], []], cursors: unknown[] = [];
+    const pages = [[error('\uE000'), error('\u{10000}')], []], cursors: unknown[] = [];
     const result = await inspectInfrastructureContents(project, source(async () => [], { orphanErrors: async (after) => { cursors.push(after); return pages.shift()!; } }), origins);
-    expect(result.traversal.orphanErrors).toBe(true); expect(result.traversal.scanned.orphanErrors).toBe(2);
-    expect(cursors).toEqual([null, { eventId: '9007199254740993', consumer: '\uE000' }, { eventId: '9007199254740993', consumer: '\u{10000}' }]);
+    expect(result.traversal.orphanErrors).toBe(false); expect(result.traversal.scanned.orphanErrors).toBe(2);
+    expect(cursors).toEqual([null]);
     expect(result.inventory.complete).toBe(false); expect(result.inventory.blockers.map((value) => value.code)).toEqual(['infrastructure-orphan-error', 'infrastructure-orphan-error']);
     expect(JSON.stringify(result)).not.toContain('\uE000'); expect(JSON.stringify(result)).not.toContain('\u{10000}');
     for (const rows of [[error('b'), error('a')], [error('a'), error('a')], [{ ...error('a'), eventId: '0' }],

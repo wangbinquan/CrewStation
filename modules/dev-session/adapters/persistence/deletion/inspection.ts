@@ -2,6 +2,7 @@ import { ProjectIdSchema } from '@crewstation/contracts';
 import type { ProjectDeletionInventory, ProjectId } from '@crewstation/contracts';
 import { jsonHash, precondition } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
+import { readTransactionPages } from '@crewstation/persistence';
 import { sql } from 'drizzle-orm';
 import type { DevelopmentDeletionContent, DevelopmentDeletionOrigin } from '../../../domain/deletion/content';
 import type { DevelopmentDeletionSources } from '../../../ports/deletion/sources';
@@ -27,7 +28,7 @@ export async function registeredDevelopmentContent(db: Executor) {
     if (jsonHash(actual.map((row) => row.column_name)) !== jsonHash([...columns].sort())) throw precondition('开发最小封写或停止事实列发生未登记变化');
   }
   const aliases = await db.execute(sql`SELECT 1 FROM dev_session.resource_identity_aliases WHERE kind IN('task','agent','cluster-operation')
-    AND jsonb_array_length(key::jsonb)=1 AND key::jsonb->>0 ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+    AND jsonb_array_length(key::jsonb)=1 AND key::jsonb->>0 ~ '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
     AND id IS DISTINCT FROM key::jsonb->>0 LIMIT 1`);
   if (aliases.length) throw precondition('开发当前对象的原标识目录冲突');
 }
@@ -51,21 +52,19 @@ async function inspectTable(db: Executor, entry: Entry, sources: DevelopmentCont
   const field = (value?: string) => sql.raw(value ?? 'NULL::text');
   const key = sql.raw('jsonb_build_array(' + entry.keys.map((column) => 'r.' + column).join(',') + ')::text');
   const body = sql.raw(entry.table === 'original_callbacks' ? "to_jsonb(r)-ARRAY['exited_at','exit_digest','recovery_digest']" : 'to_jsonb(r)');
-  for (;;) {
-    const rows: Row[] = await db.execute<Row>(sql`SELECT ${key} AS key,encode(sha256(convert_to((${body})::text,'UTF8')),'hex') AS digest,
+  await readTransactionPages<Row>(db, sql`SELECT ${key} AS key,encode(sha256(convert_to((${body})::text,'UTF8')),'hex') AS digest,
       ${field(entry.workspace)} AS workspace,${field(entry.runtime)} AS runtime,${field(entry.previous)} AS previous,
       ${field(entry.operation)} AS operation,${field(entry.project)} AS project,${field(entry.agent)} AS agent,${field(entry.legacyAgent)} AS legacy_agent,
       ${sql.raw(entry.invalid ?? 'false')} AS invalid
       FROM ${sql.raw(entry.from ?? 'dev_session.' + entry.table + ' r')}
-      WHERE ${after === null ? sql`true` : sql`${key} COLLATE "C">${after} COLLATE "C"`} ORDER BY ${key} COLLATE "C" LIMIT 200`);
-    if (!rows.length) break;
+      ORDER BY ${key} COLLATE "C"`, async (rows) => {
     for (const row of rows) {
       if (after !== null && Buffer.compare(Buffer.from(row.key), Buffer.from(after)) <= 0) throw precondition('开发内容完整分页不符');
       const ownership = await rowOwnership(entry, row, sources);
       if (ownership.project === project) contents.push({ table: entry.table, key: row.key, digest: row.digest, ownership: ownership.digest });
       count++; after = row.key;
     }
-  }
+  });
   return { contents, count };
 }
 export async function inspectDevelopmentContent(db: Executor, rawSources: DevelopmentDeletionSources, rawProject: ProjectId) {

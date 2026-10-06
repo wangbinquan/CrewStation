@@ -11,6 +11,23 @@ import { corruptRuntimeContent, runtimeContentFixture, seedRuntimeContent } from
 
 const available = await testDatabaseAvailable();
 describe.skipIf(!available)('TaskRuntime content inventory (actual read-only PG; controlled original public identities)', () => {
+  test('migrated UUIDv4 task, rebuild and runner aliases retain all original content', async () => {
+    const f = await runtimeContentFixture();
+    try {
+      const seeded = await seedRuntimeContent(f), before = await f.inspect();
+      const [native] = await f.database.db.execute<{ runner: string }>(sql`SELECT native->>'runnerId' AS runner FROM task_runtime.environments WHERE id=${seeded.child}`);
+      const directory = resourceIdentityDirectory(f.database.db, () => [taskRuntimeMigrations]);
+      const aliases = [
+        ['task', '49ecbb6a-611e-4d26-82d9-f12be88c57a8', f.parent],
+        ['rebuild', '8a6ec5d0-8e33-4c81-b095-3200fd4f0a86', seeded.rebuild],
+        ['runner', '63f6ff57-0e0b-4e40-b986-6b0f4c6af653', native!.runner],
+      ] as const;
+      for (const [kind, legacy, id] of aliases) await directory.bind('task_runtime', kind, [legacy], id);
+      expect(await f.inspect()).toEqual(before);
+      for (const [kind, legacy, id] of aliases) expect(await directory.resolve(kind, [legacy])).toBe(id);
+    } finally { await f.database.drop(); }
+  });
+
   test('traverses every payload family to EOF, accounts for legacy columns, excludes foreign history and exports no content', async () => {
     const f = await runtimeContentFixture();
     try {

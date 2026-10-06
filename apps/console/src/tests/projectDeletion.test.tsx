@@ -12,6 +12,21 @@ let page: Awaited<ReturnType<typeof renderElement>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; });
 const project = { id: deletionProjectId, name: '旧列表名称', slug: 'old-list-slug' };
 
+test('只读盘点长期等待时仍可关闭，返回原列表且没有删除请求', async () => {
+  let accepted = 0;
+  function List() {
+    const [open, setOpen] = useState(false);
+    return <><button onClick={() => setOpen(true)}>检查末行项目</button>
+      {open ? <ProjectDeletionDialog project={project} loading onClose={() => setOpen(false)} onConfirm={async () => { accepted++; }} /> : null}</>;
+  }
+  page = await renderElement(<List />, messages); page.host.scrollTop = 700;
+  const trigger = page.button('检查末行项目'); trigger.focus(); await page.click('检查末行项目');
+  expect(openDialog().textContent).toContain('正在核对项目资源'); expect(page.button('继续删除…').disabled).toBe(true);
+  await page.click('关闭');
+  expect(document.querySelectorAll('dialog[open]')).toHaveLength(0);
+  expect(document.activeElement === trigger).toBe(true); expect(page.host.scrollTop).toBe(700); expect(accepted).toBe(0);
+});
+
 test('只有原项目、未过期、完整 22 个所有者且无引用的盘点才能确认', () => {
   const plan = deletionPlan(); expect(deletionPlanReady(plan, project.id)).toBe(true);
   expect(deletionPlanReady(undefined, project.id)).toBe(false);

@@ -21,6 +21,16 @@ async function fixture() {
   return {root,base,file,blob,manifest,link,input,drop:()=>rm(root,{recursive:true,force:true})};
 }
 describe('Distribution native filesystem inventory; no production erasure claim',()=>{
+  test('a stalled successful inventory body observes its original timeout',async()=>{
+    const f=await fixture();let cancelled=false,guard:ReturnType<typeof setTimeout>|undefined;
+    try{
+      const client=createRegistryInventoryClient({baseUrl:'http://source',token:'original-registry-source-token-over-32-characters',timeoutMs:20,
+        fetch:async()=>new Response(new ReadableStream({cancel(){cancelled=true;}}))});
+      const result=await Promise.race([client.observe(f.input).catch((error:unknown)=>error),new Promise(resolve=>{guard=setTimeout(()=>resolve('deadline escaped'),250);})]);
+      expect(result).toBeInstanceOf(Error);expect(cancelled).toBe(true);
+    }finally{clearTimeout(guard);await f.drop();}
+  });
+
   test('untagged and overwritten revisions include original layers and preserve every foreign reference',async()=>{
     const f=await fixture();try{
       const config=await f.blob('{"architecture":"arm64"}'),own=await f.blob('original layer'),shared=await f.blob('shared layer'),foreign=await f.blob('other project');
@@ -113,8 +123,14 @@ describe('Distribution native filesystem inventory; no production erasure claim'
     const f=await fixture();try{
       const config=await f.blob('{}'),layer=await f.blob('original'),image=await f.manifest(config,[layer]);await f.link('apps/original',image);
       const token='registry-client-private-token'.padEnd(40,'0'),handler=createFilesystemMetricsHandler({token,roots:{local:f.root}});
-      const client=createRegistryInventoryClient({baseUrl:'http://probe',token,fetch:(url,init)=>handler(new Request(url,init))});
+      let busy = true; const signals: AbortSignal[] = [];
+      const client=createRegistryInventoryClient({baseUrl:'http://probe',token,fetch:(url,init)=>{
+        signals.push(init.signal!);
+        if (busy) { busy = false; return Promise.resolve(Response.json({ error: 'A measurement is already running' }, { status: 409 })); }
+        return handler(new Request(url,init));
+      }});
       const original=await client.observe(f.input);expect(original.blobs).toHaveLength(3);
+      expect(signals).toHaveLength(2); expect(signals[0] === signals[1]).toBe(true);
       const mutations:Array<(result:typeof original)=>void>=[
         result=>{result.key='other original';},result=>{result.requestIdentity='b'.repeat(64);},result=>{result.repositories.push('apps/other');},
         result=>{result.entries.push({...result.entries[0]!,path:'repositories/apps/other/_uploads'});},
@@ -124,7 +140,8 @@ describe('Distribution native filesystem inventory; no production erasure claim'
       ];
       for(const mutate of mutations){const result=structuredClone(original);mutate(result);
         await expect(createRegistryInventoryClient({baseUrl:'http://probe',token,fetch:async()=>Response.json(result)}).observe(f.input)).rejects.toThrow();}
-      const aborted=new AbortController();aborted.abort();await expect(client.observe(f.input,aborted.signal)).rejects.toThrow('HTTP 503');
+      const aborted=new AbortController();aborted.abort();const reads = signals.length;
+      await expect(client.observe(f.input,aborted.signal)).rejects.toThrow(); expect(signals).toHaveLength(reads);
       expect(()=>createRegistryInventoryClient({baseUrl:'file:///tmp/native',token})).toThrow();
       expect(()=>createRegistryInventoryClient({baseUrl:'http://user:secret@probe',token})).toThrow();
       expect(()=>createRegistryInventoryClient({baseUrl:'http://probe',token:'short'})).toThrow();

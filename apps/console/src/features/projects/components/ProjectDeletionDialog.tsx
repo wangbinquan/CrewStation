@@ -43,6 +43,7 @@ export function ProjectDeletionDialog({ project, plan, operation, loading = fals
   const reviewing = !operation || !!plan;
   const sameOperation = operation ? operation.state === 'needs-attention' && plan?.operationId === operation.id && plan.supersedes === operation.confirmationDigest : !plan?.operationId;
   const ready = !loading && !pending && sameOperation && deletionPlanReady(plan, project.id, now);
+  const closingLocked = busy || pending && loading;
   const target = operation?.project ?? plan?.target ?? project;
   const confirm = async () => {
     if (inFlight.current || loading || pending || !sameOperation || !plan || confirmation !== plan.id || !deletionPlanReady(plan, project.id)) return;
@@ -52,12 +53,12 @@ export function ProjectDeletionDialog({ project, plan, operation, loading = fals
     finally { inFlight.current = false; if (active.current) setBusy(false); }
   };
   return <>
-    <Dialog title={t(reviewing && !pending ? 'projects.delete.reviewTitle' : 'projects.delete.progressTitle')} size="large" busy={busy || loading} onClose={onClose} returnFocusTo={returnFocusTo}
+    <Dialog title={t(reviewing && !pending ? 'projects.delete.reviewTitle' : 'projects.delete.progressTitle')} size="large" busy={closingLocked} onClose={onClose} returnFocusTo={returnFocusTo}
       footer={<ActionRow>
         {pending ? onRecover ? <Button variant="primary" disabled={loading || busy} onClick={onRecover}>{t('projects.delete.recover')}</Button> : null
           : reviewing ? <><Button variant="danger" disabled={!ready || busy} onClick={() => { if (ready && deletionPlanReady(plan, project.id)) setConfirmation(plan!.id); }}>{t('projects.delete.next')}</Button>{onReview ? <Button variant="secondary" disabled={loading || busy} onClick={onReview}>{t('projects.delete.refresh')}</Button> : null}</>
           : <>{operation?.canRetry && onRetry ? <Button variant="primary" disabled={loading || busy} onClick={onRetry}>{t('projects.delete.retry')}</Button> : null}{operation?.state === 'needs-attention' && onReview ? <Button variant="secondary" disabled={loading || busy} onClick={onReview}>{t('projects.delete.reconfirm')}</Button> : null}</>}
-        <Button variant="ghost" disabled={busy || loading} onClick={onClose}>{t('projects.delete.close')}</Button>
+        <Button variant="ghost" disabled={closingLocked} onClick={onClose}>{t('projects.delete.close')}</Button>
       </ActionRow>}>
       <Stack><DefinitionList layout="grid" items={[{ label: t('projects.delete.project'), value: target.name }, { label: t('projects.delete.slug'), value: target.slug }]} />
         {operation ? <DeletionProgress operation={operation} /> : null}

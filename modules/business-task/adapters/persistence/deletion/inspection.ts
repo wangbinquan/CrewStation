@@ -2,6 +2,7 @@ import { ProjectIdSchema, ResourceIdSchema } from '@crewstation/contracts';
 import type { ProjectDeletionInventory, ProjectId } from '@crewstation/contracts';
 import { jsonHash, precondition } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
+import { readTransactionPages } from '@crewstation/persistence';
 import { sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { BusinessContentOrigin, BusinessDeletionContent } from '../../../domain/deletion/content';
@@ -27,7 +28,7 @@ export async function registeredBusinessContent(db: Executor): Promise<void> {
     if (jsonHash(actual.map((row) => row.column_name)) !== jsonHash([...columns].sort())) throw precondition('业务最小封写／停止事实列发生未登记变化');
   }
   const aliases = await db.execute(sql`SELECT 1 FROM business_task.resource_identity_aliases WHERE kind IN('task','subtask')
-    AND jsonb_array_length(key::jsonb)=1 AND key::jsonb->>0 ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+    AND jsonb_array_length(key::jsonb)=1 AND key::jsonb->>0 ~ '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
     AND id IS DISTINCT FROM key::jsonb->>0 LIMIT 1`);
   if (aliases.length) throw precondition('业务当前对象的原标识目录冲突');
 }
@@ -75,14 +76,12 @@ export async function inspectBusinessContent(db: Executor, sources: BusinessDele
     let after: string | null = null; const selected: BusinessDeletionContent[] = []; counts[entry.table] = 0;
     const field = (value?: string) => sql.raw(value ?? 'NULL::text');
     const key = sql.raw('jsonb_build_array(' + entry.keys.map((column) => 'r.' + column).join(',') + ')::text');
-    for (;;) {
-      const body = sql.raw(entry.table === 'original_callbacks' ? "to_jsonb(r)-ARRAY['exited_at','exit_digest','recovery_digest']" : 'to_jsonb(r)');
-      const rows: Row[] = await db.execute<Row>(sql`SELECT ${key} AS key,encode(sha256(convert_to((${body})::text,'UTF8')),'hex') AS digest,
+    const body = sql.raw(entry.table === 'original_callbacks' ? "to_jsonb(r)-ARRAY['exited_at','exit_digest','recovery_digest']" : 'to_jsonb(r)');
+    await readTransactionPages<Row>(db, sql`SELECT ${key} AS key,encode(sha256(convert_to((${body})::text,'UTF8')),'hex') AS digest,
         ${field(entry.service)} AS service,${field(entry.project)} AS project,${field(entry.task)} AS task,${field(entry.runtime)} AS runtime,
         ${sql.raw(entry.invalid ?? 'false')} AS invalid,${sql.raw(entry.table === 'cluster_commands' ? "r.legacy_body->'operation'->'target'->>'taskId'" : entry.table === 'subtasks' ? "r.legacy_spec->'execution'->>'taskId'" : 'NULL::text')} AS old_runtime
         FROM ${sql.raw(entry.from ?? 'business_task.' + entry.table + ' r')}
-        WHERE ${after === null ? sql`true` : sql`${key} COLLATE "C">${after} COLLATE "C"`} ORDER BY ${key} COLLATE "C" LIMIT 200`);
-      if (!rows.length) break;
+        ORDER BY ${key} COLLATE "C"`, async (rows) => {
       for (const row of rows) {
         if (row.invalid || after !== null && Buffer.compare(Buffer.from(row.key), Buffer.from(after)) <= 0) throw precondition('业务原内容关系或完整分页不符');
         const facts = [];
@@ -101,7 +100,7 @@ export async function inspectBusinessContent(db: Executor, sources: BusinessDele
         if (first.project === project) selected.push({ table: entry.table, key: row.key, digest: row.digest, ownership: jsonHash(facts) });
         counts[entry.table]!++; after = row.key;
       }
-    }
+    });
     contents.push(...selected);
     if (selected.length) {
       const identity = jsonHash(selected), sourceIdentity = jsonHash(selected.map(({ key, ownership }) => ({ key, ownership })));

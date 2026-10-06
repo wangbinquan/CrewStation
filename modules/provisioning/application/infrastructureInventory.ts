@@ -29,10 +29,11 @@ function afterError(value: InfrastructureOrphanError, previous: Pick<Infrastruct
 export async function inspectInfrastructureContents(rawProjectId: ProjectId, source: InfrastructureContentSource, origins: InfrastructureOriginSources, coordinator?: InfrastructureCoordinator): Promise<InfrastructureContentInventory> {
   const projectId = ProjectIdSchema.parse(rawProjectId), contents: OwnedInfrastructureContent[] = [], resources: ProjectDeletionInventory['resources'] = [];
   if (coordinator && coordinator.projectId !== projectId) throw precondition('删除协调保留范围与盘点项目不符');
-  const blockers: ProjectDeletionBlocker[] = [], evidence: string[] = [];
+  const blockers: ProjectDeletionBlocker[] = [], blockerKeys = new Set<string>(), evidence: string[] = [];
   const eof = { queue: false, event: false, orphanErrors: false }, scanned = { queue: 0, event: 0, orphanErrors: 0 };
   const blocked = (code: string, message: string, resourceId?: string) => {
-    if (!blockers.some((entry) => entry.code === code && entry.resourceId === resourceId)) blockers.push({ participant: 'provisioning', code, message, ...(resourceId ? { resourceId } : {}) });
+    const key = JSON.stringify([code, resourceId ?? null]);
+    if (!blockerKeys.has(key)) { blockerKeys.add(key); blockers.push({ participant: 'provisioning', code, message, ...(resourceId ? { resourceId } : {}) }); }
   };
   async function classify(row: InfrastructureContentRow) {
     const channel = row.document.channel, key = channel + ':' + row.id;
@@ -62,12 +63,16 @@ export async function inspectInfrastructureContents(rawProjectId: ProjectId, sou
         const rows = await reader[channel](after);
         if (!Array.isArray(rows) || rows.length > 200) throw precondition('基础设施分页不完整');
         if (!rows.length) { eof[channel] = true; break; }
+        const blockerCount = blockers.length;
         for (const raw of rows) {
           const row = content.parse(raw);
           if (row.document.channel !== channel || after !== null && BigInt(row.id) <= BigInt(after) || channel === 'queue' && row.deadLetters !== 0)
             throw precondition('基础设施分页原身份不连续');
           scanned[channel]++; await classify(row); after = row.id;
         }
+        // A rejected page cannot authorize cleanup. Return its real blocker promptly,
+        // preserving EOF=false instead of spending minutes proving a scope already known to be incomplete.
+        if (blockers.length > blockerCount) return;
       }
     } catch { blocked('infrastructure-traversal-incomplete', '未能读尽任务或事件的全部分页，不能确认清理范围', channel); }
   }
@@ -87,6 +92,7 @@ export async function inspectInfrastructureContents(rawProjectId: ProjectId, sou
             blocked('infrastructure-orphan-error', '历史事件错误缺少原事件，不能推断其项目归属', 'event:' + row.eventId + ':' + jsonHash(row.consumer));
             after = { eventId: row.eventId, consumer: row.consumer };
           }
+          if (blockers.length) break;
         }
       } catch { blocked('infrastructure-traversal-incomplete', '未能读尽全部历史事件错误，不能确认清理范围', 'orphan-errors'); }
     });

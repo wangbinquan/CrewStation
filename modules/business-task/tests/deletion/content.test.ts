@@ -5,6 +5,7 @@ import { jsonHash, newResourceId } from '@crewstation/kernel';
 import { resourceIdentityDirectory } from '@crewstation/persistence';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import { sql } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/postgres-js';
 import { businessContentSnapshot } from '../../adapters/persistence/deletion/inspection';
 import { BUSINESS_CONTENT } from '../../adapters/persistence/deletion/contentTables';
 import type { BusinessDeletionOrigin } from '../../domain/deletion/content';
@@ -33,6 +34,41 @@ async function fixture() {
 }
 
 describe.skipIf(!available)('business content inspection (actual PG; controlled original Project/TaskRuntime identities)', () => {
+  test('a migrated UUIDv4 task alias retains the current inventory and the original directory', async () => {
+    const f = await fixture();
+    try {
+      const task = await f.seedTask(), before = await f.inspect(), legacy = '49ecbb6a-611e-4d26-82d9-f12be88c57a8';
+      const directory = resourceIdentityDirectory(f.database.db, () => [businessTaskMigrations]);
+      await directory.bind('business_task', 'task', [legacy], task);
+      expect(await f.inspect()).toEqual(before);
+      expect(await directory.resolve('task', [legacy])).toBe(task);
+    } finally { await f.database.drop(); }
+  });
+
+  test('large inventory bounds relation scans and still verifies foreign rows through EOF', async () => {
+    const f = await fixture();
+    try {
+      const target = await f.seedTask(), other = await f.seedTask(newResourceId(), f.otherProject, f.otherService);
+      const materials = Array.from({ length: 10001 }, (_, index) => ({ id: newResourceId(), key: 'inventory-' + index, other_project: index % 2 === 1 }));
+      await f.database.db.execute(sql`INSERT INTO business_task.execution_materials(id,service_id,task_id,request_key,digest,sealed,size_bytes,created_at)
+        SELECT x.id,CASE WHEN x.other_project THEN ${f.otherService} ELSE ${f.service} END,
+          CASE WHEN x.other_project THEN ${other} ELSE ${target} END,x.key,${jsonHash('original')},'private-material',64,now()
+        FROM jsonb_to_recordset(${JSON.stringify(materials)}::jsonb) x(id text,key text,other_project boolean)`);
+      let scans = 0;
+      const database = drizzle({ client: f.database.handle.client, logger: { logQuery(query) {
+        if (query.includes('FROM business_task.execution_materials r')) scans++;
+      } } });
+      const inspected = await businessContentSnapshot(database, f.sources, f.project);
+      expect(inspected.traversal.counts.execution_materials).toBe(10001);
+      expect(inspected.inventory.resources.find((row) => row.id === 'execution_materials')?.count).toBe(5001);
+      // The live deletion dialog stalled because every 200-row page rescanned and sorted the whole relation.
+      expect(scans).toBe(2);
+      await f.database.db.execute(sql`INSERT INTO business_task.execution_materials(id,service_id,task_id,request_key,digest,sealed,size_bytes,created_at)
+        VALUES(${newResourceId()},${f.otherService},${target},'tail-conflict',${jsonHash('conflict')},'private-material',64,now())`);
+      await expect(businessContentSnapshot(database, f.sources, f.project)).rejects.toThrow('项目归属冲突');
+    } finally { await f.database.drop(); }
+  }, 30000);
+
   test('reads all 25 content tables to EOF, includes more than 200 closed historical tasks and keeps private payloads in PostgreSQL', async () => {
     const f = await fixture();
     try {
