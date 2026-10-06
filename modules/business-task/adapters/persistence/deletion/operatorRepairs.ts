@@ -5,6 +5,7 @@ import type { Database, Executor } from '@crewstation/persistence';
 import { appendContentConfirmation, readContentConfirmation, readTransactionPages, withExclusiveDatabaseAdmission } from '@crewstation/persistence';
 import { sql } from 'drizzle-orm';
 import type { BusinessDeletionSources } from '../../../ports/deletion/sources';
+import { nativeExecutionRepairItems } from './nativeExecutionRepairs';
 
 interface Row extends Record<string, unknown> { body: Record<string, unknown>; digest: string; project_id: string | null; service_id: string | null }
 /** A reviewed negative decision concerns this whole foreign child, without inventing its missing runtime owner. */
@@ -36,7 +37,7 @@ export async function businessRepairItems(db: Executor, sources: BusinessDeletio
     FROM business_task.subtasks r LEFT JOIN business_task.tasks t ON t.id=r.task_id WHERE r.spec->'execution'->>'taskId' IS NOT NULL ORDER BY r.id`, async (rows) => {
     for (const row of rows) { const item = await candidate(db, sources, assets, target, row); if (item) items.push(item); }
   });
-  return items;
+  return [...items, ...await nativeExecutionRepairItems(db, sources, assets, target)];
 }
 
 export async function retainedBusinessChild(db: Executor, sources: BusinessDeletionSources, assets: ProjectDeletionCurrentAssets | undefined, target: ProjectDeletionTarget, key: string, digest: string): Promise<string | undefined> {

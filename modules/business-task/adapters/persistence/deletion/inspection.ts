@@ -9,6 +9,7 @@ import type { BusinessContentOrigin, BusinessDeletionContent } from '../../../do
 import type { BusinessDeletionSources } from '../../../ports/deletion/sources';
 import { BUSINESS_CONTENT } from './contentTables';
 import { retainedBusinessChild } from './operatorRepairs';
+import { retainedNativeExecutions } from './nativeExecutionRepairs';
 
 const originSchema = z.object({ complete: z.literal(true), id: ResourceIdSchema, scope: z.enum(['project', 'platform']),
   projectIds: z.array(ProjectIdSchema), revision: z.string().regex(/^[a-f0-9]{64}$/) }).strict().superRefine((value, context) => {
@@ -81,6 +82,7 @@ export async function inspectBusinessContent(db: Executor, sources: BusinessDele
     return value;
   };
   const task = taskSource(db, source, project, origins);
+  const nativeRetained = target ? await retainedNativeExecutions(db, sources, sources.currentAssets, target) : new Map();
   for (const entry of BUSINESS_CONTENT) {
     let after: string | null = null; const selected: BusinessDeletionContent[] = []; counts[entry.table] = 0;
     const field = (value?: string) => sql.raw(value ?? 'NULL::text');
@@ -93,6 +95,8 @@ export async function inspectBusinessContent(db: Executor, sources: BusinessDele
         ORDER BY ${key} COLLATE "C"`, async (rows) => {
       for (const row of rows) {
         if (row.invalid || after !== null && Buffer.compare(Buffer.from(row.key), Buffer.from(after)) <= 0) throw precondition('业务原内容关系或完整分页不符');
+        const nativeDecision = nativeRetained.get(entry.table + ':' + row.key);
+        if (nativeDecision?.digest === row.digest) { retained.push(nativeDecision.decision); counts[entry.table]!++; after = row.key; continue; }
         if (entry.table === 'subtasks' && target) {
           const decision = await retainedBusinessChild(db, sources, sources.currentAssets, target, row.key, row.digest);
           if (decision) { retained.push(decision); counts[entry.table]!++; after = row.key; continue; }

@@ -15,7 +15,7 @@ const order = ['finalization_execution_proofs', 'finalization_revisions', 'recov
 /** Every deletion matches the frozen primary key and whole private row digest, in original child-before-parent order. */
 export async function purgeBusinessContent(db: Executor, sources: BusinessWorkSources, context: ProjectDeletionContext, scope: BusinessDeletionScope) {
   if (scope.compacted) return;
-  const current = await inspectBusinessContent(db, sources, context.target.id);
+  const current = await inspectBusinessContent(db, sources, context.target.id, context.target);
   if (jsonHash(current.contents) !== jsonHash(scope.contents)) throw precondition('业务封写后的原内容发生变化，不能删除替换记录');
   if (order.length !== BUSINESS_CONTENT.length || BUSINESS_CONTENT.some((entry) => !order.includes(entry.table))) throw precondition('业务删除顺序未覆盖全部内容');
   for (const table of order) {
