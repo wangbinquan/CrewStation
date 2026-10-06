@@ -1,6 +1,6 @@
 import { AcceptProjectDeletionSchema, ConfirmProjectDeletionRepairSchema, ProjectDeletionCapabilitiesSchema, ProjectDeletionLookupSchema, ProjectIdSchema, ResourceIdSchema } from '@crewstation/contracts';
 import type { Actor, UserId } from '@crewstation/contracts';
-import { actorFrom, parseBody, parseParams } from '@crewstation/http';
+import { actorFrom, keepResponseOpen, parseBody, parseParams } from '@crewstation/http';
 import type { AppEnv } from '@crewstation/http';
 import { forbidden } from '@crewstation/kernel';
 import { Hono } from 'hono';
@@ -25,21 +25,24 @@ export function projectDeletionRoutes(api: ProjectDeletionController, isAdmin: (
     if (!result.isAdmin) throw forbidden('只有管理员可以永久删除项目或读取清理材料');
     c.header('cache-control', 'no-store'); return { ...result, userId: result.userId as UserId };
   };
+  const longActor = async (c: Parameters<typeof actorFrom>[0]): Promise<Actor> => {
+    const user = await actor(c); keepResponseOpen(c); return user;
+  };
   if (api.repairs) {
     r.get('/v1/projects/:projectId/deletion-repairs', async (c) => {
-      const user = await actor(c); return c.json(await api.repairs!.inspect(user, parseParams(c, projectParams).projectId));
+      const user = await longActor(c); return c.json(await api.repairs!.inspect(user, parseParams(c, projectParams).projectId));
     });
     r.post('/v1/projects/:projectId/deletion-repairs', async (c) => {
-      const user = await actor(c), input = await parseBody(c, ConfirmProjectDeletionRepairSchema);
+      const user = await longActor(c), input = await parseBody(c, ConfirmProjectDeletionRepairSchema);
       return c.json(await api.repairs!.confirm(user, parseParams(c, projectParams).projectId, input));
     });
   }
   r.post('/v1/projects/:projectId/deletion-plans', async (c) => {
-    const user = await actor(c); await parseBody(c, z.object({}).strict());
+    const user = await longActor(c); await parseBody(c, z.object({}).strict());
     return c.json(await api.prepare(user, parseParams(c, projectParams).projectId));
   });
   r.post('/v1/projects/:projectId/deletions', async (c) => {
-    const user = await actor(c), input = await parseBody(c, AcceptProjectDeletionSchema);
+    const user = await longActor(c), input = await parseBody(c, AcceptProjectDeletionSchema);
     const operation = await api.accept(user, parseParams(c, projectParams).projectId, input);
     c.header('location', `/v1/project-deletions/${operation.id}`); return c.json(operation, 202);
   });
@@ -56,11 +59,11 @@ export function projectDeletionRoutes(api: ProjectDeletionController, isAdmin: (
     c.header('location', `/v1/project-deletions/${operation.id}`); return c.json(operation, 202);
   });
   r.post('/v1/project-deletions/:operationId/reconfirmation-plans', async (c) => {
-    const user = await actor(c); await parseBody(c, z.object({}).strict());
+    const user = await longActor(c); await parseBody(c, z.object({}).strict());
     return c.json(await api.prepareReconfirmation(user, parseParams(c, operationParams).operationId));
   });
   r.post('/v1/project-deletions/:operationId/reconfirm', async (c) => {
-    const user = await actor(c), input = await parseBody(c, AcceptProjectDeletionSchema);
+    const user = await longActor(c), input = await parseBody(c, AcceptProjectDeletionSchema);
     const operation = await api.reconfirm(user, parseParams(c, operationParams).operationId, input);
     c.header('location', `/v1/project-deletions/${operation.id}`); return c.json(operation, 202);
   });

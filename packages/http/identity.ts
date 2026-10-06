@@ -18,7 +18,11 @@ export interface AppVariables {
   traceId?: string;
 }
 
-export type AppEnv = { Variables: AppVariables };
+export type AppEnv = {
+  Variables: AppVariables;
+  /** Bun passes its current server as Hono's bindings; in-process route tests may omit it. */
+  Bindings: { timeout?: (request: Request, seconds: number) => void };
+};
 
 /** 只信任网关剥离并重新注入后的头；进程只在网关之后可达。 */
 export function identityFromHeaders(): MiddlewareHandler<AppEnv> {

@@ -13,5 +13,6 @@ export { devSessionScopeDenial } from './devSessionScope';
 export { parseBody, parseParams, parseQuery } from './validate';
 export type { HttpActor } from './actor';
 export { actorFrom } from './actor';
+export { keepResponseOpen } from './keepResponseOpen';
 export type { Stoppable } from './processBootstrap';
 export { installShutdown } from './processBootstrap';
