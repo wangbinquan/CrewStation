@@ -215,3 +215,9 @@ release 原生工作区的 full identity 继续绑定完整消费者/回调选�
 ProjectDeletionSession.read在无待定请求、原operation ID一致、state为needs-attention且phase为seal、当前plan.operationId与plan.supersedes都匹配时，只更新operation，保留已准备的完整或阻断计划。其余权威状态（新确认摘要、运行、后续阶段、成功）仍执行accepted清理。轮询始终只读，不发新计划或删除请求。回归包含完整和阻断清单跨refresh/open保留，以及确认摘要或phase/state改变后失效；实际正式浏览器需跨两个5秒周期仍显示完整阻断或确认清单。
 
 T14诊断补充：在线API容器内额外构造整套Root触发22:14:05Z的OOMKilled并重启，停止该方案。三个来源失败由现有服务在盘点catch处记录participant、projectId及源码调用位置；只提取/app/modules与/app/packages的固定文件/行号，不记录异常消息、SQL、请求、堆栈首行或业务正文。报告仍为source-unavailable，资源与许可判定不变；验证内部日志有可定位调用位置且原错误中的私密内容不会输出。
+
+## I36-T15 本地 Registry 来源字段的持久编码
+
+实际单行原release fence为8,118,118字节、runtime fence为20,721字节；本机纯解析确认retained与native-work均通过，两个Registry materials都在原范围比较处失败。packages/filesystem-metrics/registry/retained.ts以JSON.stringify摘要包含opaque origin；JSONB改变origin字段排列。平台nativeRegistry/source.ts已有固定14字段原来源顺序。只恢复这一完整已声明本地来源的编码顺序，通过严格14字段schema读取；其他来源形状沿既有opaque契约，不省略未知字段。该schema值约束与生成器已有来源完全对应，任何UID、容器、镜像、卷、节点、物理路径或epoch变化都继续影响摘要。
+
+真实原件的只读重建证据 /tmp/cs-rfc037-i36-registry-origin-order-proof-v1.json 表明两者origin字段和值均未变，完整physical scope、nativeHistory digest全部精确再现。原件和旧摘要不改，不采用新birth、不引入兼容身份白名单。修复落在原registry/retained primitive；回归为filesystem方法用例与platform既有OwnerComposition的真实PG JSONB保存/重读/重建工厂，以及身份和未知字段变化拒绝。持续中的T14唯一完整门不取消、不重复；此增量单独检查并以新确切提交树六CI为准。

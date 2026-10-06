@@ -5,7 +5,12 @@ import type { RegistryInventoryResponse } from './protocol';
 
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
 const consumerSource = z.strictObject({ identity: hash, probeUid: z.uuid(), containerId: z.string().min(1), imageId: z.string().min(1), nodeUid: z.uuid(), nodeName: z.string().min(1), bootId: z.uuid(), namespace: z.string().min(1) });
-export const RegistryDeletionHistorySchema = z.strictObject({ version: z.literal(1), projectId: z.uuid(), sourceIdentity: hash, origin: z.json(),
+// Preserve the local source's published material encoding across JSONB key reordering.
+// Strict matching retains every declared field; other origin formats remain opaque.
+const localRegistryOrigin = z.strictObject({ namespaceUid: z.uuid(), serviceUid: z.uuid(), podUid: z.uuid(), containerId: z.string().min(1), imageId: z.string().min(1),
+  nodeUid: z.uuid(), nodeName: z.string().min(1), pvcUid: z.uuid(), pvUid: z.uuid(), providerPath: z.string().min(1), mountPath: z.string().min(1),
+  rootEpoch: hash, volumeEpoch: hash, probeUid: z.uuid() });
+export const RegistryDeletionHistorySchema = z.strictObject({ version: z.literal(1), projectId: z.uuid(), sourceIdentity: hash, origin: z.union([localRegistryOrigin, z.json()]),
   query: RegistryInventoryRequestSchema, original: RegistryInventoryResponseSchema, consumers: consumerSource });
 export type RegistryDeletionHistory = z.infer<typeof RegistryDeletionHistorySchema>;
 const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');

@@ -41,3 +41,13 @@ T14候选固定5个功能路径：自动读取只在同一operation、同一supe
 5路径精确lint、整仓两类typecheck和arch均通过；官方防护12／12、100%，无违规。该新候选的唯一完整check已经启动，冻结文件和原专用测试PG身份均固定；不取消或重复。55项、静态、防护、完整终态及精确提交CI均待作为同一候选的证据接续。修复未发布，实际项目仍停在seal。
 
 当前唯一完整check已进入用例阶段且未取消；上一完整终态十项外部观测失败的七个实际在制品来源SHA256均与当前相同，未替换或提交。按development-rules §3，以本批55／0、四层静态及12／12接精确九路径发布；新完整检查继续保留到终态，不能把运行中记作通过。新审计 /tmp/cs-rfc037-i36-reconfirmation-inprogress-audit-v1.json 明确区分历史终态和当前已观察结果。
+
+## T15 已定位的实际 Registry 原因
+
+单行限16 MiB的只读导出取得原release/runtime fence，未汇总历史；本机仅构造相关解析器，无在线Root或写许可。retained两者均通过，native-work两者均通过，Registry materials两者均在原范围比较失败。随后按照原nativeRegistry/source.ts的14字段顺序只重排origin，保持全部字段与值，完整原physical范围与原nativeHistory digest两者均精确复现。原件 cs-rfc037-i36-original-{release,runtime_environment}-fence-v1.json、offline-parse-v1.json、offline-physics-v1.json、registry-origin-order-proof-v1.json（均/tmp前缀）保留。此结论定位序列化缺陷，尚未表示在线来源或清理成功。
+
+## T15 固定候选检查与发布资格
+
+修复只为既有本地来源的严格14字段恢复原生成顺序，全部原值、出生身份与已发布摘要保持；其他origin格式完整保留为opaque。真实PG JSONB保存后分别重建release/runtime工厂，完整范围通过；PVC、容器、Node、root epoch或未知字段变化仍拒绝且无物理清理。最终实际五文件24 pass／4个既有Linux环境skip／0 fail、213断言；精确lint、整仓后端及console类型、arch四层通过，官方改动行4／4、100%无违规。原两个完整fence本机解析四层均通过，未观察在线来源、未取得写许可，不替代实际AFTER。固定3路径指纹 cs-rfc037-i36-registry-jsonb-candidate-v2.json，实际检查 green-v2、static-v2、patch-v2（均/tmp前缀）。
+
+T14已精确提交推送6143f539787b8ab4f9b6cf2f6de1b225fd4bd507，六CI和正式部署继续，其唯一完整check未取消。当前完整日志已观察三个外部observability失败，保存实际文件、上下文摘要与当前七个外部来源指纹；其中三个来源相对旧终态已继续开发，不能再声称七个均未变。按development-rules §3，自有检查通过后接精确7路径发布和确切提交树六CI；新的T15唯一完整检查以共享锁事件等待前一检查终态，不重复整仓门禁、不阻断其他开发。证据 cs-rfc037-i36-registry-jsonb-inprogress-audit-v1.json。原项目仍needs-attention/seal，7回执；PG当前基线、两个实际在线来源、原操作全部资源回收及独立AFTER尚待完成。

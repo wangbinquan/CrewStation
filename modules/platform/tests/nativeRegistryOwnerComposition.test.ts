@@ -8,6 +8,36 @@ import { consumerFixture } from '../../../packages/filesystem-metrics/consumerFi
 import { nativeRegistryOwnerFixture } from './nativeRegistryOwnerFixture';
 import { runtimeImageProjectDeletionOwner } from '../../runtime-environment/application/projectDeletion';
 import { RuntimeImagePhysicalScopeSchema } from '../../runtime-environment/domain/records';
+import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
+
+const databaseAvailable = await testDatabaseAvailable();
+
+for (const mode of ['runtime-environment', 'release'] as const) {
+  test.skipIf(!databaseAvailable)(`${mode}: real JSONB persistence retains the complete original Registry material and rejects changed native births`, async () => {
+    const database = await createTestDatabase();
+    try { await consumerFixture(async proc => {
+      const f = await nativeRegistryOwnerFixture(proc.root, mode); await f.prepareProc(); await proc.process('101');
+      try {
+        const scope = (await f.api.capture()).scope!;
+        const [row] = await database.handle.client<{ body: typeof scope }[]>`SELECT ${JSON.stringify(scope)}::jsonb AS body`;
+        const restored = row!.body;
+        const original = scope.nativeHistory!.body as { registry: { origin: Record<string, unknown> } };
+        const saved = restored.nativeHistory!.body as typeof original;
+        expect(JSON.stringify(saved.registry.origin)).not.toBe(JSON.stringify(original.registry.origin));
+        expect(saved.registry.origin).toEqual(original.registry.origin); expect(jsonHash(restored)).toBe(jsonHash(scope));
+        // The actual durable fence failed here even though JSONB changed only the origin's field order.
+        expect((await f.rebuild().inspect(restored)).complete).toBe(true);
+        expect(f.controls.reclaimed).toBe(0); expect(await f.exists(f.layer)).toBe(true);
+        for (const field of ['pvcUid', 'containerId', 'nodeUid', 'rootEpoch', 'unknownSourceField']) {
+          const body = structuredClone(saved); body.registry.origin[field] = newResourceId();
+          const changed = { ...restored, nativeHistory: { ...restored.nativeHistory!, body, digest: jsonHash(body) } };
+          await expect(f.rebuild().inspect(changed)).rejects.toThrow('身份变化');
+        }
+        expect(f.controls.reclaimed).toBe(0); expect(await f.exists(f.layer)).toBe(true);
+      } finally { await f.drop(); }
+    }); } finally { await database.drop(); }
+  }, 30_000);
+}
 
 test('runtime Registry inventory translates original pull addresses and preserves platform pins within the project prefix', async () => {
   await consumerFixture(async proc => {

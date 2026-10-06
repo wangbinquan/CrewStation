@@ -67,6 +67,26 @@ test('transport observation time does not continuously invalidate confirmations,
     expect(JSON.stringify(f.history)).not.toContain('old project payload');
   } finally { await f.drop(); }
 });
+test('local Registry origin reordering preserves published material hashes without losing fields or accepting a replaced physical origin', async () => {
+  const f = await fixture(); try {
+    const origin = { namespaceUid: randomUUID(), serviceUid: randomUUID(), podUid: randomUUID(), containerId: 'containerd://' + 'a'.repeat(64), imageId: 'registry@sha256:' + 'b'.repeat(64),
+      nodeUid: randomUUID(), nodeName: 'original-node', pvcUid: randomUUID(), pvUid: randomUUID(), providerPath: '/original/volume', mountPath: '/var/lib/registry',
+      rootEpoch: f.history.original.rootIdentity, volumeEpoch: f.history.original.volumeIdentity, probeUid: randomUUID() };
+    const history = captureRegistryHistory({ ...f.history, origin, sourceIdentity: hash(origin) });
+    const restored = { ...history, origin: Object.fromEntries(Object.entries(origin).reverse()) };
+    // PostgreSQL JSONB reorders the opaque origin and previously changed the complete material identity.
+    expect(registryHistoryIdentity(restored)).toBe(registryHistoryIdentity(history));
+    const current = { identity: history.sourceIdentity, origin, inventory: await observeRegistryInventory(f.root, { ...f.query, ...retainedRegistryQuery(history) }) };
+    expect(bindRegistryHistory(restored, current).storage).toBe(3);
+    for (const field of Object.keys(origin)) {
+      const changed = { ...history, origin: { ...origin, [field]: randomUUID() } };
+      expect(registryHistoryIdentity(changed)).not.toBe(registryHistoryIdentity(history));
+      expect(() => bindRegistryHistory(changed, current)).toThrow('changed');
+    }
+    expect(registryHistoryIdentity({ ...history, origin: { ...origin, unknownSourceField: true } })).not.toBe(registryHistoryIdentity(history));
+    expect(captureRegistryHistory(restored).origin).toEqual(origin);
+  } finally { await f.drop(); }
+});
 test('platform catalog pins remain in the original storage request after metadata disappears, rather than becoming project-owned by prefix', async () => {
   const f = await fixture(); try {
     const query = { ...f.query, protectedRepositories: ['apps/original'] }, original = await observeRegistryInventory(f.root, query);
