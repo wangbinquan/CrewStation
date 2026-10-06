@@ -1,9 +1,12 @@
 import type { UsageContributionEvidence } from '../../domain/completeUsageEvidence'
 import type { CompleteWorkingRows, CompleteWorkingRow, CompleteWorkingPage } from '../../ports/completeWorkingRows'
-import type { CompleteUsageWorkspace,CompleteUsageOrdering } from '../../ports/completeUsageWorkspace'
+import type { CompleteUsageWorkspace, CompleteUsageOrdering } from '../../ports/completeUsageWorkspace'
 import { completeOrdinalKey } from '../../domain/completeOrdinal'
 import { compareCompleteUsage } from '../../domain/completeUsageOrder'
 import { completeCoverageWorkspace } from './completeCoverageWorkspace'
+import { completeAncestryWorkspace } from './completeAncestryWorkspace'
+import { completeUsagePrefetch } from './completeUsagePrefetch'
+import { completeCoverageRootReads } from '../../domain/complete-usage/coverageKeys'
 
 async function* retainedInput<T>(input: {
   readonly rows: CompleteWorkingRows
@@ -13,7 +16,8 @@ async function* retainedInput<T>(input: {
   readonly signal?: AbortSignal
 }) {
   if (!input.sealed()) throw new Error('Complete usage input is not sealed')
-  let after: string | null = null, seen = 0n
+  let after: string | null = null,
+    seen = 0n
   for (;;) {
     input.signal?.throwIfAborted()
     const page: CompleteWorkingPage<T> = await input.rows.page<T>(input.namespace, after, 100)
@@ -31,51 +35,59 @@ async function* retainedInput<T>(input: {
   }
 }
 
+async function flushUsageAllocations(rows: CompleteWorkingRows, namespace: string, pending: CompleteWorkingRow[]) {
+  if (!pending.length) return
+  await rows.insert(namespace, pending)
+  pending.length = 0
+}
+
 /** One immutable input population precedes ancestry, ordering and selection. */
-export function completeUsageWorkspace<T extends UsageContributionEvidence>(input: {
+interface UsageWorkspaceInput<T extends UsageContributionEvidence> {
   readonly rows: CompleteWorkingRows
   readonly namespace: string
   readonly keyOf: (value: string) => string
   readonly identity: (record: T) => string
   readonly signal?: AbortSignal
-  readonly order:CompleteUsageOrdering<T>
-}) {
+  readonly order: CompleteUsageOrdering<T>
+}
+
+export function completeUsageWorkspace<T extends UsageContributionEvidence>(input: UsageWorkspaceInput<T>) {
   const space = (suffix: string) => `${input.namespace}/${suffix}`
   const coverage = completeCoverageWorkspace(input.rows, space('coverage'), input.keyOf)
-  const ancestryCache = new Map<string, string>()
-  const pendingAncestry = new Map<string, string>()
+  const ancestry = completeAncestryWorkspace(input.rows, space('ancestry'), input.keyOf, input.signal)
   const pendingAllocations: CompleteWorkingRow[] = []
-  let count = 0n, allocations = 0n, sealed = false
+  let count = 0n,
+    allocations = 0n,
+    sealed = false
   let sort: ReturnType<CompleteUsageOrdering<T>> | undefined
-  async function flushAncestry() {
-    if (!pendingAncestry.size) return
-    await input.rows.insert(space('ancestry'), [...pendingAncestry].map(([key, document]) => ({key, document})))
-    pendingAncestry.clear()
-  }
-  async function flushAllocations() {
-    if (!pendingAllocations.length) return
-    await input.rows.insert(space('allocations'), pendingAllocations)
-    pendingAllocations.length = 0
-  }
-  const records = () => retainedInput<T>({rows:input.rows,namespace:space('input'),sealed:() => sealed,count:() => count,signal:input.signal})
+  const flushAllocations = () => flushUsageAllocations(input.rows, space('allocations'), pendingAllocations)
+  const records = () =>
+    retainedInput<T>({
+      rows: input.rows,
+      namespace: space('input'),
+      sealed: () => sealed,
+      count: () => count,
+      signal: input.signal,
+    })
   const workspace: CompleteUsageWorkspace<T> = {
     coverage: coverage.coverage,
-    records,
+    records: () => completeUsagePrefetch(records(), ancestry.prefetch, input.signal),
     orderedRecords: async function* () {
-      sort ??= input.order({workspace: input.rows, namespace: space('sort'), records: records(), compare: compareCompleteUsage, signal: input.signal})
-      yield* (await sort).records()
+      sort ??= input.order({
+        workspace: input.rows,
+        namespace: space('sort'),
+        records: records(),
+        compare: compareCompleteUsage,
+        signal: input.signal,
+      })
+      yield* completeUsagePrefetch((await sort).records(), (batch) => coverage.prefetchRoots(completeCoverageRootReads(batch)), input.signal)
     },
-    async bindAncestry(group, session, ancestors) {
-      const key = input.keyOf(JSON.stringify([group, session])), path = JSON.stringify(ancestors)
-      const previous = ancestryCache.get(key) ?? pendingAncestry.get(key) ?? await input.rows.get<string>(space('ancestry'), key)
-      if (previous !== undefined && previous !== path) throw new Error('Conflicting observation session ancestry')
-      if (previous === undefined) pendingAncestry.set(key, path)
-      ancestryCache.delete(key); ancestryCache.set(key, path)
-      if (ancestryCache.size > 4096) ancestryCache.delete(ancestryCache.keys().next().value!)
-      if (pendingAncestry.size === 500) await flushAncestry()
-    },
+    bindAncestry: ancestry.bind,
     async allocate(record, contribution, quality) {
-      pendingAllocations.push({key: completeOrdinalKey(allocations++), document: {record, contribution, quality}})
+      pendingAllocations.push({
+        key: completeOrdinalKey(allocations++),
+        document: { record, contribution, quality },
+      })
       if (pendingAllocations.length === 500) await flushAllocations()
     },
   }
@@ -86,19 +98,32 @@ export function completeUsageWorkspace<T extends UsageContributionEvidence>(inpu
       for (let offset = 0; offset < items.length; offset += 500) {
         input.signal?.throwIfAborted()
         const batch = items.slice(offset, offset + 500)
-        await input.rows.insert(space('identities'), batch.map((record) => ({key: input.keyOf(input.identity(record)), document: true})))
-        await input.rows.insert(space('input'), batch.map((document, i) => ({key: completeOrdinalKey(count + BigInt(i)), document})))
+        await input.rows.insert(
+          space('identities'),
+          batch.map((record) => ({
+            key: input.keyOf(input.identity(record)),
+            document: true,
+          })),
+        )
+        await input.rows.insert(
+          space('input'),
+          batch.map((document, i) => ({
+            key: completeOrdinalKey(count + BigInt(i)),
+            document,
+          })),
+        )
         count += BigInt(batch.length)
       }
     },
     seal(expectedRows: string) {
-      if (sealed || !/^(0|[1-9]\d*)$/.test(expectedRows) || BigInt(expectedRows) !== count)
-        throw new Error('Complete usage input EOF count does not match')
+      if (sealed || !/^(0|[1-9]\d*)$/.test(expectedRows) || BigInt(expectedRows) !== count) throw new Error('Complete usage input EOF count does not match')
       sealed = true
     },
     async flush() {
       input.signal?.throwIfAborted()
-      await flushAncestry(); await flushAllocations(); await coverage.flush()
+      await ancestry.flush()
+      await flushAllocations()
+      await coverage.flush()
     },
     allocationsNamespace: space('allocations'),
   }

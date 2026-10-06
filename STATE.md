@@ -1,3 +1,9 @@
+## 2026-10-06 RFC-034 原 TEMP 批量读取与完整检查
+
+九路径候选通过原 getMany 合并冷 ancestry／coverage root，保留同连接、原 key 字节、完整输入／祖先／allocation EOF、四桶与原 AVL／排序；500仅单包，不是人口截止。原 empty EOF／首次点读和 await 写入、flush／evict 一致性保持。真实1201 self-total全部identity与Token对账、521祖先／后页冲突及缓存／取消回归保持原预算。SOURCE-R1两P2 FAIL、首次完整check类型FAIL留证；只修真实fixture model／provider:null后，SOURCE-R3有效有限PASS。
+
+固定改变候选的唯一完整check于05:59:39Z→06:33:34Z终态exit0，9文件字节稳定；结构／lint／后端与console类型通过，6219 pass／157原环境skip／0 fail、289050断言。详见 [本片检查记录](proposal/rfc/RFC-034-runtime-observability/batched-temp-lookup-progress.md)。新确切SHA六CI、镜像／本机八组件部署及原100K／10M双规模继续；旧52c双240分钟timeout保持，不缩人口或放宽判据。producer OFF、CSv2／before-final／seal、CLI／自测／托管实际联动和两RFC仍开放。以下全部共享旧正文与并行输出逐字保留，未联系其他会话。
+
 ## 2026-10-05 RFC-034 原页运输与持久复制候选
 
 原 journal 页按严格64KiB块到实际字节EOF接通Runner／Session，未知root出生保持null。原文附在原首帧既有JSONB，与数字行同一PG事务提交，普通outbox仍只输原数字；真实PG副本与所有缺口判定先于Runner ACK。内部原页HTTP与严格client、结束／普通ACK／重启后的原文保持，不加第二数字账本或迁移。原JSON顺序摘要与实际Unicode字节完整保存。
