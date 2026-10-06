@@ -68,3 +68,21 @@ v7于2026-10-06T00:32:06.850807Z开始，01:03:14.440042Z自然结束，退出0�
 14路径候选单次完整门禁于2026-10-06T02:09:22.472006Z开始，02:43:32.588241Z自然结束，退出0；结构、lint、后端类型和控制台类型四层通过，6204 pass／157环境skip／0 fail、285278断言、1257文件。Bun用例耗时1962.46秒，完整检查首尾包含静态检查，未中途取消或重启。14个功能文件首尾指纹保持，真实PG原配置保持；原件`/private/tmp/cs-rfc037-native-inventory-read-full-v1-receipt.json`，日志SHA256 `8cc48a056a257f452c49f8183a59b09e2099e276db110a6031a61fb907e11b99`。环境skip不算正式原生清理验收。
 
 本批允许清单仅14功能路径与本验收记录、STATE共16路径；精确提交、确切SHA六项hosted CI和本机部署分别记录终态。原专用项目仍存在且删除操作数0；I35等待作者裁定及真正历史缺口不由本次读取修复消除。
+
+## 原生读取修复的确切发布、实际部署与原计划
+
+16路径精确发布为`c597d7e60323b49a1c94ee97c82ab6fab568e4f6`；[CI37405641477](https://github.com/wangbinquan/CrewStation/actions/runs/37405641477)的static、unit、module、console、gate、e2e六项均终态成功。本机于2026-10-06T03:12:10.798Z完成八组件部署，实际Pod imageID及节点OCI revision与该提交一致；250项已安装迁移checksum保持，无迁移作业。API实际uid/gid1000的报告目录独占创建、fsync、回读和删除证明文件通过。原项目的Namespace、Pod、PV/PVC、PG数据库/角色OID、GitLab及专用Registry/SCM配置身份保持；Runner仍为52c8eb74原摘要，正式Probe仍为4e26b38f原Pod UID。回执`/private/tmp/cs-rfc037-c597d7e60323-native-inventory-read-v1-deployment-receipt.json`。
+
+03:12:27.898Z至03:13:35.558Z的实际factory诊断使用部署镜像、原配置与Kubernetes，PG启动default_transaction_read_only=on，未启动后台、服务器或迁移。runtime-environment完整且无阻塞、6资源；release完整且无阻塞、15资源。业务目标服务来源一致，旧执行任务缺失则返回明确中文原因。前后删除操作数0；原件`/private/tmp/cs-rfc037-c597d7e60323-native-inventory-read-live-owner-diagnosis-v1.jsonl`。
+
+管理员仅发起一次新盘点，原项目`01a0f30b-c652-7000-8d6f-553e3b5f6135`的计划`01a10f3a-1b2d-7000-abaa-c8056ae36ed2`于03:20:28.393Z保存，历时219.007秒。22方中18方完整；57项阻塞由business-task、data-control、gateway、provisioning产生，原运行镜像与发布读取故障已消除。最终确认不可用，全平台删除操作数仍为0；不能据此写成永久删除验收通过。原件`/private/tmp/cs-rfc037-c597d7e60323-native-inventory-read-live-plan-v1.json`及截图`/private/tmp/cs-rfc037-c597d7e6-blocked-plan-20261006.jpg`。
+
+创建弹窗再次核对正式`team-assistant.cs.localhost`、预览`preview.team-assistant.cs.localhost`与模板初始代码/页面/API/发布配置说明，仅预览并取消，没有创建替代验收项目。1280×720时弹窗为880×688、底部操作可见；原390/320窄屏证明保持。截图`/private/tmp/cs-rfc037-c597d7e6-project-creation-live-20261006.jpg`。盘点弹窗关闭后dialogCount=0，焦点回到末行永久删除按钮，main scrollTop=1163.5，原项目仍存在；回执`/private/tmp/cs-rfc037-c597d7e6-browser-close-proof-v1.json`。
+
+最终交接`/private/tmp/cs-rfc037-native-inventory-read-deployed-handoff-v1.json`绑定发布、六项CI、实际部署、原计划及关闭证明。后继`b0c7a52ee78f5700cec09715937197a97c26c394`仅增加观测验收文档；本批14功能文件指纹未变，本机main与origin/main同步，实际部署源码仍为c597d7e6。没有因此重跑未变候选的完整门禁。
+
+## 原历史恢复路径的只读审计
+
+接续审计读取平台登记备份元数据及当前PostgreSQL设置：object_backups无记录、archive_mode=off、WAL备份标记0。archiveCommandConfigured字段仅表示SHOW值非空，不能作为归档已启用的证明。缺失业务任务的当前ID与旧tsk键在business_task.recovery_requests、business_task.recovery_audit和task_runtime.development_parent_recovery_sweep中均未找到记录。只读启动参数和20秒statement_timeout均已固定，未修改任何历史或执行删除；操作数仍为0。原件`/private/tmp/cs-rfc037-original-history-recovery-audit-v1.json`与`/private/tmp/cs-rfc037-original-history-recovery-links-v1.json`。
+
+该范围不包含外部持有的备份，不能推断它们不存在。I35仍待作者裁定，批准它也不会自动修复业务、网关及原生PostgreSQL的三类缺失原来源。已批准的原身份、未知归属拒绝和完整after合同保持；完整项目回收仍未完成。

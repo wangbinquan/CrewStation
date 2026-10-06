@@ -3570,3 +3570,11 @@ TaskRuntime七阶段仅受控停止端口，DevSession的原删除许可/回调f
 
 
 2026-10-06 本批14路径原生读取候选完整check自然结束，02:09:22.472006Z至02:43:32.588241Z，退出0：6204 pass／157环境skip／0 fail、285278断言、1257文件；四层静态通过、14功能指纹首尾保持、原专用PG配置不变。回执`/private/tmp/cs-rfc037-native-inventory-read-full-v1-receipt.json`，日志SHA256 `8cc48a056a257f452c49f8183a59b09e2099e276db110a6031a61fb907e11b99`。精确发布允许清单为14功能路径及此共享STATE、本RFC验收记录共16路径；批外Session/RFC-036输出保留。确切SHA六项CI、本机部署与原专用项目全回收继续独立验收；I35仍待作者批准，未以跳过/缺失历史伪称删除成功。
+
+## 2026-10-06 RFC-037 原生读取修复已部署，原历史仍阻断
+
+上述16路径已精确发布`c597d7e60323b49a1c94ee97c82ab6fab568e4f6`；[CI37405641477](https://github.com/wangbinquan/CrewStation/actions/runs/37405641477)六项终态成功。03:12:10.798Z本机八组件就绪，实际Pod imageID和节点OCI revision均核实为该提交；250项已安装迁移及原项目/原生配置身份保持，未执行迁移作业。Runner保持52c8eb74原摘要，正式Probe保持4e26b38f原Pod UID，producer OFF、无新增模型任务。发布、部署和实机回执汇总为`/private/tmp/cs-rfc037-native-inventory-read-deployed-handoff-v1.json`；本机main随后与远端同步到仅追加观测验收文档的`b0c7a52ee78f5700cec09715937197a97c26c394`，不得把该后继文档提交写成实际部署源码。
+
+实际部署factory只读诊断以及管理员唯一一次新计划均确认runtime-environment与release盘点完整。原项目`01a0f30b-c652-7000-8d6f-553e3b5f6135`的计划`01a10f3a-1b2d-7000-abaa-c8056ae36ed2`历时219.007秒，22方中18方完整，57阻塞；business-task、data-control、gateway、provisioning仍不完整。全平台删除操作数0、原项目仍存在、最终确认不可用，尚无物理回收或after证明。创建弹窗、最终正式/预览域名及模板用途再次实机核对；取消和关闭恢复列表末行焦点与scrollTop 1163.5。
+
+接续只读恢复审计确认平台登记的object_backups为空、当前PostgreSQL archive_mode=off且WAL备份标记0；缺失业务任务的当前和旧键在三个已登记恢复表中均无记录。原件`/private/tmp/cs-rfc037-original-history-recovery-audit-v1.json`与`/private/tmp/cs-rfc037-original-history-recovery-links-v1.json`。此检查不证明外部持有的备份不存在，也不把父引用、当前同名对象或缺失行作为原历史。I35全平台巡检边界仍待作者裁定；业务、网关、原生PostgreSQL的缺失原来源还需恢复或另行明确批准相应合同。全部批外WIP与STATE历史保持，没有跨会话消息或新增Agent。
