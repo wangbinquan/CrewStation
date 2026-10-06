@@ -67,7 +67,10 @@ export class ProjectDeletionSession {
       return undefined;
     }
     const operation = this.original(found);
-    if (this.requestObserved(operation)) this.accepted(operation); else this.update({ operation });
+    const plan = this.state.plan;
+    const reviewingOriginal = !this.pending && plan?.operationId === operation.id && plan.supersedes === operation.confirmationDigest
+      && operation.state === 'needs-attention' && operation.phase === 'seal';
+    if (this.requestObserved(operation) && !reviewingOriginal) this.accepted(operation); else this.update({ operation });
     return operation;
   }
   async open(): Promise<void> {

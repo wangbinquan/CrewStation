@@ -64,6 +64,24 @@ describe.skipIf(!available)('删除编排（真实 PG＋有状态外部替身）
       expect(f.external.calls.filter((c) => c.projectId === project.id)).toHaveLength(0);
     } finally { f.external.unavailable.delete('data'); }
   });
+  test('来源失败仅记录内部源码位置，私密异常正文和日志故障都不改变阻断', async () => {
+    for (const loggerFails of [false, true]) {
+      const project = await f.create(), warnings: unknown[] = [];
+      const error = new Error('private-source-password-and-sql');
+      error.stack = 'Error: private-source-password-and-sql\n at capture (/app/modules/platform/adapters/k8s/nativeProjectWork/catalog.ts:24:50)\n at client (/app/packages/k8s/client.ts:35:12)';
+      const owners = f.external.owners.map(owner => owner.participant === 'data' ? { ...owner, inspect: async () => { throw error; } } : owner);
+      const controller = projectDeletionController({ intents: f.intents, owners, workerOwner: 'test', isAdmin: async () => true, enqueue: async () => {},
+        logger: { ...noopLogger, warn: (...args) => { warnings.push(args); if (loggerFails) throw new Error('log unavailable'); } } });
+      const plan = await controller.prepare(f.admin, project.id);
+      expect(plan.complete).toBe(false); expect(plan.participants).toHaveLength(22);
+      expect(plan.blockers).toContainEqual(expect.objectContaining({ participant: 'data', code: 'source-unavailable' }));
+      expect(warnings).toEqual([['project deletion inventory source failed', { projectId: project.id, participant: 'data', sourceLocations: [
+        '/app/modules/platform/adapters/k8s/nativeProjectWork/catalog.ts:24:50', '/app/packages/k8s/client.ts:35:12',
+      ] }]]);
+      expect(JSON.stringify(warnings)).not.toContain('private-source-password-and-sql');
+      expect(f.external.calls.filter(c => c.projectId === project.id)).toHaveLength(0);
+    }
+  });
   test('消费者未停止时只等待，全部 stop 证明之前不调用 purge；恢复后项目根最后清除', async () => {
     const shared = await f.create(), { value, operation } = await f.start(); f.external.waitStop.add('business-task');
     try {

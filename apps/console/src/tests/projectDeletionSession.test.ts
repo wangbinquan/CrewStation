@@ -26,6 +26,37 @@ function fixture() {
     found: (value?: ProjectDeletionOperation) => { found = value; } };
 }
 
+test('原重新确认的完整与阻断清单跨进度轮询和重开保留，读取不再发起确认', async () => {
+  for (const blocked of [false, true]) {
+    const f = fixture(); f.operation.phase = 'seal';
+    const operation = { ...f.operation, state: 'needs-attention' as const }; f.found(operation);
+    const blockers = blocked ? [{ participant: 'release' as const, code: 'source-unavailable', message: '原来源仍需恢复' }] : [];
+    const plan = { ...f.plan, operationId: operation.id, supersedes: operation.confirmationDigest, digest: 'c'.repeat(64), complete: !blocked, blockers };
+    f.api.prepareReconfirmation = async () => plan;
+    const session = f.session(); await session.open(); await session.review();
+    expect(session.getSnapshot().plan).toEqual(plan);
+    await session.refresh(); await session.refresh(); await session.open();
+    expect(session.getSnapshot()).toMatchObject({ loading: false, pending: false, plan, operation });
+    expect(f.sent).toHaveLength(0); expect(f.retained.size).toBe(0);
+    f.elapse(60_001); await session.refresh(); await session.confirm(plan);
+    expect(session.getSnapshot().plan).toEqual(plan); expect(f.sent).toHaveLength(0);
+  }
+});
+
+test('权威进度的确认摘要、状态或阶段变化会使原重新确认清单失效', async () => {
+  for (const changed of ['digest', 'state', 'phase'] as const) {
+    const f = fixture(); f.operation.phase = 'seal';
+    const operation = { ...f.operation, state: 'needs-attention' as const }; f.found(operation);
+    const session = f.session(); await session.open(); await session.review();
+    expect(session.getSnapshot().plan).toBeDefined();
+    const current = { ...operation, confirmationDigest: changed === 'digest' ? 'd'.repeat(64) : operation.confirmationDigest,
+      state: changed === 'state' ? 'running' as const : operation.state, phase: changed === 'phase' ? 'stop' as const : operation.phase };
+    f.found(current); await session.refresh();
+    expect(session.getSnapshot().operation).toEqual(current); expect(session.getSnapshot().plan).toBeUndefined();
+    expect(f.sent).toHaveLength(0); expect(f.retained.size).toBe(0);
+  }
+});
+
 test('确定的原确认拒绝经再次查询查无操作才解除本键，重新盘点仍需另一次显式确认', async () => {
   for (const status of [409, 412]) {
     const f = fixture(), session = f.session(); await session.open();

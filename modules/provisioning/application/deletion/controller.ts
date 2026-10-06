@@ -17,7 +17,7 @@ export function projectDeletionController(deps: DeletionControllerDeps): Project
   const bestEffortQueue = async (id: string) => { try { await deps.enqueue(id); } catch { deps.logger.warn('project deletion queue delayed; persistent recovery will retry', { operationId: id }); } };
   return {
     repairs: deletionOperatorRepairs(deps.intents, deps.owners, deps.isAdmin),
-    prepare: async (actor, id) => { await admin(actor); return deps.intents.prepare(actor, id, await collectDeletionInventory(deps.intents, deps.owners, id)); },
+    prepare: async (actor, id) => { await admin(actor); return deps.intents.prepare(actor, id, await collectDeletionInventory(deps.intents, deps.owners, id, deps.logger)); },
     accept: async (actor, id, input) => {
       await admin(actor); const previous = await deps.intents.replay(actor, id, input); if (previous) return previous;
       const operation = await deps.intents.accept(actor, id, input);
@@ -28,12 +28,12 @@ export function projectDeletionController(deps: DeletionControllerDeps): Project
     retry: async (actor, id) => { await admin(actor); const operation = await deps.intents.retry(actor, id); if (operation.state === 'accepted') await bestEffortQueue(id); return operation; },
     prepareReconfirmation: async (actor, id) => {
       await admin(actor); const operation = await deps.intents.read(actor, id);
-      return deps.intents.prepareReconfirmation(actor, id, await collectDeletionInventory(deps.intents, deps.owners, operation.project.id));
+      return deps.intents.prepareReconfirmation(actor, id, await collectDeletionInventory(deps.intents, deps.owners, operation.project.id, deps.logger));
     },
     reconfirm: async (actor, id, input) => {
       await admin(actor); const previous = await deps.intents.replayReconfirmation(actor, id, input); if (previous) return previous;
       const current = await deps.intents.read(actor, id);
-      const operation = await deps.intents.reconfirm(actor, id, input, await collectDeletionInventory(deps.intents, deps.owners, current.project.id));
+      const operation = await deps.intents.reconfirm(actor, id, input, await collectDeletionInventory(deps.intents, deps.owners, current.project.id, deps.logger));
       await bestEffortQueue(id); return operation;
     },
     enqueue: deps.enqueue,

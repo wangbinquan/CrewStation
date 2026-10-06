@@ -209,3 +209,9 @@ release 原生工作区的 full identity 继续绑定完整消费者/回调选�
 只有事务写入前的确定拒绝返回 details.code=project_deletion_confirmation_rejected，并绑定原 planId/requestKey。console 仅在该明确409/412及请求绑定吻合后重新读取原操作：发现操作继续显示原回执；读取为空或原重新确认仍阻塞、且持久键与本请求一致时才清除本键并展示 plan-invalid。其他错误、读取失败、换操作或另一窗口键保持未知结果，不自动发新请求。既有统一两层确认、取消/Esc及列表上下文保持。
 
 回归包括真实PG无二次前置扫描/原子deleting/同键重放、封存前身份变化零清理、过期与不完整拒绝标记；原生回调新增与真实对象/缓存出生边界；console确定拒绝恢复、未知错误和跨窗口键保留。实际原项目仍需154个回执及全部独立AFTER，不能以替身通过关闭RFC。
+
+## I36-T14 轮询保留原重新确认计划
+
+ProjectDeletionSession.read在无待定请求、原operation ID一致、state为needs-attention且phase为seal、当前plan.operationId与plan.supersedes都匹配时，只更新operation，保留已准备的完整或阻断计划。其余权威状态（新确认摘要、运行、后续阶段、成功）仍执行accepted清理。轮询始终只读，不发新计划或删除请求。回归包含完整和阻断清单跨refresh/open保留，以及确认摘要或phase/state改变后失效；实际正式浏览器需跨两个5秒周期仍显示完整阻断或确认清单。
+
+T14诊断补充：在线API容器内额外构造整套Root触发22:14:05Z的OOMKilled并重启，停止该方案。三个来源失败由现有服务在盘点catch处记录participant、projectId及源码调用位置；只提取/app/modules与/app/packages的固定文件/行号，不记录异常消息、SQL、请求、堆栈首行或业务正文。报告仍为source-unavailable，资源与许可判定不变；验证内部日志有可定位调用位置且原错误中的私密内容不会输出。
