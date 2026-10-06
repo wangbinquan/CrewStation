@@ -19,3 +19,13 @@ test('frozen release inventory validates all three complete original kinds and n
   expect(HistoricalReleaseRegisteredInventorySchema.safeParse(event({ ...producer, spec: { ...producer.spec, produces: [{ ...producer.spec.produces[0], unexpected: true }] } })).success).toBe(false);
   expect(HistoricalReleaseRegisteredInventorySchema.safeParse(event({ ...proxy, spec: { ...proxy.spec, upstream: { connection: 'original', unexpected: true } } })).success).toBe(false);
 });
+
+test('the frozen pre-identity compute-name grammar is complete and rejects mixed versions, extra fields and incomplete profiles', () => {
+  const agent = { name: 'original', compute: 'sample-stub', permission: 'read-only', systemPromptFile: 'original.md' };
+  const manifest = (agentProfiles: unknown[]) => ({ apiVersion: 'crewstation/v1', kind: 'DigitalWorker', spec: { service, tasks: { profile: 'standard-small', agentProfiles } } });
+  expect(HistoricalReleaseRegisteredInventorySchema.safeParse(event(manifest([agent]))).success).toBe(true);
+  for (const profile of [{ ...agent, extra: true }, { ...agent, compute: '' }, { ...agent, compute: { kind: 'default' } }, { ...agent, driver: 'stub', model: 'original/model' }, { name: 'missing' }])
+    expect(HistoricalReleaseRegisteredInventorySchema.safeParse(event(manifest([profile]))).success).toBe(false);
+  expect(HistoricalReleaseRegisteredInventorySchema.safeParse(event(manifest([agent, { name: 'older', driver: 'stub', model: 'original/model' }]))).success).toBe(false);
+  expect(HistoricalReleaseRegisteredInventorySchema.safeParse(event(manifest([agent, agent]))).success).toBe(false);
+});

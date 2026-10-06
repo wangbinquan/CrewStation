@@ -1,4 +1,4 @@
-/** Inventory-only frozen pre-RFC001 shape from fc833a01c4a6811e1bfaab0ae457ade21122fa67; never used by event replay or release execution. */
+/** Inventory-only grammars frozen at fc833a01c4a6811e1bfaab0ae457ade21122fa67 and f94f0f324efdb9c40d8bb20087c3f23ae1fc7a1d; never used by event replay or release execution. */
 import { z } from 'zod';
 import { SlugSchema } from '../../ids';
 
@@ -25,13 +25,18 @@ export const OutputContractSchema = z.object({
   schema: z.string().min(1).optional(),
 }).strict();
 
-export const TasksSpecSchema = z.object({
+const ComputeAgentProfileSchema = AgentProfileSchema.omit({ driver: true, model: true }).extend({ compute: SlugSchema }).strict();
+const taskFields = {
   /** 管理员定义的任务容器套餐。 */
   profile: SlugSchema,
   defaultVolumeMode: VolumeModeSchema.default('follow-container'),
-  agentProfiles: z.array(AgentProfileSchema).default([]),
   outputContracts: z.array(OutputContractSchema).default([]),
-}).strict().refine((t) => new Set(t.agentProfiles.map((p) => p.name)).size === t.agentProfiles.length, 'agentProfiles 名称重复')
+};
+// Each complete tasks document belongs to one historical grammar; mixed driver/compute profiles are rejected.
+export const TasksSpecSchema = z.union([
+  z.object({ ...taskFields, agentProfiles: z.array(AgentProfileSchema).default([]) }).strict(),
+  z.object({ ...taskFields, agentProfiles: z.array(ComputeAgentProfileSchema).default([]) }).strict(),
+]).refine((t) => new Set(t.agentProfiles.map((p) => p.name)).size === t.agentProfiles.length, 'agentProfiles 名称重复')
   .refine((t) => new Set(t.outputContracts.map((c) => c.name)).size === t.outputContracts.length, 'outputContracts 名称重复');
 
 export type AgentDriver = z.infer<typeof AgentDriverSchema>;

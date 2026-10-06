@@ -9,9 +9,9 @@ import { operatorRetentionFixture } from './operatorRetentionFixture';
 
 const available = await testDatabaseAvailable();
 const request = (item: ProjectDeletionRepairItem) => ({ owner: item.owner, key: item.key, originalDigest: item.originalDigest, evidenceDigest: item.evidenceDigest, decision: 'retain' as const });
-async function historicalEvent(f: Awaited<ReturnType<typeof operatorRetentionFixture>>) {
+async function historicalEvent(f: Awaited<ReturnType<typeof operatorRetentionFixture>>, compute = false) {
   const original = { projectId: 'prj_' + '1'.repeat(32), serviceId: 'svc_' + '2'.repeat(32), releaseId: 'rel_' + '3'.repeat(32), tag: 'v0.1', commitSha: 'original', occurredAt: '2026-09-10T00:00:00Z',
-    manifest: { apiVersion: 'crewstation/v1', kind: 'DigitalWorker', spec: { service: { command: ['run'], port: 3000, plan: 'small' }, tasks: { profile: 'standard-small', agentProfiles: [{ name: 'chat-v1', driver: 'stub', model: 'original/model' }] } } } };
+    manifest: { apiVersion: 'crewstation/v1', kind: 'DigitalWorker', spec: { service: { command: ['run'], port: 3000, plan: 'small' }, tasks: { profile: 'standard-small', agentProfiles: [compute ? { name: 'chat-v1', compute: 'sample-stub', permission: 'read-only' } : { name: 'chat-v1', driver: 'stub', model: 'original/model' }] } } } };
   const identities = new Map<string, string>(), resolve = async (kind: string, keys: readonly string[]) => {
     const key = jsonHash([kind, keys]); let value = identities.get(key); if (!value) { value = newResourceId(); identities.set(key, value); } return value;
   };
@@ -21,6 +21,26 @@ async function historicalEvent(f: Awaited<ReturnType<typeof operatorRetentionFix
   await f.database.db.execute(sql`UPDATE platform_infra.domain_events SET legacy_payload=${JSON.stringify(original)}::jsonb,identity_provenance=${JSON.stringify(proof)}::jsonb WHERE id=${id}::bigint`);
   return { id, payload, original, proof };
 }
+
+test.skipIf(!available)('the frozen compute-name release grammar preserves complete known and missing-owner events without hiding the remaining repair candidates', async () => {
+  const f = await operatorRetentionFixture();
+  try {
+    const history = await historicalEvent(f, true), before = await f.snapshot();
+    f.state.known = true; expect(await f.owner().inspect(f.target)).toEqual([]); f.state.known = false;
+    const [item] = await f.owner().inspect(f.target);
+    expect(item?.key).toBe('event:' + history.id); expect(item?.allowedDecisions).toEqual(['retain']);
+    expect(item?.facts.filter(fact => fact.label.startsWith('历史原引用'))).toHaveLength(3);
+    await f.owner().confirm(f.target, f.actor, request(item!));
+    expect((await f.owner().inspect(f.target))[0]!.confirmed?.decision).toBe('retain');
+    expect(await f.snapshot()).toEqual(before);
+    const normalization = f.origins.historicalReleaseNormalization!;
+    f.origins.historicalReleaseNormalization = async () => ({ ...(history.payload as object), commitSha: 'changed' });
+    await expect(f.owner().confirm(f.target, f.actor, request(item!))).rejects.toThrow();
+    f.origins.historicalReleaseNormalization = normalization;
+    for (const key of ['active', 'shared'] as const) { f.state[key] = true; expect((await f.owner().inspect(f.target))[0]!.allowedDecisions).toEqual([]); f.state[key] = false; }
+    expect(await f.snapshot()).toEqual(before);
+  } finally { await f.database.drop(); }
+});
 
 test.skipIf(!available)('a complete known historical driver/model event no longer aborts the entire repair candidate EOF; current execution still rejects it', async () => {
   const f = await operatorRetentionFixture();

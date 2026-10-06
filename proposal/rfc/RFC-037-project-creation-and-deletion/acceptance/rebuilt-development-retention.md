@@ -1,6 +1,6 @@
 # I36：重建开发任务的当前保留基线
 
-作者已批准 `legacy-recovery-options.md` 最后一节“允许按当前身份逐项保留”。本片实现已完成相关检查，确切提交／六项 CI／部署及原项目实际删除、独立 AFTER 继续；不记 RFC 完成。
+作者已批准 `legacy-recovery-options.md` 最后一节“允许按当前身份逐项保留”。本片 a0185949 已完成确切提交／六项 CI／八组件部署；新发现的旧算力格式读取修复及原项目实际删除、独立 AFTER 继续，不记 RFC 完成。
 
 仅补充缺少旧 UID 的外项目 dev-session 旧网关记录：当前公开原任务、环境、服务和持久 Pod UID 必须一致，原名字不存在。完整 Pod EOF、全部正规／init／临时容器、实际挂载 PVC、全量 PVC／PV 及 claimRef 必须核清；目标关联、其他消费者、共享实际卷、未知卷来源和任何读取缺口继续阻断。当前完整 Pod 及确认摘要来自同一分页快照；卷按实际路径或 driver／handle 核对，而非仅凭任务的 PVC 名推断。
 
@@ -19,3 +19,13 @@ bb5d88761ac9 的确切 SHA 六项 hosted CI 全成功。其首次迁移因 Docke
 磁盘事故中平台 PostgreSQL 原 Pod 内进程自然重启，旧 containerID 保留作历史，不称其仍运行。正式当前物理来源连续两次一致，原 Pod／Node／Service／PVC／PV UID、mount／provider path 及独立原数据库／角色 OID 全保持。新唯一 Job `rfc037-i36-followup-migrate-bb5d88761ac9-r3` 成功安装第255项，原254 checksum保持；bb5八组件实际 OCI 与 Ready 验核，原 Runner13996451、Probe4e26及全部项目原资源保持。不可覆盖回执 `cs-rfc037-bb5d88761ac9-i36-followup-retry-v2-deployment-receipt.json`，此前失败证据保留。
 
 部署后真实浏览器：创建弹窗显示标识决定且不可后改域名、正式 `rfc037-modal-preview.cs.localhost`／待验证 `preview.rfc037-modal-preview.cs.localhost` 与模板生成初始代码和发布配置的作用；未创建新资源，关闭草稿。截图 `cs-rfc037-i36-creation-modal-deployed-v2.png`。长驻完整预检后顶层归属弹窗 Esc 只关顶层，最终返回原删除按钮焦点及列表滚动1163.5保持，回执 `cs-rfc037-i36-bb5-long-dialog-close-v1.json`。原项目仍 active、删除 operation 为0；本片部署后重新读取完整候选并逐项确认，再执行原项目永久回收与全部独立 AFTER。
+
+## a018 实际上线与历史算力格式接续
+
+`a0185949d1a297c803366dc6550334bd513de69f` 的 [确切六项 CI](https://github.com/wangbinquan/CrewStation/actions/runs/37469114226) 全成功；八组件 Ready、实际节点 OCI／Pod 镜像与提交一致，原255迁移 checksum保持、没有DDL或新迁移Job。部署回执 `cs-rfc037-a0185949d1a2-i36-development-retention-v1-deployment-receipt.json`。重新预检315.556秒、22方完整返回，60个已知归属阻断；原项目 active、operation0。已批准的原记录、10个外项目运行Pod及新增重建开发任务与原独立BEFORE逐项一致，重建任务候选当前全部事实完整、无阻断。
+
+实际确认读取事件109又发现 v1 的 compute 档位名格式被仅冻结 driver／model 的历史契约拒绝。仓内原提交 `f94f0f324efdb9c40d8bb20087c3f23ae1fc7a1d` 的完整档案与既有 fc833a01 格式分别严格校验；禁止混合历史档案、额外字段、未知或残缺值。仅读取器增加另一真实历史格式，当前事件生产／重放／执行、原迁移声明及未知归属负向保留要求均保持。
+
+新真实PG回归先复现相同driver／model／compute三处错误，再修复；六文件15 pass／0 fail、171断言，精确结构／类型／lint全通过，官方改动行7／7、100%无违规。候选语法在a018实例内独立隔离只读重构，对实际完整813个事件、34个旧发布和35个当前发布核验全部格式、双摘要及原不可变迁移重新推导，零错误、无写入。该证明是候选来源验证，不冒充已部署增量；私有回执 `cs-rfc037-i36-compute-history-live-full-readonly-v1.jsonl`。
+
+PG来源探针与其他只读盘点发生读占用，原错误留证；占用结束后的第10次有限只读检查得到完整当前reclaim候选，零阻断，两个原库OID276598／276606、角色276597／276605、原Pod／当前容器／PVC／PV及实际目录全部一致，未补旧14NULL。回执 `cs-rfc037-i36-a018-repair-readonly-diagnostics-v2.jsonl`。本有限候选沿开发规则§3精确检查接干净提交CI，已知外部在制品的完整门失败不重复、不删改。新确切发布／CI／部署后，继续完整归属保存、原项目双确认实际删除及全部独立AFTER。

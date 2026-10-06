@@ -36,3 +36,15 @@ test('the complete frozen grammar supports all original kinds and rejects extra 
   const duplicate = [raw.manifest.spec.tasks.agentProfiles[0], raw.manifest.spec.tasks.agentProfiles[0]];
   expect(HistoricalReleaseRegisteredInventorySchema.safeParse({ ...raw, manifest: { ...raw.manifest, spec: { ...raw.manifest.spec, tasks: { ...raw.manifest.spec.tasks, agentProfiles: duplicate } } } }).success).toBe(false);
 });
+
+test('the immutable event migration reproduces the frozen compute-name grammar with scoped original profile aliases', async () => {
+  const raw = original(), before = structuredClone(raw), calls: string[][] = [];
+  const input = { ...raw, manifest: { ...raw.manifest, spec: { ...raw.manifest.spec, tasks: { ...raw.manifest.spec.tasks, agentProfiles: [{ name: 'chat-v1', compute: 'sample-stub', permission: 'read-only' }, { name: 'default-agent', compute: 'default' }] } } } };
+  const result = await reproduceHistoricalRelease(input, { resolve: async (kind, keys) => { calls.push([kind, ...keys]); return Bun.randomUUIDv7(); } });
+  expect(calls).toContainEqual(['compute-profile', 'sample-stub']);
+  expect(calls).toContainEqual(['agent-profile', raw.serviceId, 'chat-v1']);
+  expect(result).toMatchObject({ manifest: { apiVersion: 'crewstation/v2', spec: { tasks: { agentProfiles: [{ name: 'chat-v1', compute: { kind: 'profile' }, permission: 'read-only' }, { name: 'default-agent', compute: { kind: 'default' } }] } } } });
+  expect(DomainPayloadSchemas[DomainTopic.releaseRegistered].strict().safeParse(result).success).toBe(true);
+  expect(DomainPayloadSchemas[DomainTopic.releaseRegistered].strict().safeParse(input).success).toBe(false);
+  expect(raw).toEqual(before);
+});
