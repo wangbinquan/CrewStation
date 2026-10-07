@@ -51,3 +51,24 @@ T14候选固定5个功能路径：自动读取只在同一operation、同一supe
 修复只为既有本地来源的严格14字段恢复原生成顺序，全部原值、出生身份与已发布摘要保持；其他origin格式完整保留为opaque。真实PG JSONB保存后分别重建release/runtime工厂，完整范围通过；PVC、容器、Node、root epoch或未知字段变化仍拒绝且无物理清理。最终实际五文件24 pass／4个既有Linux环境skip／0 fail、213断言；精确lint、整仓后端及console类型、arch四层通过，官方改动行4／4、100%无违规。原两个完整fence本机解析四层均通过，未观察在线来源、未取得写许可，不替代实际AFTER。固定3路径指纹 cs-rfc037-i36-registry-jsonb-candidate-v2.json，实际检查 green-v2、static-v2、patch-v2（均/tmp前缀）。
 
 T14已精确提交推送6143f539787b8ab4f9b6cf2f6de1b225fd4bd507，六CI和正式部署继续，其唯一完整check未取消。当前完整日志已观察三个外部observability失败，保存实际文件、上下文摘要与当前七个外部来源指纹；其中三个来源相对旧终态已继续开发，不能再声称七个均未变。按development-rules §3，自有检查通过后接精确7路径发布和确切提交树六CI；新的T15唯一完整检查以共享锁事件等待前一检查终态，不重复整仓门禁、不阻断其他开发。证据 cs-rfc037-i36-registry-jsonb-inprogress-audit-v1.json。原项目仍needs-attention/seal，7回执；PG当前基线、两个实际在线来源、原操作全部资源回收及独立AFTER尚待完成。
+
+## T14 正式部署、真实轮询与当前 PG 确认
+
+6143f539787b8ab4f9b6cf2f6de1b225fd4bd507 的37542796646六项CI全部success，八组件正式部署就绪，256迁移及原Runner／探针／存储守卫通过，部署回执 cs-rfc037-6143f539787b-i36-reconfirmation-v1-deployment-receipt.json。实际管理员刷新后从长列表原项目打开统一进度弹窗，同一原操作重新盘点返回22方清单，并跨实际5秒轮询保持；证据 cs-rfc037-i36-reconfirmation-polling-preserved-v1.json。正式服务的有界源码日志分别定位到既有release/runtime Registry材料比较行，吻合T15离线完整原范围复现。
+
+实际“确认旧资源归属”FormDialog逐条核对当前PostgreSQL，两个原数据库OID 276598／276606、两个原角色OID 276597／276605、原Pod／PVC／PV保持，容器见证为已单独核实的1706ad8312e1…重启实例。当前完整原记录摘要c30126b7…、证据摘要b35a2128…；按既有B授权选择并正式保存一条当前基线，23:32:22.395Z持久确认。只读精确单确认行回读验证当前容器、原Pod与四个原OID，不汇总历史；原14条NULL和两个缺旧正文继续原样。证据 current-postgres-baseline-{ui,confirm,saved}-v2（均/tmp/cs-rfc037-i36-前缀）。保存不会删除资源，随后自动进行新完整盘点；原操作仍须原两次确认及实际AFTER。
+
+T14唯一完整check于23:32:55.423630Z自然结束：6376 pass／157 skip／5 fail、437346断言、1300文件。四项外部observability在制品失败；另一个Registry字段顺序回归是在此门运行期间新增的T15用例，旧门混合了候选，不作为T15完整通过。五项原失败及冻结T14五路径保持的证据全数保留：cs-rfc037-i36-reconfirmation-full-terminal-audit-v1.json。T15的新固定候选唯一完整check已在同一共享锁释放后于23:32:55.483339Z启动；不取消、不再启动一轮。当前T15定向24／0、静态四层及4／4保持，精确提交2f26fc4a0b7e96bcc198a215e2dc04c6882c4bc2的六CI、部署、实际清理与全部独立AFTER继续。
+
+
+## T15 唯一完整终态与实机用例整体预算
+
+原冻结3路径唯一完整check于2026-10-07T00:19:47.314972Z自然终态：6382 pass／157环境skip／1 fail，437429断言，1300文件。唯一失败为TaskRuntime工作盘归档的实机用例在默认5000ms整体预算处超时；原失败、原候选及日志均保持，不能以单独重跑2／0替代完整通过。该文件相邻用例已经明确采用15000ms，且单独实际耗时6148ms；两者都包含真实PG迁移、资源装配及异步收尾。只把第二条整体用例预算与已有第一条对齐至15000ms，实际待决credential、seal、外项目可用、零迟到资源及全部finally/完整原历史断言逐字保持，不放宽产品时限或停止证明。冻结原3路径及这一测试共4路径，启动修订候选唯一完整检查；完成前不关闭RFC。原终态审计 cs-rfc037-i36-registry-jsonb-full-terminal-audit-v1.json 的 allowedToClose=false。
+
+
+## T16 实际测量锁竞争
+
+实际最小原Registry来源只读复查完成，controller原UID a7e17ca8-7916-4736-8383-355c1cc84de6、容器c4921306a573…、restartCount=0保持，platformRootsCreated=0。release 328次正式测量busy409后35081ms退出（AbortError），runtime 36次409后30415ms完整，consumerCount=0、原sourceIdentity保持，两次真正完整graph分别11931ms与12587ms。原独立BEFORE及全部物理实例不改，结果保存 cs-rfc037-i36-registry-live-minimal-readonly-v1.json/.jsonl。最初红用例错误使用非协议busy正文，单独保留red-v1；修正为真实精确正文后red-v2稳定在原短预算退出，不能把v1的未知409失败当作预算红。60秒统一capture/client后实际3文件20／0、89断言，包括实际文件图和所有取消／到期／未知错误守卫；带原专用真实PG的4文件最终回归、四静态、防护及唯一完整门接续。
+
+
+T16最终固定3路径真实4文件22／0、119断言，精确lint和后端类型通过；console类型与结构沿未变更层复用，静态共4／4，官方改动行3／3、100%。初始测试fetch签名类型错误已修正，原static-v2失败保留，最终static-v3通过。原T15全库6382／157／1超时原样，第二条真实PG整体预算按相邻用例修正而实际封闭断言不改；新固定候选唯一全库检查排队，不能当作通过。按作者最快上库/部署授权接确切提交树六CI；六CI成功才部署，原项目实际回收及全部独立AFTER继续。

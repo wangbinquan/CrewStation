@@ -93,5 +93,5 @@ describe.skipIf(!available)('original TaskRuntime storage work (actual factory a
       expect((await f.work.history(f.project)).every((row) => row.exited)).toBe(true);
       await expect(archive.values(newResourceId())).rejects.toThrow('实际原任务');
     } finally { f.release.resolve(); await issuing; await sealing; await f.drop(); }
-  });
+  }, 15_000); // Same serial real-PG fixture and teardown budget as the adjacent case; actual promise and seal assertions stay unchanged.
 });

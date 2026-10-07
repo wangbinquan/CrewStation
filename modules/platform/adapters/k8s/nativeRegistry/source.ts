@@ -10,15 +10,16 @@ import {registryProbe,registryServer,registryStorage,registryUnavailable} from '
 import type {RegistrySourceOptions} from './origin';
 
 export type RegistryInventoryQuery=Pick<RegistryInventoryRequest,'exact'|'prefixes'|'retainedDigests'|'retainedManifests'|'protectedRepositories'>;
+const READ_BUDGET_MS=60_000;
 /** Read-only bridge to the actual service, runtime image, volume and node probe; no writer/erasure claim. */
 export function nativeRegistrySource(k8s:K8sClient,raw:RegistrySourceOptions,fetcher:typeof fetch=fetch) {
   const options={...raw};
   if(options.probeToken.length<32||!isAbsolute(options.probeRoot)||!/^sha256:[a-f0-9]{64}$/.test(options.imageDigest)||![options.port,options.probePort].every(p=>Number.isInteger(p)&&p>0&&p<=65535))throw registryUnavailable('Registry 原来源配置不完整');
   const capture=async (rawQuery:RegistryInventoryQuery,callerSignal?:AbortSignal)=>{
     const query=structuredClone(rawQuery);
-    const signal=AbortSignal.any([...(callerSignal?[callerSignal]:[]),AbortSignal.timeout(40_000)]),server=await registryServer(k8s,options,signal);
+    const signal=AbortSignal.any([...(callerSignal?[callerSignal]:[]),AbortSignal.timeout(READ_BUDGET_MS)]),server=await registryServer(k8s,options,signal);
     const volume=await registryStorage(k8s,options,server.pod,signal),probe=await registryProbe(k8s,options,server.node.name,signal);
-    const client=createRegistryInventoryClient({baseUrl:`http://${isIP(probe.address)===6?'['+probe.address+']':probe.address}:${options.probePort}`,token:options.probeToken,
+    const client=createRegistryInventoryClient({baseUrl:`http://${isIP(probe.address)===6?'['+probe.address+']':probe.address}:${options.probePort}`,token:options.probeToken,timeoutMs:READ_BUDGET_MS,
       fetch:(url,init)=>fetcher(url,init)});
     const started=Date.now(),key=jsonHash({namespace:server.namespace.metadata.uid,service:server.service.metadata.uid,pvc:volume.pvc.metadata.uid,pv:volume.pv.metadata.uid,query});
     const inventory=await client.observe({key,rootId:'local',directory:basename(volume.path),...query},signal);

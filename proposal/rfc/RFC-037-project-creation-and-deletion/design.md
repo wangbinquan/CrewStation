@@ -221,3 +221,11 @@ T14诊断补充：在线API容器内额外构造整套Root触发22:14:05Z的OOMK
 实际单行原release fence为8,118,118字节、runtime fence为20,721字节；本机纯解析确认retained与native-work均通过，两个Registry materials都在原范围比较处失败。packages/filesystem-metrics/registry/retained.ts以JSON.stringify摘要包含opaque origin；JSONB改变origin字段排列。平台nativeRegistry/source.ts已有固定14字段原来源顺序。只恢复这一完整已声明本地来源的编码顺序，通过严格14字段schema读取；其他来源形状沿既有opaque契约，不省略未知字段。该schema值约束与生成器已有来源完全对应，任何UID、容器、镜像、卷、节点、物理路径或epoch变化都继续影响摘要。
 
 真实原件的只读重建证据 /tmp/cs-rfc037-i36-registry-origin-order-proof-v1.json 表明两者origin字段和值均未变，完整physical scope、nativeHistory digest全部精确再现。原件和旧摘要不改，不采用新birth、不引入兼容身份白名单。修复落在原registry/retained primitive；回归为filesystem方法用例与platform既有OwnerComposition的真实PG JSONB保存/重读/重建工厂，以及身份和未知字段变化拒绝。持续中的T14唯一完整门不取消、不重复；此增量单独检查并以新确切提交树六CI为准。
+
+
+## I36-T16 原Registry完整读取的测量竞争
+
+只读最小适配器在现有controller读取原留存registry历史，未构造平台Root、未打开DB、未执行写许可；原controller UID／容器／OCI／restartCount保持。release连续328次精确测量busy409后在内层35081ms退出；runtime同原身份等待后30415ms完成完整graph／全部消费者／再次graph读，consumerCount=0。原source外围40秒与client默认35秒不一致，使正常完整读取被短内层预算中断。将该安装来源的整个capture与内层client统一为60秒，全部K8s分页、原Pod/PVC/PV/Node/probe、原filesystem epoch、时间和范围验证原样；精确busy才重读，未知409/403、到期和调用者取消一律拒绝。测试压缩真实35/40/60秒定时器，使用实际busy重试、实际文件图与原K8s来源，拒绝永久忙和未知冲突；不延长任何产品销毁许可。TaskRuntime仅对齐已有相邻真实PG用例15000ms整体预算，全部实际断言保持。修订候选唯一全库检查排队，确切提交六CI、实际部署与原操作全部AFTER分别留证。
+
+
+T16最终固定3路径真实4文件22／0、119断言，精确lint和后端类型通过；console类型与结构沿未变更层复用，静态共4／4，官方改动行3／3、100%。初始测试fetch签名类型错误已修正，原static-v2失败保留，最终static-v3通过。原T15全库6382／157／1超时原样，第二条真实PG整体预算按相邻用例修正而实际封闭断言不改；新固定候选唯一全库检查排队，不能当作通过。按作者最快上库/部署授权接确切提交树六CI；六CI成功才部署，原项目实际回收及全部独立AFTER继续。

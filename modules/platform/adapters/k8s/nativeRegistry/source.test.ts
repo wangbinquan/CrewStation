@@ -1,4 +1,4 @@
-import {describe,test,expect} from 'bun:test';
+import {describe,test,expect,spyOn} from 'bun:test';
 import {createHash} from 'node:crypto';
 import {mkdtemp,mkdir,writeFile,rm,rename} from 'node:fs/promises';
 import {join} from 'node:path';
@@ -29,6 +29,27 @@ async function fixture(){
   return {root,base,k8s,options,query,fetcher,calls,adapter:nativeRegistrySource(k8s,options,fetcher),drop:()=>rm(root,{recursive:true,force:true})};
 }
 describe('actual registry source bridge; real filesystem and controlled K8s',()=>{
+  test('original Registry capture waits for probe contention within one bounded read, while deadline, caller cancellation and non-busy errors still reject',async()=>{
+    const f=await fixture(),timeout=AbortSignal.timeout.bind(AbortSignal);
+    // Compress the actual installed 35/40/60s timers; keep real contention retries, filesystem reads and original K8s validation.
+    const timer=spyOn(AbortSignal,'timeout').mockImplementation(ms=>timeout(ms===35_000?70:ms===40_000?90:ms===60_000?300:ms));
+    const busy=()=>Response.json({error:'A measurement is already running'},{status:409});
+    try{
+      let calls=0;
+      const fetcher=(async(url,init)=>++calls===1?busy():f.fetcher(url,init))as typeof fetch;
+      const original=await nativeRegistrySource(f.k8s,f.options,fetcher).capture(f.query);
+      expect(calls).toBe(2);expect(original.inventory.blobs).toHaveLength(3);expect(original.origin.pvcUid).toBe('pvc-original');expect(f.k8s.deleted).toHaveLength(0);
+      const expired=(async(_url,_init)=>busy())as typeof fetch;
+      await expect(nativeRegistrySource(f.k8s,f.options,expired).capture(f.query)).rejects.toThrow();
+      const cancelled=new AbortController();cancelled.abort();calls=0;
+      await expect(nativeRegistrySource(f.k8s,f.options,fetcher).capture(f.query,cancelled.signal)).rejects.toThrow();expect(calls).toBe(0);
+      for(const response of [new Response(null,{status:403}),Response.json({error:'other_conflict'},{status:409})]){
+        calls=0;const rejected=(async(_url,_init)=>{calls++;return response;})as typeof fetch;
+        await expect(nativeRegistrySource(f.k8s,f.options,rejected).capture(f.query)).rejects.toThrow();expect(calls).toBe(1);
+      }
+      expect(f.k8s.deleted).toHaveLength(0);
+    }finally{timer.mockRestore();await f.drop();}
+  });
   test('a caller changing repository scope while the original source is being read cannot change that capture',async()=>{
     const f=await fixture();try{
       const get=f.k8s.get.bind(f.k8s);let release!:()=>void,entered!:()=>void;
