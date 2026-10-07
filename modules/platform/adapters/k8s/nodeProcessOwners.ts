@@ -7,6 +7,7 @@ import { jsonHash, precondition } from '@crewstation/kernel';
 import { originalNodeProbe } from './nodeFileConsumers';
 import type { NodeConsumerOrigin } from './nodeFileConsumers';
 import { freshPlatformNode } from './platformPodTermination';
+import { onlyReportedHostFamilyChanged } from './nodeProbeObservation';
 export interface NodeProcessOwnerOrigin extends NodeConsumerOrigin { cgroupNamespace: string }
 
 /** Whole original host process groups, bound to the same installation as
@@ -27,7 +28,8 @@ export function nodeProcessOwnerSource(k8s: K8sClient, raw: { namespace: string;
       if (source && source.identity !== current.identity) throw unavailable(); source = current; observed.push(result);
     }
     const current = await k8s.get(Resources.Pod!, probe.metadata.name, options.namespace, signal);
-    if (!current || current.metadata.uid !== probe.metadata.uid || current.metadata.resourceVersion !== probe.metadata.resourceVersion || current.metadata.deletionTimestamp) throw unavailable();
+    if (!probe.metadata.resourceVersion || !current?.metadata.resourceVersion || current.metadata.uid !== probe.metadata.uid || current.metadata.deletionTimestamp
+      || current.metadata.resourceVersion !== probe.metadata.resourceVersion && !onlyReportedHostFamilyChanged(probe, current)) throw unavailable();
     const bindings = observed.flatMap(row => row.owners);
     return { source: source!, complete: true as const, owners: bindings, count: bindings.reduce((count, row) => count + row.threads.length, 0), digest: jsonHash({ source, owners, observed }) };
   };

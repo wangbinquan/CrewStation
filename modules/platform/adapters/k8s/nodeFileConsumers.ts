@@ -6,6 +6,7 @@ import type { K8sClient, K8sObject } from '@crewstation/k8s';
 import { jsonHash, precondition } from '@crewstation/kernel';
 import { completeRegistryObjects } from './nativeRegistry/origin';
 import { freshPlatformNode } from './platformPodTermination';
+import { onlyReportedHostFamilyChanged } from './nodeProbeObservation';
 
 export interface NodeConsumerOrigin { readonly identity: string; readonly probeUid: string; readonly containerId: string; readonly imageId: string; readonly nodeUid: string; readonly nodeName: string; readonly bootId: string; readonly namespace: string }
 interface Spec { hostPID?: boolean; nodeName?: string; containers?: Array<{ name: string; env?: Array<{ name: string; value?: string }>; envFrom?: unknown[]; securityContext?: { runAsUser?: number; readOnlyRootFilesystem?: boolean; allowPrivilegeEscalation?: boolean; capabilities?: { add?: string[] } } }> }
@@ -31,7 +32,8 @@ export function nodeFileConsumerSource(k8s: K8sClient, raw: { namespace: string;
       count += result.consumers.length; digests.push(jsonHash(result));
     }
     const current = await k8s.get(Resources.Pod!, probe.metadata.name, options.namespace, signal);
-    if (!current || current.metadata.uid !== probe.metadata.uid || current.metadata.resourceVersion !== probe.metadata.resourceVersion || current.metadata.deletionTimestamp) throw unavailable();
+    if (!probe.metadata.resourceVersion || !current?.metadata.resourceVersion || current.metadata.uid !== probe.metadata.uid || current.metadata.deletionTimestamp
+      || current.metadata.resourceVersion !== probe.metadata.resourceVersion && !onlyReportedHostFamilyChanged(probe, current)) throw unavailable();
     return { source: source!, complete: true as const, count, digest: jsonHash({ source, files: unique, observations: digests }) };
   };
   return { capture: (node: { uid: string; name: string }, identities: ConsumerRequest['identities']) => read(node, identities),

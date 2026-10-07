@@ -1,3 +1,4 @@
+import { setTimeout as delay } from 'node:timers/promises';
 import { ProcessOwnerRequestSchema, ProcessOwnerResponseSchema } from './protocol';
 import type { ProcessOwnerRequest } from './protocol';
 import { observeProcessOwners } from './inventory';
@@ -26,14 +27,24 @@ export function createProcessOwnerClient(options: { baseUrl: string; token: stri
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || options.token.length < 32) throw Error('Original process owner transport installation is incomplete');
   return { observe: async (raw: ProcessOwnerRequest, signal = AbortSignal.timeout(15_000)) => {
     const query = ProcessOwnerRequestSchema.parse(raw), observeDeadline = () => {};
+    let originalSource = query.source;
     signal.addEventListener('abort', observeDeadline, { once: true });
     try {
-    const response = await readProbeResponse(fetcher, url, { method: 'POST', redirect: 'error', headers: { authorization: 'Bearer ' + options.token, 'content-type': 'application/json' }, body: JSON.stringify(query) }, signal);
-    if (!response.ok) throw Error('Original native process owner source is unavailable'); const observed = ProcessOwnerResponseSchema.parse(await body(response, 8_388_608, signal));
-    if (observed.owners.length !== query.owners.length || new Set(observed.owners.map(row => row.key)).size !== query.owners.length
-      || observed.owners.some(row => !query.owners.some(wanted => wanted.key === row.key))
-      || observed.complete && query.source && (observed.bootId !== query.source.bootId || observed.namespace !== query.source.namespace || observed.cgroupNamespace !== query.source.cgroupNamespace)) throw Error('Original native process owner response changed its scope or namespace');
-    return observed;
+      for (;;) {
+      signal.throwIfAborted();
+      const response = await readProbeResponse(fetcher, url, { method: 'POST', redirect: 'error', headers: { authorization: 'Bearer ' + options.token, 'content-type': 'application/json' }, body: JSON.stringify(query) }, signal);
+      if (!response.ok) throw Error('Original native process owner source is unavailable'); const observed = ProcessOwnerResponseSchema.parse(await body(response, 8_388_608, signal));
+      const churn = !observed.complete && observed.blockers.length > 0 && observed.blockers.every(row => row.code === 'process-unreadable' || row.code === 'process-changed');
+      if (observed.owners.length !== query.owners.length || new Set(observed.owners.map(row => row.key)).size !== query.owners.length
+        || observed.owners.some(row => !query.owners.some(wanted => wanted.key === row.key))
+        || (observed.complete || churn) && originalSource && (observed.bootId !== originalSource.bootId || observed.namespace !== originalSource.namespace || observed.cgroupNamespace !== originalSource.cgroupNamespace)) throw Error('Original native process owner response changed its scope or namespace');
+      signal.throwIfAborted();
+      if (churn) {
+        originalSource = ProcessOwnerRequestSchema.parse({ owners: query.owners, source: { bootId: observed.bootId, namespace: observed.namespace, cgroupNamespace: observed.cgroupNamespace } }).source;
+        await delay(100, undefined, { signal }); continue;
+      }
+      return observed;
+      }
     } finally { signal.removeEventListener('abort', observeDeadline); }
   } };
 }
