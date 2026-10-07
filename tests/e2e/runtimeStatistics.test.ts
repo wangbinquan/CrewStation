@@ -65,17 +65,24 @@ describe.skipIf(!session)('RFC-034 formal runtime observation', () => {
       const scroll = '[data-runtime-task] [role="region"]';
       expect(await page.eval<boolean>(`document.querySelector('${scroll}').scrollWidth > document.querySelector('${scroll}').clientWidth`)).toBe(width < 680);
       const lane = scroll + ' [data-runtime-section="swimlane"] button[aria-label]:not(:disabled)';
-      await page.waitUntil(`!!document.querySelector('${lane}')`);
-      await page.eval(`document.querySelector('${lane}').click()`);
+      // Readiness and the original click share one DOM evaluation: background refresh can replace the region between CDP awaits.
+      await page.waitUntil(`(() => {const bar=document.querySelector('${lane}');if(!bar)return false;bar.click();return true})()`);
       await page.waitUntil('!!document.querySelector("dialog[open]")');
       expect(await page.eval<boolean>('!!document.querySelector("dialog[open]")')).toBe(true);
       await page.cmd('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
       await page.cmd('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
       await settle(page); expect(await page.eval<boolean>('!document.querySelector("dialog[open]")')).toBe(true);
-      const zoomButton = `document.querySelector('${scroll}')?.closest('section')?.querySelector('header button')`;
-      await page.waitUntil(`document.querySelector('${scroll}')?.clientWidth > 0 && !!(${zoomButton}) && !(${zoomButton}).disabled`);
-      const unzoomedWidth = await page.eval<number>(`document.querySelector('${scroll}').scrollWidth`);
-      await page.eval(`(${zoomButton}).click()`);
+      const unzoomedWidth = await page.eval<number>(`(async () => {
+        const started=performance.now();
+        for(;;) {
+          const region=document.querySelector('${scroll}'),button=region?.closest('section')?.querySelector('header button');
+          if(region?.clientWidth>0 && region.querySelector('[data-runtime-section="swimlane"] button[aria-label]:not(:disabled)') && button && !button.disabled) {
+            const originalWidth=region.scrollWidth;button.click();return originalWidth;
+          }
+          if(performance.now()-started>15000)throw new Error('Original timeline zoom control did not settle');
+          await new Promise(resolve=>setTimeout(resolve,200));
+        }
+      })()`);
       await page.waitUntil(`document.querySelector('${scroll}')?.clientWidth > 0 && document.querySelector('${scroll}').scrollWidth > ${unzoomedWidth}`);
       expect(await page.eval<boolean>(`document.querySelector('${scroll}').scrollWidth > document.querySelector('${scroll}').clientWidth`)).toBe(true);
       expect(await page.eval<number>('document.documentElement.scrollWidth-innerWidth')).toBeLessThanOrEqual(1);

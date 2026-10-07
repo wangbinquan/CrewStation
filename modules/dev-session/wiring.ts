@@ -1,3 +1,5 @@
+import { developmentObservationProducer } from './application/development/observationProducer';
+import type { DevelopmentDispatchSession } from './ports/developmentDispatch';
 import type { DevelopmentCleanupSession } from './ports/developmentCleanup';
 import { developmentCleanupParticipant } from './application/development/cleanup';
 import { developmentEndingStore } from './adapters/persistence/ending/store';
@@ -55,6 +57,7 @@ export interface DevSessionModuleDeps {
   deletionWorkSources?: DevelopmentWorkSources;
   developmentUsagePricing?: DevelopmentUsagePricing;
   developmentCleanupSession?: DevelopmentCleanupSession;
+  developmentDispatchSession?: DevelopmentDispatchSession;
   projectDeletionSession?: (context: ProjectDeletionContext, taskId: TaskId) => Promise<DevelopmentCleanupSession>;
   identities?: ResourceIdentityDirectory;
   /** 资源台账里 CLI／Agent 执行记录的阶段（RFC-025 §11.2）；缺省时名册照 Runner 的说法给出。 */
@@ -119,7 +122,18 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
 function developmentApi(deps: DevSessionModuleDeps, useCaseDeps: DevSessionUseCaseDeps, projectWork?: DevelopmentProjectWork): DevSessionModuleApi {
   const lifecycle = sessionLifecycleUseCases(useCaseDeps);
   const rawAgentStarts = drizzleAgentStarts(deps.db, !!projectWork), agentStarts = projectWork ? guardedDevelopmentPort(rawAgentStarts, projectWork) : rawAgentStarts;
-  const agentExecutions = new AgentExecutionLifecycle(useCaseDeps, agentStarts);
+  const store = developmentUsageOwnerStore(deps.db), pricing = deps.developmentUsagePricing;
+  const rawUsage = developmentUsageOwner(projectWork ? guardedDevelopmentPort(store, projectWork) : store, agentStarts, useCaseDeps.environments,
+    pricing && projectWork ? guardedDevelopmentPort(pricing, projectWork) : pricing);
+  const developmentUsage = projectWork ? developmentUsageWork(rawUsage, projectWork) : rawUsage;
+  const endingStore = developmentEndingStore(deps.db, useCaseDeps.clock);
+  const originalEndingStore = projectWork ? guardedDevelopmentPort(endingStore, projectWork) : endingStore;
+  const observation = deps.developmentDispatchSession && deps.developmentCleanupSession ? developmentObservationProducer(useCaseDeps, {
+    owner: rawUsage, store: originalEndingStore,
+    dispatch: projectWork ? guardedDevelopmentPort(deps.developmentDispatchSession, projectWork) : deps.developmentDispatchSession,
+    ending: projectWork ? guardedDevelopmentPort(deps.developmentCleanupSession, projectWork) : deps.developmentCleanupSession,
+  }) : undefined;
+  const agentExecutions = new AgentExecutionLifecycle(useCaseDeps, agentStarts, observation);
   const agents = agentUseCases(useCaseDeps, agentStarts, agentExecutions);
   const remind = idleReminderUseCase(useCaseDeps);
   const rawTerminals = drizzleNativeTerminals(deps.db, !!projectWork), terminals = projectWork ? guardedDevelopmentPort(rawTerminals, projectWork) : rawTerminals;
@@ -131,11 +145,6 @@ function developmentApi(deps: DevSessionModuleDeps, useCaseDeps: DevSessionUseCa
     useCaseDeps.logger.warn('native activity query unavailable', { taskId });
     return undefined;
   }), useCaseDeps.clock);
-  const store = developmentUsageOwnerStore(deps.db), pricing = deps.developmentUsagePricing;
-  const rawUsage = developmentUsageOwner(projectWork ? guardedDevelopmentPort(store, projectWork) : store, agentStarts, useCaseDeps.environments,
-    pricing && projectWork ? guardedDevelopmentPort(pricing, projectWork) : pricing);
-  const developmentUsage = projectWork ? developmentUsageWork(rawUsage, projectWork) : rawUsage;
-  const endingStore = developmentEndingStore(deps.db, useCaseDeps.clock);
   const makeCleanup = (session: DevelopmentCleanupSession, closing = false) => developmentCleanupParticipant({ owner: rawUsage,
     store: projectWork ? guardedDevelopmentPort(endingStore, projectWork) : endingStore, environments: useCaseDeps.environments,
     session: projectWork ? guardedDevelopmentPort(session, projectWork) : session, clock: useCaseDeps.clock,

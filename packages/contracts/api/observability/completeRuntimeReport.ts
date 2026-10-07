@@ -42,7 +42,7 @@ const duration=z.discriminatedUnion('state',[
 export const RuntimeCompleteSummarySchema=z.strictObject({
   tasks:count,metrics:CompleteRuntimeMetricsSchema,durations:duration,
   trend:z.array(z.strictObject({from:z.iso.datetime(),to:z.iso.datetime(),tasks:count,metrics:CompleteRuntimeMetricsSchema})),
-  sources:z.array(z.strictObject({kind:z.enum(['business-task','development-agent']),tasks:count,metrics:CompleteRuntimeMetricsSchema,collectionState:z.enum(['available','production-disabled'])})),
+  sources:z.array(z.strictObject({kind:z.enum(['business-task','development-agent']),tasks:count,metrics:CompleteRuntimeMetricsSchema,collectionState:z.enum(['available','production-disabled','validation-selected'])})),
 });
 export type RuntimeCompleteSummary=z.infer<typeof RuntimeCompleteSummarySchema>;
 export const RuntimeReportHeaderSchema=z.strictObject({reportId:ResourceIdSchema,projectionVersion:z.literal(2),scope:z.enum(['project','system']),projectId:ProjectIdSchema.nullable(),filters:RuntimeStatisticsQuerySchema,asOf:z.iso.datetime(),snapshotId:z.string().min(1),generation:count,sourceRevision:count,taskId:TaskIdSchema.optional(),coverage:z.literal('complete'),buildMs:z.number().nonnegative()});

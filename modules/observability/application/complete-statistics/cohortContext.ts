@@ -43,7 +43,7 @@ export function completeCohortContext(input:CompleteRuntimeCohortInput) {
       await input.rows.clearTree(input.namespace+'/private-tasks/'+input.keyOf(task.id));
     },
     finishSummary(durations:RuntimeCompleteSummary['durations']):RuntimeCompleteSummary {
-      return {tasks:String(count),metrics:completeRuntimeMetrics(fold),durations,trend:trends.map(bin=>({from:bin.from,to:bin.to,tasks:bin.count,metrics:completeRuntimeMetrics(bin.fold)})),sources:[...sources].map(([kind,source])=>({kind,tasks:source.count,metrics:completeRuntimeMetrics(source.fold),collectionState:kind==='development-agent'?'production-disabled':'available'}))};
+      return {tasks:String(count),metrics:completeRuntimeMetrics(fold),durations,trend:trends.map(bin=>({from:bin.from,to:bin.to,tasks:bin.count,metrics:completeRuntimeMetrics(bin.fold)})),sources:[...sources].map(([kind,source])=>({kind,tasks:source.count,metrics:completeRuntimeMetrics(source.fold),collectionState:kind==='development-agent'?(input.sourceCollection?.development??'production-disabled'):'available'}))};
     },
   };
 }

@@ -1,4 +1,4 @@
-import { bindTaskMaintenance } from './adapters/observability/taskMaintenance'; import { clusterMetadata } from './application/cluster/metadata'; import { registryCreationAdmission } from './adapters/registryCreationAdmission';
+import { bindTaskMaintenance } from './adapters/observability/taskMaintenance'; import { clusterMetadata } from './application/cluster/metadata'; import { registryCreationAdmission } from './adapters/registryCreationAdmission'; import { forwardDevelopmentCleanup } from './application/developmentCleanupPorts';
 import { resourceCatalogs } from './application/resource-center/resourceCatalogs'; import { sessionDeletionSources } from './application/deletion/sessionSources';
 import { businessRuntimePorts } from './application/deletion/businessSources'; import { deletionCurrentAssets } from './adapters/k8s/deletionCurrentAssets'; import { gatewayDevelopmentRetention } from './adapters/k8s/gatewayDevelopmentRetention';
 import { dataDeletionSources } from './application/deletion/dataSources';
@@ -295,7 +295,7 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
   const testRunner = createSessionClient(settings.sessionInternalUrl);
   const mcp = [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }];
   const ledger = resources.api.owner('task-runtime');
-  const taskRuntime = createTaskRuntimeModule({
+  const taskRuntime = createTaskRuntimeModule({ developmentCleanup: forwardDevelopmentCleanup(() => taskRuntime.api, () => devSession.api.developmentCleanup),
     deletionStops: runtimeCleanupPorts(project.api, resources.api, () => devSession.api, createProjectDeletionSessionClient(settings.sessionInternalUrl)),
     ...(settings.platformPodUid ? { deletionWorkSources: runtimeDeletionSources(project.api, () => late.businessTask, projectCallbackOwners(k8s, settings.systemNamespace, settings.platformPodUid, 'crewstation.io/runtime-project-stop')) } : {}),
     ...(data.api.archiveHelper ? { archive: { credentials: data.api.archiveHelper, apiUrl: `http://cs-api.${settings.systemNamespace}.svc:8087` } } : {}),
@@ -316,7 +316,7 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
   const runner = createSessionClient(settings.sessionInternalUrl);
   // 两类任务共用解析：受理固定档位修订，派发时取材料，凭据仅进入受控 Runner 通道。
   const computeCatalog = { pinLaunchVersion: core.agentRuntime.api.pinLaunchVersion, launchMaterialAt: core.agentRuntime.api.launchMaterialAt, resolve: (name: ComputeProfileSelector | undefined, usage: ComputeUsage, projectId: ProjectId) => core.agentRuntime.api.resolveForProject(projectId, name, usage), launchMaterial: core.agentRuntime.api.launchMaterial, launchMetadata: core.agentRuntime.api.launchMetadata };
-  const devSession = createDevSessionModule({
+  const devSession = createDevSessionModule({ developmentDispatchSession: runner, developmentCleanupSession: runner,
     projectDeletionSession: developmentDeletionSession(project.api, createProjectDeletionSessionClient(settings.sessionInternalUrl)),
     ...(settings.platformPodUid ? { deletionWorkSources: developmentDeletionSources(project.api, taskRuntime.api, () => late.clusterManagement, projectCallbackOwners(k8s, settings.systemNamespace, settings.platformPodUid, 'crewstation.io/development-project-stop')) } : {}),
     developmentUsagePricing: developmentObservationAdmission(() => late.observability),
@@ -333,7 +333,7 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
     // 注入 Agent 的远程 MCP 连接凭据由 identity 签发：一个签发者、一个密钥环、一份 JWKS。
     credentials: { issueDevSessionToken: (binding) => core.identity.api.issueDevSessionToken(binding) },
     compute: computeCatalog,
-    settings: { idleMinutes: settings.idleMinutes, userDomain: settings.userDomain, mcp, defaultPreviewPort: 3000 },
+    settings: { developmentNativeObservationAdmissions: settings.developmentNativeObservationAdmissions, idleMinutes: settings.idleMinutes, userDomain: settings.userDomain, mcp, defaultPreviewPort: 3000 },
   });
   const businessTask = createBusinessTaskModule({ ...businessRuntimePorts(core.data.api, taskRuntime.api, project.api, () => late.businessTask, settings.platformPodUid ? projectCallbackOwners(k8s, settings.systemNamespace, settings.platformPodUid, 'crewstation.io/business-project-stop') : undefined, deletionCurrentAssets(k8s)), taskStorageStatus: (id) => settings.workloadCreation === 'ledger' ? core.data.api.taskStorageStatus(id) : Promise.resolve({ available: false, reason: 'workload_safety_unavailable' }), taskInputs: core.data.api.taskInputs, executionObservations: businessObservationAdmission(() => late.observability), storageControl: { apply: core.data.api.applyObjectWriteControl }, legacyRecoveryProof: legacyOwnerObserver(deps.k8s, settings.systemNamespace), ...businessExecutionPorts(runtimeImages.api, core.config.api, core.identity.api, SYSTEM_ACTOR),
     identities: deps.identities,
@@ -380,7 +380,7 @@ function composeAggregates(deps: CompositionDeps, late: Late, core: ReturnType<t
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, apiCatalog, isAdmin } = core;
   const serviceOfProject = project.api.resolveServiceOfProject;
-  const observability = createObservabilityModule({ reportSnapshot:deps.runtimeReportSnapshot,reportDataRoot:settings.runtimeReportDataRoot,reportFacts:completeRuntimeFactSources({business:{tasks:readBusinessObservationTaskPage,attempts:readBusinessObservationAttemptPage},development:{tasks:readDevelopmentObservationTaskPage,attempts:readDevelopmentObservationAttemptPage},projectName:readProjectObservationName,profileName:readProfileObservationName}),
+  const observability = createObservabilityModule({ developmentNativeObservationAdmissions:settings.developmentNativeObservationAdmissions, reportSnapshot:deps.runtimeReportSnapshot,reportDataRoot:settings.runtimeReportDataRoot,reportFacts:completeRuntimeFactSources({business:{tasks:readBusinessObservationTaskPage,attempts:readBusinessObservationAttemptPage},development:{tasks:readDevelopmentObservationTaskPage,attempts:readDevelopmentObservationAttemptPage},projectName:readProjectObservationName,profileName:readProfileObservationName}),
     deletion: { identities: deps.identities, assertGrant: project.api.assertProjectDeletionGrant,
       tasks: { list: (target) => originalObservationTasks(runtime.taskRuntime.api, target.id) },
       originalUsage: originalObservationUsage(project.api, createProjectDeletionSessionClient(settings.sessionInternalUrl), runtime.businessTask.api.v3, runtime.devSession.api.developmentUsage) },

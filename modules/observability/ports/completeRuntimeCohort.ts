@@ -1,12 +1,14 @@
 import type {RuntimeFactQuery,RuntimeSourceKind,RuntimeCompleteSummary,RuntimeReportSection,CompleteRuntimeTaskSummary} from '@crewstation/contracts';
 import type {CompleteRuntimeFold} from '../domain/completeRuntimeMetrics';
 import type {CompleteRuntimeTaskBuild,CompleteRuntimeTaskInput} from './completeRuntimeTask';
+import type {CompleteReportSourceCollection} from './completeRuntimeReportCache';
 import type {CompleteSourceReceipt} from './completeReport';
 import type {CompleteRuntimeFactSources} from './completeRuntimeFactSources';
 export interface CompleteRuntimeReportRow {readonly section:RuntimeReportSection;readonly parent:string|null;readonly key:string;readonly document:unknown}
 export interface CompleteDimensionWorking {readonly key:string;readonly metadata:Readonly<Record<string,unknown>>;readonly fold:CompleteRuntimeFold;count:string}
 export interface CompleteRuntimeCohortInput extends Pick<CompleteRuntimeTaskInput,'snapshotId'|'asOf'|'rows'|'namespace'|'keyOf'|'system'|'usageWorkspace'|'signal'> {
   readonly query:RuntimeFactQuery;
+  readonly sourceCollection?:CompleteReportSourceCollection;
   readonly facts:CompleteRuntimeFactSources;
   task(task:Parameters<CompleteRuntimeFactSources['attempts']>[0],namespace:string):Promise<CompleteRuntimeTaskBuild>;
 }

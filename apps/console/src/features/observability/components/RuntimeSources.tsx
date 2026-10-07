@@ -18,7 +18,7 @@ export function RuntimeSourceFilter({ search, change }: FilterProps) {
 }
 export function RuntimeSources({ data, search, change }: FilterProps & { data: RuntimeCompleteSummary }) {
   const t = useT(); if (!data.sources) return null;
-  return <Card title={t('runtime.source.title')} footer={t('runtime.source.hint')} stacked>
+  return <Card title={t('runtime.source.title')} footer={t(data.sources.some(row=>row.collectionState==='validation-selected')?'runtime.source.validation-hint':'runtime.source.hint')} stacked>
     <DataTable className={styles.table} columns={['source.title', 'objects', 'input', 'cacheRead', 'cacheWrite', 'output', 'tokens', 'cost', 'source.collection'].map((key) => t('runtime.' + key))}>
       {data.sources.map((row) => <tr key={row.kind} data-runtime-source={row.kind}><td><Button size="small" variant="ghost" onClick={() => change({ ...search, sourceKind: row.kind, tab: 'tasks', agent: undefined, profile: undefined })}>{runtimeSourceLabel(row.kind, t)}</Button></td>
         <td>{completeCount(row.tasks)}</td>{(['input', 'cacheRead', 'cacheWrite', 'output'] as const).map((bucket) => <td key={bucket}>{completeTokens(row.metrics, bucket)}</td>)}

@@ -1,13 +1,13 @@
 import type { DevelopmentUsageInfo, TaskId } from '@crewstation/contracts';
 import { DevelopmentUsageInfoSchema, StoredDevelopmentUsageSchema } from '@crewstation/contracts';
-import { jsonHash } from '@crewstation/kernel';
+import { jsonHash, newResourceId } from '@crewstation/kernel';
 import type { DevelopmentDispatchDecision, DevelopmentDispatchDeps, DevelopmentDispatchResult } from '../../ports/developmentDispatch';
 import type { DevelopmentUsageOwnerRecord } from '../../ports/developmentUsage';
 import { developmentCapabilitiesSupported, developmentDispatchCommand, developmentInfoDecision, developmentReceiptDecision } from '../../domain/developmentDispatch';
 
 async function originalInfo(deps: DevelopmentDispatchDeps, id: TaskId, original?: DevelopmentUsageOwnerRecord): Promise<DevelopmentUsageInfo | undefined> {
   try {
-    const raw = await deps.session.sendCommand(id, { id: 'development-info-' + id, type: 'developmentUsageInfo', ...(original?.binding ? { key: original.binding.key } : {}) });
+    const raw = await deps.session.sendCommand(id, { id: 'development-info-' + newResourceId(), type: 'developmentUsageInfo', ...(original?.binding ? { key: original.binding.key } : {}) });
     const parsed = DevelopmentUsageInfoSchema.safeParse(raw);
     return parsed.success ? parsed.data : undefined;
   } catch { return undefined; }
@@ -17,6 +17,7 @@ async function bindOriginal(deps: DevelopmentDispatchDeps, original: Development
   if (!status.connected) return { kind: 'waiting', reason: 'disconnected' };
   if (!status.capabilities) return { kind: 'waiting', reason: 'unknown-capabilities' };
   if (!developmentCapabilitiesSupported(original, status.capabilities)) {
+    if (original.intent.nativeSource?.version === 2) return { kind: 'waiting', reason: 'source-unavailable' };
     if (status.capabilities.developmentStartAgentFenceV1 === 1) {
       await deps.owner.observeSupported(id); // Persist the selected-layout fence before any legacy decision.
       return { kind: 'waiting', reason: 'source-unavailable' };
@@ -44,6 +45,12 @@ async function recoverOriginal(deps: DevelopmentDispatchDeps, original: Developm
   if (!info) return { kind: 'waiting', reason: 'source-unavailable' };
   const decision = developmentInfoDecision(binding, info);
   if (decision.kind === 'empty' && stored.receipt) return { kind: 'waiting', reason: 'receipt-regressed' };
+  if (decision.kind === 'empty' && original.intent.nativeSource?.version === 2) {
+    const status = await deps.session.connectionStatus(binding.runtimeTaskId);
+    if (!status.connected) return { kind: 'waiting', reason: 'disconnected' };
+    if (!status.capabilities) return { kind: 'waiting', reason: 'unknown-capabilities' };
+    if (!developmentCapabilitiesSupported(original, status.capabilities)) return { kind: 'waiting', reason: 'source-unavailable' };
+  }
   return decision;
 }
 async function dispatchPrepared(deps: DevelopmentDispatchDeps, executionTaskId: TaskId): Promise<DevelopmentDispatchResult> {

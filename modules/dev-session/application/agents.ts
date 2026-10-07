@@ -4,6 +4,8 @@ import type {
 import { PLATFORM_AGENT_PERMISSION } from '@crewstation/contracts';
 import { forbidden, newId, notFound, precondition } from '@crewstation/kernel';
 import { reserveDevelopmentImage } from './runtimeImageSelection';
+import { freezeDevelopmentObservation } from './development/observationSelection';
+import { restartDevelopmentObservationIntent } from '../domain/development/observationSelection';
 import type { AgentStart, AgentStartRepository } from '../ports/agentStarts';
 import type { AgentExecutionLifecycle } from './agentExecution';
 import type { DevSessionUseCaseDeps } from './dependencies';
@@ -34,13 +36,15 @@ export function agentUseCases(deps: DevSessionUseCaseDeps, starts: AgentStartRep
       // RFC-006：受理时解析档位（省略即 default），headless 只能用两种已知协议；此后派发只按固定修订取材料。
       const resolved = await deps.compute.resolve(input.compute, 'agent', env.projectId);
       const imageTaskId = newId('tsk') as TaskId;
-      const runtimeImage = await reserveDevelopmentImage(deps, actor, env.projectId, { type: 'agent', id: imageTaskId }, input.runtimeImageVersionId, { profileId: resolved.id, revision: resolved.revision });
-      const start: AgentStart = {
+      const candidate: AgentStart = {
         agentId: newId('agt'), taskId: env.id, createdBy: actor.userId, compute: resolved.id, computeName: resolved.name, profile: { profileId: resolved.id, revision: resolved.revision }, permission: PLATFORM_AGENT_PERMISSION,
         request: { prompt: input.prompt, ...(input.cwd ? { cwd: input.cwd } : {}), ...(input.resumeSessionId ? { resumeSessionId: input.resumeSessionId } : {}) },
-        execution: { taskId: imageTaskId, runnerId: Bun.randomUUIDv7(), image: runtimeImage?.image ?? resolved.image, ...(runtimeImage ? { runtimeImage } : {}), ...(resolved.taskProfile ? { taskProfile: resolved.taskProfile } : {}) },
+        execution: { taskId: imageTaskId, runnerId: Bun.randomUUIDv7(), image: resolved.image, ...(resolved.taskProfile ? { taskProfile: resolved.taskProfile } : {}) },
         state: 'pending', cursor: 0, finalized: false, createdAt: deps.clock.now().toISOString(),
       };
+      const observationIntent = await freezeDevelopmentObservation(deps, env.projectId, candidate, resolved);
+      const runtimeImage = await reserveDevelopmentImage(deps, actor, env.projectId, { type: 'agent', id: imageTaskId }, input.runtimeImageVersionId, { profileId: resolved.id, revision: resolved.revision });
+      const start: AgentStart = { ...candidate, execution: { ...candidate.execution, ...(observationIntent ? { observationIntent } : {}), ...(runtimeImage ? { runtimeImage, image: runtimeImage.image } : {}) } };
       await starts.insert(start);
       if (runtimeImage) await deps.runtimeImages!.confirm(runtimeImage, { type: 'agent', id: imageTaskId });
       const execution = await executions.admit(start);
@@ -98,7 +102,7 @@ async function withExecution(deps: DevSessionUseCaseDeps, start: AgentStart, obs
   const env = start.finalized ? undefined : await deps.environments.getEnvironment(start.execution.taskId);
   const base: AgentInstanceDto = observed ?? { agentId: start.agentId, taskId: start.taskId, compute: start.compute, computeName: start.computeName, permission: start.permission, state: 'preparing', profileRevision: start.profile.revision, startedAt: start.createdAt };
   const state: AgentInstanceState = start.state === 'ended' && !['completed', 'failed', 'cancelled'].includes(base.state) ? (start.cancelled ? 'cancelled' : start.failure ? 'failed' : 'completed') : base.state;
-  const executionState = env?.native?.state ?? (start.finalized || start.state === 'ended' ? 'finished' : 'queued');
+  const executionState = env?.native?.state ?? (start.finalized || start.state === 'ended' && !start.execution.observationIntent ? 'finished' : 'queued');
   const message = start.failure ?? (['queued', 'starting'].includes(executionState) ? env?.message : undefined);
   return { ...base, image: start.execution.image, computeName: start.computeName, compute: base.compute || start.compute, profileRevision: base.profileRevision ?? start.profile.revision, state,
     ...(start.execution.runtimeImage ? { runtimeImage: start.execution.runtimeImage } : {}),
@@ -152,7 +156,7 @@ export function clusterAgentUseCases(deps: DevSessionUseCaseDeps, starts: AgentS
         if (next && !await starts.get(next.agentId)) {
           if (!env.connected || env.state !== 'running') throw precondition('父工作区未就绪，无法重开 Agent');
           await starts.insert({ agentId: next.agentId, taskId: old.taskId, createdBy: actor.userId, compute: old.compute, computeName: old.computeName, profile: old.profile, permission: PLATFORM_AGENT_PERMISSION, request: old.request,
-            execution: { ...old.execution, taskId: next.taskId, runnerId: Bun.randomUUIDv7(), previousTaskId: id }, state: 'pending', cursor: 0, finalized: false, createdAt: deps.clock.now().toISOString() });
+            execution: { ...old.execution, taskId: next.taskId, runnerId: Bun.randomUUIDv7(), previousTaskId: id, ...(old.execution.observationIntent ? { observationIntent: restartDevelopmentObservationIntent(old.execution.observationIntent, next) } : {}) }, state: 'pending', cursor: 0, finalized: false, createdAt: deps.clock.now().toISOString() });
         }
         await executions.end((await starts.get(old.agentId))!, { cancelled: true });
       });

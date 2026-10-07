@@ -1,7 +1,7 @@
 import { and, asc, eq, gt, sql } from 'drizzle-orm';
 import type { AgentPermission, TaskId, UserId } from '@crewstation/contracts';
 import type { Database } from '@crewstation/persistence';
-import { newResourceId } from '@crewstation/kernel';
+import { newResourceId, precondition } from '@crewstation/kernel';
 import type { AgentStart, AgentStartRepository } from '../../ports/agentStarts';
 import { agentStarts as table, clusterAgentRestarts } from './agentStartTable';
 
@@ -38,6 +38,11 @@ export function drizzleAgentStarts(db: Database, admissionGuarded = false): Agen
       if (changed.length) return;
       await db.update(table).set({ cursor: sql`greatest(${table.cursor}, ${start.cursor})`, failure: sql`coalesce(${start.failure ?? null}, ${table.failure})` })
         .where(and(eq(table.agentId, start.agentId), eq(table.logicalEnding, true)));
+    },
+    finalizeEndedExecution: async (agentId, executionTaskId) => {
+      const changed = await db.update(table).set({ finalized: true }).where(and(eq(table.agentId, agentId),
+        eq(table.executionTaskId, executionTaskId), eq(table.logicalEnding, true), eq(table.state, 'ended'))).returning({ id: table.agentId });
+      if (!changed.length) throw precondition('原生执行物理收尾的原身份或逻辑结束记录尚未就绪');
     },
     withLock: (agentId, operation) => db.transaction(async (tx) => { await tx.execute(sql`select pg_advisory_xact_lock(hashtext('dev_session.agent_start'), hashtext(${agentId}))`); await operation(); }),
   };

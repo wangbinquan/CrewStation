@@ -1,3 +1,4 @@
+import { developmentNativePageCapabilities } from './agents/development/nativeCapabilities';
 import { openDevelopmentUsage } from './agents/openDevelopmentUsage';
 import type { DevelopmentUsageJournal } from './agents/developmentUsageJournal';
 import { profileBusinessStorage } from './storage/profileBusinessStorage';
@@ -134,7 +135,7 @@ class TaskRunner implements RunnerHandle {
       taskId: config.taskId,
       runnerToken: config.runnerToken,
       workdir: paths.root,
-      capabilities: { ...(developmentUsageRequired ? { developmentStartAgentFenceV1: 1 as const } : {}), ...(developmentUsage ? { developmentUsageV1: 1 as const, developmentUsageStopV1: 1 as const, developmentNativeSourceV1: 1 as const, usageObservationsV1: 1 as const, nativeUsageTreeV1: 1 as const } : {}), ...(config.businessJournalDir && process.platform === 'linux' ? { businessExecutionV3: 1 as const, usageObservationsV1: 1 as const, nativeUsageTreeV1: 1 as const } : {}), protocols: [...RUNNER_PROTOCOLS], pty: terminals.backend !== undefined, preview: preview.enabled, ...(apiInvoker.enabled ? { apiInvocations: 1 as const } : {}), previewControl: 1 as const, terminalControl: 1 as const, runtimeInitialization: 1 as const, interpreters: interpreters.list },
+      capabilities: { ...developmentNativePageCapabilities(config.developmentUsage ? { taskId: config.taskId, podUid: config.developmentUsage.podUid } : undefined, developmentUsage), ...(developmentUsageRequired ? { developmentStartAgentFenceV1: 1 as const } : {}), ...(developmentUsage ? { developmentUsageV1: 1 as const, developmentUsageStopV1: 1 as const, developmentNativeSourceV1: 1 as const, usageObservationsV1: 1 as const, nativeUsageTreeV1: 1 as const } : {}), ...(config.businessJournalDir && process.platform === 'linux' ? { businessExecutionV3: 1 as const, usageObservationsV1: 1 as const, nativeUsageTreeV1: 1 as const } : {}), protocols: [...RUNNER_PROTOCOLS], pty: terminals.backend !== undefined, preview: preview.enabled, ...(apiInvoker.enabled ? { apiInvocations: 1 as const } : {}), previewControl: 1 as const, terminalControl: 1 as const, runtimeInitialization: 1 as const, interpreters: interpreters.list },
     });
     const dispatcherRef: { current?: CommandDispatcher } = {};
     const link = createSessionLink({

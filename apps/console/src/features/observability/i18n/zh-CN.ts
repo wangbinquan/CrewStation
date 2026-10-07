@@ -11,6 +11,8 @@ export const messages = {
   "runtime.source.collection": "采集状态 / 质量",
   "runtime.source.available": "来源已接入",
   "runtime.source.production-disabled": "开发生产采集未开启",
+  "runtime.source.validation-selected": "验证配置采集（未默认启用）",
+  "runtime.source.validation-hint": "同一时间范围、筛选和快照的全部消耗；验证配置只选择新采集的开发执行，不限制历史统计。CLI 和算力测试尚未接入，缺失数据不等于零。",
   "runtime.source.facts": "执行记录已核对，用量有缺口",
   "runtime.source.complete": "已知用量完整",
   "runtime.source.partial": "用量未知或不完整",

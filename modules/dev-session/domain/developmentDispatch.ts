@@ -39,7 +39,8 @@ export function developmentInfoDecision(registration: DevelopmentUsageRegistrati
 }
 export function developmentCapabilitiesSupported(original: DevelopmentDispatchOriginal, capabilities: RunnerHello['capabilities']): boolean {
   return capabilities.developmentUsageV1 === 1 && capabilities.developmentUsageStopV1 === 1 && capabilities.usageObservationsV1 === 1
-    && (!original.intent.nativeSource || (capabilities.developmentNativeSourceV1 === 1 && capabilities.nativeUsageTreeV1 === 1));
+    && (!original.intent.nativeSource || (capabilities.developmentNativeSourceV1 === 1 && capabilities.nativeUsageTreeV1 === 1))
+    && (original.intent.nativeSource?.version !== 2 || capabilities.developmentNativePagesV2 === 2);
 }
 /** Check the normalized original intent before sending any launch material. */
 export function developmentDispatchCommand(original: DevelopmentDispatchOriginal, raw: StartAgentCommand): StartAgentCommand | undefined {

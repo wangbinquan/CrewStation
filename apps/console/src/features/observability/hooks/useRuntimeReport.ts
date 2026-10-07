@@ -4,8 +4,8 @@ import {runtimeCompleteReportContent,type RuntimeCompleteReport} from '@crewstat
 import {api} from '../../../shared/api/client';
 import {useApiQuery} from '../../../shared/api/useApi';
 /** Poll the actual pending report while keeping accepted content in place during a same-query refresh. */
-export function useRuntimeReport(key:readonly unknown[],request:()=>Promise<RuntimeCompleteReport>,projectId?:string,pinnedId?:string,enabled=true,format?:'native-pages/1') {
-  const version=format==='native-pages/1'?'recorded-scope-metrics/4':'recorded-scope-metrics/3',queryKey=['runtime-complete',version,...key,pinnedId],identity=JSON.stringify(queryKey),client=useQueryClient(),active=useRef<{key:string;report:RuntimeCompleteReport|undefined}|undefined>(undefined);
+export function useRuntimeReport(key:readonly unknown[],request:()=>Promise<RuntimeCompleteReport>,projectId?:string,pinnedId?:string,enabled=true,format?:'native-pages/1'|'native-pages/2') {
+  const version=format==='native-pages/2'?'recorded-scope-metrics/5':format==='native-pages/1'?'recorded-scope-metrics/4':'recorded-scope-metrics/3',queryKey=['runtime-complete',version,...key,pinnedId],identity=JSON.stringify(queryKey),client=useQueryClient(),active=useRef<{key:string;report:RuntimeCompleteReport|undefined}|undefined>(undefined);
   return useApiQuery<RuntimeCompleteReport>(queryKey,async()=>{
     const previous=active.current?.key===identity?active.current.report:undefined,pending={key:identity,report:previous};
     active.current=pending;

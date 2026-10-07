@@ -17,6 +17,7 @@ import {buildCompleteRuntimeTask} from './application/completeRuntimeTask';
 import {sealCompleteRuntimeReport} from './application/complete-statistics/reportBuild';
 import {runtimeReportAdmissionKey} from './ports/completeRuntimeReportCache';
 import {completeRuntimeReportUseCases} from './application/complete-statistics/reportService';
+import {developmentCollectionConfiguration,type DevelopmentCollectionAdmission} from './application/complete-statistics/sourceCollection';
 import {completeRuntimeReportCache,originalRuntimeReportIdentity} from './adapters/persistence/reports/reportStore';
 import {completeRuntimeFileSpool} from './adapters/persistence/reports/fileSpool';
 import {completeRuntimeLedgerSources} from './adapters/persistence/completeRuntimeLedgerSources';
@@ -71,6 +72,8 @@ export interface ObservabilityModuleDeps {
   reportSnapshot?:ReportSnapshotSession;
   reportFacts?:CompleteRuntimeFactSourceFactory<Executor>;
   reportDataRoot?:string;
+  /** Explicit validation configuration metadata, independent of historical report selection. */
+  developmentNativeObservationAdmissions?:readonly DevelopmentCollectionAdmission[];
   deletion?: { identities: ObservabilityProjectDirectory; tasks?: ObservabilityDeletionTasks; originalUsage?: ObservationOriginalUsage; assertGrant(context: ProjectDeletionContext): Promise<void> };
   pricingProfiles?: PricingProfileDirectory;
   executionAccess?: ExecutionObservationAccess;
@@ -173,9 +176,9 @@ export const completeStatisticsWorkspace:CompleteUsageWorkspaceFactory=(input)=>
 function completeRuntimeReports(deps:ObservabilityModuleDeps) {
  const session=deps.reportSnapshot,factory=deps.reportFacts,root=deps.reportDataRoot;
  if(!session||!factory||!root)return undefined;
- const spool=completeRuntimeFileSpool(root),store=completeRuntimeReportCache(deps.db),owner=randomUUID();
+ const spool=completeRuntimeFileSpool(root),store=completeRuntimeReportCache(deps.db),owner=randomUUID(),sourceCollection=developmentCollectionConfiguration(deps.developmentNativeObservationAdmissions);
  const costVisible=async(projectId:ProjectId)=> (await drizzleCostVisibility(deps.db).read(projectId))?.visibility==='project-members-and-services';
- return completeRuntimeReportUseCases({store,spool,owner,authorizer:deps.authorizer,costVisible,
+ return completeRuntimeReportUseCases({store,spool,owner,authorizer:deps.authorizer,costVisible,sourceCollection,
   build:async(report,signal)=>{
    const started=Date.now(),query={...report.request.filters,...(report.request.taskId?{taskId:report.request.taskId}:{}),...(report.request.projectId?{projectId:report.request.projectId}:{} )};
    return session.run(async(snapshot)=>{
@@ -183,7 +186,7 @@ function completeRuntimeReports(deps:ObservabilityModuleDeps) {
     const nativeCache:CompleteNativeCacheFactory=<T>(space:string)=>completeWorkingCache<T>(snapshot.workspace,space,signal);
     const nativeSource=completeDevelopmentNativeScopeSource({db:snapshot.executor,rows:snapshot.workspace,namespace:namespace+'/original-native-source',keyOf:jsonHash,cache:nativeCache,signal});
     const usageWorkspace:CompleteUsageWorkspaceFactory=(candidate)=>completeStatisticsWorkspace({...candidate,nativeSource,nativeCache});
-    const build=await buildCompleteRuntimeCohort({query,facts,snapshotId:snapshot.snapshotId,asOf:snapshot.asOf,rows:snapshot.workspace,namespace,keyOf:jsonHash,system:report.request.projectId===null,usageWorkspace,signal,
+    const build=await buildCompleteRuntimeCohort({query,facts,sourceCollection:report.request.sourceCollection,snapshotId:snapshot.snapshotId,asOf:snapshot.asOf,rows:snapshot.workspace,namespace,keyOf:jsonHash,system:report.request.projectId===null,usageWorkspace,signal,
       task:(task,privateNamespace)=>buildCompleteRuntimeTask({task,snapshotId:snapshot.snapshotId,asOf:snapshot.asOf,rows:snapshot.workspace,namespace:privateNamespace,keyOf:jsonHash,system:report.request.projectId===null,usageWorkspace,signal,attempts:facts.attempts(task),ledger:completeRuntimeLedgerSources(snapshot.executor,task,snapshot.snapshotId)}),
     });
     if(report.request.taskId&&build.summary.tasks!=='1')throw precondition('原任务不存在或原受理身份不唯一');

@@ -11,6 +11,8 @@ export const messages = {
   "runtime.source.collection": "Collection / quality",
   "runtime.source.available": "Source connected",
   "runtime.source.production-disabled": "Development production collection disabled",
+  "runtime.source.validation-selected": "Validation collection selected (not enabled by default)",
+  "runtime.source.validation-hint": "All consumption uses the same time range, filters and snapshot. Validation admissions select new development collection, never historical statistics. CLI and profile tests are not connected, and missing data is not zero.",
   "runtime.source.facts": "Execution records verified; usage has gaps",
   "runtime.source.complete": "Known usage complete",
   "runtime.source.partial": "Usage unknown or incomplete",

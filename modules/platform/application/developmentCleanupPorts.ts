@@ -2,7 +2,7 @@ import { TaskIdSchema } from '@crewstation/contracts';
 import { jsonHash, precondition } from '@crewstation/kernel';
 import type { DevelopmentCleanupParticipant, DevelopmentCleanupQuery } from '../ports/developmentCleanup';
 
-/** Explicit cross-owner adapter, deliberately absent from production platform wiring. */
+/** Explicit cross-owner adapter; selected executions retain the original Task and digital-owner agreement. */
 export function developmentCleanupPort(task: DevelopmentCleanupQuery, owner: DevelopmentCleanupParticipant): DevelopmentCleanupParticipant {
   return { advance: async (input) => {
     const selection = await task.inspectDevelopmentCleanupSelection?.(TaskIdSchema.parse(input.identity.executionId));
@@ -10,5 +10,13 @@ export function developmentCleanupPort(task: DevelopmentCleanupQuery, owner: Dev
     const result = await owner.advance(input);
     if (result.kind === 'permitted' && jsonHash(result.evidence.selection) !== jsonHash(selection)) throw precondition('数字 owner 返回了其他开发清理选择');
     return result;
+  } };
+}
+
+/** Resolve both original public owners lazily after the platform composition has finished. */
+export function forwardDevelopmentCleanup(task: () => DevelopmentCleanupQuery, owner: () => DevelopmentCleanupParticipant | undefined): DevelopmentCleanupParticipant {
+  return { advance: (input) => {
+    const current = owner();
+    return current ? developmentCleanupPort(task(), current).advance(input) : Promise.resolve({ kind: 'waiting' as const, reason: 'development-owner-unavailable' });
   } };
 }

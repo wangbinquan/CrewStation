@@ -77,7 +77,7 @@ const common = {
   durations: z.strictObject({ samples: z.number().int().nonnegative(), p50Ms: z.number().nullable(), p95Ms: z.number().nullable(), maxMs: z.number().nullable() }),
   quality: z.array(z.strictObject({ reason: z.string(), taskIds: z.array(TaskIdSchema) })),
   sourceScope: z.enum(['business-tasks', 'project-executions']),
-  sources: z.array(z.strictObject({ kind: RuntimeSourceKindSchema, objects: z.number().int().nonnegative(), metrics: RuntimeUsageMetricsSchema, collectionState: z.enum(['available', 'production-disabled']) })).optional(),
+  sources: z.array(z.strictObject({ kind: RuntimeSourceKindSchema, objects: z.number().int().nonnegative(), metrics: RuntimeUsageMetricsSchema, collectionState: z.enum(['available', 'production-disabled', 'validation-selected']) })).optional(),
 };
 export const ProjectRuntimeStatisticsSchema = z.strictObject({ ...common, scope: z.literal('project'), projectId: ProjectIdSchema });
 export const SystemRuntimeStatisticsSchema = z.strictObject({ ...common, scope: z.literal('system'),

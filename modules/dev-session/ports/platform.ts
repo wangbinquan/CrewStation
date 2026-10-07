@@ -78,6 +78,8 @@ export interface Notifier {
 }
 
 export interface DevSessionSettings {
+  /** Explicit new-execution validation selection; never a statistics population limit. */
+  readonly developmentNativeObservationAdmissions?: readonly { projectId: string; profileId: string; profileRevision: number }[];
   readonly idleMinutes: number;
   readonly userDomain: string;
   /** 注入 Agent 的平台 MCP 连接（能力说明、操作）。 */
