@@ -29,7 +29,8 @@ export function nativeRegistrySource(k8s:K8sClient,raw:RegistrySourceOptions,fet
     if(current.pod.metadata.uid!==server.pod.metadata.uid||currentVolume.containerId!==volume.containerId||currentVolume.imageId!==volume.imageId)throw registryUnavailable('Registry 原运行实例在盘点期间变化');
     for(const original of pinned) {
       const actual=await k8s.get(Resources[original.kind]!,original.metadata.name,original.metadata.namespace,signal);
-      if(!original.metadata.resourceVersion||!actual||actual.metadata.uid!==original.metadata.uid||actual.metadata.resourceVersion!==original.metadata.resourceVersion||actual.metadata.deletionTimestamp)throw registryUnavailable('Registry 原挂载／来源探针在盘点期间变化');
+      if(!original.metadata.resourceVersion||!actual?.metadata.resourceVersion||actual.metadata.uid!==original.metadata.uid||actual.metadata.deletionTimestamp||
+        actual.metadata.resourceVersion!==original.metadata.resourceVersion&&!onlyReportedHostFamilyChanged(original,actual))throw registryUnavailable('Registry 原挂载／来源探针在盘点期间变化');
     }
     if((await freshPlatformNode(k8s,server.pod))?.uid!==server.node.uid)throw registryUnavailable('Registry 原节点在盘点期间变化');
     const origin={namespaceUid:server.namespace.metadata.uid!,serviceUid:server.service.metadata.uid!,podUid:server.pod.metadata.uid!,containerId:volume.containerId,imageId:volume.imageId,
@@ -40,4 +41,29 @@ export function nativeRegistrySource(k8s:K8sClient,raw:RegistrySourceOptions,fet
   return {capture,verify:async (query:RegistryInventoryQuery,original:{identity:string},signal?:AbortSignal)=>{
     const current=await capture(query,signal);if(current.identity!==original.identity)throw conflict('Registry 原实例或存储来源已替换',{code:'native_registry_source_changed'});return current;
   }};
+}
+
+interface HostStatus {hostIP?:string;hostIPs?:Array<Record<string,unknown>>}
+function onlyReportedHostFamilyChanged(original:K8sObject,current:K8sObject) {
+  if(original.kind!=='Pod'||current.kind!=='Pod')return false;
+  const before=original['status'] as HostStatus|undefined,after=current['status'] as HostStatus|undefined;
+  if(!before||!after||before.hostIP!==after.hostIP||before.hostIPs?.length===after.hostIPs?.length)return false;
+  const complete=(status:HostStatus)=>{
+    const host=status.hostIP,entries=status.hostIPs;
+    return typeof host==='string'&&isIP(host)>0&&Array.isArray(entries)&&[1,2].includes(entries.length)&&entries.every((entry,index)=>
+      entry&&typeof entry==='object'&&Object.keys(entry).length===1&&typeof entry['ip']==='string'&&isIP(entry['ip'])>0&&
+      (index===0?entry['ip']===host:isIP(entry['ip'])!==isIP(host)));
+  };
+  if(!complete(before)||!complete(after))return false;
+  const physical=(object:K8sObject)=>{
+    const copy=structuredClone(object),metadata=copy.metadata as K8sObject['metadata']&{managedFields?:Array<Record<string,unknown>>};
+    delete metadata.resourceVersion;delete (copy['status'] as HostStatus).hostIPs;
+    for(const entry of metadata.managedFields??[]){
+      const fields=entry['fieldsV1'] as Record<string,Record<string,unknown>>|undefined;
+      if(entry['manager']==='kubelet'&&entry['operation']==='Update'&&entry['apiVersion']==='v1'&&entry['subresource']==='status'&&
+        entry['fieldsType']==='FieldsV1'&&fields?.['f:status']?.['f:hostIPs']!==undefined)delete entry['time'];
+    }
+    return jsonHash(copy);
+  };
+  return physical(original)===physical(current);
 }

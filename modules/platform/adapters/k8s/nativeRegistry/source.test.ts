@@ -21,7 +21,7 @@ async function fixture(){
   await k8s.apply({apiVersion:'v1',kind:'Pod',metadata:{name:'registry-0',namespace:'system',uid:'registry-original',labels:{app:'registry'}},spec:{nodeName:'node',volumes:[{name:'data',persistentVolumeClaim:{claimName:'registry-data'}}],containers:[{name:'registry',env:[{name:'REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY',value:'/var/lib/registry'}],volumeMounts:[{name:'data',mountPath:'/var/lib/registry'}]}]},status:{podIP:'10.0.0.2',conditions:[{type:'Ready',status:'True'}],containerStatuses:[{name:'registry',containerID:'containerd://'+'c'.repeat(64),imageID:'docker.io/library/registry@sha256:'+'d'.repeat(64),ready:true,state:{running:{}}}]} });
   await k8s.apply({apiVersion:'v1',kind:'PersistentVolumeClaim',metadata:{name:'registry-data',namespace:'system',uid:'pvc-original'},spec:{volumeName:'registry-pv'}});
   await k8s.apply({apiVersion:'v1',kind:'PersistentVolume',metadata:{name:'registry-pv',uid:'pv-original',annotations:{'pv.kubernetes.io/provisioned-by':'rancher.io/local-path','local.path.provisioner/selected-node':'node'}},spec:{claimRef:{uid:'pvc-original',name:'registry-data',namespace:'system'},hostPath:{path:join(root,'volume')}}});
-  await k8s.apply({apiVersion:'v1',kind:'Pod',metadata:{name:'probe',namespace:'system',uid:'probe-original',labels:{app:'cs-storage-probe'}},spec:{nodeName:'node',volumes:[{name:'source',hostPath:{path:root,type:'Directory'}}],containers:[{name:'probe',volumeMounts:[{name:'source',mountPath:'/volumes',readOnly:true}]}]},status:{podIP:'10.0.0.3',conditions:[{type:'Ready',status:'True'}]} });
+  await k8s.apply({apiVersion:'v1',kind:'Pod',metadata:{name:'probe',namespace:'system',uid:'probe-original',labels:{app:'cs-storage-probe'}},spec:{nodeName:'node',volumes:[{name:'source',hostPath:{path:root,type:'Directory'}}],containers:[{name:'probe',volumeMounts:[{name:'source',mountPath:'/volumes',readOnly:true}]}]},status:{hostIP:'192.0.2.1',hostIPs:[{ip:'192.0.2.1'}],podIP:'10.0.0.3',conditions:[{type:'Ready',status:'True'}],containerStatuses:[{name:'probe',containerID:'containerd://original-probe',ready:true,restartCount:0}]} });
   const handler=createFilesystemMetricsHandler({token,roots:{local:root}}),calls:string[]=[];
   const fetcher=(async(url,init)=>{calls.push(String(url));return handler(new Request(String(url),init));}) as typeof fetch;
   const options={namespace:'system',service:'registry',port:5000,container:'registry',imageDigest:'sha256:'+'d'.repeat(64),probeRoot:root,probePort:8095,probeToken:token};
@@ -29,6 +29,45 @@ async function fixture(){
   return {root,base,k8s,options,query,fetcher,calls,adapter:nativeRegistrySource(k8s,options,fetcher),drop:()=>rm(root,{recursive:true,force:true})};
 }
 describe('actual registry source bridge; real filesystem and controlled K8s',()=>{
+  test('kubelet discovering then withdrawing the second host address preserves the actual original source and complete graph',async()=>{
+    const f=await fixture();try{
+      const managedFields=[{manager:'kubelet',operation:'Update',apiVersion:'v1',subresource:'status',fieldsType:'FieldsV1',fieldsV1:{'f:status':{'f:hostIPs':{}}},time:'2026-10-07T00:00:00Z'}];
+      await f.k8s.mergePatch(Resources.Pod!,'probe','system',{metadata:{managedFields}});
+      const original=await f.adapter.capture(f.query);
+      for(const discover of [true,false]){
+        const fetcher=(async(url,init)=>{
+          const response=await f.fetcher(url,init);
+          await f.k8s.mergePatch(Resources.Pod!,'probe','system',{metadata:{managedFields:[{...managedFields[0],time:discover?'2026-10-07T00:01:00Z':'2026-10-07T00:02:00Z'}]},status:{hostIPs:discover?[{ip:'192.0.2.1'},{ip:'2001:db8::1'}]:[{ip:'192.0.2.1'}]}});
+          return response;
+        })as typeof fetch;
+        const current=await nativeRegistrySource(f.k8s,f.options,fetcher).capture(f.query);
+        expect(current.identity).toBe(original.identity);expect(current.inventory.blobs).toHaveLength(3);expect(current.origin.probeUid).toBe('probe-original');
+      }
+      expect(f.k8s.deleted).toHaveLength(0);
+    }finally{await f.drop();}
+  });
+  for(const mode of ['uid','container','image','ready','restart','mount','node','labels','annotations','unknown status','unknown metadata','unknown host field','primary address','same-family address','version only','managed owner','managed fields','pvc','pv','service','namespace'])test(`host-address status cannot hide ${mode} changes`,async()=>{
+    const f=await fixture();try{
+      const fetcher=(async(url,init)=>{
+        const response=await f.fetcher(url,init);
+        const metadata:Record<string,unknown>={},status:Record<string,unknown>={hostIPs:[{ip:'192.0.2.1'},{ip:'2001:db8::1'}]},spec:Record<string,unknown>={};
+        if(mode==='uid')metadata.uid='replacement-probe';
+        if(['container','image','ready','restart'].includes(mode))status.containerStatuses=[{name:'probe',containerID:mode==='container'?'containerd://replacement':'containerd://original-probe',imageID:mode==='image'?'replacement-image':undefined,ready:mode!=='ready',restartCount:mode==='restart'?1:0}];
+        if(mode==='mount')spec.volumes=[{name:'source',hostPath:{path:f.root+'/other',type:'Directory'}}];if(mode==='node')spec.nodeName='other';
+        if(mode==='labels')metadata.labels={app:'cs-storage-probe','crewstation.io/project':'foreign'};if(mode==='annotations')metadata.annotations={'foreign-owner':'yes'};
+        if(mode==='unknown status')status.unknown=true;if(mode==='unknown metadata')metadata.unknown=true;
+        if(mode==='unknown host field')status.hostIPs=[{ip:'192.0.2.1'},{ip:'2001:db8::1',unknown:true}];
+        if(mode==='primary address'){status.hostIP='192.0.2.2';status.hostIPs=[{ip:'192.0.2.2'},{ip:'2001:db8::1'}];}
+        if(mode==='same-family address')status.hostIPs=[{ip:'192.0.2.1'},{ip:'192.0.2.2'}];if(mode==='version only')status.hostIPs=[{ip:'192.0.2.1'}];
+        if(mode==='managed owner')metadata.managedFields=[{manager:'unknown',time:new Date().toISOString()}];if(mode==='managed fields')metadata.managedFields=[{manager:'kubelet',fieldsV1:{unknown:true}}];
+        await f.k8s.mergePatch(Resources.Pod!,'probe','system',{metadata,status,spec});
+        const refs={pvc:[Resources.PersistentVolumeClaim!,'registry-data','system'],pv:[Resources.PersistentVolume!,'registry-pv',undefined],service:[Resources.Service!,'registry','system'],namespace:[Resources.Namespace!,'system',undefined]}as const;
+        const ref=refs[mode as keyof typeof refs];if(ref)await f.k8s.mergePatch(ref[0],ref[1],ref[2],{metadata:{annotations:{unknown:'changed'}}});
+        return response;
+      })as typeof fetch;
+      await expect(nativeRegistrySource(f.k8s,f.options,fetcher).capture(f.query)).rejects.toThrow();expect(f.k8s.deleted).toHaveLength(0);
+    }finally{await f.drop();}
+  });
   test('original Registry capture waits for probe contention within one bounded read, while deadline, caller cancellation and non-busy errors still reject',async()=>{
     const f=await fixture(),timeout=AbortSignal.timeout.bind(AbortSignal);
     // Compress the actual installed 35/40/60s timers; keep real contention retries, filesystem reads and original K8s validation.
