@@ -1,5 +1,5 @@
 import { PROJECT_DELETION_PHASES, ProjectDeletionStepResultSchema } from '@crewstation/contracts';
-import type { ProjectDeletionOwner, ProjectDeletionPhase } from '@crewstation/contracts';
+import type { ProjectDeletionBlocker, ProjectDeletionOwner, ProjectDeletionPhase } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
 import type { ProjectDeletionIntents, ProjectDeletionStopOwner } from '../../ports/projectDeletions';
 import { missingStopDependencies } from './stopDependencies';
@@ -18,6 +18,7 @@ export async function advanceProjectDeletion(intents: ProjectDeletionIntents, ow
   try {
     for (const phase of PROJECT_DELETION_PHASES) {
       let waiting: { participant: ProjectDeletionOwner['participant']; reason: string } | undefined;
+      const blockers: ProjectDeletionBlocker[] = [];
       for (const owner of orderedOwners(owners, phase)) {
       currentOwner = owner;
       if (operation.receipts.some((r) => r.participant === owner.participant && r.phase === phase)) continue;
@@ -34,16 +35,18 @@ export async function advanceProjectDeletion(intents: ProjectDeletionIntents, ow
         await intents.renew(lease, 600);
       }, () => owner.run(context)));
       if (result.kind === 'waiting') {
-        if (phase !== 'stop') { await intents.defer(lease, owner.participant, result.reason); return; }
-        // Independent owners can progress; original connections and resource deletion require completed dependencies.
+        if (phase !== 'stop' && phase !== 'seal') { await intents.defer(lease, owner.participant, result.reason); return; }
+        // Close every source before waiting; stopping still requires each original dependency's receipt.
         waiting ??= { participant: owner.participant, reason: result.reason }; continue;
       }
       if (result.kind === 'blocked') {
         if (result.blockers.some((b) => b.participant !== owner.participant)) throw precondition('清理阻塞来源身份不符');
+        if (phase === 'seal') { blockers.push(...result.blockers); continue; }
         await intents.block(lease, result.blockers); return;
       }
       operation = await intents.receipt(lease, owner.participant, phase, result.evidence);
       }
+      if (blockers.length) { await intents.block(lease, blockers); return; }
       if (waiting) { await intents.defer(lease, waiting.participant, waiting.reason); return; }
     }
     await intents.complete(lease);

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { IDENTITY_HEADERS } from '@crewstation/contracts';
+import { IDENTITY_HEADERS, PROJECT_DELETION_PARTICIPANTS } from '@crewstation/contracts';
+import type { ProjectDeletionParticipant } from '@crewstation/contracts';
 import { createApp } from '@crewstation/http';
 import { newId, noopLogger } from '@crewstation/kernel';
 import { runMigrations } from '@crewstation/persistence';
@@ -14,6 +15,51 @@ const available = await testDatabaseAvailable(); let f: DeletionFixture;
 beforeAll(async () => { if (available) { f = await deletionFixture(); await runMigrations(f.database.db, [queueMigrations]); } });
 afterAll(async () => { await f?.database.drop(); });
 describe.skipIf(!available)('持久删除工作器与完整装配门（真实 PG）', () => {
+  test('封闭遇到首个阻塞仍关闭后续来源，汇总全部原因且不停止或清理，恢复同一原操作', async () => {
+    const { value, operation } = await f.start(), foreign = await f.create();
+    const blocked = new Set<ProjectDeletionParticipant>(['release', 'cluster-management']);
+    const originals = f.external.owners.filter((owner) => blocked.has(owner.participant)).map((owner) => ({ owner, run: owner.run }));
+    for (const { owner, run } of originals) owner.run = async (context) => {
+      const result = await run(context);
+      return context.phase === 'seal' ? { kind: 'blocked', blockers: [{ participant: owner.participant, code: 'inventory-changed', message: '原来源已封闭，需要重新核对' }] } : result;
+    };
+    try {
+      await f.controller.advance(operation.id);
+      const current = await f.controller.read(f.admin, operation.id);
+      expect(current.state).toBe('needs-attention'); expect(current.phase).toBe('seal');
+      expect(current.blockers.map((blocker) => blocker.participant).sort()).toEqual([...blocked].sort());
+      expect(current.receipts).toHaveLength(PROJECT_DELETION_PARTICIPANTS.length - blocked.size);
+      expect(current.receipts.every((receipt) => receipt.phase === 'seal')).toBe(true);
+      expect(f.external.calls.filter((call) => call.projectId === value.id).every((call) => call.phase === 'seal')).toBe(true);
+      for (const owner of f.external.owners.filter((owner) => owner.participant !== 'project')) {
+        expect(f.external.state(owner.participant, value.id)).toMatchObject({ sealed: true, exists: true, running: true, storage: true, metadata: true });
+        expect(f.external.state(owner.participant, foreign.id)).toMatchObject({ sealed: false, exists: true, running: true, storage: true, metadata: true });
+      }
+      for (const { owner, run } of originals) owner.run = run;
+      await f.controller.retry(f.admin, operation.id); await f.controller.advance(operation.id);
+      const completed = await f.controller.read(f.admin, operation.id);
+      expect(completed.id).toBe(operation.id); expect(completed.state).toBe('succeeded'); expect(completed.receipts).toHaveLength(154);
+    } finally { for (const { owner, run } of originals) owner.run = run; }
+  });
+  test('封闭等待时后续来源仍关闭，仅缺原等待回执，不进入后续阶段，原操作可继续', async () => {
+    const { value, operation } = await f.start();
+    const owner = f.external.owners.find((entry) => entry.participant === 'release')!, original = owner.run;
+    owner.run = async (context) => {
+      const result = await original(context);
+      return context.phase === 'seal' ? { kind: 'waiting', reason: '等待原来源完整核对' } : result;
+    };
+    try {
+      await f.controller.advance(operation.id);
+      const current = await f.controller.read(f.admin, operation.id);
+      expect(current.phase).toBe('seal'); expect(current.receipts).toHaveLength(PROJECT_DELETION_PARTICIPANTS.length - 1);
+      expect(current.receipts.every((receipt) => receipt.phase === 'seal')).toBe(true);
+      expect(f.external.calls.filter((call) => call.projectId === value.id).every((call) => call.phase === 'seal')).toBe(true);
+      for (const entry of f.external.owners.filter((entry) => entry.participant !== 'project')) expect(f.external.state(entry.participant, value.id)).toMatchObject({ sealed: true, exists: true, running: true, storage: true, metadata: true });
+      owner.run = original; f.elapse(15_001); await f.controller.advance(operation.id);
+      const completed = await f.controller.read(f.admin, operation.id);
+      expect(completed.id).toBe(operation.id); expect(completed.state).toBe('succeeded'); expect(completed.receipts).toHaveLength(154);
+    } finally { owner.run = original; }
+  });
   test('持久入队按原操作去重，真实队列心跳驱动 owner，全部回执后作业和操作才完成', async () => {
     const { operation } = await f.start(), enqueue = deletionEnqueue(f.database.db);
     await enqueue(operation.id); await enqueue(operation.id);
