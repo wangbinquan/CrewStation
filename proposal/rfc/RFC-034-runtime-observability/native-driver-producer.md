@@ -49,3 +49,12 @@ upstream DB初始化命令在实际最终launch版本的初始化与取消证据
 检查点移至既有 `agents/development/nativeTurnCheckpoints.ts` 分组；原 `DevelopmentNativeJournalBinding` 与 `NativeAuthority` 的完全相同字段独立到该分组的纯类型文件，journal 在原入口继续重导出同一 binding 类型。两个执行类的可执行正文逐字保持，原 journal 表、事务、checkpoint/EOF/ACK、测试断言与预算不变。修正后按实际 37 路径候选重新冻结源码复核与唯一完整检查；旧完整检查不能代替修正候选的成功结果。
 
 后继 SOURCE37 复核发现 journal 的原 `NativeAuthority` 返回类型仍需绑定；原 FAIL 回执保留。仅以原 binding.original 的 ReturnType 别名恢复原完全相同类型，并删除已无消费者的类型 import。执行正文、原公开 binding 入口与所有行为保持；重新冻结 v3 候选，不能复用 v2 FAIL 为通过。
+
+
+## 2026-10-08 实际检查、发布与新模型验收
+
+37 路径冻结 v3 已完成独立 SOURCE VALID/PASS，唯一完整检查为 6476 pass／0 fail／158 skip、450548 断言；实际候选与控制首末保持。提交 `aebbda4a1646bec16590098be1ef86eeff24ca8e` 已精确推送，[六项 CI 37692853218](https://github.com/wangbinquan/CrewStation/actions/runs/37692853218) 全部 success，本机八组件与实际 OCI 来源均已核对。
+
+新固定 Task 镜像仅用于验证算力 r4。实际 fresh→resume 的同一原执行／root 已有三原 pass 真实 EOF、source ACK 3/3；四原 session／29 part／七数值 step 逐条对上项目及系统完整分页报表，四桶 21822／41856／0／243、63921 Token、验收人民币 ¥0.066516，旧四步不重计。原 r3 的已知 45605／¥0.060076 同时恢复可见，但原 v2 资格继续不完整。详见[真实验收及未关闭阻塞](./native-real-validation-20261008.md)。
+
+新 B 未能调度；A 正常取消已有真实 WAL 终态与完整 ACK，平台 cleaning／Pod 释放仍未收敛；默认生产开关、CLI／算力测试与完整时间采集不凭此页开启。该实际成功不代签完整 RFC 或未启动任务。

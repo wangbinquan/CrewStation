@@ -21,3 +21,10 @@
 原九帧 A1..5/B1..4 的已知值与验收专用人民币价格是校验基准，不能手工补造平台 ACK、before、原页或文件身份。完整 v2 driver producer 接线仍单独未闭合，默认配置不变。
 
 定向真实 PG 回归已通过（1 pass / 0 fail / 62 assertions，2026-10-08）：原九帧经真实 FULL/WAL journal、Session PG、账本与原价估值落地，重启和失 ACK 重放保持五笔四桶与五项人民币金额；未来真实 v2 同步骤 final 原页被 held，零新增 owner；真实旧 capture 对应 meter 缺失会 conflict，测试只在私有数据库中恢复原样行。所用原专用 PG 容器、端口与准备事务配置未修改。类型检查与范围 lint 已通过。完整 check、独立 SOURCE、精确 CI、部署和原真实任务页面核验仍为待办。
+
+
+## 2026-10-08 原九帧实机恢复通过
+
+本片七路径已进入 `aebbda4a1646bec16590098be1ef86eeff24ca8e` 的 37 路径组合候选，独立 SOURCE、唯一完整检查 6476／0 fail／158 skip、精确六项 CI 和八组件本机部署均完成。原 r3 两 Agent／三 Pod UID、镜像和 restart=0 保持；原九帧未改，原五条 OpenCode step-finish（输出含 reasoning）逐一匹配恢复账本及受理原价。
+
+项目和系统原范围均到真实 EOF，已记录输入 23834、缓存读 21568、缓存写 0、输出 203、总 45605、人民币验收估值 ¥0.060076；A35989／¥0.044186、B9616／¥0.01589。正式系统页面已实际显示四分类、金额、项目和算力名称，缺口继续标明不完整。原 nativeSource=2 选择与实际 v1 的不完整 capture 不提升为 v2 页或完整零。新 r4 真正 v2 producer 的完整七步对拍单独记录，见[本次真实验收](./native-real-validation-20261008.md)。
