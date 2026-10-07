@@ -1,3 +1,4 @@
+import type { DevelopmentNativeProducer } from '@crewstation/agent-drivers';
 import type { AgentEvent, DevelopmentRunnerUsageCapture, StartAgentCommand } from '@crewstation/contracts';
 import { RunnerCommandError } from '../commandError';
 import { validateDevelopmentStart } from './developmentStartIntent';
@@ -26,6 +27,15 @@ export class DevelopmentAgentUsage {
     try { return this.journal.permitLaunch(this.key); }
     catch (error) { this.journal.interrupt(this.key.executionId, 'journal-unavailable'); throw error; }
   };
+
+  get nativeProducer(): DevelopmentNativeProducer | undefined {
+    if (this.admission.intent.nativeSource?.version !== 2) return undefined;
+    return { lineageKey: this.admission.intent.nativeUsageLineageKey,
+      beginTurn: (input) => this.journal.nativeBeginTurn(this.key, input),
+      owner: (prepared, rootCreatedAt) => this.journal.nativeTurnOwner(this.key, prepared, rootCreatedAt),
+      interrupted: () => { this.journal.interrupt(this.key.executionId, 'invalid-capture'); },
+    };
+  }
 
   readonly capture = (capture: DevelopmentRunnerUsageCapture, occurredAt: string): void => {
     try { this.journal.capture(this.key, capture, occurredAt); }

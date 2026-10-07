@@ -51,6 +51,8 @@ export interface NativeUsagePassReader {
   readonly initialCursor: string
   /** Original root creation time in this exact read snapshot; absence remains unknown. */
   readonly rootCreatedAt: number | null
+  /** Actual root parent from the same original snapshot, before traversal normalizes the queue. */
+  readonly rootParentSessionId: string | null
   /** One frozen page may be retried. No next page is read until its original owner ACK. */
   next(cursor: string): NativeUsagePassPage
   acknowledge(ordinal: string, payloadDigest: string): void

@@ -17,10 +17,20 @@ export interface DevelopmentPreparedPage extends Omit<UsageSourcePage, 'native'>
 /** Independent persisted Session registration and original accepted price are checked before any write. */
 export function prepareDevelopmentUsagePage(raw: DevelopmentUsagePage, owner: DevelopmentUsageResolved,
   session: DevelopmentUsageRegistration, accepted: AcceptedExecutionPrice): DevelopmentPreparedPage {
+  if (owner.nativeSelection?.version === 2) throw precondition('原生 v2 尚未装配平台投影，不能确认或丢弃原数字页');
+  return prepareRecordedDevelopmentPage(raw, owner, session, accepted);
+}
+/** Restore only actual legacy facts; the original v2 selection stays frozen and incomplete. */
+export function prepareDevelopmentVersionRecovery(raw: DevelopmentUsagePage, owner: DevelopmentUsageResolved,
+  session: DevelopmentUsageRegistration, accepted: AcceptedExecutionPrice): DevelopmentPreparedPage {
+  if (owner.nativeSelection?.version !== 2) throw precondition('版本错配恢复必须绑定原 v2 选择');
+  return prepareRecordedDevelopmentPage(raw, owner, session, accepted);
+}
+function prepareRecordedDevelopmentPage(raw: DevelopmentUsagePage, owner: DevelopmentUsageResolved,
+  session: DevelopmentUsageRegistration, accepted: AcceptedExecutionPrice): DevelopmentPreparedPage {
   const { source, registration } = prepareDevelopmentAdmission(raw, owner, session, accepted);
   const choice = owner.nativeSelection;
-  if (choice?.version === 2) throw precondition('原生 v2 尚未装配平台投影，不能确认或丢弃原数字页');
-  if (choice && (choice.version !== 1 || !choice.expectedNamespace || choice.expectedNamespace.length > 512)) throw precondition('开发原生来源原选择无效');
+  if (choice && (![1, 2].includes(choice.version) || !choice.expectedNamespace || choice.expectedNamespace.length > 512)) throw precondition('开发原生来源原选择无效');
   const streamSourceId = developmentStreamId(registration), context: DevelopmentNativeContext = {
     registration, streamSourceId, ...(choice ? { selection: { version: choice.version, expectedNamespace: choice.expectedNamespace } } : {}),
   };

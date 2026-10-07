@@ -79,7 +79,7 @@ test('fresh Kubernetes emptyDirs initialize the original numeric store and retai
     if (!journal) throw new Error('Original numeric journal did not open');
     const journalId = journal.journalId;
     expect(journal.info()).toMatchObject({ runtimeTaskId: id(3), podUid: 'pod-a', receipt: null });
-    expect(developmentNativePageCapabilities({ taskId: TaskIdSchema.parse(id(3)), podUid: 'pod-a' }, journal)).toEqual({ developmentNativePagesV2: 2 });
+    expect(developmentNativePageCapabilities({ taskId: TaskIdSchema.parse(id(3)), podUid: 'pod-a' }, journal, 2)).toEqual({ developmentNativePagesV2: 2 });
     expect(lstatSync(options.directory).mode & 0o022).toBe(0);
     expect(lstatSync(options.bindingDirectory).mode & 0o022).toBe(0);
     journal.close();

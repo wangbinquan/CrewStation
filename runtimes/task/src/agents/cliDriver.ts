@@ -29,7 +29,7 @@ export function createOpencodeCliDriver(options: CliDriverOptions = {}): AgentDr
 /** 缺省驱动工厂：两种已知协议各一个驱动；通用终端协议没有 headless 驱动，只进「＋ CLI」（C6）。 */
 export function createCliDriverFactory(options: CliDriverOptions = {}): AgentDriverFactory {
   const drivers: Record<KnownAgentProtocol, AgentDriver> = { 'claude-code': createClaudeCodeCliDriver(options), opencode: createOpencodeCliDriver(options) };
-  return { forProtocol: (protocol) => drivers[protocol] };
+  return { developmentNativePagesV2: drivers.opencode.developmentNativePagesV2, forProtocol: (protocol) => drivers[protocol] };
 }
 
 const defaultWhich = (binary: string): string | null => Bun.which(binary);
@@ -37,6 +37,7 @@ const defaultWhich = (binary: string): string | null => Bun.which(binary);
 function adapt(driver: CliAgentDriver): AgentDriver {
   return {
     protocol: driver.protocol,
+    developmentNativePagesV2: driver.developmentNativePagesV2,
     start: (spec, context) => wrap(driver, spec, context),
   };
 }
@@ -60,6 +61,7 @@ function toDriverSpec(spec: AgentSpec): DriverAgentSpec {
   return {
     businessEvents: spec.businessEvents,
     usageObservationsV1: spec.usageObservationsV1,
+    developmentNativePagesV2: spec.developmentNativePagesV2,
     ...(spec.developmentNativeSourceV1 === undefined ? {} : { developmentNativeSourceV1: spec.developmentNativeSourceV1 }),
     nativeUsageTreeV1: spec.nativeUsageTreeV1, nativeUsageLineageKey: spec.nativeUsageLineageKey,
     ...(spec.businessSkills === undefined ? {} : { businessSkills: spec.businessSkills }),
@@ -77,7 +79,7 @@ function toDriverSpec(spec: AgentSpec): DriverAgentSpec {
 }
 
 function toDriverContext(context: AgentLaunchContext): DriverLaunchContext {
-  return { usageSink: context.usageSink, cwd: context.cwd, env: context.env, logger: context.logger, host: createProcessHost(context.launcher), managed: context.managed, runDir: context.managed.runDir };
+  return { usageSink: context.usageSink, developmentNativeProducer: context.developmentNativeProducer, cwd: context.cwd, env: context.env, logger: context.logger, host: createProcessHost(context.launcher), managed: context.managed, runDir: context.managed.runDir };
 }
 
 /** 把 ProcessLauncher 与本运行时的进程／流工具包成驱动包声明的 ProcessHost 端口。 */

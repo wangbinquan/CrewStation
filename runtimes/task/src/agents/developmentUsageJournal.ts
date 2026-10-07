@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import type { DevelopmentNativeTurnInput } from '@crewstation/agent-drivers';
 import type { NativeUsagePassOwner } from '@crewstation/agent-drivers';
 import type { DevelopmentNativePreparation } from '@crewstation/contracts';
 import { DevelopmentNativeJournal, type DevelopmentNativePageEvidence } from './developmentNativeJournal';
@@ -205,6 +206,14 @@ export class DevelopmentUsageJournal {
       this.db.query('UPDATE executions SET acknowledged_sequence=?,spool_bytes=max(0,spool_bytes-?) WHERE execution_id=?').run(through, bytes, key.executionId);
     }).immediate();
     return this.remember(this.receipt(this.row(key.executionId)!));
+  }
+
+  nativeBeginTurn(key: DevelopmentUsageKey, input: DevelopmentNativeTurnInput): void {
+    this.key(key); this.native.beginTurn(key, input);
+  }
+
+  nativeTurnOwner(key: DevelopmentUsageKey, prepared: DevelopmentNativePreparation, rootCreatedAt: number | null): NativeUsagePassOwner {
+    this.key(key); return this.native.turnOwner(key, prepared, rootCreatedAt);
   }
 
   nativeOwner(key: DevelopmentUsageKey, prepared: DevelopmentNativePreparation): NativeUsagePassOwner {

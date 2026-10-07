@@ -60,7 +60,7 @@ class PendingAgentSupervisor implements AgentSupervisor {
       }
       const logger = deps.logger.child({ agentId: command.agentId, protocol });
       const agent = new ManagedAgentProcess(toSpec(command), { driver, beforeStart: deps.beforeStart, launcher: deps.launcher, cwd, commandEnv: command.env, material: command.beforeStart, processAttemptId: command.processAttemptId,
-        usageSink: usage?.capture, usageInterrupted: usage?.incomplete, usageCanLaunch: usage?.permitLaunch, logger });
+        usageSink: usage?.capture, developmentNativeProducer: usage?.nativeProducer, usageInterrupted: usage?.incomplete, usageCanLaunch: usage?.permitLaunch, logger });
       entry.process = agent; this.running.set(command.agentId, agent);
       logger.info('agent started', { mode: command.mode, profile: command.compute + '@' + command.profileRevision, model: command.launch.model ?? null, mcp: command.mcp.length, envKeys: Object.keys(command.env).length, steps: command.beforeStart.steps.length });
       const pumping = pumpAgent(deps, this.running, command.agentId, agent, usage);
@@ -105,7 +105,7 @@ class PendingAgentSupervisor implements AgentSupervisor {
 
 function toSpec(command: StartAgentCommand): AgentSpec {
   return {
-    ...(command.developmentUsage ? { usageObservationsV1: 1 as const, nativeUsageTreeV1: 1 as const, nativeUsageLineageKey: command.developmentUsage.intent.nativeUsageLineageKey, ...(command.developmentUsage.intent.nativeSource?.version === 1 ? { developmentNativeSourceV1: 1 as const } : {}) } : {}),
+    ...(command.developmentUsage ? { usageObservationsV1: 1 as const, nativeUsageTreeV1: 1 as const, nativeUsageLineageKey: command.developmentUsage.intent.nativeUsageLineageKey, ...(command.developmentUsage.intent.nativeSource?.version === 1 ? { developmentNativeSourceV1: 1 as const } : command.developmentUsage.intent.nativeSource?.version === 2 ? { developmentNativePagesV2: 2 as const } : {}) } : {}),
     agentId: command.agentId,
     compute: command.compute,
     profileRevision: command.profileRevision,

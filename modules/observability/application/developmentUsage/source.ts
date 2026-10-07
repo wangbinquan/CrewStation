@@ -1,6 +1,6 @@
 import { conflict, jsonHash, precondition } from '@crewstation/kernel';
 import type { DevelopmentNativePageEvidence, DevelopmentUsagePage, DevelopmentUsageRegistration } from '@crewstation/contracts';
-import { prepareDevelopmentUsagePage } from '../developmentUsage';
+import { prepareDevelopmentUsagePage, prepareDevelopmentVersionRecovery } from '../developmentUsage';
 import { prepareDevelopmentAdmission } from './admission';
 import { developmentStreamId } from '../../domain/developmentNative';
 import { prepareDevelopmentNativePacket, type DevelopmentNativePacket } from '../../domain/developmentUsage/packet';
@@ -18,6 +18,8 @@ export interface NativeDevelopmentPreparedPage {
 export async function prepareDevelopmentSourcePage(raw: DevelopmentUsagePage, owner: DevelopmentUsageResolved,
   session: DevelopmentUsageRegistration, accepted: AcceptedExecutionPrice, read: DevelopmentUsageSource['nativePage']) {
   if (owner.nativeSelection?.version !== 2) return prepareDevelopmentUsagePage(raw, owner, session, accepted);
+  if (raw.events.length && raw.events.every(event => event.capture.version === 1))
+    return prepareDevelopmentVersionRecovery(raw, owner, session, accepted);
   const { source, registration, original } = prepareDevelopmentAdmission(raw, owner, session, accepted), choice = owner.nativeSelection;
   if (!choice.expectedNamespace || choice.expectedNamespace.length > 512 || !read) throw precondition('原生 v2 缺少冻结选择或 Session 原页读取口');
   if (source.events.some(event => event.capture.version !== 2)) throw precondition('原生 v2 来源不能混入旧帧');

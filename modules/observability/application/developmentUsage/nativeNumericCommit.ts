@@ -48,9 +48,11 @@ export async function commitNativeOriginalStep(input: { tx: NativeDevelopmentTra
   const path = await tx.nativePath(original.source.passKey, original.step.id);
   if (!path) return ['native-original-step-path-unmatched'];
   let owner = await tx.nativeOwner(path.sourceNamespace, original.step.id, original.step.stepId);
-  if (owner.state === 'missing' && before) {
-    const adopted = qualifyNativeLegacyAdoption(before, path, await tx.nativeLegacyOwners(path, before));
+  if (owner.state === 'missing') {
+    const candidates = await tx.nativeLegacyOwners(path, before ?? original);
+    const adopted = before ? qualifyNativeLegacyAdoption(before, path, candidates) : undefined;
     if (adopted) { await tx.nativeClaim(adopted, path); owner = await tx.nativeOwner(path.sourceNamespace, original.step.id, original.step.stepId); }
+    else if (candidates.length) return ['native-owner-unresolved'];
   }
   const priorModel = owner.usage ? await tx.nativeOriginalModel(owner.receipt!.meter,
     owner.usage.projection.modelRevision ?? owner.usage.revision) : undefined;

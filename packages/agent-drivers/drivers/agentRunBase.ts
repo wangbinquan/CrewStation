@@ -37,7 +37,7 @@ export abstract class AgentRunBase implements DriverAgentProcess {
   ) {
     this.events = createEventStream<AgentEvent>(spec.businessEvents ? 4 * 1024 * 1024 : undefined);
     this.event = createAgentEventFactory(spec.agentId);
-    this.usageObserver = (spec.businessEvents || context.usageSink !== undefined) && spec.usageObservationsV1 === 1 && prepared.normalizeUsage
+    this.usageObserver = (spec.businessEvents || context.usageSink !== undefined) && spec.developmentNativePagesV2 !== 2 && spec.usageObservationsV1 === 1 && prepared.normalizeUsage
       ? createUsageObserver(prepared.normalizeUsage, spec.agentId, spec.resumeSessionId) : undefined;
   }
 

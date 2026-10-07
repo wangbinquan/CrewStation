@@ -1,3 +1,4 @@
+import type { DevelopmentNativeProducer } from './developmentNativeProducer';
 import type { DevelopmentRunnerUsageCapture, BusinessMaterialRequest } from '@crewstation/contracts';
 // 驱动对外契约。与 `runtimes/task/src/agents/driver.ts` 的 AgentDriver／AgentProcess 结构一致，
 // 但不能直接 import 它（技术包不依赖运行时），于是在这里重新声明；宿主的 cliDriver.ts 做适配。
@@ -16,6 +17,7 @@ export interface DriverAgentSpec {
   usageObservationsV1?: 1;
   nativeUsageTreeV1?: 1;
   developmentNativeSourceV1?: 1;
+  developmentNativePagesV2?: 2;
   nativeUsageLineageKey?: string;
   agentId: string;
   /** 算力档位名（RFC-001）：平台透传，驱动不解释，只在 started 事件里回显。 */
@@ -35,6 +37,7 @@ export interface DriverAgentSpec {
 export interface DriverLaunchContext {
   /** Direct durable numeric sink; ordinary text and business event mapping remain separate. */
   usageSink?: (capture: DevelopmentRunnerUsageCapture, occurredAt: string) => void;
+  developmentNativeProducer?: DevelopmentNativeProducer;
   cwd: string;
   /** 已含模型凭据的完整子进程环境；驱动只读不记录。 */
   env: Record<string, string>;
@@ -59,6 +62,7 @@ export interface DriverAgentProcess {
 /** 一种已知协议的驱动：二进制来自每次启动的 `spec.launch.binaryPath`，驱动本身不绑定任何二进制（RFC-006 C5）。 */
 export interface CliAgentDriver {
   readonly protocol: KnownAgentProtocol;
+  readonly developmentNativePagesV2?: 2;
   start(spec: DriverAgentSpec, context: DriverLaunchContext): DriverAgentProcess;
 }
 

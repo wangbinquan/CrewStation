@@ -35,6 +35,7 @@ export function opencodeAdapter(): CliRuntimeAdapter {
     // `opencode run --help`（1.18.29 实测）的 message 是位置参数，没有任何 stdin 流入口：
     // 交互式只能退化为「一轮一进程 ＋ `--session <id>` 续接」。
     supportsResidentStream: false,
+    developmentNativePagesV2: 2,
     prepare: prepareOpencode,
   };
 }
@@ -69,6 +70,7 @@ async function prepareOpencode(spec: DriverAgentSpec, context: DriverLaunchConte
     env.OPENCODE_CONFIG_CONTENT = JSON.stringify(config);
   }
   return {
+    nativePageBootstrap: (finalEnv) => ({ cmd: [...head, 'db', 'SELECT 1', '--format', 'json'], env: finalEnv }),
     plan: (input) => ({
       cmd: buildOpencodeArgv(
         {

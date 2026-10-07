@@ -18,6 +18,8 @@ export interface TurnInput {
 }
 
 export interface PreparedRuntime {
+  /** Native bootstrap uses the actual upstream binary and this turn's final environment. */
+  nativePageBootstrap?(env: Record<string, string>): { cmd: string[]; env: Record<string, string> };
   normalizeUsage?: UsageNormalizer;
   nativeUsageCapture?(input: NativeCaptureInput, env: Readonly<Record<string, string | undefined>>): NativeUsageCapture;
   /** 组装一次拉起的 argv／env／stdin 约定。 */
@@ -35,5 +37,6 @@ export interface CliRuntimeAdapter {
   readonly protocol: KnownAgentProtocol;
   /** CLI 是否真的支持「进程常驻、持续读 stdin」；false 时交互式退化为链式 one-shot。 */
   readonly supportsResidentStream: boolean;
+  readonly developmentNativePagesV2?: 2;
   prepare(spec: DriverAgentSpec, context: DriverLaunchContext): Promise<PreparedRuntime>;
 }

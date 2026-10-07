@@ -167,6 +167,7 @@ test('one frozen page requires owner ACK, retries exact bytes, and keeps the ori
       identity: reader.identity,
       initialCursor: first.nextCursor!,
       rootCreatedAt: reader.rootCreatedAt,
+      rootParentSessionId: reader.rootParentSessionId,
       next: reader.next,
       acknowledge: reader.acknowledge,
       close: reader.close,

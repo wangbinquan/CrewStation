@@ -1,3 +1,8 @@
+import { DevelopmentNativeTurnCheckpoints } from './development/nativeTurnCheckpoints';
+import type { DevelopmentNativeJournalBinding } from './development/nativeJournalBinding';
+export type { DevelopmentNativeJournalBinding } from './development/nativeJournalBinding';
+type NativeAuthority = ReturnType<DevelopmentNativeJournalBinding['original']>;
+import type { DevelopmentNativeTurnInput } from '@crewstation/agent-drivers';
 import type { Database } from 'bun:sqlite';
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
@@ -5,22 +10,12 @@ import type { NativeUsagePassOwner } from '@crewstation/agent-drivers';
 import {
   DevelopmentNativePreparationSchema, DevelopmentNativePageCaptureSchema, DevelopmentUsageEventSchema,
   NativeUsagePassIdentitySchema, NativeUsagePassPageSchema, NativeUsagePassAckSchema, NativeUsagePassAdmissionSchema,
-  type DevelopmentNativePreparation, type DevelopmentUsageKey, type DevelopmentUsageReceipt,
+  type DevelopmentNativePreparation, type DevelopmentUsageKey,
   type NativeUsagePassIdentity, type NativeUsagePassPage, type NativeUsagePassAck, type NativeUsagePassAdmission,
 } from '@crewstation/contracts';
 
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const same = isDeepStrictEqual;
-interface NativeAuthority {
-  header: string; incarnation: string; phase: DevelopmentUsageReceipt['phase'];
-  interruption: DevelopmentUsageReceipt['interruption']; lastSequence: number; acknowledgedSequence: number;
-}
-export interface DevelopmentNativeJournalBinding {
-  incarnation: string; journalId: string; podUid: string;
-  eventBytes: number; pageBytes: number;
-  original(key: DevelopmentUsageKey): NativeAuthority;
-  committed(key: DevelopmentUsageKey): void;
-}
 interface PassRow {
   pass_id: string; execution_id: string; turn: string; identity_json: string; admission_json: string;
   root_created_at: number | null; next_cursor: string | null; ordinal: string; scan_position: string;
@@ -50,6 +45,7 @@ function pageDigests(raw: Parameters<NativeUsagePassOwner['persist']>[0]) {
 
 /** Original accepted FULL/WAL connection. Tables retain evidence; none is a numeric ledger. */
 export class DevelopmentNativeJournal {
+  private readonly turns: DevelopmentNativeTurnCheckpoints;
   constructor(private readonly db: Database, private readonly binding: DevelopmentNativeJournalBinding) {
     db.exec(`CREATE TABLE IF NOT EXISTS development_native_preparations (
       execution_id TEXT NOT NULL,turn TEXT NOT NULL,document TEXT NOT NULL,PRIMARY KEY(execution_id,turn));
@@ -67,19 +63,36 @@ export class DevelopmentNativeJournal {
       CREATE TABLE IF NOT EXISTS development_native_steps (
       pass_id TEXT NOT NULL,step_id TEXT NOT NULL,session_id TEXT NOT NULL,document TEXT NOT NULL,
       ordinal TEXT NOT NULL,PRIMARY KEY(pass_id,step_id));`);
+    this.turns = new DevelopmentNativeTurnCheckpoints(db, binding);
   }
 
-  owner(key: DevelopmentUsageKey, raw: DevelopmentNativePreparation): NativeUsagePassOwner {
+  beginTurn(key: DevelopmentUsageKey, input: DevelopmentNativeTurnInput): void {
+    this.outer(); this.authority(key); this.turns.begin(key, input);
+  }
+
+  turnOwner(key: DevelopmentUsageKey, raw: DevelopmentNativePreparation, rootCreatedAt: number | null): NativeUsagePassOwner {
+    this.outer(); this.authority(key);
+    const prepared = DevelopmentNativePreparationSchema.parse(raw), checkpoint = this.turns.bind(key, prepared, rootCreatedAt);
+    return this.owner(key, prepared, hash(checkpoint));
+  }
+
+  owner(key: DevelopmentUsageKey, raw: DevelopmentNativePreparation, turnCheckpointDigest?: string): NativeUsagePassOwner {
     this.outer();
     const prepared = DevelopmentNativePreparationSchema.parse(raw), original = this.authority(key);
     const header = JSON.parse(original.header) as { nativeSource?: { version: number }; nativeAdmission?: { lineageKey: string; resumeSessionId: string | null } };
     if (header.nativeSource?.version !== 2 || !header.nativeAdmission)
       throw new Error('Original admission did not explicitly select native v2');
-    const selected = header.nativeAdmission;
+    const checkpoint = turnCheckpointDigest === undefined ? undefined : this.turns.read(key, prepared.turn);
+    if (checkpoint) {
+      this.turns.matches(checkpoint, prepared);
+      if (hash(checkpoint) !== turnCheckpointDigest || checkpoint.rootSessionId !== prepared.rootSessionId)
+        throw new Error('Native owner changed its original turn checkpoint');
+    }
+    const selected = checkpoint ?? header.nativeAdmission;
     if (selected.resumeSessionId !== null && selected.resumeSessionId !== prepared.rootSessionId)
       throw new Error('Native prepared root changed the original resume intent');
     const document = JSON.stringify({ key, podUid: this.binding.podUid, ...prepared, lineageKey: selected.lineageKey,
-      baselineKind: selected.resumeSessionId === null ? 'fresh' : 'resume' });
+      baselineKind: selected.resumeSessionId === null ? 'fresh' : 'resume', ...(turnCheckpointDigest === undefined ? {} : { turnCheckpointDigest }) });
     this.db.transaction(() => {
       this.authority(key);
       const prior = this.db.query<{ document: string }, [string, string]>(
@@ -89,6 +102,8 @@ export class DevelopmentNativeJournal {
     }).immediate();
     const check = (identity: NativeUsagePassIdentity) => {
       if (this.authority(key).header !== original.header) throw new Error('Original native admission header changed');
+      if (checkpoint && hash(this.turns.read(key, prepared.turn)) !== turnCheckpointDigest)
+        throw new Error('Native pass changed its original turn checkpoint');
       const actual = this.db.query<{ document: string }, [string, string]>(
         'SELECT document FROM development_native_preparations WHERE execution_id=? AND turn=?').get(key.executionId, prepared.turn);
       if (!actual || actual.document !== document) throw new Error('Original native preparation is missing or changed');
@@ -101,6 +116,8 @@ export class DevelopmentNativeJournal {
     return {
       admit: async (identity, cursor, rootCreatedAt) => {
         this.outer(); NativeUsagePassIdentitySchema.parse(identity); check(identity);
+        if (checkpoint && checkpoint.rootCreatedAt !== rootCreatedAt)
+          throw new Error('Native pass changed its checkpoint original root birth');
         if (cursor !== JSON.stringify([identity.passId, '0', hash(identity)]) ||
             (rootCreatedAt !== null && (!Number.isSafeInteger(rootCreatedAt) || rootCreatedAt < 0 || rootCreatedAt >= 253402300800000)))
           throw new Error('Native admission changed original cursor or root birth');
@@ -147,9 +164,16 @@ export class DevelopmentNativeJournal {
     const saved = this.db.query<PageRow, [string, string]>(
       'SELECT document,ack,sequence_from,sequence_through FROM development_native_pages WHERE pass_id=? AND ordinal=?').get(passId, ordinal);
     if (!stored || !saved) throw new Error('Original native preparation or page is unavailable');
-    const { key: preparedKey, podUid, lineageKey, baselineKind, ...rawPreparation } = JSON.parse(stored.document);
+    const { key: preparedKey, podUid, lineageKey, baselineKind, turnCheckpointDigest, ...rawPreparation } = JSON.parse(stored.document);
     const prepared = DevelopmentNativePreparationSchema.parse(rawPreparation);
     const header = JSON.parse(original.header) as { nativeSource?: { version: number }; nativeAdmission?: { lineageKey: string; resumeSessionId: string | null } };
+    const checkpoint = turnCheckpointDigest === undefined ? undefined : this.turns.read(key, prepared.turn);
+    if (checkpoint) {
+      this.turns.matches(checkpoint, prepared);
+      if (hash(checkpoint) !== turnCheckpointDigest || checkpoint.rootSessionId !== prepared.rootSessionId ||
+          checkpoint.rootCreatedAt !== pass.root_created_at) throw new Error('Retained native turn checkpoint changed');
+    }
+    const selected = checkpoint ?? header.nativeAdmission;
     const identity = NativeUsagePassIdentitySchema.parse(JSON.parse(pass.identity_json));
     const admission = NativeUsagePassAdmissionSchema.parse(JSON.parse(pass.admission_json));
     const raw = JSON.parse(saved.document) as NativeUsagePassPage, page = NativeUsagePassPageSchema.parse(raw);
@@ -158,8 +182,8 @@ export class DevelopmentNativeJournal {
       throw new Error('Retained native original root birth is invalid');
     if (!same(preparedKey, key) || podUid !== this.binding.podUid || original.incarnation !== key.incarnation ||
         header.nativeSource?.version !== 2 || !header.nativeAdmission ||
-        lineageKey !== header.nativeAdmission.lineageKey || baselineKind !== (header.nativeAdmission.resumeSessionId === null ? 'fresh' : 'resume') ||
-        (baselineKind === 'resume' && prepared.rootSessionId !== header.nativeAdmission.resumeSessionId) ||
+        lineageKey !== header.nativeAdmission.lineageKey || baselineKind !== (selected?.resumeSessionId === null ? 'fresh' : 'resume') ||
+        (baselineKind === 'resume' && prepared.rootSessionId !== selected?.resumeSessionId) ||
         identity.turn !== prepared.turn || identity.lineageKey !== lineageKey || identity.rootSessionId !== prepared.rootSessionId ||
         identity.nativeSource !== 'opencode:' + prepared.store.actualPathDigest || identity.sourceGeneration !== hash(prepared.store) ||
         identity.epoch !== prepared.store.sourceEpoch || !same(admission.identity, identity) || !same(page.identity, identity) ||

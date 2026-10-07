@@ -17,17 +17,17 @@ function fixture(){
  return {journal,context,selected:{taskId:context.runtimeTaskId,podUid:context.podUid}};
 }
 test('v2 is advertised only for selected actual task and Pod with a fresh healthy original journal and native reader',()=>{
- const f=fixture();expect(f.journal.info().receipt).toBeNull();expect(developmentNativePageCapabilities(f.selected,f.journal)).toEqual({developmentNativePagesV2:2});
- expect(developmentNativePageCapabilities(undefined,f.journal)).toEqual({});expect(developmentNativePageCapabilities(f.selected,undefined)).toEqual({});
- expect(developmentNativePageCapabilities({...f.selected,taskId:TaskIdSchema.parse(id(9))},f.journal)).toEqual({});expect(developmentNativePageCapabilities({...f.selected,podUid:'replacement-pod'},f.journal)).toEqual({});
- expect(developmentNativePageCapabilities(f.selected,{info:()=>{throw Error('unreadable journal');},nativePage:f.journal.nativePage.bind(f.journal)})).toEqual({});
+ const f=fixture();expect(developmentNativePageCapabilities(f.selected,f.journal)).toEqual({});expect(f.journal.info().receipt).toBeNull();expect(developmentNativePageCapabilities(f.selected,f.journal,2)).toEqual({developmentNativePagesV2:2});
+ expect(developmentNativePageCapabilities(undefined,f.journal,2)).toEqual({});expect(developmentNativePageCapabilities(f.selected,undefined,2)).toEqual({});
+ expect(developmentNativePageCapabilities({...f.selected,taskId:TaskIdSchema.parse(id(9))},f.journal,2)).toEqual({});expect(developmentNativePageCapabilities({...f.selected,podUid:'replacement-pod'},f.journal,2)).toEqual({});
+ expect(developmentNativePageCapabilities(f.selected,{info:()=>{throw Error('unreadable journal');},nativePage:f.journal.nativePage.bind(f.journal),nativeBeginTurn:f.journal.nativeBeginTurn.bind(f.journal),nativeTurnOwner:f.journal.nativeTurnOwner.bind(f.journal)},2)).toEqual({});
 });
 test('an actual interrupted original journal cannot retain the v2 capability through a cached receipt',()=>{
  const f=fixture(),intent=DevelopmentStartIntentSchema.parse({version:1,identity:{projectId:f.context.projectId,taskId:f.context.workspaceTaskId,executionId:f.context.runtimeTaskId,agentId:id(4),sourceKind:'development-agent',executionGeneration:1},profileId:id(5),profileRevision:2,
   launch:{protocol:'opencode',binaryPath:'/usr/local/bin/opencode'},permission:'full',mode:'interactive',initialPrompt:'original',cwd:null,resumeSessionId:null,systemPrompt:null,mcp:[],nativeUsageLineageKey:'actual-original-lineage',nativeSource:{version:2}});
  const draft={intent,digestNonce:'a'.repeat(64)},admission=DevelopmentUsageAdmissionSchema.parse({...draft,key:{executionId:f.context.runtimeTaskId,journalId:f.journal.journalId,incarnation:f.journal.incarnation,payloadDigest:developmentIntentDigest(draft)}});
- f.journal.reserve(admission);f.journal.running(admission.key);expect(developmentNativePageCapabilities(f.selected,f.journal)).toEqual({developmentNativePagesV2:2});
- f.journal.close();journals.splice(journals.indexOf(f.journal),1);expect(f.journal.info().receipt?.interruption).toBe('journal-unavailable');expect(developmentNativePageCapabilities(f.selected,f.journal)).toEqual({});
+ f.journal.reserve(admission);f.journal.running(admission.key);expect(developmentNativePageCapabilities(f.selected,f.journal,2)).toEqual({developmentNativePagesV2:2});
+ f.journal.close();journals.splice(journals.indexOf(f.journal),1);expect(f.journal.info().receipt?.interruption).toBe('journal-unavailable');expect(developmentNativePageCapabilities(f.selected,f.journal,2)).toEqual({});
 });
 test('Hello keeps old fields unchanged; optional v2 requires all original numeric and native dependencies',()=>{
  const hello:RunnerHello={type:'hello',protocolVersion:TASKRUNNER_PROTOCOL_VERSION,taskId:TaskIdSchema.parse(id(3)),runnerToken:'test-only-runner-token',workdir:'/work',capabilities:{protocols:['opencode'],pty:true,preview:false}};

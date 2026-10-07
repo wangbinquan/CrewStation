@@ -1,7 +1,7 @@
 import type { DevelopmentUsageRegistration, DevelopmentNativeSource, NativeUsageProof, RunnerUsageMeasurement, UsageExecutionIdentity } from "@crewstation/contracts";
 import { conflict, jsonHash } from "@crewstation/kernel";
 
-export interface DevelopmentNativeSelection { version: 1; expectedNamespace: string }
+export interface DevelopmentNativeSelection { version: 1 | 2; expectedNamespace: string }
 export interface DevelopmentNativeContext {
   registration: DevelopmentUsageRegistration; streamSourceId: string;
   selection?: DevelopmentNativeSelection;
@@ -30,7 +30,7 @@ export function developmentNativeState(before: DevelopmentNativeState | undefine
   if (before && jsonHash({ registration: before.registration, streamSourceId: before.streamSourceId, selection: before.selection ?? null }) !==
       jsonHash({ ...context, selection: context.selection ?? null })) throw conflict('开发原生来源归属冲突');
   if (context.selection && proof.lineageKey !== context.selection.expectedNamespace) throw conflict('开发原生来源与原选择命名空间不符');
-  if (source && (!context.selection || source.version !== context.selection.version || source.lineageKey !== context.selection.expectedNamespace ||
+  if (source && (!context.selection || source.lineageKey !== context.selection.expectedNamespace ||
       source.turn !== proof.turn || source.turnIndex !== proof.turnIndex || source.observedAt !== proof.observedAt)) throw conflict('开发原生来源未绑定原选择与证明');
   const state: DevelopmentNativeState = { ...context, begin: before?.begin ?? null, finish: before?.finish ?? null,
     ...(before?.beginRoot === undefined ? {} : { beginRoot: before.beginRoot }),
@@ -50,7 +50,7 @@ export function developmentNativeState(before: DevelopmentNativeState | undefine
   if (state.begin && state.finish && (jsonHash(state.begin.beginStore) !== jsonHash(state.finish.beginStore) ||
       state.begin.turn !== state.finish.turn || state.begin.turnIndex !== state.finish.turnIndex ||
       state.begin.plannedPathDigest !== state.finish.plannedPathDigest)) throw conflict('开发最终来源不能替换已持久开始证明');
-  state.sourceVerified = !!context.selection && verified(state.begin, state.finish, proof);
+  state.sourceVerified = context.selection?.version === 1 && verified(state.begin, state.finish, proof);
   return state;
 }
 /** Actual file continuity alone cannot prove that both stages refer to the original native root. */

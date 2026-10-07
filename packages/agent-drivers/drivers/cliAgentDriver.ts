@@ -18,7 +18,9 @@ import { ResidentAgentRun } from './residentRun';
 export function createCliAgentDriver(adapter: CliRuntimeAdapter, which: (binary: string) => string | null): CliAgentDriver {
   return {
     protocol: adapter.protocol,
+    developmentNativePagesV2: adapter.developmentNativePagesV2,
     start: (spec, context) => {
+      if (spec.developmentNativePagesV2 === 2 && (adapter.developmentNativePagesV2 !== 2 || adapter.supportsResidentStream)) return failedBeforeStart(spec, 'development_native_unsupported', '当前驱动未提供原生分页采集');
       if (spec.launch.protocol !== adapter.protocol) return failedBeforeStart(spec, 'protocol_mismatch', `档位协议 ${spec.launch.protocol} 不能由 ${adapter.protocol} 驱动启动`);
       if (which(spec.launch.binaryPath) === null) return failedBeforeStart(spec, 'driver_not_installed', `driver binary not installed: ${spec.launch.binaryPath}`);
       return start(adapter, spec, context);

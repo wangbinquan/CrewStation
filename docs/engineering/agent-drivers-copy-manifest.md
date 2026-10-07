@@ -548,3 +548,8 @@ packages/agent-drivers/
 14. **OpenCode prompt 上限**：prompt 走 argv，硬上限 120 KiB（Linux `MAX_ARG_STRLEN`）；CrewStation 业务子任务若传大输入需改走文件或 stdin（OpenCode 是否接受 stdin prompt：unknown from code）。
 15. **`Bun.which('bwrap')`／`socat`**：只与 Claude 内置沙箱有关；沙箱关闭后可随 `boundary.ts` 一起删除，但删除意味着 `settings.permissions.deny` 这层唯一能拦 Edit／Write 工具越界的手段也没有了（代码注释：deny 在所有 permission-mode 下生效）。CrewStation 一容器一任务是否还需要它需裁定。
 16. **两个 @deprecated 旧上下文**：`SystemAgentSpawnContext`／`BusinessNodeSpawnContext` 与 `spawnCtx.ts` 翻译层是 agent-workflow 未完成的「true merge」债；照抄可保字节等价，但 CrewStation 没有对拍需求，可在复制后第一步就合并为单一 `AgentSpawnContext` 装配。
+
+
+## RFC-034 开发原生分页接线（2026-10-08）
+
+本项为 CrewStation runtime-owned 开发数字接缝：`contract/developmentNativeProducer.ts`、`drivers/usage/developmentNativePagedCapture.ts` 定义窄 owner closure，原 key/Pod/日志留在 runtime；`chainedRun.ts` 仅原生 v2选择进入 upstream SQL初始化、before/final完整分页，新源能力绑定真实驱动与健康日志。`agentDriver.ts`、`cliRuntimeAdapter.ts`、`opencode/driver.ts` 透传选择和producer；`agentRunBase.ts` 的v2选择关闭旧SDK重复采集。原默认/legacy驱动与进程budget保持。`nativeUsagePass.ts`/`nativeUsagePassTypes.ts` 增加同一原快照 raw root parent，不能把 child冒充新root。runtime每轮checkpoint由 `developmentNativeTurnCheckpoints.ts`持久维护；不复制AW平台受理或OwnershipToken逻辑，也不更改上游复制源commit。实际来源schema/原页ACK由现有共享contracts保持。

@@ -19,6 +19,7 @@ function packetSize(options: NativeUsagePassOptions) {
 class NativeUsagePass implements NativeUsagePassReader {
   readonly initialCursor: string;
   readonly rootCreatedAt: number | null;
+  readonly rootParentSessionId: string | null;
   private readonly scan: NativeUsagePassScan;
   private readonly store: NativeUsagePassStore;
   private readonly packet: ReturnType<typeof packetSize>;
@@ -33,6 +34,7 @@ class NativeUsagePass implements NativeUsagePassReader {
     this.initialCursor = this.cursor();
     this.store = new NativeUsagePassStore(path, identity.rootSessionId);
     this.rootCreatedAt = this.store.rootCreatedAt;
+    this.rootParentSessionId = this.store.root.parent_id;
     this.scan = new NativeUsagePassScan(this.store);
   }
 
