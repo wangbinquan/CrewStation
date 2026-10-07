@@ -57,6 +57,6 @@ export function privateReportWorkspace(db: Executor, active: () => boolean, sign
       return { items: selected.map((r) => ({ key: String(r['key']), document: JSON.parse(String(r['document'])) as T })), nextCursor: rows.length > size ? String(selected.at(-1)!['key']) : null };
     },
     async clear(namespace) { check(namespace); await db.execute(sql`DELETE FROM pg_temp.cs_report_workspace WHERE namespace=${namespace}`); },
-    async clearTree(namespace) { check(namespace); await db.execute(sql`DELETE FROM pg_temp.cs_report_workspace WHERE namespace=${namespace} OR left(namespace,length(${namespace})+1)=${namespace}||'/'`); },
+    async clearTree(namespace) { check(namespace); await db.execute(sql`DELETE FROM pg_temp.cs_report_workspace WHERE namespace=${namespace} OR (namespace>=${namespace+'/'} AND namespace<${namespace+'0'})`); },
   };
 }

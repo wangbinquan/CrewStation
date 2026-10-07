@@ -55,7 +55,7 @@ export async function developmentStatisticsFixture(tdb: TestDatabase, sharedProf
   };
   const settle=async(pending:Promise<RuntimeCompleteReport>,actor:Actor=admin,project:ProjectId|null=null)=>{
     let report=RuntimeCompleteReportSchema.parse(await pending);
-    while(report.state==='building')report=RuntimeCompleteReportSchema.parse(await module.api.runtimeCompleteReportStatus(actor,project,report.reportId));
+    while(report.state==='building'){await Promise.all(module.reportWorkers.map(worker=>worker.drain()));report=RuntimeCompleteReportSchema.parse(await module.api.runtimeCompleteReportStatus(actor,project,report.reportId));}
     return report;
   };
   const ready=async(pending:Promise<RuntimeCompleteReport>,actor:Actor=admin,project:ProjectId|null=null)=>{const report=await settle(pending,actor,project);if(report.state!=='ready')throw new Error(JSON.stringify(report));return report;};

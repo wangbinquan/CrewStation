@@ -19,6 +19,36 @@ function originalCallback<T>(raw: SessionConnectionBirth, address: string, conne
   });
 }
 
+/** Keep the real birth and its private exit key even if its admission transaction fails. */
+async function registerOriginalConnection(deps: Pick<SessionUseCaseDeps, 'connectionHistory' | 'registry' | 'settings'>,
+  births: WeakMap<RunnerConnection, { original: SessionConnectionBirth; privateKey: string }>, connection: RunnerConnection,
+  now: Date, stopping: () => boolean): Promise<void> {
+  const assertStarting = () => { if (stopping()) throw precondition('会话服务正在停止，不能登记新的连接'); };
+  // An already admitted hello must retain its real birth through shutdown.
+  // The outer open rejects later hellos; the final check prevents welcome.
+  const history = deps.connectionHistory;
+  if (!history) {
+    await deps.registry.claim(connection.hello.taskId, deps.settings.selfAddress, now);
+    assertStarting(); return;
+  }
+  const privateKey = Array.from(crypto.getRandomValues(new Uint8Array(32)), (value) => value.toString(16).padStart(2, '0')).join('');
+  let issued: Promise<void> | undefined;
+  try {
+    // Only the fresh original birth holds Session's guard. Welcome and ready
+    // leave this scope, after the original durable registration has finished.
+    await history.open(connection.hello.taskId, () => {
+      issued = history.birth({ id: newResourceId(), taskId: connection.hello.taskId, replica: deps.settings.selfAddress,
+        at: now.toISOString(), exitKeyHash: jsonHash(privateKey) }).then((original) => { births.set(connection, { original, privateKey }); });
+      return issued;
+    });
+  } catch (error) {
+    // A driver rejection can precede the issued birth's actual settlement.
+    // Caller finish must retain its original permission and await that work.
+    await issued?.catch(() => undefined); throw error;
+  }
+  assertStarting();
+}
+
 /** Own the original connection's private exit permission until every callback has drained and its durable exit is saved. */
 export function runnerLifetime(deps: Pick<SessionUseCaseDeps, 'connectionHistory' | 'taskAccess' | 'registry' | 'settings'>, connections: Map<TaskId, RunnerConnection>, subscribers: Map<TaskId, Set<EventSink>>) {
   const births = new WeakMap<RunnerConnection, { original: SessionConnectionBirth; privateKey: string }>();
@@ -76,9 +106,9 @@ export function runnerLifetime(deps: Pick<SessionUseCaseDeps, 'connectionHistory
     },
     open: (hello: (raw: unknown, socket: EventSink) => Promise<RunnerOpenResult>) => (raw: unknown, socket: EventSink): Promise<RunnerOpenResult> => {
       if (stopping) return Promise.resolve({ ok: false, code: 'service-stopping', message: '会话服务正在停止，请重新连接' });
-      const taskId = raw && typeof raw === 'object' && 'taskId' in raw ? raw.taskId : undefined;
-      const original = deps.connectionHistory && typeof taskId === 'string' ? deps.connectionHistory.open(taskId as TaskId, () => hello(raw, socket)) : hello(raw, socket);
-      const pending = original.then(async (result) => {
+      // Each owner admits its own hello callbacks. Holding Session's guard
+      // while TaskRuntime needs the same finite pool creates a circular wait.
+      const pending = hello(raw, socket).then(async (result) => {
         if (!stopping || !result.ok) return result;
         if (connections.get(result.connection.hello.taskId) === result.connection) connections.delete(result.connection.hello.taskId);
         await finish(result.connection, '会话服务正在停止', true);
@@ -94,10 +124,6 @@ export function runnerLifetime(deps: Pick<SessionUseCaseDeps, 'connectionHistory
       // onClose removes its connection before the private finally and
       // registry release complete. Service shutdown owns those exits too.
       await Promise.all([...exiting]);
-    }, register: async (connection: RunnerConnection, now: Date) => {
-    if (!deps.connectionHistory) { await deps.registry.claim(connection.hello.taskId, deps.settings.selfAddress, now); return; }
-    const privateKey = Array.from(crypto.getRandomValues(new Uint8Array(32)), (value) => value.toString(16).padStart(2, '0')).join('');
-    const original = await deps.connectionHistory.birth({ id: newResourceId(), taskId: connection.hello.taskId, replica: deps.settings.selfAddress, at: now.toISOString(), exitKeyHash: jsonHash(privateKey) });
-    births.set(connection, { original, privateKey });
-  } };
+    }, register: (connection: RunnerConnection, now: Date) => registerOriginalConnection(deps, births, connection, now, () => stopping),
+  };
 }
