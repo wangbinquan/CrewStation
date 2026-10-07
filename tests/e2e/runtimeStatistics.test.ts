@@ -7,6 +7,30 @@ import { installRuntimeStatisticsFixture, measureRuntimeOverview } from './runti
 const session = await e2eAvailable() ? await openAdminSession() : undefined;
 afterAll(async () => { await session?.close(); }, 30_000);
 describe.skipIf(!session)('RFC-034 formal runtime observation', () => {
+  test('deployed system statistics endpoint returns one complete original report', async () => {
+    const response = await session!.admin.eval<{ status: number; report: unknown }>(`(async () => {
+      const initial=await fetch('/v1/admin/observability/statistics?from=2026-01-01T00:00:00.000Z&to=2027-01-01T00:00:00.000Z&timezone=Asia%2FShanghai');
+      let report=await initial.json();const reportId=report.reportId,deadline=performance.now()+4000;
+      while(report.state==='building') {
+        if(performance.now()>=deadline)throw new Error('Original complete report did not settle');
+        await new Promise(resolve=>setTimeout(resolve,100));
+        const next=await fetch('/v1/admin/observability/reports/'+reportId);if(!next.ok)throw new Error('Original report status unavailable');
+        report=await next.json();if(report.reportId!==reportId)throw new Error('Original complete report identity changed');
+      }
+      return {status:initial.status,report};
+    })()`);
+    expect(response.status).toBe(200);
+    const report=RuntimeCompleteReportSchema.parse(response.report);
+    expect(['ready','not-ready']).toContain(report.state);
+    if(report.state==='ready') {
+      expect(report.header).toMatchObject({scope:'system',projectionVersion:2,coverage:'complete',filters:{from:'2026-01-01T00:00:00.000Z',to:'2027-01-01T00:00:00.000Z',timezone:'Asia/Shanghai'}});
+      if(report.summary.metrics.state==='ready')expect(report.summary.metrics.cost.currency).toBe('CNY');
+      else expect(report.summary.metrics.state).toBe('not-applicable');
+    } else if(report.state==='not-ready') {
+      expect(report.gaps.length).toBeGreaterThan(0);
+      expect(report).not.toHaveProperty('summary');expect(report).not.toHaveProperty('metrics');
+    }
+  });
   test('layout archive preserves original attempt native pages and rejects unknown parents', async () => {
     const page = session!.admin, f = await installRuntimeStatisticsFixture(page);
     await open(page, '/admin/observability/tasks/' + f.taskId + '?' + f.query);
@@ -34,30 +58,6 @@ describe.skipIf(!session)('RFC-034 formal runtime observation', () => {
     }
     expect(result.unknownParentRejected).toBe(true);
     expect(page.takeErrors()).toEqual([]);
-  });
-  test('deployed system statistics endpoint returns one complete original report', async () => {
-    const response = await session!.admin.eval<{ status: number; report: unknown }>(`(async () => {
-      const initial=await fetch('/v1/admin/observability/statistics?from=2026-01-01T00:00:00.000Z&to=2027-01-01T00:00:00.000Z&timezone=Asia%2FShanghai');
-      let report=await initial.json();const reportId=report.reportId,deadline=performance.now()+4000;
-      while(report.state==='building') {
-        if(performance.now()>=deadline)throw new Error('Original complete report did not settle');
-        await new Promise(resolve=>setTimeout(resolve,100));
-        const next=await fetch('/v1/admin/observability/reports/'+reportId);if(!next.ok)throw new Error('Original report status unavailable');
-        report=await next.json();if(report.reportId!==reportId)throw new Error('Original complete report identity changed');
-      }
-      return {status:initial.status,report};
-    })()`);
-    expect(response.status).toBe(200);
-    const report=RuntimeCompleteReportSchema.parse(response.report);
-    expect(['ready','not-ready']).toContain(report.state);
-    if(report.state==='ready') {
-      expect(report.header).toMatchObject({scope:'system',projectionVersion:2,coverage:'complete',filters:{from:'2026-01-01T00:00:00.000Z',to:'2027-01-01T00:00:00.000Z',timezone:'Asia/Shanghai'}});
-      if(report.summary.metrics.state==='ready')expect(report.summary.metrics.cost.currency).toBe('CNY');
-      else expect(report.summary.metrics.state).toBe('not-applicable');
-    } else if(report.state==='not-ready') {
-      expect(report.gaps.length).toBeGreaterThan(0);
-      expect(report).not.toHaveProperty('summary');expect(report).not.toHaveProperty('metrics');
-    }
   });
   test('24 trend columns, standard card gaps and five views fit both levels in Chinese/English and light/dark', async () => {
     const page = session!.admin, f = await installRuntimeStatisticsFixture(page);
