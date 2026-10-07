@@ -100,17 +100,24 @@ describe.skipIf(!session)('RFC-034 formal runtime observation', () => {
       await page.cmd('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
       await page.cmd('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
       await settle(page); expect(await page.eval<boolean>('!document.querySelector("dialog[open]")')).toBe(true);
-      const unzoomedWidth = await page.eval<number>(`(async () => {
+      const zoomResult = await page.eval<{ state: 'ready'; originalWidth: number } | { state: 'timeout'; diagnostics: Record<string, unknown> }>(`(async () => {
         const started=performance.now();
         for(;;) {
           const region=document.querySelector('${scroll}'),button=region?.closest('section')?.querySelector('header button');
           if(region?.clientWidth>0 && region.querySelector('[data-runtime-section="swimlane"] button[aria-label]:not(:disabled)') && button && !button.disabled) {
-            const originalWidth=region.scrollWidth;button.click();return originalWidth;
+            const originalWidth=region.scrollWidth;button.click();return {state:'ready',originalWidth};
           }
-          if(performance.now()-started>15000)throw new Error('Original timeline zoom control did not settle');
+          if(performance.now()-started>15000)return {state:'timeout',diagnostics:{
+            clientWidth:region?.clientWidth??null,innerWidth,barCount:region?.querySelectorAll('[data-runtime-section="swimlane"] button[aria-label]:not(:disabled)').length??null,
+            headerButton:button?.textContent??null,buttonDisabled:button?.disabled??null,regionCount:document.querySelectorAll('${scroll}').length,
+            hiddenAncestor:region?.closest('[hidden]')?.outerHTML.slice(0,500)??null,openDialogs:document.querySelectorAll('dialog[open]').length,href:location.href,
+          }};
           await new Promise(resolve=>setTimeout(resolve,200));
         }
       })()`);
+      // Return the complete same-evaluation timeout state before throwing: Page.eval truncates browser exceptions.
+      if (zoomResult.state === 'timeout') throw new Error('Original timeline zoom control did not settle: ' + JSON.stringify(zoomResult.diagnostics));
+      const unzoomedWidth = zoomResult.originalWidth;
       await page.waitUntil(`document.querySelector('${scroll}')?.clientWidth > 0 && document.querySelector('${scroll}').scrollWidth > ${unzoomedWidth}`);
       expect(await page.eval<boolean>(`document.querySelector('${scroll}').scrollWidth > document.querySelector('${scroll}').clientWidth`)).toBe(true);
       expect(await page.eval<number>('document.documentElement.scrollWidth-innerWidth')).toBeLessThanOrEqual(1);
