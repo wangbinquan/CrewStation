@@ -24,6 +24,12 @@ async function apply(copies: Copies, taskId: TaskId, operation: ProjectDeletionS
       return developmentSources.offer(operation.key);
     }
     case 'development-source-ack': return developmentSources.acknowledge(operation.key, operation.through);
+    case 'development-native-page': {
+      if (!developmentSources.nativePage) throw precondition('开发原页读取尚未装配');
+      const page = await developmentSources.nativePage(operation.key, operation.passId, operation.ordinal);
+      if (!page) throw precondition('开发已持久原页不存在，不能伪造停止证明');
+      return page;
+    }
     case 'development-measurement': return developmentSources.measurement(operation.key, operation.recordId, operation.revision);
     case 'business-read': return business.get(taskId, operation.executionId);
     case 'business-originals': {

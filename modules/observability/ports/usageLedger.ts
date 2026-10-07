@@ -19,7 +19,7 @@ export interface UsageLedgerTransaction {
   evidence(measurement: UsageEvidence, afterRevision: number, limit: number): Promise<UsageEvidence[]>;
   current(measurement: UsageEvidence): Promise<UsageRecord | undefined>;
   append(event: UsageSourcePage['events'][number], fingerprint: string): Promise<void>;
-  project(value: UsageRecord): Promise<void>;
+  project(value: UsageRecord, originalModelEvidence?: UsageEvidence): Promise<void>;
   capture(identity: UsageExecutionIdentity, frame: RunnerUsageCapture): Promise<void>;
   advance(nextCursor: string, fingerprint: string): Promise<void>;
 }

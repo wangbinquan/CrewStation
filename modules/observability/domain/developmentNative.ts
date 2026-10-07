@@ -73,6 +73,8 @@ export interface DevelopmentModelEvidence {
   meter: { identity: UsageExecutionIdentity; sourceId: string; recordId: string };
   revision: number; streamSourceId: string; sequence: number; index: number;
   turn: string | null; turnIndex: number | null; measurementFingerprint: string;
+  native?: { passKey: string; ordinal: string; stepIndex: number; originalDocumentDigest: string;
+    sourceTurn: string; sourceTurnIndex: number; sourceWatermark: string };
   actualModel: RunnerUsageMeasurement['actualModel']; modelRef: string | null;
 }
 export const developmentMeterKey = (meter: DevelopmentModelEvidence['meter']) => jsonHash(meter);
@@ -83,5 +85,5 @@ export function sameDevelopmentRegistration(a: DevelopmentUsageRegistration, b: 
 export function developmentModelFingerprint(value: DevelopmentModelEvidence): string {
   return jsonHash({ meter: value.meter, revision: value.revision, streamSourceId: value.streamSourceId,
     turn: value.turn, turnIndex: value.turnIndex, measurementFingerprint: value.measurementFingerprint,
-    actualModel: value.actualModel, modelRef: value.modelRef });
+    actualModel: value.actualModel, modelRef: value.modelRef, ...(value.native ? { native: value.native } : {}) });
 }

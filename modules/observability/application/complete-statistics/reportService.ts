@@ -1,5 +1,5 @@
 import {jsonHash,newResourceId,forbidden,notFound,precondition} from '@crewstation/kernel';
-import {RuntimeStatisticsQuerySchema,RuntimeReportPageQuerySchema,runtimeCompleteReportContent,RUNTIME_REPORT_FACT_SECTIONS,type Actor,type ProjectId,type TaskId,type RuntimeStatisticsQuery,type RuntimeReportPageQuery} from '@crewstation/contracts';
+import {RuntimeStatisticsQuerySchema,RuntimeReportPageQuerySchema,runtimeCompleteReportContent,RUNTIME_REPORT_NATIVE_FACT_SECTIONS,type Actor,type ProjectId,type TaskId,type RuntimeStatisticsQuery,type RuntimeReportPageQuery} from '@crewstation/contracts';
 import type {CompleteReportRequest,CompleteReportStored,CompleteReportManifest,CompleteRuntimeReportCache,CompleteReportSpool} from '../../ports/completeRuntimeReportCache';
 import type {ProjectAuthorizer} from '../../ports/sources';
 import {completeSourceCursor,completeSourcePosition} from '../../domain/completeSourceCursor';
@@ -40,7 +40,7 @@ export function completeRuntimeReportUseCases(input:{store:CompleteRuntimeReport
  }
  async function request(actor:Actor,projectId:ProjectId|null,filters:RuntimeStatisticsQuery,taskId?:TaskId) {
   await authorize(actor,projectId);if(paused||controller.signal.aborted)throw precondition('完整报告正在清理，请稍后刷新');const identity=await input.store.identity(),query=RuntimeStatisticsQuerySchema.parse(filters),request:CompleteReportRequest={actor,projectId,filters:query,...(taskId?{taskId}: {})};
-  const requestKey=jsonHash({projectionVersion:2,executionFactsVersion:4,identity,request}),owner=input.owner+'/'+newResourceId();
+  const requestKey=jsonHash({projectionVersion:2,executionFactsVersion:5,identity,request}),owner=input.owner+'/'+newResourceId();
   const existing=await input.store.ensure(request,requestKey,owner,newResourceId());
   if(existing.state==='failed'&&jobs.has(existing.id))await jobs.get(existing.id);
   const report=jobs.has(existing.id)?existing:await input.store.claim(existing.id,owner);schedule(report);return report.report;
@@ -49,7 +49,7 @@ export function completeRuntimeReportUseCases(input:{store:CompleteRuntimeReport
   async status(actor:Actor,projectId:ProjectId|null,id:string){let report=await readable(actor,projectId,id);if(report.state==='building'&&!jobs.has(id))report=await input.store.claim(id,input.owner+'/'+newResourceId());schedule(report);return report.report;},
   async page(actor:Actor,projectId:ProjectId|null,id:string,query:RuntimeReportPageQuery) {
    const report=await readable(actor,projectId,id),content=runtimeCompleteReportContent(report.report);if(!content)throw precondition('完整报告尚未就绪');
-   const parsed=RuntimeReportPageQuerySchema.parse(query);if(content.header.coverage==='complete-facts'&&!RUNTIME_REPORT_FACT_SECTIONS.includes(parsed.section))throw precondition('用量原始记录不完整，不能读取数值明细');
+   const parsed=RuntimeReportPageQuerySchema.parse(query);if(content.header.coverage==='complete-facts'&&!RUNTIME_REPORT_NATIVE_FACT_SECTIONS.includes(parsed.section))throw precondition('用量原始记录不完整，不能读取数值明细');
    const source=JSON.stringify([id,parsed.section,parsed.parent??null,parsed.rowKey??null]),parent=jsonHash(report.request);
    const after=completeSourcePosition(parsed.after??null,content.header.snapshotId,source,parent)??null;
    if(after!==null&&!/^(0|[1-9]\d*)$/.test(after))throw precondition('报告分页位置无效');

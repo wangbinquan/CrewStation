@@ -17,6 +17,8 @@ export const ProjectDeletionSessionDataSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('development-drain'), key: DevelopmentUsageKeySchema, reason: DevelopmentUsageDrainReasonSchema }),
   z.strictObject({ type: z.literal('development-source'), key: DevelopmentUsageKeySchema }),
   z.strictObject({ type: z.literal('development-source-ack'), key: DevelopmentUsageKeySchema, through }),
+  z.strictObject({ type: z.literal('development-native-page'), key: DevelopmentUsageKeySchema,
+    passId: z.string().min(1).max(512), ordinal: z.string().regex(/^(0|[1-9][0-9]*)$/) }),
   z.strictObject({ type: z.literal('development-measurement'), key: DevelopmentUsageKeySchema, ...measurement }),
   z.strictObject({ type: z.literal('business-read'), executionId }),
   z.strictObject({ type: z.literal('business-originals'), after: executionId.nullable() }),

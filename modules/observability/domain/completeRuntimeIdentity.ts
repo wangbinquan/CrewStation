@@ -1,4 +1,4 @@
-import type { RuntimeAttemptFact,RuntimeTaskHeaderFact,UsageExecutionIdentity,UsageRecord,UsageNativeCapture } from '@crewstation/contracts';
+import type { RuntimeAttemptFact,RuntimeTaskHeaderFact,UsageExecutionIdentity,UsageRecord,UsageNativeCapture,RuntimeNativePagedCapture } from '@crewstation/contracts';
 import { runtimeLedgerScope,runtimeOwnsIdentity } from './runtimeIdentity';
 
 export const completeUsageIdentity=(record:Pick<UsageRecord,'identity'|'sourceId'|'recordId'>)=>JSON.stringify([completeObservedIdentity(record.identity),record.sourceId,record.recordId]);
@@ -31,3 +31,6 @@ export function assertCompleteObserved(task:RuntimeTaskHeaderFact,identity:Usage
 }
 export const completeCaptureIdentity=(capture:UsageNativeCapture)=>JSON.stringify([completeObservedIdentity(capture.identity),capture.sourceId,capture.proof.root,capture.proof.turn,capture.proof.turnIndex]);
 export const completeUsageCaptureIdentity=(record:UsageRecord)=>record.scope===null?null:JSON.stringify([completeObservedIdentity(record.identity),record.sourceId,record.scope.root,record.scope.turn,record.scope.turnIndex]);
+
+export const completePagedCaptureIdentity=(capture:RuntimeNativePagedCapture)=>JSON.stringify([completeObservedIdentity(capture.identity),capture.sourceId,capture.id,capture.pass]);
+export const completePagedUsageCaptureIdentity=(record:UsageRecord)=>!record.scope||!('native' in record.scope)?null:JSON.stringify([completeObservedIdentity(record.identity),record.sourceId,record.scope.native.passKey,record.scope.native.identity]);

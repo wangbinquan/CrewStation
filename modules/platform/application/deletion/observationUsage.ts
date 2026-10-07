@@ -1,4 +1,4 @@
-import { RunnerUsageMeasurementSchema } from '@crewstation/contracts';
+import { RunnerUsageMeasurementSchema, DevelopmentNativePageEvidenceSchema } from '@crewstation/contracts';
 import type { ProjectDeletionContext, ProjectId, RunnerUsageSourceIdentity, TaskId } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
 import type { ObservationCleanupBinding } from '../../ports/deletion/observation';
@@ -14,7 +14,9 @@ export function originalObservationUsage(project: ProjectContexts, bind: Observa
     tasks: async (context: ProjectDeletionContext, after: TaskId | null) => bind.tasks(await project.projectDeletionParticipantContext(context, 'session'), after),
     task: async (context: ProjectDeletionContext, id: TaskId) => {
       const task = bind(await project.projectDeletionParticipantContext(context, 'session'), id);
-      return { ...task, businessMeasurement: async (source: RunnerUsageSourceIdentity, recordId: string, revision: number) => {
+      return { ...task, nativeDevelopmentPage: async (key: Parameters<DevelopmentObservationOwner['resolve']>[0], passId: string, ordinal: string) =>
+        DevelopmentNativePageEvidenceSchema.parse(await task.data({ type: 'development-native-page', key, passId, ordinal })),
+        businessMeasurement: async (source: RunnerUsageSourceIdentity, recordId: string, revision: number) => {
         if (source.runtimeTaskId !== id) throw precondition('观测模型证据必须沿用当前原任务');
         return RunnerUsageMeasurementSchema.nullable().parse(await task.data({ type: 'business-measurement', executionId: source.executionId, recordId, revision })) ?? undefined;
       } };

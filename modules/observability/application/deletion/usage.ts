@@ -37,14 +37,15 @@ async function drainDevelopment(context: ProjectDeletionContext, taskId: TaskId,
   let through: number | undefined;
   while (true) {
     const page = await task.offerDevelopment(registration.key);
-    if (!page) return;
+    if (!page) break;
     if (through !== undefined && page.after !== through) throw precondition('原开发数字页没有沿已提交水位继续');
     const owner = await source.development(page.key);
     if (!owner) throw precondition('原开发数字页缺少独立开发 owner');
-    await writer.development(context, page, owner, registration);
+    await writer.development(context, page, owner, registration, task);
     await task.acknowledgeDevelopment(page.key, page.through);
     through = page.through;
   }
+  await writer.developmentPending?.(context, registration, task);
 }
 /** No ordinary polling caps or swallowed failures: every original directory and numerical source reaches EOF. */
 export function drainOriginalObservationUsage(source: ObservationOriginalUsage, writer: ObservationDeletionWriter) {

@@ -1,4 +1,4 @@
-import type { DevelopmentUsageKey, DevelopmentUsageLookup, DevelopmentUsagePage, DevelopmentUsageRegistration, ProjectDeletionContext, RunnerBusinessReceipt,
+import type { DevelopmentNativePageEvidence, DevelopmentUsageKey, DevelopmentUsageLookup, DevelopmentUsagePage, DevelopmentUsageRegistration, ProjectDeletionContext, RunnerBusinessReceipt,
   RunnerUsageMeasurement, RunnerUsageSourceIdentity, RunnerUsageSourcePage, TaskId, UsageExecutionIdentity } from '@crewstation/contracts';
 import type { DevelopmentUsageResolved } from './developmentUsage';
 import type { UsageSourcePage } from './usageLedger';
@@ -11,6 +11,7 @@ export interface ObservationOriginalTask {
   lookupDevelopmentUsage(taskId: TaskId): Promise<DevelopmentUsageLookup>;
   offerDevelopment(key: DevelopmentUsageKey): Promise<DevelopmentUsagePage | null>;
   acknowledgeDevelopment(key: DevelopmentUsageKey, through: number): Promise<void>;
+  nativeDevelopmentPage?(key: DevelopmentUsageKey, passId: string, ordinal: string): Promise<DevelopmentNativePageEvidence>;
 }
 export interface ObservationOriginalUsage {
   tasks(context: ProjectDeletionContext, after: TaskId | null): Promise<readonly TaskId[]>;
@@ -21,5 +22,6 @@ export interface ObservationOriginalUsage {
 export interface ObservationDeletionWriter {
   business(context: ProjectDeletionContext, original: ObservationOriginalTask, source: RunnerUsageSourcePage, page: UsageSourcePage): Promise<void>;
   development(context: ProjectDeletionContext, source: DevelopmentUsagePage, owner: DevelopmentUsageResolved,
-    registration: DevelopmentUsageRegistration): Promise<void>;
+    registration: DevelopmentUsageRegistration, original?: ObservationOriginalTask): Promise<void>;
+  developmentPending?(context: ProjectDeletionContext, registration: DevelopmentUsageRegistration, original: ObservationOriginalTask): Promise<void>;
 }

@@ -1,48 +1,35 @@
-import type { CompleteWorkingRows, CompleteWorkingRow } from '../../ports/completeWorkingRows'
+import type { CompleteWorkingRows } from '../../ports/completeWorkingRows'
 import type { CoverageIntervalStore, CoverageIntervalNode } from '../../domain/coverageIntervalIndex'
-interface Root {
-  readonly tree: string
-  readonly id: string | null
-  /** A single original interval needs no second TEMP row or node index. */
-  readonly point?: readonly [number, number]
-}
+import { CoverageRootStore } from './completeCoverage/rootStore'
+import { createCoverageBuffers } from './completeCoverage/buffers'
+import type { CoverageRoot as Root } from './completeCoverage/rootDocuments'
 const remember = <T>(cache: Map<string, T>, key: string, value: T) => {
   cache.delete(key)
   cache.set(key, value)
   if (cache.size > 4096) cache.delete(cache.keys().next().value!)
 }
-const flushRows = async <T>(rows: CompleteWorkingRows, space: string, dirty: Map<string, T>) => {
-  if (!dirty.size) return
-  const batch: CompleteWorkingRow<T>[] = [...dirty].map(([key, document]) => ({ key, document }))
-  await rows.upsert(space, batch)
-  dirty.clear()
-}
 
 interface RootReader {
-  rows: CompleteWorkingRows
-  rootSpace: string
+  store: CoverageRootStore
   keyOf: (value: string) => string
   roots: Map<string, Root>
   dirtyRoots: Map<string, Root>
-  empty: () => boolean | undefined
-  setEmpty: (value: boolean) => void
   revision: () => bigint
 }
 
 async function readRoot(input: RootReader, tree: string) {
-  const { rows, rootSpace, keyOf, roots, dirtyRoots } = input
+  const { store, keyOf, roots, dirtyRoots } = input
   const key = keyOf(tree)
   let row = roots.get(key) ?? dirtyRoots.get(key)
   // Only an affirmative original TEMP EOF permits this empty-relation shortcut.
-  if (!row && input.empty() === true) return null
-  if (!row && input.empty() === undefined) {
-    const first = await rows.page<Root>(rootSpace, null, 1)
-    if (input.empty() === undefined) input.setEmpty(first.items.length === 0 && first.nextCursor === null)
+  if (!row && store.empty(tree) === true) return null
+  if (!row && store.empty(tree) === undefined) {
+    await store.probe(tree)
     row = roots.get(key) ?? dirtyRoots.get(key)
   }
   while (!row) {
     const before = input.revision()
-    const retained = await rows.get<Root>(rootSpace, key)
+    const retained = await store.get(tree)
     row = roots.get(key) ?? dirtyRoots.get(key)
     if (!row && before !== input.revision()) continue
     row ??= retained
@@ -55,34 +42,34 @@ async function readRoot(input: RootReader, tree: string) {
 
 async function prefetchRoots(
   input: {
-    rows: CompleteWorkingRows
-    rootSpace: string
+    store: CoverageRootStore
     keyOf: (value: string) => string
     roots: Map<string, Root>
     dirtyRoots: Map<string, Root>
     coverage: CoverageIntervalStore
-    empty: () => boolean | undefined
     revision: () => bigint
   },
   trees: Iterable<string>,
 ) {
-  const { rows, rootSpace, keyOf, roots, dirtyRoots, coverage } = input
+  const { store, keyOf, roots, dirtyRoots, coverage } = input
   const wanted = new Map<string, string>()
   async function load() {
     const batch = new Map(wanted)
     wanted.clear()
     const before = input.revision()
-    const found = await rows.getMany<Root>(rootSpace, [...batch.keys()])
+    const found = await store.getMany([...batch.values()])
     // setRoot owns newer facts, including writes already flushed or evicted while this read waited.
     if (input.revision() !== before) return
     const actual = new Map(found.map((row) => [row.key, row.document]))
     for (const [key, tree] of batch) if (!roots.has(key) && !dirtyRoots.has(key)) remember(roots, key, actual.get(key) ?? { tree, id: null })
   }
   for (const tree of trees) {
-    if (input.empty() === undefined) await coverage.root(tree)
-    if (input.empty() === true) continue
+    if (store.empty(tree) === undefined) await coverage.root(tree)
+    if (store.empty(tree) === true) continue
     const key = keyOf(tree)
-    if (roots.has(key) || dirtyRoots.has(key)) continue
+    const retained = roots.get(key) ?? dirtyRoots.get(key), prior = wanted.get(key)
+    if (retained && retained.tree !== tree || prior !== undefined && prior !== tree) throw new Error('Coverage root key identity conflict')
+    if (retained) continue
     wanted.set(key, tree)
     if (wanted.size === 500) await load()
   }
@@ -91,33 +78,26 @@ async function prefetchRoots(
 
 /** Bounded dirty buffers and caches; authority remains the original connection's TEMP rows. */
 export function completeCoverageWorkspace(rows: CompleteWorkingRows, namespace: string, keyOf: (value: string) => string) {
-  const roots = new Map<string, Root>(),
-    nodes = new Map<string, CoverageIntervalNode>()
-  const dirtyRoots = new Map<string, Root>(),
-    dirtyNodes = new Map<string, CoverageIntervalNode>()
-  let sequence = 0n,
-    rootWrites = 0n
-  // Only an affirmative original TEMP EOF can prove the entire root relation empty.
-  let originalRootsEmpty: boolean | undefined
-  const rootSpace = `${namespace}/roots`,
-    nodeSpace = `${namespace}/nodes`
+  const nodeSpace = `${namespace}/nodes`, store = new CoverageRootStore(rows, namespace, keyOf)
+  const { roots, nodes, dirtyRoots, dirtyNodes, flushRoots, flushNodes } = createCoverageBuffers(rows, nodeSpace, store)
+  let sequence = 0n, rootWrites = 0n
   const nodeKey = (tree: string, id: string) => keyOf(JSON.stringify([tree, id]))
-  const read = { rows, rootSpace, keyOf, roots, dirtyRoots, empty: () => originalRootsEmpty,
-    setEmpty: (value: boolean) => { originalRootsEmpty = value }, revision: () => rootWrites }
+  const read = { store, keyOf, roots, dirtyRoots, revision: () => rootWrites }
   const coverage: CoverageIntervalStore = {
     root: (tree) => readRoot(read, tree),
     async setRoot(tree, id) {
       rootWrites++
-      originalRootsEmpty = false
+      store.written(tree)
       const key = keyOf(tree), current = roots.get(key) ?? dirtyRoots.get(key),
         nodeId = nodeKey(tree, id), pending = dirtyNodes.get(nodeId)
+      if (current && current.tree !== tree) throw new Error('Coverage root key identity conflict')
       const leaf = pending && pending.left === null && pending.right === null && pending.height === 1 && pending.maximum === pending.end
       const row: Root = current?.id === id && current.point ? current
         : current?.id == null && leaf ? { tree, id, point: [pending.start, pending.end] } : { tree, id }
       if (row.point) { dirtyNodes.delete(nodeId); nodes.delete(nodeId) }
       remember(roots, key, row)
       dirtyRoots.set(key, row)
-      if (dirtyRoots.size === 500) await flushRows(rows, rootSpace, dirtyRoots)
+      if (dirtyRoots.size >= 500) await flushRoots()
     },
     async node(tree, id) {
       await coverage.root(tree)
@@ -140,18 +120,18 @@ export function completeCoverageWorkspace(rows: CompleteWorkingRows, namespace: 
         const row: Root = leaf ? { tree, id: node.id, point: [node.start, node.end] } : { tree, id: node.id }
         rootWrites++; remember(roots, rootKey, row); dirtyRoots.set(rootKey, row)
         if (leaf) {
-          if (dirtyRoots.size === 500) await flushRows(rows, rootSpace, dirtyRoots)
+          if (dirtyRoots.size >= 500) await flushRoots()
           return
         }
       }
       // Keep a new first leaf pending until the original setRoot retains its exact point.
-      if (dirtyNodes.size === 499 && root?.id == null && node.left === null && node.right === null && node.height === 1 && node.maximum === node.end && !dirtyNodes.has(nodeKey(tree, node.id))) await flushRows(rows, nodeSpace, dirtyNodes)
+      if (dirtyNodes.size === 499 && root?.id == null && node.left === null && node.right === null && node.height === 1 && node.maximum === node.end && !dirtyNodes.has(nodeKey(tree, node.id))) await flushNodes()
       const key = nodeKey(tree, node.id),
         copy = { ...node }
       remember(nodes, key, copy)
       dirtyNodes.set(key, copy)
-      if (dirtyNodes.size === 500) await flushRows(rows, nodeSpace, dirtyNodes)
-      if (dirtyRoots.size === 500) await flushRows(rows, rootSpace, dirtyRoots)
+      if (dirtyNodes.size >= 500) await flushNodes()
+      if (dirtyRoots.size >= 500) await flushRoots()
     },
     async allocateId() {
       return String(++sequence)
@@ -162,8 +142,8 @@ export function completeCoverageWorkspace(rows: CompleteWorkingRows, namespace: 
     coverage,
     prefetchRoots: (trees: Iterable<string>) => prefetchRoots(prefetch, trees),
     flush: async () => {
-      await flushRows(rows, rootSpace, dirtyRoots)
-      await flushRows(rows, nodeSpace, dirtyNodes)
+      await flushRoots()
+      await flushNodes()
     },
   }
 }

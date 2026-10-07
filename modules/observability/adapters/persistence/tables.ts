@@ -2,6 +2,7 @@ import { pgSchema, text, timestamp, bigint, boolean, integer, primaryKey, index,
 import { jsonDocument } from "@crewstation/persistence";
 import type { UsageRecord, UsageObservation, UsageValuation, UsageNativeCapture, RunnerUsageMeasurement, TokenPriceVersion, ExecutionCostVisibilityDto } from "@crewstation/contracts";
 import type { UsageEvidence, NativeCaptureDocument, NativeBaselineEntry, NativeRepair } from "../../domain/usageProjection";
+import type { NativeLedgerReference } from '../../domain/developmentUsage/nativeLedgerReference';
 import type { AcceptedExecutionPrice } from "../../ports/tokenPricing";
 import type { DevelopmentModelEvidence } from "../../domain/developmentNative";
 
@@ -22,6 +23,7 @@ export const alerts = observabilitySchema.table('alerts', {
 export const usageHeads = observabilitySchema.table('usage_heads', {
   taskKey: text('task_key').primaryKey(), projectId: text('project_id').notNull(), taskId: text('task_id').notNull(),
   sequence: bigint('sequence', { mode: 'number' }).notNull(),
+  nativeRevision: text('native_revision').notNull().default('0'),
 });
 export const usageSources = observabilitySchema.table('usage_sources', {
   taskKey: text('task_key').notNull(), sourceId: text('source_id').notNull(), cursor: text('cursor'),
@@ -82,7 +84,7 @@ export const nativeBaselines = observabilitySchema.table('native_baselines', {
 
 export const nativeRepairs = observabilitySchema.table('native_repairs', {
   meterKey: text('meter_key').primaryKey(), taskKey: text('task_key').notNull(), nativeKey: text('native_key').notNull(),
-  valuationKey: text('valuation_key').notNull(), active: boolean('active').notNull(), document: jsonDocument('document').$type<NativeRepair>().notNull(),
+  valuationKey: text('valuation_key').notNull(), active: boolean('active').notNull(), document: jsonDocument('document').$type<NativeRepair | NativeLedgerReference>().notNull(),
 }, (t) => [index('native_repair_key').on(t.taskKey, t.nativeKey)]);
 
 export const tokenPriceHeads = observabilitySchema.table('token_price_heads', {

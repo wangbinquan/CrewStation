@@ -16,7 +16,7 @@ async function snapshotRecord(db: Executor, taskKey: string, snapshotId: string 
     if (row.expiresAt <= now) throw gone('用量快照已过期，请重新读取');
     return row;
   }
-  const through = (await db.select().from(usageHeads).where(eq(usageHeads.taskKey, taskKey)).limit(1))[0]?.sequence ?? 0;
+  const through = (await db.select({ sequence: usageHeads.sequence }).from(usageHeads).where(eq(usageHeads.taskKey, taskKey)).limit(1))[0]?.sequence ?? 0;
   const row = { id: (version === 2 ? 'v2:' : '') + newResourceId(), taskKey, through, visibilityRevision, createdAt: now, expiresAt: now + lifetimeMs };
   await db.insert(usageSnapshots).values(row);
   return row;
@@ -66,7 +66,7 @@ function captureObservation(row: { sequence: number; document: UsageNativeCaptur
  * to the last returned sequence, so a dense source cannot hide the other one. */
 export async function usageChangesWithCaptures(db: Executor, taskKey: string, after: number, limit: number): Promise<UsageSyncChanges> {
   if (!Number.isSafeInteger(after) || after < 0 || !Number.isInteger(limit) || limit < 1 || limit > 500) throw new RangeError('Invalid usage changes page');
-  const head = (await db.select().from(usageHeads).where(eq(usageHeads.taskKey, taskKey)).limit(1))[0]?.sequence ?? 0;
+  const head = (await db.select({ sequence: usageHeads.sequence }).from(usageHeads).where(eq(usageHeads.taskKey, taskKey)).limit(1))[0]?.sequence ?? 0;
   if (after > head) throw validation('Usage cursor is ahead of committed evidence', { reason: 'cursor-ahead' });
   const values = await db.select({ sequence: usageChanges.sequence, document: usageChanges.document }).from(usageChanges)
     .where(and(eq(usageChanges.taskKey, taskKey), gt(usageChanges.sequence, after), lte(usageChanges.sequence, head))).orderBy(asc(usageChanges.sequence)).limit(limit + 1);

@@ -1,7 +1,13 @@
 import { observationDeletionUsageDatabase } from './adapters/persistence/deletionUsageDatabase';
 import type { ObservabilityDeletionInput } from './adapters/persistence/projectDeletion';
 import { drainOriginalObservationUsage } from './application/deletion/usage';
-import { developmentUsageIngestion, prepareDevelopmentUsagePage } from './application/developmentUsage';
+import { developmentUsageIngestion } from './application/developmentUsage';
+import { prepareDevelopmentSourcePage, nativeDevelopmentPageIngestion } from './application/developmentUsage/source';
+import { originalDevelopmentReconciliation } from './application/developmentUsage/reconciliation';
+import { nativeDevelopmentWork } from './application/developmentUsage/nativeDevelopmentWork';
+import { valueDevelopmentMeter } from './application/developmentUsage/developmentValuationRefs';
+import { drainNativeDevelopmentWork } from './application/developmentUsage/drain';
+import { developmentStreamId } from './domain/developmentNative';
 
 import {randomUUID} from 'node:crypto';
 import type {ReportSnapshotSession} from '@crewstation/persistence';
@@ -22,9 +28,9 @@ import {completeExternalSort} from './application/completeExternalSort';
 import {completeWorkingCache} from './application/completeWorkingCache';
 import type {CompleteNativeCacheFactory} from './ports/completeNativeScope';
 import type {CompleteUsageWorkspaceFactory} from './ports/completeUsageWorkspace';
-import { developmentUsageReconciliation } from './application/developmentUsage';
 import { valueDevelopmentUsagePage } from './application/developmentValuations';
 import type { DevelopmentUsageSource } from './ports/developmentUsage';
+import type { NativeOriginalPageReader } from './ports/nativeDevelopmentLedger';
 import { executionValuations, valueRunnerUsagePage } from './application/executionValuations';
 import { drizzleExecutionValuations, drizzleUsageLedger } from './adapters/persistence/drizzleUsageLedger';
 import { runnerUsageReconciliation, usageIngestion } from './application/usageIngestion';
@@ -113,8 +119,12 @@ export function createObservabilityModule(deps: ObservabilityModuleDeps): Observ
     access: deps.executionAccess ?? { task: async () => { throw precondition('执行观测来源尚未接入'); } } });
   const valuations = drizzleExecutionValuations(deps.db), valueUsage = executionValuations({ store: valuations, pricing: executionPricing, clock: useCaseDeps.clock });
   const reconcileBusinessUsage = deps.usageSource ? runnerUsageReconciliation({ source: deps.usageSource, store: ledger, logger, value: valueRunnerUsagePage({ store: valuations, source: deps.usageSource, value: valueUsage }) }) : async () => 0;
-  const reconcileDevelopment = deps.developmentUsageSource ? developmentUsageReconciliation({ source: deps.developmentUsageSource,
-    store: ledger, pricing: executionPricing, logger, value: valueDevelopmentUsagePage({ models: ledger, store: valuations, value: valueUsage }) }) : undefined;
+  const reconcileDevelopment = deps.developmentUsageSource ? originalDevelopmentReconciliation({ source: deps.developmentUsageSource,
+    store: ledger, pricing: executionPricing, logger, value: valueDevelopmentUsagePage({ models: ledger, store: valuations, value: valueUsage }),
+    native: originalDevelopmentWorker(ledger, valuations, valueUsage, async (pass, ordinal) => {
+      if (!deps.developmentUsageSource?.nativePage) throw precondition('原生 v2 缺少实际 Session 原页读取口');
+      return deps.developmentUsageSource.nativePage(pass.document.key, pass.progress.identity.passId, ordinal);
+    }, useCaseDeps.clock) }) : undefined;
   let pendingUsage: Promise<number> | undefined;
   const reconcileUsage = reconcileDevelopment ? () => pendingUsage ??= (async () => {
     const results = await Promise.allSettled([reconcileBusinessUsage(), reconcileDevelopment()]);
@@ -194,13 +204,30 @@ function originalObservationDrain(input: ObservabilityDeletionInput, source: Obs
       const value = executionValuations({ store, pricing, clock });
       await valueRunnerUsagePage({ store, source: { measurement: original.businessMeasurement }, value })(sourcePage, page);
     },
-    development: async (context, sourcePage, owner, registration) => {
+    development: async (context, sourcePage, owner, registration, original) => {
       const accepted = await pricing.get(registration.identity);
       if (!accepted) throw precondition('原开发执行缺少人民币受理，不能伪造数值排空');
-      const page = prepareDevelopmentUsagePage(sourcePage, owner, registration, accepted), db = observationDeletionUsageDatabase(input, context, page);
-      const ledger = drizzleUsageLedger(db), store = drizzleExecutionValuations(db), value = executionValuations({ store, pricing, clock });
-      await developmentUsageIngestion(ledger)(page);
-      await valueDevelopmentUsagePage({ models: ledger, store, value })(page);
+      const page = await prepareDevelopmentSourcePage(sourcePage, owner, registration, accepted, original?.nativeDevelopmentPage?.bind(original));
+      const db = observationDeletionUsageDatabase(input, context, page), ledger = drizzleUsageLedger(db), store = drizzleExecutionValuations(db);
+      if ('kind' in page) await nativeDevelopmentPageIngestion(ledger)(page);
+      else { await developmentUsageIngestion(ledger)(page); await valueDevelopmentUsagePage({ models: ledger, store,
+        value: executionValuations({ store, pricing, clock }) })(page); }
+    },
+    developmentPending: async (context, registration, original) => {
+      const scope = { projectId: registration.identity.projectId, taskId: registration.identity.taskId };
+      const db = observationDeletionUsageDatabase(input, context, scope), ledger = drizzleUsageLedger(db), store = drizzleExecutionValuations(db);
+      const work = originalDevelopmentWorker(ledger, store, executionValuations({ store, pricing, clock }), async (pass, ordinal) => {
+        if (!original.nativeDevelopmentPage) throw precondition('原生停止恢复缺少实际 Session 原页读取口');
+        return original.nativeDevelopmentPage(pass.document.key, pass.progress.identity.passId, ordinal);
+      }, clock);
+      await drainNativeDevelopmentWork(ledger, { scope, sourceId: developmentStreamId(registration) }, work);
     },
   });
+}
+
+function originalDevelopmentWorker(ledger: ReturnType<typeof drizzleUsageLedger>, store: ReturnType<typeof drizzleExecutionValuations>,
+  value: ReturnType<typeof executionValuations>, read: NativeOriginalPageReader, clock: Clock) {
+  const price = valueDevelopmentMeter({ models: ledger, store, value });
+  return nativeDevelopmentWork({ store: ledger, read, now: () => clock.now().toISOString(),
+    value: async refs => { for (const ref of refs) await price(ref); } });
 }

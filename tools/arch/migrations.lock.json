@@ -155,6 +155,8 @@
     "modules/observability/adapters/persistence/migrations/0020_original_usage_task_binding.sql": "66febff87b2fae69ab8b78153de63c8f722274d4203fb436c0261afb388ad852",
     "modules/observability/adapters/persistence/migrations/0021_native_development_consumption.sql": "573693939eaf85b956716756fcd00e8cae67c869d1d665541f29dbea56fd5506",
     "modules/observability/adapters/persistence/migrations/0022_valuation_task_index.sql": "39df625b7174b0926f42b372134367e22622265119d56ab7fa50be6768e8b8b6",
+    "modules/observability/adapters/persistence/migrations/0023_native_numeric_owners.sql": "1385cd9fd8415cf9325a521c8fc75877cd668681f578ef18f74dbf3fe181fbf0",
+    "modules/observability/adapters/persistence/migrations/0024_native_work_dependencies.sql": "67cd67c25cf9b96087aaa298d711cb6fed17d18af61e63402180f5a2721f41dd",
     "modules/project/adapters/persistence/migrations/0001_create_schema.sql": "8cb29f5022308ccafceedb3e0b1130e8bc13fc2d831e5146d9dd34abe30b8abe",
     "modules/project/adapters/persistence/migrations/0002_core_tables.sql": "29e544627de379d3f7ab195cbacf8959f234b7c661a2ed5402ab29ffc8483f22",
     "modules/project/adapters/persistence/migrations/0003_compute_profiles.sql": "1ca73704b0fa919337946e02244842673141e27d337033c111478a9405f82ba6",

@@ -1,13 +1,14 @@
-import { DevelopmentUsagePageSchema, DevelopmentUsageRegistrationSchema, UsageRecordSchema,
+import { DevelopmentUsagePageSchema, UsageRecordSchema,
   type DevelopmentUsagePage, type DevelopmentUsageRegistration } from '@crewstation/contracts';
-import { conflict, jsonHash, precondition, validation, type Logger } from '@crewstation/kernel';
+import { conflict, jsonHash, precondition, type Logger } from '@crewstation/kernel';
 import { developmentCaptureSourceId, developmentStreamId, type DevelopmentNativeContext } from '../domain/developmentNative';
-import { sameDevelopmentRegistration, type DevelopmentModelEvidence } from "../domain/developmentNative";
+import { type DevelopmentModelEvidence } from "../domain/developmentNative";
 import { rebuildUsageProjection } from '../domain/usageProjection';
 import type { DevelopmentUsageLedgerStore, DevelopmentUsageSource, DevelopmentUsageResolved } from '../ports/developmentUsage';
 import type { AcceptedExecutionPrice, ExecutionPriceStore } from '../ports/tokenPricing';
 import type { UsageSourcePage } from '../ports/usageLedger';
 import { appendUsageEvidence } from './usageIngestion';
+import { prepareDevelopmentAdmission } from './developmentUsage/admission';
 
 export interface DevelopmentPreparedPage extends Omit<UsageSourcePage, 'native'> {
   context: DevelopmentNativeContext; source: DevelopmentUsagePage;
@@ -16,13 +17,7 @@ export interface DevelopmentPreparedPage extends Omit<UsageSourcePage, 'native'>
 /** Independent persisted Session registration and original accepted price are checked before any write. */
 export function prepareDevelopmentUsagePage(raw: DevelopmentUsagePage, owner: DevelopmentUsageResolved,
   session: DevelopmentUsageRegistration, accepted: AcceptedExecutionPrice): DevelopmentPreparedPage {
-  const source = DevelopmentUsagePageSchema.parse(raw), registration = DevelopmentUsageRegistrationSchema.parse(session);
-  const original = DevelopmentUsageRegistrationSchema.parse(owner.registration);
-  if (!source.events.length || source.after === source.through) throw validation('开发数值来源页没有连续事件');
-  if (!sameDevelopmentRegistration(registration, original) || jsonHash(source.key) !== jsonHash(registration.key)) throw precondition('开发数值来源与原独立登记不符');
-  if (jsonHash(owner.price) !== jsonHash(accepted) || jsonHash(owner.price.identity) !== jsonHash(registration.identity) ||
-      owner.price.profile?.id !== registration.profileId || owner.price.profile.revision !== registration.profileRevision ||
-      !Number.isSafeInteger(owner.price.priceBookRevision) || owner.price.priceBookRevision < 0 || !Number.isFinite(Date.parse(owner.price.acceptedAt))) throw precondition('开发来源必须沿用原执行的档位与人民币受理');
+  const { source, registration } = prepareDevelopmentAdmission(raw, owner, session, accepted);
   const choice = owner.nativeSelection;
   if (choice?.version === 2) throw precondition('原生 v2 尚未装配平台投影，不能确认或丢弃原数字页');
   if (choice && (choice.version !== 1 || !choice.expectedNamespace || choice.expectedNamespace.length > 512)) throw precondition('开发原生来源原选择无效');

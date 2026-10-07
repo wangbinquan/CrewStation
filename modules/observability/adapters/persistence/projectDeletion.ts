@@ -9,6 +9,8 @@ import {runtimeReportAdmissionKey} from '../../ports/completeRuntimeReportCache'
 import type { ObservabilityReportLifecycle, ObservabilityDeletionRepository, ObservabilityDeletionTasks, ObservabilityProjectDirectory } from '../../ports/projectDeletion';
 
 const columns: Readonly<Record<string, readonly string[]>> = {
+  development_native_owners: ["document", "fingerprint", "meter_key", "project_id", "session_id", "source_namespace", "step_id", "task_id", "task_key"],
+  development_native_work: ["document", "pass_key", "project_id", "source_id", "task_id", "task_key"],
   development_native_paths: ["depth", "parent_session_id", "pass_key", "path_digest", "project_id", "session_id", "source_namespace", "task_id", "task_key"],
   development_native_passes: ["document", "fingerprint", "pass_key", "progress", "project_id", "source_id", "state", "task_id", "task_key", "work_cursor", "work_state"],
   development_native_pages: ["complete", "document", "fingerprint", "ordinal", "packet_count", "pass_key", "project_id", "task_id", "task_key"],
@@ -40,7 +42,7 @@ const columns: Readonly<Record<string, readonly string[]>> = {
   usage_changes: ["document", "meter_key", "sequence", "task_key"],
   usage_events: ["event_id", "fingerprint", "source_id", "task_key"],
   usage_evidence: ["document", "fingerprint", "meter_key", "revision"],
-  usage_heads: ["project_id", "sequence", "task_id", "task_key"],
+  usage_heads: ["native_revision", "project_id", "sequence", "task_id", "task_key"],
   usage_pages: ["cursor", "fingerprint", "source_id", "task_key"],
   usage_projections: ["document", "meter_key", "task_key"],
   usage_snapshots: ["created_at", "expires_at", "id", "task_key", "through", "visibility_revision"],

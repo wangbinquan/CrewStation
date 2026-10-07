@@ -1,4 +1,6 @@
 import { ProjectIdSchema, ProjectDeletionTargetSchema, TaskIdSchema, ExecutionObservationIdentitySchema, DevelopmentUsageRegistrationSchema } from '@crewstation/contracts';
+import type { DevelopmentUsageResolved } from '../../observability/ports/developmentUsage';
+import type { TestDatabase } from '@crewstation/testkit';
 import type { ProjectDeletionContext, RunnerUsageCapture } from '@crewstation/contracts';
 import { request as httpRequest } from 'node:http';
 import { createApp } from '@crewstation/http';
@@ -31,7 +33,7 @@ const loopback = (input: string | URL, init?: RequestInit) => new Promise<Respon
   req.once('error', reject); req.end(init?.body ? String(init.body) : undefined);
 });
 /** Actual factories, legacy PostgreSQL copies and Session HTTP; upstream stop/identity grants are controlled. No real workload is created. */
-export async function observationDeletionFixture() {
+export async function observationDeletionFixture(options: { native?: (database: TestDatabase, projectId: typeof ProjectIdSchema._output) => Promise<DevelopmentUsageResolved> } = {}) {
   const beforeFence = { ...sessionMigrations, files: sessionMigrations.files.filter((file) => file.name.localeCompare('0011_') < 0) };
   const database = await createTestDatabase([beforeFence, observabilityMigrations]);
   const projectId = ProjectIdSchema.parse(newResourceId()), otherId = ProjectIdSchema.parse(newResourceId()), operationId = newResourceId();
@@ -57,6 +59,7 @@ export async function observationDeletionFixture() {
     await database.db.execute(sql`INSERT INTO session.development_usage_events(task_id,sequence,digest,event) VALUES(${developmentRuntime},${sequence},${jsonHash(event)},${JSON.stringify(event)}::jsonb)`);
   }
   await runMigrations(database.db, [sessionMigrations]);
+  const native = await options.native?.(database, projectId), allIds = native ? [...ids, native.registration.runtimeTaskId, native.registration.identity.taskId] : ids;
   let valid = true, closing = false, ackFault: 'before' | 'after' | undefined, requests = 0;
   const grant = async (context: ProjectDeletionContext) => { if (!valid || context.operationId !== operationId || context.target.id !== projectId) throw precondition('controlled original Root expired'); };
   const server = Bun.serve({ port: 0, fetch: () => new Response('initializing', { status: 503 }) }), address = `http://127.0.0.1:${server.port}`;
@@ -64,8 +67,8 @@ export async function observationDeletionFixture() {
     pid: process.pid, pidNamespace: '731', bootId: crypto.randomUUID(), startTicks: '91' };
   const session = createSessionModule({ db: database.db, isAdmin: async () => true, runnerAuth: { verifyRunnerToken: async () => ({ ok: true, projectId }) },
     taskAccess: { canOpenStream: async () => true, onRunnerConnected: async () => true, onRunnerDisconnected: async () => {} },
-    deletionSources: { processes: { protectCurrent: async () => processIdentity, sweep: async () => {} }, resolve: async (key) => ids.includes(key as typeof businessRuntime) ? { id: TaskIdSchema.parse(key), complete: true, scope: 'project', projectIds: [projectId], revision: jsonHash({ key, projectId }) } : undefined,
-      tasks: async (id, after) => id === projectId ? ids.filter((key) => after === null || key > after).sort().slice(0, 200) : [],
+    deletionSources: { processes: { protectCurrent: async () => processIdentity, sweep: async () => {} }, resolve: async (key) => allIds.includes(key as typeof businessRuntime) ? { id: TaskIdSchema.parse(key), complete: true, scope: 'project', projectIds: [projectId], revision: jsonHash({ key, projectId }) } : undefined,
+      tasks: async (id, after) => id === projectId ? allIds.filter((key) => after === null || key > after).sort().slice(0, 200) : [],
       assertGrant: grant, assertAvailable: async () => { if (closing) throw precondition('controlled project sealed'); } },
     settings: { selfAddress: address, commandTimeoutMs: 1000, runnerStaleMs: 30_000, replayLimit: 100 } });
   const app = createApp({ name: 'original-observation-session' }); app.route('/', session.http.internal); server.reload({ fetch: app.fetch });
@@ -82,13 +85,13 @@ export async function observationDeletionFixture() {
   } };
   const originalUsage = originalObservationUsage(contexts, createProjectDeletionSessionClient(address, request), {
     resolveUsageSource: async (source) => source.runtimeTaskId === businessRuntime && source.executionId === receipt.executionId && source.attempt === 1 && source.incarnation === receipt.incarnation && source.payloadDigest === receipt.payloadDigest ? businessIdentity : undefined,
-  }, { resolve: async (key) => accepted && jsonHash(key) === jsonHash(registration.key) ? { registration, price: accepted } : undefined });
+  }, { resolve: async (key) => native && jsonHash(key) === jsonHash(native.registration.key) ? native : accepted && jsonHash(key) === jsonHash(registration.key) ? { registration, price: accepted } : undefined });
   const module = createObservabilityModule({ db: database.db, k8s: createFakeK8sClient(), isAdmin: async () => true, authorizer: { authorize: async () => {} },
     services: { resolveServiceOfProject: async () => undefined }, slots: { slotRoles: async () => undefined },
     traces: { environments: { traceKeys: async () => [], activeTraceIds: async () => [], list: async () => [] }, deliveries: { traceKeys: async () => [], activeTraceIds: async () => [], list: async () => [] },
       businessTasks: { list: async () => [] }, sessions: { summarize: async () => [], events: async () => [] } },
     deletion: { identities: resourceIdentityDirectory(database.db, () => [sessionMigrations, observabilityMigrations]), assertGrant: grant,
-      tasks: { list: async () => ({ ids, complete: true }) }, originalUsage },
+      tasks: { list: async () => ({ ids: allIds, complete: true }) }, originalUsage },
   });
   const accepted = await module.api.acceptExecutionPrice({ identity: registration.identity, profile: { id: registration.profileId, revision: 3, protocol: 'opencode' } });
   const owner = module.api.deletionOwner!, confirmed = await owner.inspect(target);

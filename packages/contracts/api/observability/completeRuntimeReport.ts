@@ -66,7 +66,9 @@ export function runtimeCompleteReportContent(report:RuntimeCompleteReport):Runti
  return report.state==='ready'?report:report.state==='not-ready'?report.facts:undefined;
 }
 export const RUNTIME_REPORT_FACT_SECTIONS:readonly RuntimeReportSection[]=['tasks','agents','agent-tasks','projects','profiles','profile-tasks','attempts','swimlane','quality'];
-export const RuntimeReportSectionSchema=z.enum(['tasks','agents','agent-tasks','projects','profiles','profile-tasks','models','attempts','calls','swimlane','captures','quality']);
+/** Native-pages/1 metadata has its own strict row contract; retain the original fact list. */
+export const RUNTIME_REPORT_NATIVE_FACT_SECTIONS:readonly RuntimeReportSection[]=[...RUNTIME_REPORT_FACT_SECTIONS,'native-pages'];
+export const RuntimeReportSectionSchema=z.enum(['tasks','agents','agent-tasks','projects','profiles','profile-tasks','models','attempts','calls','swimlane','captures','native-pages','quality']);
 export type RuntimeReportSection=z.infer<typeof RuntimeReportSectionSchema>;
 export const RuntimeReportPageQuerySchema=z.strictObject({section:RuntimeReportSectionSchema,parent:z.string().optional(),rowKey:z.string().min(1).optional(),after:z.string().optional(),pageSize:z.coerce.number().int().min(1).max(500).default(100)});
 export type RuntimeReportPageQuery=z.infer<typeof RuntimeReportPageQuerySchema>;
@@ -86,3 +88,5 @@ export type CompleteRuntimeAgent=z.infer<typeof CompleteRuntimeAgentSchema>;
 export type CompleteRuntimeModel=z.infer<typeof CompleteRuntimeModelSchema>;
 export type CompleteRuntimeContribution=z.infer<typeof CompleteRuntimeContributionSchema>;
 export type CompleteRuntimeCall=z.infer<typeof CompleteRuntimeCallSchema>;
+
+export {RuntimeNativePagedCaptureSchema,type RuntimeNativePagedCapture} from './nativePagedCapture';

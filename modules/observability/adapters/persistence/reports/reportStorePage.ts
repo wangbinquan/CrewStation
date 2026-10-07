@@ -1,13 +1,13 @@
 import {sql} from 'drizzle-orm';
 import type {Executor} from '@crewstation/persistence';
-import {runtimeCompleteReportContent,RUNTIME_REPORT_FACT_SECTIONS,RuntimeCompleteReportSchema,type RuntimeReportPage,type RuntimeReportPageQuery} from '@crewstation/contracts';
+import {runtimeCompleteReportContent,RUNTIME_REPORT_NATIVE_FACT_SECTIONS,RuntimeCompleteReportSchema,type RuntimeReportPage,type RuntimeReportPageQuery} from '@crewstation/contracts';
 import type {CompleteReportStored,CompleteReportManifest} from '../../../ports/completeRuntimeReportCache';
 import {assertPublishedRuntimeReport} from './reportIntegrity';
 import {assertCompleteRuntimeFactItem} from '../../../domain/completeReportFacts';
 /** Seek and count only in a published immutable full report. Never sum the current response page. */
 export async function completeRuntimeReportPage<T>(db:Executor,report:CompleteReportStored,query:RuntimeReportPageQuery,after:string|null):Promise<RuntimeReportPage<T>> {
  const content=runtimeCompleteReportContent(report.report);if(!content)throw new Error('Full runtime report is not ready');
- if(content.header.coverage==='complete-facts'&&!RUNTIME_REPORT_FACT_SECTIONS.includes(query.section))throw new Error('Incomplete usage cannot read numeric collections');
+ if(content.header.coverage==='complete-facts'&&!RUNTIME_REPORT_NATIVE_FACT_SECTIONS.includes(query.section))throw new Error('Incomplete usage cannot read numeric collections');
  const parent=query.parent??'',header=content.header;
  const [published]=await db.execute(sql`SELECT report,manifest FROM observability.runtime_reports WHERE id=${report.id} AND state=${report.report.state}`);if(!published||JSON.stringify(RuntimeCompleteReportSchema.parse(published['report']))!==JSON.stringify(report.report))throw new Error('Published complete report no longer available');
  await assertPublishedRuntimeReport(db,report.id,report.report,published['manifest'] as CompleteReportManifest|null);

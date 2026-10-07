@@ -26,7 +26,8 @@ export async function fixture(legacy = false, tasks?: ObservabilityDeletionTasks
 }
 export async function insertRow(database: TestDatabase, name: string, body: Record<string, unknown>) {
   const table = sql`${sql.identifier('observability')}.${sql.identifier(name)}`;
-  await database.db.execute(sql`INSERT INTO ${table} SELECT * FROM jsonb_populate_record(NULL::${table},${JSON.stringify(body)}::jsonb)`);
+  const row = name === 'usage_heads' ? { native_revision: '0', ...body } : body;
+  await database.db.execute(sql`INSERT INTO ${table} SELECT * FROM jsonb_populate_record(NULL::${table},${JSON.stringify(row)}::jsonb)`);
 }
 export async function contentCounts(database: TestDatabase): Promise<Record<string, number>> {
   const result: Record<string, number> = {};
@@ -39,7 +40,7 @@ export async function seed(database: TestDatabase, projectId: string) {
   const taskId = newResourceId(), executionId = newResourceId(), taskKey = jsonHash({ projectId, taskId }), meterKey = jsonHash(newResourceId()), captureId = jsonHash(newResourceId());
   const identity = { projectId, taskId, executionId }, document = { identity, private: 'private-value:' + projectId };
   const rows: Record<string, Record<string, unknown>> = {
-    usage_heads: { task_key: taskKey, project_id: projectId, task_id: taskId, sequence: 3 },
+    usage_heads: { task_key: taskKey, project_id: projectId, task_id: taskId, sequence: 3, native_revision: '0' },
     accepted_execution_prices: { execution_id: executionId, generation: 1, fingerprint: 'price', document },
     alerts: { id: newResourceId(), project_id: projectId, type: 'health-failing', key: 'health-failing:prod', state: 'firing', detail: 'private-detail:' + projectId, fired_at: new Date().toISOString(), resolved_at: null },
     cost_visibility: { project_id: projectId, revision: 1, document: { projectId, private: 'cost-private' } },

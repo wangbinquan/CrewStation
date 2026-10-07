@@ -44,7 +44,7 @@ export async function appendUsageEvidence(tx: UsageLedgerTransaction, event: Usa
     const previous = await tx.current(event.measurement);
     const projection = rebuildUsageProjection([...retained, event.measurement], previous);
     UsageRecordSchema.parse(projection);
-    if (projection !== previous) await tx.project(projection);
+    if (projection !== previous) await tx.project(projection, event.measurement);
   }
   await tx.append(event, fingerprint);
   return revision === undefined;

@@ -10,17 +10,18 @@ import {EmptyState} from '../../../shared/ui/EmptyState';
 import {completeCount} from '../model/completeFormat';
 import styles from './RuntimeStatistics.module.css';
 const positions=new Map<string,readonly (string|undefined)[]>();
-interface Props<T> {header:RuntimeReportHeader;section:RuntimeReportPageQuery['section'];parent?:string;rowKey?:string;children:(items:readonly T[])=>ReactNode;emptyKey?:string}
+interface Props<T> {header:RuntimeReportHeader;section:RuntimeReportPageQuery['section'];parent?:string;rowKey?:string;children:(items:readonly T[])=>ReactNode;emptyKey?:string;hideEmpty?:boolean}
 /** Page size limits one transport response, never the report population or any aggregate. */
 export function RuntimeRows<T>(props:Props<T>) {
  const {header,section,parent,rowKey}=props,key=JSON.stringify([header.reportId,section,parent,rowKey]);
  return <RuntimeRowsPage<T> key={key} {...props} positionKey={key}/>;
 }
-function RuntimeRowsPage<T>({header,section,parent,rowKey,children,emptyKey='runtime.empty',positionKey}:Props<T>&{positionKey:string}) {
+function RuntimeRowsPage<T>({header,section,parent,rowKey,children,emptyKey='runtime.empty',hideEmpty=false,positionKey}:Props<T>&{positionKey:string}) {
  const t=useT(),[cursors,setCursors]=useState<readonly (string|undefined)[]>(()=>positions.get(positionKey)??[undefined]);
  const after=cursors.at(-1),page=useRuntimeReportPage<T>(['runtime-report-page',positionKey,after],header,{section,parent,rowKey,after,pageSize:100});
  const change=(next:readonly (string|undefined)[])=>{positions.set(positionKey,next);setCursors(next);};
  const data=page.error?undefined:page.data;
+ if(hideEmpty&&data?.total==='0'&&!page.isPending&&!page.error)return null;
  return <Stack data-runtime-section={section}><QueryStatus isPending={page.isPending} error={page.error}/>
   {data?data.items.length?children(data.items):<EmptyState title={t(emptyKey)}/>:null}
   <ActionRow><span className={styles.hint}>{data?t('runtime.pageCount',{shown:data.items.length,total:completeCount(data.total)}):t('runtime.pageLoading')}</span>

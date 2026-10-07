@@ -1,4 +1,4 @@
-import type {RuntimeAttemptFact,RuntimeTaskHeaderFact,RuntimeReportSection,UsageNativeCapture} from '@crewstation/contracts';
+import type {RuntimeAttemptFact,RuntimeTaskHeaderFact,RuntimeReportSection,UsageNativeCapture,RuntimeNativePagedCapture} from '@crewstation/contracts';
 import {completeRuntimeMetrics,emptyCompleteRuntimeFold,mergeCompleteRuntimeFold,addCompleteRuntimeAllocation,type CompleteRuntimeFold} from '../../domain/completeRuntimeMetrics';
 import {completeObservedIdentity} from '../../domain/completeRuntimeIdentity';
 import {completeRuntimeSourceKind} from '../../domain/completeRuntimeCohort';
@@ -72,6 +72,11 @@ export async function retainCompleteTaskDimensions(input:CompleteRuntimeCohortIn
     const attempt=await attempts.get(input.keyOf(completeObservedIdentity(row.document.identity)));
     if(!attempt)throw new Error('Original native capture admitted attempt missing');
     await reportRows.append('captures',input.keyOf(completeObservedIdentity(row.document.identity)),row.document.id,row.document);
+  }
+  for await(const row of completeWorkingTraversal<RuntimeNativePagedCapture>(input.rows,privateRoot+'/native-pages',input.signal)) {
+    const attempt=await attempts.get(input.keyOf(completeObservedIdentity(row.document.identity)));
+    if(!attempt)throw new Error('Original paged native capture admitted attempt missing');
+    await reportRows.append('native-pages',input.keyOf(completeObservedIdentity(row.document.identity)),row.document.id,row.document);
   }
   for await(const row of completeWorkingTraversal<CompleteRuntimeAllocation>(input.rows,task.build.allocationsNamespace,input.signal)) {
     await dimensions.model(task.summary,row.document,task.build.fold.visible);

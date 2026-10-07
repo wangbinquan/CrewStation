@@ -6,6 +6,7 @@ import { completeSourceCursor, completeSourcePosition } from '../../domain/compl
 import { runtimeLedgerScope } from '../../domain/runtimeIdentity';
 import type { CompleteRuntimeLedgerSources } from '../../ports/completeRuntimeLedgerSources';
 import type { CompleteSourceReader } from '../../ports/completeReport';
+import { nativeReportCaptures } from './developmentUsage/nativeReportCaptures';
 import { usageProjections, executionValuations, nativeCaptures, costVisibility, usageHeads } from './tables';
 
 function selectedIdentity(identity: SQL, task: RuntimeTaskHeaderFact) {
@@ -23,6 +24,7 @@ export function completeRuntimeLedgerSources(db: Executor, task: RuntimeTaskHead
   });
   return {
     snapshotId,
+    ...(task.source?.kind === 'development-agent' ? { pagedCaptures: reader('native-pages', nativeReportCaptures(db, selectedIdentity(sql`p.document->'registration'->'identity'`, task), pageSize)) } : {}),
     usage: reader('usage', async (after) => {
       const rows = await db.select({ key: usageProjections.meterKey, document: usageProjections.document }).from(usageProjections)
         .where(and(eq(usageProjections.taskKey, taskKey), selectedIdentity(sql`${usageProjections.document}->'identity'`, task), after === undefined ? undefined : gt(usageProjections.meterKey, after)))

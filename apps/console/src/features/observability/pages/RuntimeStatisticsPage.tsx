@@ -31,7 +31,7 @@ function RuntimeViewTabs({projectId,search,change,children}:{projectId?:string;s
 }
 function RuntimeTaskPage({projectId,taskId,go}:PageProps&{taskId:string}) {
  const t=useT(),search=parseRuntimeSearch(useSearch({strict:false}));
- const query=useRuntimeReport(['task',projectId??'system',taskId],()=>projectId?api.observability.projectRuntimeTask(projectId,taskId):api.observability.systemRuntimeTask(taskId),projectId,search.reportId);
+ const query=useRuntimeReport(['task',projectId??'system',taskId],()=>projectId?api.observability.projectRuntimeTask(projectId,taskId):api.observability.systemRuntimeTask(taskId),projectId,search.reportId,true,'native-pages/1');
  const report=query.error?undefined:query.data,data=report?runtimeCompleteReportContent(report):undefined,back=()=>go(search);
  return <Stack className={styles.page}><QueryStatus isPending={query.isPending} error={query.error}/>
   {report&&data?<><RuntimeReportState report={report}/><RuntimeItem<CompleteRuntimeTaskSummary> header={data.header} section="tasks" rowKey={taskId}>{task=><RuntimeTaskView task={task} header={data.header} back={back}/>}</RuntimeItem></>:<><PageHeader title={t('runtime.task')} actions={<Button size="small" variant="ghost" onClick={back}>{t('runtime.back')}</Button>}/>{report?<RuntimeReportState report={report}/>:null}</>}
@@ -43,7 +43,7 @@ function RuntimeOverviewPage({projectId,go}:PageProps) {
  const t=useT(),search=parseRuntimeSearch(useSearch({strict:false})),[initialNow]=useState(()=>Date.now());
  const window=runtimeWindow(search,initialNow),operations=search.tab==='resources'||search.tab==='health',current={...search,from:window.from,to:window.to};
  const filters={...window,q:search.q,state:search.state,quality:search.quality,sourceKind:search.sourceKind};
- const query=useRuntimeReport(['statistics',projectId??'system',filters],()=>projectId?api.observability.projectRuntimeStatistics(projectId,filters):api.observability.systemRuntimeStatistics(filters),projectId,search.reportId,!operations);
+ const query=useRuntimeReport(['statistics',projectId??'system',filters],()=>projectId?api.observability.projectRuntimeStatistics(projectId,filters):api.observability.systemRuntimeStatistics(filters),projectId,search.reportId,!operations,'native-pages/1');
  const report=operations||query.error?undefined:query.data,data=report?runtimeCompleteReportContent(report):undefined;
  const change=(next:RuntimeSearch)=>{const candidate={...current,...next};go({...candidate,reportId:cohortKey(candidate)===cohortKey(current)?candidate.reportId:undefined});};
  const returnKey=runtimeReturnKey(projectId??'system',current);useRuntimeListReturn(returnKey,data!==undefined);
