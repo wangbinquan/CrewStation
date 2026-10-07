@@ -13,6 +13,15 @@ export function deletionIntentUseCases(deps: ProjectUseCaseDeps) {
       const record = await deps.uow.read.deletions.findOperation(id);
       return record ? { projectId: record.operation.project.id, operationId: record.operation.id } : undefined;
     },
+    projectDeletionOriginalTarget: async (id: ProjectId) => {
+      const record = await deps.uow.read.deletions.findOperation(id);
+      if (!record) return undefined;
+      const planId = record.operation.confirmations?.[0]?.planId ?? record.planId;
+      const stored = await deps.uow.read.deletions.getPlan(planId);
+      if (!stored) return undefined;
+      if (record.operation.project.id !== id || stored.plan.target.id !== id || stored.plan.operationId) throw precondition('首次受理计划的原项目身份不符');
+      return stored.plan.target;
+    },
     deletionScope: (id: ProjectId) => deletionScope(deps, id),
     prepareDeletionPlan: (actor: Actor, id: ProjectId, reports: readonly ProjectDeletionInventory[]) => adminDeletionWork(deps, actor, () => deps.uow.run(async (scope) => {
       const project = await scope.deletions.lockProject(id);

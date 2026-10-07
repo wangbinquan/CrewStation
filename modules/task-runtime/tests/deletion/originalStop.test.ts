@@ -88,7 +88,7 @@ describe.skipIf(!available)('production runtime STOP composition (actual PG/fact
       const calls = f.state.digitalCalls; expect((await f.owner.run(f.context('stop'))).kind).toBe('done'); expect(f.state.digitalCalls).toBe(calls);
       expect((await f.database.db.execute<{ body: { stopped: unknown } }>(sql`SELECT body FROM task_runtime.project_deletions WHERE project_id=${f.project}`))[0]!.body.stopped).not.toBeNull();
     } finally { await f.drop(); }
-  });
+  }, 15_000); // Real PG setup, four original STOP passes and cleanup share one fixture budget; all safety assertions remain.
   test('expired Root grants issue no digital or physical work and preserve the original Pod and volume', async () => {
     const f = await originalStopFixture();
     try {
@@ -111,5 +111,5 @@ describe.skipIf(!available)('production runtime STOP composition (actual PG/fact
       expect(f.state.volumeCalls).toBe(0);
       expect((await f.k8s.get(Resources.PersistentVolumeClaim!, f.pvc.metadata.name, f.project))?.metadata.uid).toBe(f.pvc.metadata.uid);
     } finally { await f.drop(); }
-  });
+  }, 15_000); // Finished-child setup, serial original STOP and actual PG cleanup use the adjacent storage fixture's budget.
 });

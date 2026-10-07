@@ -7,6 +7,8 @@ export interface ProjectDeletionApi {
   readonly deletionOwner: ProjectDeletionOwner;
   /** Trusted coordinator identity only; no actor, confirmed content, secrets or new operation. */
   projectDeletionCoordinator(projectId: ProjectId): Promise<{ operationId: string; projectId: ProjectId } | undefined>;
+  /** Original first accepted target, before deleting changes state/revision; unavailable after plan compaction. */
+  projectDeletionOriginalTarget(projectId: ProjectId): Promise<ProjectDeletionTarget | undefined>;
   assertProjectDeletionGrant(context: ProjectDeletionContext): Promise<void>;
   /** Internal participants obtain another owner's original confirmed material from the stored plan, never from a caller-made inventory. */
   projectDeletionParticipantContext(context: ProjectDeletionContext, participant: ProjectDeletionParticipant): Promise<ProjectDeletionContext>;

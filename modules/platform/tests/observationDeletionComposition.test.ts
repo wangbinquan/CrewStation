@@ -7,6 +7,8 @@ import { observationDeletionFixture, originalCapture } from './observationDeleti
 
 const available = await testDatabaseAvailable();
 describe.skipIf(!available)('original observation drain composition (real factories/PG/HTTP; controlled upstream Root)', () => {
+  // The budget includes migrations, 114 persisted observations, ACK replay and all seven phases.
+  // Session requests keep their own one-second deadline; full-suite database load needs more headroom.
   test('loss before and after ACK resumes without duplicate usage, drains over the ordinary cap, freezes final content and preserves another project', async () => {
     const f = await observationDeletionFixture();
     try {
@@ -45,5 +47,5 @@ describe.skipIf(!available)('original observation drain composition (real factor
       expect(await f.database.db.execute(sql`SELECT 1 FROM observability.usage_projections WHERE task_key<>${healthyKey}`)).toHaveLength(0);
       await expect(f.module.api.ingestExecutionUsage(ownPage)).rejects.toThrow();
     } finally { f.restore(); await f.close(); }
-  }, 30_000);
+  }, 90_000);
 });

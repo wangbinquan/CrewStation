@@ -74,7 +74,7 @@ export interface ObservabilityModuleDeps {
   reportDataRoot?:string;
   /** Explicit validation configuration metadata, independent of historical report selection. */
   developmentNativeObservationAdmissions?:readonly DevelopmentCollectionAdmission[];
-  deletion?: { identities: ObservabilityProjectDirectory; tasks?: ObservabilityDeletionTasks; originalUsage?: ObservationOriginalUsage; assertGrant(context: ProjectDeletionContext): Promise<void> };
+  deletion?: { identities: ObservabilityProjectDirectory; tasks?: ObservabilityDeletionTasks; originalTarget?: ObservabilityDeletionInput['originalTarget']; originalUsage?: ObservationOriginalUsage; assertGrant(context: ProjectDeletionContext): Promise<void> };
   pricingProfiles?: PricingProfileDirectory;
   executionAccess?: ExecutionObservationAccess;
   usageSource?: RunnerUsageSource;

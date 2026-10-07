@@ -381,7 +381,7 @@ function composeAggregates(deps: CompositionDeps, late: Late, core: ReturnType<t
   const { project, config, data, apiCatalog, isAdmin } = core;
   const serviceOfProject = project.api.resolveServiceOfProject;
   const observability = createObservabilityModule({ developmentNativeObservationAdmissions:settings.developmentNativeObservationAdmissions, reportSnapshot:deps.runtimeReportSnapshot,reportDataRoot:settings.runtimeReportDataRoot,reportFacts:completeRuntimeFactSources({business:{tasks:readBusinessObservationTaskPage,attempts:readBusinessObservationAttemptPage},development:{tasks:readDevelopmentObservationTaskPage,attempts:readDevelopmentObservationAttemptPage},projectName:readProjectObservationName,profileName:readProfileObservationName}),
-    deletion: { identities: deps.identities, assertGrant: project.api.assertProjectDeletionGrant,
+    deletion: { identities: deps.identities, assertGrant: project.api.assertProjectDeletionGrant, originalTarget: project.api.projectDeletionOriginalTarget,
       tasks: { list: (target) => originalObservationTasks(runtime.taskRuntime.api, target.id) },
       originalUsage: originalObservationUsage(project.api, createProjectDeletionSessionClient(settings.sessionInternalUrl), runtime.businessTask.api.v3, runtime.devSession.api.developmentUsage) },
     ...(runtime.devSession.api.developmentUsage ? { developmentUsageSource: developmentObservationSource(runtime.devSession.api.developmentUsage, runtime.session.api) } : {}), usageSource: observationUsageSource(runtime.businessTask.api.v3, runtime.session.api), ...observationPorts(runtime.businessTask.api.v3, project.api, core.agentRuntime.api, resources.api),

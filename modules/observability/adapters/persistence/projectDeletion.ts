@@ -1,4 +1,4 @@
-import type { ProjectDeletionContext, ProjectDeletionTarget } from '@crewstation/contracts';
+import type { ProjectDeletionContext, ProjectDeletionTarget, ProjectId } from '@crewstation/contracts';
 import { PROJECT_DELETION_PHASES, ProjectDeletionContextSchema, ProjectDeletionInventorySchema } from '@crewstation/contracts';
 import { jsonHash, precondition } from '@crewstation/kernel';
 import type { Database, Executor, Transaction } from '@crewstation/persistence';
@@ -63,12 +63,14 @@ type ContentRow = { table: string; tid: string; body: Record<string, unknown>; p
 type Fence = { project_id: string; operation_id: string; generation: number; revision: string; original: Scope; verified: boolean; phase_index: number; completed_count: number; completed_digest: string | null; stopped_revision: string | null; stopped_count: number | null };
 export interface ObservabilityDeletionInput {
   db: Database; identities: ObservabilityProjectDirectory; tasks?: ObservabilityDeletionTasks; reports?:ObservabilityReportLifecycle;
+  originalTarget?(id: ProjectId): Promise<ProjectDeletionTarget | undefined>;
   assertGrant(context: ProjectDeletionContext): Promise<void>;
 }
 type Input = ObservabilityDeletionInput;
 const lockTimeout = (error: unknown): boolean => !!error && typeof error === 'object' && ('code' in error && error.code === '55P03' || 'cause' in error && lockTimeout(error.cause));
 const ownerKey = (entity: Entity) => JSON.stringify([entity.kind, entity.id]);
 const normalized = (scope: Scope, projectId: string) => scope.projectKeys.includes(projectId) ? scope.projectId : projectId;
+const targetIdentity = ({ state: _state, revision: _revision, ...identity }: ProjectDeletionTarget) => identity;
 
 /** Every normal write enters before acquiring its task or pricing row locks. */
 export async function admitObservationWrite(tx: Transaction, projectId: string): Promise<void> {
@@ -84,7 +86,11 @@ export async function originalObservationScope(input: Input, db: Executor, targe
   const retained = (await db.execute<{ original: Scope }>(sql`SELECT original FROM observability.deletion_fences WHERE project_id=${target.id}`))[0]?.original;
   if (retained) {
     const scope = scopeSchema.parse(retained);
-    if (scope.targetHash !== jsonHash(target)) throw precondition('观测清理的原项目身份发生变化');
+    if (scope.targetHash !== jsonHash(target)) {
+      const original = await input.originalTarget?.(target.id);
+      if (!original || scope.projectId !== original.id || scope.targetHash !== jsonHash(original)
+        || jsonHash(targetIdentity(original)) !== jsonHash(targetIdentity(target))) throw precondition('观测清理的原项目身份发生变化');
+    }
     for (const key of scope.projectKeys.filter((key) => key !== target.id)) if (await input.identities.resolve('project', [key]) !== target.id) throw precondition('观测旧项目标识的原身份冲突');
     return scope;
   }

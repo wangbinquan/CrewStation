@@ -33,7 +33,9 @@ export function drizzleLeaseStore(db: Executor): LeaseStore {
     renew: async (resourceId, holder, ttlMs) => (await db.update(leases).set({ expiresAt: until(ttlMs) })
       .where(and(eq(leases.resourceId, resourceId), eq(leases.holder, holder))).returning({ holder: leases.holder })).length === 1,
     release: async (resourceId, holder) => { await db.delete(leases).where(and(eq(leases.resourceId, resourceId), eq(leases.holder, holder))); },
-    prune: async (expiredBefore) => (await db.delete(leases).where(lt(leases.expiresAt, expiredBefore)).returning({ id: leases.resourceId })).length,
+    prune: async (expiredBefore) => (await db.delete(leases).where(sql`${leases.expiresAt} < ${expiredBefore.toISOString()}::timestamptz OR (${leases.expiresAt} < now() AND EXISTS (
+      SELECT 1 FROM resources.deletion_fences fence WHERE fence.project_id = resources.content_project(jsonb_build_object('resource_id',${leases.resourceId})) AND fence.operation_id IS NOT NULL AND NOT fence.retired
+    ))`).returning({ id: leases.resourceId })).length,
   };
 }
 

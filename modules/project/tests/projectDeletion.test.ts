@@ -116,6 +116,19 @@ describe.skipIf(!available)('项目永久删除的持久意图与完成屏障（
     }
   });
 
+  test('内部原目标读取首次受理计划；重新确认不得将 deleting 的新计划当作原身份', async () => {
+    const f = await start();
+    // 2026-10-07 原观测屏障需核对首次 active/provisioning 目标，不能从当前 deleting 目标补造。
+    expect(await mod.api.projectDeletionOriginalTarget(f.project.id)).toEqual(f.plan.target);
+    await mod.api.blockProjectDeletion(f.lease, [{ participant: 'gateway', code: 'changed', message: '测试来源需重新确认' }]);
+    const plan = await mod.api.prepareProjectDeletionReconfirmation(admin, f.operation.id, f.reports);
+    expect(plan.target.state).toBe('deleting'); expect(plan.target.revision).not.toBe(f.plan.target.revision);
+    await mod.api.reconfirmProjectDeletion(admin, f.operation.id, request(plan), f.reports);
+    expect(await mod.api.projectDeletionOriginalTarget(f.project.id)).toEqual(f.plan.target);
+    expect(await mod.api.projectDeletionOriginalTarget(newId('unknown') as ProjectId)).toBeUndefined();
+    const unaccepted = await create(); expect(await mod.api.projectDeletionOriginalTarget(unaccepted.id)).toBeUndefined();
+  });
+
   test('发布 outbox 失败整笔受理回滚，没有 deleting 或半笔操作', async () => {
     const project = await create(), { plan, reports } = await prepare(project);
     await db.db.execute(`CREATE FUNCTION platform_infra.reject_project_deletion() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.topic = 'project.deletion-requested' THEN RAISE EXCEPTION 'outbox unavailable'; END IF; RETURN NEW; END $$`);

@@ -29,6 +29,25 @@ async function stages(f: Awaited<ReturnType<typeof setup>>, confirmed: ProjectDe
 }
 
 describe.skipIf(!available)('observability project permanent cleanup', () => {
+  test('首次目标证明允许 deleting 的状态修订，所有实体字段变化或原来源缺失仍阻断', async () => {
+    const f = await setup(); await seed(database!, target.id); await seed(database!, otherId);
+    const confirmed = await f.owner.inspect(target);
+    expect((await f.owner.run(f.context(confirmed, 'seal'))).kind).toBe('done');
+    // 2026-10-07 实机原屏障保存 active/revision 4；重新确认读取 deleting/revision 5。
+    const current = { ...target, state: 'deleting' as const, revision: '2' };
+    const restored = observabilityDeletionOwner(observabilityDeletionRepository({ ...f.input, originalTarget: async () => target }));
+    expect(await restored.inspect(current)).toEqual(confirmed);
+    await expect(f.owner.inspect(current)).rejects.toThrow('原项目');
+    const missing = observabilityDeletionOwner(observabilityDeletionRepository({ ...f.input, originalTarget: async () => undefined }));
+    await expect(missing.inspect(current)).rejects.toThrow('原项目');
+    const wrong = observabilityDeletionOwner(observabilityDeletionRepository({ ...f.input, originalTarget: async () => ({ ...target, revision: '99' }) }));
+    await expect(wrong.inspect(current)).rejects.toThrow('原项目');
+    for (const field of ['slug', 'name', 'namespace', 'prodHost', 'previewHost', 'serviceHost'] as const) {
+      await expect(restored.inspect({ ...current, [field]: 'replacement' })).rejects.toThrow('原项目');
+    }
+    for (const phase of PROJECT_DELETION_PHASES) expect((await restored.run({ ...f.context(confirmed, phase, 2), target: current })).kind).toBe('done');
+    expect((await contentCounts(database!)).usage_heads).toBe(1);
+  });
   test('clears all twenty content tables without query caps, preserves another project and platform prices, and blocks late writes', async () => {
     const f = await setup(), own = await seed(database!, target.id), other = await seed(database!, otherId);
     await raw(sql`INSERT INTO observability.alerts(id,project_id,type,key,state,detail,fired_at) SELECT 'dense-' || value,${target.id},'health-failing','health-failing:prod','firing','private-dense',now() FROM generate_series(1,2001) AS value`);
