@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { lstatSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
+import { chmodSync, lstatSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Logger } from '@crewstation/kernel';
 import type { RunnerConfig } from '../config';
@@ -23,7 +23,19 @@ export function openDevelopmentUsage(config: RunnerConfig, logger: Logger): Deve
   let journal: DevelopmentUsageJournal | undefined;
   try {
     if (options.directory === options.bindingDirectory) throw new Error('binding must be independent');
-    for (const mount of [options.directory, options.bindingDirectory]) {
+    const mounts = [options.directory, options.bindingDirectory];
+    const initial = mounts.map((mount) => lstatSync(mount));
+    if (initial.some((stat) => !stat.isDirectory() || stat.uid !== process.getuid?.())) throw new Error('unsafe mount');
+    if (initial.some((stat) => (stat.mode & 0o022) !== 0)) {
+      // Kubernetes creates new emptyDir roots as 0777. Initialize only that exact
+      // fresh layout before opening the original journal or launching any Agent.
+      // Inspect BOTH mounts first: surviving original data must never be renamed
+      // into a fresh store, and every existing-store rejection remains intact.
+      if (initial.some((stat) => (stat.mode & 0o022) !== 0 && (stat.mode & 0o7777) !== 0o777)
+        || mounts.some((mount) => readdirSync(mount).length !== 0)) throw new Error('unsafe mount');
+      for (let i = 0; i < mounts.length; i++) if ((initial[i]!.mode & 0o022) !== 0) chmodSync(mounts[i]!, 0o700);
+    }
+    for (const mount of mounts) {
       const stat = lstatSync(mount);
       if (!stat.isDirectory() || stat.uid !== process.getuid?.() || (stat.mode & 0o022) !== 0) throw new Error('unsafe mount');
     }

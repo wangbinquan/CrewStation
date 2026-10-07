@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'bun:test';
-import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DEVELOPMENT_USAGE_BINDING_DIRECTORY, DEVELOPMENT_USAGE_DIRECTORY, ProjectIdSchema, TaskIdSchema } from '@crewstation/contracts';
@@ -7,6 +7,7 @@ import { noopLogger } from '@crewstation/kernel';
 import { loadConfigFromEnv } from '../config';
 import { loadDevelopmentUsageConfig } from './developmentUsageConfig';
 import { openDevelopmentUsage } from './openDevelopmentUsage';
+import { developmentNativePageCapabilities } from './development/nativeCapabilities';
 
 const id = (n: number) => `019f0000-0000-7000-8000-${String(n).padStart(12, '0')}`;
 const base = { CS_TASK_ID: id(3), CS_RUNNER_TOKEN: 'private-token', CS_SESSION_URL: 'ws://session.test/' };
@@ -63,4 +64,44 @@ test('a missing independent binding, changed physical identity, or substituted n
   rmSync(join(config.developmentUsage.bindingDirectory, 'binding'), { recursive: true });
   expect(openDevelopmentUsage(config, noopLogger)).toBeUndefined();
   expect(existsSync(join(config.developmentUsage.directory, 'journal/executions.sqlite'))).toBe(true);
+});
+
+// The real selected Kubernetes Pods arrived with two empty root-owned 0777 emptyDirs,
+// so no journal or v2 capability opened and both accepted Agents stayed preparing.
+// Exercise the original journal and actual capability producer, including restart.
+test('fresh Kubernetes emptyDirs initialize the original numeric store and retain its identity on reopen', () => {
+  for (const writable of ['numeric', 'binding', 'both']) {
+    const config = store(), options = config.developmentUsage;
+    if (writable !== 'binding') chmodSync(options.directory, 0o777);
+    if (writable !== 'numeric') chmodSync(options.bindingDirectory, 0o777);
+    const journal = openDevelopmentUsage(config, noopLogger);
+    expect(journal).toBeDefined();
+    if (!journal) throw new Error('Original numeric journal did not open');
+    const journalId = journal.journalId;
+    expect(journal.info()).toMatchObject({ runtimeTaskId: id(3), podUid: 'pod-a', receipt: null });
+    expect(developmentNativePageCapabilities({ taskId: TaskIdSchema.parse(id(3)), podUid: 'pod-a' }, journal)).toEqual({ developmentNativePagesV2: 2 });
+    expect(lstatSync(options.directory).mode & 0o022).toBe(0);
+    expect(lstatSync(options.bindingDirectory).mode & 0o022).toBe(0);
+    journal.close();
+    const reopened = openDevelopmentUsage(config, noopLogger);
+    expect(reopened?.journalId).toBe(journalId);
+    reopened?.close();
+  }
+});
+
+test('existing nonempty stores and other writable modes cannot be reclassified as a fresh Kubernetes mount', () => {
+  const existing = store(), options = existing.developmentUsage;
+  chmodSync(options.directory, 0o777);
+  writeFileSync(join(options.bindingDirectory, 'existing-original-file'), 'preserve-original');
+  expect(openDevelopmentUsage(existing, noopLogger)).toBeUndefined();
+  expect(lstatSync(options.directory).mode & 0o777).toBe(0o777);
+  expect(readFileSync(join(options.bindingDirectory, 'existing-original-file'), 'utf8')).toBe('preserve-original');
+  expect(existsSync(join(options.directory, 'journal'))).toBe(false);
+  for (const mode of [0o702, 0o770, 0o772]) {
+    const other = store(); chmodSync(other.developmentUsage.directory, mode);
+    expect(lstatSync(other.developmentUsage.directory).mode & 0o7777).toBe(mode);
+    expect(openDevelopmentUsage(other, noopLogger)).toBeUndefined();
+    expect(lstatSync(other.developmentUsage.directory).mode & 0o7777).toBe(mode);
+    expect(existsSync(join(other.developmentUsage.directory, 'journal'))).toBe(false);
+  }
 });
