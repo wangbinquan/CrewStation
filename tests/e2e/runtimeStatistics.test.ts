@@ -72,7 +72,11 @@ describe.skipIf(!session)('RFC-034 formal runtime observation', () => {
       await page.cmd('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
       await page.cmd('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
       await settle(page); expect(await page.eval<boolean>('!document.querySelector("dialog[open]")')).toBe(true);
-      await page.eval(`document.querySelector('[data-runtime-task] section header button').click()`);
+      const zoomButton = `document.querySelector('${scroll}')?.closest('section')?.querySelector('header button')`;
+      await page.waitUntil(`document.querySelector('${scroll}')?.clientWidth > 0 && !!(${zoomButton}) && !(${zoomButton}).disabled`);
+      const unzoomedWidth = await page.eval<number>(`document.querySelector('${scroll}').scrollWidth`);
+      await page.eval(`(${zoomButton}).click()`);
+      await page.waitUntil(`document.querySelector('${scroll}')?.clientWidth > 0 && document.querySelector('${scroll}').scrollWidth > ${unzoomedWidth}`);
       expect(await page.eval<boolean>(`document.querySelector('${scroll}').scrollWidth > document.querySelector('${scroll}').clientWidth`)).toBe(true);
       expect(await page.eval<number>('document.documentElement.scrollWidth-innerWidth')).toBeLessThanOrEqual(1);
       expect(page.takeErrors()).toEqual([]);
