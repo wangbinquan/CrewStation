@@ -356,3 +356,9 @@ T17 自有最终候选：真实文件系统红37/1、绿42/0及138断言，官�
 d82eb5e7 的干净实机验收已通过泳道详情打开与 Esc 关闭，随后在旧全局 section header button 查询处得到 null 并抛出 TypeError（runtimeStatistics.test.ts:75）；原错误日志留证。缩放改为从可见泳道 region 找到所属统一 Card 的标题按钮，等待控件就绪后记录真实原滚动宽度，再点击并等待宽度实际增加。原桌面／窄屏溢出、语言／主题、统一详情与 Esc、全部无浏览器错误断言保持；新增可见宽度增长断言防止待加载或错误控件被误记为缩放成功。仅修改既有验收文件及本接续，T17 三个生产候选内容指纹保持，不取消或重复已在执行的完整门。新的准确提交须全部六 CI 成功后部署，原项目尚未实际回收。
 
 - [ ] RFC-037-I36-T19 泳道缩放语义与控件就绪精确发布、准确 SHA 六 CI、原存储守卫部署、同原操作及九项独立 AFTER。
+
+## I36-T20 完整原始页档案接续
+
+4cd1596a 的实机缩放就绪等待仍失败。纯只读档案协议复现已定位根因：打开 agent 详情请求 native-pages/原attempt.key，而布局夹具只归档了该 parent 的 captures，native-pages 仅有全局页。原缺失请求明确抛出 Unknown immutable report page request，生产 useRuntimeReportPage 正确撤销未验证报表，造成后续 TaskView 消失；此前仅修选择器不足，三次 CI 错误均留证。现在对每个原 attempt 同时从源端按完整 EOF／原 reportId/snapshotId 归档 captures 与 native-pages，没有空页兜底，没有修改生产失败封闭行为。新增真实浏览器档案回归核对原 parent、snapshot、明确零项与 EOF，未知 parent 仍拒绝；原完整布局、两层 scope、语言／主题、详情／Esc、可见缩放增长断言不动。T17 三项生产指纹不变；只提交本次两个既有验收文件和本接续，旧完整门／CI 不取消、不重跑。新准确提交须六 CI 成功后才部署，原删除仍未物理完成。
+
+- [ ] RFC-037-I36-T20 缺失原页先红后绿协议复现、真实浏览器回归、精确发布／六 CI／原存储守卫部署、同原操作与九项独立 AFTER。

@@ -29,7 +29,7 @@ async function archiveReport(archive:Archive,alias:string,query:string) {
  for(const task of global.get('tasks')??[])for(const section of ['attempts','swimlane','calls'] as const)await archivePages(archive,path,report,section,String(task['id']));
  for(const agent of global.get('agents')??[])await archivePages(archive,path,report,'agent-tasks',String(agent['key']));
  for(const profile of global.get('profiles')??[])await archivePages(archive,path,report,'profile-tasks',String(profile['key']));
- for(const attempt of global.get('attempts')??[])await archivePages(archive,path,report,'captures',String(attempt['key']));
+ for(const attempt of global.get('attempts')??[])for(const section of ['captures','native-pages'] as const)await archivePages(archive,path,report,section,String(attempt['key']));
 }
 
 /** Only layout uses fixtures; the preceding endpoint test reads the deployed original report. */

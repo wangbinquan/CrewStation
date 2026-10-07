@@ -7,6 +7,34 @@ import { installRuntimeStatisticsFixture, measureRuntimeOverview } from './runti
 const session = await e2eAvailable() ? await openAdminSession() : undefined;
 afterAll(async () => { await session?.close(); }, 30_000);
 describe.skipIf(!session)('RFC-034 formal runtime observation', () => {
+  test('layout archive preserves original attempt native pages and rejects unknown parents', async () => {
+    const page = session!.admin, f = await installRuntimeStatisticsFixture(page);
+    await open(page, '/admin/observability/tasks/' + f.taskId + '?' + f.query);
+    const result = await page.eval<{ pages: { section: string; parent: string; total: string; items: unknown[]; sameSnapshot: boolean; eof: boolean }[]; unknownParentRejected: boolean }>(`(async () => {
+      const report = await (await fetch('/v1/admin/observability/tasks/${f.taskId}')).json();
+      const path = '/v1/admin/observability/reports/' + report.header.reportId + '/pages?';
+      const attempts = await (await fetch(path + new URLSearchParams({section:'attempts',parent:'${f.taskId}',pageSize:'100'}))).json();
+      const pages = [];
+      for (const attempt of attempts.items) for (const section of ['captures','native-pages']) {
+        const original = await (await fetch(path + new URLSearchParams({section,parent:attempt.key,pageSize:'100'}))).json();
+        pages.push({section,parent:original.parent,total:original.total,items:original.items,
+          sameSnapshot:original.reportId===report.header.reportId && original.snapshotId===report.header.snapshotId,eof:original.nextCursor===null});
+      }
+      let unknownParentRejected = false;
+      try { await fetch(path + new URLSearchParams({section:'native-pages',parent:'unregistered-original-attempt',pageSize:'100'})); }
+      catch (error) { unknownParentRejected = String(error).includes('Unknown immutable report page request'); }
+      return {pages,unknownParentRejected};
+    })()`);
+    expect(result.pages).toHaveLength(2);
+    expect(result.pages.map(row => row.section)).toEqual(['captures', 'native-pages']);
+    expect(new Set(result.pages.map(row => row.parent)).size).toBe(1);
+    for (const row of result.pages) {
+      expect(row).toMatchObject({ total: '0', items: [], sameSnapshot: true, eof: true });
+      expect(row.parent).toContain(f.taskId);
+    }
+    expect(result.unknownParentRejected).toBe(true);
+    expect(page.takeErrors()).toEqual([]);
+  });
   test('deployed system statistics endpoint returns one complete original report', async () => {
     const response = await session!.admin.eval<{ status: number; report: unknown }>(`(async () => {
       const initial=await fetch('/v1/admin/observability/statistics?from=2026-01-01T00:00:00.000Z&to=2027-01-01T00:00:00.000Z&timezone=Asia%2FShanghai');
