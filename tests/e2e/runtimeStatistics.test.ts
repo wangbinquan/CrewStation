@@ -64,7 +64,10 @@ describe.skipIf(!session)('RFC-034 formal runtime observation', () => {
       await page.eval(`document.querySelector('header button[lang="${locale}"]').click()`); await settle(page);
       const scroll = '[data-runtime-task] [role="region"]';
       expect(await page.eval<boolean>(`document.querySelector('${scroll}').scrollWidth > document.querySelector('${scroll}').clientWidth`)).toBe(width < 680);
-      await page.eval(`document.querySelector('${scroll} button').click()`); await settle(page);
+      const lane = scroll + ' [data-runtime-section="swimlane"] button[aria-label]:not(:disabled)';
+      await page.waitUntil(`!!document.querySelector('${lane}')`);
+      await page.eval(`document.querySelector('${lane}').click()`);
+      await page.waitUntil('!!document.querySelector("dialog[open]")');
       expect(await page.eval<boolean>('!!document.querySelector("dialog[open]")')).toBe(true);
       await page.cmd('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
       await page.cmd('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
