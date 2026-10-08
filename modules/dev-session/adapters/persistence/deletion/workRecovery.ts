@@ -20,7 +20,8 @@ export async function observeDevelopmentWork(db: Database, processes: Developmen
       const projects = await tx.execute<{ project_id: ProjectId }>(sql`SELECT DISTINCT project_id FROM dev_session.original_callbacks
         WHERE original_process->>'podUid'=${original.podUid} AND original_process->>'nodeUid'=${original.nodeUid}
         AND original_process->>'nodeName'=${original.nodeName} AND exited_at IS NULL`);
-      for (const row of projects) for (const callback of await developmentWorkHistory(tx, row.project_id)) {
+      // A few lost exits must not materialize millions of unrelated ended births during rollout recovery.
+      for (const row of projects) for (const callback of await developmentWorkHistory(tx, row.project_id, original)) {
         if (callback.exited || callback.process.podUid !== original.podUid || callback.process.nodeUid !== original.nodeUid || callback.process.nodeName !== original.nodeName) continue;
         await tx.execute(sql`SELECT set_config('crewstation.dev_session_pod_recovery',${jsonHash(original)},true)`);
         await tx.execute(sql`UPDATE dev_session.original_callbacks SET exited_at=clock_timestamp(),recovery_digest=${fact.digest},

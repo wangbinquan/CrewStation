@@ -1,8 +1,8 @@
 import type { ProjectId } from '@crewstation/contracts';
 import type { Executor } from '@crewstation/persistence';
 import { sql } from 'drizzle-orm';
-import { DevelopmentWorkCallbackSchema } from '../../../domain/deletion/work';
-import type { DevelopmentWorkCallback } from '../../../domain/deletion/work';
+import { DevelopmentWorkCallbackSchema, DevelopmentWorkPodSchema } from '../../../domain/deletion/work';
+import type { DevelopmentWorkCallback, DevelopmentWorkPod } from '../../../domain/deletion/work';
 
 interface Row extends Record<string, unknown> {
   id: string; project_id: string; origin_kind: string; origin_key: string; origin_id: string; kind: string;
@@ -11,10 +11,13 @@ interface Row extends Record<string, unknown> {
   deletion_grant: unknown;
 }
 /** Read terminal and pending original callbacks to EOF; no scheduler window is a deletion boundary. */
-export async function developmentWorkHistory(db: Executor, project: ProjectId): Promise<DevelopmentWorkCallback[]> {
+export async function developmentWorkHistory(db: Executor, project: ProjectId, stoppedPod?: DevelopmentWorkPod): Promise<DevelopmentWorkCallback[]> {
+  const original = stoppedPod ? DevelopmentWorkPodSchema.parse(stoppedPod) : undefined;
   const history: DevelopmentWorkCallback[] = []; let after: string | null = null;
   for (;;) {
     const rows: Row[] = await db.execute<Row>(sql`SELECT * FROM dev_session.original_callbacks WHERE project_id=${project}
+      AND ${original ? sql`exited_at IS NULL AND original_process->>'podUid'=${original.podUid}
+        AND original_process->>'nodeUid'=${original.nodeUid} AND original_process->>'nodeName'=${original.nodeName}` : sql`true`}
       AND ${after === null ? sql`true` : sql`id COLLATE "C">${after} COLLATE "C"`} ORDER BY id COLLATE "C" LIMIT 200`);
     if (!rows.length) return history;
     for (const row of rows) {
