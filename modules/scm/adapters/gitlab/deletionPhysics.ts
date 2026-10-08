@@ -139,6 +139,10 @@ function nativePurge(options: Sources, materials: Materials, observe: ReturnType
     
     const { scope, result } = materials(raw); await grant(context, scope, 'purge');
     const stopped = await proof(scope); if (stopped.kind !== 'done') return stopped;
+    // A replay can start after native cleanup has finished. Full independent absence is already the purge result.
+    if (stopped.nativeRemaining === 0 && stopped.storageRemaining === 0) {
+      await grant(context, scope, 'purge'); return stopped;
+    }
     for (const material of result) {
       await grant(context, scope, 'purge');
       const collected = await options.destruction.run({ mode: 'purge', original: material.native }); verifyInstance(collected);

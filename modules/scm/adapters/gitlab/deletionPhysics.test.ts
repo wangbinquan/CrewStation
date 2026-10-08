@@ -65,6 +65,31 @@ function fixture() {
 }
 
 describe('SCM physical deletion with native protocol sources', () => {
+  test('purge replays an already empty original scope using complete independent proof without another native mutation', async () => {
+    const f = fixture(), scope = (await f.physics.capture(f.plan)).scope!, originalScope = structuredClone(scope);
+    f.state.parent = 0;
+    f.storage.locations.forEach(row => { row.present = false; row.entries = []; }); reviseStorage(f.storage);
+    const run = f.sources.destruction.run;
+    f.sources.destruction.run = async (query) => {
+      if (query.mode !== 'observe') throw Error('already empty original cannot require another mutation');
+      return run(query);
+    };
+    f.sources.removal.remove = async () => { throw Error('already empty original cannot require another file mutation'); };
+    const context = { ...f.context, phase: 'purge' as const };
+    expect(await f.physics.purge(context, scope)).toMatchObject({ kind: 'done', nativeRemaining: 0, storageRemaining: 0,
+      independent: true, producersClosed: true, consumersStopped: true, scopeDigest: jsonHash(scope) });
+    expect(await f.physics.purge({ ...context, generation: 2 }, scope)).toMatchObject({ kind: 'done', nativeRemaining: 0, storageRemaining: 0 });
+    expect(scope).toEqual(originalScope);
+    expect(f.calls.filter(row => row === 'activity')).toHaveLength(2);
+    expect(f.calls).not.toContain('purge'); expect(f.calls).not.toContain('remove');
+    f.state.grant = false; await expect(f.physics.purge(context, scope)).rejects.toThrow('grant expired');
+    f.state.grant = true; f.state.consumers = 1;
+    expect((await f.physics.purge(context, scope)).kind).toBe('waiting');
+    f.state.consumers = 0; f.state.missingSource = true;
+    await expect(f.physics.purge(context, scope)).rejects.toThrow('original files unavailable');
+    f.state.missingSource = false; f.state.replacement = true;
+    await expect(f.physics.purge(context, scope)).rejects.toThrow('原安装实例变化');
+  });
   test('activity retains original birth and a later birth sharing its device and inode', async () => {
     const f = fixture(), scope = (await f.physics.capture(f.plan)).scope!, originalScope = structuredClone(scope);
     const entry = f.storage.locations[0]!.entries[0]!, originalBirth = entry.birthtimeNs;
