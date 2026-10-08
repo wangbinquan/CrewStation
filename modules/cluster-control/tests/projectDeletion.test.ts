@@ -90,3 +90,55 @@ test('原 Pending PVC 首次供给的 PV 可进入同操作等待；已确认 PV
   f.admission.ownsVolume = async () => false;
   expect(await f.run('prove')).toMatchObject({ kind: 'blocked', blockers: [{ code: 'unknown-object' }] });
 });
+
+test('原路由、中间件和凭据按原 UID 回收；已完成 purge 的同操作在 prove 收敛，ACK 不冒充完成', async () => {
+  const f = await clusterDeletionFixture();
+  for (const kind of ['IngressRoute', 'Middleware', 'Secret']) await f.put(deletionObject(kind, 'original'));
+  await f.put(deletionObject('Service', 'idle'));
+  await f.plan(); await f.run('seal'); expect((await f.run('stop')).kind).toBe('done');
+  const remove = f.k8s.delete.bind(f.k8s); let acknowledgements = 0;
+  f.k8s.delete = async (ref, name, namespace, options) => {
+    if (ref.kind !== 'IngressRoute') return remove(ref, name, namespace, options);
+    acknowledgements++; expect(options?.preconditions?.uid).toBe('uid-IngressRoute-original');
+    await f.k8s.mergePatch(ref, name, namespace, { metadata: { deletionTimestamp: new Date().toISOString(), finalizers: ['example.test/retain'] } }); return true;
+  };
+  expect((await f.run('prove')).kind).toBe('waiting');
+  expect(acknowledgements).toBe(1);
+  expect(await f.k8s.get(Resources.Middleware!, 'original', TARGET.namespace)).toBeUndefined();
+  expect(await f.k8s.get(Resources.Secret!, 'original', TARGET.namespace)).toBeUndefined();
+  expect(await f.k8s.get(Resources.Service!, 'idle', TARGET.namespace)).toBeDefined();
+  expect(f.removed).not.toContain('Namespace/' + TARGET.namespace);
+  expect((await f.run('prove')).kind).toBe('waiting'); expect(acknowledgements).toBe(1);
+  expect((await f.k8s.get(Resources.IngressRoute!, 'original', TARGET.namespace))?.metadata.finalizers).toEqual(['example.test/retain']);
+  await remove(Resources.IngressRoute!, 'original', TARGET.namespace);
+  expect((await f.run('prove')).kind).toBe('done');
+});
+
+test('purge 清理原网关实体，未知对象及同名替换阻断全部写入；封闭准入和当前许可每次仍须成立', async () => {
+  const f = await clusterDeletionFixture(); await f.put(deletionObject('IngressRoute', 'original')); await f.plan(); await f.run('seal');
+  expect((await f.run('purge')).kind).toBe('done'); expect(f.removed).toEqual(['IngressRoute/original']);
+  for (const replacement of [false, true]) {
+    const changed = await clusterDeletionFixture(); await changed.put(deletionObject('Middleware', 'original')); await changed.plan(); await changed.run('seal');
+    if (replacement) await changed.k8s.mergePatch(Resources.Middleware!, 'original', TARGET.namespace, { metadata: { uid: 'replacement' } });
+    else await changed.k8s.create(deletionObject('Secret', 'unknown'));
+    expect((await changed.run('purge')).kind).toBe('blocked'); expect(changed.removed).toEqual([]);
+  }
+  const revoked = await clusterDeletionFixture(); await revoked.put(deletionObject('Secret', 'original')); await revoked.plan(); await revoked.run('seal'); revoked.revoke();
+  await expect(revoked.run('prove')).rejects.toThrow('失效'); expect(revoked.removed).toEqual([]);
+});
+
+test('清理前原 UID 或公开台账归属发生竞态时拒绝删除，且不移除原 finalizer', async () => {
+  for (const replaceUid of [true, false]) {
+    const f = await clusterDeletionFixture(); await f.put(deletionObject('IngressRoute', 'original')); await f.plan(); await f.run('seal');
+    const get = f.k8s.get.bind(f.k8s); let reads = 0;
+    f.k8s.get = async (...args) => {
+      if (args[0].kind === 'IngressRoute' && ++reads === 1) {
+        if (replaceUid) await f.k8s.mergePatch(Resources.IngressRoute!, 'original', TARGET.namespace, { metadata: { uid: 'replacement' } });
+        else { const key = 'IngressRoute/' + TARGET.namespace + '/original'; f.claims.set(key, { ...f.claims.get(key)!, projectId: undefined }); }
+      }
+      return get(...args);
+    };
+    await expect(f.run('prove')).rejects.toThrow(); expect(f.removed).toEqual([]);
+    expect(await get(Resources.IngressRoute!, 'original', TARGET.namespace)).toBeDefined();
+  }
+});

@@ -8,10 +8,12 @@ import type { ProjectClusterDeletion } from '../../../ports/projectDeletion';
 import type { ClusterDeletionAdmission } from '../../../api/projectDeletion';
 import { removeRetiredNamespace } from '../namespaceRetirement';
 import { inspectProjectCluster } from './inspection';
+import { reclaimProjectObjects } from './objectReclamation';
 
 export function clusterDeletionSource(k8s: K8sClient, ledger: Pick<LedgerObservations, 'claimOf' | 'get'>, systemNamespace: string, admission: ClusterDeletionAdmission): ProjectClusterDeletion {
   return {
     inspect: (target) => inspectProjectCluster(k8s, ledger, admission, target, systemNamespace),
+    reclaimObjects: (context) => reclaimProjectObjects(k8s, ledger, admission, context),
     removeNamespace: async (context: ProjectDeletionContext, uid: string) => {
       const children = context.confirmed.resources.filter((entry) => ['Service', 'ResourceQuota', 'NetworkPolicy'].includes(entry.kind)).map((entry) => {
         const value = JSON.parse(entry.id) as { namespace?: string; name?: string };
