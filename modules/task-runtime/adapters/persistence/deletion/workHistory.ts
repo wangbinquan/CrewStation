@@ -2,8 +2,8 @@ import type { ProjectId } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
 import type { Executor } from '@crewstation/persistence';
 import { sql } from 'drizzle-orm';
-import { RuntimeWorkCallbackSchema } from '../../../domain/deletion/work';
-import type { RuntimeWorkCallback } from '../../../domain/deletion/work';
+import { RuntimeWorkCallbackSchema, RuntimeWorkPodSchema } from '../../../domain/deletion/work';
+import type { RuntimeWorkCallback, RuntimeWorkPod } from '../../../domain/deletion/work';
 
 export interface RuntimeCallbackRow extends Record<string, unknown> {
   id: string; project_id: string; origin_kind: string; origin_key: string; origin_id: string; kind: string;
@@ -17,10 +17,13 @@ export function runtimeCallbackFromRow(row: RuntimeCallbackRow) {
     exitKeyDigest: row.exit_key_hash, grant: row.deletion_grant, exited: row.exited_at !== null, exitDigest: row.exit_digest, recoveryDigest: row.recovery_digest });
 }
 /** Pending and terminal callbacks are traversed to EOF, never bounded by a scheduler page. */
-export async function runtimeWorkHistory(db: Executor, project: ProjectId): Promise<RuntimeWorkCallback[]> {
+export async function runtimeWorkHistory(db: Executor, project: ProjectId, stoppedPod?: RuntimeWorkPod): Promise<RuntimeWorkCallback[]> {
+  const original = stoppedPod ? RuntimeWorkPodSchema.parse(stoppedPod) : undefined;
   const history: RuntimeWorkCallback[] = []; let after: string | null = null;
   for (;;) {
     const rows: RuntimeCallbackRow[] = await db.execute<RuntimeCallbackRow>(sql`SELECT * FROM task_runtime.original_callbacks WHERE project_id=${project}
+      AND ${original ? sql`exited_at IS NULL AND original_process->>'podUid'=${original.podUid}
+        AND original_process->>'nodeUid'=${original.nodeUid} AND original_process->>'nodeName'=${original.nodeName}` : sql`true`}
       AND ${after === null ? sql`true` : sql`id COLLATE "C">${after} COLLATE "C"`} ORDER BY id COLLATE "C" LIMIT 200`);
     if (!rows.length) return history;
     for (const row of rows) {

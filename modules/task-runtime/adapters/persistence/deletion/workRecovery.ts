@@ -20,7 +20,7 @@ export async function observeRuntimeWork(db: Database, processes: RuntimeWorkPro
       const projects = await tx.execute<{ project_id: ProjectId }>(sql`SELECT DISTINCT project_id FROM task_runtime.original_callbacks
         WHERE original_process->>'podUid'=${original.podUid} AND original_process->>'nodeUid'=${original.nodeUid}
         AND original_process->>'nodeName'=${original.nodeName} AND exited_at IS NULL`);
-      for (const row of projects) for (const callback of await runtimeWorkHistory(tx, row.project_id)) {
+      for (const row of projects) for (const callback of await runtimeWorkHistory(tx, row.project_id, original)) {
         if (callback.exited || callback.process.podUid !== original.podUid || callback.process.nodeUid !== original.nodeUid || callback.process.nodeName !== original.nodeName) continue;
         await tx.execute(sql`SELECT set_config('crewstation.task_runtime_pod_recovery',${jsonHash(original)},true)`);
         await tx.execute(sql`UPDATE task_runtime.original_callbacks SET exited_at=clock_timestamp(),recovery_digest=${fact.digest},
