@@ -1,3 +1,7 @@
+## 2026-10-09 RFC-037 当前交付状态
+
+创建弹窗、用途说明、管理员二次确认永久删除已部署；原项目同操作154回执、九项独立AFTER与实际创建／成功界面均通过。运行源码 `05f6acc63d49481e3a3ac6f1cefa16ac2d981ae9` 六项CI成功；完整证据见 [最终验收](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/complete-deletion.md)。收口文档的准确提交CI与实际部署源码分别核验。下方日期段落是相应时点的历史记录，并行输出完整保留。
+
 ## I36-T35 原完整盘点排序空间（2026-10-09，进行中）
 
 254338df 准确六 CI／八组件通过，原集群实体及 namespace 已真实回收；同一原操作现 metadata／129 回执／两确认，在 TaskRuntime 暂停。原 PG 日志实证 FETCH 临时文件空间不足，卷仅约 580 MiB 可用；目标该模块内容与回调零，但全量外项目历史仍须完整验证。全部旧回执、原四封存与两确认已独立只读保留。
@@ -8,7 +12,7 @@
 
 ## I36-T34 原集群网关实体回收缺口（2026-10-09）
 
-T33 实际 7e83f5ac 六 CI、八组件与同安装出生观察服务通过；同一原删除操作保持两次确认，release 已完成，85 份回执后在 cluster-control/prove 等待。完整只读 discovery 的 45 类资源证实 PVC/PV、工作负载和凭据已无残留，剩下原项目的四条 IngressRoute、九个 Middleware 以及允许的命名空间脚手架；原 UID 与公开台账均保持。网关内容 owner 的说明把物理回收交给资源与集群 owner，但资源只回收卷，集群之前只等待实体消失，形成缺口。
+T33 实际 7e83f5ac 六 CI、八组件与同安装出生观察服务通过；同一原删除操作保持两次确认，release 已完成，85 份回执后在 cluster-control/prove 等待。完整只读 discovery 的 45 类资源证实 PVC/PV、工作负载和凭据已无残留，剩下原项目的四条 IngressRoute、七个 Middleware 以及允许的命名空间脚手架；原 UID 与公开台账均保持。网关内容 owner 的说明把物理回收交给资源与集群 owner，但资源只回收卷，集群之前只等待实体消失，形成缺口。
 
 补正集群 purge 与 prove 收敛：仅清理原确认的 IngressRoute、Middleware、Secret；每次重新核验原 namespace、API、kind、name、UID、公开项目台账和完整子 UID，前后核对当前持久许可／封写，使用 UID 和资源版本删除前置条件。正常 finalizer 保留；受理后完整 discovery 实际消失才完成。未知、新增、同名替换、归属变化、旧许可均阻断。prove 收敛兼容同一原操作已有 purge 回执，保留其原材料、四封存、两确认及所有旧回执，不补造证明或手动删对象。
 
@@ -3831,3 +3835,12 @@ TaskRuntime七阶段仅受控停止端口，DevSession的原删除许可/回调f
 ### RFC-037 I36-T33（进行中，2026-10-09）
 
 a4778e准确六CI与八组件实际部署均通过；原项目按原确认继续到51回执/2确认后，release在purge暂停。原BuildKit目标cache/history/文件均已不存在，完整只读核验发现旧目标目录inode被同一受保护Postgres的新FSM文件复用，出生时间不同，实际外Pod/容器不变。现补齐通用文件消费者出生身份和同原节点私有Registry只读入口，保留原Probe、原NodeConsumerOrigin、原全部封存材料与原确认；未知身份继续阻断。原失败证据与原库行均保留。当前只完成基础红绿及接线初查，准确候选检查/六CI/观察服务与八组件部署/原154回执/九项独立AFTER/成功界面仍待实际完成。保留本文件内并发RFC-034接力内容。
+
+
+## 2026-10-09 RFC-037 完整交付
+
+实际运行源码 `05f6acc63d49481e3a3ac6f1cefa16ac2d981ae9`，[准确六CI](https://github.com/wangbinquan/CrewStation/actions/runs/37833112391)与八组件实际Pod imageID／节点OCI核验通过；259迁移保持、无新模型任务。创建使用共享弹窗，直接说明域名标识和模板用途、实时渲染正式／预览域名；管理员二次确认永久删除、后台进度与同操作恢复已实际通过。
+
+原专用项目 `01a0f30b-c652-7000-8d6f-553e3b5f6135`、原操作 `01a11338-80af-7000-a710-9322722ebba4` 最终 succeeded／verify、154唯一回执／两确认、无阻塞。27／28／30／32／48／51／85／113／129回执与四封存保持；九项AFTER、13物理全零、原GitLab383／PG OID／K8 UID／全部登记内容列核验；69缓存／49历史、30完整业务行／25表关系、9个当前外项目Pod保持，第10个旧工作台及4相关对象在目标清理前淘汰、原沿革留证。原Probe／Postgres／Registry producer保持。
+
+原inode复用使用原birthtimeNs完整元组和同安装私有观察服务只读核对修复。最终TaskRuntime排序修复Linux47／0／1052及静态通过，此前集群定向55／0／465保持，原未变出生源码Linux141／0／819、Mac131／7skip／0／772留证；当前92项本地整库门未重跑，历史44项FAIL及其他会话full-v7失败保留，完整权威取准确六CI。[最终验收](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/complete-deletion.md)。八完成文档另取准确CI，纯文档不作为部署源码。全部并行WIP和STATE原文保持，STATE含RFC-034并行输出。
