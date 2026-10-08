@@ -4,7 +4,6 @@ import { nodeProcessOwnerSource } from '../nodeProcessOwners';
 import { freshPlatformNode } from '../platformPodTermination';
 import { captureWorkCatalog, inspectWorkCatalog, removeWorkObjects } from './catalog';
 import type { CallbackProcess, NativeWorkOptions, PodObject, PodWorkHistory, WorkCatalog, WorkNode } from './bindings';
-import { objectKey } from './bindings';
 import type { ProjectDeletionContext } from '@crewstation/contracts';
 export function podWorkIdentity(work: PodWorkHistory) {
   return jsonHash({ catalog: work.catalog, nodes: work.nodes, workspaces: work.workspaces.map(row => ({ pod: row.pod, node: row.node, sourceIdentity: row.sourceIdentity, consumers: row.consumers,
@@ -50,7 +49,9 @@ export function nativePodWork(options: NativeWorkOptions) {
     const resourceContext = await project.projectDeletionParticipantContext(context, 'resources'), resources = options.resources().projectDeletion;
     const protectedPods = options.cluster().projectPodProtection({ assertGrant: project.assertProjectDeletionGrant,
       seal: ctx => resources.sealClusterAdmission(ctx, project.assertProjectDeletionGrant), assertSealed: ctx => resources.assertClusterAdmission(ctx, project.assertProjectDeletionGrant) }, resources.podStopReceipts(project.assertProjectDeletionGrant));
-    const keys = original.catalog.objects.filter(row => row.kind === 'Pod').map(objectKey);
+    // The resource participant confirms full Kubernetes keys, including the API version.
+    const keys = original.catalog.objects.filter(row => row.kind === 'Pod')
+      .map(({ kind, namespace, name }) => JSON.stringify({ apiVersion: 'v1', kind, namespace, name }));
     const result = await protectedPods.stopSelected(resourceContext, keys); await grant(); return result;
   };
   const purge = async (context: ProjectDeletionContext, original: PodWorkHistory) => {

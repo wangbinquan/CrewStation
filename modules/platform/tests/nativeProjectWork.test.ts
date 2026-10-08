@@ -3,11 +3,14 @@ import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import { Resources } from '@crewstation/k8s';
+import { jsonHash } from '@crewstation/kernel';
+import { createClusterControlModule } from '@crewstation/module-cluster-control';
 import { nativeRuntimeProjectWork } from '../adapters/k8s/nativeProjectWork/runtime';
 import { nativeReleaseProjectWork } from '../adapters/k8s/nativeProjectWork/release';
 import { removeWorkObjects } from '../adapters/k8s/nativeProjectWork/catalog';
 import { withNativeWork } from './nativeWorkFixture';
 import type { PodWorkHistory } from '../adapters/k8s/nativeProjectWork/bindings';
+import { nativePodWork } from '../adapters/k8s/nativeProjectWork/pods';
 
 test('runtime work stops original controllers and Pods with actual resource-participant context before deleting retained credentials', () => withNativeWork(async f => {
   await f.installWork('runtime-environment'); const source = nativeRuntimeProjectWork(f.options), original = await source.capture(f.target, { consumers: [{ id: f.consumerId }], callbacks: [{ process: f.callback }] });
@@ -31,6 +34,34 @@ test('empty runtime work still uses a complete original host; replaced, unknown 
   await f.k8s.mergePatch(Resources.Secret!, 'credential', 'project', { metadata: { uid: 'replaced' } });
   await expect(source.inspect(original.native)).rejects.toThrow('替换'); await expect(removeWorkObjects(f.options, work.catalog, false, async () => {})).rejects.toThrow();
   await rm(join(f.proc.root, 'self/ns/cgroup')); await expect(source.callbackExit({ process: f.callback })).rejects.toThrow();
+}));
+test('native Pod stop uses the complete confirmed resource key through the public cluster-control factory', () => withNativeWork(async f => {
+  await f.installWork('runtime-environment');
+  const pod = (await f.k8s.get(Resources.Pod!, 'work', f.target.namespace))!, originalSpec = structuredClone(pod['spec']);
+  const key = JSON.stringify({ apiVersion: pod.apiVersion, kind: pod.kind, namespace: pod.metadata.namespace, name: pod.metadata.name });
+  const resource = { kind: 'protected:Pod', id: key, identity: JSON.stringify({ uid: f.workUid, nodeName: 'node', nodeUid: f.ids['node'], specDigest: jsonHash(originalSpec) }), count: 1 };
+  const sourceContext = f.context('stop', 'runtime-environment'), resourceContext = { ...sourceContext, confirmed: { ...sourceContext.confirmed, participant: 'resources' as const, resources: [resource] } };
+  const project = { ...f.options.project(), projectDeletionParticipantContext: async () => resourceContext };
+  const store = { get: async (_context: typeof sourceContext, actualKey: string, uid: string) => {
+    expect(actualKey).toBe(key); expect(uid).toBe(f.workUid);
+    return { key, uid, nodeUid: f.ids['node']!, digest: jsonHash('persisted fixture stop'), observedAt: new Date().toISOString() };
+  }, save: async () => { throw Error('An existing original stop receipt must be reused'); } };
+  const control = createClusterControlModule({ k8s: f.k8s, systemNamespace: 'system', isAdmin: async () => true,
+    legacy: { resolveTaskId: async () => undefined, task: async () => undefined },
+    ledger: { get: async () => undefined, claimOf: async () => undefined, listLive: async () => [], changesSince: async () => [], latestChange: async () => 0,
+      observe: async () => ({ status: 'unchanged' }), observeConditions: async () => ({ status: 'unchanged' }), adoptOrphanVolume: async () => undefined, children: async () => [] },
+  });
+  const options = { ...f.options, project: () => project, cluster: () => control.api,
+    resources: () => ({ ...f.options.resources(), projectDeletion: { ...f.options.resources().projectDeletion, podStopReceipts: () => store } }) };
+  const source = nativePodWork(options), original = await source.capture({ mode: 'runtime-environment', target: f.target, consumerIds: [f.consumerId] }, []);
+  const frozen = structuredClone(original);
+  await f.k8s.mergePatch(Resources.Pod!, 'work', f.target.namespace, { metadata: { annotations: { 'crewstation.io/project-delete-operation': sourceContext.operationId }, finalizers: ['crewstation.io/project-delete-stop-proof'], deletionTimestamp: new Date().toISOString() } });
+  // The real public callee rejects a key missing apiVersion before reading the saved original UID receipt.
+  expect(await source.stop(sourceContext, original)).toMatchObject({ kind: 'done', evidence: { count: 1 } });
+  expect(original).toEqual(frozen); expect((await f.k8s.get(Resources.Pod!, 'work', f.target.namespace))?.['spec']).toEqual(originalSpec);
+  expect((await f.k8s.get(Resources.Pod!, 'work', f.target.namespace))?.metadata.finalizers).not.toContain('crewstation.io/project-delete-stop-proof');
+  const protection = control.api.projectPodProtection({ assertGrant: project.assertProjectDeletionGrant, seal: async () => {}, assertSealed: async () => {} }, store);
+  await expect(protection.stopSelected(resourceContext, [JSON.stringify({ apiVersion: 'v1', kind: 'Pod', namespace: 'foreign', name: 'work' })])).rejects.toThrow('确认范围');
 }));
 const available = await testDatabaseAvailable();
 describe.skipIf(!available)('native release work with real PostgreSQL writer exclusion', () => {
