@@ -4,11 +4,13 @@ import type { NativeProjectGrantPort, NativeWorkResourcePort, NativeWorkClusterP
 export type { NativeScmPort, RuntimeWorkContent, ReleaseWorkContent, CallbackProcess } from '../../../ports/deletion/nativeWork';
 import type { PodWorkspaceHistory } from '../nativePodWorkspace/source';
 import type { NodeProcessOwnerOrigin } from '../nodeProcessOwners';
+import type { NodeConsumerBirthTransport } from '../nodeFileConsumers';
 
 export type RuntimeWorkSource = NativeWorkSource<RuntimeWorkContent>;
 export type ReleaseWorkSource = NativeWorkSource<ReleaseWorkContent>;
 export interface NativeWorkOptions {
   k8s: K8sClient; systemNamespace: string; probePort: number; probeToken: string;
+  consumerBirth?: NodeConsumerBirthTransport;
   project(): NativeProjectGrantPort; resources(): NativeWorkResourcePort; cluster(): NativeWorkClusterPort;
   fetch?: typeof fetch;
 }

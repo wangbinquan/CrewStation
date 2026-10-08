@@ -30,14 +30,22 @@ export async function captureRegistryNativeInstallation(k8s: K8sClient, raw: Omi
   return RegistryNativeInstallationSchema.parse({ ...input, pins });
 }
 export function registryNativeSourceValidator(k8s: K8sClient, raw: RegistryNativeInstallation, readSource: typeof observeFilesystemSource = observeFilesystemSource) {
+  const input = RegistryNativeInstallationSchema.parse(structuredClone(raw)), inspect = registryNativeInstallationValidator(k8s, input, readSource);
+  return async (history: RegistryDeletionHistory, signal: AbortSignal) => {
+    if (history.sourceIdentity !== jsonHash(input.origin) || jsonHash(history.origin) !== jsonHash(input.origin) || history.query.directory !== basename(input.origin.providerPath)
+      || history.original.rootIdentity !== input.origin.rootEpoch || history.original.volumeIdentity !== input.origin.volumeEpoch) throw Error('Registry retained source is another installation');
+    await inspect(signal);
+  };
+}
+/** A read-only host observation rechecks the same installation without
+ * manufacturing a deletion history or entering its erasure authority. */
+export function registryNativeInstallationValidator(k8s: K8sClient, raw: RegistryNativeInstallation, readSource: typeof observeFilesystemSource = observeFilesystemSource) {
   const input = RegistryNativeInstallationSchema.parse(structuredClone(raw)), expected = material(input);
   if (!isAbsolute(input.root) || dirname(input.origin.providerPath) !== input.root || !isAbsolute(input.origin.mountPath)
     || new Set(input.pins.map(row => [row.kind, row.namespace ?? '', row.name].join(':'))).size !== 7
     || expected.some(([kind, name, namespace, uid]) => !input.pins.some(row => row.kind === kind && row.name === name && row.namespace === namespace && row.uid === uid))) throw Error('Registry native fixed installation is incomplete');
-  const inspect = async (history: RegistryDeletionHistory, signal: AbortSignal) => {
+  const inspect = async (signal: AbortSignal) => {
     signal.throwIfAborted();
-    if (history.sourceIdentity !== jsonHash(input.origin) || jsonHash(history.origin) !== jsonHash(input.origin) || history.query.directory !== basename(input.origin.providerPath)
-      || history.original.rootIdentity !== input.origin.rootEpoch || history.original.volumeIdentity !== input.origin.volumeEpoch) throw Error('Registry retained source is another installation');
     const originals: K8sObject[] = [];
     for (const pin of input.pins) {
       const object = await k8s.get(Resources[pin.kind]!, pin.name, pin.namespace, signal);
@@ -51,7 +59,7 @@ export function registryNativeSourceValidator(k8s: K8sClient, raw: RegistryNativ
     const leaseSpec = lease?.['spec'] as { renewTime?: string; holderIdentity?: string } | undefined, age = Date.now() - Date.parse(leaseSpec?.renewTime ?? '');
     if (!(node['status'] as { conditions?: Array<{ type: string; status: string }> }).conditions?.some(row => row.type === 'Ready' && row.status === 'True')
       || leaseSpec?.holderIdentity !== input.origin.nodeName || !Number.isFinite(age) || age < -5000 || age > 40_000 || !lease?.metadata.ownerReferences?.some(row => row.kind === 'Node' && row.uid === input.origin.nodeUid)) throw Error('Registry original node heartbeat is unavailable');
-    const source = await readSource(input.root, { key: 'registry-native-source', rootId: 'local', directory: history.query.directory, entries: [{ key: 'registry', relativePath: 'docker/registry/v2', kind: 'directory' }] }, signal);
+    const source = await readSource(input.root, { key: 'registry-native-source', rootId: 'local', directory: basename(input.origin.providerPath), entries: [{ key: 'registry', relativePath: 'docker/registry/v2', kind: 'directory' }] }, signal);
     if (source.rootIdentity !== input.origin.rootEpoch || source.volumeIdentity !== input.origin.volumeEpoch) throw Error('Registry original native root or volume was replaced');
     signal.throwIfAborted();
   };

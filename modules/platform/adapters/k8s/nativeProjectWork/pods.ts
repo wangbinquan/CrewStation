@@ -11,7 +11,7 @@ export function podWorkIdentity(work: PodWorkHistory) {
 }
 
 export function nativePodWork(options: NativeWorkOptions) {
-  const probe = { namespace: options.systemNamespace, port: options.probePort, token: options.probeToken };
+  const probe = { namespace: options.systemNamespace, port: options.probePort, token: options.probeToken, consumerBirth: options.consumerBirth };
   const workspaces = nativePodWorkspaceSource(options.k8s, { ...probe, hostRoot: '/var/lib/kubelet/pods', mountPath: '/kubelet-pods' }, options.fetch);
   const processes = nodeProcessOwnerSource(options.k8s, probe, options.fetch);
   const capture = async (input: Omit<WorkCatalog, 'objects'>, callbacks: readonly CallbackProcess[]) => {

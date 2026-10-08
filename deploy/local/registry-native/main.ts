@@ -12,6 +12,7 @@ import { RegistryProcessIdentitySchema } from './process/identity';
 import { originalRegistryPause } from './process/pause';
 import { runRegistryPauseGuardian, startRegistryPauseGuardian } from './process/guardian';
 import { captureRegistryOperatorBirth, proveRegistryOperatorExit } from './process/operatorExit';
+import { nativeRegistryNodeConsumers } from './nodeConsumers';
 
 // Only the deployment's secret file supplies the installation, database and
 // permit transport. The HTTP request cannot select a PID, path or command.
@@ -26,6 +27,7 @@ const journal = nativeRegistryJournal(config.journal, jsonHash(config.installati
 await journal.recoverInterrupted();
 const assertOriginalSource = registryNativeSourceValidator(k8s, config.installation);
 const handler = nativeRegistryService({ token: config.token, root: config.installation.root, sourceIdentity: journal.sourceIdentity, journal, assertGrant, assertOriginalSource,
+  fileConsumers: nativeRegistryNodeConsumers(k8s, config.installation, config.process),
   authority: (context, history, signal) => nativeRegistryAuthority({ db: db.db, process: processOwner, context, history, signal, assertGrant, assertOriginalSource }) });
 const server = Bun.serve({ hostname: config.hostname, port: config.port, idleTimeout: 120, fetch: handler });
 let closing = false;

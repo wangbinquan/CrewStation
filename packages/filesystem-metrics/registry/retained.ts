@@ -68,7 +68,7 @@ export function registryExclusiveConsumerFiles(raw: RegistryDeletionHistory, cur
   retainedCoverage(history, inventory);
   const shared = new Set(inventory.blobs.filter(row => row.otherRepositories.length).map(row => row.digest));
   return [...new Map([...history.original.entries.filter(row => row.kind === 'file'), ...history.original.blobs.filter(row => !shared.has(row.digest))]
-    .map(row => [row.device + ':' + row.inode, { device: row.device, inode: row.inode }])).values()];
+    .map(row => [row.device + ':' + row.inode + ':' + row.birthtimeNs, { device: row.device, inode: row.inode, birthtimeNs: row.birthtimeNs }])).values()];
 }
 
 const observationSchema = z.strictObject({ identity: hash, sourceIdentity: hash, native: z.number().int().nonnegative(), storage: z.number().int().nonnegative(), allocatedBytes: z.number().int().nonnegative(),

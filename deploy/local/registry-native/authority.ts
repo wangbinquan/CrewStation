@@ -30,8 +30,8 @@ export function nativeRegistryAuthority(input: { db: Database; process: Original
   };
   const consumers = async (currentSignal: AbortSignal) => {
     await validate(currentSignal);
-    const files = [...history.original.entries.filter(row => row.kind === 'file'), ...history.original.blobs].map(row => ({ device: row.device, inode: row.inode }));
-    const users = await inspect([...new Map(files.map(row => [row.device + ':' + row.inode, row])).values()], '/proc', currentSignal);
+    const files = [...history.original.entries.filter(row => row.kind === 'file'), ...history.original.blobs].map(row => ({ device: row.device, inode: row.inode, birthtimeNs: row.birthtimeNs }));
+    const users = await inspect([...new Map(files.map(row => [row.device + ':' + row.inode + ':' + row.birthtimeNs, row])).values()], '/proc', currentSignal);
     if (!users.complete || users.blockers.length || users.bootId !== original.bootId || users.namespace !== original.namespace || users.consumers.length) throw Error('Original Registry files still have native users or incomplete host evidence');
     await validate(currentSignal);
   };

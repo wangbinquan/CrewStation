@@ -11,12 +11,12 @@ import { nodeFileConsumerSource } from '../nodeFileConsumers';
  * The owner adds its real persistent writer fence before issuing completion. */
 export function nativeRegistryArtifacts(k8s: K8sClient, options: RegistrySourceOptions, fetcher: typeof fetch = fetch) {
   const original = { ...options }, source = nativeRegistrySource(k8s, original, fetcher);
-  const consumers = nodeFileConsumerSource(k8s, { namespace: original.namespace, port: original.probePort, token: original.probeToken }, fetcher);
+  const consumers = nodeFileConsumerSource(k8s, { namespace: original.namespace, port: original.probePort, token: original.probeToken, consumerBirth: original.consumerBirth }, fetcher);
   return {
     capture: async (projectId: string, raw: RegistryInventoryQuery): Promise<RegistryDeletionHistory> => {
       const query = structuredClone(raw), current = await source.capture(query);
       const files = [...current.inventory.entries.filter(row => row.kind === 'file'), ...current.inventory.blobs.filter(row => !row.otherRepositories.length)]
-        .map(row => ({ device: row.device, inode: row.inode }));
+        .map(row => ({ device: row.device, inode: row.inode, birthtimeNs: row.birthtimeNs }));
       const users = await consumers.capture({ uid: current.origin.nodeUid, name: current.origin.nodeName }, files);
       // Re-read the original source after the node observation; no replacement
       // probe or volume can be bound to an earlier graph by name alone.

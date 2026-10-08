@@ -28,7 +28,11 @@ describe.skipIf(!available)('native Registry original PostgreSQL exclusion', () 
           confirmed: { participant: 'release', complete: true, revision: jsonHash('original'), resources: [], references: [], blockers: [] } });
         const native = nativeRegistryAuthority({ db: tdb.db, process, signal: AbortSignal.timeout(10_000), context, history,
           assertGrant: async () => { grants++; }, assertOriginalSource: async () => { originals++; },
-          observe: async (files, root, signal) => { observations++; signal?.throwIfAborted(); expect(root).toBe('/proc'); expect(files.length).toBeGreaterThan(0); return { version: 1, complete: true, bootId, namespace: original.namespace, consumers: [], blockers: [] }; } });
+          observe: async (files, root, signal) => {
+            observations++; signal?.throwIfAborted(); expect(root).toBe('/proc'); expect(files.length).toBeGreaterThan(0);
+            for (const file of files) expect([...history.original.entries, ...history.original.blobs].some(row => row.device === file.device && row.inode === file.inode && row.birthtimeNs === file.birthtimeNs)).toBe(true);
+            return { version: 1, complete: true, bootId, namespace: original.namespace, consumers: [], blockers: [] };
+          } });
         const request = { query: history.query, original: history.original };
         await expect(native.assertClosed(request, AbortSignal.timeout(1000))).rejects.toThrow('exited');
         const writer = withSharedDatabaseAdmission(tdb.db, NATIVE_REGISTRY_ADMISSION, async () => { entered.resolve(); await finish.promise; }); await entered.promise;

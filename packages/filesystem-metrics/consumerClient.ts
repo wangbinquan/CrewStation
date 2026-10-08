@@ -18,7 +18,7 @@ export function createFileConsumerClient(options: { baseUrl: string; token: stri
       const response = await readProbeResponse(request, endpoint, { method: 'POST', redirect: 'error', headers: { authorization: `Bearer ${options.token}`, 'content-type': 'application/json' },
         body: JSON.stringify(input) }, deadline);
       if (!response.ok) throw new Error(`Consumer source HTTP ${response.status}`);
-      const result = ConsumerResponseSchema.parse(JSON.parse(await boundedReply(response, deadline)));
+      const result = ConsumerResponseSchema.parse(JSON.parse(await boundedFileConsumerReply(response, deadline)));
       deadline.throwIfAborted();
       if (result.consumers.some(({ device, inode }) => !wanted.has(`${device}:${inode}`))) throw new Error('Consumer source returned unrequested file identities');
       if (input.mode === 'observe' && result.complete && (input.source.bootId !== result.bootId || input.source.namespace !== result.namespace)) throw new Error('Consumer source changed its captured identity');
@@ -33,7 +33,7 @@ export function createFileConsumerClient(options: { baseUrl: string; token: stri
     observe: (source: Extract<ConsumerRequest, { mode: 'observe' }>['source'], identities: ConsumerRequest['identities'], signal?: AbortSignal) => observe({ mode: 'observe', source, identities }, signal),
   };
 }
-async function boundedReply(response: Response, signal: AbortSignal): Promise<string> {
+export async function boundedFileConsumerReply(response: Response, signal: AbortSignal): Promise<string> {
   if (Number(response.headers.get('content-length')) > 8_388_608) throw new Error('Consumer source response is oversized');
   if (!response.body) throw new Error('Consumer source response is empty');
   const reader = response.body.getReader(), chunks: Uint8Array[] = []; let size = 0;

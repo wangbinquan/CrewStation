@@ -32,7 +32,7 @@ test('retained native graph survives catalog unlink and a JSON round trip; old e
     await rm(join(f.base, `blobs/sha256/${f.own.slice(7, 9)}/${f.own.slice(7)}/data`));
     const missing = await f.current(); expect(bindRegistryHistory(restored, missing).storage).toBe(2);
     const old = restored.original.blobs.find(row => row.digest === f.own)!;
-    expect(registryExclusiveConsumerFiles(restored, missing.inventory)).toContainEqual({ device: old.device, inode: old.inode });
+    expect(registryExclusiveConsumerFiles(restored, missing.inventory)).toContainEqual({ device: old.device, inode: old.inode, birthtimeNs: old.birthtimeNs });
   } finally { await f.drop(); }
 });
 test('an independently observed new foreign reference preserves the original shared bytes and excludes their foreign consumers', async () => {
@@ -41,7 +41,7 @@ test('an independently observed new foreign reference preserves the original sha
     await f.file(`repositories/apps/other/_manifests/revisions/sha256/${other.slice(7)}/link`, other);
     const current = await f.current(), old = f.history.original.blobs.find(row => row.digest === f.own)!;
     expect(bindRegistryHistory(f.history, current).storage).toBe(1);
-    expect(registryExclusiveConsumerFiles(f.history, current.inventory)).not.toContainEqual({ device: old.device, inode: old.inode });
+    expect(registryExclusiveConsumerFiles(f.history, current.inventory).some(row => row.device === old.device && row.inode === old.inode)).toBe(false);
   } finally { await f.drop(); }
 });
 test('a fresh but empty scope, source substitution and a copied same-name inode cannot prove original reclamation', async () => {

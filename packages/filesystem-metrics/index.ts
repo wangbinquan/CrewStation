@@ -8,6 +8,8 @@ export type { SourceRequest, SourceResponse } from './source';
 export { ConsumerRequestSchema, ConsumerResponseSchema } from './consumersProtocol';
 export type { ConsumerRequest, ConsumerResponse } from './consumersProtocol';
 export { createFileConsumerClient } from './consumerClient';
+export { createNodeFileConsumerClient, NodeFileConsumerOriginSchema, NodeFileConsumerRequestSchema, NodeFileConsumerResponseSchema, nodeFileConsumerRequestDigest } from './nodeConsumerClient';
+export type { NodeFileConsumerOrigin, NodeFileConsumerRequest, NodeFileConsumerResponse } from './nodeConsumerClient';
 export {observeRegistryInventory} from './registry/inventory';
 export {RegistryInventoryRequestSchema,RegistryInventoryResponseSchema} from './registry/protocol';
 export type {RegistryInventoryRequest,RegistryInventoryResponse} from './registry/protocol';

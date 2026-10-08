@@ -1,6 +1,6 @@
 import { isIP } from 'node:net';
-import { createFileConsumerClient } from '@crewstation/filesystem-metrics';
-import type { ConsumerRequest } from '@crewstation/filesystem-metrics';
+import { createFileConsumerClient, createNodeFileConsumerClient } from '@crewstation/filesystem-metrics';
+import type { ConsumerRequest, NodeFileConsumerOrigin } from '@crewstation/filesystem-metrics';
 import { Resources } from '@crewstation/k8s';
 import type { K8sClient, K8sObject } from '@crewstation/k8s';
 import { jsonHash, precondition } from '@crewstation/kernel';
@@ -8,11 +8,12 @@ import { completeRegistryObjects } from './nativeRegistry/origin';
 import { freshPlatformNode } from './platformPodTermination';
 import { onlyReportedHostFamilyChanged } from './nodeProbeObservation';
 
-export interface NodeConsumerOrigin { readonly identity: string; readonly probeUid: string; readonly containerId: string; readonly imageId: string; readonly nodeUid: string; readonly nodeName: string; readonly bootId: string; readonly namespace: string }
+export type NodeConsumerOrigin = NodeFileConsumerOrigin;
+export interface NodeConsumerBirthTransport { readonly baseUrl: string; readonly token: string }
 interface Spec { hostPID?: boolean; nodeName?: string; containers?: Array<{ name: string; env?: Array<{ name: string; value?: string }>; envFrom?: unknown[]; securityContext?: { runAsUser?: number; readOnlyRootFilesystem?: boolean; allowPrivilegeEscalation?: boolean; capabilities?: { add?: string[] } } }> }
 const unavailable = () => precondition('原节点全部文件消费者不可核实，不能把局部 PID 范围当成已退出', { code: 'node_consumers_unavailable' });
-export function nodeFileConsumerSource(k8s: K8sClient, raw: { namespace: string; port: number; token: string }, fetcher: (url: URL, init: RequestInit) => Promise<Response> = fetch) {
-  const options = { ...raw };
+export function nodeFileConsumerSource(k8s: K8sClient, raw: { namespace: string; port: number; token: string; consumerBirth?: NodeConsumerBirthTransport }, fetcher: (url: URL, init: RequestInit) => Promise<Response> = fetch) {
+  const options = { ...raw, ...(raw.consumerBirth ? { consumerBirth: { ...raw.consumerBirth } } : {}) };
   if (options.token.length < 32 || !Number.isInteger(options.port) || options.port < 1 || options.port > 65535) throw unavailable();
   const read = async (rawNode: { uid: string; name: string }, rawIdentities: ConsumerRequest['identities'], rawOriginal?: NodeConsumerOrigin) => {
     const node = { ...rawNode }, identities = rawIdentities.map(row => ({ ...row })), original = rawOriginal ? { ...rawOriginal } : undefined;
@@ -20,15 +21,27 @@ export function nodeFileConsumerSource(k8s: K8sClient, raw: { namespace: string;
     const address = (probe['status'] as { podIP: string }).podIP;
     const runtime = (probe['status'] as { containerStatuses: Array<{ name: string; containerID: string; imageID: string }> }).containerStatuses.find(row => row.name === 'probe')!;
     const client = createFileConsumerClient({ baseUrl: `http://${isIP(address) === 6 ? '[' + address + ']' : address}:${options.port}`, token: options.token, timeoutMs: 60_000, fetch: (url, init) => fetcher(url, init) });
+    const birth = options.consumerBirth ? createNodeFileConsumerClient({ ...options.consumerBirth, fetch: fetcher }) : undefined;
     let source = original, count = 0; const digests: string[] = [];
-    const unique = [...new Map(identities.map(row => [row.device + ':' + row.inode, row])).values()];
+    const unique = [...new Map(identities.map(row => [row.device + ':' + row.inode + ':' + (row.birthtimeNs ?? ''), row])).values()];
+    const captured = (bootId: string, namespace: string) => {
+      const current = { probeUid: probe.metadata.uid!, containerId: runtime.containerID, imageId: runtime.imageID, nodeUid: node.uid, nodeName: node.name, bootId, namespace };
+      return { ...current, identity: jsonHash(current) };
+    };
+    if (!source && birth) {
+      const result = await client.capture([], signal);
+      if (!result.complete || result.blockers.length) throw unavailable(); source = captured(result.bootId, result.namespace);
+    }
     for (let offset = 0; offset < Math.max(1, unique.length); offset += 256) {
       const page = unique.slice(offset, offset + 256);
-      const result = source ? await client.observe({ bootId: source.bootId, namespace: source.namespace }, page, signal) : await client.capture(page, signal);
+      // Original probe binaries keep their conservative two-tuple protocol.
+      // Only the bound private whole-host observer may disambiguate births.
+      const legacy = [...new Map(page.map(({ device, inode }) => [device + ':' + inode, { device, inode }])).values()];
+      const result = birth && source ? await birth.observe({ origin: source, identities: page }, signal)
+        : source ? await client.observe({ bootId: source.bootId, namespace: source.namespace }, legacy, signal) : await client.capture(legacy, signal);
       if (!result.complete || result.blockers.length || (await freshPlatformNode(k8s, probe))?.uid !== node.uid) throw unavailable();
-      const current = { probeUid: probe.metadata.uid!, containerId: runtime.containerID, imageId: runtime.imageID, nodeUid: node.uid, nodeName: node.name, bootId: result.bootId, namespace: result.namespace };
-      const captured = { ...current, identity: jsonHash(current) };
-      if (source && source.identity !== captured.identity) throw unavailable(); source = captured;
+      const current = captured(result.bootId, result.namespace);
+      if (source && source.identity !== current.identity) throw unavailable(); source = current;
       count += result.consumers.length; digests.push(jsonHash(result));
     }
     const current = await k8s.get(Resources.Pod!, probe.metadata.name, options.namespace, signal);

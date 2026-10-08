@@ -5,11 +5,11 @@ import { Resources } from '@crewstation/k8s';
 import type { K8sClient, K8sObject } from '@crewstation/k8s';
 import { jsonHash, precondition } from '@crewstation/kernel';
 import { nodeFileConsumerSource, originalNodeProbe } from '../nodeFileConsumers';
-import type { NodeConsumerOrigin } from '../nodeFileConsumers';
+import type { NodeConsumerOrigin, NodeConsumerBirthTransport } from '../nodeFileConsumers';
 import { completeRegistryObjects } from '../nativeRegistry/origin';
 import { freshPlatformNode } from '../platformPodTermination';
 
-interface Options { namespace: string; port: number; token: string; hostRoot: string; mountPath: string }
+interface Options { namespace: string; port: number; token: string; hostRoot: string; mountPath: string; consumerBirth?: NodeConsumerBirthTransport }
 interface PodSpec { nodeName?: string; volumes?: Array<{ name: string; emptyDir?: unknown; hostPath?: { path?: string }; }>; containers?: Array<{ name: string;
   env?: Array<{ name: string; value?: string }>; volumeMounts?: Array<{ name: string; mountPath: string; readOnly?: boolean; subPath?: string; subPathExpr?: string }> }> }
 type PodOrigin = { uid: string; name: string; namespace: string; specDigest: string; volumes: string[] };
@@ -20,7 +20,7 @@ export interface PodWorkspaceHistory {
   nodePods: Array<{ uid: string; nativeUid: string; namespace: string }>;
 }
 const unavailable = (message: string) => precondition(message, { code: 'native_pod_workspace_unavailable' });
-const files = (inventory: PodWorkspaceResponse) => inventory.volumes.flatMap(row => row.files.map(({ device, inode }) => ({ device, inode })));
+const files = (inventory: PodWorkspaceResponse) => inventory.volumes.flatMap(row => row.files.map(({ device, inode, birthtimeNs }) => ({ device, inode, birthtimeNs })));
 /** Complete original node catalog, fixed read-only mount and whole-host file
  * consumers. A missing API Pod is deliberately not a producer-exit proof. */
 export function nativePodWorkspaceSource(k8s: K8sClient, raw: Options, fetcher: (url: URL, init: RequestInit) => Promise<Response> = fetch) {

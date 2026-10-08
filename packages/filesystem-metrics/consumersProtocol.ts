@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 const uint64 = z.string().regex(/^(?:0|[1-9][0-9]{0,19})$/).refine((value) => /^[0-9]{1,20}$/.test(value) && BigInt(value) <= 18_446_744_073_709_551_615n);
-const fileIdentity = z.object({ device: uint64, inode: uint64.refine((value) => value !== '0') }).strict();
-const identities = z.array(fileIdentity).max(256).refine((values) => new Set(values.map(({ device, inode }) => `${device}:${inode}`)).size === values.length);
+const fileIdentity = z.object({ device: uint64, inode: uint64.refine((value) => value !== '0'), birthtimeNs: uint64.refine(value => value !== '0').optional() }).strict();
+const identities = z.array(fileIdentity).max(256).refine((values) => new Set(values.map(({ device, inode, birthtimeNs }) => `${device}:${inode}:${birthtimeNs ?? ''}`)).size === values.length);
 const source = z.object({ bootId: z.string().regex(/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/), namespace: z.string().regex(/^pid:\[[1-9][0-9]*\]$/).max(80) }).strict();
 
 /** Capture records the actual visible namespace; every later observation binds that original source. */

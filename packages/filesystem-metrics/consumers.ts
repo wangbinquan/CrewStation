@@ -1,9 +1,10 @@
 import { join } from 'node:path';
+import type { BigIntStats } from 'node:fs';
 import { nativeConsumerTables } from './consumerTables';
 import { consumerMetadata } from './consumerMetadata';
 type Metadata = ReturnType<typeof consumerMetadata>;
 
-export interface RetainedFileIdentity { readonly device: string; readonly inode: string }
+export interface RetainedFileIdentity { readonly device: string; readonly inode: string; readonly birthtimeNs?: string }
 export interface FileConsumer {
   readonly pid: number; readonly tid: number; readonly startedTick: string; readonly kind: 'descriptor' | 'mapping' | 'cwd' | 'root' | 'executable';
   readonly device: string; readonly inode: string;
@@ -15,6 +16,12 @@ export interface FileConsumerSnapshot {
 }
 class ChangedConsumerError extends Error {}
 const identityKey = (device: string, inode: string) => `${device}:${inode}`;
+type Wanted = ReadonlyMap<string, readonly (string | undefined)[]>;
+function birthMatches(births: readonly (string | undefined)[], observed: BigIntStats) {
+  if (births.includes(undefined)) return true;
+  if (observed.birthtimeNs <= 0n) throw new Error('Original file birth is unavailable');
+  return births.includes(String(observed.birthtimeNs));
+}
 const startTick = (value: string, id: string) => {
   const end = value.lastIndexOf(') '), tick = end < 0 ? undefined : value.slice(end + 2).trim().split(/\s+/)[19];
   if (!value.startsWith(`${id} (`) || !tick || !/^[0-9]+$/.test(tick)) throw new Error('Invalid process identity'); return tick;
@@ -23,8 +30,10 @@ const linuxDevice = (major: bigint, minor: bigint) => String((minor & 0xffn) | (
 
 /** Reads every thread in the visible process namespace; scope identity and producer closure must be verified separately. No file contents, arguments or environment are read. */
 export async function observeFileConsumers(identities: readonly RetainedFileIdentity[], procRoot = '/proc', signal?: AbortSignal): Promise<FileConsumerSnapshot> {
-  if (identities.some(({ device, inode }) => !/^[0-9]+$/.test(device) || !/^[1-9][0-9]*$/.test(inode))) throw new Error('Invalid retained file identity');
-  const wanted = new Set(identities.map(({ device, inode }) => identityKey(device, inode)));
+  if (identities.some(({ device, inode, birthtimeNs }) => !/^[0-9]+$/.test(device) || !/^[1-9][0-9]*$/.test(inode)
+    || birthtimeNs !== undefined && (!/^[1-9][0-9]{0,19}$/.test(birthtimeNs) || BigInt(birthtimeNs) > 18_446_744_073_709_551_615n))) throw new Error('Invalid retained file identity');
+  const wanted = new Map<string, (string | undefined)[]>();
+  for (const row of identities) { const key = identityKey(row.device, row.inode); wanted.set(key, [...wanted.get(key) ?? [], row.birthtimeNs]); }
   const consumers: FileConsumer[] = [], blockers: { code: 'source-unreadable' | 'process-unreadable' | 'process-changed'; pid?: number }[] = [];
   const tables = nativeConsumerTables(procRoot), metadata = consumerMetadata(procRoot);
   let bootId = '', namespace = '';
@@ -48,7 +57,7 @@ export async function observeFileConsumers(identities: readonly RetainedFileIden
 }
 
 const processIds = async (root: string, metadata: Metadata) => (await metadata.entries(root)).filter((id) => /^[1-9][0-9]*$/.test(id)).sort();
-async function inspectProcess(root: string, id: string, wanted: ReadonlySet<string>, consumers: FileConsumer[], metadata: Metadata, signal?: AbortSignal, tables?: ReturnType<typeof nativeConsumerTables>): Promise<void> {
+async function inspectProcess(root: string, id: string, wanted: Wanted, consumers: FileConsumer[], metadata: Metadata, signal?: AbortSignal, tables?: ReturnType<typeof nativeConsumerTables>): Promise<void> {
   const directory = join(root, id), startedTick = startTick(await metadata.read(join(directory, 'stat'), signal), id);
   const before = await processIds(join(directory, 'task'), metadata), observed: FileConsumer[] = [];
   // Linux CLONE_THREAD requires CLONE_SIGHAND and CLONE_VM. Only the actual
@@ -71,7 +80,7 @@ async function inspectProcess(root: string, id: string, wanted: ReadonlySet<stri
   if (sharedMaps && JSON.stringify(references) !== JSON.stringify(await retainedReferences(join(directory, 'task', id), id, id, startedTick, wanted, metadata, signal, false))) throw new ChangedConsumerError('Original shared references changed');
   consumers.push(...observed, ...mappings);
 }
-async function inspectThread(directory: string, id: string, tid: string, wanted: ReadonlySet<string>, consumers: FileConsumer[], metadata: Metadata, signal?: AbortSignal, mappings = true, shared?: { files: boolean; fs: boolean }): Promise<void> {
+async function inspectThread(directory: string, id: string, tid: string, wanted: Wanted, consumers: FileConsumer[], metadata: Metadata, signal?: AbortSignal, mappings = true, shared?: { files: boolean; fs: boolean }): Promise<void> {
   signal?.throwIfAborted(); const startedTick = startTick(await metadata.read(join(directory, 'stat'), signal), tid);
   const before = await retainedReferences(directory, id, tid, startedTick, wanted, metadata, signal, mappings, shared);
   const after = await retainedReferences(directory, id, tid, startedTick, wanted, metadata, signal, mappings, shared);
@@ -80,10 +89,11 @@ async function inspectThread(directory: string, id: string, tid: string, wanted:
   if (startedTick !== startTick(await metadata.read(join(directory, 'stat'), signal), tid)) throw new ChangedConsumerError('Original thread changed');
   consumers.push(...before);
 }
-async function retainedReferences(directory: string, id: string, tid: string, startedTick: string, wanted: ReadonlySet<string>, metadata: Metadata, signal?: AbortSignal, mappings = true, shared?: { files: boolean; fs: boolean }): Promise<FileConsumer[]> {
+async function retainedReferences(directory: string, id: string, tid: string, startedTick: string, wanted: Wanted, metadata: Metadata, signal?: AbortSignal, mappings = true, shared?: { files: boolean; fs: boolean }): Promise<FileConsumer[]> {
   const found = new Map<string, FileConsumer>();
-  const record = (kind: FileConsumer['kind'], device: string, inode: string) => {
-    if (wanted.has(identityKey(device, inode))) found.set(`${kind}:${device}:${inode}`, { pid: Number(id), tid: Number(tid), startedTick, kind, device, inode });
+  const record = (kind: FileConsumer['kind'], observed: BigIntStats) => {
+    const device = String(observed.dev), inode = String(observed.ino), births = wanted.get(identityKey(device, inode));
+    if (births && birthMatches(births, observed)) found.set(`${kind}:${device}:${inode}`, { pid: Number(id), tid: Number(tid), startedTick, kind, device, inode });
   };
   const descriptors = shared?.files ? [] : await metadata.entries(join(directory, 'fd'));
   if (descriptors.some((name) => !/^[0-9]+$/.test(name))) throw new Error('Unknown descriptor entry');
@@ -91,19 +101,25 @@ async function retainedReferences(directory: string, id: string, tid: string, st
   for (const kind of ['cwd', 'root', 'executable'] as const) if (!(shared?.fs && kind !== 'executable') && !(shared && !mappings && kind === 'executable')) links.push({ name: kind === 'executable' ? 'exe' : kind, kind });
   for (const link of links) {
     await metadata.checkpoint(signal);
-    try { const observed = await metadata.identity(join(directory, link.name)); record(link.kind, String(observed.dev), String(observed.ino)); }
+    try { const observed = await metadata.identity(join(directory, link.name)); record(link.kind, observed); }
     catch (error) { if (!isMissing(error)) throw error; }
   }
   return [...found.values(), ...mappings ? await mappingReferences(directory, id, tid, startedTick, wanted, metadata, signal) : []];
 }
-async function mappingReferences(directory: string, id: string, tid: string, startedTick: string, wanted: ReadonlySet<string>, metadata: Metadata, signal?: AbortSignal): Promise<FileConsumer[]> {
+async function mappingReferences(directory: string, id: string, tid: string, startedTick: string, wanted: Wanted, metadata: Metadata, signal?: AbortSignal): Promise<FileConsumer[]> {
   const maps = await metadata.read(join(directory, 'maps'), signal), found = new Map<string, FileConsumer>();
   for (const line of maps.split('\n').filter(Boolean)) {
-    signal?.throwIfAborted(); const match = /^[a-f0-9]+-[a-f0-9]+\s+[-rwxps]+\s+[a-f0-9]+\s+([a-f0-9]+):([a-f0-9]+)\s+([0-9]+)(?:\s|$)/i.exec(line);
+    signal?.throwIfAborted(); const match = /^([a-f0-9]+-[a-f0-9]+)\s+[-rwxps]+\s+[a-f0-9]+\s+([a-f0-9]+):([a-f0-9]+)\s+([0-9]+)(?:\s|$)/i.exec(line);
     if (!match) throw new Error('Unknown mapping format');
-    if (match[3] !== '0') {
-      const device = linuxDevice(BigInt(`0x${match[1]}`), BigInt(`0x${match[2]}`)), inode = match[3]!;
-      if (wanted.has(identityKey(device, inode))) found.set(device + ':' + inode, { pid: Number(id), tid: Number(tid), startedTick, kind: 'mapping', device, inode });
+    if (match[4] !== '0') {
+      const device = linuxDevice(BigInt(`0x${match[2]}`), BigInt(`0x${match[3]}`)), inode = match[4]!, births = wanted.get(identityKey(device, inode));
+      if (!births) continue;
+      if (!births.includes(undefined)) {
+        const observed = await metadata.identity(join(directory, 'map_files', match[1]!));
+        if (String(observed.dev) !== device || String(observed.ino) !== inode) throw new ChangedConsumerError('Original mapped file changed');
+        if (!birthMatches(births, observed)) continue;
+      }
+      found.set(device + ':' + inode, { pid: Number(id), tid: Number(tid), startedTick, kind: 'mapping', device, inode });
     }
   }
   return [...found.values()];

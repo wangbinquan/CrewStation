@@ -38,7 +38,7 @@ function originalBuildKitScope(original: BuildKitWorkHistory, current: BuildKitS
  * completion; native acknowledgements never turn into a zero receipt. */
 export function nativeBuildKitProjectWork(options: BuildKitWorkOptions) {
   const source = nativeBuildKitSource(options.k8s, options.installation, options.fetch, options.controlTransport), consumers = nodeFileConsumerSource(options.k8s,
-    { namespace: options.systemNamespace, port: options.probePort, token: options.probeToken }, options.fetch);
+    { namespace: options.systemNamespace, port: options.probePort, token: options.probeToken, consumerBirth: options.consumerBirth }, options.fetch);
   const capture = async (target: ProjectDeletionTarget, content: ReleaseWorkContent): Promise<BuildKitWorkHistory> => {
     const actor: Actor = { userId: BUILTIN_RESOURCES.systemActor as UserId, isAdmin: true }, project = await options.project().getProject(actor, target.id);
     if (project.id !== target.id || project.slug !== target.slug) throw precondition('原项目出生与删除范围不符');
@@ -46,13 +46,13 @@ export function nativeBuildKitProjectWork(options: BuildKitWorkOptions) {
     const gitInputs = await buildKitGitInputs(options.scm(), options.gitlab, target, content), selected = await selectBuildKitWork({ k8s: options.k8s, options: options.installation, source: initial, gitInputs, projectCreatedAt: project.createdAt, fetch: options.fetch });
     const current = await source.verify({ files: { storageIds: selected.storageIds, contentDigests: selected.contentDigests }, history }, initial);
     if (jsonHash(current.native) !== jsonHash(initial.native) || ['cache', 'results', 'snapshots', 'containerd'].some(key => current.inventory[key as 'cache'].revision !== initial.inventory[key as 'cache'].revision)) throw precondition('原共享缓存图在源码完整 EOF 期间变化');
-    const users = await consumers.capture({ uid: current.origin.nodeUid, name: current.origin.nodeName }, current.inventory.files.map(row => ({ device: row.device, inode: row.inode })));
+    const users = await consumers.capture({ uid: current.origin.nodeUid, name: current.origin.nodeName }, current.inventory.files.map(row => ({ device: row.device, inode: row.inode, birthtimeNs: row.birthtimeNs })));
     const checked = await source.verify(current.query, current); if (jsonHash(checked.native) !== jsonHash(current.native) || checked.inventory.revision !== current.inventory.revision) throw precondition('原共享缓存在完整消费者盘点期间变化');
     return { version: 1, source: current, ...selected, originalFiles: current.inventory.files, consumers: users.source };
   };
   const inspect = async (original: BuildKitWorkHistory) => {
     const current = await source.verify(original.source.query, original.source); originalBuildKitScope(original, current);
-    const users = await consumers.observe(original.consumers, original.originalFiles.map(row => ({ device: row.device, inode: row.inode })));
+    const users = await consumers.observe(original.consumers, original.originalFiles.map(row => ({ device: row.device, inode: row.inode, birthtimeNs: row.birthtimeNs })));
     const checked = await source.verify(original.source.query, original.source); originalBuildKitScope(original, checked);
     if (jsonHash(current.native) !== jsonHash(checked.native) || current.inventory.revision !== checked.inventory.revision) throw precondition('原缓存回收盘点与文件消费者不是同一完整范围');
     const refs = original.selection.histories.map(row => row.ref), selectedLeases = checked.inventory.containerd.leases.filter(row => row.kind === 'cache' && original.cacheIds.includes(row.id) || row.kind === 'history' && refs.includes(row.id));

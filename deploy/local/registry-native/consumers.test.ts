@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { join } from 'node:path';
-import { symlink } from 'node:fs/promises';
+import { symlink, stat } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { createFilesystemMetricsHandler } from '../../../packages/filesystem-metrics';
 import { consumerFixture } from '../../../packages/filesystem-metrics/consumerFixture';
@@ -20,3 +20,11 @@ test('unreadable host evidence remains incomplete and request cancellation is no
   expect((await inspect([], '/proc')).complete).toBe(false);
   await expect(inspect([], '/proc', AbortSignal.abort())).rejects.toThrow();
 });
+test('same-inode requests retain all distinct births across the whole-host reader', async () => consumerFixture(async proc => {
+  await Bun.write(join(proc.root, 'sys/kernel/random/boot_id'), randomUUID()); const path = await proc.process('101'); await symlink(proc.file, join(path, 'fd/6'));
+  const birthtimeNs = String((await stat(proc.file, { bigint: true })).birthtimeNs);
+  const inspect = nativeRegistryConsumerReader(async req => createFilesystemMetricsHandler({ roots: {}, token: req.headers.get('authorization')!.slice(7), procRoot: proc.root })(req));
+  const other = { ...proc.identity, birthtimeNs: String(BigInt(birthtimeNs) + 1n) }, actual = { ...proc.identity, birthtimeNs };
+  expect((await inspect([other], '/proc')).consumers).toHaveLength(0);
+  expect((await inspect([actual, other], '/proc')).consumers).toHaveLength(1);
+}));

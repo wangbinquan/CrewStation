@@ -5,7 +5,7 @@ import type {K8sClient,K8sObject,ResourceRef} from '@crewstation/k8s';
 import {precondition} from '@crewstation/kernel';
 import {freshPlatformNode} from '../platformPodTermination';
 
-export interface RegistrySourceOptions {namespace:string;service:string;port:number;container:string;imageDigest:string;probeRoot:string;probePort:number;probeToken:string}
+export interface RegistrySourceOptions {namespace:string;service:string;port:number;container:string;imageDigest:string;probeRoot:string;probePort:number;probeToken:string;consumerBirth?:{readonly baseUrl:string;readonly token:string}}
 interface Mount {name:string;mountPath:string;readOnly?:boolean;subPath?:string;subPathExpr?:string}
 interface Container {name:string;command?:string[];args?:string[];env?:Array<{name:string;value?:string;valueFrom?:unknown}>;volumeMounts?:Mount[]}
 interface Spec {nodeName?:string;containers?:Container[];volumes?:Array<{name:string;persistentVolumeClaim?:{claimName:string};hostPath?:{path:string;type?:string}}>}
