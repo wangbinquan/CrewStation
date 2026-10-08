@@ -151,7 +151,7 @@ async function inspectContent(input: Input, db: Executor, target: ProjectDeletio
 }
 async function originalFence(tx: Transaction, context: ProjectDeletionContext): Promise<Fence> {
   const row = (await tx.execute<Fence>(sql`SELECT * FROM cluster_management.deletion_fences WHERE project_id=${context.target.id} FOR UPDATE`))[0];
-  if (!row || row.operation_id !== context.operationId || row.generation !== context.generation || row.revision !== context.confirmed.revision) throw precondition('集群内容清理的原操作、世代或确认修订已变化');
+  if (!row || row.operation_id !== context.operationId || row.generation > context.generation || row.revision !== context.confirmed.revision) throw precondition('集群内容清理的原操作、世代或确认修订已变化');
   row.original = scopeSchema.parse(row.original);
   if (row.original.namespace !== context.target.namespace || row.original.serviceId !== context.target.serviceId) throw precondition('集群清理许可不属于原项目范围');
   return row;
@@ -161,15 +161,17 @@ async function permission(input: Input, raw: ProjectDeletionContext): Promise<Pr
   if (context.confirmed.participant !== 'cluster-management' || !context.confirmed.complete || context.confirmed.blockers.length || context.confirmed.references.length || !input.assertGrant) throw precondition('缺少完整的集群内容清理许可');
   await input.assertGrant(context); return context;
 }
-async function mark(tx: Transaction, context: ProjectDeletionContext) {
-  await tx.execute(sql`SELECT set_config('crewstation.cluster_deletion_owner',${context.operationId + ':' + context.generation + ':' + context.phase},true)`);
+async function mark(tx: Transaction, context: ProjectDeletionContext, sealGeneration = context.generation) {
+  await tx.execute(sql`SELECT set_config('crewstation.cluster_deletion_owner',${context.operationId + ':' + sealGeneration + ':' + context.phase},true)`);
 }
 export function clusterDeletionRepository(input: Input): ClusterDeletionRepository {
   const admitted = async <T>(raw: ProjectDeletionContext, work: (tx: Transaction, row: Fence) => Promise<T>) => {
     const context = await permission(input, raw);
     return withExclusiveDatabaseAdmission(input.db, admissionKey(context.target.id), async (tx) => {
-      await input.assertGrant!(context); await mark(tx, context);
-      const result = await work(tx, await originalFence(tx, context)); await input.assertGrant!(context); return result;
+      await input.assertGrant!(context);
+      const row = await originalFence(tx, context);
+      await mark(tx, context, row.generation);
+      const result = await work(tx, row); await input.assertGrant!(context); return result;
     });
   };
   return {

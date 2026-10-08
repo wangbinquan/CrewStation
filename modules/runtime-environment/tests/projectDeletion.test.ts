@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { sql } from 'drizzle-orm';
 import { runMigrations } from '@crewstation/persistence';
 import { jsonHash, newResourceId } from '@crewstation/kernel';
-import { ProjectDeletionTargetSchema, PROJECT_DELETION_PHASES, type ProjectDeletionContext, type RuntimeImageSource } from '@crewstation/contracts';
+import { ProjectDeletionTargetSchema, PROJECT_DELETION_PHASES, type ProjectDeletionContext, type ProjectDeletionEvidence, type RuntimeImageSource } from '@crewstation/contracts';
 import { runtimeImageFixture, type RuntimeImageFixture } from './runtimeImageFixture';
 import { builtVersion } from './versionFixture';
 import { createRuntimeEnvironmentModule, runtimeEnvironmentMigrations } from '../wiring';
@@ -23,8 +23,8 @@ const processIdentity = { podUid: '91754092-388a-4131-a452-f9d4b75f0766', nodeUi
 async function setup() {
   const f = await runtimeImageFixture(); fixtures.push(f);
   const target = ProjectDeletionTargetSchema.parse({ id: f.project, slug: 'demo', name: 'Demo', namespace: 'cs-demo', kind: 'DigitalWorker', state: 'active', revision: '1', prodHost: 'demo.cs.localhost', previewHost: 'preview.demo.cs.localhost', serviceHost: 'demo' });
-  const operationId = newResourceId(), controls = { independent: true, closed: true, stopped: true, native: 0, storage: 0, proofs: 0, grants: true };
-  const assertGrant = async (context: ProjectDeletionContext) => { if (context.operationId !== operationId || !controls.grants) throw new Error('wrong grant'); };
+  const operationId = newResourceId(), controls = { independent: true, closed: true, stopped: true, native: 0, storage: 0, proofs: 0, grants: true, generation: 1 };
+  const assertGrant = async (context: ProjectDeletionContext) => { if (context.operationId !== operationId || !controls.grants) throw new Error('wrong grant'); if(context.generation!==controls.generation)throw new Error('当前租约世代已失效'); };
   const repository = runtimeImageDeletionRepository({ db: f.tdb.db, assertGrant });
   const proof = async (scope: RuntimeImagePhysicalScope) => {
     controls.proofs++;
@@ -89,7 +89,7 @@ test('确认后新增内容会永久封写并要求新世代确认，沿固定�
   expect((await x.owner.run(x.context(old,'seal'))).kind).toBe('blocked');
   await expect(x.f.tdb.db.transaction(async(tx)=>{await tx.execute(sql`INSERT INTO runtime_environment.allocation_receipts VALUES(${newResourceId()},${x.f.project},'{}'::jsonb)`);})).rejects.toMatchObject({cause:{code:'55000'}});
   const next = await x.owner.inspect(x.target); expect(next.revision).not.toBe(old.revision);
-  for (const phase of PROJECT_DELETION_PHASES) expect((await x.owner.run(x.context(next,phase,2))).kind).toBe('done');
+  x.controls.generation=2; for (const phase of PROJECT_DELETION_PHASES) expect((await x.owner.run(x.context(next,phase,2))).kind).toBe('done');
   expect((await x.repository.content(x.target)).rows).toHaveLength(0);
 });
 
@@ -275,4 +275,32 @@ test('确认摘要包含原生对象与原输入的绑定；同一批原生 ID �
   expect((await owner.run(x.context(before,'seal'))).kind).toBe('blocked');
 });
 
+});
+
+
+test.skipIf(!available)('lease recovery preserves original seal runtime-environment and current grant', async () => {
+  const x = await setup(); x.controls.generation = 3;
+  const confirmed = await x.owner.inspect(x.target); await x.owner.run(x.context(confirmed, 'seal', 3));
+  const sealed = (await x.f.tdb.db.execute<{generation:number;revision:string;original:unknown;receipts:Partial<Record<ProjectDeletionContext['phase'],ProjectDeletionEvidence>>}>(sql`SELECT generation,revision,original,receipts FROM runtime_environment.deletion_fences WHERE project_id=${x.f.project}`))[0]!;
+  x.controls.generation = 7;
+  const proofCalls = x.controls.proofs;
+  await expect(x.owner.run(x.context(confirmed,'stop',3))).rejects.toThrow('世代');
+  expect(x.controls.proofs).toBe(proofCalls);
+  x.controls.generation = 1;
+  await expect(x.owner.run(x.context(confirmed,'stop',1))).rejects.toThrow('世代');
+  x.controls.generation = 7;
+  await expect(x.owner.run(x.context({...confirmed,revision:'0'.repeat(64)},'stop',7))).rejects.toThrow('修订');
+  expect((await x.owner.run(x.context(confirmed,'stop',7))).kind).toBe('done');
+  for (const phase of PROJECT_DELETION_PHASES.slice(2)) {
+    x.controls.generation++;
+    expect((await x.owner.run(x.context(confirmed,phase,x.controls.generation))).kind).toBe('done');
+  }
+  const final = await x.repository.load(x.context(confirmed,'verify',x.controls.generation));
+  expect(final.phaseIndex).toBe(6); expect(Object.keys(final.receipts)).toHaveLength(7);
+  expect(final.receipts.seal).toEqual(sealed.receipts.seal);
+  const fence = (await x.f.tdb.db.execute<{generation:number;revision:string;original:unknown}>(sql`SELECT generation,revision,original FROM runtime_environment.deletion_fences WHERE project_id=${x.f.project}`))[0]!;
+  expect(fence).toEqual({generation:sealed.generation,revision:sealed.revision,original:sealed.original});
+  x.controls.generation++;
+  expect(await x.owner.run(x.context(confirmed,'metadata',x.controls.generation))).toEqual({kind:'done',evidence:final.receipts.metadata!});
+  expect((await x.f.uow.read.projectContent(x.f.otherProject)).rows.some(row=>row.table==='allocation_receipts')).toBe(true);
 });

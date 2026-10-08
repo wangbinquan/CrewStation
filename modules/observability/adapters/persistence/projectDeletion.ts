@@ -154,8 +154,12 @@ async function scan(db: Executor, scope: Scope, tasks?: { ids: readonly string[]
 export async function observationOwnerTransaction<T>(input: Input, context: ProjectDeletionContext, scope: Scope, work: (tx: Transaction) => Promise<T>) {
   return withExclusiveDatabaseAdmission(input.db, admissionKey(scope.projectId), async (tx) => {
     for (const key of scope.projectKeys.filter((key) => key !== scope.projectId)) await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${admissionKey(key)},0))`);
-    await tx.execute(sql`SELECT set_config('crewstation.observability_deletion',${context.operationId + ':' + context.generation + ':' + context.phase},true)`);
-    return work(tx);
+    await input.assertGrant(context);
+    const fence = context.phase === 'seal' ? undefined : await currentObservationFence(tx, context);
+    if (context.phase !== 'seal' && (!fence?.verified || fence.revision !== context.confirmed.revision)) throw precondition('观测原封写范围尚未确认或当前许可变化');
+    const sealGeneration = fence?.generation ?? context.generation;
+    await tx.execute(sql`SELECT set_config('crewstation.observability_deletion',${context.operationId + ':' + sealGeneration + ':' + context.phase},true)`);
+    const result = await work(tx); await input.assertGrant(context); return result;
   });
 }
 export async function authorizeObservationDeletion(input: Input, raw: ProjectDeletionContext): Promise<ProjectDeletionContext> {
@@ -223,7 +227,7 @@ async function stepQuiesced(input: Input, raw: ProjectDeletionContext): Promise<
   const tasks = await input.tasks?.list(context.target);
   const work=()=>observationOwnerTransaction(input, context, scope, async (tx) => {
     const fence = await currentObservationFence(tx, context);
-    if (!fence?.verified || fence.generation !== context.generation) throw precondition('观测原范围尚未确认或世代已变化');
+    if (!fence?.verified || fence.revision !== context.confirmed.revision) throw precondition('观测原范围尚未确认或世代已变化');
     if (fence.phase_index < index - 1 || fence.phase_index > index && context.phase !== 'metadata') throw precondition('观测清理需要原前序阶段，不能跳步');
     if(context.phase==='verify'&&!(await clearReports(input,tx)))return 'waiting' as const;
     let stoppedRevision = fence.stopped_revision, stoppedCount = fence.stopped_count;
@@ -242,7 +246,7 @@ async function stepQuiesced(input: Input, raw: ProjectDeletionContext): Promise<
       if (!current.inventory.complete || current.own.length) throw precondition('观测内容仍有残留或来源不完整');
     }
     const count = context.phase === 'seal' ? fence.completed_count : ['stop', 'metadata', 'verify'].includes(context.phase) ? stoppedCount ?? 0 : 0;
-    const digest = fence.completed_digest && context.phase === 'verify' ? fence.completed_digest : jsonHash({ participant: 'observability', operationId: context.operationId, generation: context.generation, phase: context.phase, count, stoppedRevision, remaining: 0 });
+    const digest = fence.completed_digest && context.phase === 'verify' ? fence.completed_digest : jsonHash({ participant: 'observability', operationId: context.operationId, generation: fence.generation, phase: context.phase, count, stoppedRevision, remaining: 0 });
     if (fence.phase_index < index) await tx.execute(sql`UPDATE observability.deletion_fences SET phase_index=${index},stopped_revision=${stoppedRevision},stopped_count=${stoppedCount},completed_digest=${context.phase === 'verify' ? digest : null} WHERE project_id=${scope.projectId}`);
     return { count, digest };
   });
@@ -258,7 +262,7 @@ export function observabilityDeletionRepository(input: Input): ObservabilityDele
     seal: (context) => seal(input, context), step: (context) => step(input, context),
     needsDrain: async (raw) => {
       const context = await authorizeObservationDeletion(input, raw), fence = await currentObservationFence(input.db, context);
-      if (context.phase !== 'stop' || !fence?.verified || fence.generation !== context.generation || fence.phase_index < 0) throw precondition('观测排空缺少当前封写许可');
+      if (context.phase !== 'stop' || !fence?.verified || fence.revision !== context.confirmed.revision || fence.phase_index < 0) throw precondition('观测排空缺少当前封写许可');
       return fence.phase_index === 0;
     },
   };

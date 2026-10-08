@@ -33,7 +33,8 @@ spec:
 
           readinessProbe: { httpGet: { path: /healthz, port: 8082 }, periodSeconds: 5, timeoutSeconds: 5 }
           livenessProbe: { httpGet: { path: /healthz, port: 8082 }, periodSeconds: 15, initialDelaySeconds: 10, timeoutSeconds: 5 }
-          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: "1", memory: 1Gi } }
+          # 全量项目清理与日常协调同时运行，保留盘点内存余量，避免 OOM 重启打断原删除。
+          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: "1", memory: 2Gi } }
 ---
 apiVersion: v1
 kind: Service

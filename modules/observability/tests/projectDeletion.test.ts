@@ -218,3 +218,26 @@ describe.skipIf(!available)('observability project permanent cleanup', () => {
     await expect(raw(sql`SELECT set_config('crewstation.observability_deletion',${f.operationId + ':1:metadata'},false); DELETE FROM observability.accepted_execution_prices`)).rejects.toThrow();
   });
 });
+
+
+test.skipIf(!available)('lease recovery preserves original seal observability and current grant', async () => {
+  const f=await setup(); await seed(database!,target.id); await seed(database!,otherId);
+  let generation=3;
+  const input={...f.input,assertGrant:async(context:Parameters<typeof f.input.assertGrant>[0])=>{await f.input.assertGrant(context);if(context.generation!==generation)throw Error('当前租约世代已失效');}};
+  const repository=observabilityDeletionRepository(input), owner=observabilityDeletionOwner(repository);
+  const confirmed=await owner.inspect(target); expect((await owner.run(f.context(confirmed,'seal',3))).kind).toBe('done');
+  const sealed=(await database!.db.execute<{generation:number;revision:string;original:unknown}>(sql`SELECT generation,revision,original FROM observability.deletion_fences WHERE project_id=${target.id}`))[0]!;
+  generation=7;
+  await expect(owner.run(f.context(confirmed,'stop',3))).rejects.toThrow('世代');
+  generation=1; await expect(owner.run(f.context(confirmed,'stop',1))).rejects.toThrow('世代');
+  generation=7;
+  expect((await owner.run(f.context(confirmed,'stop',7))).kind).toBe('done');
+  for(const phase of PROJECT_DELETION_PHASES.slice(2)){generation++;expect((await owner.run(f.context(confirmed,phase,generation))).kind).toBe('done');}
+  const fence=(await database!.db.execute<{generation:number;revision:string;original:unknown}>(sql`SELECT generation,revision,original FROM observability.deletion_fences WHERE project_id=${target.id}`))[0]!;
+  expect(fence).toEqual(sealed);expect((await contentCounts(database!)).usage_heads).toBe(1);
+  const replay=await owner.run(f.context(confirmed,'metadata',generation));generation++;
+  expect(await owner.run(f.context(confirmed,'metadata',generation))).toEqual(replay);
+  const badResources={...confirmed,resources:[{...confirmed.resources[0]!,identity:'0'.repeat(64)},...confirmed.resources.slice(1)]};
+  const {revision:_revision,...material}=badResources;
+  await expect(repository.needsDrain(f.context({...material,revision:jsonHash(material)},'stop',generation))).rejects.toThrow('封写');
+});

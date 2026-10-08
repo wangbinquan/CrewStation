@@ -255,3 +255,21 @@ describe.skipIf(!available)('cluster project content permanent cleanup', () => {
     expect((await f.repository.inspection(foreign.inspectionId))?.inspection.domain).toEqual(foreign.domain);
   });
 });
+
+
+test.skipIf(!available)('lease recovery preserves original seal cluster-management and current grant', async () => {
+  const f=await fixture();let generation=3;
+  const input={...f.input,assertGrant:async(context:ProjectDeletionContext)=>{await f.input.assertGrant(context);if(context.generation!==generation)throw Error('当前租约世代已失效');}};
+  const repository=clusterDeletionRepository(input),owner=clusterManagementDeletionOwner(repository);
+  const confirmed=await owner.inspect(target);expect((await owner.run(f.context(confirmed,'seal',3))).kind).toBe('done');
+  const sealed=(await tdb!.db.execute<{generation:number;revision:string;original:unknown}>(sql`SELECT generation,revision,original FROM cluster_management.deletion_fences WHERE project_id=${target.id}`))[0]!;
+  generation=7;await expect(owner.run(f.context(confirmed,'stop',3))).rejects.toThrow('世代');
+  generation=1;await expect(owner.run(f.context(confirmed,'stop',1))).rejects.toThrow('世代');generation=7;
+  await expect(owner.run(f.context({...confirmed,revision:'0'.repeat(64)},'stop',7))).rejects.toThrow('修订');
+  expect((await owner.run(f.context(confirmed,'stop',7))).kind).toBe('done');
+  for(const phase of PROJECT_DELETION_PHASES.slice(2)){generation++;expect((await owner.run(f.context(confirmed,phase,generation))).kind).toBe('done');}
+  const fence=(await tdb!.db.execute<{generation:number;revision:string;original:unknown}>(sql`SELECT generation,revision,original FROM cluster_management.deletion_fences WHERE project_id=${target.id}`))[0]!;
+  expect(fence).toEqual(sealed); const proof=await owner.run(f.context(confirmed,'verify',generation));generation++;
+  expect(await owner.run(f.context(confirmed,'verify',generation))).toEqual(proof);
+  expect((await f.repository.latest())!.resources.some(row=>row.ownership.scope==='project'&&row.ownership.projectId===target.id)).toBe(false);
+});

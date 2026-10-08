@@ -5,7 +5,7 @@ import { releaseAdmissionKey } from '../adapters/persistence/drizzleUnitOfWork';
 import { eventbusMigrations } from '@crewstation/eventbus';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import { jsonHash, newResourceId } from '@crewstation/kernel';
-import { NATIVE_REGISTRY_ADMISSION, PROJECT_DELETION_PHASES, ProjectDeletionTargetSchema, type ProjectDeletionContext, type ProjectId, type ServiceId, type ReleaseId, type UserId } from '@crewstation/contracts';
+import { NATIVE_REGISTRY_ADMISSION, PROJECT_DELETION_PHASES, ProjectDeletionTargetSchema, type ProjectDeletionContext, type ProjectDeletionEvidence, type ProjectId, type ServiceId, type ReleaseId, type UserId } from '@crewstation/contracts';
 import { releaseMigrations } from '../wiring';
 import { drizzleUnitOfWork, releaseProjectAdmissions } from '../adapters/persistence/drizzleUnitOfWork';
 import { releaseDeletionRepository } from '../adapters/persistence/projectDeletion';
@@ -21,9 +21,9 @@ async function setup(){
  const tdb=await createTestDatabase([eventbusMigrations,releaseMigrations]);fixtures.push(tdb);
  const db=tdb.db,uow=drizzleUnitOfWork(db),project=newResourceId() as ProjectId,service=newResourceId() as ServiceId,otherProject=newResourceId() as ProjectId,otherService=newResourceId() as ServiceId;
  const target=ProjectDeletionTargetSchema.parse({id:project,serviceId:service,slug:'demo',name:'Demo',namespace:'cs-demo',kind:'DigitalWorker',state:'active',revision:'1',prodHost:'demo.test',previewHost:'preview.demo.test',serviceHost:'demo'});
- const operationId=newResourceId(), controls={grant:true,independent:true,closed:true,stopped:true,native:0,storage:0,proofs:0};
+ const operationId=newResourceId(), controls={grant:true,independent:true,closed:true,stopped:true,native:0,storage:0,proofs:0,generation:1};
  const services={resolveServiceById:async(id:ServiceId)=>id===service||id===otherService?{projectId:id===service?project:otherProject,slug:'demo',name:'Demo',namespace:'cs-demo'}:undefined};
- const assertGrant=async(context:ProjectDeletionContext)=>{if(!controls.grant||context.operationId!==operationId)throw Error('wrong grant');};
+ const assertGrant=async(context:ProjectDeletionContext)=>{if(!controls.grant||context.operationId!==operationId)throw Error('wrong grant');if(context.generation!==controls.generation)throw Error('当前租约世代已失效');};
  const repository=releaseDeletionRepository({db,services,assertGrant});
  const proof=async(scope:ReleasePhysicalScope)=>{controls.proofs++;const retained=await repository.retained(target);return {kind:'done' as const,digest:jsonHash({scope,native:controls.native,storage:controls.storage}),scopeDigest:jsonHash(scope),sourceIdentity:scope.source.identity,independent:controls.independent,producersClosed:controls.closed,consumersStopped:controls.stopped,nativeRemaining:controls.native,storageRemaining:controls.storage,callbackExits:(retained?.content.callbacks??[]).map((entry)=>({id:entry.id,originalIdentity:releaseCallbackIdentity(entry),digest:jsonHash({stopped:entry.id})}))};};
  const physics:ReleaseDeletionPhysics={capture:async(_target,content)=>{const bindings=content.consumers.map(({kind,id,identity})=>({kind,id,identity})).sort((a,b)=>(a.kind+':'+a.id).localeCompare(b.kind+':'+b.id));return {complete:true,blockers:[],references:[],scope:{version:1,projectId:project,originDigest:jsonHash({projectId:project,bindings,identityLinks:content.identityLinks}),source:{identity:jsonHash('source'),epoch:jsonHash('epoch'),version:'controlled-test-port'},bindings,objects:[{kind:'artifact',id:'controlled-artifact:'+project,identity:'sha256:'+'a'.repeat(64),sourceIdentity:jsonHash('source'),count:1}],coverage:RELEASE_PHYSICAL_KINDS.map((kind)=>({kind,identity:jsonHash(kind),complete:true}))}};},inspect:async()=>({complete:true,blockers:[],references:[]}),stop:async(_context,scope)=>proof(scope),purge:async(_context,scope)=>proof(scope),prove:proof};
@@ -60,7 +60,7 @@ describe.skipIf(!available)('发布持久删除原范围与阶段',()=>{
   const x=await setup(),confirmed=await x.owner.inspect(x.target);await x.uow.read.releases.update({...x.own,status:'offline',message:'changed'});
   expect((await x.owner.run(x.context(confirmed,'seal'))).kind).toBe('blocked');
   const next=await x.owner.inspect(x.target);expect(next.revision).not.toBe(confirmed.revision);
-  for(const phase of PROJECT_DELETION_PHASES)expect((await x.owner.run(x.context(next,phase,2))).kind).toBe('done');expect((await x.repository.content(x.target)).rows).toHaveLength(0);
+  x.controls.generation=2;for(const phase of PROJECT_DELETION_PHASES)expect((await x.owner.run(x.context(next,phase,2))).kind).toBe('done');expect((await x.repository.content(x.target)).rows).toHaveLength(0);
  });
  test('verify 的旧成功回执必须重新证明，不能掩盖原资源再次出现',async()=>{
   const x=await setup(),confirmed=await x.owner.inspect(x.target);for(const phase of PROJECT_DELETION_PHASES)await x.owner.run(x.context(confirmed,phase));
@@ -100,7 +100,7 @@ describe.skipIf(!available)('发布持久删除原范围与阶段',()=>{
    for(let i=0;i<100;i++){const rows=await x.db.execute(sql`SELECT 1 FROM pg_locks WHERE locktype='advisory' AND mode='ExclusiveLock' AND NOT granted`);if(rows.length)break;await Bun.sleep(5);}
    expect(sealed).toBe(false);await x.uow.read.releases.update({...x.foreign,message:'other project continues'});
   }finally{release.resolve();await running;}
-  expect((await pending!).kind).toBe('blocked');const next=await x.owner.inspect(x.target);for(const phase of PROJECT_DELETION_PHASES)expect((await x.owner.run(x.context(next,phase,2))).kind).toBe('done');
+  expect((await pending!).kind).toBe('blocked');const next=await x.owner.inspect(x.target);x.controls.generation=2;for(const phase of PROJECT_DELETION_PHASES)expect((await x.owner.run(x.context(next,phase,2))).kind).toBe('done');
   expect((await x.uow.read.releases.getById(x.foreign.id))?.message).toBe('other project continues');
  });
  test('原发布输入、交接目标和最小别名不可重绑定，清理后也不能插入本项目的新别名',async()=>{
@@ -137,4 +137,32 @@ describe.skipIf(!available)('发布持久删除原范围与阶段',()=>{
   await x.db.execute(sql`DROP TABLE release.future_private`);for(const phase of PROJECT_DELETION_PHASES.slice(5))expect((await x.owner.run(x.context(confirmed,phase))).kind).toBe('done');
  });
 
+});
+
+
+test.skipIf(!available)('lease recovery preserves original seal release and current grant', async () => {
+  const x = await setup(); x.controls.generation = 3;
+  const confirmed = await x.owner.inspect(x.target); await x.owner.run(x.context(confirmed, 'seal', 3));
+  const sealed = (await x.db.execute<{generation:number;revision:string;original:unknown;receipts:Partial<Record<ProjectDeletionContext['phase'],ProjectDeletionEvidence>>}>(sql`SELECT generation,revision,original,receipts FROM release.deletion_fences WHERE project_id=${x.project}`))[0]!;
+  x.controls.generation = 7;
+  const proofCalls = x.controls.proofs;
+  await expect(x.owner.run(x.context(confirmed,'stop',3))).rejects.toThrow('世代');
+  expect(x.controls.proofs).toBe(proofCalls);
+  x.controls.generation = 1;
+  await expect(x.owner.run(x.context(confirmed,'stop',1))).rejects.toThrow('世代');
+  x.controls.generation = 7;
+  await expect(x.owner.run(x.context({...confirmed,revision:'0'.repeat(64)},'stop',7))).rejects.toThrow('修订');
+  expect((await x.owner.run(x.context(confirmed,'stop',7))).kind).toBe('done');
+  for (const phase of PROJECT_DELETION_PHASES.slice(2)) {
+    x.controls.generation++;
+    expect((await x.owner.run(x.context(confirmed,phase,x.controls.generation))).kind).toBe('done');
+  }
+  const final = await x.repository.load(x.context(confirmed,'verify',x.controls.generation));
+  expect(final.phaseIndex).toBe(6); expect(Object.keys(final.receipts)).toHaveLength(7);
+  expect(final.receipts.seal).toEqual(sealed.receipts.seal);
+  const fence = (await x.db.execute<{generation:number;revision:string;original:unknown}>(sql`SELECT generation,revision,original FROM release.deletion_fences WHERE project_id=${x.project}`))[0]!;
+  expect(fence).toEqual({generation:sealed.generation,revision:sealed.revision,original:sealed.original});
+  x.controls.generation++;
+  expect(await x.owner.run(x.context(confirmed,'metadata',x.controls.generation))).toEqual({kind:'done',evidence:final.receipts.metadata!});
+  expect(await x.uow.read.releases.getById(x.foreign.id)).toEqual(x.foreign);
 });

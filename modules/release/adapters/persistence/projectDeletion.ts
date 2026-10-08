@@ -33,7 +33,7 @@ async function permission(input: Input, raw: ProjectDeletionContext): Promise<Pr
 }
 async function original(tx: Executor, context: ProjectDeletionContext): Promise<Fence> {
   const row = (await tx.execute<Fence>(sql`SELECT operation_id,generation,revision,original,scope_verified,phase_index,receipts FROM release.deletion_fences WHERE project_id=${context.target.id} FOR UPDATE`))[0];
-  if (!row || row.operation_id !== context.operationId || row.generation !== context.generation || row.revision !== context.confirmed.revision) throw precondition('发布原操作、世代或确认修订已变化');
+  if (!row || row.operation_id !== context.operationId || row.generation > context.generation || row.revision !== context.confirmed.revision) throw precondition('发布原操作、世代或确认修订已变化');
   row.original = parsedScope(row.original, context.target);
   row.receipts = z.partialRecord(z.enum(PROJECT_DELETION_PHASES), ProjectDeletionEvidenceSchema).parse(row.receipts);
   return row;
@@ -88,8 +88,10 @@ export function releaseDeletionRepository(input: Input): ReleaseDeletionReposito
     const context = await permission(input, raw);
     return withExclusiveDatabaseAdmission(input.db, releaseAdmissionKey(context.target.id), async (tx) => {
       await input.assertGrant(context);
-      await tx.execute(sql`SELECT set_config('crewstation.release_deletion_owner',${context.operationId + ':' + context.generation + ':' + context.phase},true)`);
-      const result = await work(tx, await original(tx, context), context); await input.assertGrant(context); return result;
+      const row = await original(tx, context);
+      // The current global lease authorizes this call; SQL keeps the original seal binding.
+      await tx.execute(sql`SELECT set_config('crewstation.release_deletion_owner',${context.operationId + ':' + row.generation + ':' + context.phase},true)`);
+      const result = await work(tx, row, context); await input.assertGrant(context); return result;
     });
   };
   return {
