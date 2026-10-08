@@ -5,14 +5,21 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { ProjectDeletionContextSchema } from '../../../packages/contracts';
 import { jsonHash, newResourceId } from '../../../packages/kernel';
 import { createRegistryReclamationClient, nativeRegistryWriterAdmission, registryHistoryIdentity } from '../../../packages/filesystem-metrics';
+import { observeFileConsumers } from '../../../packages/filesystem-metrics/consumers';
 import { consumerFixture } from '../../../packages/filesystem-metrics/consumerFixture';
 import { registryArtifactFixture } from '../../../modules/platform/adapters/k8s/nativeRegistry/artifactFixture';
 import { nativeRegistryService } from './service';
 import { nativeRegistryJournal } from './journal';
+import { captureRegistryNativeInstallation, RegistryNativeOriginSchema, registryNativeSourceValidator } from './source';
 
 async function fixture(proc: { root: string; process(id: string): Promise<string> }, participant: 'release' | 'runtime-environment' = 'release') {
   await writeFile(join(proc.root, 'sys/kernel/random/boot_id'), randomUUID() + '\n'); await proc.process('101');
   const f = await registryArtifactFixture(proc.root), history = await f.source.capture(newResourceId(), f.query);
+  const installation = await captureRegistryNativeInstallation(f.k8s, { namespace: 'system', service: 'registry', pod: 'registry', pvc: 'registry', pv: 'registry', probe: 'probe', container: 'registry', root: f.root,
+    origin: RegistryNativeOriginSchema.parse(history.origin) }, AbortSignal.timeout(5000));
+  const inspectSource = registryNativeSourceValidator(f.k8s, installation);
+  const originalFiles = [...history.original.entries.filter(row => row.kind === 'file'), ...history.original.blobs]
+    .map(({ device, inode, birthtimeNs }) => ({ device, inode, birthtimeNs }));
   const context = ProjectDeletionContextSchema.parse({ operationId: newResourceId(), generation: 1, phase: 'purge',
     target: { id: history.projectId, name: 'Original', slug: 'original', namespace: 'cs-original', kind: 'DigitalWorker', state: 'deleting', revision: '1', prodHost: 'original.invalid', previewHost: 'preview.original.invalid', serviceHost: 'original.service.invalid' },
     confirmed: { participant, complete: true, revision: jsonHash('original confirmed plan'), blockers: [], references: [], resources: [{
@@ -23,7 +30,13 @@ async function fixture(proc: { root: string; process(id: string): Promise<string
   const journal = nativeRegistryJournal(join(f.root, 'native-journal.sqlite'), history.sourceIdentity);
   const handler = nativeRegistryService({ root: f.root, token, sourceIdentity: history.sourceIdentity, journal,
     assertGrant: async actual => { checks++; if (!valid || jsonHash(actual) !== jsonHash(context)) throw Error('revoked or substituted original operation'); },
-    assertOriginalSource: async original => { originalChecks++; const report = await f.source.inspect(original); if (report.consumerCount) throw Error('actual old consumers remain'); },
+    // Match the actual host's pinned installation check; the native eraser
+    // reads the byte graph and the final assertion uses the independent source.
+    assertOriginalSource: async (original, signal) => {
+      originalChecks++; await inspectSource(original, signal);
+      const report = await observeFileConsumers(originalFiles, proc.root, signal);
+      if (!report.complete || report.blockers.length || report.bootId !== history.consumers.bootId || report.namespace !== history.consumers.namespace || report.consumers.length) throw Error('actual old consumers or changed source remain');
+    },
     authority: () => ({ exclusive: async (_original, work) => { if (!closed) throw Error('actual writers remain'); return work(); }, assertClosed: async () => { if (!closed) throw Error('actual writers remain'); } }) });
   const request = (body: unknown = { context, history }, credential = token, method = 'POST') => handler(new Request('http://native/native/registry/reclaim', { method, headers: { authorization: 'Bearer ' + credential }, body: JSON.stringify(body) }));
   const client = createRegistryReclamationClient({ baseUrl: 'http://native/', token, fetch: (url, init) => handler(new Request(url, init)) });
@@ -66,6 +79,17 @@ test.skipIf(process.platform !== 'linux')('actual private service/client and Lin
       const independent = await f.source.inspect(f.history);
       expect(independent).toMatchObject({ native: 0, storage: 0, consumerCount: 0, independent: true, physicalReclamationProven: false });
       expect(f.counts().checks).toBeGreaterThan(10); expect(f.counts().originalChecks).toBeGreaterThan(10);
+    } finally { await f.drop(); }
+  });
+});
+test('private service rechecks the complete original installation before entering native erasure', async () => {
+  await consumerFixture(async proc => {
+    const f = await fixture(proc); try {
+      await f.k8s.apply({ apiVersion: 'v1', kind: 'Service', metadata: { name: 'registry', namespace: 'system', uid: f.ids.service }, spec: { selector: { app: 'another-original' }, ports: [{ port: 5000 }] } });
+      expect((await f.request()).status).toBe(403);
+      expect(f.counts().originalChecks).toBe(1);
+      expect(f.journal.status()).toMatchObject({ active: 0, total: 0 });
+      expect(await readFile(f.path(f.layer), 'utf8')).toBe('original project layer');
     } finally { await f.drop(); }
   });
 });
