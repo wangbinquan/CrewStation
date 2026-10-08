@@ -29,6 +29,7 @@ export class RuntimeContentSources {
   readonly rows: RuntimeContentRows;
   private readonly publicCache = new Map<string, Promise<RuntimeDeletionOrigin | undefined>>();
   private readonly tasks = new Map<string, Promise<RuntimeDeletionOrigin>>();
+  private readonly workOrigins = new Map<string, Promise<RuntimeDeletionOrigin>>();
   private readonly memberCounts = new Map<string, Promise<number>>();
   private readonly origins = new Map<string, RuntimeContentOrigin>();
   constructor(private readonly db: Executor, private readonly sources: RuntimeDeletionSources, private readonly project: ProjectId) {
@@ -66,10 +67,18 @@ export class RuntimeContentSources {
     if (kind === 'project' && origin.id !== origin.projectIds[0]) throw precondition('运行环境原项目身份冲突');
     return origin;
   }
-  async workOrigin(kind: RuntimeWorkInput['originKind'], key: string) {
-    const original = await retainedRuntimeOrigin(this.db, kind, key);
-    if (!original) throw precondition('运行原回调缺少不可变的最小来源');
-    return this.remember(kind, key, original);
+  workOrigin(kind: RuntimeWorkInput['originKind'], key: string) {
+    const cacheKey = JSON.stringify([kind, key]); let pending = this.workOrigins.get(cacheKey);
+    if (!pending) {
+      // Immutable minimum origins belong to this snapshot; each callback still validates its complete birth against them.
+      pending = (async () => {
+        const original = await retainedRuntimeOrigin(this.db, kind, key);
+        if (!original) throw precondition('运行原回调缺少不可变的最小来源');
+        return this.remember(kind, key, original);
+      })();
+      this.workOrigins.set(cacheKey, pending);
+    }
+    return pending;
   }
   private async taskFromRow(id: string, row: RuntimeRawRow): Promise<RuntimeDeletionOrigin> {
     TaskKindSchema.parse(row['kind']); ResourceIdSchema.parse(id);
