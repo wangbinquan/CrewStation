@@ -29,13 +29,19 @@ export async function registeredRuntimeContent(db: Executor) {
 }
 async function inspectTable(db: Executor, entry: RuntimeContentTable, sources: RuntimeContentSources, project: ProjectId) {
   const key = runtimeContentKey(entry), contents: RuntimeDeletionContent[] = [];
+  const table = sql.raw('task_runtime.' + entry.table), keys = sql.raw(entry.keys.map((name) => 'r.' + name).join(','));
+  const matching = sql.raw(entry.keys.map((name) => 'r.' + name + '=ordered.' + name).join(' AND '));
   // Exit proof advances after seal. Its validity is checked separately; only the immutable birth belongs to the frozen content CAS.
   const body = sql.raw(entry.table === 'original_callbacks' ? "to_jsonb(r)-ARRAY['exited_at','exit_digest','recovery_digest']" : 'to_jsonb(r)');
   let after: string | null = null, count = 0;
-  await readTransactionPages<RuntimeContentRow>(db, sql`SELECT ${key} AS key,to_jsonb(r) AS body,${runtimeDocumentInvalid(entry)} AS invalid,
-      encode(sha256(convert_to((${body})::text,'UTF8')),'hex') AS digest FROM ${sql.raw('task_runtime.' + entry.table)} r
-      ORDER BY ${key} COLLATE "C"`, async (rows) => {
+  // Keep only primary keys in the sort; the lateral barrier reads each complete row afterwards on this same snapshot.
+  await readTransactionPages<RuntimeContentRow>(db, sql`SELECT ordered.key,to_jsonb(r) AS body,${runtimeDocumentInvalid(entry)} AS invalid,
+      encode(sha256(convert_to((${body})::text,'UTF8')),'hex') AS digest
+      FROM (SELECT ${keys},${key} COLLATE "C" AS key FROM ${table} r ORDER BY key OFFSET 0) ordered
+      LEFT JOIN LATERAL (SELECT r.* FROM ${table} r WHERE ${matching} OFFSET 0) r ON true
+      ORDER BY ordered.key COLLATE "C"`, async (rows) => {
     for (const row of rows) {
+      if (!row.body) throw precondition('运行环境原主键内容缺失，不能确认全部清理范围');
       if (row.invalid) throw precondition('运行环境原内容存在显式无效的 JSON 关系');
       sources.rows.prime(entry.table, row.body);
     }

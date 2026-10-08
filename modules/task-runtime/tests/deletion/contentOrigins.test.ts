@@ -5,13 +5,13 @@ import type { Database } from '@crewstation/persistence';
 import { testDatabaseAvailable } from '@crewstation/testkit';
 import { sql } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
-import { runtimeContentSnapshot } from '../../adapters/persistence/deletion/inspection';
+import { inspectRuntimeContent, runtimeContentSnapshot } from '../../adapters/persistence/deletion/inspection';
 import { runtimeProjectAdmissionKey } from '../../adapters/persistence/deletion/projectWork';
 import { runtimeWorkFixture } from './workFixture';
 
 const available = await testDatabaseAvailable();
 describe.skipIf(!available)('runtime content original sources (actual PG)', () => {
-  test('reuses immutable sources within each complete snapshot and still rejects a late mismatched callback', async () => {
+  test('reuses immutable sources, bounds sorting space and still rejects a late mismatched callback', async () => {
     const f = await runtimeWorkFixture();
     try {
       await f.work.run(f.input(), async () => undefined);
@@ -50,11 +50,20 @@ describe.skipIf(!available)('runtime content original sources (actual PG)', () =
       originReads.length = 0;
       expect(await inspect()).toEqual(first);
       expect(originReads.toSorted()).toEqual([f.parent, f.otherParent].toSorted());
+      const constrained = () => f.database.db.transaction(async (tx) => {
+        await tx.execute(sql.raw("SET LOCAL work_mem='64kB'"));
+        await tx.execute(sql.raw("SET LOCAL temp_file_limit='512kB'"));
+        return inspectRuntimeContent(tx, f.sources, f.project);
+      }, { isolationLevel: 'repeatable read', accessMode: 'read only' });
+      // The original full-row sort exhausts temporary space; every full row must still reach the same EOF and digest.
+      expect(await constrained()).toEqual(first);
+      expect(await originalRows()).toEqual(before);
       // Corrupt only the isolated fixture after two full reads. The last row must still be checked after the source is cached.
       await f.database.db.execute(sql.raw('ALTER TABLE task_runtime.original_callbacks DISABLE TRIGGER USER'));
       try { await f.database.db.execute(sql`UPDATE task_runtime.original_callbacks SET origin_revision=${'b'.repeat(64)} WHERE id=${pending.at(-1)!.id}`); }
       finally { await f.database.db.execute(sql.raw('ALTER TABLE task_runtime.original_callbacks ENABLE TRIGGER USER')); }
       await expect(inspect()).rejects.toThrow('原父记录关系不符');
+      await expect(constrained()).rejects.toThrow('原父记录关系不符');
     } finally { await f.work.drain(); await f.drop(); }
   }, 30_000);
 });
