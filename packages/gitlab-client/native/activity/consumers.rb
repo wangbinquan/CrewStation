@@ -2,18 +2,24 @@
 
 # Inspect every visible thread's descriptors, mappings and filesystem context.
 # Never read the contents of a project file or signal a process.
+require 'fiddle'
+
 module CrewstationGitlabActivity
   class Consumers
     LIMIT = 100_000
 
     def initialize(identities, processes = nil)
       raise 'native-source-activity-identities-invalid' unless identities.is_a?(Array) && identities.length <= LIMIT
-      @targets = identities.to_h do |row|
-        raise 'native-source-activity-identity-invalid' unless row.keys.sort == %w[device inode] &&
-          row.values.all? { |value| value.is_a?(String) && value.match?(/\A[0-9]{1,20}\z/) && value.to_i <= 18_446_744_073_709_551_615 } && row['inode'] != '0'
-        [[row['device'], row['inode']], true]
+      @targets = {}
+      identities.each do |row|
+        raise 'native-source-activity-identity-invalid' unless [%w[device inode], %w[birthtimeNs device inode]].include?(row.keys.sort) &&
+          row.values.all? { |value| value.is_a?(String) && value.match?(/\A(?:0|[1-9][0-9]{0,19})\z/) && value.to_i <= 18_446_744_073_709_551_615 } &&
+          row['inode'] != '0' && row['birthtimeNs'] != '0'
+        births = (@targets[[row['device'], row['inode']]] ||= [])
+        value = row['birthtimeNs']
+        raise 'native-source-activity-identities-duplicate' if births.include?(value) || !births.empty? && (value.nil? || births.include?(nil))
+        births << value
       end
-      raise 'native-source-activity-identities-duplicate' unless @targets.length == identities.length
       @references = []
       @inspected = 0
       @processes = processes
@@ -31,7 +37,7 @@ module CrewstationGitlabActivity
         raise 'native-source-activity-process-changed' unless status("/proc/#{pid}/stat")[:tick] == process[:tick] && ids("/proc/#{pid}/task") == threads
       end
       raise 'native-source-activity-process-set-changed' unless pids == before
-      @references.sort_by { |row| [row[:pid], row[:tid], row[:kind], row[:device], row[:inode]] }
+      @references.sort_by { |row| [row[:pid], row[:tid], row[:kind], row[:device], row[:inode], row[:birthtimeNs].to_s] }
     end
 
     private
@@ -54,17 +60,59 @@ module CrewstationGitlabActivity
       { state: fields.fetch(0), tick: tick }
     end
 
-    def reference(pid, tid, started, kind, device, inode)
+    def reference(pid, tid, started, kind, device, inode, path, fallback = nil)
       @inspected += 1
       raise 'native-source-activity-inspection-budget' if @inspected > 2_000_000
-      return unless @targets.key?([device, inode])
+      births = @targets[[device, inode]]
+      return unless births
+      actual = kind == 'mapping' ? mapping_birth(path, fallback, device, inode) : birth(path, device, inode) unless births.include?(nil)
+      # An unavailable birth remains a possible original consumer. A positively
+      # different birth proves inode reuse, independently of path or process name.
+      return if actual && !births.include?(actual)
       raise 'native-source-activity-reference-budget' if @references.length >= LIMIT
-      @references << { pid: pid, tid: tid, startedTick: started, kind: kind, device: device, inode: inode }
+      row = { pid: pid, tid: tid, startedTick: started, kind: kind, device: device, inode: inode }
+      row[:birthtimeNs] = actual if actual
+      @references << row
+    end
+
+    def birth(path, device, inode)
+      before = File.stat(path)
+      raise 'native-source-activity-file-changed' unless before.dev.to_s == device && before.ino.to_s == inode
+      @statx ||= Fiddle::Function.new(Fiddle.dlopen(nil)['statx'],
+        [Fiddle::TYPE_INT, Fiddle::TYPE_VOIDP, Fiddle::TYPE_INT, Fiddle::TYPE_INT, Fiddle::TYPE_VOIDP], Fiddle::TYPE_INT)
+      data = Fiddle::Pointer.malloc(256, Fiddle::RUBY_FREE)
+      return nil unless @statx.call(-100, path, 0, 0xfff, data).zero? && (data[0, 4].unpack1('L') & 0x800) != 0
+      major, minor = data[136, 8].unpack('LL')
+      observed_device = ((major & 0xfff) << 8) | (minor & 0xff) | ((minor & 0xfff00) << 12) | ((major & ~0xfff) << 32)
+      after = File.stat(path)
+      raise 'native-source-activity-file-changed' unless observed_device.to_s == device && data[32, 8].unpack1('Q').to_s == inode && after.dev == before.dev && after.ino == before.ino
+      seconds, nanos = data[80, 16].unpack('qL')
+      value = seconds * 1_000_000_000 + nanos
+      value.positive? && value <= 18_446_744_073_709_551_615 ? value.to_s : nil
+    rescue Errno::EACCES, Errno::EPERM, Fiddle::DLError
+      nil
+    end
+
+    def mapping_birth(path, fallback, device, inode)
+      value = birth(path, device, inode)
+      return value if value
+      path_birth(fallback, device, inode)
+    rescue Errno::ENOENT
+      path_birth(fallback, device, inode)
+    end
+
+    def path_birth(path, device, inode)
+      return nil if !path || path.empty? || path.end_with?(' (deleted)')
+      stat = File.stat(path)
+      return nil unless stat.dev.to_s == device && stat.ino.to_s == inode
+      birth(path, device, inode)
+    rescue Errno::ENOENT, Errno::EACCES, Errno::EPERM
+      nil
     end
 
     def descriptor(pid, tid, started, kind, path)
       stat = File.stat(path)
-      reference(pid, tid, started, kind, stat.dev.to_s, stat.ino.to_s)
+      reference(pid, tid, started, kind, stat.dev.to_s, stat.ino.to_s, path)
     rescue Errno::ENOENT
       # A descriptor closed while scanning is no longer a consumer. The owning
       # thread's original birth is checked again after all reads.
@@ -86,7 +134,7 @@ module CrewstationGitlabActivity
         next if fields[4] == '0'
         major, minor = fields[3].split(':').map { |value| value.to_i(16) }
         device = ((major & 0xfff) << 8) | (minor & 0xff) | ((minor & 0xfff00) << 12) | ((major & ~0xfff) << 32)
-        reference(pid, tid, started, 'mapping', device.to_s, fields[4])
+        reference(pid, tid, started, 'mapping', device.to_s, fields[4], path + '/map_files/' + fields[0], fields[5]&.strip)
       end
       raise 'native-source-activity-thread-changed' unless status(path + '/stat')[:tick] == before[:tick]
     end

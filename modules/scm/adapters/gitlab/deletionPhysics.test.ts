@@ -3,7 +3,7 @@ import { jsonHash, newResourceId, precondition } from '@crewstation/kernel';
 import type { ProjectDeletionContext, ProjectId } from '@crewstation/contracts';
 import { nativeFixture, reviseNative } from '../../../../packages/gitlab-client/native/fixture';
 import { storageFixture, reviseStorage } from '../../../../packages/gitlab-client/native/storage/fixture';
-import type { GitLabActivityReceipt, GitLabDestructionReceipt, GitLabFenceReceipt, GitLabFenceRequest } from '@crewstation/gitlab-client';
+import type { GitLabActivityReceipt, GitLabActivityRequest, GitLabDestructionReceipt, GitLabFenceReceipt, GitLabFenceRequest } from '@crewstation/gitlab-client';
 import type { ScmDeletionPlan } from '../../ports/projectDeletion';
 import { gitLabDeletionPhysicsAdapter } from './deletionPhysics';
 
@@ -19,7 +19,7 @@ function fixture() {
     confirmed: { participant: 'scm', revision: jsonHash('controlled source grant'), complete: true, resources: [], references: [], blockers: [] } };
   const state = { parent: 1, children: 0, foreign: 0, requests: 0, consumers: 0, grant: true, missingSource: false, fenced: true, lostDelete: false,
     replacement: false, afterActivity: undefined as (() => void) | undefined, afterMutation: undefined as (() => void) | undefined };
-  const calls: string[] = [], originals: unknown[] = [];
+  const calls: string[] = [], originals: unknown[] = [], activityQueries: GitLabActivityRequest['identities'][] = [];
   const beforeAfter = () => ({ before: structuredClone(f.instance), after: { ...f.instance, ...(state.replacement ? { id: 'c'.repeat(64) } : {}) } });
   const nativeRemaining = (): GitLabDestructionReceipt => {
     const facts = { project: structuredClone(f.inventory.project), parentRemaining: state.parent, credentialsRemaining: 0, pipelinesRemaining: 0, foreignReferences: state.foreign,
@@ -32,8 +32,8 @@ function fixture() {
     native: { observe: async () => { calls.push('capture-native'); return { ...beforeAfter(), inventory: structuredClone(f.inventory) }; } },
     files: { observe: async (_original: unknown, retained?: unknown) => { calls.push('files'); if (state.missingSource) throw Error('original files unavailable');
       if (retained) originals.push(retained); return { ...beforeAfter(), footprint: { version: 1 as const, nativeRevision: f.inventory.nativeRevision, inventory: structuredClone(storage) } }; } },
-    activity: { observe: async (query: { identities: { device: string; inode: string }[] }) => {
-      calls.push('activity'); const facts = { nativeRevision: f.inventory.nativeRevision, identitiesDigest: jsonHash(query.identities), workhorseInFlight: state.requests,
+    activity: { observe: async (query: { identities: GitLabActivityRequest['identities'] }) => {
+      calls.push('activity'); activityQueries.push(structuredClone(query.identities)); const facts = { nativeRevision: f.inventory.nativeRevision, identitiesDigest: jsonHash(query.identities), workhorseInFlight: state.requests,
         gitalyInFlight: 0, sidekiqInFlight: 0, queuedProjectJobs: 0, consumers: state.consumers && query.identities[0]
           ? [{ ...query.identities[0], pid: 7, tid: 8, startedTick: '11', kind: 'descriptor' as const }] : [] };
       const receipt: GitLabActivityReceipt = { ...facts, version: 1, complete: true, revision: jsonHash(facts), observedAt: new Date().toISOString(), runtime: structuredClone(f.inventory.runtime),
@@ -61,10 +61,20 @@ function fixture() {
     assertGrant: async () => { calls.push('grant'); if (!state.grant) throw precondition('original project grant expired'); },
   };
   const physics = gitLabDeletionPhysicsAdapter(sources);
-  return { ...f, projectId, plan, context, storage, state, sources, physics, calls, originals };
+  return { ...f, projectId, plan, context, storage, state, sources, physics, calls, originals, activityQueries };
 }
 
 describe('SCM physical deletion with native protocol sources', () => {
+  test('activity retains original birth and a later birth sharing its device and inode', async () => {
+    const f = fixture(), scope = (await f.physics.capture(f.plan)).scope!, originalScope = structuredClone(scope);
+    const entry = f.storage.locations[0]!.entries[0]!, originalBirth = entry.birthtimeNs;
+    entry.birthtimeNs = (BigInt(originalBirth) + 1n).toString();
+    entry.identity = jsonHash({ device: entry.device, inode: entry.inode, birthtimeNs: entry.birthtimeNs, kind: entry.kind }); reviseStorage(f.storage);
+    expect((await f.physics.prove(scope)).kind).toBe('waiting');
+    const sameInode = f.activityQueries[0]!.filter(row => row.device === entry.device && row.inode === entry.inode);
+    expect(sameInode.map(row => row.birthtimeNs).sort()).toEqual([originalBirth, entry.birthtimeNs].sort());
+    expect(scope).toEqual(originalScope); expect(f.calls).not.toContain('remove');
+  });
   test('capture retains full native and filesystem identities; stop, purge and independent proof require all sources', async () => {
     const f = fixture(), captured = await f.physics.capture(f.plan), scope = captured.scope!;
     expect(captured.complete).toBe(true); expect(scope.coverage).toHaveLength(11); expect(scope.retained).toHaveLength(1);

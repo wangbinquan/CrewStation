@@ -39,7 +39,9 @@ async function stoppedOriginal(input: Sources, row: Material, signal: AbortSigna
   if (before.foreignReferences || absent && before.parentRemaining || empty && before.nativeRemaining) throw Error('native-source-original-records-not-stopped');
   const inventory = await observeFiles(input, row, signal);
   const identities = [...new Map([row.footprint.inventory, inventory].flatMap(value => value.locations.flatMap(location => location.entries))
-    .map(entry => [entry.device + ':' + entry.inode, { device: entry.device, inode: entry.inode }])).values()];
+    .map(entry => [entry.device + ':' + entry.inode + ':' + entry.birthtimeNs,
+      { device: entry.device, inode: entry.inode, birthtimeNs: entry.birthtimeNs }])).values()]
+    .sort((a, b) => (a.device + ':' + a.inode + ':' + a.birthtimeNs).localeCompare(b.device + ':' + b.inode + ':' + b.birthtimeNs));
   const activityQuery = { original: row.native, identities };
   const activity = parseGitLabActivityOutput(await input.activity.read(activityQuery, signal), activityQuery);
   if (activity.workhorseInFlight || activity.gitalyInFlight || activity.sidekiqInFlight || activity.queuedProjectJobs

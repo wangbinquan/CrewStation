@@ -47,7 +47,7 @@ describe('native process account routing', () => {
   test('Linux temporary descriptors, unlinked bytes, mappings, cwd, executable and birth changes are checked', async () => {
     const result = await rubyFixture([...(process.platform === 'linux' ? [] : ['-c']), import.meta.dir + '/../../../packages/gitlab-client/native/activity/consumers.test.rb']);
     expect(result.status, result.stderr).toBe(0);
-    if (process.platform === 'linux') expect(JSON.parse(result.stdout)).toEqual({ standaloneConsumerCases: 8, originalProjectTouched: false });
+    if (process.platform === 'linux') expect(JSON.parse(result.stdout)).toEqual({ standaloneConsumerCases: 22, originalProjectTouched: false });
     else expect(result.stdout).toContain('Syntax OK');
   });
   test('every original process account is read with fixed Ruby and full manifest is verified before Rails', async () => {

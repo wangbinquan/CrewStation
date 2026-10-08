@@ -2,6 +2,8 @@ import { expect, test } from 'bun:test';
 import { nativeGitlabMutationGrants } from './grants';
 import { grantsFixture } from './grantsFixture';
 import { reviseStorage } from '../../../packages/gitlab-client/native/storage/fixture';
+import { jsonHash } from '../../../packages/kernel';
+import type { GitLabActivityRequest } from '../../../packages/gitlab-client';
 
 test('fixed native origins and persisted permit precede every effect; revocation during drain stops destruction', async () => {
   const f = grantsFixture(), guards = nativeGitlabMutationGrants(f);
@@ -51,4 +53,52 @@ test('physical removal requires the whole fresh prefix, zero detached records an
     else await expect(work).rejects.toThrow();
     expect(f.calls).not.toContain('purge');
   }
+});
+
+test('purge and removal check the retained file birth when unrelated logs reuse its inode', async () => {
+  for (const phase of ['purge', 'removal']) {
+    const f = grantsFixture(); f.context.phase = 'purge'; f.state.parent = 0;
+    const original = structuredClone(f.material), file = f.inventory.locations[0]!.entries[1]!;
+    const empty = structuredClone(f.inventory);
+    for (const location of empty.locations) { location.present = false; location.entries = []; }
+    reviseStorage(empty);
+    f.footprint.read = async () => 'CS_GITLAB_FOOTPRINT=' + JSON.stringify({ ...f.material.footprint, inventory: empty });
+    const read = f.activity.read, queries: GitLabActivityRequest['identities'][] = [];
+    f.activity.read = async query => {
+      queries.push(structuredClone(query.identities));
+      const receipt = JSON.parse((await read(query)).slice('CS_GITLAB_ACTIVITY='.length));
+      if (query.identities.some(row => row.device === file.device && row.inode === file.inode && !row.birthtimeNs)) {
+        receipt.consumers = [{ device: file.device, inode: file.inode, pid: 7, tid: 8, startedTick: '11', kind: 'descriptor' }];
+      }
+      const { nativeRevision, identitiesDigest, workhorseInFlight, gitalyInFlight, sidekiqInFlight, queuedProjectJobs, consumers } = receipt;
+      receipt.revision = jsonHash({ nativeRevision, identitiesDigest, workhorseInFlight, gitalyInFlight, sidekiqInFlight, queuedProjectJobs, consumers });
+      return 'CS_GITLAB_ACTIVITY=' + JSON.stringify(receipt);
+    };
+    const guards = nativeGitlabMutationGrants(f);
+    // 原 pack 删除后，日志复用它的 inode；丢掉出生身份会再次阻断原项目清理。
+    await guards.run({ context: f.context, materials: [f.material], request: {} }, async () => {
+      if (phase === 'purge') await guards.destructionStopped({ mode: 'purge', original: f.native }, AbortSignal.timeout(1000));
+      else await guards.removalStopped({ original: empty }, AbortSignal.timeout(1000));
+    });
+    expect(queries).toHaveLength(1);
+    expect(queries[0]!.find(row => row.device === file.device && row.inode === file.inode)?.birthtimeNs).toBe(file.birthtimeNs);
+    expect(f.material).toEqual(original); expect(f.calls).not.toContain('purge');
+  }
+});
+
+test('native mutation grants retain distinct original and current births of the same inode', async () => {
+  const f = grantsFixture(); f.context.phase = 'purge'; f.state.parent = 0;
+  const original = structuredClone(f.material), current = structuredClone(f.inventory), file = current.locations[0]!.entries[1]!;
+  const originalBirth = file.birthtimeNs; file.birthtimeNs = (BigInt(originalBirth) + 1n).toString();
+  file.identity = jsonHash({ device: file.device, inode: file.inode, birthtimeNs: file.birthtimeNs, kind: file.kind }); reviseStorage(current);
+  f.footprint.read = async () => 'CS_GITLAB_FOOTPRINT=' + JSON.stringify({ ...f.material.footprint, inventory: current });
+  const read = f.activity.read, queries: GitLabActivityRequest['identities'][] = [];
+  f.activity.read = async query => { queries.push(structuredClone(query.identities)); return read(query); };
+  const guards = nativeGitlabMutationGrants(f);
+  await guards.run({ context: f.context, materials: [f.material], request: {} }, () => guards.removalStopped({ original: current }, AbortSignal.timeout(1000)));
+  expect(queries).toHaveLength(1);
+  // 同一个 inode 的后续文件不能覆盖保留下来的原文件出生身份。
+  expect(queries[0]!.filter(row => row.device === file.device && row.inode === file.inode).map(row => row.birthtimeNs).sort())
+    .toEqual([originalBirth, file.birthtimeNs].sort());
+  expect(f.material).toEqual(original); expect(f.calls).not.toContain('purge');
 });

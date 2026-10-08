@@ -2,7 +2,8 @@ import { describe, expect, test } from 'bun:test';
 import { jsonHash } from '@crewstation/kernel';
 import { nativeFixture } from '../fixture';
 import { createGitLabActivityClient, createGitLabActivityHandler, parseGitLabActivityOutput } from './transport';
-import type { GitLabActivityReceipt } from './protocol';
+import { GitLabActivityRequestSchema } from './protocol';
+import type { GitLabActivityReceipt, GitLabActivityRequest } from './protocol';
 
 const token = 'original-private-activity-token'.repeat(2);
 const testFetch = (handler: (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => Promise<Response>) => handler as typeof fetch;
@@ -21,6 +22,26 @@ const revise = (f: ReturnType<typeof fixture>) => { const { version: _v, complet
   physicalReclamationProven: _p, producersClosed: _w, consumersStopped: _s, ...facts } = f.receipt; f.receipt.revision = jsonHash(facts); };
 
 describe('all-thread GitLab activity source', () => {
+  test('birth-aware requests preserve reused inode identities and bind declared consumer birth', async () => {
+    const f = fixture(), request: GitLabActivityRequest = { ...f.request,
+      identities: [{ device: '65025', inode: '9', birthtimeNs: '100' }, { device: '65025', inode: '9', birthtimeNs: '200' }] };
+    f.receipt.identitiesDigest = jsonHash(request.identities); f.receipt.consumers[0]!.birthtimeNs = '100'; revise(f);
+    const handler = serve(f), client = createGitLabActivityClient({ baseUrl: 'http://private/', token, instance: f.instance,
+      fetch: testFetch(async (input, init) => handler(new Request(input, init))) });
+    // New GitLab logs can reuse an original pack inode; their distinct births must survive transport.
+    expect((await client.observe(request)).receipt.consumers[0]!.birthtimeNs).toBe('100');
+    f.receipt.consumers[0]!.birthtimeNs = '300'; revise(f);
+    expect(() => parseGitLabActivityOutput(output(f), request)).toThrow();
+  });
+  test('unknown consumer birth remains blocking and duplicate or ambiguous identities are rejected', () => {
+    const f = fixture(), request: GitLabActivityRequest = { ...f.request, identities: [{ device: '65025', inode: '9', birthtimeNs: '100' }] };
+    f.receipt.identitiesDigest = jsonHash(request.identities); revise(f);
+    expect(parseGitLabActivityOutput(output(f), request).consumers).toHaveLength(1);
+    expect(GitLabActivityRequestSchema.safeParse({ ...request, identities: [request.identities[0], request.identities[0]] }).success).toBe(false);
+    expect(GitLabActivityRequestSchema.safeParse({ ...request, identities: [...request.identities, f.request.identities[0]] }).success).toBe(false);
+    for (const birthtimeNs of ['0', '-1', '18446744073709551616'])
+      expect(GitLabActivityRequestSchema.safeParse({ ...request, identities: [{ ...request.identities[0], birthtimeNs }] }).success).toBe(false);
+  });
   test('real request/response preserves busy counters and held mappings without declaring deletion', async () => {
     const f = fixture(); f.receipt.workhorseInFlight = 2; f.receipt.queuedProjectJobs = 1; revise(f);
     const handler = serve(f), client = createGitLabActivityClient({ baseUrl: 'http://private/', token, instance: f.instance, fetch: testFetch(async (input, init) => handler(new Request(input, init))) });

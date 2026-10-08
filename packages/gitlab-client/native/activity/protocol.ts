@@ -3,8 +3,16 @@ import { jsonHash } from '@crewstation/kernel';
 import { GitLabNativeInventorySchema, GitLabNativeInstanceSchema } from '../protocol';
 
 const uint64 = z.string().regex(/^(?:0|[1-9][0-9]{0,19})$/).refine(value => BigInt(value) <= 18_446_744_073_709_551_615n);
-const identity = z.strictObject({ device: uint64, inode: uint64.refine(value => value !== '0') });
-const identities = z.array(identity).max(100_000).refine(values => new Set(values.map(value => value.device + ':' + value.inode)).size === values.length);
+const identity = z.strictObject({ device: uint64, inode: uint64.refine(value => value !== '0'), birthtimeNs: uint64.refine(value => value !== '0').optional() });
+const identities = z.array(identity).max(100_000).refine(values => {
+  const births = new Map<string, Set<string | undefined>>();
+  for (const value of values) {
+    const key = value.device + ':' + value.inode, seen = births.get(key) ?? new Set<string | undefined>();
+    if (seen.has(value.birthtimeNs) || seen.size && (value.birthtimeNs === undefined || seen.has(undefined))) return false;
+    seen.add(value.birthtimeNs); births.set(key, seen);
+  }
+  return true;
+});
 const hash = z.string().regex(/^[a-f0-9]{64}$/), count = z.number().int().nonnegative();
 export const GitLabActivityRequestSchema = z.strictObject({ original: GitLabNativeInventorySchema, identities });
 const facts = z.strictObject({ nativeRevision: hash, identitiesDigest: hash, workhorseInFlight: count, gitalyInFlight: count,

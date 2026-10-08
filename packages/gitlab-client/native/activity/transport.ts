@@ -14,9 +14,16 @@ const digest = (value: string) => createHash('sha256').update(value).digest();
 export function parseGitLabActivityOutput(output: string, request: GitLabActivityRequest) {
   if (Buffer.byteLength(output) > 8_388_608 || output.trim().split('\n').length !== 1 || !output.trim().startsWith('CS_GITLAB_ACTIVITY=')) throw unavailable();
   const receipt = GitLabActivityReceiptSchema.parse(JSON.parse(output.trim().slice('CS_GITLAB_ACTIVITY='.length)));
-  const identities = new Set(request.identities.map(row => row.device + ':' + row.inode));
+  const identities = new Map<string, Set<string | undefined>>();
+  for (const row of request.identities) {
+    const key = row.device + ':' + row.inode, births = identities.get(key) ?? new Set<string | undefined>();
+    births.add(row.birthtimeNs); identities.set(key, births);
+  }
   if (receipt.nativeRevision !== request.original.nativeRevision || receipt.identitiesDigest !== jsonHash(request.identities)
-    || receipt.consumers.some(row => !identities.has(row.device + ':' + row.inode))
+    || receipt.consumers.some(row => {
+      const births = identities.get(row.device + ':' + row.inode);
+      return !births || row.birthtimeNs !== undefined && !births.has(undefined) && !births.has(row.birthtimeNs);
+    })
     || jsonHash({ bootId: receipt.runtime.bootId, namespace: receipt.runtime.namespace }) !== jsonHash({ bootId: request.original.runtime.bootId, namespace: request.original.runtime.namespace })) throw unavailable();
   return receipt;
 }

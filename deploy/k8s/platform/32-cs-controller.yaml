@@ -19,7 +19,7 @@ spec:
         - name: cs-controller
           image: cs-control-plane:dev
           imagePullPolicy: IfNotPresent
-          args: ["apps/cs-controller/src/main.ts"]
+          args: ["--smol", "apps/cs-controller/src/main.ts"]
           ports: [{ name: http, containerPort: 8082 }]
           envFrom:
             - configMapRef: { name: crewstation-env }

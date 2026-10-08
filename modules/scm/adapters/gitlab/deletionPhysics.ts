@@ -23,7 +23,8 @@ const pathKind = (location: GitLabStorageInventory['locations'][number]) => loca
   ? location.relative.includes('.wiki.git') ? 'wiki' : location.relative.includes('.design.git') ? 'design' : location.relative.startsWith('@snippets/') || location.relative.includes('+removed-') && location.key.includes('snippet') ? 'snippet' : 'repository'
   : location.root;
 const identities = (inventories: GitLabStorageInventory[]) => [...new Map(inventories.flatMap(value => value.locations.flatMap(row => row.entries))
-  .map(row => [row.device + ':' + row.inode, { device: row.device, inode: row.inode }])).values()].sort((a, b) => (a.device + ':' + a.inode).localeCompare(b.device + ':' + b.inode));
+  .map(row => [row.device + ':' + row.inode + ':' + row.birthtimeNs, { device: row.device, inode: row.inode, birthtimeNs: row.birthtimeNs }])).values()]
+  .sort((a, b) => (a.device + ':' + a.inode + ':' + a.birthtimeNs).localeCompare(b.device + ':' + b.inode + ':' + b.birthtimeNs));
 const idle = (value: GitLabActivityReceipt) => value.workhorseInFlight === 0 && value.gitalyInFlight === 0 && value.sidekiqInFlight === 0 && value.queuedProjectJobs === 0;
 
 type Verify = (value: { before: GitLabNativeInstance; after: GitLabNativeInstance }) => void;
