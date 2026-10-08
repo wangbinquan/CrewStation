@@ -68,6 +68,7 @@ test('cancellation during the final source recheck remains observable instead of
   const path = await f.process('22'), maps = join(path, 'maps'), boot = join(f.root, 'sys/kernel/random/boot_id'), controller = new AbortController();
   await rm(maps); expect(await Bun.spawn(['mkfifo', maps], { stdout: 'ignore', stderr: 'ignore' }).exited).toBe(0);
   const observing = observeFileConsumers([f.identity], f.root, controller.signal);
+  const outcome = observing.catch((error: unknown) => error);
   const first = await open(maps, 'w');
   try {
     await rm(boot); expect(await Bun.spawn(['mkfifo', boot], { stdout: 'ignore', stderr: 'ignore' }).exited).toBe(0);
@@ -76,5 +77,6 @@ test('cancellation during the final source recheck remains observable instead of
   // The final boot-id read is metadata I/O too; cancellation there must not emit a completed source observation.
   const last = await open(boot, 'w');
   try { controller.abort(new Error('cancelled during source recheck')); await last.write('12345678-1234-1234-1234-123456789abc\n'); } finally { await last.close(); }
+  expect(await outcome).toBeInstanceOf(Error);
   await expect(observing).rejects.toThrow('cancelled during source recheck');
 }));

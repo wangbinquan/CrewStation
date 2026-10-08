@@ -12,7 +12,7 @@ export interface RootDeletionIntents {
   retry(actor: Actor, id: string): Promise<ProjectDeletionOperation>;
   prepareReconfirmation(actor: Actor, id: string, inventory: readonly ProjectDeletionInventory[]): Promise<ProjectDeletionPlan>;
   replayReconfirmation(actor: Actor, id: string, input: AcceptProjectDeletion): Promise<ProjectDeletionOperation | undefined>;
-  reconfirm(actor: Actor, id: string, input: AcceptProjectDeletion, inventory: readonly ProjectDeletionInventory[]): Promise<ProjectDeletionOperation>;
+  reconfirm(actor: Actor, id: string, input: AcceptProjectDeletion, inventory: readonly ProjectDeletionInventory[] | (() => Promise<readonly ProjectDeletionInventory[]>)): Promise<ProjectDeletionOperation>;
   claim(id: string, owner: string, seconds: number): Promise<{ lease: DeletionLease; operation: ProjectDeletionOperation; plan: ProjectDeletionPlan } | undefined>;
   renew(lease: DeletionLease, seconds: number): Promise<void>;
   defer(lease: DeletionLease, participant: ProjectDeletionParticipant, reason: string): Promise<void>;

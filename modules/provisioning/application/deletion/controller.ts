@@ -32,8 +32,10 @@ export function projectDeletionController(deps: DeletionControllerDeps): Project
     },
     reconfirm: async (actor, id, input) => {
       await admin(actor); const previous = await deps.intents.replayReconfirmation(actor, id, input); if (previous) return previous;
-      const current = await deps.intents.read(actor, id);
-      const operation = await deps.intents.reconfirm(actor, id, input, await collectDeletionInventory(deps.intents, deps.owners, current.project.id, deps.logger));
+      const operation = await deps.intents.reconfirm(actor, id, input, async () => {
+        const current = await deps.intents.read(actor, id);
+        return collectDeletionInventory(deps.intents, deps.owners, current.project.id, deps.logger);
+      });
       await bestEffortQueue(id); return operation;
     },
     enqueue: deps.enqueue,

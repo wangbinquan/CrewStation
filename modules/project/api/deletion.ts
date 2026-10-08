@@ -22,7 +22,8 @@ export interface ProjectDeletionApi {
   retryProjectDeletion(actor: Actor, operationId: string): Promise<ProjectDeletionOperation>;
   prepareProjectDeletionReconfirmation(actor: Actor, operationId: string, inventory: readonly ProjectDeletionInventory[]): Promise<ProjectDeletionPlan>;
   replayProjectDeletionReconfirmation(actor: Actor, operationId: string, input: AcceptProjectDeletion): Promise<ProjectDeletionOperation | undefined>;
-  reconfirmProjectDeletion(actor: Actor, operationId: string, input: AcceptProjectDeletion, inventory: readonly ProjectDeletionInventory[]): Promise<ProjectDeletionOperation>;
+  /** The server captures submission time before invoking a trusted inventory source; HTTP callers cannot supply the source or clock. */
+  reconfirmProjectDeletion(actor: Actor, operationId: string, input: AcceptProjectDeletion, inventory: readonly ProjectDeletionInventory[] | (() => Promise<readonly ProjectDeletionInventory[]>)): Promise<ProjectDeletionOperation>;
   /** 已完成操作没有计划原文；只有成功认领的工作器才拿到清理身份。 */
   claimProjectDeletion(operationId: string, owner: string, leaseSeconds?: number): Promise<{ lease: ProjectDeletionLease; operation: ProjectDeletionOperation; plan: ProjectDeletionPlan } | undefined>;
   renewProjectDeletion(lease: ProjectDeletionLease, leaseSeconds?: number): Promise<void>;
