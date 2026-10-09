@@ -17,7 +17,7 @@ export function WizardFrame({ step, current, onStep, summary, children, footer, 
   useEffect(() => { heading.current?.focus(); }, [step]);
   return <div className={styles.wizard}>
     {!embedded ? <header className={styles.header}>
-      <ButtonLink to={PROJECT_PATHS[space].release} params={{ projectId }} search={backSearch} variant="ghost">{t('release.wizard.back')}</ButtonLink>
+      <ButtonLink to={PROJECT_PATHS[space].release} params={{ projectId }} search={backSearch} resetScroll={!backSearch.focus} variant="ghost">{t('release.wizard.back')}</ButtonLink>
       <div><h1>{t(history ? 'release.wizard.historyTitle' : 'release.wizard.title')}</h1><p className={styles.muted}>{t('release.wizard.subtitle')}</p></div>
     </header> : null}
     <nav aria-label={t('release.wizard.steps')}><ol className={styles.steps}>{WIZARD_STEPS.map((name, index) => <li key={name} data-current={index === current}>

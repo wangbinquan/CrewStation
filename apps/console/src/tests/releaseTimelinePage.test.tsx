@@ -50,14 +50,30 @@ test('切流或成员读取失败仍可查看历史发布，不伪造缺失的�
   expect(document.querySelectorAll('a[id^="release-history-"]')).toHaveLength(3); expect(f.writes).toHaveLength(0);
 });
 
-test('超过 40 条历史从第三页末行进入当次向导，回看步骤零写入，返回恢复游标和触发焦点', async () => {
+test.each(['header', 'footer'])('超过 40 条历史从第三页末行进入当次向导，%s 返回恢复游标、实际滚动和触发焦点', async place => {
   const f = releaseJourneyFixture(); f.detail.status = 'succeeded'; f.detail.continuation.canVerify = false;
   f.state.rows = [...Array.from({ length: 40 }, (_, i) => ({ ...f.summary(), id: `01a11e42-fe19-7c81-9ce5-${(i + 1).toString(16).padStart(12, '0')}` as never })), f.summary()];
-  page = await renderApp(`/projects/${projectId}/release`); await page.click('更早的记录'); await page.click('更早的记录'); expect(page.search().cursor).toBe('40');
+  page = await renderApp(`/projects/${projectId}/release`, undefined, undefined, { scrollRestoration: true }); await page.click('更早的记录'); await page.click('更早的记录'); expect(page.search().cursor).toBe('40');
+  const main = () => document.querySelector('main')!;
+  main().scrollTop = 640; main().dispatchEvent(new Event('scroll'));
   const trigger = document.getElementById(`release-history-${journeyId}`)!; await act(async () => { trigger.focus(); trigger.click(); }); await page.settle();
   expect(page.path()).toBe(`/projects/${projectId}/release/journeys/${journeyId}`); expect(document.querySelectorAll('dialog')).toHaveLength(0);
   await page.click('2构建与部署'); expect(document.querySelector('h2[tabindex]')?.textContent).toBe('构建与部署'); expect(f.writes).toHaveLength(0);
-  await page.click('返回发布总览'); expect(page.search().cursor).toBe('40'); expect(document.activeElement?.id).toBe(`release-history-${journeyId}`); expect(f.writes).toHaveLength(0);
+  const links = [...document.querySelectorAll<HTMLAnchorElement>('a')].filter(node => node.textContent === '返回发布总览');
+  await act(async () => links[place === 'header' ? 0 : links.length - 1]!.click()); await page.settle();
+  // The real router used to reset main after the history effect had already restored it.
+  expect(main().scrollTop).toBe(640);
+  expect(page.search().cursor).toBe('40'); expect(document.activeElement?.id).toBe(`release-history-${journeyId}`); expect(f.writes).toHaveLength(0);
+});
+
+test('旧版本历史返回同样保留主内容区滚动，路由默认复位不能覆盖历史恢复', async () => {
+  const f = releaseDeliveryFixture(); page = await renderApp(`/projects/${projectId}/release`, undefined, undefined, { scrollRestoration: true });
+  const main = () => document.querySelector('main')!;
+  main().scrollTop = 880; main().dispatchEvent(new Event('scroll'));
+  await act(async () => document.getElementById(`release-history-${historyId}`)!.click()); await page.settle();
+  expect(page.path()).toBe(`/projects/${projectId}/release/versions/${historyId}`);
+  await page.click('返回发布总览'); expect(main().scrollTop).toBe(880);
+  expect(document.activeElement?.id).toBe(`release-history-${historyId}`); expect(f.writes).toHaveLength(0);
 });
 
 test('标签表在发布页最下方直接展开，列出仓库里的全部标签', async () => {

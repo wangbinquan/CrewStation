@@ -34,6 +34,8 @@
 .section {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  max-width: 100%;
   gap: var(--cs-space-1);
 }
 

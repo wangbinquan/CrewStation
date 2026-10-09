@@ -53,7 +53,7 @@ function Version({ release, history, refresh, error }: { readonly release: Relea
     if (search.switch && currentJourney && !error) void navigate({ to: RELEASE_PATHS[space].journey, params: { projectId, journeyId: currentJourney }, search: { cursor: search.cursor, filter: search.filter, focus: search.focus }, replace: true });
   }, [search.switch, search.cursor, search.filter, search.focus, currentJourney, error, navigate, projectId, space]);
   return <div className={styles.stack}>
-    <ButtonLink variant="ghost" to={PROJECT_PATHS[space].release} params={{ projectId }} search={{ cursor: search.cursor, filter: search.filter, focus: search.focus }}>{t('release.wizard.back')}</ButtonLink>
+    <ButtonLink variant="ghost" to={PROJECT_PATHS[space].release} params={{ projectId }} search={{ cursor: search.cursor, filter: search.filter, focus: search.focus }} resetScroll={!search.focus}>{t('release.wizard.back')}</ButtonLink>
     <PageHeader title={`${t('release.detail.title')} · ${release.tag}`} />
     <QueryStatus isPending={slots.isPending} error={error ?? slots.error} />
     <DefinitionList items={[{ label: t('release.prepare.sha'), value: <code>{release.commitSha}</code> }, { label: t('release.publish.branch'), value: release.branch }, { label: t('release.history.columnStatus'), value: t(`release.status.${release.status}`) }]} />
