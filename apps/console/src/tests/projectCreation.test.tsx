@@ -34,7 +34,14 @@ test('开发列表打开共享弹窗，无独立创建页；关闭、重开、Es
   expect(document.querySelectorAll('dialog[open]')).toHaveLength(0);
   await page.click('新建项目'); expect(page.path()).toBe(path); expect(openDialog().getAttribute('data-cs-dialog')).toBe('');
   expect(document.querySelectorAll('dialog[open]')).toHaveLength(1); expect(document.activeElement === openDialog().querySelector('[name="name"]')).toBe(true);
+  // 两个示例的名字和选中后的说明都必须明确界面差异，避免把纯 API 示例当成可打开的页面。
+  const templateSection = openDialog().querySelector('[name="template"]')!.closest('section')!;
+  expect(templateSection.querySelector('option[value="01a0bf5d-8f4b-7002-9560-94caf593fb19"]')?.textContent).toBe('基础应用（有界面）');
+  expect(templateSection.querySelector('option[value="01a0e222-de8b-7000-8cd8-207c8673b62e"]')?.textContent).toBe('业务执行示例（仅接口，无界面）');
+  expect(templateSection.querySelector('strong + p')?.textContent).toContain('可在浏览器中打开的应用界面');
   await ready(); await field('template', '01a0e222-de8b-7000-8cd8-207c8673b62e');
+  expect(templateSection.querySelector('strong')?.textContent).toBe('业务执行示例（仅接口，无界面）');
+  expect(templateSection.querySelector('strong + p')?.textContent).toContain('仅提供 API 接口，没有应用界面');
   expect(openDialog().textContent).toContain('后台业务任务'); expect(openDialog().textContent).toContain('billing.installed.apps.test');
   await page.click('取消'); expect(document.querySelectorAll('dialog[open]')).toHaveLength(0); expect(page.search()).toEqual(search);
   expect(document.activeElement?.textContent).toContain('新建项目');
@@ -48,6 +55,9 @@ test('旧自建和管理员书签落到列表弹窗，关闭不再停留新建�
   projectCreationFixture('developer'); page = await renderApp('/projects/new'); expect(page.path()).toBe('/projects'); expect(openDialog().textContent).toContain('域名标识');
   await page.click('取消'); expect(document.querySelectorAll('dialog[open]')).toHaveLength(0);
   page.unmount(); projectCreationFixture(); page = await renderApp('/admin/projects/new'); expect(page.path()).toBe('/admin/projects'); expect(openDialog().textContent).toContain('负责人');
+  expect(openDialog().querySelector('[name="template"] option[value="01a0e222-de8b-7000-8cd8-207c8673b62e"]')?.textContent).toBe('业务执行示例（仅接口，无界面）');
+  await field('template', '01a0e222-de8b-7000-8cd8-207c8673b62e');
+  expect(openDialog().querySelector('[name="template"]')?.closest('section')?.querySelector('strong + p')?.textContent).toContain('仅提供 API 接口，没有应用界面');
   await cancelWithEscape(); expect(document.querySelectorAll('dialog[open]')).toHaveLength(0);
 });
 

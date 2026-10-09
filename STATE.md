@@ -1,3 +1,13 @@
+## 2026-10-09 示例应用的界面说明
+
+创建项目的共享模板选择器明确区分 `minimal-sample`「基础应用（有界面）」与 `business-execution-v3`「业务执行示例（仅接口，无界面）」。选中后说明分别写明浏览器应用界面与仅提供 API、没有应用界面；中英文同步，普通自建和管理员代建共用原说明映射，模板身份与创建行为保持。
+
+原两条创建旅程回归先因缺少标注失败，修正后创建旅程和文案键检查 32 pass／0 fail、146 断言；本批三路径 lint 与 Vite 构建通过。独立浏览器加载该构建和只读创建夹具，在两个入口、中英文、1440／390／320、明暗主题下 48 场景通过，说明无横向溢出、Esc 关闭恢复焦点、写请求 0；这属于本地构建验收，不是共享平台部署。
+
+本次唯一完整 `bun run check` 的结构、lint、后端和前端类型检查均通过；整库测试已出现范围外 development-usage／development-cleanup 用例的 PostgreSQL `CONNECTION_ENDED` 失败，保留 `/private/tmp/crewstation-template-ui-check-20261009.log`，不宣称整库绿，不改并发在制品。按开发规则 §3 使用本批精确检查，并以对应提交的 GitHub 六项 CI 核验发布。共享平台尚未部署本批文案。
+
+下方全部接力历史原样保留。
+
 ## 2026-10-09 RFC-037 当前交付状态
 
 创建弹窗、用途说明、管理员二次确认永久删除已部署；原项目同操作154回执、九项独立AFTER与实际创建／成功界面均通过。运行源码 `05f6acc63d49481e3a3ac6f1cefa16ac2d981ae9` 六项CI成功；完整证据见 [最终验收](proposal/rfc/RFC-037-project-creation-and-deletion/acceptance/complete-deletion.md)。收口文档的准确提交CI与实际部署源码分别核验。下方日期段落是相应时点的历史记录，并行输出完整保留。
