@@ -14,7 +14,7 @@ import { traefikApplier } from './adapters/k8s/traefikApplier';
 import { drizzleRateLimitRepository } from './adapters/persistence/drizzleRateLimits';
 import { drizzleAllowlistRepository, drizzlePodIdentityRepository, drizzleRouteRepository } from './adapters/persistence/drizzleRepositories';
 import { drizzleMaintenanceUnitOfWork } from './adapters/persistence/drizzleMaintenance';
-import { gatewayDeletionRepository } from './adapters/persistence/projectDeletion';
+import { gatewayAdmissionKeys, gatewayDeletionRepository } from './adapters/persistence/projectDeletion';
 import { gatewayDeletionOwner } from './application/projectDeletion';
 import type { GatewayModuleApi } from './api/moduleApi';
 import { allowlistUseCases } from './application/allowlist';
@@ -122,6 +122,7 @@ export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
   const allowlist = allowlistUseCases(useCaseDeps, maintenance.serviceCallBlock);
   const pods = podIdentityUseCases(useCaseDeps);
   const api: GatewayModuleApi = {
+    sharedAdmissionKeys: gatewayAdmissionKeys,
     ...(deps.projects ? { deletionOwner: { ...gatewayDeletionOwner(deletion, deps.projects.assertProjectDeletionGrant), ...(deletion.repairs ? { repairs: deletion.repairs } : {}) } } : {}),
     name: 'gateway', ...routes, ...allowlist, evaluate: allowlist.evaluate, lookupByIp: pods.lookupByIp, purgeIdentityTombstones: pods.purgeTombstones, ...maintenance, ...limits, ...resourceRateLimitUseCases(useCaseDeps, deps.isAdmin),
     checkAllowlist: () => checkAllowlist(useCaseDeps, allowlist.verifyAllowlist),

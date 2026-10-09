@@ -3,14 +3,14 @@ import { randomBytes } from 'node:crypto';
 import { ProjectDeletionContextSchema, ProjectIdSchema, ResourceIdSchema } from '@crewstation/contracts';
 import type { ProjectDeletionContext, ProjectId } from '@crewstation/contracts';
 import { jsonHash, newResourceId, precondition } from '@crewstation/kernel';
-import { assertSharedDatabaseAdmissionActive, withExclusiveDatabaseAdmission, withSharedDatabaseAdmission } from '@crewstation/persistence';
+import { assertSharedDatabaseAdmissionActive, withExclusiveDatabaseAdmission, withSharedDatabaseAdmissions } from '@crewstation/persistence';
 import type { Database, Executor } from '@crewstation/persistence';
 import { sql } from 'drizzle-orm';
 import { ProvisioningCallbackProcessSchema, ProvisioningCallbackSchema, ProvisioningContainerProcessSchema, ProvisioningPodProcessSchema, provisioningCallbackIdentity, provisioningContainer } from '../../domain/projectWork';
 import type { ProvisioningCallback, ProvisioningWorkKind } from '../../domain/projectWork';
 import type { ProvisioningCallbackProcesses, ProvisioningProjectWork } from '../../ports/projectWork';
 
-interface Input { db: Database; processes: ProvisioningCallbackProcesses; assertAvailable(id: ProjectId): Promise<void>; assertGrant(context: ProjectDeletionContext): Promise<void> }
+interface Input { db: Database; processes: ProvisioningCallbackProcesses; sharedAdmissionKeys?: (id: ProjectId) => readonly string[]; assertAvailable(id: ProjectId): Promise<void>; assertGrant(context: ProjectDeletionContext): Promise<void> }
 interface Scope { db: Database; projectId: ProjectId; serviceId: string; active: boolean; ping(): Promise<void> }
 const scopes = new AsyncLocalStorage<Scope>();
 const key = (id: string) => 'provisioning.project-admission:' + ProjectIdSchema.parse(id);
@@ -99,7 +99,9 @@ export function provisioningProjectWork(input: Input): ProvisioningProjectWork {
         if (prior.db !== input.db || prior.serviceId !== serviceId) throw precondition('不能扩展开通原回调的项目或服务范围');
         await checkCurrent(projectId); return work();
       }
-      return withSharedDatabaseAdmission(input.db, key(projectId), async (protectedTx) => {
+      // Complete the admitted call graph before IO; nested owners only reuse subsets of these actual locks.
+      const keys = [key(projectId), ...(kind === 'provision' ? input.sharedAdmissionKeys?.(projectId) ?? [] : [])];
+      return withSharedDatabaseAdmissions(input.db, keys, async (protectedTx) => {
         await input.assertAvailable(projectId);
         if ((await input.db.execute(sql`SELECT project_id FROM provisioning.project_admissions WHERE project_id=${projectId}`)).length) throw precondition('项目开通准入已永久封闭');
         const processIdentity = ProvisioningCallbackProcessSchema.parse(await input.processes.protectCurrent());

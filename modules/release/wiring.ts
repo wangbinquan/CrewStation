@@ -25,7 +25,7 @@ import type { Hono } from 'hono';
 import { buildKitBuilder } from './adapters/k8s/buildKitBuilder';
 import { migrationJobRunner } from './adapters/k8s/migrationJob';
 import { kubernetesSlotDeployer } from './adapters/k8s/slotDeployer';
-import { drizzleUnitOfWork, releaseProjectAdmissions } from './adapters/persistence/drizzleUnitOfWork';
+import { drizzleUnitOfWork, releaseAdmissionKeys, releaseProjectAdmissions } from './adapters/persistence/drizzleUnitOfWork';
 import { queueReleaseJobs } from './adapters/queue/releaseJobs';
 import type { ProjectDeletionContext } from '@crewstation/contracts';
 import type { ReleaseCallbackProcess } from './domain/release';
@@ -146,6 +146,7 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
     ...(deps.ledger && deps.creation === 'ledger' ? { creation: 'ledger' as const } : {}), ...(deps.renderer ? { renderer: effects(deps.renderer) } : {}),
   };
   const implementation: ReleaseModuleApi = {
+    sharedAdmissionKeys: releaseAdmissionKeys,
     name: 'release',
     ...journeyQueries(useCaseDeps),
     verifyJourney: verifyJourneyUseCase(useCaseDeps),

@@ -45,11 +45,12 @@ export function eventDeliveryOwners(k8s: K8sClient, namespace: string, currentPo
 }
 
 export function provisioningWorkPorts(k8s: K8sClient, namespace: string, podUid: string | undefined,
-  source: { assertProjectAvailable(id: ProjectId): Promise<void>; assertProjectDeletionGrant(context: ProjectDeletionContext): Promise<void> }) {
+  source: { assertProjectAvailable(id: ProjectId): Promise<void>; assertProjectDeletionGrant(context: ProjectDeletionContext): Promise<void> },
+  sharedAdmissionKeys?: (id: ProjectId) => readonly string[]) {
   if (!podUid) return {};
   const owners = projectCallbackOwners(k8s, namespace, podUid, 'crewstation.io/provisioning-project-stop');
   return { projectWork: { processes: { protectCurrent: owners.protectCurrentProcess, sweep: owners.sweep },
-    assertAvailable: source.assertProjectAvailable, assertGrant: source.assertProjectDeletionGrant } };
+    sharedAdmissionKeys, assertAvailable: source.assertProjectAvailable, assertGrant: source.assertProjectDeletionGrant } };
 }
 
 /** 每个内容 owner 的原回调使用独立保护，停止证明不跨 owner 冒用。 */

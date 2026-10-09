@@ -12,6 +12,7 @@ const CONTENT = ['pod_identities', 'routes', 'service_maintenance', 'maintenance
 const CONTENT_KEYS: Record<typeof CONTENT[number], readonly string[]> = { pod_identities: ['namespace', 'pod_name'], routes: ['service_id'], service_maintenance: ['service_id'], maintenance_events: ['id'], rate_limits: ['scope'], rate_limit_receipts: ['operation_id'] };
 const FACTS = ['resource_identity_aliases', 'deletion_fences', 'deletion_entities', 'deletion_document_owners', 'deletion_work', 'deletion_process_stops', 'allowlists', 'operator_confirmations'] as const;
 const admissionKey = (id: string) => `gateway.project-admission:${id}`;
+export const gatewayAdmissionKeys = (id: ProjectId): readonly string[] => [admissionKey(id)];
 const podKey = (row: Pick<PodIdentityRecord, 'podUid' | 'source' | 'developmentSource' | 'namespace' | 'podName'>) => row.podUid ?? row.source?.podUid ?? row.developmentSource?.podUid ?? `legacy:${row.namespace}/${row.podName}`;
 const value = <T>(body: unknown): T => (typeof body === 'string' ? JSON.parse(body) : body) as T;
 async function registered(db: Executor) {
@@ -208,7 +209,7 @@ export function gatewayDeletionRepository(db: Database, deps: GatewayDeletionDep
       for (const id of ids) if (closed.has(id) || !active.has(id)) result = stripDocument(result, owners, id);
       return result;
     },
-    withEffects: (service, kind, work) => withSharedDatabaseAdmissions(db, [admissionKey(service.projectId)], async (guard) => {
+    withEffects: (service, kind, work) => withSharedDatabaseAdmissions(db, gatewayAdmissionKeys(service.projectId), async (guard) => {
       if (!await available(service.projectId)) throw precondition('项目网关准入已关闭'); await deps.assertAvailable?.(service.projectId);
       await remember(db, 'service', service.serviceId, service.projectId);
       if (deps.assertGrant && !deps.processes) throw precondition('原网关回调进程来源尚未装配');

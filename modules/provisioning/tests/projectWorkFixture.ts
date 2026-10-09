@@ -11,7 +11,7 @@ import { createProvisioningModule } from '../wiring';
 import { provisioningContainer } from '../domain/projectWork';
 
 /** Actual PostgreSQL and module calls; the container source is controlled, not physical acceptance. */
-export async function projectWorkFixture(options: { beforePodStopMigration?: boolean } = {}) {
+export async function projectWorkFixture(options: { beforePodStopMigration?: boolean; sharedAdmissionKeys?: (id: ProjectId) => readonly string[] } = {}) {
   const database = await createTestDatabase([queueMigrations, eventbusMigrations]);
   const facts = new Map<ProjectId, ProjectFacts>(), calls: string[] = [], exits = new Set<string>(), waiting = new Map<string, () => void>();
   const native = { podUid: newResourceId(), nodeUid: newResourceId(), nodeName: 'controlled-node', containerId: 'containerd://' + 'a'.repeat(64),
@@ -27,7 +27,7 @@ export async function projectWorkFixture(options: { beforePodStopMigration?: boo
       if (wholeStopped) await accept.podStopped(podIdentity, jsonHash({ actual: 'controlled-whole-pod-termination', podIdentity }));
       await accept.releasable(native.podUid); } };
   const module = createProvisioningModule({ db: database.db, workerOwner: 'original-work-test', consumerName: 'original-work-test', logger: noopLogger,
-    isAdmin: async () => true, projectWork: { processes, assertAvailable: async (id) => { const value = facts.get(id); if (!value || value.state === 'deleting') throw precondition('controlled-project-unavailable'); },
+    isAdmin: async () => true, projectWork: { processes, sharedAdmissionKeys: options.sharedAdmissionKeys, assertAvailable: async (id) => { const value = facts.get(id); if (!value || value.state === 'deleting') throw precondition('controlled-project-unavailable'); },
       assertGrant: async () => { if (!permit) throw precondition('controlled-grant-stale'); } },
     namespaces: { systemNamespace: 'controlled-system', pollMs: 1 },
     ledger: { declare: async (input) => { calls.push('declare:' + input.kind); await declared(); return { id: newResourceId() }; }, get: async (id) => ({ id, phase: 'ready', children: [] }) },

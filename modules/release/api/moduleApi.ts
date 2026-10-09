@@ -45,6 +45,8 @@ export interface ReleaseProjectContent {
 
 /** release 模块对外能力：发布、切流、查询；流水线推进由工作器调用。 */
 export interface ReleaseModuleApi {
+  /** Composition acquires the complete callback graph before entering another owner's original work. */
+  sharedAdmissionKeys(projectId: ProjectId): readonly string[];
   listJourneys(actor: Actor, serviceId: ServiceId, input: ReleaseJourneyPageRequest): Promise<ReleaseJourneyPage>;
   getJourney(actor: Actor, journeyId: string): Promise<ReleaseJourneyDetail>;
   journeyHistory(actor: Actor, releaseId: ReleaseId): Promise<ReleaseJourneyHistory>;

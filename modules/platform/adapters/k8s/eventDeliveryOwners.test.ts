@@ -172,7 +172,9 @@ test('实际 Root 的开通工作反转端口只在原 Pod 配置存在时装配
   const f = await fixture(), available = async () => undefined, grant = async () => undefined;
   const source = { assertProjectAvailable: available, assertProjectDeletionGrant: grant };
   expect(provisioningWorkPorts(f.k8s, 'system', undefined, source)).toEqual({});
-  const ports = provisioningWorkPorts(f.k8s, 'system', f.podUid, source);
+  const keys = () => ['controlled-downstream'];
+  const ports = provisioningWorkPorts(f.k8s, 'system', f.podUid, source, keys);
   expect(ports.projectWork?.assertAvailable).toBe(available); expect(ports.projectWork?.assertGrant).toBe(grant);
+  expect(ports.projectWork?.sharedAdmissionKeys).toBe(keys);
   await ports.projectWork?.processes.sweep({ stopped: async () => { throw new Error('not terminated'); }, releasable: async () => true });
 });

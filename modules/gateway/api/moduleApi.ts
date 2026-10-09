@@ -40,6 +40,7 @@ export interface ObservedPodObject {
 
 /** gateway 模块对外能力：路由与放行表生成、Pod 身份反查与服务域放行评估（cs-auth 用后两者）。 */
 export interface GatewayModuleApi {
+  sharedAdmissionKeys(projectId: ProjectId): readonly string[];
   readonly name: 'gateway';
   readonly deletionOwner?: ProjectDeletionOwner;
   applyResourceChange(actor: Actor, projectId: ProjectId, input: { operationId: string; target: ResourceTarget; expectedRevision: string; values: ResourceValues }): Promise<{ revision: string; effect: string; applied: boolean }>;

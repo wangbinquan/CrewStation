@@ -5,6 +5,7 @@ import { sql } from 'drizzle-orm';
 import { gatewayDeletionFixture, type GatewayDeletionFixture } from './gatewayDeletionFixture';
 import { gatewayDeletionRepository } from '../adapters/persistence/projectDeletion';
 import type { GatewayProcess } from '../ports/repositories';
+import { assertSharedDatabaseAdmissionActive, withSharedDatabaseAdmissions } from '@crewstation/persistence';
 
 const available = await testDatabaseAvailable(); let f: GatewayDeletionFixture;
 afterEach(async () => { await f?.db.drop(); });
@@ -25,6 +26,16 @@ async function waitForFact(kind: 'exclusive-wait' | 'finished') {
 }
 
 describe.skipIf(!available)('网关原外部回调退出（真实 PG、实际挂起回调）', () => {
+  test('开通预先取锁后实际网关调和复用原 backend，独立回调完成且开通范围仍有效', async () => {
+    f = await gatewayDeletionFixture(); const application = f.application(), outer = 'provisioning.project-admission:' + f.own.id;
+    await withSharedDatabaseAdmissions(f.db.db, [outer, ...application.api.sharedAdmissionKeys(f.own.id)], async tx => {
+      const [backend] = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
+      expect(await application.api.reconcileService(f.own.serviceId!)).toHaveLength(3);
+      const [callback] = await f.db.db.execute<{ backend_pid: number; state: string }>(sql`SELECT backend_pid,state FROM gateway.deletion_work WHERE project_id=${f.own.id}`);
+      expect(callback).toMatchObject({ backend_pid: backend!.pid, state: 'finished' });
+      expect(() => assertSharedDatabaseAdmissionActive(f.db.db, outer)).not.toThrow();
+    });
+  });
   test('seal 等原实际回调；其他项目仍可调和；回调新内容需要原操作重新确认', async () => {
     f = await gatewayDeletionFixture(); const work = heldRoutes(); await work.entered; const started = await f.begin();
     let sealed = false; const sealing = work.application.api.deletionOwner!.run(started.context).finally(() => { sealed = true; });

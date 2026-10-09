@@ -63,3 +63,13 @@
 准备流程明确区分服务端拒绝与受理之后的读取失败：409 可以保留草稿后修改，受理后读取 429 仍保留原发送意图，只读核对后继续，不能再次发布。来源准备 11 pass／75 断言。最终静态门禁（结构、全仓 lint、双端类型）通过，控制台生产构建通过。
 
 本地完整 check 已按原计划持续运行，收集真实 PG 与覆盖率；运行中 development-usage 的 nativeNumericHistory 多页恢复用例在 5000ms 超时。它不属于本次修改，未放宽超时或改写用例。完整日志 `/private/tmp/rfc038-full-check.log` 与最终候选精确检查分开留证，最终全仓结论以准确提交的 GitHub CI 为准。
+
+## 6. 实机准备发现的开通阻塞
+
+实现提交 `79260316afe168c420800e0d78eb6a22750ed121` 已推送；准确 CI 的 static、unit、console、e2e 已通过，module 和 gate 尚在等待，不能提前算整库通过。四个镜像已从该 Git 提交构建并核对源码标签，尚未部署。
+
+2026-10-09 04:01 UTC，通过现有开发 OIDC 管理员和产品创建入口建立专用项目 `01a11ed2-d922-7000-884a-87a2991d1e3a`（`rfc038-wizard-20261009`），使用既有 `rfc028-service-validation` 50m／256Mi 套餐。实际开通在 `reconcileRoutes` 报 `Cannot expand an active shared admission`；仓库与数据库已供给，但没有完成首次发布。没有修改其他项目或跳过原保护。
+
+根因是原开通回调只持有 provisioning 锁，网关及首次发布的多源准入却要求其他锁。修正在组合层读取两个 owner 的公开准入键集合，仅对 provision 工作在外部 IO 之前按既有原语一次排序取锁；后续网关／发布继续执行自己的项目许可、封写检查、原进程保护、独立出生和退出记录。既有原语仍拒绝执行中扩张，未加入绕过、额外池或新的执行器；排队与命名空间重下发保持原范围。
+
+真实 PG 反例先得到 0 pass／1 fail（预期 active，实际 failed）。修复后开通、网关、发布及 Root 端口五文件 50 pass／357 断言；补充真实网关和首次发布共享实际 backend、独立记录退出的组合断言后，最终三文件 18 pass／153 断言。原项目跨范围拒绝、退出、封写等待、断线和物理来源断言保持。日志为 `/private/tmp/rfc038-downstream-red.log`、`/private/tmp/rfc038-admission-fix-tests.log`、`/private/tmp/rfc038-admission-final-tests.log`。该修正需新的准确提交 CI 和部署后重试同一项目验收。

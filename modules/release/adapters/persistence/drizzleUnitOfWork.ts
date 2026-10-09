@@ -56,6 +56,7 @@ export function drizzleUnitOfWork(db: Database, projection?: SlotProjectionDeps)
 }
 
 export const releaseAdmissionKey = (id: string) => 'release.project-admission:' + ProjectIdSchema.parse(id);
+export const releaseAdmissionKeys = (id: string): readonly string[] => [NATIVE_REGISTRY_ADMISSION, releaseAdmissionKey(id), 'resources.project-admission:' + ProjectIdSchema.parse(id)];
 const callbackScopes = new AsyncLocalStorage<{ db: Database; projectId: string; serviceId: string; active: boolean; ping(): Promise<void> }>();
 export function releaseProjectAdmissions(input: { db: Database; protectCurrent(): Promise<ReleaseCallbackProcess>; assertAvailable(projectId: string): Promise<void>; assertNativeRegistryAvailable?: () => Promise<void> }): ReleaseProjectAdmissions {
   const current = () => { const scope = callbackScopes.getStore(); if (!scope?.active || scope.db !== input.db) throw precondition('原发布回调已经退出或不在准入范围'); assertSharedDatabaseAdmissionActive(input.db, releaseAdmissionKey(scope.projectId)); assertSharedDatabaseAdmissionActive(input.db, NATIVE_REGISTRY_ADMISSION); return scope; };
@@ -67,7 +68,7 @@ export function releaseProjectAdmissions(input: { db: Database; protectCurrent()
       const prior = callbackScopes.getStore();
       if (prior?.db === input.db) { if (prior.projectId !== projectId || prior.serviceId !== serviceId) throw precondition('不能扩展原发布回调'); await checkCurrent(); return work(); }
       await input.assertAvailable(projectId);
-      return withSharedDatabaseAdmissions(input.db, [NATIVE_REGISTRY_ADMISSION, releaseAdmissionKey(projectId), 'resources.project-admission:' + projectId], async (protectedTx) => {
+      return withSharedDatabaseAdmissions(input.db, releaseAdmissionKeys(projectId), async (protectedTx) => {
         await input.assertNativeRegistryAvailable?.();
         await input.assertAvailable(projectId);
         const sealed = await input.db.execute(sql`SELECT project_id FROM release.deletion_fences WHERE project_id=${projectId} UNION ALL SELECT project_id FROM release.project_admissions WHERE project_id=${projectId} AND sealed`);

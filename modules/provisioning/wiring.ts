@@ -55,7 +55,7 @@ export interface ProvisioningModuleDeps {
   /** 仅在全部 owner 接齐后组合；未提供时不开放永久删除 HTTP 或工作器。 */
   deletion?: { intents: ProjectDeletionIntents; owners: readonly ProjectDeletionOwner[] }
     | ((api: Pick<ProvisioningModuleApi, 'projectDeletionOwner' | 'finalizeProjectDeletion'>) => { intents: ProjectDeletionIntents; owners: readonly ProjectDeletionOwner[] });
-  projectWork?: { processes: ProvisioningCallbackProcesses; assertAvailable(id: ProjectId): Promise<void>; assertGrant(context: ProjectDeletionContext): Promise<void> };
+  projectWork?: { processes: ProvisioningCallbackProcesses; sharedAdmissionKeys?: (id: ProjectId) => readonly string[]; assertAvailable(id: ProjectId): Promise<void>; assertGrant(context: ProjectDeletionContext): Promise<void> };
 }
 
 export interface ProvisioningModule {

@@ -11,12 +11,25 @@ import { releaseHandoffUseCases } from '../application/execution/handoff';
 import { executionHandoffFixture } from './executionHandoffFixture';
 import { drizzleUnitOfWork, releaseProjectAdmissions } from '../adapters/persistence/drizzleUnitOfWork';
 import { protectedReleaseEffects } from '../application/projectDeletion';
+import { assertSharedDatabaseAdmissionActive, withSharedDatabaseAdmissions } from '@crewstation/persistence';
 
 const fixtures: Array<{close():Promise<void>}> = [];
 afterEach(async () => { for (const f of fixtures.splice(0)) await f.close(); });
 const native = { podUid: '91754092-388a-4131-a452-f9d4b75f0766', nodeUid: '8acdd9b0-3dd8-4a8a-afdf-a1d90a17cf1a', nodeName: 'controlled-test', containerId: 'containerd://' + 'a'.repeat(64), pid: process.pid, pidNamespace: '1000', bootId: '8acdd9b0-3dd8-4a8a-afdf-a1d90a17cf1a', startTicks: '123' };
 const available = await testDatabaseAvailable();
 describe.skipIf(!available)('发布原项目准入与外部 IO', () => {
+  test('首次发布在开通预先取得的完整锁内保留独立发布出生和退出，不扩张原范围', async () => {
+    const f = await releaseImageFixture(false, () => ({ projectAdmission: { protectCurrent: async () => native, assertAvailable: async () => {} } })); fixtures.push(f);
+    const outer = 'provisioning.project-admission:' + f.projectId;
+    await withSharedDatabaseAdmissions(f.db, [outer, ...f.runtime.api.sharedAdmissionKeys(f.projectId)], async tx => {
+      const [backend] = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
+      const created = await f.runtime.api.publish(f.actor, f.serviceId, { branch: 'main', version: 'patch' });
+      expect(created.id).toBeTruthy();
+      const [callback] = await f.db.execute<{ backend_pid: number; exited_at: Date | null }>(sql`SELECT backend_pid,exited_at FROM release.deletion_callbacks`);
+      expect(callback!.backend_pid).toBe(backend!.pid); expect(callback!.exited_at).not.toBeNull();
+      expect(() => assertSharedDatabaseAdmissionActive(f.db, outer)).not.toThrow();
+    });
+  });
   test('公开发布与流水线实际保留同一项目回调出生，完成后独立写原退出；默认没有删除 owner', async () => {
     let checks = 0;
     const f = await releaseImageFixture(false, (projectId) => ({ projectAdmission: { protectCurrent: async () => native, assertAvailable: async (id) => { expect(id).toBe(projectId); checks++; } } })); fixtures.push(f);
