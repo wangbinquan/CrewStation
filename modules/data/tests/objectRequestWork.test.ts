@@ -157,7 +157,8 @@ describe.skipIf(!available)('actual Data original byte callbacks (controlled byt
   });
 
   test('actual factory returns a download before completion and keeps original work pending until upstream finishes', async () => {
-    const f = await fixture();
+    const f = await fixture(), exitLocked = Promise.withResolvers<void>(), releaseExit = Promise.withResolvers<void>();
+    let locked: Promise<unknown> | undefined;
     try {
       const download = await f.data.api.objectService!.download({ identity: 'original-service' },f.own.object.id,{ signal: noSignal });
       const history = await f.data.api.objectRequestHistory!.read(f.target.id);
@@ -167,14 +168,23 @@ describe.skipIf(!available)('actual Data original byte callbacks (controlled byt
       expect((await f.data.api.deletionOwner!.run(ctx)).kind).toBe('waiting');
       expect(await f.db.db.execute(sql`SELECT project_id FROM data.project_deletions`)).toHaveLength(0);
       expect((await f.own.catalog.space(f.own.space.id))?.activeTransfers).toBe(1);
+      locked = f.db.db.transaction(async tx => {
+        await tx.execute(sql`SELECT id FROM data.object_work WHERE id=${history.records[0]!.id} FOR UPDATE`);
+        exitLocked.resolve(); await releaseExit.promise;
+      });
+      await exitLocked.promise;
       f.finish(); expect((await new Response(download.body).arrayBuffer()).byteLength).toBe(f.result.size);
+      // Body EOF precedes the original callback's durable exit; history is the public completion boundary.
+      expect((await f.data.api.objectRequestHistory!.read(f.target.id)).records[0]?.state).toBe('running');
+      releaseExit.resolve(); await locked;
+      await waitFinished(f);
       expect((await f.own.catalog.space(f.own.space.id))?.activeTransfers).toBe(0);
       expect((await f.data.api.objectRequestHistory!.read(f.target.id)).records[0]).toMatchObject({ state: 'finished',exitDigest: expect.stringMatching(/^[a-f0-9]{64}$/) });
       const renewed = { ...ctx,generation: 2,confirmed: await f.data.api.deletionOwner!.inspect(f.target) };
       expect((await f.data.api.deletionOwner!.run(renewed)).kind).toBe('done');
       await expect(f.plane.verify(f.own.object,noSignal)).rejects.toThrow('sealed');
       expect(f.calls()).toBe(1);
-    } finally { f.finish(); await f.db.drop(); }
+    } finally { releaseExit.resolve(); f.finish(); await locked; await waitFinished(f); await f.db.drop(); }
   });
 
   test('cancellation and upstream failure end only their own original callback; all byte methods are admitted', async () => {

@@ -73,3 +73,13 @@
 根因是原开通回调只持有 provisioning 锁，网关及首次发布的多源准入却要求其他锁。修正在组合层读取两个 owner 的公开准入键集合，仅对 provision 工作在外部 IO 之前按既有原语一次排序取锁；后续网关／发布继续执行自己的项目许可、封写检查、原进程保护、独立出生和退出记录。既有原语仍拒绝执行中扩张，未加入绕过、额外池或新的执行器；排队与命名空间重下发保持原范围。
 
 真实 PG 反例先得到 0 pass／1 fail（预期 active，实际 failed）。修复后开通、网关、发布及 Root 端口五文件 50 pass／357 断言；补充真实网关和首次发布共享实际 backend、独立记录退出的组合断言后，最终三文件 18 pass／153 断言。原项目跨范围拒绝、退出、封写等待、断线和物理来源断言保持。日志为 `/private/tmp/rfc038-downstream-red.log`、`/private/tmp/rfc038-admission-fix-tests.log`、`/private/tmp/rfc038-admission-final-tests.log`。该修正需新的准确提交 CI 和部署后重试同一项目验收。
+
+## 7. 准确 CI 的既有用例边界修正
+
+实现提交 `79260316afe168c420800e0d78eb6a22750ed121` 的 [六项 CI](https://github.com/wangbinquan/CrewStation/actions/runs/37881411133) 最终全部成功。开通补正 `55724c7ce292ebc31f90bcd7314323c5d3b71743` 的 [CI](https://github.com/wangbinquan/CrewStation/actions/runs/37882756170) 中 static、unit、console、e2e 成功；module 为 3559 pass／11 skip／2 fail，gate 因该层失败而阻断，没有算作通过。
+
+两处失败都在既有用例。对象下载的正文 EOF 早于原回调 finally 写入持久退出，测试此前直接读历史，可能观察到合法的 running。现用真实 PG 行锁稳定保留这个窗口，断言 EOF 后仍 running，释放锁后通过既有有界 `waitFinished` 等待公开历史中的原回调退出，再验证完整退出摘要及删除准入。内部下载对象带 `completed` Promise，但服务 API 类型没有公开它，因此没有将内部属性冒充公开契约，也没有为测试扩大生产接口。等待基于持久状态且有固定期限，不重新执行请求或重试失败用例；生产完成语义没有修改。
+
+配置用例将七阶段、22 个参与者的 154 次真实回执事务合在默认五秒中，CI 在 5000ms 终止，后续连接关闭错误来自仍运行的场景；独立诊断耗时 1999ms。现按七个有序业务阶段分别验收，保留全部事务、1502 条历史快照、重复清理、其他项目保留和根删除后墓碑断言，并新增每阶段的快照保留／清除检查。各阶段保持默认期限；没有放宽超时、跳过或重新执行失败场景来作为通过依据。
+
+真实 PG 两文件已验证原失败窗口在行锁下保持 running；最终类型对齐后同一批定向检查为 24 pass／0 fail／309 断言，结果记录在 `/private/tmp/rfc038-ci-regression-fixed.log`，结构、精确 lint 与后端类型检查通过。这一批只修改测试与审查记录，生产代码仍与开通补正一致；后续准确提交 CI 和实际部署验收继续执行。

@@ -69,24 +69,35 @@ describe.skipIf(!available)('配置所有者永久清理（真实 PG）', () => 
     offset += 120_001; await project.api.claimProjectDeletion(started.operation.id, 'new-owner');
     await expect(config.api.deletionOwner!.run(started.context)).rejects.toMatchObject({ kind: 'precondition' });
   });
-  test('全部先前证明后清掉每个历史快照，重复清理稳定，其他项目保留；根删除后墓碑拦住旧键复活', async () => {
-    const id = await make(), other = await make(); const item = await write(id, 'delete-me'), shared = await write(other, 'keep-me');
-    await db.db.execute(sql`INSERT INTO config.version_entries(project_id,env,version,name,is_secret,value,item_id,definition_id,binding_name)
-      SELECT ${id},'production',n,${item.name},true,'historic-cipher',${item.id},${item.definitionId},${item.bindingName} FROM generate_series(2,1502) n`);
-    const started = await begin(id); expect(started.context.confirmed.resources.find((r) => r.kind === 'version_entries')?.count).toBe(1502);
-    for (const phase of PROJECT_DELETION_PHASES) for (const participant of PROJECT_DELETION_PARTICIPANTS) {
-      const context = { ...started.context, phase, confirmed: started.plan.participants.find((r) => r.participant === participant)! };
-      const owner = participant === 'config' ? config.api.deletionOwner : participant === 'project' ? project.api.deletionOwner : undefined;
-      const step = owner ? await owner.run(context) : { kind: 'done' as const, evidence: { kind: 'not-applicable' as const, digest: jsonHash({ participant, phase }), description: '其他 owner 空范围的模块测试占位证明', count: 0 } };
-      expect(step.kind).toBe('done'); if (step.kind !== 'done') throw new Error('module cleanup failed');
-      if (participant === 'config' && phase === 'metadata') expect(await owner!.run(context)).toEqual(step);
-      await project.api.recordProjectDeletionReceipt(started.lease, participant, phase, step.evidence);
-    }
-    expect((await project.api.completeProjectDeletion(started.lease)).state).toBe('succeeded');
-    expect((await config.api.deletionOwner!.inspect(started.context.target)).resources.every((r) => r.count === 0)).toBe(true);
-    expect(await config.api.renderEnv(other, 'production')).toEqual({ [shared.name]: 'keep-me' });
-    await expect(Promise.resolve(db.db.execute(sql`INSERT INTO config.value_sets VALUES (${id},'production',1,now())`))).rejects.toMatchObject({ cause: { message: 'project configuration is sealed for deletion' } });
-    expect(await db.db.execute(sql`SELECT project_id,operation_id FROM config.deletion_fences WHERE project_id = ${id}`)).toMatchObject([{ project_id: id, operation_id: started.operation.id }]);
+  describe('完整清理的逐阶段证明', () => {
+    let id: ProjectId, other: ProjectId, shared: Awaited<ReturnType<typeof write>>, started: Awaited<ReturnType<typeof begin>>;
+    beforeAll(async () => {
+      id = await make(); other = await make(); const item = await write(id, 'delete-me'); shared = await write(other, 'keep-me');
+      await db.db.execute(sql`INSERT INTO config.version_entries(project_id,env,version,name,is_secret,value,item_id,definition_id,binding_name)
+        SELECT ${id},'production',n,${item.name},true,'historic-cipher',${item.id},${item.definitionId},${item.bindingName} FROM generate_series(2,1502) n`);
+      started = await begin(id); expect(started.context.confirmed.resources.find((r) => r.kind === 'version_entries')?.count).toBe(1502);
+    });
+    // Each phase has its own observable boundary; retain all 154 real receipt transactions and the default deadline.
+    for (const phase of PROJECT_DELETION_PHASES) test(`${phase}：全部参与者证明齐备，历史快照只在 metadata 清除`, async () => {
+      for (const participant of PROJECT_DELETION_PARTICIPANTS) {
+        const context = { ...started.context, phase, confirmed: started.plan.participants.find((r) => r.participant === participant)! };
+        const owner = participant === 'config' ? config.api.deletionOwner : participant === 'project' ? project.api.deletionOwner : undefined;
+        const step = owner ? await owner.run(context) : { kind: 'done' as const, evidence: { kind: 'not-applicable' as const, digest: jsonHash({ participant, phase }), description: '其他 owner 空范围的模块测试占位证明', count: 0 } };
+        expect(step.kind).toBe('done'); if (step.kind !== 'done') throw new Error('module cleanup failed');
+        if (participant === 'config' && phase === 'metadata') expect(await owner!.run(context)).toEqual(step);
+        await project.api.recordProjectDeletionReceipt(started.lease, participant, phase, step.evidence);
+      }
+      const report = await config.api.deletionOwner!.inspect(started.context.target);
+      expect(report.resources.find((r) => r.kind === 'version_entries')?.count).toBe(['metadata', 'verify'].includes(phase) ? 0 : 1502);
+      expect(await config.api.renderEnv(other, 'production')).toEqual({ [shared.name]: 'keep-me' });
+    });
+    test('全部阶段证明后完成根删除，保留其他项目与防重放墓碑', async () => {
+      expect((await project.api.completeProjectDeletion(started.lease)).state).toBe('succeeded');
+      expect((await config.api.deletionOwner!.inspect(started.context.target)).resources.every((r) => r.count === 0)).toBe(true);
+      expect(await config.api.renderEnv(other, 'production')).toEqual({ [shared.name]: 'keep-me' });
+      await expect(Promise.resolve(db.db.execute(sql`INSERT INTO config.value_sets VALUES (${id},'production',1,now())`))).rejects.toMatchObject({ cause: { message: 'project configuration is sealed for deletion' } });
+      expect(await db.db.execute(sql`SELECT project_id,operation_id FROM config.deletion_fences WHERE project_id = ${id}`)).toMatchObject([{ project_id: id, operation_id: started.operation.id }]);
+    });
   });
   test('新项目内容表遗漏登记时拒绝空盘点／成功证明', async () => {
     const id = await make(); await db.db.execute('CREATE TABLE config.unknown_content(project_id text)');
