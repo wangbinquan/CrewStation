@@ -1,0 +1,297 @@
+{
+  "recordedAt": "2026-10-09T06:26:51.049385+00:00",
+  "sourceCommit": "5faa6427dd8570972fc60878e1bb4dfae050790d",
+  "ci": {
+    "url": "https://github.com/wangbinquan/CrewStation/actions/runs/37890163439",
+    "conclusion": "success",
+    "jobs": [
+      {
+        "name": "module（模块级 UT）",
+        "conclusion": "success",
+        "startedAt": "2026-10-09T05:47:44Z",
+        "completedAt": "2026-10-09T06:15:51Z"
+      },
+      {
+        "name": "e2e（实机端到端）",
+        "conclusion": "success",
+        "startedAt": "2026-10-09T05:49:05Z",
+        "completedAt": "2026-10-09T05:58:58Z"
+      },
+      {
+        "name": "unit（方法级 UT）",
+        "conclusion": "success",
+        "startedAt": "2026-10-09T05:51:28Z",
+        "completedAt": "2026-10-09T05:52:11Z"
+      },
+      {
+        "name": "static（结构规则 · lint · 类型）",
+        "conclusion": "success",
+        "startedAt": "2026-10-09T05:50:36Z",
+        "completedAt": "2026-10-09T05:52:49Z"
+      },
+      {
+        "name": "console（工作台）",
+        "conclusion": "success",
+        "startedAt": "2026-10-09T05:52:13Z",
+        "completedAt": "2026-10-09T05:55:01Z"
+      },
+      {
+        "name": "gate（汇总 · 新增代码防护）",
+        "conclusion": "success",
+        "startedAt": "2026-10-09T06:17:21Z",
+        "completedAt": "2026-10-09T06:17:42Z"
+      }
+    ]
+  },
+  "platform": {
+    "sourceCommit": "5faa6427dd8570972fc60878e1bb4dfae050790d",
+    "capturedAt": "2026-10-09T06:23:57.860339+00:00",
+    "components": [
+      {
+        "deployment": "cs-api",
+        "deploymentUid": "b29a07a4-f251-46d4-8b67-d6c456c85749",
+        "podUid": "64b7a20b-4b06-4914-ba31-077acf4a7fc5",
+        "image": "docker.io/library/cs-control-plane@sha256:cf5780a0adf63fdddcc98cc0bc60c62158fcbf0cf5a11d37cfee91fd4482e7b6",
+        "actualImageId": "docker.io/library/cs-control-plane@sha256:cf5780a0adf63fdddcc98cc0bc60c62158fcbf0cf5a11d37cfee91fd4482e7b6",
+        "ready": true,
+        "restarts": 0
+      },
+      {
+        "deployment": "cs-auth",
+        "deploymentUid": "a9682e05-2aee-4b76-9842-223da720574e",
+        "podUid": "10fc815d-fbe3-49d1-a884-f34f9649cab1",
+        "image": "docker.io/library/cs-control-plane@sha256:cf5780a0adf63fdddcc98cc0bc60c62158fcbf0cf5a11d37cfee91fd4482e7b6",
+        "actualImageId": "docker.io/library/cs-control-plane@sha256:cf5780a0adf63fdddcc98cc0bc60c62158fcbf0cf5a11d37cfee91fd4482e7b6",
+        "ready": true,
+        "restarts": 0
+      },
+      {
+        "deployment": "cs-controller",
+        "deploymentUid": "5107f19e-22d5-4d7b-8850-78204f329e82",
+        "podUid": "9406e33e-95f4-47cd-b461-ef280ccdbed5",
+        "image": "docker.io/library/cs-control-plane@sha256:cf5780a0adf63fdddcc98cc0bc60c62158fcbf0cf5a11d37cfee91fd4482e7b6",
+        "actualImageId": "docker.io/library/cs-control-plane@sha256:cf5780a0adf63fdddcc98cc0bc60c62158fcbf0cf5a11d37cfee91fd4482e7b6",
+        "ready": true,
+        "restarts": 0
+      },
+      {
+        "deployment": "cs-session",
+        "deploymentUid": "68a3334b-917a-43b7-808e-e3d366fdc2ef",
+        "podUid": "53652398-350e-478d-896f-fc6f3d503241",
+        "image": "docker.io/library/cs-control-plane@sha256:cf5780a0adf63fdddcc98cc0bc60c62158fcbf0cf5a11d37cfee91fd4482e7b6",
+        "actualImageId": "docker.io/library/cs-control-plane@sha256:cf5780a0adf63fdddcc98cc0bc60c62158fcbf0cf5a11d37cfee91fd4482e7b6",
+        "ready": true,
+        "restarts": 0
+      },
+      {
+        "deployment": "cs-events",
+        "deploymentUid": "483d82fb-89c0-41df-b03e-9b025822fe1a",
+        "podUid": "4708d154-7007-4a1b-8eed-d8c6af02c0ea",
+        "image": "docker.io/library/cs-control-plane@sha256:cf5780a0adf63fdddcc98cc0bc60c62158fcbf0cf5a11d37cfee91fd4482e7b6",
+        "actualImageId": "docker.io/library/cs-control-plane@sha256:cf5780a0adf63fdddcc98cc0bc60c62158fcbf0cf5a11d37cfee91fd4482e7b6",
+        "ready": true,
+        "restarts": 0
+      },
+      {
+        "deployment": "console",
+        "deploymentUid": "c4874a0e-6415-4c2b-b141-74ac25ea10ed",
+        "podUid": "766ef501-2eaa-4610-aeb6-6b483326d8c7",
+        "image": "docker.io/library/cs-console@sha256:5deca1244fb2a86e27a89bb55dc0e1451cc42d610ca3e35ec272c9ae8e42aa22",
+        "actualImageId": "docker.io/library/cs-console@sha256:5deca1244fb2a86e27a89bb55dc0e1451cc42d610ca3e35ec272c9ae8e42aa22",
+        "ready": true,
+        "restarts": 0
+      },
+      {
+        "deployment": "mcp-capabilities",
+        "deploymentUid": "c53a1d73-3ec1-4848-a370-6c4579f31edc",
+        "podUid": "1845019e-e937-4e77-bec8-e33cced8eae7",
+        "image": "docker.io/library/cs-control-plane@sha256:cf5780a0adf63fdddcc98cc0bc60c62158fcbf0cf5a11d37cfee91fd4482e7b6",
+        "actualImageId": "docker.io/library/cs-control-plane@sha256:cf5780a0adf63fdddcc98cc0bc60c62158fcbf0cf5a11d37cfee91fd4482e7b6",
+        "ready": true,
+        "restarts": 0
+      },
+      {
+        "deployment": "mcp-operations",
+        "deploymentUid": "e979a774-d521-4031-a3fa-af9c7dafb80a",
+        "podUid": "c35e1896-7b0b-4c51-8b8f-c552cb398b2f",
+        "image": "docker.io/library/cs-control-plane@sha256:cf5780a0adf63fdddcc98cc0bc60c62158fcbf0cf5a11d37cfee91fd4482e7b6",
+        "actualImageId": "docker.io/library/cs-control-plane@sha256:cf5780a0adf63fdddcc98cc0bc60c62158fcbf0cf5a11d37cfee91fd4482e7b6",
+        "ready": true,
+        "restarts": 0
+      }
+    ]
+  },
+  "images": {
+    "cs-control-plane": {
+      "tag": "cs-control-plane:rfc038-5faa6427",
+      "imageId": "sha256:bde46d33de1c2f00869639fad692ea1f58c9f8ec90b37f92ddd1405fde6427ee",
+      "sourceCommit": "5faa6427dd8570972fc60878e1bb4dfae050790d"
+    },
+    "cs-console": {
+      "tag": "cs-console:rfc038-5faa6427",
+      "imageId": "sha256:c7d682d5842f202a4c5eb749d78bdd7690bd28f88662cc48c72c60eb904e4fa0",
+      "sourceCommit": "5faa6427dd8570972fc60878e1bb4dfae050790d"
+    },
+    "cs-task-runtime": {
+      "tag": "cs-task-runtime:rfc038-5faa6427",
+      "imageId": "sha256:3ff4283ea2f2c18f0af6e812ea94f27c01d8d43a591f3222708c65e3d2ce7a84",
+      "sourceCommit": "5faa6427dd8570972fc60878e1bb4dfae050790d"
+    },
+    "cs-builder": {
+      "tag": "cs-builder:rfc038-5faa6427",
+      "imageId": "sha256:82952e2ff48f99309619cee078e5ed1753bcb5075431de12718f8e80b09affa8",
+      "sourceCommit": "5faa6427dd8570972fc60878e1bb4dfae050790d"
+    }
+  },
+  "deploymentTargets": {
+    "images": {
+      "cs-control-plane:dev": "docker.io/library/cs-control-plane@sha256:cf5780a0adf63fdddcc98cc0bc60c62158fcbf0cf5a11d37cfee91fd4482e7b6",
+      "cs-console:dev": "docker.io/library/cs-console@sha256:5deca1244fb2a86e27a89bb55dc0e1451cc42d610ca3e35ec272c9ae8e42aa22",
+      "cs-task-runtime:dev": "docker.io/library/cs-task-runtime@sha256:bdb3281e2c48512fc7bb2e83b1d17459470021063b573e69cea6ef7f4d5ac479"
+    },
+    "taskImage": "registry.crewstation-system.svc.cluster.local:5000/crewstation/task-runtime@sha256:bdb3281e2c48512fc7bb2e83b1d17459470021063b573e69cea6ef7f4d5ac479"
+  },
+  "browser": {
+    "sourceCommit": "5faa6427dd8570972fc60878e1bb4dfae050790d",
+    "capturedAt": "2026-10-09T06:25:25.043565+00:00",
+    "runs": [
+      {
+        "name": "history-project",
+        "passed": 16,
+        "failed": 0,
+        "assertions": 336,
+        "exitCode": 0,
+        "log": "/private/tmp/rfc038-live-final-history-project.log",
+        "logSha256": "34d7d173cdc6a9c1a0041330bc9b48f867ef0b094b73298613859caa46d1a607"
+      },
+      {
+        "name": "history-integration",
+        "passed": 16,
+        "failed": 0,
+        "assertions": 336,
+        "exitCode": 0,
+        "log": "/private/tmp/rfc038-live-final-history-integration.log",
+        "logSha256": "09c11170caa40e126cfca8c70a9e916c9d61b24d8cd19b68e9cf0edd123b0d5b"
+      },
+      {
+        "name": "wizard-layout",
+        "passed": 4,
+        "failed": 0,
+        "assertions": 36,
+        "exitCode": 0,
+        "log": "/private/tmp/rfc038-live-final-wizard-layout.log",
+        "logSha256": "953bb2c655a4cc9a17c201593d10972422201171b26c1cbedd3680a2e7d804f6"
+      },
+      {
+        "name": "release-overview",
+        "passed": 1,
+        "failed": 0,
+        "assertions": 4,
+        "exitCode": 0,
+        "log": "/private/tmp/rfc038-live-final-release-overview.log",
+        "logSha256": "ed0f53b3d27644baffe046dfe0a96f729f210560741c9f0b04be3c0952bfa417"
+      }
+    ]
+  },
+  "localFocused": {
+    "passed": 39,
+    "failed": 0,
+    "assertions": 236,
+    "files": 5,
+    "static": "passed",
+    "consoleBuild": "passed"
+  },
+  "localFullGate": {
+    "passed": 6524,
+    "skipped": 160,
+    "failed": 12,
+    "errors": 5,
+    "assertions": 450615,
+    "files": 1336,
+    "seconds": 3899,
+    "log": "/private/tmp/rfc038-full-check.log",
+    "failures": [
+      "actual original native usage history and stable recovery > a complete multi-page before bridges each actual page instead of comparing every step with the final EOF watermark",
+      "sealed original execution facts > project Task lifetime facts retain the independently sealed original identity and all attempts",
+      "RFC-034 explicitly negotiated proof sync > more than one page of interleaved numeric, proof and CNY history loses no records",
+      "(unnamed)",
+      "项目永久删除的持久意图与完成屏障（真实 PG） > 完整阶段后仍必须清完本模块内容才删根；清理证据和最小结果跨根删除可读，同键重放不重建",
+      "原生 owner：存在真实连接、预备事务或原名字锁就等待，不能用 finished JS 回执冒充排空",
+      "RFC-034 bound development native cleanup > a main container still running keeps the original stop finalizer, both Secrets and quota",
+      "RFC-034 bound development native cleanup > wrong Runner token or original admission tuple cannot be reclaimed",
+      "网关原外部回调退出（真实 PG、实际挂起回调） > 开通预先取锁后实际网关调和复用原 backend，独立回调完成且开通范围仍有效",
+      "实际 Root 的开通工作反转端口只在原 Pod 配置存在时装配，并保留原许可来源",
+      "deletion Session data client (real PG and two internal HTTP replicas; controlled Root ownership) > sealed original pages replay until acknowledged, preserve large usage integers and exclude ordinary consumers"
+    ],
+    "candidateNote": "Continuous original gate included shared WIP and in-process module caches while final corrections were made; not an exact final-candidate run. Final targeted checks and exact-SHA CI are recorded separately."
+  },
+  "application": {
+    "projectId": "01a11ed2-d922-7000-884a-87a2991d1e3a",
+    "slug": "rfc038-wizard-20261009",
+    "commitSha": "4520ff2b9d7c2246c0881099f6036c20aa5e9a7a",
+    "journeys": [
+      {
+        "id": "01a11f1b-9eca-7000-83b1-4dfcfb103ba7",
+        "releaseId": "01a11f1b-9e42-7000-90a2-81b036df1148",
+        "kind": "publish",
+        "status": "succeeded",
+        "events": 15
+      },
+      {
+        "id": "01a11f1e-62b6-7000-a584-2c01f650c478",
+        "releaseId": "01a11f1e-624b-7000-9a1e-d0710c18c880",
+        "kind": "publish",
+        "status": "succeeded",
+        "events": 15
+      },
+      {
+        "id": "01a11f30-e700-7000-9cfd-225fee3f4807",
+        "releaseId": "01a11f1b-9e42-7000-90a2-81b036df1148",
+        "kind": "redeploy",
+        "status": "awaiting-verification",
+        "events": 6
+      }
+    ],
+    "activePhysical": "blue",
+    "activeReleaseId": "01a11f1e-624b-7000-9a1e-d0710c18c880",
+    "originalSuccessHistoryUnchanged": true,
+    "all36EventsUnchangedAfterUpgrade": true,
+    "otherReleaseIdentities": [
+      {
+        "count": 79,
+        "digest": "b21cb6b2276c7bb9178b962aba674b31"
+      }
+    ],
+    "authorization": "User explicitly approved offlining and redeploying only this project standby v0.1.0; current v0.1.1 remains production."
+  },
+  "logs": [
+    {
+      "path": "/private/tmp/rfc038-full-check.log",
+      "sha256": "f3fba7414c5dcdbbea6424410f65aacfd4a120d77f859a405652e4ec0cf835ea"
+    },
+    {
+      "path": "/private/tmp/rfc038-live-history-scroll-red.log",
+      "sha256": "cb42f6934eec9e0242a6aa188dc5ddc0417773840a67f388afef740ba37dba63"
+    },
+    {
+      "path": "/private/tmp/rfc038-preview-integration-narrow-red.log",
+      "sha256": "fc27eb81b8dee9c1113302676c65b2c527ae689d66b419bfc0fea7a7fb74d744"
+    },
+    {
+      "path": "/private/tmp/rfc038-scroll-console-tests-final.log",
+      "sha256": "4003c9e2bf673d769c3f033fbb648ad6e8b5b2f3a12c1eb127fb1d218d90e9ba"
+    },
+    {
+      "path": "/private/tmp/rfc038-scroll-static-final.log",
+      "sha256": "9587c2d895aa6a9e3002271158ebdc855b409ceeb4960c91ce33d580b09b9572"
+    },
+    {
+      "path": "/private/tmp/rfc038-scroll-console-build.log",
+      "sha256": "26112291de91c6665ab9e4abd58d3e3e363e0a3aa4b7e7ad6f691d23b13a4efb"
+    },
+    {
+      "path": "/private/tmp/rfc038-upgrade-final.log",
+      "sha256": "534851575f41f70f1948bff196e280f0e3b1b1d874b61d5ba1af088473de681d"
+    }
+  ]
+}

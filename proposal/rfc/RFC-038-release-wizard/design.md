@@ -1,6 +1,8 @@
 # RFC-038｜技术设计
 
-> In Progress · 2026-10-09。作者已批准完整实现方案、提交到远端、本地完整部署与完整验证；以下接口、留存、兼容处理和实施范围按整案执行。
+> Done · 2026-10-09。作者已批准完整实现方案、提交到远端、本地完整部署与完整验证；以下接口、留存、兼容处理和实施范围按整案执行。
+
+> 完成证据：[实际验收](./acceptance.md)；运行源码 `5faa6427` 六 CI、八组件部署、37 项实机回归及三条独立流程核对通过。
 
 ## 目录
 
@@ -21,7 +23,7 @@
 | 位置 | 承担的工作 |
 |---|---|
 | `features/release/pages/` | 发布总览、向导路由；历史及当前共用向导入口 |
-| `features/release/components/wizard/`、`components/history/` | 准备／部署／验证／上线／完成视图，历史列表与阶段回看 |
+| `features/release/components/journey/` | 准备／部署／验证／上线／完成视图，历史列表与阶段回看 |
 | `features/release/model/journey/` | DTO 到视图的纯投影、同意图恢复、本地准备草稿；UI不成为执行状态权威 |
 | `shared/ui/progress/`、`shared/ui/dialog/` | 复用 StageProgress、Dialog/FormDialog/ConfirmationDialog；必要时小幅向后兼容扩展 |
 | `shared/logs/` | 从现有 logs feature提取可复用的有界日志请求和展示，两处共用；不互相 import feature |
@@ -72,9 +74,9 @@ Journal的当次终态与Release的当前状态分开。发布等待人工验证
 
 ## 4. 接口与数据流
 
-### 4.1 拟新增工作台接口
+### 4.1 新增工作台接口
 
-| 接口 | 拟定合同 |
+| 接口 | 实现契约 |
 |---|---|
 | `GET /v1/services/:serviceId/release-journeys?cursor&limit` | 原view授权；50条以内一页、严格游标；摘要区分journal与legacy；返回nextCursor／hasMore，覆盖历史而非只取最新50个Release |
 | `GET /v1/release-journeys/:journeyId` | 精确原project/service授权；返回固定snapshot、阶段events、revision、当前实际部署的continuation与原因 |
