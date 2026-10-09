@@ -39,6 +39,10 @@ import { publishUseCase } from './application/publish';
 import { activeWebhookIngress, releaseObjectStorage, releaseQueries } from './application/queries';
 import { switchTrafficUseCase } from './application/switchTraffic';
 import { releaseRoutes } from './http/releaseRoutes';
+import { journeyRoutes } from './http/journeyRoutes';
+import { journeyQueries } from './application/journey/queries';
+import { verifyJourneyUseCase } from './application/journey/verification';
+import { journeyObserver } from './application/journey/observer';
 import type { ImageBuilder, MigrationRunner, SlotDeployer, SlotRenderer } from './ports/delivery';
 import { slotOwnerUseCases } from './application/slotOwners';
 import type { ConfigSource, DataSource, HostNaming, MaintenanceWindow, PlanCatalog, ProjectAuthorizer, ProjectOwners, ReleaseSettings, ServiceResolver, SlotNotifier } from './ports/platform';
@@ -143,6 +147,9 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
   };
   const implementation: ReleaseModuleApi = {
     name: 'release',
+    ...journeyQueries(useCaseDeps),
+    verifyJourney: verifyJourneyUseCase(useCaseDeps),
+    progressJourneys: journeyObserver(useCaseDeps),
     originalInfrastructureOwnership: (key, representation) => releaseInfrastructureOrigin(deps.db, key, representation),
     ...(deps.deletion && admission ? { deletionOwner: releaseProjectDeletionOwner({
       repository: releaseDeletionRepository({ db: deps.db, services: deps.services, identities: deps.deletionIdentities, assertGrant: deps.deletion.assertGrant }),
@@ -170,8 +177,9 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
   return {
     api,
     withResourceCreationAdmission: (input, work) => releaseResourceCreationWork(useCaseDeps, input, work),
-    http: [releaseRoutes(api, deps.isAdmin)],
+    http: [releaseRoutes(api, deps.isAdmin), journeyRoutes(api, deps.isAdmin)],
     workers: [createWorker({ db: deps.db, kinds: [PIPELINE_JOB_KIND], owner: deps.settings.workerOwner, concurrency: 4, logger, handler: pipelineJobHandler(api, jobs) }), sweep, periodicJob(() => api.progressHandoffs().then(() => undefined), (error) => logger.warn('execution handoff progress failed', { error: String(error) }), 1000),
+      periodicJob(() => api.progressJourneys().then(() => undefined), (error) => logger.warn('release journey observation failed', { error: String(error) }), 3000),
       ...(deps.ledger ? [slotLedgerResyncWorker(() => resyncSlotLedger(useCaseDeps.uow, logger, useCaseDeps), logger)] : [])],
     migrations: releaseMigrations,
   };

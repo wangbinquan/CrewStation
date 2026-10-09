@@ -62,9 +62,10 @@ test('下线要行内确认；下线后卡片显示已下线，「部署版本�
 // M5、M10：发布记录里可以重新部署的版本带「重新部署」；确认面板写明会替换待命槽上的哪个版本，请求带上它。
 test('从发布记录重新部署较早的版本：写明替换待命版本，取消不发请求，确认带上待命版本', async () => {
   const f = slotLifecycleFixture(); page = await renderApp(`/projects/${projectId}/release`);
-  const timelineButtons = () => [...document.querySelectorAll<HTMLButtonElement>('ul button')].filter((node) => node.textContent === '重新部署');
-  expect(timelineButtons()).toHaveLength(1);
-  await act(async () => timelineButtons()[0]!.click()); await page.settle();
+  const link = document.getElementById(`release-history-${oldId}`)!;
+  await act(async () => link.click()); await page.settle();
+  expect(page.path()).toBe(`/projects/${projectId}/release/versions/${oldId}`);
+  await click('重新部署到待验证版本');
   expect(page.text()).toContain('把 v0.9.0 重新部署到待验证版本？'); expect(page.text()).toContain('v1.0.0（会被替换并下线）');
   expect(versionSelect()?.value).toBe(oldId); expect(versionOptions()).toEqual(['v0.9.0 · ccccccc · main · 已被替代']);
   await click('取消'); expect(page.text()).not.toContain('把 v0.9.0 重新部署到待验证版本？'); expect(f.writes).toHaveLength(0);

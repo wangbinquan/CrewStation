@@ -1,4 +1,5 @@
 import type { HandoffRepository } from './executionHandoff';
+import type { JourneyRepository } from './journey';
 import type { PhysicalSlot, ServiceSlots } from '../domain/slots';
 import type { JobProjection, JobRecordRef, SlotRecordRef } from './ledger';
 import type { MaintenanceRepository } from './repositories';
@@ -12,6 +13,7 @@ export interface DomainEventPublisher {
 }
 
 export interface RepositoryScope {
+  readonly journeys: JourneyRepository;
   readonly handoffs: HandoffRepository;
   readonly maintenance: MaintenanceRepository;
   readonly releases: ReleaseRepository;

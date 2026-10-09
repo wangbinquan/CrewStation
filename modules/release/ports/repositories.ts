@@ -38,6 +38,7 @@ export interface SlotEventRecord {
 }
 
 export interface SlotEventRepository {
+  listByRelease(releaseId: ReleaseId): Promise<SlotEventRecord[]>;
   insert(record: SlotEventRecord): Promise<void>;
   listByService(serviceId: ServiceId, limit: number): Promise<SlotEventRecord[]>;
 }
@@ -68,6 +69,7 @@ export interface TrafficSwitchRecord {
 }
 
 export interface TrafficSwitchRepository {
+  listByRelease(releaseId: ReleaseId): Promise<TrafficSwitchRecord[]>;
   insert(record: TrafficSwitchRecord): Promise<void>;
   listByService(serviceId: ServiceId, limit: number): Promise<TrafficSwitchRecord[]>;
 }

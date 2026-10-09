@@ -188,6 +188,7 @@
     "modules/release/adapters/persistence/migrations/0008_execution_handoffs.sql": "56e3651823bea7bef0f1b5059eec8e4c916293b3d1ea3f7f98061a0ab2247478",
     "modules/release/adapters/persistence/migrations/0009_project_deletion.sql": "9fb0caab1f7a578102d521f778a0b19103eb7c58a5e4ad7142d2f656f0c81a92",
     "modules/release/adapters/persistence/migrations/0010_native_registry_admission.sql": "2dc1448f450a88888ce20b740189e345cf3d49969f97da2acdfb5599bade5f42",
+    "modules/release/adapters/persistence/migrations/0011_release_journeys.sql": "001294d4ab3cbf15cfd9df36d0bc59c47eea6c32f013dd348686b308e5e46867",
     "modules/resource-access/adapters/persistence/migrations/0001_create_schema.sql": "1fb64e2e0742691915204ac40a8c076b65e71dd2fd85b675410c6d646df92f33",
     "modules/resource-access/adapters/persistence/migrations/0002_project_deletion_fences.sql": "f849da85bacf17ffefe3a5b92f4413e44b9a3f9bd7b5dfe8cfbcda85a494d772",
     "modules/resource-access/adapters/persistence/migrations/0003_original_identity_guard.sql": "9317b9c0c1b8370b6191f8e2bcb656420b2f14cd26ac1db25ec23803b1d027f0",

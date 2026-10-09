@@ -1,12 +1,21 @@
 import './domSetup';
+import { act } from 'react';
+import { journeyId, releaseJourneyFixture } from './releaseJourneyFixture';
 import { afterEach, expect, test } from 'bun:test';
 import { renderApp } from './renderApp';
-import { historyId, prodId, projectId, releaseDeliveryFixture, serviceId, targetId, userId } from './releaseDeliveryFixture';
+import { historyId, prodId, projectId, releaseDeliveryFixture, serviceId, userId } from './releaseDeliveryFixture';
 
 const originalFetch = globalThis.fetch;
 let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 const other = '01a0bf5d-8f4b-7222-8222-222222222222', gone = '01a0bf5d-8f4b-7111-8111-111111111111', unknownRelease = '01a0bf5d-8f4b-7000-8000-000000000000';
+
+test('旧记录内嵌五步回看只保留一个返回入口，返回仍携带原历史页游标', async () => {
+  const f = releaseDeliveryFixture(); page = await renderApp(`/projects/${projectId}/release/versions/${prodId}?cursor=older-page&focus=${prodId}`);
+  expect([...document.querySelectorAll('a')].filter(node => node.textContent === '返回发布总览')).toHaveLength(1);
+  await page.click('4确认上线'); expect(page.text()).toContain('未记录'); expect(f.writes).toHaveLength(0);
+  await page.click('返回发布总览'); expect(page.search().cursor).toBe('older-page'); expect(page.search().focus).toBe(prodId);
+});
 function withTimeline(options: { readonly switchesFail?: boolean; readonly membersFail?: boolean } = {}) {
   const f = releaseDeliveryFixture(), base = globalThis.fetch;
   globalThis.fetch = (async (raw, init) => {
@@ -24,34 +33,35 @@ const rows = () => [...document.querySelectorAll('ul[aria-label="发布记录"] 
 /** 发布、切流、成员三份查询都到齐才有完整时间线；整套并跑时慢半拍，最多再等几拍。 */
 async function untilRows(count: number) { for (let i = 0; i < 12 && rows().length < count; i++) await page!.settle(); }
 
-test('发布页时间线合并发布与切流：倒序、人名与标签代替 UUID、失败条目有构建日志入口、标签可选中详情', async () => {
+test('发布历史与切流记录均可访问，旧流程独立显示未记录，失败原因和原版本保持准确', async () => {
   const f = withTimeline(); f.releases[2]!.status = 'failed'; f.releases[2]!.message = '构建失败：缺少依赖';
-  page = await renderApp(`/projects/${projectId}/release`); await untilRows(5);
-  // 此前是两张表各自一列 UUID（RFC-020 audit §3.5）。
-  expect(rows()).toHaveLength(5); expect(rows()[0]).toStartWith('v1.1.0 就绪bbbbbbb · main'); expect(rows()[3]).toStartWith('v1.0.0 就绪aaaaaaa · main'); expect(rows()[4]).toStartWith('v0.9.0 失败');
-  expect(rows()[1]).toContain('成员 01a0bf5d… 把 版本 01a0bf5d… 切为正式版本');
-  expect(rows()[2]).toContain('开发者小王 把 v1.0.0 切为正式版本'); expect(rows()[2]).toContain('原因：验收通过');
-  expect(rows()[4]).toContain('失败原因：构建失败：缺少依赖'); expect(page.text()).not.toContain(other); expect(page.text()).not.toContain(gone);
-  const logs = [...document.querySelectorAll('ul[aria-label="发布记录"] a')].find((link) => link.textContent === '构建日志')!;
-  expect(logs.getAttribute('href')).toContain('source=build'); expect(logs.getAttribute('href')).toContain(`releaseId=${historyId}`);
-  expect(page.text()).not.toContain('切流记录'); expect(document.querySelector('ul[aria-label="发布记录"]')?.textContent).not.toContain('registry');
-  await page.click('v0.9.0'); expect(page.search().release).toBe(historyId); expect(page.text()).toContain('构建失败：缺少依赖');
-  await page.click('详情'); expect(page.search().release).toBe(unknownRelease);
+  page = await renderApp(`/projects/${projectId}/release`); await untilRows(2);
+  expect(document.querySelectorAll('a[id^="release-history-"]')).toHaveLength(3);
+  expect(rows()).toHaveLength(2); expect(rows()[1]).toContain('开发者小王 把 v1.0.0 切为正式版本'); expect(rows()[1]).toContain('原因：验收通过');
+  const link = document.getElementById(`release-history-${historyId}`)!;
+  await act(async () => link.click()); await page.settle();
+  expect(page.path()).toBe(`/projects/${projectId}/release/versions/${historyId}`); expect(page.text()).toContain('构建失败：缺少依赖'); expect(page.text()).toContain('未记录');
+  expect(document.querySelectorAll('dialog')).toHaveLength(0); expect(f.writes).toHaveLength(0);
 });
 
-test('切流或成员读取失败时只列能读到的一类并说明；负责人在待验证卡上直接上线，switch=1 进入即核对', async () => {
-  withTimeline({ switchesFail: true, membersFail: true });
-  page = await renderApp(`/projects/${projectId}/release?switch=1`); await untilRows(3); await page.settle(); await page.settle();
-  expect(page.text()).toContain('切流记录读取失败：切流服务不可用'); expect(page.text()).toContain('成员名单暂不可读'); expect(rows()).toHaveLength(3); expect(page.text()).not.toContain('尚无发布记录');
-  // 概览的「上线 vX…」带 switch=1 进来：不用再点一次，确认面板已经打开。
-  expect(page.text()).toContain('正式版本 v1.0.0 → v1.1.0'); expect([...document.querySelectorAll('button')].some((node) => node.textContent === '确认上线 v1.1.0')).toBe(true);
-  const versions = document.querySelector('section[aria-label="实际部署版本"]')!;
-  expect([...versions.querySelectorAll('button')].map((node) => node.textContent)).toContain('上线 v1.1.0'); expect(page.search()).toMatchObject({ switch: true });
-  expect(page.text()).not.toContain(targetId.slice(0, 8) + '…');
+test('切流或成员读取失败仍可查看历史发布，不伪造缺失的操作人', async () => {
+  const f = withTimeline({ switchesFail: true, membersFail: true }); page = await renderApp(`/projects/${projectId}/release`);
+  expect(page.text()).toContain('切流记录读取失败：切流服务不可用'); expect(page.text()).toContain('成员名单暂不可读');
+  expect(document.querySelectorAll('a[id^="release-history-"]')).toHaveLength(3); expect(f.writes).toHaveLength(0);
+});
+
+test('超过 40 条历史从第三页末行进入当次向导，回看步骤零写入，返回恢复游标和触发焦点', async () => {
+  const f = releaseJourneyFixture(); f.detail.status = 'succeeded'; f.detail.continuation.canVerify = false;
+  f.state.rows = [...Array.from({ length: 40 }, (_, i) => ({ ...f.summary(), id: `01a11e42-fe19-7c81-9ce5-${(i + 1).toString(16).padStart(12, '0')}` as never })), f.summary()];
+  page = await renderApp(`/projects/${projectId}/release`); await page.click('更早的记录'); await page.click('更早的记录'); expect(page.search().cursor).toBe('40');
+  const trigger = document.getElementById(`release-history-${journeyId}`)!; await act(async () => { trigger.focus(); trigger.click(); }); await page.settle();
+  expect(page.path()).toBe(`/projects/${projectId}/release/journeys/${journeyId}`); expect(document.querySelectorAll('dialog')).toHaveLength(0);
+  await page.click('2构建与部署'); expect(document.querySelector('h2[tabindex]')?.textContent).toBe('构建与部署'); expect(f.writes).toHaveLength(0);
+  await page.click('返回发布总览'); expect(page.search().cursor).toBe('40'); expect(document.activeElement?.id).toBe(`release-history-${journeyId}`); expect(f.writes).toHaveLength(0);
 });
 
 test('标签表在发布页最下方直接展开，列出仓库里的全部标签', async () => {
-  withTimeline(); page = await renderApp(`/projects/${projectId}/release`); await untilRows(5); await page.settle();
+  withTimeline(); page = await renderApp(`/projects/${projectId}/release`); await untilRows(2); await page.settle();
   // 2026-09-23 作者裁定标签表不再折叠（RFC-020 design §6 修订）：不用先点开，也不能再包进 <details>。
   const titles = [...document.querySelectorAll('main section > header > h2')];
   expect(titles.at(-1)?.textContent).toBe('标签');

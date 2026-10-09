@@ -1,4 +1,4 @@
-import type { Actor, AgentProtocol, ApiOperationDto, BeforeStartMaterial, ComputeProfileSelector, ComputeUsage, LaunchSpec, ProfileRevisionRef, BranchDto, Manifest, ProjectId, PublishRequest, ReleaseDto, ServiceId, SlotDto, TaskId, UserId } from '@crewstation/contracts';
+import type { Actor, AgentProtocol, ApiOperationDto, BeforeStartMaterial, ComputeProfileSelector, ComputeUsage, LaunchSpec, ProfileRevisionRef, BranchDto, Manifest, ProjectId, PublishRequest, ReleaseDto, ReleaseJourneySource, ServiceId, SlotDto, TaskId, UserId } from '@crewstation/contracts';
 
 /** api-catalog L3 的公开操作查询，由平台装配。 */
 export interface ApiInvocationCatalog {
@@ -56,7 +56,7 @@ export interface ComputeCatalog {
 
 /** 由 release 模块提供。 */
 export interface Releases {
-  publish(actor: Actor, serviceId: ServiceId, input: PublishRequest): Promise<ReleaseDto>;
+  publish(actor: Actor, serviceId: ServiceId, input: PublishRequest, source?: ReleaseJourneySource): Promise<ReleaseDto>;
   getSlots(actor: Actor, serviceId: ServiceId): Promise<SlotDto[]>;
 }
 

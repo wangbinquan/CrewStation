@@ -103,6 +103,7 @@ export const messages = {
   'ui.progress.state.running': '进行中',
   'ui.progress.state.succeeded': '已完成',
   'ui.progress.state.failed': '失败',
+  'ui.progress.state.unknown': '未记录',
   'ui.progress.state.skipped': '已跳过',
   'ui.progress.overall.running': '启动中',
   'ui.progress.overall.ready': '已就绪',

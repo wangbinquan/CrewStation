@@ -130,12 +130,12 @@ describe.skipIf(!session?.project)('项目工作台信息架构（RFC-020）', (
     expect(page.takeErrors()).toEqual([]);
   }, 60_000);
 
-  test('WS-14：发布页有合并的发布记录时间线，待验证卡上是上线／回退或负责人说明', async () => {
+  test('WS-14：发布页保留历史流程记录，待验证卡上继续上线／回退或负责人说明', async () => {
     const page = session!.admin, id = session!.project!.id;
     await viewport(page, 1440); await open(page, `/projects/${id}/release`);
-    await page.waitUntil(`!!document.querySelector('ul[aria-label="发布记录"]') || document.body.innerText.includes('尚无发布记录')`);
+    await page.waitUntil(`[...document.querySelectorAll('main h2')].some(node => node.textContent === '发布流程记录') || document.body.innerText.includes('尚无发布记录')`);
     const text = await page.text();
-    expect(text).not.toContain('切流记录'); expect(text).toContain('发布记录');
+    expect(text).not.toContain('切流记录'); expect(text).toContain('发布流程记录');
     const actions = await texts(page, 'section[aria-label="实际部署版本"] button');
     // RFC-021：待验证版本下线后卡上是「已下线」，槽空着且有可重新部署的版本时主按钮是「部署版本…」（T14）；2026-09-23 实撞演示项目处于这一态。
     expect(actions.some((label) => label.startsWith('上线 ') || label.startsWith('回退到 ') || label === '部署版本…') || text.includes('由项目负责人上线') || text.includes('尚未部署') || text.includes('已下线')).toBe(true);

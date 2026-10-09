@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ReleaseStatusSchema, SlotNameSchema } from '../events/topics';
-import { ReleaseIdSchema, ServiceIdSchema, UserIdSchema } from '../ids';
+import { ReleaseIdSchema, ResourceIdSchema, ServiceIdSchema, UserIdSchema } from '../ids';
 import { ResourceReasonSchema } from './resources/resourceRecord';
 import { FullCommitShaSchema } from './scm';
 
@@ -8,6 +8,7 @@ import { FullCommitShaSchema } from './scm';
 export const OfflineReasonSchema = z.enum(['manual', 'rollback-expired', 'idle', 'cluster']);
 
 export const ReleaseDtoSchema = z.object({
+  journeyId: ResourceIdSchema.optional(),
   id: ReleaseIdSchema,
   serviceId: ServiceIdSchema,
   tag: z.string(),
@@ -59,6 +60,7 @@ export const SlotOfflineDtoSchema = z.object({
 });
 
 export const SlotDtoSchema = z.object({
+  targetRevision: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   name: SlotNameSchema,
   active: z.boolean(),
   releaseId: ReleaseIdSchema.optional(),
@@ -109,6 +111,8 @@ export const SetAutoOfflinePolicyRequestSchema = z.object({ ...autoOfflineFields
 });
 
 export const TrafficSwitchRequestSchema = z.object({
+  journeyId: ResourceIdSchema.optional(),
+  expectedTargetRevision: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   requestKey: z.string().min(1).max(128).optional(),
   toSlot: SlotNameSchema,
   /** null 明确表示确认时尚无正式版本；省略保留旧客户端语义。 */
@@ -119,6 +123,7 @@ export const TrafficSwitchRequestSchema = z.object({
 });
 
 export const TrafficSwitchDtoSchema = z.object({
+  journeyId: ResourceIdSchema.optional(),
   handoff: z.object({ stage: z.enum(['freezing', 'preparing', 'routing', 'activating', 'complete']), epoch: z.number().int().positive().optional(), message: z.string().optional() }).optional(),
   id: z.string(),
   serviceId: ServiceIdSchema,

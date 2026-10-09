@@ -13,7 +13,7 @@ import type { ServiceResolver } from '../../ports/platform';
 import { releaseAdmissionKey } from './drizzleUnitOfWork';
 import { releaseCallbackContent, releaseContentRowKey, releaseContentOver } from './projectContent';
 
-const contentTables = ['traffic_switches', 'replica_overrides', 'slot_maintenance', 'slot_events', 'execution_handoffs', 'service_slots', 'deletion_callbacks', 'releases'] as const;
+const contentTables = ['release_journey_events', 'release_journeys', 'traffic_switches', 'replica_overrides', 'slot_maintenance', 'slot_events', 'execution_handoffs', 'service_slots', 'deletion_callbacks', 'releases'] as const;
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
 
 type Fence = { operation_id: string; generation: number; revision: string; original: ReleaseDeletionScope; scope_verified: boolean; phase_index: number; receipts: ReleaseDeletionStored['receipts'] };

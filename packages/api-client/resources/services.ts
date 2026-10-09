@@ -3,12 +3,17 @@ import type {
   ServiceDto, ServiceMaintenanceView, SetMaintenanceRequest, SlotDto, SlotEventDto, TagDto, TakeOfflineRequest, TrafficSwitchDto, TrafficSwitchRequest,
 } from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
+import type { ReleaseJourneyDetail, ReleaseJourneyHistory, ReleaseJourneyPage, ReleaseJourneyPageRequest, VerifyReleaseJourneyRequest } from '@crewstation/contracts';
 import type { ItemsPage } from '../itemsPage';
 import type { PublishInput } from '../requestInputs';
 import { segment } from '../requestUrl';
 
 /** 服务视角：仓库、分支与标签（scm）、Release、两个部署槽与切流（release）。 */
 export interface ServicesResource {
+  listReleaseJourneys(serviceId: string, query?: Partial<ReleaseJourneyPageRequest>): Promise<ReleaseJourneyPage>;
+  getReleaseJourney(journeyId: string): Promise<ReleaseJourneyDetail>;
+  getReleaseJourneyHistory(releaseId: string): Promise<ReleaseJourneyHistory>;
+  verifyReleaseJourney(journeyId: string, input: VerifyReleaseJourneyRequest): Promise<ReleaseJourneyDetail>;
   /** GET /v1/services/:serviceId */
   get(serviceId: string): Promise<ServiceDto>;
   /** GET /v1/services/:serviceId/repository */
@@ -53,6 +58,10 @@ export interface ServicesResource {
 export function servicesResource(transport: Transport): ServicesResource {
   const base = (serviceId: string) => `/v1/services/${segment(serviceId)}`;
   return {
+    listReleaseJourneys: (serviceId, query) => transport.request<ReleaseJourneyPage>('GET', `${base(serviceId)}/release-journeys`, { query }),
+    getReleaseJourney: (id) => transport.request<ReleaseJourneyDetail>('GET', `/v1/release-journeys/${segment(id)}`),
+    getReleaseJourneyHistory: (id) => transport.request<ReleaseJourneyHistory>('GET', `/v1/releases/${segment(id)}/journey-history`),
+    verifyReleaseJourney: (id, input) => transport.request<ReleaseJourneyDetail>('POST', `/v1/release-journeys/${segment(id)}/verification`, { body: input }),
     get: (serviceId) => transport.request<ServiceDto>('GET', base(serviceId)),
     getRepository: (serviceId) => transport.request<RepositoryBindingDto>('GET', `${base(serviceId)}/repository`),
     previewManifestUpgrade: (serviceId, content) => transport.request<ManifestUpgradePreview>('POST', `${base(serviceId)}/manifest-upgrade`, { body: { content } }),

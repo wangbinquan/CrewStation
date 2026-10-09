@@ -9,6 +9,7 @@ import { WAIT } from './pipelineContext';
 import { renderSlotEnv } from './pipelineEnv';
 import { ledgerJobSteps } from './ledgerJobs';
 import { loadReleaseManifest, prepareReleaseImage } from './releaseImage';
+import { recordPipelinePreparation } from './journey/recording';
 
 export interface BuildSteps {
   startBuild(release: Release, svc: ResolvedService): Promise<StepResult>;
@@ -27,6 +28,7 @@ export function buildSteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext, start
     let manifest: Manifest;
     try {
       manifest = release.manifest ?? await loadReleaseManifest(deps, release);
+      await deps.uow.run(scope => recordPipelinePreparation(scope, release, manifest.spec.release.migrationCommand ? 'migration' : 'deploy', deps.clock.now()));
       if (!release.pipeline.runtimeImage && release.image && deps.runtimeImages?.pinBuiltImage) {
         release = { ...release, manifest, image: await deps.runtimeImages.pinBuiltImage(svc.slug, release.image) };
         await deps.uow.run((scope) => scope.releases.update(release));

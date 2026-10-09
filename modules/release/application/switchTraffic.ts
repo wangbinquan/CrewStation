@@ -7,6 +7,7 @@ import { precheckFailed, precheckReason } from '../domain/precheck';
 import { physicalOf, roleOf, switchTraffic } from '../domain/slots';
 import type { ReleaseUseCaseDeps } from './dependencies';
 import { switchToDto } from './toDto';
+import { journeyForLaunch, recordJourneyLaunch, replayJourneyLaunch } from './journey/launch';
 
 /** 晋级与回退都是负责人的一次切流（G15）；破坏性迁移之后禁止切回旧版本。 */
 export function switchTrafficUseCase(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'authorizer' | 'services' | 'clock' | 'maintenance' | 'executionHandoff'>) {
@@ -20,6 +21,8 @@ export function switchTrafficUseCase(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'aut
     const now = clock.now();
     return uow.run(async (scope) => {
       const slots = await scope.slots.get(serviceId);
+      const replay = await replayJourneyLaunch(scope, serviceId, input);
+      if (replay) return replay;
       if (!slots) throw precheckFailed(precheckReason('no-deployment', '服务尚无任何部署', '先发布一个版本'));
       if (input.requestKey) {
         const prior = await scope.handoffs.findByKey(serviceId, input.requestKey);
@@ -43,6 +46,8 @@ export function switchTrafficUseCase(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'aut
       }
       // 切流到含破坏性迁移的版本同样要求维护窗口（Design §6.5「部署与切流」，RFC-021 M27）。
       if (targetRelease) assertSwitchAllowed(targetRelease.manifest?.spec.release.migration, targetRelease.tag, windowOpen);
+      if (!targetRelease) throw precondition('目标发布不存在');
+      const journey = await journeyForLaunch(scope, actor, input, targetRelease, currentRelease, slots, now);
       const controlled = currentRelease?.manifest?.kind === 'DigitalWorker' && currentRelease.manifest.spec.tasks?.executionControl === 'fenced' || targetRelease?.manifest?.kind === 'DigitalWorker' && targetRelease.manifest.spec.tasks?.executionControl === 'fenced';
       if (controlled) {
         if (!deps.executionHandoff) throw precondition('平台执行交接尚未配置');
@@ -50,9 +55,10 @@ export function switchTrafficUseCase(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'aut
         if (!input.requestKey || input.expectedActiveRelease === undefined || !input.expectedTargetRelease) throw precondition('执行交接需要 requestKey 和明确的来源／目标发布');
         const compatibility = await deps.executionHandoff.precheck(serviceId, targetRelease.id);
         if (!compatibility.supported) throw precondition('目标不支持活动任务契约', { code: 'task_contract_unsupported', blocked: compatibility.blocked });
-        const operation = { id: newId('tsw'), requestKey: input.requestKey, serviceId, projectId: svc.projectId, expectedActiveReleaseId: currentRelease?.id ?? null, targetReleaseId: targetRelease.id,
+        const operation = { id: newId('tsw'), journeyId: journey.id, requestKey: input.requestKey, serviceId, projectId: svc.projectId, expectedActiveReleaseId: currentRelease?.id ?? null, targetReleaseId: targetRelease.id,
           targetSlot: target, stage: 'freezing' as const, actorUserId: actor.userId, ...(input.reason ? { reason: input.reason } : {}), createdAt: now.toISOString(), updatedAt: now.toISOString(), revision: 0, owner: null, leaseUntil: null };
-        await scope.handoffs.insert(operation); return handoffSwitchDto(operation);
+        await scope.handoffs.insert(operation);
+        return recordJourneyLaunch(scope, journey, input, handoffSwitchDto(operation), targetRelease, slots, now);
       }
       await scope.slots.save(next);
       // 切流永远是「待命槽接管生产流量」：目标槽切之前的角色是 preview，切之后是 prod。
@@ -64,7 +70,7 @@ export function switchTrafficUseCase(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'aut
       };
       await scope.switches.insert(record);
       await scope.events.publish(DomainTopic.trafficSwitched, { occurredAt: now.toISOString(), projectId: svc.projectId, serviceId, fromSlot: 'preview', toSlot: 'prod', releaseId: record.releaseId, actorUserId: actor.userId });
-      return switchToDto(record);
+      return recordJourneyLaunch(scope, journey, input, switchToDto(record), targetRelease, slots, now);
     });
   };
 }

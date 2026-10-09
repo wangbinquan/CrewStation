@@ -7,11 +7,13 @@ import type { PhysicalSlot, ServiceSlots, SlotState } from '../domain/slots';
 import { roleOf } from '../domain/slots';
 import type { HostNaming } from '../ports/platform';
 import type { TrafficSwitchRecord } from '../ports/repositories';
+import { releaseTargetRevision } from '../domain/journey/journey';
 
 export function releaseToDto(release: Release, slots: ServiceSlots | undefined): ReleaseDto {
   const onSlot = slots && (['blue', 'green'] as PhysicalSlot[]).find((p) => slots[p].releaseId === release.id);
   return {
     id: release.id,
+    ...(release.pipeline.journeyId ? { journeyId: release.pipeline.journeyId } : {}),
     serviceId: release.serviceId,
     tag: release.tag,
     commitSha: release.commitSha,
@@ -51,6 +53,7 @@ export function slotToDto(slots: ServiceSlots, physical: PhysicalSlot, releases:
   const release = slot.releaseId ? releases.get(slot.releaseId) : undefined;
   return {
     name: role,
+    ...(release ? { targetRevision: releaseTargetRevision(release, slot) } : {}),
     active: role === 'prod',
     ...(slot.releaseId ? { releaseId: slot.releaseId } : {}),
     ...(release ? { tag: release.tag, commitSha: release.commitSha } : {}),

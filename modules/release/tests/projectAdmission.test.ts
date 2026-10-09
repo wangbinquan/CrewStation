@@ -85,7 +85,7 @@ describe.skipIf(!available)('发布原项目准入与外部 IO', () => {
     const original = (await f.uow.read.handoffs.latest(f.serviceId))!, project = newResourceId() as ProjectId, service = newResourceId() as ServiceId;
     const old = { ...f.old, id: newResourceId() as typeof f.old.id, projectId: project, serviceId: service }, target = { ...f.target, id: newResourceId() as typeof f.target.id, projectId: project, serviceId: service };
     await f.uow.read.releases.insert(old);await f.uow.read.releases.insert(target);
-    await f.uow.read.handoffs.insert({ ...original,id:newResourceId(),requestKey:newResourceId(),projectId:project,serviceId:service,expectedActiveReleaseId:old.id,targetReleaseId:target.id });
+    await f.uow.read.handoffs.insert({ ...original,journeyId:undefined,id:newResourceId(),requestKey:newResourceId(),projectId:project,serviceId:service,expectedActiveReleaseId:old.id,targetReleaseId:target.id });
     const services = { resolveServiceById: async (id: ServiceId) => ({ projectId:id===service?project:f.old.projectId,slug:'handoff',name:'handoff',namespace:'cs-handoff' }) };
     const admission = releaseProjectAdmissions({ db:f.database.db,protectCurrent:async()=>native,assertAvailable:async(id)=>{if(id===f.old.projectId)throw Error('own project sealed');} });
     expect(await releaseHandoffUseCases({...f.deps,services,admission}).progressHandoffs()).toBe(1);
@@ -103,7 +103,7 @@ describe.skipIf(!available)('发布原项目准入与外部 IO', () => {
       const target = { ...f.target, id: newResourceId() as typeof f.target.id, projectId, serviceId };
       await f.uow.read.releases.insert(old); await f.uow.read.releases.insert(target);
       const id = newResourceId();
-      await f.uow.read.handoffs.insert({ ...original, id, requestKey: newResourceId(), projectId, serviceId, expectedActiveReleaseId: old.id, targetReleaseId: target.id });
+      await f.uow.read.handoffs.insert({ ...original, journeyId: undefined, id, requestKey: newResourceId(), projectId, serviceId, expectedActiveReleaseId: old.id, targetReleaseId: target.id });
       projects.set(serviceId, projectId); return id;
     };
     for (let i = 0; i < 19; i++) await add(f.old.projectId);
@@ -152,7 +152,7 @@ describe.skipIf(!available)('发布原项目准入与外部 IO', () => {
       const serviceId = newResourceId() as ServiceId, id = newResourceId();
       const old = { ...f.old, id: newResourceId() as typeof f.old.id, serviceId }, target = { ...f.target, id: newResourceId() as typeof f.target.id, serviceId };
       await f.uow.read.releases.insert(old); await f.uow.read.releases.insert(target);
-      await f.uow.read.handoffs.insert({ ...original, id, requestKey: newResourceId(), serviceId, expectedActiveReleaseId: old.id, targetReleaseId: target.id }); ids.push(id);
+      await f.uow.read.handoffs.insert({ ...original, journeyId: undefined, id, requestKey: newResourceId(), serviceId, expectedActiveReleaseId: old.id, targetReleaseId: target.id }); ids.push(id);
     }
     expect((await f.uow.read.handoffs.pending(1)).map((row) => row.id)).toEqual([ids[0]!]);
     await f.database.db.execute(sql`UPDATE release.execution_handoffs SET updated_at='2099-01-01T00:00:00Z'::timestamptz WHERE id=${ids[0]!}`);

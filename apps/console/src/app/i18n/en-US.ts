@@ -102,6 +102,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'ui.progress.state.running': 'In progress',
   'ui.progress.state.succeeded': 'Done',
   'ui.progress.state.failed': 'Failed',
+  'ui.progress.state.unknown': 'Not recorded',
   'ui.progress.state.skipped': 'Skipped',
   'ui.progress.overall.running': 'Starting',
   'ui.progress.overall.ready': 'Ready',

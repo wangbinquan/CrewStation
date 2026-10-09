@@ -129,7 +129,7 @@ export function admittedReleaseApi(deps: ReleaseUseCaseDeps, api: ReleaseModuleA
     });
   };
   return { ...api,
-    publish: (actor, id, input) => service(id, { actor, input }, () => api.publish(actor, id, input), 'publish'),
+    publish: (actor, id, input, source) => service(id, { actor, input, source }, () => api.publish(actor, id, input, source), 'publish'),
     switchTraffic: (actor, id, input) => service(id, { actor, input }, () => api.switchTraffic(actor, id, input)),
     takeOffline: (actor, id, input) => service(id, { actor, input }, () => api.takeOffline(actor, id, input)),
     postponeOffline: (actor, id, input) => service(id, { actor, input }, () => api.postponeOffline(actor, id, input)),

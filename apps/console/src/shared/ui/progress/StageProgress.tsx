@@ -6,7 +6,7 @@ import type { Progress, ProgressStage } from './stageProgressView';
 import { awaitingFailureLog, clockSkew, formatDuration, stageElapsed, stageLabel, stagePosition, totalElapsed } from './stageProgressView';
 import styles from './StageProgress.module.css';
 
-const ICON: Record<ProgressStage['state'], string> = { succeeded: '✓', running: '●', pending: '○', failed: '✕', skipped: '–' };
+const ICON: Record<ProgressStage['state'], string> = { succeeded: '✓', running: '●', pending: '○', failed: '✕', skipped: '–', unknown: '?' };
 
 /**
  * 有进行中的段时每秒刷新一次；时钟偏差由服务器读出时刻与本机收到时刻算出（RFC-022 B9）。
@@ -49,10 +49,11 @@ export function StageProgress<S extends ProgressStage>({ progress, title, label,
   const { index, stage: current } = stagePosition(progress);
   const failed = progress.stages.find((stage) => stage.state === 'failed');
   const logToggle = !!failed && (!!failed.logTail || emptyLogText !== undefined);
+  const elapsedTotal = totalElapsed(progress, now, skew);
   return <section className={[styles.progress, className].filter(Boolean).join(' ')} data-state={progress.state} aria-label={typeof title === 'string' ? title : t('ui.progress.label')}>
     {title !== undefined ? <header className={styles.header}>
       <span className={styles.title}>{title}</span>
-      <span className={styles.total}>{t(progress.state === 'running' ? 'ui.progress.elapsed' : 'ui.progress.total', { time: formatDuration(t, totalElapsed(progress, now, skew)) })}</span>
+      {elapsedTotal !== undefined ? <span className={styles.total}>{t(progress.state === 'running' ? 'ui.progress.elapsed' : 'ui.progress.total', { time: formatDuration(t, elapsedTotal) })}</span> : null}
     </header> : null}
     <ol className={styles.stages}>
       {progress.stages.map((stage, i) => {
@@ -60,7 +61,7 @@ export function StageProgress<S extends ProgressStage>({ progress, title, label,
         return <li key={`${stage.kind}-${i}`} className={styles.stage} data-state={stage.state} aria-current={progress.state === 'running' && i === index - 1 ? 'step' : undefined}>
           <span className={styles.icon} aria-hidden="true">{ICON[stage.state]}</span>
           <span className={styles.name}>{name(stage)}<span className={styles.hidden}>{`（${t(`ui.progress.state.${stage.state}`)}）`}</span></span>
-          <span className={styles.time}>{stage.state === 'skipped' ? t('ui.progress.state.skipped') : elapsed !== undefined ? formatDuration(t, elapsed) : ''}</span>
+          <span className={styles.time}>{stage.state === 'skipped' || stage.state === 'unknown' ? t(`ui.progress.state.${stage.state}`) : elapsed !== undefined ? formatDuration(t, elapsed) : ''}</span>
           {stage.detail && stage.state !== 'pending' ? <p className={styles.detail}>{stage.detail}</p> : null}
           {stage.warning ? <p className={styles.warning}>{stage.warning}</p> : null}
           {stage.error ? <p className={styles.error}>{stage.error.message}</p> : null}

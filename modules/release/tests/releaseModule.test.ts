@@ -50,7 +50,7 @@ beforeAll(async () => {
   manifestYaml = baseManifest('migration: { compatibility: none, destructive: false, rollback: switch-back }');
   release = createReleaseModule({
     db: tdb.db, k8s,
-    tagger: { createReleaseTag: async (_service, input) => { tagCounter += 1; return { tag: `v0.1.${tagCounter}`, commitSha: input.expectedCommitSha ?? `sha${tagCounter}` }; } },
+    tagger: { createReleaseTag: async (_service, input) => { tagCounter += 1; return { tag: `v0.1.${tagCounter}`, commitSha: input.expectedCommitSha ?? tagCounter.toString(16).padStart(40, 'a') }; } },
     repo: {
       readFile: async (_s, _ref, path) => (path === 'crewstation.yaml' ? manifestYaml : path === 'openapi.yaml' ? 'openapi: 3.1.0\npaths: {}\n' : undefined),
       repositoryUrl: async () => ({ httpUrl: 'http://gitlab.local/crewstation/demo.git', credentialSecretName: 'demo-git' }),

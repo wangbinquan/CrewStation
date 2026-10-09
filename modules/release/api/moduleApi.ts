@@ -1,4 +1,6 @@
 import type { RuntimeImageHistoryRead, RuntimeImageHistoryItem } from '@crewstation/contracts';
+import type { ReleaseJourneySource } from '@crewstation/contracts';
+import type { ReleaseJourneyDetail, ReleaseJourneyHistory, ReleaseJourneyPage, ReleaseJourneyPageRequest, VerifyReleaseJourneyRequest } from '@crewstation/contracts';
 import type { ProjectDeletionInventory, ProjectDeletionOwner, ProjectDeletionTarget } from '@crewstation/contracts';
 import type { ReleaseResourceUsage } from '@crewstation/contracts';
 import type { ClusterResource, ClusterInspectRequest, ClusterInspection, ClusterOperation } from '@crewstation/contracts';
@@ -43,6 +45,11 @@ export interface ReleaseProjectContent {
 
 /** release 模块对外能力：发布、切流、查询；流水线推进由工作器调用。 */
 export interface ReleaseModuleApi {
+  listJourneys(actor: Actor, serviceId: ServiceId, input: ReleaseJourneyPageRequest): Promise<ReleaseJourneyPage>;
+  getJourney(actor: Actor, journeyId: string): Promise<ReleaseJourneyDetail>;
+  journeyHistory(actor: Actor, releaseId: ReleaseId): Promise<ReleaseJourneyHistory>;
+  verifyJourney(actor: Actor, journeyId: string, input: VerifyReleaseJourneyRequest): Promise<ReleaseJourneyDetail>;
+  progressJourneys(): Promise<number>;
   readonly deletionOwner?: ProjectDeletionOwner;
   /** Complete retained content, including old identities. Native reclamation requires its own independent source. */
   deletionContent(target: ProjectDeletionTarget): Promise<ReleaseProjectContent>;
@@ -61,7 +68,7 @@ export interface ReleaseModuleApi {
   inspectSlotOperation(actor: Actor, target: ClusterResource, request: ClusterInspectRequest): Promise<Pick<ClusterInspection, 'capability' | 'domain'>>;
   executeSlotOperation(actor: Actor, operation: ClusterOperation, inspection: ClusterInspection): Promise<{ operationId: string }>;
   observeSlotOperation(operation: ClusterOperation): Promise<{ done: boolean; failed?: boolean; reason: string }>;
-  publish(actor: Actor, serviceId: ServiceId, input: PublishRequest): Promise<ReleaseDto>;
+  publish(actor: Actor, serviceId: ServiceId, input: PublishRequest, source?: ReleaseJourneySource): Promise<ReleaseDto>;
   switchTraffic(actor: Actor, serviceId: ServiceId, input: TrafficSwitchRequest): Promise<TrafficSwitchDto>;
   listReleases(actor: Actor, serviceId: ServiceId): Promise<ReleaseDto[]>;
   getRelease(actor: Actor, releaseId: ReleaseId): Promise<ReleaseDto>;

@@ -14,6 +14,7 @@ import { releaseProjectDeletionOwner } from '../application/projectDeletion';
 import { RELEASE_PHYSICAL_KINDS, releaseCallbackIdentity, type ReleasePhysicalScope } from '../domain/release';
 import type { ReleaseDeletionPhysics } from '../ports/unitOfWork';
 import { initialSlots } from '../domain/slots';
+import { createJourney } from '../application/journey/recording';
 const fixtures: Awaited<ReturnType<typeof createTestDatabase>>[]=[];
 afterEach(async()=>{for(const f of fixtures.splice(0))await f.drop();});
 const available=await testDatabaseAvailable();
@@ -35,6 +36,24 @@ async function setup(){
  return {tdb,db,uow,project,service,otherProject,otherService,target,operationId,controls,services,repository,owner,physics,assertGrant,admissions,record,own,foreign,context};
 }
 describe.skipIf(!available)('发布持久删除原范围与阶段',()=>{
+ test('RFC-038 日志全量纳入原确认范围、封写和清零；外项目原流程完整保留',async()=>{
+  const x=await setup();
+  const own=await x.uow.run(scope=>createJourney(scope,x.own,x.own.createdBy,'publish',{kind:'repository'},x.own.createdAt));
+  const foreign=await x.uow.run(scope=>createJourney(scope,x.foreign,x.foreign.createdBy,'publish',{kind:'repository'},x.foreign.createdAt));
+  const savedForeign=await x.uow.read.journeys.snapshot(foreign.id);
+  const content=await x.repository.content(x.target);
+  expect(content.inventory.complete).toBe(true);
+  expect(content.rows.filter(row=>row.table==='release_journeys')).toHaveLength(1);
+  expect(content.rows.filter(row=>row.table==='release_journey_events')).toHaveLength(2);
+  const confirmed=await x.owner.inspect(x.target);await x.owner.run(x.context(confirmed,'seal'));
+  await expect(x.uow.read.journeys.append(own.id,{transitionKey:'late',stage:'build',state:'running',at:new Date().toISOString()})).rejects.toMatchObject({cause:{code:'55000'}});
+  for(const phase of PROJECT_DELETION_PHASES.slice(1))expect((await x.owner.run(x.context(confirmed,phase))).kind).toBe('done');
+  expect(await x.uow.read.journeys.snapshot(own.id)).toBeUndefined();
+  expect(await x.uow.read.journeys.events(own.id)).toEqual([]);
+  expect((await x.repository.content(x.target)).rows).toEqual([]);
+  expect(await x.uow.read.journeys.snapshot(foreign.id)).toEqual(savedForeign);
+  await expect(x.uow.run(scope=>createJourney(scope,x.own,x.own.createdBy,'publish',{kind:'repository'},x.own.createdAt))).rejects.toThrow();
+ });
  test('原回调实际 finally 退出，七阶段重建重放；外项目和全局记录保持且永久拒绝迟到写',async()=>{
   const x=await setup();await x.admissions.run(x.project,x.service,{kind:'pipeline',consumerId:x.own.id,inputDigest:jsonHash('input')},async()=>{await x.uow.read.releases.update({...x.own,message:'callback'});});
   const original=await releaseInfrastructureOrigin(x.db,x.own.id);
@@ -69,7 +88,9 @@ describe.skipIf(!available)('发布持久删除原范围与阶段',()=>{
  test('普通 SQL 不得改原身份、擦除封闭控制或凭 GUC 伪造退出',async()=>{
   const x=await setup();await expect(x.db.execute(sql`UPDATE release.releases SET project_id=${x.otherProject} WHERE id=${x.own.id}`).then((value)=>value)).rejects.toMatchObject({cause:{code:'55000'}});
   await x.admissions.run(x.project,x.service,{kind:'pipeline',consumerId:x.own.id,inputDigest:jsonHash('sql')},async()=>{await expect(x.db.execute(sql`UPDATE release.deletion_callbacks SET exited_at=now(),exit_digest=release.callback_receipt(to_jsonb(deletion_callbacks)) WHERE project_id=${x.project}`).then((value)=>value)).rejects.toMatchObject({cause:{code:'55000'}});});
-  await expect(x.db.execute(sql`TRUNCATE release.releases`).then((value)=>value)).rejects.toMatchObject({cause:{code:'55000'}});
+  await expect(x.db.execute(sql`TRUNCATE release.releases`).then((value)=>value)).rejects.toMatchObject({cause:{code:'0A000'}});
+  await expect(x.db.execute(sql`TRUNCATE release.releases,release.release_journeys,release.release_journey_events`).then((value)=>value)).rejects.toMatchObject({cause:{code:'55000'}});
+  expect(await x.uow.read.releases.getById(x.own.id)).toEqual(x.own);
   const confirmed=await x.owner.inspect(x.target);await x.owner.run(x.context(confirmed,'seal'));
   await expect(x.db.execute(sql`DELETE FROM release.deletion_fences WHERE project_id=${x.project}`).then((value)=>value)).rejects.toMatchObject({cause:{code:'55000'}});
   await expect(x.db.execute(sql`UPDATE release.project_admissions SET sealed=false WHERE project_id=${x.project}`).then((value)=>value)).rejects.toMatchObject({cause:{code:'55000'}});

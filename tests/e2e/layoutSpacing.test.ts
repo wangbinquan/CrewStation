@@ -14,7 +14,7 @@ async function viewport(page: Page, width: number) {
 
 async function click(page: Page, label: string) {
   await page.eval(`(() => {
-    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === ${JSON.stringify(label)});
+    const button = [...document.querySelectorAll('button,a')].find((node) => node.textContent.trim() === ${JSON.stringify(label)});
     if (!button) throw new Error('Missing button: ' + ${JSON.stringify(label)});
     button.click();
   })()`);
@@ -120,18 +120,19 @@ describe.skipIf(!session)('卡片操作区的真实布局间距', () => {
 });
 
 describe.skipIf(!session?.project)('项目操作区的真实布局间距', () => {
-  test.each([1280, 390])('%dpx：发布准备弹窗的底部按钮上下留白、不超出窗口，来源按钮之间留白', async (width) => {
+  test.each([1440, 1024, 390, 320])('%dpx：独立发布向导操作条留白、无横向溢出，来源操作连续', async (width) => {
     const page = session!.admin;
     await viewport(page, width);
     await open(page, `/projects/${session!.project!.id}/release`);
     await click(page, '准备发布');
-    // 2026-09-23 起发布准备是弹窗，按钮在弹窗底部的操作条里：量它与操作条上下边的留白，以及弹窗离窗口两侧的距离。
+    await page.waitUntil(`location.pathname.endsWith('/release/publish') && !!document.querySelector('#release-wizard-step-heading')`);
+    expect(await page.eval<number>(`document.querySelectorAll('dialog[open]').length`)).toBe(0);
     const actual = await page.eval<{ top: number; bottom: number; left: number; right: number; width: number; containerWidth: number; overflow: number }>(`(() => {
-      const dialog = document.querySelector('dialog[open]');
-      if (!dialog) throw new Error('Missing dialog');
-      const button = [...dialog.querySelectorAll('button')].find((node) => node.textContent.trim() === '检查发布来源');
-      if (!button) throw new Error('Missing button: 检查发布来源');
-      const footer = button.parentElement.parentElement.getBoundingClientRect(), rect = button.getBoundingClientRect(), frame = dialog.getBoundingClientRect();
+      const heading = document.querySelector('#release-wizard-step-heading');
+      const wizard = heading?.parentElement.parentElement;
+      const button = [...(wizard?.querySelectorAll('button') ?? [])].find((node) => node.textContent.trim() === '开始构建与部署');
+      if (!button) throw new Error('Missing wizard primary action');
+      const footer = button.parentElement.getBoundingClientRect(), rect = button.getBoundingClientRect(), frame = wizard.getBoundingClientRect();
       return { top: rect.top - footer.top, bottom: footer.bottom - rect.bottom, left: frame.left, right: innerWidth - frame.right, width: rect.width, containerWidth: footer.width, overflow: document.documentElement.scrollWidth - innerWidth };
     })()`);
     expect(actual.top).toBeGreaterThanOrEqual(8);
@@ -148,7 +149,7 @@ describe.skipIf(!session?.project)('项目操作区的真实布局间距', () =>
     })()`);
     expect(sourceGap).toBeGreaterThanOrEqual(8);
     expect(page.takeErrors()).toEqual([]);
-    await click(page, '取消');
+    await click(page, '稍后继续');
   }, 45_000);
 
   test('告警状态筛选与调用链「按 trace_id 打开」的操作有独立间隔', async () => {

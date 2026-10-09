@@ -58,6 +58,8 @@ export function slotLifecycleFixture(role: Role = 'owner', admin = false) {
     if (path === `/v1/workbench/project-summaries/${projectId}`) return [testerSummaryFixture(projectId, serviceId), 200];
     if (path.endsWith('/slots')) return [{ items: state.slots }, 200];
     if (path.endsWith('/releases')) return [{ items: releases }, 200];
+    if (path.endsWith('/release-journeys')) return [{ items: releases.map(release => ({ recordKind: 'legacy', release, provenance: 'retained-release', stages: [{ stage: 'build', state: 'unknown' }] })), hasMore: false }, 200];
+    if (path.endsWith('/journey-history')) { const release = releases.find(release => path.includes(release.id)); return [{ journeys: [], ...(release ? { legacy: { recordKind: 'legacy', release, provenance: 'retained-release', stages: [{ stage: 'build', state: 'unknown' }] } } : {}), trafficSwitches: [], slotEvents: state.slotEvents.filter(event => event.releaseId === release?.id) }, 200]; }
     if (path.endsWith('/redeploy-precheck')) { const reason = state.precheck[path.split('/')[3] ?? '']; return [reason ? { ok: false, reason } : { ok: true }, 200]; }
     if (path.startsWith('/v1/releases/')) return [releases.find((item) => path.endsWith(item.id)), 200];
     if (path.endsWith('/slot-events')) return [{ items: state.slotEvents }, 200];

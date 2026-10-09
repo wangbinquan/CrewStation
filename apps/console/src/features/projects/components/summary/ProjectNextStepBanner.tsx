@@ -1,5 +1,5 @@
 import type { ProjectSummaryDetail } from '@crewstation/contracts';
-import { PROJECT_PATHS } from '../../../../shared/project/projectPaths';
+import { RELEASE_PATHS } from '../../../../shared/project/projectPaths';
 import type { ProjectSpace } from '../../../../shared/project/projectPaths';
 import { useT } from '../../../../shared/lib/useT';
 import { summaryIsFresh } from '../../model/projectSummaryState';
@@ -27,6 +27,6 @@ export function ProjectNextStepBanner({ item, space }: { readonly item: ProjectS
   if (!step) return null;
   return <div className={styles.banner} data-tone={step.tone} role="status">
     <div><strong>{step.title}</strong><p className={styles.muted}>{step.hint}</p></div>
-    {step.releaseId ? <ButtonLink to={PROJECT_PATHS[space].release} params={{ projectId: item.project.id }} search={{ release: step.releaseId }}>{t('projects.summary.next.viewRelease')}</ButtonLink> : null}
+    {step.releaseId ? <ButtonLink to={RELEASE_PATHS[space].version} params={{ projectId: item.project.id, releaseId: step.releaseId }}>{t('projects.summary.next.viewRelease')}</ButtonLink> : null}
   </div>;
 }

@@ -5,7 +5,7 @@ import { useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import type { ApiClientError } from '../../../shared/api/useApi';
 import { useProjectScope } from '../../../shared/project/ProjectScope';
-import { PROJECT_PATHS } from '../../../shared/project/projectPaths';
+import { PROJECT_PATHS, RELEASE_PATHS } from '../../../shared/project/projectPaths';
 import { UnsavedChangesGuard } from '../../../shared/navigation/UnsavedChangesGuard';
 import { useT } from '../../../shared/lib/useT';
 import { DataBindingPane } from '../components/DataBindingPane';
@@ -111,7 +111,7 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
           <div className={styles.actions}>
             {newCli}
             {previewLink ? <ExternalButtonLink size="small" href={previewLink}>{t('devSession.native.openPreview')}</ExternalButtonLink> : null}
-            <ButtonLink variant="primary" size="small" to={PROJECT_PATHS[space].release} params={{ projectId }} search={{ source: 'session' }}>{t('devSession.native.prepareRelease')}</ButtonLink>
+            <ButtonLink variant="primary" size="small" to={RELEASE_PATHS[space].publish} params={{ projectId }} search={{ source: 'session' }}>{t('devSession.native.prepareRelease')}</ButtonLink>
             {/* 危险动作排最后、红字红框；只给会话创建者与负责人。 */}
             {canReleaseSession(access, session) ? <Button variant="danger" size="small" disabled={release.isPending} onClick={requestRelease}>{release.isPending ? t('devSession.release.pending') : t('devSession.release.action')}</Button> : null}
           </div>

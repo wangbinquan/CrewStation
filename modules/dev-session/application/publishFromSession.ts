@@ -36,6 +36,6 @@ export function publishFromSessionUseCase(deps: DevSessionUseCaseDeps) {
     });
     if ((push.exitCode ?? 1) !== 0) throw precondition(`推送失败，未打标签：${(push.stderr ?? '').split('\n').filter((l) => !l.includes('@')).join(' ').slice(0, 500)}`);
     await environments.touch(env.id);
-    return releases.publish(actor, svc.serviceId, { ...releaseInput, expectedCommitSha: status.headSha });
+    return releases.publish(actor, svc.serviceId, { ...releaseInput, expectedCommitSha: status.headSha }, { kind: 'session', taskId: env.id });
   };
 }

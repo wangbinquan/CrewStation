@@ -5,7 +5,7 @@ import type { Translate } from '../../lib/useT';
 /** 公共步骤条能画的一段：启动进度（RFC-022）的段与档位测试的段都满足。 */
 export interface ProgressStage {
   readonly kind: string;
-  readonly state: StartupStageState;
+  readonly state: StartupStageState | 'unknown';
   readonly startedAt?: string;
   readonly endedAt?: string;
   readonly durationMs?: number;
@@ -20,7 +20,7 @@ export interface ProgressStage {
 export interface Progress<S extends ProgressStage = ProgressStage> {
   readonly state: 'running' | 'ready' | 'failed' | 'cancelled';
   readonly stages: readonly S[];
-  readonly startedAt: string;
+  readonly startedAt?: string;
   readonly endedAt?: string;
   /** 服务器给出这份进度的时刻；没有时按本机时钟计时。 */
   readonly observedAt?: string;
@@ -64,14 +64,15 @@ export function stageElapsed(stage: ProgressStage, now: number, skew: number): n
 }
 
 /** 整个过程到现在（结束了就到结束）的用时。 */
-export function totalElapsed(progress: Progress, now: number, skew: number): number {
+export function totalElapsed(progress: Progress, now: number, skew: number): number | undefined {
+  if (!progress.startedAt) return undefined;
   const end = progress.endedAt ? Date.parse(progress.endedAt) : now + skew;
   return Math.max(0, end - Date.parse(progress.startedAt));
 }
 
 /** 当前段在第几段（从 1 起）与一共几段；跳过的段也算在总数里，和步骤条上看到的行数一致。 */
 export function stagePosition<S extends ProgressStage>(progress: Progress<S>): { index: number; total: number; stage?: S } {
-  const stage = currentStage(progress.stages);
+  const stage = currentStage(progress.stages.filter((entry): entry is S & { state: StartupStageState } => entry.state !== 'unknown'));
   return { index: stage ? progress.stages.indexOf(stage) + 1 : 0, total: progress.stages.length, ...(stage ? { stage } : {}) };
 }
 

@@ -208,7 +208,7 @@ describe('概览按实际状态选择下一步', () => {
       tag: 'v1.0.2', commitSha: 'b'.repeat(40), branch: 'main', status: 'failed', createdBy: summaryUserId, createdAt: time, updatedAt: time }] };
     page = await renderApp(`/projects/${f.item.project.id}`);
     expect(document.querySelector('[data-primary-project-action]')?.textContent).toContain('处理 v1.0.2 发布问题');
-    expect(document.querySelector('[data-primary-project-action]')?.getAttribute('href')).toContain('release=01a0bf5d-8f4b-7645-8cca-c128d59001d1');
+    expect(document.querySelector('[data-primary-project-action]')?.getAttribute('href')).toContain('/release/versions/01a0bf5d-8f4b-7645-8cca-c128d59001d1');
     f.item.releases = { status: 'ready', checkedAt: time, value: [] }; await page.reread();
     expect(document.querySelector('[data-primary-project-action]')?.textContent).toContain('开始开发');
     await page.click('开始开发'); expect(page.path()).toBe(`/projects/${f.item.project.id}/dev-session`); expect(f.writes).toEqual([]);

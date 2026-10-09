@@ -4,7 +4,7 @@ import type { ReactElement } from 'react';
 import { api } from '../../../../shared/api/client';
 import { queryKeys } from '../../../../shared/api/queryKeys';
 import { useApiQuery } from '../../../../shared/api/useApi';
-import { PROJECT_PATHS } from '../../../../shared/project/projectPaths';
+import { PROJECT_PATHS, RELEASE_PATHS } from '../../../../shared/project/projectPaths';
 import { resourcePhaseTone } from '../../../../shared/resources/resourcePhaseTone';
 import { useProjectResources } from '../../../../shared/resources/useProjectResources';
 import type { ProjectSpace } from '../../../../shared/project/projectPaths';
@@ -36,7 +36,7 @@ export function StatusCards({ item, space, available }: { readonly item: Project
       if (!part) return <Card key={name} compact title={t(`slot.${name}`)}><span className={styles.muted}>{t('projects.summary.unknown')}</span></Card>;
       if (!known) return <Card key={name} compact title={t(`slot.${name}`)}><SummaryUnavailable part={part} /></Card>;
       return <DeployedVersionCard key={name} role={name} slot={slot} known={available} sha="short" health={health(name)} maintenance={name === 'prod' ? maintenance.current : undefined}
-        primary={name === 'preview' && available && switchTarget ? <ButtonLink variant="primary" to={PROJECT_PATHS[space].release} params={{ projectId }} search={{ switch: true }}>{t('projects.summary.goLive', { tag: slot?.tag ?? '' })}</ButtonLink> : undefined} />;
+        primary={name === 'preview' && available && switchTarget ? <ButtonLink variant="primary" to={RELEASE_PATHS[space].version} params={{ projectId, releaseId: slot!.releaseId! }} search={{ switch: true }}>{t('projects.summary.goLive', { tag: slot?.tag ?? '' })}</ButtonLink> : undefined} />;
     })}
     {tester ? null : <DevelopmentCard item={item} space={space} available={available} />}
   </div>;

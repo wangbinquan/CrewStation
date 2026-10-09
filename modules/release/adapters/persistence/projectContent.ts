@@ -7,8 +7,11 @@ import type { ReleaseContentDirectory } from '../../ports/repositories';
 import { ReleaseCallbackRecordSchema, releaseCallbackIdentity } from '../../domain/release';
 import type { ReleaseCallbackRecord, ReleaseDeletionContent } from '../../domain/release';
 import type { ServiceResolver } from '../../ports/platform';
+import { validateJourneyContent } from './journey/content';
 
 const columns: Readonly<Record<string, readonly string[]>> = {
+  release_journeys: ['id', 'project_id', 'service_id', 'release_id', 'kind', 'status', 'revision', 'request_key', 'body', 'created_at'],
+  release_journey_events: ['id', 'project_id', 'service_id', 'release_id', 'journey_id', 'sequence', 'transition_key', 'body', 'created_at'],
   releases: ['id', 'service_id', 'project_id', 'tag', 'commit_sha', 'branch', 'status', 'target_slot', 'image', 'manifest', 'config_version', 'pipeline', 'message', 'created_by', 'created_at', 'updated_at', 'legacy_manifest', 'identity_provenance', 'legacy_resource_id'],
   service_slots: ['service_id', 'active', 'blue', 'green', 'updated_at'],
   traffic_switches: ['id', 'service_id', 'from_slot', 'to_slot', 'release_id', 'previous_release_id', 'actor_user_id', 'reason', 'created_at'],
@@ -145,6 +148,7 @@ export async function releaseContentOver(tx: Executor, input: { services: Servic
   const rawRows = await tx.execute<{ table: string; body: Record<string, unknown> }>(sql.join(statements, sql` UNION ALL `));
   const blockers: ProjectDeletionBlocker[] = [], references: ProjectDeletionInventory['references'] = [];
   const blocked = (code: string, message: string) => { if (!blockers.some((entry) => entry.code === code)) blockers.push(blocker(code, message)); };
+  validateJourneyContent(rawRows, blocked);
   const { aliases, normalize, bindAlias } = await identityScope(input, target, rawRows, blocked);
   const rows: Row[] = rawRows.filter((entry) => contentTables.includes(entry.table)).map((entry) => ({ ...entry, key: releaseContentRowKey(entry.table, entry.body), owners: new Set<string>(), releases: new Set<string>(), services: new Set<string>() }));
   const serviceOwners = new Map<string, Set<string>>(), releaseOwners = new Map<string, Set<string>>(), resolvedServices = new Map<string, string | undefined>();

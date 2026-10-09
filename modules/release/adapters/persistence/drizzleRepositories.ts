@@ -69,6 +69,7 @@ export function drizzleTrafficSwitchRepository(db: Executor): TrafficSwitchRepos
     actorUserId: row.actorUserId as UserId, ...(row.reason ? { reason: row.reason } : {}), createdAt: row.createdAt,
   });
   return {
+    listByRelease: async (id) => (await db.select().from(trafficSwitches).where(eq(trafficSwitches.releaseId, id)).orderBy(desc(trafficSwitches.createdAt), desc(trafficSwitches.id))).map(toRecord),
     insert: async (r) => { await db.insert(trafficSwitches).values({ ...r, reason: r.reason ?? null }); },
     listByService: async (serviceId, limit) => (await db.select().from(trafficSwitches).where(eq(trafficSwitches.serviceId, serviceId)).orderBy(desc(trafficSwitches.createdAt)).limit(limit)).map(toRecord),
   };
@@ -81,6 +82,7 @@ export function drizzleSlotEventRepository(db: Executor): SlotEventRepository {
     ...(row.deadline ? { deadline: row.deadline } : {}), at: row.at,
   });
   return {
+    listByRelease: async (id) => (await db.select().from(slotEvents).where(eq(slotEvents.releaseId, id)).orderBy(desc(slotEvents.at), desc(slotEvents.id))).map(toRecord),
     insert: async (r) => { await db.insert(slotEvents).values({ ...r, reason: r.reason ?? null, actorUserId: r.actorUserId ?? null, deadline: r.deadline ?? null }); },
     // 同一毫秒里的记录按 id（UUIDv7，按生成先后递增）排定先后，时间线顺序稳定。
     listByService: async (serviceId, limit) => (await db.select().from(slotEvents).where(eq(slotEvents.serviceId, serviceId)).orderBy(desc(slotEvents.at), desc(slotEvents.id)).limit(limit)).map(toRecord),

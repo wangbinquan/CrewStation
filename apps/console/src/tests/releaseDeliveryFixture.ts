@@ -33,6 +33,8 @@ export function releaseDeliveryFixture() {
       else if (path === `/v1/workbench/project-summaries/${projectId}`) body = testerSummaryFixture(projectId, serviceId);
       else if (path === `/v1/projects/${projectId}`) body = { id: projectId, serviceId, name: '演示应用', slug: 'demo', kind: state.admin ? 'APIProxy' : 'DigitalWorker', state: 'active', ownerUserId: userId };
       else if (path.endsWith('/slots')) { if (state.failSlots) { status = 503; body = { error: 'unavailable', message: '部署读取失败' }; } else body = { items: state.slots }; }
+      else if (path.endsWith('/release-journeys')) body = { items: releases.map(release => ({ recordKind: 'legacy', release, provenance: 'retained-release', stages: [{ stage: 'build', state: 'unknown' }] })), hasMore: false };
+      else if (path.endsWith('/journey-history')) { const release = releases.find(release => path.includes(release.id)); body = { journeys: [], ...(release ? { legacy: { recordKind: 'legacy', release, provenance: 'retained-release', stages: [{ stage: 'build', state: 'unknown' }] } } : {}), trafficSwitches: [], slotEvents: [] }; }
       else if (path.startsWith('/v1/releases/')) { const item = releases.find((release) => path.endsWith(release.id)); body = state.badRelease ? { ...item, serviceId: '01a0bf5d-8f4b-7f17-8623-f7330845107a' } : item; }
       else if (path.endsWith('/execution-handoff')) body = state.handoff;
       else if (path.endsWith('/releases')) body = { items: releases };

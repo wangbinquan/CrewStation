@@ -1,4 +1,4 @@
-import type { Actor, PublishRequest, ReleaseDto, ReleaseId, ServiceId } from '@crewstation/contracts';
+import type { Actor, PublishRequest, ReleaseDto, ReleaseId, ReleaseJourneySource, ServiceId } from '@crewstation/contracts';
 import { DomainTopic } from '@crewstation/contracts';
 import { conflict, newId, notFound } from '@crewstation/kernel';
 import { precheckFailed } from '../domain/precheck';
@@ -7,6 +7,7 @@ import { initialSlots, standbyOf } from '../domain/slots';
 import type { ReleaseUseCaseDeps } from './dependencies';
 import { publishReason } from './publishPrecheck';
 import { releaseToDto } from './toDto';
+import { createJourney } from './journey/recording';
 
 /**
  * 发布是独立动作（R35）：统一预检→平台打标签→登记 Release→流水线异步推进到待命槽；同一服务同时只有一条发布在进行。
@@ -14,7 +15,7 @@ import { releaseToDto } from './toDto';
  */
 export function publishUseCase(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'tagger' | 'authorizer' | 'services' | 'jobs' | 'clock' | 'repo' | 'maintenance' | 'plans' | 'config' | 'data' | 'settings'>) {
   const { uow, tagger, authorizer, services, jobs, clock } = deps;
-  return async (actor: Actor, serviceId: ServiceId, input: PublishRequest): Promise<ReleaseDto> => {
+  return async (actor: Actor, serviceId: ServiceId, input: PublishRequest, source: ReleaseJourneySource = { kind: 'repository' }): Promise<ReleaseDto> => {
     const svc = await services.resolveServiceById(serviceId);
     if (!svc) throw notFound('服务', serviceId);
     await authorizer.authorize(actor, svc.projectId, 'publish');
@@ -41,8 +42,11 @@ export function publishUseCase(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'tagger' |
         ...(input.message ? { message: input.message } : {}), createdBy: actor.userId, createdAt: now, updatedAt: now,
       };
       await scope.releases.insert(release);
+      const journey = await createJourney(scope, release, actor.userId, 'publish', source, now);
+      const accepted = { ...release, pipeline: { ...release.pipeline, journeyId: journey.id } };
+      await scope.releases.update(accepted);
       await scope.events.publish(DomainTopic.releaseStatusChanged, { occurredAt: now.toISOString(), serviceId, releaseId: release.id, status: 'pending' });
-      return releaseToDto(release, slots);
+      return releaseToDto(accepted, slots);
     });
     await jobs.enqueuePipelineStep(dto.id, 0, 0);
     return dto;

@@ -12,6 +12,7 @@ import type { PipelineContext, ResolvedService, StepResult } from './pipelineCon
 import { DONE, WAIT } from './pipelineContext';
 import { prepareSlotDeploy } from './deployPrecheck';
 import { ledgerJobSteps } from './ledgerJobs';
+import { interruptReleaseJourneys, recordPipelinePreparation } from './journey/recording';
 
 export interface DeploySteps {
   startDeploy(release: Release, svc: ResolvedService, manifest: Manifest): Promise<StepResult>;
@@ -25,6 +26,7 @@ export function deploySteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): Dep
   const ledgerJobs = ledgerJobSteps(deps, ctx);
 
   const startDeploy: DeploySteps['startDeploy'] = async (release, svc, manifest) => {
+    await uow.run(scope => recordPipelinePreparation(scope, release, 'deploy', clock.now()));
     const prepared = await prepareSlotDeploy(deps, release, svc, manifest, release.targetSlot);
     if ('reason' in prepared) return ctx.fail(release, reasonText(prepared.reason));
     const { plan, replicas, env } = prepared;
@@ -39,12 +41,13 @@ export function deploySteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): Dep
       if (previous && previous !== release.id) {
         const old = await scope.releases.getById(previous);
         if (old?.status === 'ready') await scope.releases.update(advance(old, 'superseded', now));
+        if (old) await interruptReleaseJourneys(scope, old, now, '待验证部署已被后续发布替换');
       }
       const service = manifest.spec.service;
       const workload = ledger ? { workload: nextWorkload(current, { releaseId: release.id, image: release.image ?? '', command: service.command, port: service.port, healthPath: service.healthPath, ...(service.probes ? { probes: service.probes } : {}), replicas, resources: { cpu: plan.cpu, memory: plan.memory } }) } : {};
       await scope.slots.save(withSlot(slots, { physical: release.targetSlot, releaseId: release.id, state: 'deploying', replicas, readyReplicas: 0, updatedAt: now, ...workload }, now));
+      await ctx.save(release, 'deploying', { manifest, configVersion: env.configVersion, pipeline: { ...release.pipeline, deployStartedAt: now.toISOString() } }, undefined, scope);
     });
-    await ctx.save(release, 'deploying', { manifest, configVersion: env.configVersion, pipeline: { ...release.pipeline, deployStartedAt: now.toISOString() } });
     return WAIT;
   };
 
@@ -61,6 +64,7 @@ export function deploySteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): Dep
         occurredAt: now.toISOString(), projectId: release.projectId, serviceId: release.serviceId, releaseId: release.id, tag: release.tag, commitSha: release.commitSha,
         executionMaterials: release.pipeline.executionMaterials, manifest: release.manifest as Manifest, ...(openapi ? { openapiDocument: Bun.YAML.parse(openapi) } : {}),
       });
+      await ctx.save(release, 'ready', { pipeline: { ...release.pipeline, readyAt: release.pipeline.readyAt ?? now.toISOString() } }, undefined, scope);
     });
   };
 
@@ -93,8 +97,6 @@ export function deploySteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): Dep
         return WAIT;
       }
       await registerReady(release, status);
-      // 首次就绪的时刻：只有就绪过的版本才能从发布记录重新部署（RFC-021 §4）。
-      await ctx.save(release, 'ready', { pipeline: { ...release.pipeline, readyAt: release.pipeline.readyAt ?? clock.now().toISOString() } });
       return DONE;
     },
   };

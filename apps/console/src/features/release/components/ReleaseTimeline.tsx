@@ -30,13 +30,14 @@ interface ReleaseTimelineProps {
   readonly onSelect: (releaseId: string) => void;
   /** 负责人与管理员：可以重新部署的发布带「重新部署」（RFC-021 M5、M10）。 */
   readonly onRedeploy?: (releaseId: string) => void;
+  readonly lifecycleOnly?: boolean;
 }
 
 /**
  * 发布与切流合并成一条按时间倒序的记录（RFC-020 D5），并入待命槽的下线／重新部署／推迟／提醒与维护的进入／调整／退出（RFC-021 B8）：
  * 人名与标签代替 UUID，失败条目带构建日志入口，标签即详情入口。某类记录读不到时只列其余几类并说明；成员名单读不到时操作人退回短 ID。
  */
-export function ReleaseTimeline({ projectId, serviceId, onSelect, onRedeploy }: ReleaseTimelineProps): ReactElement {
+export function ReleaseTimeline({ projectId, serviceId, onSelect, onRedeploy, lifecycleOnly = false }: ReleaseTimelineProps): ReactElement {
   const t = useT(), date = useDateText(), { space } = useProjectScope();
   const releases = useApiQuery(queryKeys.releases(serviceId), () => api.services.listReleases(serviceId));
   const switches = useApiQuery(queryKeys.trafficSwitches(serviceId), () => api.services.listTrafficSwitches(serviceId));
@@ -49,7 +50,7 @@ export function ReleaseTimeline({ projectId, serviceId, onSelect, onRedeploy }: 
   const names = new Map<string, string>();
   for (const member of members.data?.items ?? []) names.set(member.userId, member.name);
   if (me.data) names.set(me.data.id, me.data.name);
-  const entries = releaseTimeline(releaseItems, switchItems, names, { slotEvents: slotEvents.error ? [] : slotEvents.data?.items ?? [], maintenance: maintenance.history });
+  const entries = releaseTimeline(releaseItems, switchItems, names, { slotEvents: slotEvents.error ? [] : slotEvents.data?.items ?? [], maintenance: maintenance.history }).filter(entry => !lifecycleOnly || entry.kind !== 'release');
   const running = releaseItems.some((release) => isInFlight(release.status));
   const items: TimelineItem[] = entries.map((entry) => entry.kind === 'release'
     ? { id: entry.id, tone: releaseStatusTone(entry.release.status), time: date(entry.at),

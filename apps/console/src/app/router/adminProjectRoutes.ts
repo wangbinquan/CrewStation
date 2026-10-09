@@ -3,7 +3,7 @@ import { createRoute, redirect } from '@tanstack/react-router';
 import { adminRoute } from '../../features/admin';
 import { HistoricalConversationsPage } from '../../features/dev-session';
 import { ProjectOverviewPage } from '../../features/projects';
-import { ReleasePage } from '../../features/release';
+import { ReleasePage, PublishWizardPage, ReleaseJourneyPage, ReleaseVersionPage } from '../../features/release';
 import { parseDevelopmentSearch, parseConversationSearch } from '../../shared/project/developmentSearch';
 import { hasLegacyOperationsTab, parseOperationsSearch } from '../../shared/project/operationsSearch';
 import { parseResourceSearch, resourceDestination, resourceTarget } from '../../shared/project/resourceSearch';
@@ -26,6 +26,9 @@ const development = createRoute({ getParentRoute: () => adminProjectRoute, path:
 });
 const conversations = createRoute({ getParentRoute: () => adminProjectRoute, path: 'dev-session/conversations', component: HistoricalConversationsPage, validateSearch: parseConversationSearch });
 const release = createRoute({ getParentRoute: () => adminProjectRoute, path: 'release', component: ReleasePage, validateSearch: parseReleaseSearch });
+const publishWizard = createRoute({ getParentRoute: () => adminProjectRoute, path: 'release/publish', component: PublishWizardPage, validateSearch: parseReleaseSearch });
+const releaseJourney = createRoute({ getParentRoute: () => adminProjectRoute, path: 'release/journeys/$journeyId', component: ReleaseJourneyPage, validateSearch: parseReleaseSearch });
+const releaseVersion = createRoute({ getParentRoute: () => adminProjectRoute, path: 'release/versions/$releaseId', component: ReleaseVersionPage, validateSearch: parseReleaseSearch });
 const operations = createRoute({ getParentRoute: () => adminProjectRoute, path: 'operations', component: ProjectOperationsPage, validateSearch: parseOperationsSearch,
   beforeLoad: ({ params, search, location }) => { if (hasLegacyOperationsTab(location.searchStr)) throw redirect({ to: '/admin/integrations/$projectId/operations', params, search, replace: true }); },
 });
@@ -46,4 +49,4 @@ const resources = createRoute({ getParentRoute: () => adminProjectRoute, path: '
   beforeLoad: ({ params, search }) => { redirectResource(params, search); },
 });
 const resourceCenter = createRoute({ getParentRoute: () => adminProjectRoute, path: 'resource-center', component: ProjectResourceCenterPage, validateSearch: parseCenterSearch });
-export const adminProjectRoutes = adminProjectRoute.addChildren([overview, observability, observationTask, development, conversations, release, operations, settings, resources, resourceCenter]);
+export const adminProjectRoutes = adminProjectRoute.addChildren([overview, observability, observationTask, development, conversations, release, publishWizard, releaseJourney, releaseVersion, operations, settings, resources, resourceCenter]);

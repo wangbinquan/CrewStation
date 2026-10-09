@@ -35,7 +35,7 @@ describe.skipIf(!available)('服务槽由资源中心建出（RFC-025 T8）', ()
     release = createReleaseModule({
       db: tdb.db, k8s, isAdmin: async (id) => id === admin.userId, authorizer: { authorize: async () => {} },
       ledger: { within: (tx) => resources.api.owner('release').within(tx as object) }, creation: 'ledger', renderer: { dryRun: async (spec, env) => { dryRuns.push({ spec, env }); } },
-      tagger: { createReleaseTag: async () => ({ tag: `v0.0.${++version}`, commitSha: `sha-${version}` }) },
+      tagger: { createReleaseTag: async () => ({ tag: `v0.0.${++version}`, commitSha: version.toString(16).padStart(40, 'a') }) },
       repo: { readFile: async (_s, _r, path) => (path === 'crewstation.yaml' ? yaml : undefined), repositoryUrl: async () => ({ httpUrl: 'https://repo.invalid/shop', credentialSecretName: 'shop-git' }) },
       services: { resolveServiceById: async () => ({ projectId, slug: 'shop', name: 'shop', namespace: 'cs-shop' }) },
       plans: { getServicePlan: async () => ({ id: plan, name: 'small', cpu: '1', memory: '1Gi', maxReplicas: 3, description: '' }), lookupComputeProfile: async () => undefined, listComputeProfiles: async () => [] },

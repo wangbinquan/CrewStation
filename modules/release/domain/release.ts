@@ -25,7 +25,7 @@ export interface Release {
    * `readyAt`：首次就绪的时刻；只有就绪过的版本才能从发布记录重新部署（RFC-021 §4）。
    * `jobs: 'ledger'`：这次发布的构建、迁移 Job 由资源中心建（RFC-025 T8），流水线照 Job 记录判结果；两个起始时刻给它们兜底的时限。
    */
-  readonly pipeline: { executionMaterials?: BusinessReleaseMaterials; runtimeImageSelections?: Array<{ versionId: string; ownerId: string }>; runtimeImage?: RuntimeImageExecutionSnapshot; buildRef?: string; migrationRef?: string; step: number; deployStartedAt?: string; readyAt?: string; jobs?: 'ledger'; buildStartedAt?: string; migrationStartedAt?: string };
+  readonly pipeline: { journeyId?: string; executionMaterials?: BusinessReleaseMaterials; runtimeImageSelections?: Array<{ versionId: string; ownerId: string }>; runtimeImage?: RuntimeImageExecutionSnapshot; buildRef?: string; migrationRef?: string; step: number; deployStartedAt?: string; readyAt?: string; jobs?: 'ledger'; buildStartedAt?: string; migrationStartedAt?: string };
   readonly message?: string;
   readonly createdBy: UserId;
   readonly createdAt: Date;

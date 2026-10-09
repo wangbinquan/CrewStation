@@ -1,0 +1,258 @@
+{
+  "artifact": "RFC-038 design prototype",
+  "startedAt": "2026-10-09T02:00:42.052Z",
+  "checks": [
+    {
+      "name": "1440px history",
+      "evidence": {
+        "width": 1408,
+        "scrollWidth": 1408,
+        "outside": [],
+        "overlappingSteps": false,
+        "dialogs": 0
+      }
+    },
+    {
+      "name": "failed history future steps",
+      "evidence": "Viewing completion on a failed process states not completed and does not invent launch"
+    },
+    {
+      "name": "failed and legacy history",
+      "evidence": "Per-stage reason and local logs; unknown timestamps; no launch controls"
+    },
+    {
+      "name": "source change and return focus",
+      "evidence": "Branch changes visible SHA; session pins current branch; note survives; history return restores trigger focus"
+    },
+    {
+      "name": "1440px preparation",
+      "evidence": {
+        "width": 1408,
+        "scrollWidth": 1408,
+        "outside": [],
+        "overlappingSteps": false,
+        "dialogs": 0
+      }
+    },
+    {
+      "name": "continuous build and resume",
+      "evidence": "Enter starts once; same process resumes from history; automatically reaches verification"
+    },
+    {
+      "name": "permission and stale target",
+      "evidence": "Developer cannot launch; target replacement stays in the confirmation step"
+    },
+    {
+      "name": "explicit launch and immutable history",
+      "evidence": "Request accepted is separate from completion; recorded verification survives; previous success stays success"
+    },
+    {
+      "name": "source and build failures",
+      "evidence": "Draft retained; build error stops delivery; next release uses a new tag and preserves failure"
+    },
+    {
+      "name": "1024px light history",
+      "evidence": {
+        "width": 992,
+        "scrollWidth": 992,
+        "outside": [],
+        "overlappingSteps": false,
+        "dialogs": 0
+      }
+    },
+    {
+      "name": "1024px light preparation",
+      "evidence": {
+        "width": 992,
+        "scrollWidth": 992,
+        "outside": [],
+        "overlappingSteps": false,
+        "dialogs": 0
+      }
+    },
+    {
+      "name": "1024px light historical launch",
+      "evidence": {
+        "width": 992,
+        "scrollWidth": 992,
+        "outside": [],
+        "overlappingSteps": false,
+        "dialogs": 0
+      }
+    },
+    {
+      "name": "1024px dark history",
+      "evidence": {
+        "width": 992,
+        "scrollWidth": 992,
+        "outside": [],
+        "overlappingSteps": false,
+        "dialogs": 0
+      }
+    },
+    {
+      "name": "1024px dark preparation",
+      "evidence": {
+        "width": 992,
+        "scrollWidth": 992,
+        "outside": [],
+        "overlappingSteps": false,
+        "dialogs": 0
+      }
+    },
+    {
+      "name": "1024px dark historical launch",
+      "evidence": {
+        "width": 992,
+        "scrollWidth": 992,
+        "outside": [],
+        "overlappingSteps": false,
+        "dialogs": 0
+      }
+    },
+    {
+      "name": "390px light history",
+      "evidence": {
+        "width": 358,
+        "scrollWidth": 358,
+        "outside": [],
+        "overlappingSteps": false,
+        "dialogs": 0
+      }
+    },
+    {
+      "name": "390px light preparation",
+      "evidence": {
+        "width": 358,
+        "scrollWidth": 358,
+        "outside": [],
+        "overlappingSteps": false,
+        "dialogs": 0
+      }
+    },
+    {
+      "name": "390px light historical launch",
+      "evidence": {
+        "width": 358,
+        "scrollWidth": 358,
+        "outside": [],
+        "overlappingSteps": false,
+        "dialogs": 0
+      }
+    },
+    {
+      "name": "390px dark history",
+      "evidence": {
+        "width": 358,
+        "scrollWidth": 358,
+        "outside": [],
+        "overlappingSteps": false,
+        "dialogs": 0
+      }
+    },
+    {
+      "name": "390px dark preparation",
+      "evidence": {
+        "width": 358,
+        "scrollWidth": 358,
+        "outside": [],
+        "overlappingSteps": false,
+        "dialogs": 0
+      }
+    },
+    {
+      "name": "390px dark historical launch",
+      "evidence": {
+        "width": 358,
+        "scrollWidth": 358,
+        "outside": [],
+        "overlappingSteps": false,
+        "dialogs": 0
+      }
+    },
+    {
+      "name": "320px light history",
+      "evidence": {
+        "width": 288,
+        "scrollWidth": 288,
+        "outside": [],
+        "overlappingSteps": false,
+        "dialogs": 0
+      }
+    },
+    {
+      "name": "320px light preparation",
+      "evidence": {
+        "width": 288,
+        "scrollWidth": 288,
+        "outside": [],
+        "overlappingSteps": false,
+        "dialogs": 0
+      }
+    },
+    {
+      "name": "320px light historical launch",
+      "evidence": {
+        "width": 288,
+        "scrollWidth": 288,
+        "outside": [],
+        "overlappingSteps": false,
+        "dialogs": 0
+      }
+    },
+    {
+      "name": "320px dark history",
+      "evidence": {
+        "width": 288,
+        "scrollWidth": 288,
+        "outside": [],
+        "overlappingSteps": false,
+        "dialogs": 0
+      }
+    },
+    {
+      "name": "320px dark preparation",
+      "evidence": {
+        "width": 288,
+        "scrollWidth": 288,
+        "outside": [],
+        "overlappingSteps": false,
+        "dialogs": 0
+      }
+    },
+    {
+      "name": "320px dark historical launch",
+      "evidence": {
+        "width": 288,
+        "scrollWidth": 288,
+        "outside": [],
+        "overlappingSteps": false,
+        "dialogs": 0
+      }
+    },
+    {
+      "name": "network and runtime",
+      "evidence": {
+        "scriptErrors": 0,
+        "nonGetRequests": 0
+      }
+    }
+  ],
+  "screenshots": [
+    "/Users/wangbinquan/.codex/visualizations/2026/10/09/01a11e42-fe19-7c81-9ce5-44a6072613f3/release-wizard-checks/desktop-history-light.png",
+    "/Users/wangbinquan/.codex/visualizations/2026/10/09/01a11e42-fe19-7c81-9ce5-44a6072613f3/release-wizard-checks/failed-history.png",
+    "/Users/wangbinquan/.codex/visualizations/2026/10/09/01a11e42-fe19-7c81-9ce5-44a6072613f3/release-wizard-checks/desktop-prepare-light.png",
+    "/Users/wangbinquan/.codex/visualizations/2026/10/09/01a11e42-fe19-7c81-9ce5-44a6072613f3/release-wizard-checks/desktop-verification-light.png",
+    "/Users/wangbinquan/.codex/visualizations/2026/10/09/01a11e42-fe19-7c81-9ce5-44a6072613f3/release-wizard-checks/desktop-launch-light.png",
+    "/Users/wangbinquan/.codex/visualizations/2026/10/09/01a11e42-fe19-7c81-9ce5-44a6072613f3/release-wizard-checks/1024-dark-history.png",
+    "/Users/wangbinquan/.codex/visualizations/2026/10/09/01a11e42-fe19-7c81-9ce5-44a6072613f3/release-wizard-checks/390-light-history.png",
+    "/Users/wangbinquan/.codex/visualizations/2026/10/09/01a11e42-fe19-7c81-9ce5-44a6072613f3/release-wizard-checks/320-light-prepare.png"
+  ],
+  "errors": [],
+  "writes": [],
+  "completedAt": "2026-10-09T02:01:10.823Z",
+  "result": "PASS",
+  "sourceSha256": "4a33359d5f45c12e0c1e638c530e7984bca0a45adf08030b31e9bd947300832b",
+  "sourceHashRecordedAfterCheckAt": "2026-10-09T02:04:26.696177+00:00",
+  "checker": "browser-check.cjs; same 28 assertions as executed local check, parameterized URL/output/runtime lookup"
+}

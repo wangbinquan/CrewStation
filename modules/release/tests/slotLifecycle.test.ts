@@ -1,18 +1,18 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import type { Actor, ProjectId, ReleaseDto, ServiceId, SlotDto, UserId } from '@crewstation/contracts';
+import type { Actor, ProjectId, ReleaseDto, ReleaseId, ServiceId, SlotDto, UserId } from '@crewstation/contracts';
 import { IDENTITY_HEADERS } from '@crewstation/contracts';
 import { eventbusMigrations } from '@crewstation/eventbus';
 import { createApp } from '@crewstation/http';
 import type { K8sClient } from '@crewstation/k8s';
 import { createFakeK8sClient, LABELS, Resources } from '@crewstation/k8s';
-import { forbidden } from '@crewstation/kernel';
+import { forbidden, newResourceId } from '@crewstation/kernel';
 import { runMigrations } from '@crewstation/persistence';
 import { queueMigrations } from '@crewstation/queue';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import { sql } from 'drizzle-orm';
 import type { TestDatabase } from '@crewstation/testkit';
 import { drizzleUnitOfWork } from '../adapters/persistence/drizzleUnitOfWork';
-import { withSlot } from '../domain/slots';
+import { initialSlots, withSlot } from '../domain/slots';
 import { createReleaseModule, releaseMigrations } from '../wiring';
 
 const available = await testDatabaseAvailable();
@@ -116,9 +116,18 @@ describe.skipIf(!available)('RFC-021 待命槽生命周期', () => {
   // 2026-09-23 实机：RFC-013 之前部署的 Deployment 标签上是旧 `rel_…` ID，只认 UUID 时下线会把它当成别的版本留着不删（本机 8 个待命槽全是这样）。
   test('RFC-013 之前部署的待命槽：Deployment 标签是旧 ID 时下线照样删掉；标签属于别的版本时不删', async () => {
     const f = await fixture(true);
-    const v1 = await f.publish(), physical = await f.standby();
-    await database!.db.execute(sql`UPDATE release.releases SET legacy_resource_id = 'rel_legacy_v1' WHERE id = ${v1.id}`);
+    // Retain an actual pre-journal execution, then upgrade before starting the current runtime.
+    const id = newResourceId() as ReleaseId, physical = await f.standby();
+    await f.uow.read.releases.insert({ id, legacyResourceId: 'rel_legacy_v1', projectId, serviceId, tag: 'v0.0.1', commitSha: 'a'.repeat(40), branch: 'main',
+      status: 'pending', targetSlot: physical, pipeline: { step: 0 }, createdBy: owner.userId, createdAt: f.state.now, updatedAt: f.state.now });
+    await f.uow.read.slots.initialize(initialSlots(serviceId, f.state.now));
     await runMigrations(database!.db, [releaseMigrations]);
+    await f.release.api.runPipelineStep(id);
+    const job = (await f.k8s.list(Resources.Job!, ns))[0]!;
+    await f.k8s.mergePatch(Resources.Job!, job.metadata.name, ns, { status: { succeeded: 1 } });
+    await f.release.api.runPipelineStep(id); await f.markReady(physical); await f.release.api.runPipelineStep(id);
+    const v1 = await f.release.api.getRelease(owner, id);
+    expect(v1.journeyId).toBeUndefined();
     await f.k8s.mergePatch(Resources.Deployment!, `lifecycle-${physical}`, ns, { metadata: { labels: { [LABELS.release]: 'rel_legacy_v1' } } });
     await f.release.api.takeOffline(owner, serviceId, { expectedReleaseId: v1.id });
     expect(await f.deployment(physical)).toBeUndefined();

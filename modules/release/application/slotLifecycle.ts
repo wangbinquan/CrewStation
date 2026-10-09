@@ -25,6 +25,7 @@ import type { SlotDeployPlan } from './deployPrecheck';
 import { dryRunReason, prepareSlotDeploy } from './deployPrecheck';
 import { loadSlotDtos } from './queries';
 import { releaseToDto } from './toDto';
+import { createJourney, interruptReleaseJourneys } from './journey/recording';
 
 type Deps = ReleaseUseCaseDeps & { isAdmin(userId: UserId): Promise<boolean> };
 
@@ -69,6 +70,7 @@ export async function offlineInScope(scope: RepositoryScope, slots: ServiceSlots
   await scope.slots.save(takeSlotOffline(slots, physical, now, input));
   const release = await scope.releases.getById(releaseId);
   if (release?.status === 'ready') await scope.releases.update(advance(release, 'offline', now));
+  if (release) await interruptReleaseJourneys(scope, release, now, `待验证部署已下线（${input.reason}）`);
   await scope.slotEvents.insert({ id: newId('sev'), serviceId: slots.serviceId, kind: 'offline', releaseId, tag: release?.tag ?? '', reason: input.reason, ...(input.actorUserId ? { actorUserId: input.actorUserId } : {}), at: now });
   await scope.events.publish(DomainTopic.releaseStatusChanged, { occurredAt: now.toISOString(), serviceId: slots.serviceId, releaseId, status: 'offline', message: `待验证槽已下线（${input.reason}）` });
   return release;
@@ -301,12 +303,16 @@ function redeployUseCase(deps: Deps, ctx: ReturnType<typeof createPipelineContex
       const previous = slots[physical].releaseId;
       const old = previous ? await scope.releases.getById(previous) : undefined;
       if (old?.status === 'ready') await scope.releases.update(advance(old, 'superseded', now));
-      const started = advance(fresh, 'deploying', now, { targetSlot: physical, configVersion: prepared.env.configVersion, pipeline: { ...fresh.pipeline, step: fresh.pipeline.step + 1, deployStartedAt: now.toISOString() } });
+      if (old) await interruptReleaseJourneys(scope, old, now, '待验证部署已被重新部署替换');
+      await interruptReleaseJourneys(scope, fresh, now, '已开始新一次重新部署');
+      const journey = await createJourney(scope, fresh, actor.userId, 'redeploy', { kind: 'external' }, now);
+      const started = advance(fresh, 'deploying', now, { targetSlot: physical, configVersion: prepared.env.configVersion, pipeline: { ...fresh.pipeline, journeyId: journey.id, step: fresh.pipeline.step + 1, deployStartedAt: now.toISOString() } });
       await scope.releases.update(started);
       // 期望在锁住槽之后按此刻的 revision 重算（预检时读的可能已旧），随槽状态进台账，调和器建对象。
       const rendered = workload ? { workload: nextWorkload(slots[physical], workload) } : {};
       const next = withSlot(slots, { physical, releaseId: fresh.id, state: 'deploying', replicas: prepared.replicas, readyReplicas: 0, updatedAt: now, ...rendered }, now);
       await scope.slots.save(next);
+      await scope.journeys.append(journey.id, { transitionKey: 'deploy:running', stage: 'deploy', state: 'running', at: now.toISOString() });
       await scope.slotEvents.insert({ id: newId('sev'), serviceId: release.serviceId, kind: 'redeploy', releaseId: fresh.id, tag: fresh.tag, actorUserId: actor.userId, at: now });
       await scope.events.publish(DomainTopic.releaseStatusChanged, { occurredAt: now.toISOString(), serviceId: release.serviceId, releaseId: fresh.id, status: 'deploying', message: '从发布记录重新部署到待验证槽' });
       return { started, slots: next };

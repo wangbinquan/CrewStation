@@ -92,8 +92,8 @@ test('开发页唯一准备发布入口带会话来源，确认草稿后跳转�
   fixture = editorWorkspaceFixture(); page = await renderApp(path);
   expect(page.text()).not.toContain('发布到待命槽'); await page.click('代码'); await page.click('a.ts'); await edit('仅编辑器中的草稿');
   await page.click('准备发布'); expect(page.path()).toBe(path); await page.click('继续编辑'); expect(content().textContent).toBe('仅编辑器中的草稿');
-  await page.click('准备发布'); await page.click('放弃输入并离开'); expect(page.search().source).toBe('session'); expect(page.path()).toBe(`/projects/${activityProjectId}/release`);
-  await page.click('检查发布来源'); expect(page.text()).toContain('确认版本');
+  await page.click('准备发布'); await page.click('放弃输入并离开'); expect(page.search().source).toBe('session'); expect(page.path()).toBe(`/projects/${activityProjectId}/release/publish`);
+  expect(page.text()).toContain('确认提交 SHA'); expect(page.text()).toContain('开始构建与部署'); expect(document.querySelectorAll('dialog')).toHaveLength(0);
   expect(fixture.commands.some((command) => ['writeFile', 'closeTerminal', 'stopAgent', 'stopNativeTerminal'].includes(command.type))).toBe(false);
   expect(fixture.writes.every((write) => write.path.endsWith('/workspace-layout'))).toBe(true);
 });

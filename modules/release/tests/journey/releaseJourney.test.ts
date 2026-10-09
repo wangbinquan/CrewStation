@@ -1,0 +1,81 @@
+import { afterEach, describe, expect, test } from 'bun:test';
+import type { VerifyReleaseJourneyRequest } from '@crewstation/contracts';
+import { ReleaseJourneyDetailSchema, ResourceIdSchema } from '@crewstation/contracts';
+import { newResourceId } from '@crewstation/kernel';
+import { testDatabaseAvailable } from '@crewstation/testkit';
+import { sql } from 'drizzle-orm';
+import { releaseImageFixture } from '../runtimeImageFixture';
+
+const available = await testDatabaseAvailable();
+describe.skipIf(!available)('RFC-038 real journal transactions', () => {
+  let f: Awaited<ReturnType<typeof releaseImageFixture>>;
+  afterEach(async () => { await f?.close(); });
+  const ready = async () => {
+    const accepted = await f.runtime.api.publish(f.actor, f.serviceId, { branch: 'main', version: 'patch', message: '原版本说明' });
+    for (let i = 0; i < 3; i++) await f.runtime.api.runPipelineStep(accepted.id);
+    return accepted;
+  };
+  test('publish persists fixed source and real skipped/build/migration/deploy evidence; GET is write-free', async () => {
+    f = await releaseImageFixture();
+    const release = await ready();
+    expect(ResourceIdSchema.safeParse(release.journeyId).success).toBe(true);
+    const before = await f.db.execute(sql`SELECT to_jsonb(j) AS body FROM release.release_journeys j`);
+    const detail = await f.runtime.api.getJourney(f.actor, release.journeyId!);
+    expect(ReleaseJourneyDetailSchema.safeParse(detail).success).toBe(true);
+    expect(detail.status).toBe('awaiting-verification');
+    expect(detail.snapshot.message).toBe('原版本说明');
+    expect(detail.stages.find((s) => s.stage === 'build')).toMatchObject({ state: 'skipped', reason: '使用已固定的运行镜像' });
+    expect(detail.stages.find((s) => s.stage === 'migration')?.state).toBe('succeeded');
+    expect(detail.continuation.canVerify).toBe(true);
+    expect(await f.runtime.api.listJourneys(f.actor, f.serviceId, { limit: 20 })).toMatchObject({ hasMore: false, items: [{ recordKind: 'journey', id: release.journeyId }] });
+    await f.runtime.api.journeyHistory(f.actor, release.id);
+    expect(await f.db.execute(sql`SELECT to_jsonb(j) AS body FROM release.release_journeys j`)).toEqual(before);
+    expect(detail.revision).toBe(detail.events.length);
+  });
+  test('verification persists one actor/target fact, rejects stale revisions and reused keys with different content', async () => {
+    f = await releaseImageFixture(); const release = await ready(), id = release.journeyId!;
+    const detail = await f.runtime.api.getJourney(f.actor, id);
+    const input: VerifyReleaseJourneyRequest = { requestKey: newResourceId(), expectedRevision: detail.revision, expectedReleaseId: release.id, expectedCommitSha: release.commitSha, expectedTargetRevision: detail.continuation.targetRevision!, note: '已检查页面' };
+    await expect(f.runtime.api.verifyJourney(f.actor, id, { ...input, expectedRevision: detail.revision - 1 })).rejects.toMatchObject({ kind: 'conflict' });
+    await expect(f.runtime.api.verifyJourney(f.actor, id, { ...input, expectedTargetRevision: '0'.repeat(64) })).rejects.toMatchObject({ kind: 'conflict' });
+    const result = await f.runtime.api.verifyJourney(f.actor, id, input);
+    expect(result.status).toBe('awaiting-confirmation');
+    expect(result.verification).toMatchObject({ actorUserId: f.actor.userId, note: input.note, targetRevision: input.expectedTargetRevision });
+    expect((await f.runtime.api.verifyJourney(f.actor, id, input)).revision).toBe(result.revision);
+    await expect(f.runtime.api.verifyJourney(f.actor, id, { ...input, note: 'changed' })).rejects.toMatchObject({ kind: 'conflict' });
+    expect((await f.uow.read.slots.get(f.serviceId))?.active).toBe('blue');
+  });
+  test('ordinary launch replay never switches again and waits for observed routing before completion', async () => {
+    let routed = false;
+    f = await releaseImageFixture(false, () => ({ executionHandoff: { precheck: async () => ({ supported: true, blocked: [] }), freeze: async () => { throw new Error('not fenced'); }, inspect: async () => ({ stage: 'inactive', epoch: 0, quiescent: false }), routeObserved: async () => { throw new Error('not fenced'); }, observeRoute: async () => routed } }));
+    const release = await ready(), id = release.journeyId!, detail = await f.runtime.api.getJourney(f.actor, id);
+    await f.runtime.api.verifyJourney(f.actor, id, { requestKey: newResourceId(), expectedRevision: detail.revision, expectedReleaseId: release.id, expectedCommitSha: release.commitSha, expectedTargetRevision: detail.continuation.targetRevision! });
+    const input = { requestKey: newResourceId(), journeyId: id, toSlot: 'preview' as const, expectedActiveRelease: null, expectedTargetRelease: release.id, expectedTargetRevision: detail.continuation.targetRevision! };
+    const accepted = await f.runtime.api.switchTraffic(f.actor, f.serviceId, input);
+    expect(accepted.journeyId).toBe(id);
+    expect(await f.runtime.api.progressJourneys()).toBe(0);
+    expect((await f.runtime.api.getJourney(f.actor, id)).status).toBe('running');
+    expect((await f.runtime.api.switchTraffic(f.actor, f.serviceId, input)).id).toBe(accepted.id);
+    await expect(f.runtime.api.switchTraffic(f.actor, f.serviceId, { ...input, reason: 'other' })).rejects.toMatchObject({ kind: 'conflict' });
+    routed = true; expect(await f.runtime.api.progressJourneys()).toBe(1);
+    const completed = await f.runtime.api.getJourney(f.actor, id);
+    expect(completed.status).toBe('succeeded');
+    expect((await f.uow.read.switches.listByService(f.serviceId, 50))).toHaveLength(1);
+    expect(await f.runtime.api.progressJourneys()).toBe(0);
+  });
+  test('replaying one producer key is idempotent; different fact and terminal edits fail', async () => {
+    f = await releaseImageFixture(); const release = await ready(), id = release.journeyId!;
+    const events = await f.uow.read.journeys.events(id), first = events[0]!;
+    const { id: _id, journeyId: _journeyId, sequence: _sequence, ...fact } = first;
+    expect((await f.uow.read.journeys.append(id, { ...fact, at: new Date().toISOString() })).revision).toBe(events.length);
+    await expect(f.uow.read.journeys.append(id, { ...fact, reason: 'different' })).rejects.toMatchObject({ kind: 'conflict' });
+    await f.runtime.api.takeOffline(f.actor, f.serviceId, { expectedReleaseId: release.id });
+    expect((await f.runtime.api.getJourney(f.actor, id)).status).toBe('interrupted');
+    await expect(f.uow.read.journeys.append(id, { transitionKey: 'fake', stage: 'build', state: 'running', at: new Date().toISOString() })).rejects.toMatchObject({ kind: 'conflict' });
+    await expect(Promise.resolve(f.db.execute(sql`UPDATE release.release_journey_events SET body=body||'{"reason":"tampered"}'::jsonb WHERE journey_id=${id}`))).rejects.toThrow();
+    const redeployed = await f.runtime.api.redeploy(f.actor, release.id, { expectedStandbyReleaseId: null });
+    expect(redeployed.journeyId).not.toBe(id);
+    expect((await f.runtime.api.journeyHistory(f.actor, release.id)).journeys).toHaveLength(2);
+    expect((await f.runtime.api.getJourney(f.actor, id)).snapshot.message).toBe('原版本说明');
+  });
+});

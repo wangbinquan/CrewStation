@@ -1,0 +1,276 @@
+<div id="cs-release-prototype" aria-label="CrewStation 发布向导">
+  <div class="rw-topbar"><span class="rw-brand">CrewStation</span><span class="rw-top-context">工作台 / 客户服务助手</span><span class="rw-preview-label">交互预览 · 示例数据</span></div>
+  <div class="rw-shell">
+    <nav class="rw-sidebar" aria-label="项目导航"><div class="rw-project-name">客户服务助手</div><span>概览</span><span>开发</span><span class="rw-nav-selected" aria-current="page">发布</span><span>运行与诊断</span><span>项目资源</span><span>设置</span></nav>
+    <main class="rw-main" aria-label="发布工作区"><div class="rw-view"></div></main>
+  </div>
+</div>
+<style>
+#cs-release-prototype { --rw-bg: light-dark(#f5f7fa,#11151c); --rw-surface: light-dark(#ffffff,#191f29); --rw-muted-bg: light-dark(#edf1f7,#222b39); --rw-border: light-dark(#dce3ed,#344154); --rw-text: light-dark(#182438,#e7edf6); --rw-muted: light-dark(#59677c,#adbacd); --rw-primary: light-dark(#235bd8,#3970df); --rw-on-primary: #ffffff; --rw-tint: light-dark(#eaf1ff,#20365b); --rw-info: light-dark(#235bd8,#8db3ff); --rw-good: light-dark(#176746,#87d9b1); --rw-good-bg: light-dark(#eaf6ef,#18372b); --rw-warn: light-dark(#86520a,#f4c976); --rw-warn-bg: light-dark(#fff5df,#392f1c); --rw-danger: light-dark(#b02f39,#ffa4ad); --rw-danger-bg: light-dark(#fff0f1,#40242a); color-scheme: light dark; color: var(--rw-text); background: var(--rw-bg); font: 400 14px/1.6 system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif; border-radius: 8px; overflow: clip; }
+#cs-release-prototype * { box-sizing: border-box; }
+#cs-release-prototype [hidden] { display:none !important; }
+#cs-release-prototype .rw-topbar { display:flex; align-items:center; flex-wrap:wrap; gap:16px; padding:14px 20px; padding-right:106px; background:var(--rw-surface); border-bottom:1px solid var(--rw-border); }
+#cs-release-prototype .rw-brand { font-weight:500; }
+#cs-release-prototype .rw-top-context { color:var(--rw-muted); font-size:12px; }
+#cs-release-prototype .rw-preview-label { margin-left:auto; color:var(--rw-muted); font-size:12px; }
+#cs-release-prototype .rw-shell { display:grid; grid-template-columns:156px minmax(0,1fr); }
+#cs-release-prototype .rw-sidebar { padding:18px 12px; background:var(--rw-surface); border-right:1px solid var(--rw-border); display:flex; flex-direction:column; gap:4px; }
+#cs-release-prototype .rw-sidebar span { padding:8px 12px; color:var(--rw-muted); border-radius:6px; }
+#cs-release-prototype .rw-sidebar .rw-nav-selected { color:var(--rw-info); background:var(--rw-tint); font-weight:500; }
+#cs-release-prototype .rw-project-name { padding:0 10px 16px; font-weight:500; }
+#cs-release-prototype .rw-main { min-width:0; padding:22px; }
+#cs-release-prototype h1 { margin:0; font-size:22px; font-weight:500; }
+#cs-release-prototype h2 { margin:0; font-size:16px; font-weight:500; }
+#cs-release-prototype h3 { margin:0 0 10px; font-size:14px; font-weight:500; }
+#cs-release-prototype p { margin:8px 0; }
+#cs-release-prototype button { font:inherit; color:var(--rw-text); background:var(--rw-surface); border:1px solid var(--rw-border); border-radius:6px; padding:7px 12px; max-width:100%; }
+#cs-release-prototype button:hover:not(:disabled) { background:var(--rw-muted-bg); }
+#cs-release-prototype button:disabled { opacity:.5; cursor:default; }
+#cs-release-prototype .rw-primary { background:var(--rw-primary); color:var(--rw-on-primary); border-color:var(--rw-primary); font-weight:500; }
+#cs-release-prototype .rw-primary:hover:not(:disabled) { background:var(--rw-primary); opacity:.9; }
+#cs-release-prototype .rw-ghost { border-color:transparent; background:transparent; }
+#cs-release-prototype .rw-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:18px; }
+#cs-release-prototype .rw-subtitle { color:var(--rw-muted); font-size:12px; }
+#cs-release-prototype .rw-back { margin:0 0 12px -8px; padding:3px 8px; }
+#cs-release-prototype .rw-version-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
+#cs-release-prototype .rw-version { padding:14px 16px; border:1px solid var(--rw-border); border-radius:8px; background:var(--rw-surface); }
+#cs-release-prototype .rw-version-label { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px; color:var(--rw-muted); }
+#cs-release-prototype .rw-version-name { font-size:20px; font-weight:500; margin:3px 0; }
+#cs-release-prototype .rw-code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px; overflow-wrap:anywhere; }
+#cs-release-prototype .rw-muted { color:var(--rw-muted); }
+#cs-release-prototype .rw-badge { display:inline-block; padding:2px 7px; border-radius:5px; font-size:12px; color:var(--rw-info); background:var(--rw-tint); white-space:nowrap; }
+#cs-release-prototype .rw-badge[data-tone="good"] { color:var(--rw-good); background:var(--rw-good-bg); }
+#cs-release-prototype .rw-badge[data-tone="error"] { color:var(--rw-danger); background:var(--rw-danger-bg); }
+#cs-release-prototype .rw-badge[data-tone="warn"] { color:var(--rw-warn); background:var(--rw-warn-bg); }
+#cs-release-prototype .rw-next { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; padding:12px 16px; background:var(--rw-tint); border-radius:6px; margin-bottom:20px; }
+#cs-release-prototype .rw-panel { border:1px solid var(--rw-border); border-radius:8px; background:var(--rw-surface); overflow:clip; }
+#cs-release-prototype .rw-panel-heading { padding:14px 16px; display:flex; justify-content:space-between; flex-wrap:wrap; align-items:center; gap:8px; border-bottom:1px solid var(--rw-border); }
+#cs-release-prototype .rw-table { width:100%; border-collapse:collapse; table-layout:fixed; }
+#cs-release-prototype .rw-table th { text-align:left; font-weight:400; color:var(--rw-muted); font-size:12px; background:var(--rw-muted-bg); }
+#cs-release-prototype .rw-table td,#cs-release-prototype .rw-table th { padding:12px 14px; border-bottom:1px solid var(--rw-border); vertical-align:middle; overflow-wrap:anywhere; }
+#cs-release-prototype .rw-table tr:last-child td { border-bottom:0; }
+#cs-release-prototype .rw-table th:first-child { width:30%; }
+#cs-release-prototype .rw-table th:nth-child(2) { width:31%; }
+#cs-release-prototype .rw-table th:nth-child(3) { width:21%; }
+#cs-release-prototype .rw-table th:last-child { width:18%; }
+#cs-release-prototype .rw-table .rw-table-action { text-align:right; }
+#cs-release-prototype .rw-row-title { font-weight:500; }
+#cs-release-prototype .rw-small { font-size:12px; color:var(--rw-muted); margin-top:3px; }
+#cs-release-prototype .rw-history-foot { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:12px 16px; color:var(--rw-muted); font-size:12px; }
+#cs-release-prototype .rw-steps { padding:16px; border-bottom:1px solid var(--rw-border); display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; margin:0; list-style:none; }
+#cs-release-prototype .rw-steps button { display:flex; align-items:center; gap:7px; border:0; padding:3px 0; background:transparent; color:var(--rw-muted); font-size:12px; width:100%; text-align:left; }
+#cs-release-prototype .rw-step-dot { flex-shrink:0; display:inline-grid; place-items:center; width:23px; height:23px; border-radius:50%; background:var(--rw-muted-bg); color:var(--rw-muted); }
+#cs-release-prototype .rw-steps [aria-current="step"] { color:var(--rw-text); font-weight:500; }
+#cs-release-prototype .rw-steps [aria-current="step"] .rw-step-dot { background:var(--rw-primary); color:var(--rw-on-primary); }
+#cs-release-prototype .rw-steps [data-finished="true"] .rw-step-dot { color:var(--rw-good); background:var(--rw-good-bg); }
+#cs-release-prototype .rw-step-body { padding:22px; min-height:328px; }
+#cs-release-prototype .rw-step-header { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+#cs-release-prototype .rw-form-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px 18px; }
+#cs-release-prototype .rw-field { display:flex; flex-direction:column; gap:5px; min-width:0; }
+#cs-release-prototype .rw-field label { font-size:12px; color:var(--rw-muted); }
+#cs-release-prototype .rw-field-wide { grid-column:1/-1; }
+#cs-release-prototype input,#cs-release-prototype select,#cs-release-prototype textarea { width:100%; min-width:0; font:inherit; padding:8px 10px; border:1px solid var(--rw-border); border-radius:6px; background:var(--rw-surface); color:var(--rw-text); }
+#cs-release-prototype textarea { resize:vertical; }
+#cs-release-prototype .rw-input-meta { display:flex; flex-wrap:wrap; gap:6px 14px; color:var(--rw-muted); font-size:12px; margin-top:10px; }
+#cs-release-prototype .rw-note { padding:10px 12px; margin-top:14px; border-radius:6px; background:var(--rw-muted-bg); color:var(--rw-muted); font-size:12px; }
+#cs-release-prototype .rw-note[data-tone="warn"] { background:var(--rw-warn-bg); color:var(--rw-warn); }
+#cs-release-prototype .rw-note[data-tone="error"] { background:var(--rw-danger-bg); color:var(--rw-danger); }
+#cs-release-prototype .rw-note[data-tone="good"] { background:var(--rw-good-bg); color:var(--rw-good); }
+#cs-release-prototype .rw-phases { padding:0; margin:0; list-style:none; }
+#cs-release-prototype .rw-phases li { padding:8px 0; display:grid; grid-template-columns:20px minmax(0,1fr) auto; gap:7px; align-items:baseline; }
+#cs-release-prototype .rw-phase-detail { grid-column:2/-1; font-size:12px; color:var(--rw-muted); }
+#cs-release-prototype .rw-phase-icon { color:var(--rw-muted); }
+#cs-release-prototype .rw-phases [data-state="done"] .rw-phase-icon { color:var(--rw-good); }
+#cs-release-prototype .rw-phases [data-state="running"] .rw-phase-icon { color:var(--rw-info); }
+#cs-release-prototype .rw-phases [data-state="failed"] .rw-phase-icon { color:var(--rw-danger); }
+#cs-release-prototype .rw-phase-time { color:var(--rw-muted); font-size:12px; font-variant-numeric:tabular-nums; }
+#cs-release-prototype .rw-dl { display:grid; grid-template-columns:116px minmax(0,1fr); gap:10px 12px; margin:0; }
+#cs-release-prototype .rw-dl dt { color:var(--rw-muted); }
+#cs-release-prototype .rw-dl dd { margin:0; overflow-wrap:anywhere; }
+#cs-release-prototype .rw-address { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; padding:12px; border:1px solid var(--rw-border); border-radius:6px; margin:14px 0; }
+#cs-release-prototype .rw-actions { padding:14px 20px; border-top:1px solid var(--rw-border); display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; background:var(--rw-surface); }
+#cs-release-prototype .rw-action-group { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+#cs-release-prototype .rw-action-status { color:var(--rw-muted); font-size:12px; }
+#cs-release-prototype .rw-log { padding:12px; margin:12px 0 0; border-radius:6px; background:var(--rw-muted-bg); font:400 12px/1.8 ui-monospace,SFMono-Regular,Menlo,monospace; white-space:pre-wrap; overflow-wrap:anywhere; }
+#cs-release-prototype .rw-result { padding:8px 0 18px; display:flex; align-items:center; gap:12px; }
+#cs-release-prototype .rw-result-icon { display:grid; place-items:center; width:40px; height:40px; border-radius:50%; background:var(--rw-good-bg); color:var(--rw-good); font-size:22px; }
+#cs-release-prototype .rw-confirm-pair { display:grid; grid-template-columns:1fr auto 1fr; gap:14px; align-items:center; padding:16px; background:var(--rw-muted-bg); border-radius:6px; margin-bottom:16px; }
+#cs-release-prototype .rw-confirm-pair strong { font-size:20px; font-weight:500; }
+#cs-release-prototype .rw-confirm-pair small { display:block; color:var(--rw-muted); font-size:12px; }
+#cs-release-prototype .rw-feedback { margin-top:12px; color:var(--rw-info); font-size:12px; }
+@media(max-width:760px) { #cs-release-prototype .rw-shell { grid-template-columns:128px minmax(0,1fr); } #cs-release-prototype .rw-main { padding:16px; } #cs-release-prototype .rw-step-body { padding:16px; } #cs-release-prototype .rw-steps button { flex-direction:column; gap:4px; text-align:center; } }
+@media(max-width:620px) { #cs-release-prototype .rw-shell { display:block; } #cs-release-prototype .rw-sidebar { display:none; } #cs-release-prototype .rw-topbar { padding:12px 14px; gap:6px 12px; } #cs-release-prototype .rw-preview-label { margin-left:0; width:100%; } #cs-release-prototype .rw-main { padding:14px 12px; } #cs-release-prototype .rw-form-grid { grid-template-columns:1fr; } #cs-release-prototype .rw-form-grid .rw-field-wide { grid-column:auto; } #cs-release-prototype input,#cs-release-prototype select,#cs-release-prototype textarea { font-size:16px; } #cs-release-prototype .rw-steps { padding:12px 8px; gap:3px; } #cs-release-prototype .rw-steps button { font-size:11px; } #cs-release-prototype .rw-step-body { padding:16px 12px; } #cs-release-prototype .rw-dl { grid-template-columns:84px minmax(0,1fr); font-size:12px; } #cs-release-prototype .rw-actions { padding:12px; } #cs-release-prototype .rw-action-status { width:100%; } #cs-release-prototype .rw-action-group { margin-left:auto; } #cs-release-prototype .rw-table thead { display:none; } #cs-release-prototype .rw-table tr { display:grid; grid-template-columns:1fr auto; padding:12px; border-bottom:1px solid var(--rw-border); gap:6px; } #cs-release-prototype .rw-table tr:last-child { border-bottom:0; } #cs-release-prototype .rw-table td { padding:0; border:0; } #cs-release-prototype .rw-table td:nth-child(2) { grid-row:2; } #cs-release-prototype .rw-table td:nth-child(3) { grid-row:3; } #cs-release-prototype .rw-table td:last-child { grid-column:2; grid-row:1/4; align-self:center; padding-left:8px; } #cs-release-prototype .rw-version { padding:12px; } #cs-release-prototype .rw-confirm-pair { gap:8px; padding:12px; } #cs-release-prototype .rw-confirm-pair strong { font-size:18px; } }
+@media(pointer:coarse) { #cs-release-prototype button { min-height:44px; } #cs-release-prototype .rw-steps button { min-height:56px; } }
+</style>
+<script>
+(() => {
+  const root = document.getElementById('cs-release-prototype');
+  const view = root.querySelector('.rw-view');
+  const steps = ['准备发布','构建与部署','验证版本','确认上线','完成'];
+  const phaseNames = ['发布已受理','构建镜像','兼容迁移','部署待验证版本','服务就绪'];
+  const controls = { role:'owner', scenario:'normal' };
+  const fixtureRows = [
+    {id:'current',tag:'v1.4.2',type:'发布',state:'verify',step:2,sha:'a7c921ef2b',actor:'王琳',start:'10-09 09:18',end:'',reason:'新增客服分流能力',times:['09:18:20','09:19:34','09:19:52','09:20:15','09:20:31']},
+    {id:'success',tag:'v1.4.1',type:'发布',state:'complete',step:4,sha:'b25e41a816',actor:'王琳',start:'10-08 16:42',end:'10-08 16:48',reason:'优化客户查询',times:['16:42:08','16:43:26','16:43:40','16:44:12','16:44:25']},
+    {id:'failure',tag:'v1.4.0',type:'发布',state:'failed',step:1,sha:'cd21389101',actor:'陈浩',start:'10-08 14:20',end:'10-08 14:21',reason:'构建失败：Dockerfile 引用的 dist 目录不存在',times:['14:20:05','14:21:09']},
+    {id:'redeploy',tag:'v1.3.8',type:'重新部署',state:'complete',step:4,sha:'23abc785fe',actor:'王琳',start:'10-07 11:08',end:'10-07 11:12',reason:'重新部署已保留制品',times:['11:08:15',null,null,'11:08:37','11:09:02']},
+    {id:'legacy',tag:'v1.3.2',type:'旧记录',state:'legacy',step:4,sha:'012f8739cb',actor:'陈浩',start:'09-26 15:36',end:'',reason:'升级前记录，部分阶段未留存',times:[]}
+  ];
+  const model = {page:'list',rows:fixtureRows.map(r=>({...r})),selected:'current',displayStep:2,readonly:false,logOpen:false,phase:0,phaseTimes:[],runSequence:0,draft:{source:'repository',branch:'main',version:'v1.4.3',message:''},feedback:'',verified:false};
+  let timerGeneration=0;
+  const escape = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const button=(label,action,primary=false,disabled=false)=>`<button class="${primary?'rw-primary':'rw-ghost'} cursor-interaction" type="button" data-action="${action}" ${disabled?'disabled':''}>${escape(label)}</button>`;
+  const selected=()=>model.rows.find(r=>r.id===model.selected)||model.rows[0];
+  const statusText=r=>({verify:'待验证',launch:'待上线',building:'部署中',activating:'上线中',complete:'已上线',failed:'构建失败',legacy:'旧记录',interrupted:'已中断'})[r.state]||'准备中';
+  const tone=r=>r.state==='complete'?'good':r.state==='failed'?'error':r.state==='interrupted'||r.state==='legacy'?'warn':'';
+  const badge=r=>`<span class="rw-badge" data-tone="${tone(r)}">${statusText(r)}</span>`;
+  const note=(text,tone='',alert=false)=>`<div class="rw-note" data-tone="${tone}" ${alert?'role="alert"':''}>${escape(text)}</div>`;
+  const dl=items=>`<dl class="rw-dl">${items.map(([name,value,code])=>`<dt>${escape(name)}</dt><dd${code?' class="rw-code"':''}>${escape(value)}</dd>`).join('')}</dl>`;
+  function save() {
+    if(!window.openai?.setWidgetState)return;
+    const snapshot={modelContent:{page:model.page,step:steps[model.displayStep],version:selected().tag,readonly:model.readonly,role:controls.role},privateContent:{model,controls}};
+    window.openai.setWidgetState(snapshot).catch(()=>{});
+  }
+  function restore(snapshot) {
+    const saved=snapshot?.privateContent;
+    if(!saved?.model||!['list','wizard','draft'].includes(saved.model.page))return;
+    const incoming=saved.model;
+    if(Array.isArray(incoming.rows)&&incoming.rows.length<=12&&incoming.rows.every(r=>typeof r.id==='string'&&typeof r.tag==='string'&&Array.isArray(r.times))) Object.assign(model,incoming);
+    if(saved.controls&&['owner','developer'].includes(saved.controls.role))Object.assign(controls,saved.controls);
+    if(!Number.isInteger(model.displayStep)||model.displayStep<0||model.displayStep>4)model.displayStep=0;
+    if(model.page==='wizard'&&['building','activating'].includes(selected().state)) { model.readonly=false; model.feedback='示例自动进度已恢复。'; }
+  }
+  restore(window.openai?.widgetState);
+  function renderList() {
+    const live=model.rows.find(r=>['verify','launch','building','activating'].includes(r.state));
+    const prod=model.rows.find(r=>r.state==='complete')||fixtureRows[1];
+    const preview=live||model.rows.find(r=>r.id!==prod.id&&r.state==='complete')||prod;
+    const running=model.rows.some(r=>['building','activating'].includes(r.state));
+    view.innerHTML=`<header class="rw-heading"><div><h1>应用发布</h1><div class="rw-subtitle">发布新版本，或接着完成已有发布</div></div>${button('发布新版本','new',true,running)}</header>
+      <div class="rw-version-grid"><div class="rw-version"><div class="rw-version-label">正式版本<span class="rw-badge" data-tone="good">运行中</span></div><div class="rw-version-name">${escape(prod.tag)}</div><span class="rw-code rw-muted">${escape(prod.sha)}</span></div><div class="rw-version"><div class="rw-version-label">${live?'待验证版本':'保留的旧版本'}${live?badge(preview):'<span class="rw-badge">回退目标</span>'}</div><div class="rw-version-name">${escape(preview.tag)}</div><span class="rw-code rw-muted">${escape(preview.sha)}</span></div></div>
+      ${live?`<div class="rw-next"><div><span class="rw-row-title">${escape(live.tag)} · ${steps[live.step]}</span><div class="rw-small">进度已保留，可以从这里继续</div></div>${button('继续发布','continue:'+live.id,true)}</div>`:''}
+      <section class="rw-panel" aria-label="历史发布记录"><div class="rw-panel-heading"><h2>历史发布记录</h2><span class="rw-small">每次操作独立留存</span></div>
+      <table class="rw-table"><thead><tr><th>版本 / 操作</th><th>当次进度</th><th>发起人 / 开始时间</th><th>操作</th></tr></thead><tbody>${model.rows.map(r=>`<tr><td><span class="rw-row-title">${escape(r.tag)}</span><div class="rw-small">${escape(r.type)} · <span class="rw-code">${escape(r.sha)}</span></div></td><td>${badge(r)}<div class="rw-small">${escape(r.state==='complete'?'五步已完成':r.state==='legacy'?'阶段信息不完整':steps[r.step])}</div>${r.state==='failed'?'<div class="rw-small">dist 目录不存在</div>':''}</td><td>${escape(r.actor)}<div class="rw-small">${escape(r.start)}</div></td><td class="rw-table-action">${button(['verify','launch','building','activating'].includes(r.state)?'继续发布':'查看流程',(['verify','launch','building','activating'].includes(r.state)?'continue:':'history:')+r.id)}</td></tr>`).join('')}</tbody></table>
+      <div class="rw-history-foot"><span>示例共 ${model.rows.length} 条 · 真实历史按页加载</span><span>选择记录查看当次向导</span></div></section>`;
+  }
+  function prepareBody() {
+    const d=model.draft;
+    return `<div class="rw-step-header"><h2>准备好这次要发布的内容</h2></div><div class="rw-form-grid">
+      <div class="rw-field"><label for="rw-source">发布来源</label><select id="rw-source" name="source"><option value="repository"${d.source==='repository'?' selected':''}>已推送分支</option><option value="session"${d.source==='session'?' selected':''}>当前开发会话</option></select></div>
+      <div class="rw-field"><label for="rw-branch">${d.source==='session'?'当前分支':'发布分支'}</label>${d.source==='session'?'<input id="rw-branch" value="main" readonly>':`<select id="rw-branch" name="branch"><option value="main"${d.branch==='main'?' selected':''}>main</option><option value="feature/customer-routing"${d.branch==='feature/customer-routing'?' selected':''}>feature/customer-routing</option></select>`}</div>
+      <div class="rw-field"><label for="rw-version">版本号</label><input id="rw-version" name="version" value="${escape(d.version)}" autocomplete="off"><span class="rw-small">建议 v1.4.3 · 也可填写其他版本号</span></div>
+      <div class="rw-field"><label for="rw-bump">版本递增</label><select id="rw-bump" name="bump"><option value="patch">补丁版本</option><option value="minor">功能版本</option><option value="major">主版本</option></select></div>
+      <div class="rw-field rw-field-wide"><label for="rw-message">这次更新了什么（可选）</label><textarea id="rw-message" name="message" rows="2" maxlength="500" placeholder="例如：新增客户分流，修复查询超时">${escape(d.message)}</textarea></div></div>
+      <div class="rw-input-meta"><span>来源已读取 · ${escape(d.branch)}</span><span class="rw-code">${d.branch==='main'?'f3c51d6e08':'25a401c95d'}</span><span>${d.source==='session'?'工作区干净 · 发布时平台代推':'仅包含已推送的提交'}</span></div>
+      ${note('构建成功后将替换当前待验证版本。待验证与正式版本共用生产数据；兼容迁移可能提前影响线上。','warn')}
+      ${model.feedback?note(model.feedback,model.feedback.includes('变化')||model.feedback.includes('版本号')?'error':'',true):''}`;
+  }
+  function deliveryBody(r) {
+    const failed=r.state==='failed',legacy=r.state==='legacy';
+    const times=r.state==='building'?model.phaseTimes:r.times;
+    const states=phaseNames.map((name,i)=>({name,state:legacy?'unknown':failed?(i===1?'failed':i<1?'done':'pending'):r.type==='重新部署'&&(i===1||i===2)?'skipped':r.state==='building'?(i<model.phase?'done':i===model.phase?'running':'pending'):'done'}));
+    const icons={unknown:'?',failed:'×',done:'✓',pending:'○',running:'●',skipped:'–'};
+    return `<div class="rw-step-header"><h2>${failed?'构建停在这里':r.state==='building'?'正在构建与部署':'构建与部署记录'}</h2>${badge(r)}</div><ol class="rw-phases">${states.map((p,i)=>`<li data-state="${p.state}"><span class="rw-phase-icon" aria-hidden="true">${icons[p.state]}</span><span>${p.name}</span><span class="rw-phase-time">${legacy?'未记录':p.state==='skipped'?'无需执行':p.state==='pending'?'未开始':p.state==='running'?'进行中':escape(times[i]||'已记录')}</span>${i===1&&failed?'<span class="rw-phase-detail">Dockerfile 引用的 dist 目录不存在</span>':p.state==='skipped'?'<span class="rw-phase-detail">使用已有制品，没有重新构建或执行迁移</span>':''}</li>`).join('')}</ol>
+      ${failed?note('请修复构建输入后发起新发布。这次失败记录会保留。','error'):legacy?note('升级前没有留存完整阶段，不能还原各段耗时。','warn'):r.state==='building'?note('平台正在自动推进，部署就绪后会直接进入验证。'):note('待验证版本已就绪；构建完成不会自动正式上线。')}
+      ${button(model.logOpen?'收起本次日志':'查看本次日志','logs')}${model.logOpen?`<pre class="rw-log">${failed?'[build] COPY dist /app/dist\n[build] failed: source directory dist was not found':legacy?'旧构建日志已不可用。':'[build] 固定来源 '+escape(r.sha)+'\n[build] '+(r.state==='building'?'阶段日志随当前进度更新':'镜像已登记\n[migration] 兼容迁移完成\n[deploy] 待验证服务已就绪')}</pre>`:''}`;
+  }
+  function verifyBody(r) {
+    if(model.readonly) return `<div class="rw-step-header"><h2>验证版本记录</h2></div>${dl([['验证人',r.state==='legacy'?'未记录':r.verification?.actor|| (r.state==='complete'?r.actor:'尚未验证')],['验证时间',r.state==='legacy'?'未记录':r.verification?.at|| (r.state==='complete'?(r.type==='重新部署'?'11:10:28':'16:47:06'):'未开始')],['版本',r.tag],['固定提交',r.sha,true],['验证结果',r.state==='legacy'?'未记录':r.verification||r.state==='complete'?'人工确认通过':'未完成'],['验证说明',r.verification?.note||'未填写']])}${note('这里记录操作人的业务验证确认；平台资源就绪不会代替人工验证。')}`;
+    return `<div class="rw-step-header"><h2>打开这个版本，确认它符合预期</h2>${badge(r)}</div>${dl([['待验证版本',r.tag],['固定提交',r.sha,true],['服务状态','就绪 · 2 / 2 副本']])}<div class="rw-address"><span class="rw-code">preview.customer.cs.localhost</span>${button('打开待验证应用 ↗','open-preview')}</div>${note('待验证与正式版本共用生产数据。验证时的业务操作会作用于同一份数据。','warn')}<div class="rw-field" style="margin-top:14px"><label for="rw-verification">验证说明（可选）</label><input id="rw-verification" name="verification" value="${escape(model.verificationNote||'')}" placeholder="例如：查询和分流流程已验证" maxlength="500"></div>${model.feedback?`<div class="rw-feedback" role="status">${escape(model.feedback)}</div>`:''}`;
+  }
+  function launchBody(r) {
+    if(model.readonly) return `<div class="rw-step-header"><h2>正式上线记录</h2></div>${dl([['上线人',r.state==='legacy'?'陈浩（原切流记录）':r.state==='complete'?(r.launchedBy||r.actor):'未开始'],['上线时间',r.state==='legacy'?'09-26 15:44（原切流记录）':r.state==='complete'?r.end:'未记录'],['上线版本',r.state==='failed'?'未上线':r.tag],['路由与执行权',r.state==='legacy'?'阶段未记录':r.state==='complete'?'已完成':'未开始'],['上线说明',r.launchReason||r.reason]])}${note('当次上线结果保留；当前是否在线单独显示，不改写这次历史。')}`;
+    if(r.state==='activating') return `<div class="rw-step-header"><h2>正在完成正式上线</h2>${badge(r)}</div><ol class="rw-phases"><li data-state="done"><span class="rw-phase-icon">✓</span><span>上线请求已受理</span><span class="rw-phase-time">已记录</span></li><li data-state="${model.phase>=1?'done':'running'}"><span class="rw-phase-icon">${model.phase>=1?'✓':'●'}</span><span>确认生产路由生效</span><span class="rw-phase-time">${model.phase>=1?'已确认':'观察中'}</span></li><li data-state="${model.phase>=1?'running':'pending'}"><span class="rw-phase-icon">${model.phase>=1?'●':'○'}</span><span>目标应用执行权激活</span><span class="rw-phase-time">${model.phase>=1?'观察中':'等待路由'}</span></li></ol>${note('生效确认完成后自动进入完成页。当前不需要再次点击上线。')}`;
+    const prod=model.rows.find(row=>row.state==='complete')||fixtureRows[1];
+    return `<div class="rw-step-header"><h2>确认把正式流量交给这个版本</h2></div><div class="rw-confirm-pair"><div><small>当前正式版本</small><strong>${escape(prod.tag)}</strong><small class="rw-code">${escape(prod.sha)}</small></div><span aria-hidden="true">→</span><div><small>将上线的版本</small><strong>${escape(r.tag)}</strong><small class="rw-code">${escape(r.sha)}</small></div></div>${dl([['业务验证','已由 '+r.actor+' 确认'],['部署核对','当前目标一致 · 就绪'],['生效后','正式地址会打开 '+r.tag]])}<div class="rw-field" style="margin-top:14px"><label for="rw-reason">上线说明（可选）</label><input id="rw-reason" name="reason" value="${escape(model.launchReason||'')}" maxlength="500" placeholder="说明这次上线的目的"></div>${controls.role==='developer'?note('你已完成发布与验证。正式上线需要项目负责人或管理员，可从历史记录继续同一个流程。','warn'):note('点击下面的确认按钮后才会正式上线。旧版本保留情况按平台策略显示。')}${model.feedback?note(model.feedback,'error',true):''}`;
+  }
+  function completeBody(r) {
+    const legacy=r.state==='legacy';
+    if(!legacy&&r.state!=='complete')return `<div class="rw-step-header"><h2>${r.state==='failed'?'这次发布未完成':'这次发布已中断'}</h2>${badge(r)}</div>${dl([['版本',r.tag],['最后到达',steps[r.step]],['正式上线','未执行'],['记录说明',r.reason]])}${note(r.state==='failed'?'后续验证与上线尚未执行；失败原因和已完成步骤保留在前面的阶段。':'待验证部署已被替换，原流程停止在当时的步骤。可从发布记录开始新的操作。',r.state==='failed'?'error':'warn')}`;
+    const current=model.rows.find(row=>row.state==='complete')?.id===r.id;
+    return `<div class="rw-result"><span class="rw-result-icon" aria-hidden="true">✓</span><div><h2>${legacy?'查看旧发布记录':r.tag+' 已正式上线'}</h2><div class="rw-small">${legacy?'保留可证的来源与原切流记录':'当次流程已完成，完整经过已保存'}</div></div></div>${dl([['版本',r.tag],['固定提交',r.sha,true],['发起人',r.actor],['开始时间',r.start],['结束时间',r.end||'未记录'],['当前状态',current?'当前正式版本':'后来已被其他版本替换'],['更新说明',r.reason]])}${current?`<div class="rw-address"><span class="rw-code">customer.cs.localhost</span>${button('打开正式应用 ↗','open-prod')}</div>`:''}${legacy?note('部分阶段与人工验证未记录。选择上方步骤可查看已有材料。','warn'):note('你可以选择上方任何已完成步骤，回看当时的时间、人员和结果。','good')}${model.feedback?`<div class="rw-feedback" role="status">${escape(model.feedback)}</div>`:''}`;
+  }
+  function renderWizard() {
+    const draft=model.page==='draft',r=selected(),step=draft?0:model.displayStep;
+    let body=draft?prepareBody():step===0?`<div class="rw-step-header"><h2>当次发布来源</h2></div>${dl([['发布类型',r.type],['来源',r.state==='legacy'?'类型未记录，原分支 main':(r.source==='session'?'当前开发会话 · ':'已推送分支 · ')+(r.branch||'main')],['版本',r.tag],['固定提交',r.sha,true],['发起人',r.actor],['开始时间',r.start],['更新说明',r.reason]])}${model.readonly?note('这是已留存的历史快照，当前分支变化不会改变这次来源。'):note('本次版本和提交已固定，构建中的来源不能更换。')}`:step===1?deliveryBody(r):step===2?verifyBody(r):step===3?launchBody(r):completeBody(r);
+    let primary='',secondary='',status='';
+    if(draft) { primary=button('构建并继续','build',true); secondary=button('稍后继续','list'); status='先部署到待验证版本'; }
+    else if(model.readonly) { primary=r.state==='failed'?button('修改后发布新版本','new',true):button('返回发布记录','list',true); status=r.state==='legacy'?'历史只读 · 缺失阶段明确未记录':'历史只读 · 选择步骤回看'; }
+    else if(step!==r.step) { primary=button('回到当前步骤','current',true); secondary=button('稍后继续','list'); status='回看已完成步骤'; }
+    else if(r.state==='verify') { primary=button('验证通过，继续上线','verify',true); secondary=button('稍后继续','list'); status='确认后会记录本次人工验证'; }
+    else if(r.state==='launch') { primary=button(controls.role==='developer'?'仅负责人可正式上线':'确认上线 '+r.tag,'launch',true,controls.role==='developer'); secondary=button('稍后继续','list'); status='将核对两个版本后切换正式流量'; }
+    else if(r.state==='building'||r.state==='activating') { primary=button(r.state==='building'?'构建与部署中…':'上线生效确认中…','noop',true,true); secondary=button('稍后继续','list'); status='进度自动更新 · 无需关页或反复确认'; }
+    else if(r.state==='failed') { primary=button('修改后发布新版本','new',true); secondary=button('返回发布记录','list'); status='本次失败保留在历史记录中'; }
+    else { primary=button('返回发布记录','list',true); status='本次流程已保留'; }
+    view.innerHTML=`${button('← 返回发布记录','list',false).replace('rw-ghost','rw-ghost rw-back')}<header class="rw-heading"><div><h1>${draft?'发布新版本':model.readonly?'历史发布流程':'发布向导'}</h1><div class="rw-subtitle">${draft?'客户服务助手 · 先部署、再验证、最后确认上线':escape(r.tag)+' · '+escape(r.type)+' · '+escape(r.actor)}</div></div>${draft?'':badge(r)}</header><section class="rw-panel" aria-label="五步发布向导"><ol class="rw-steps">${steps.map((name,i)=>`<li><button type="button" class="cursor-interaction" data-action="step:${i}" ${i===step?'aria-current="step"':''} data-finished="${!draft&&i<r.step}" ${draft||(!model.readonly&&i>r.step)?'disabled':''}><span class="rw-step-dot">${!draft&&i<r.step?'✓':i+1}</span><span>${name}</span></button></li>`).join('')}</ol><section class="rw-step-body" aria-label="${steps[step]}">${body}</section><footer class="rw-actions"><span class="rw-action-status" role="status" aria-live="polite">${status}</span><div class="rw-action-group">${secondary}${primary}</div></footer></section>`;
+  }
+  function render() {
+    const focused=document.activeElement,hadFocus=view.contains(focused);
+    const action=focused?.getAttribute('data-action'),name=focused?.getAttribute('name');
+    model.page==='list'?renderList():renderWizard();
+    if(!hadFocus)return;
+    const same=action?[...view.querySelectorAll('[data-action]')].find(node=>node.dataset.action===action):name?[...view.querySelectorAll('[name]')].find(node=>node.name===name):null;
+    const origin=model.page==='list'?[...view.querySelectorAll('[data-action]')].find(node=>node.dataset.action===('continue:'+model.selected)||node.dataset.action===('history:'+model.selected)):null;
+    const target=(same&&!same.disabled? same:null)||origin||view.querySelector('.rw-steps [aria-current="step"]:not(:disabled),[name="source"],.rw-primary:not(:disabled)');
+    target?.focus({preventScroll:true});
+  }
+  function gotoList() { model.page='list'; model.logOpen=false; model.feedback=''; render(); save(); }
+  function openFlow(id,readonly) { model.selected=id; model.page='wizard'; model.readonly=readonly; model.displayStep=selected().step; model.logOpen=false; model.feedback=''; render(); save(); }
+  function newDraft() { if(model.rows.some(r=>['building','activating'].includes(r.state)))return; if(model.rows.some(r=>r.tag===model.draft.version)){const last=model.rows.map(r=>r.tag).filter(t=>/^v1\.4\.\d+$/.test(t)).map(t=>Number(t.split('.')[2]));model.draft.version='v1.4.'+(Math.max(...last)+1);} model.page='draft'; model.readonly=false; model.displayStep=0; model.feedback=''; model.logOpen=false; model.verificationNote=''; model.launchReason=''; render(); save(); }
+  function stamp() { return new Date().toLocaleTimeString('zh-CN',{hour12:false,timeZone:'Asia/Shanghai'}); }
+  function build() {
+    const d=model.draft;
+    if(model.rows.some(r=>['building','activating'].includes(r.state)))return;
+    if(!/^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(d.version)) { model.feedback='请输入合法版本号，例如 v1.4.3。'; render(); root.querySelector('[name="version"]').focus(); return; }
+    if(model.rows.some(r=>r.tag===d.version)) { model.feedback='该版本号已存在，请选择新的版本号。'; render(); root.querySelector('[name="version"]').focus(); return; }
+    if(controls.scenario==='sourceChanged') { model.feedback='来源提交已变化，请重新核对；版本号与更新说明已保留。'; render(); return; }
+    const id='new-'+(++model.runSequence);
+    const row={id,tag:d.version,type:'发布',state:'building',step:1,sha:d.branch==='main'?'f3c51d6e08':'25a401c95d',source:d.source,branch:d.branch,actor:controls.role==='developer'?'陈浩':'王琳',start:'10-09 '+stamp().slice(0,5),end:'',reason:d.message||'新增客户分流',times:[]};
+    model.rows.unshift(row);model.phase=0;model.phaseTimes=[stamp()];model.feedback='';openFlow(id,false);runBuild(id);
+  }
+  function runBuild(id) {
+    const generation=++timerGeneration;
+    const tick=()=>setTimeout(()=>{
+      if(generation!==timerGeneration||!model.rows.find(r=>r.id===id)||model.rows.find(r=>r.id===id).state!=='building')return;
+      const row=model.rows.find(r=>r.id===id);
+      if(controls.scenario==='buildFail'&&model.phase===1) { row.state='failed';row.reason='构建失败：Dockerfile 引用的 dist 目录不存在';row.end='10-09 '+stamp();row.times=model.phaseTimes; }
+      else if(model.phase<4) { model.phase++;model.phaseTimes[model.phase]=stamp();tick(); }
+      else { row.state='verify';row.step=2;row.times=model.phaseTimes.slice();for(const old of model.rows)if(old.id!==id&&['verify','launch'].includes(old.state))old.state='interrupted';if(model.selected===id)model.displayStep=2; }
+      render();save();
+    },850);
+    tick();
+  }
+  function verify() { const r=selected();r.verification={actor:controls.role==='developer'?'陈浩':'王琳',at:stamp(),note:model.verificationNote||''};r.state='launch';r.step=3;model.displayStep=3;model.verified=true;model.feedback='';render();save(); }
+  function launch() {
+    if(controls.role==='developer')return;
+    if(controls.scenario==='targetChanged') { model.feedback='待验证版本已被另一发布替换。原确认失效，请核对当前部署后继续。';render();return; }
+    const r=selected();r.state='activating';r.step=3;r.launchedBy='王琳';r.launchReason=model.launchReason||'';model.phase=0;render();save();resumeLaunch(r);
+  }
+  function resumeLaunch(r) {
+    const generation=++timerGeneration;
+    setTimeout(()=>{if(generation!==timerGeneration)return;model.phase=1;render();setTimeout(()=>{if(generation!==timerGeneration)return;r.state='complete';r.step=4;r.end='10-09 '+stamp();model.displayStep=4;model.readonly=true;render();save();},1000);},1000);
+  }
+  view.addEventListener('click',event=>{
+    const target=event.target.closest('[data-action]');if(!target||target.disabled)return;
+    const [action,id]=target.dataset.action.split(':');
+    if(action==='new')newDraft();
+    else if(action==='list')gotoList();
+    else if(action==='continue')openFlow(id,false);
+    else if(action==='history')openFlow(id,true);
+    else if(action==='step') {model.displayStep=Number(id);model.logOpen=false;model.feedback='';render();save();}
+    else if(action==='current') {model.displayStep=selected().step;render();save();}
+    else if(action==='build')build();
+    else if(action==='logs') {model.logOpen=!model.logOpen;render();save();}
+    else if(action==='open-preview') {model.feedback='示例待验证应用已打开；发布向导仍停留在这里。';render();save();}
+    else if(action==='open-prod') {model.feedback='示例正式应用入口已打开；当次历史仍完整保留。';render();save();}
+    else if(action==='verify')verify();
+    else if(action==='launch')launch();
+  });
+  view.addEventListener('input',event=>{const field=event.target;if(['version','message'].includes(field.name))model.draft[field.name]=field.value;if(field.name==='verification')model.verificationNote=field.value;if(field.name==='reason')model.launchReason=field.value;});
+  view.addEventListener('change',event=>{const field=event.target;if(field.name==='source'){model.draft.source=field.value;if(field.value==='session')model.draft.branch='main';render();}if(field.name==='branch'){model.draft.branch=field.value;render();}if(field.name==='bump'){model.draft.version={patch:'v1.4.3',minor:'v1.5.0',major:'v2.0.0'}[field.value];render();}save();});
+  window.addEventListener('openai:set_globals',event=>{const snapshot=event.detail?.globals?.widgetState;if(snapshot?.privateContent&&JSON.stringify(snapshot.privateContent)!==JSON.stringify({model,controls})){timerGeneration++;restore(snapshot);render();if(selected().state==='building')runBuild(selected().id);else if(selected().state==='activating')resumeLaunch(selected());}});
+  render();
+  if(selected().state==='building')runBuild(selected().id);else if(selected().state==='activating')resumeLaunch(selected());
+  if(globalThis.Tweak){const tweak=new Tweak({container:root,onChange:render});tweak.addSelect(controls,'role',{label:'预览身份',options:[{label:'项目负责人',value:'owner'},{label:'开发者',value:'developer'}]});tweak.addSelect(controls,'scenario',{label:'下一次操作场景',options:[{label:'正常发布',value:'normal'},{label:'构建失败',value:'buildFail'},{label:'来源发生变化',value:'sourceChanged'},{label:'上线目标被替换',value:'targetChanged'}]});}
+})();
+</script>

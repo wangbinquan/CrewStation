@@ -17,7 +17,7 @@ async function fixture() {
   database = await createTestDatabase([eventbusMigrations, queueMigrations, releaseMigrations]);
   const k8s = createFakeK8sClient(); let version = 0;
   const release = createReleaseModule({ db: database.db, k8s, isAdmin: async (id) => id === admin.userId, authorizer: { authorize: async () => {} },
-    tagger: { createReleaseTag: async () => ({ tag: `v0.0.${++version}`, commitSha: `sha-${version}` }) }, repo: { readFile: async (_s, _r, path) => path === 'crewstation.yaml' ? yaml : undefined, repositoryUrl: async () => ({ httpUrl: 'https://repo.invalid/test', credentialSecretName: 'test-git' }) },
+    tagger: { createReleaseTag: async () => ({ tag: `v0.0.${++version}`, commitSha: version.toString(16).padStart(40, 'a') }) }, repo: { readFile: async (_s, _r, path) => path === 'crewstation.yaml' ? yaml : undefined, repositoryUrl: async () => ({ httpUrl: 'https://repo.invalid/test', credentialSecretName: 'test-git' }) },
     services: { resolveServiceById: async () => ({ projectId, slug: 'maintenance', name: 'maintenance', namespace: 'cs-maintenance' }) },
     plans: { getServicePlan: async () => ({ id: '01a0bf5d-8f4b-781d-8b8e-bbbbc69c6c6a', name: 'small', cpu: '1', memory: '1Gi', maxReplicas: 3, description: '' }), lookupComputeProfile: async () => undefined, listComputeProfiles: async () => [] },
     config: { render: async () => ({ values: {}, version: 1 }), validate: async () => ({ missing: [] }) }, data: { envFor: async () => ({}) }, hosts: { prodHost: () => 'prod.invalid', previewHost: () => 'preview.invalid' },

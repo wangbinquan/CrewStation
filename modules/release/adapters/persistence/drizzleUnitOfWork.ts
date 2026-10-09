@@ -1,4 +1,5 @@
 import { drizzleHandoffs } from './handoff/repository';
+import { drizzleJourneys } from './journey/repository';
 import { drizzleMaintenance } from './drizzleMaintenance';
 import { publishDomainEvent } from '@crewstation/eventbus';
 import { NATIVE_REGISTRY_ADMISSION, ProjectIdSchema, ResourceIdSchema } from '@crewstation/contracts';
@@ -21,6 +22,7 @@ export function scopeOver(executor: Executor, lockSlots = false, projection?: Sl
   const releases = drizzleReleaseRepository(executor), slots = drizzleSlotRepository(executor, lockSlots), offlinePolicy = drizzleOfflinePolicyRepository(executor);
   const sources = { releases, offlinePolicy };
   return {
+    journeys: drizzleJourneys(executor),
     handoffs: drizzleHandoffs(executor),
     maintenance: drizzleMaintenance(executor),
     releases,
@@ -43,6 +45,7 @@ export function drizzleUnitOfWork(db: Database, projection?: SlotProjectionDeps)
   const run: UnitOfWork['run'] = (fn) => db.transaction((tx) => fn(scopeOver(tx, true, projection))), read = scopeOver(db, false, projection);
   // These historical "read" repositories also expose writes. Route every write through a real UOW so admission identity reaches SQL.
   return { run, read: { ...read,
+    journeys: { ...read.journeys, insert: (r) => run((s) => s.journeys.insert(r)), append: (id, event, patch) => run((s) => s.journeys.append(id, event, patch)) },
     releases: { ...read.releases, insert: (r) => run((s) => s.releases.insert(r)), update: (r) => run((s) => s.releases.update(r)), recordConfigVersion: (id, version) => run((s) => s.releases.recordConfigVersion(id, version)) },
     slots: { ...read.slots, initialize: (r) => run((s) => s.slots.initialize(r)), save: (r) => run((s) => s.slots.save(r)) },
     handoffs: { ...read.handoffs, insert: (r) => run((s) => s.handoffs.insert(r)), claim: (id, owner) => run((s) => s.handoffs.claim(id, owner)), settle: (r, update) => run((s) => s.handoffs.settle(r, update)) },
