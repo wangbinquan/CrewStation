@@ -5,6 +5,7 @@ import type {TestDatabase} from '@crewstation/testkit';
 import {createTestDatabase,testDatabaseAvailable} from '@crewstation/testkit';
 import {developmentUsageOwner} from '../application/developmentUsage';
 import {developmentObservationProducer} from '../application/development/observationProducer';
+import {AgentExecutionLifecycle} from '../application/agentExecution';
 import {developmentUsageOwnerStore} from '../adapters/persistence/developmentUsage';
 import {drizzleAgentStarts} from '../adapters/persistence/drizzleAgentStarts';
 import {developmentEndingStore} from '../adapters/persistence/ending/store';
@@ -46,12 +47,26 @@ describe.skipIf(!available)('selected native v2 actual original producer stores'
   expect(await f.endingStore.get(f.child.id)).toEqual(first);expect((await f.owner.get(f.child.id))!.closeReason).toBe('workspace-released');expect(await f.starts.get(f.start.agentId)).toMatchObject({state:'ended',finalized:false});expect(f.startsSent()).toHaveLength(0);expect(f.controls.priceCalls).toBe(1);
  },30000);
  test('a logical completed handoff waits for actual original terminal evidence, then retries the same closed owner without inventing a physical exit',async()=>{
-  const f=await observationProducerFixture(database.db,{bound:true});await expect(f.producer.end({...f.start,state:'ended'})).rejects.toThrow();expect((await f.owner.get(f.child.id))!.closeReason).toBe('completed');expect(await f.endingStore.get(f.child.id)).toBeUndefined();
+  const f=await observationProducerFixture(database.db,{bound:true});await f.producer.end({...f.start,state:'ended'});expect((await f.owner.get(f.child.id))!.closeReason).toBe('completed');expect(await f.endingStore.get(f.child.id)).toBeUndefined();
   const receipt=await f.setReceipt({phase:'finished',result:'completed',finalThrough:0},true);await f.producer.end({...f.start,state:'ended',cancelled:true});
   expect(await f.endingStore.get(f.child.id)).toMatchObject({firstReason:'completed',logicalResult:'completed',actualEndedAt:null,stage:'awaiting-stop',stop:null,closure:null});expect((await f.owner.get(f.child.id))!.binding!.key).toEqual(receipt.key);expect(f.startsSent()).toHaveLength(0);expect(f.issues).toHaveLength(0);expect(f.controls.priceCalls).toBe(1);
  },30000);
  test('unbound cancellation queues an original ending job without claiming a zero stream, rebinding or starting a model',async()=>{
   const f=await observationProducerFixture(database.db);await f.producer.end({...f.start,state:'ended',cancelled:true});expect(await f.endingStore.get(f.child.id)).toMatchObject({firstReason:'cancelled',logicalResult:null,actualEndedAt:null,stage:'awaiting-stop',stop:null,closure:null});
   expect((await f.owner.get(f.child.id))!.binding).toBeNull();expect(f.registrations).toHaveLength(0);expect(f.calls).toHaveLength(0);expect(f.issues).toHaveLength(0);expect(f.materialRefs).toHaveLength(0);expect(f.controls.priceCalls).toBe(1);
+ },30000);
+ test('a failed unbound selected execution waits without a fake model receipt or physical end, including a reconstructed lifecycle',async()=>{
+  const f=await observationProducerFixture(database.db),original=(await f.owner.get(f.child.id))!,failure='Original Pod never reached Runner readiness';
+  const lifecycle=new AgentExecutionLifecycle(f.applicationDeps,f.starts,f.producer);await lifecycle.end(f.start,{failure});
+  const saved=(await f.starts.get(f.start.agentId))!;expect(saved).toMatchObject({state:'ended',failure,finalized:false});expect(saved.endedAt).toBeUndefined();
+  const closed=(await f.owner.get(f.child.id))!;expect(closed).toEqual({...original,closeReason:'error'});expect(await f.endingStore.get(f.child.id)).toBeUndefined();
+  const restored=new AgentExecutionLifecycle(f.applicationDeps,drizzleAgentStarts(database.db),developmentObservationProducer(f.applicationDeps,{...f.ports,store:developmentEndingStore(database.db,f.applicationDeps.clock)}));await restored.end(saved,{failure});
+  expect(await f.starts.get(f.start.agentId)).toEqual(saved);expect(await f.owner.get(f.child.id)).toEqual(closed);expect(await f.endingStore.get(f.child.id)).toBeUndefined();
+  expect(f.registrations).toHaveLength(0);expect(f.calls).toHaveLength(0);expect(f.startsSent()).toHaveLength(0);expect(f.issues).toHaveLength(0);expect(f.materialRefs).toHaveLength(0);expect(f.controls.priceCalls).toBe(1);
+ },30000);
+ test('an actual completed receipt cannot satisfy an error close request or authorize physical cleanup',async()=>{
+  const f=await observationProducerFixture(database.db,{bound:true});await f.owner.close(f.child.id,'error');const original=(await f.owner.get(f.child.id))!;
+  await f.setReceipt({phase:'finished',result:'completed',finalThrough:0},true);await expect(f.producer.end({...f.start,state:'ended',failure:'original error'})).rejects.toThrow('完成或错误请求需要对应实际终态回执');
+  expect(await f.owner.get(f.child.id)).toEqual(original);expect(await f.endingStore.get(f.child.id)).toBeUndefined();expect(f.startsSent()).toHaveLength(0);expect(f.controls.priceCalls).toBe(1);
  },30000);
 });

@@ -10,6 +10,8 @@ export async function requestDevelopmentEnding(deps: DevelopmentEndingDeps, id: 
   if (!original || original.unsupported) return { kind: 'legacy' } as const;
   const stored = ['completed', 'error'].includes(reason) && original.binding ? developmentEndingStored(original.binding, await deps.session.registerDevelopmentUsage(original.binding)) : undefined;
   const receipt = stored?.receipt?.phase === 'finished' ? stored.receipt : undefined;
+  // A pending original terminal is recovery work, never a fabricated error/completion request.
+  if (['completed', 'error'].includes(reason) && !receipt) return { kind: 'waiting', reason: 'terminal-receipt-unavailable' } as const;
   return { kind: 'ending', job: await deps.store.request({ executionTaskId: id, expectedRegistration: original.binding, reason, observedAt, ...(receipt ? { receipt } : {}) }) } as const;
 }
 /** Independent bounded recovery, including ended/finalized starts. No timers or production wiring. */

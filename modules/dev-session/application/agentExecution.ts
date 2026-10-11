@@ -53,7 +53,7 @@ export class AgentExecutionLifecycle {
     }
     // A recovered digital terminal receipt is logical evidence, without an actual end timestamp.
     const ended: AgentStart = { ...start, state: 'ended', ...(outcome.failure ? { failure: outcome.failure } : {}), ...(outcome.cancelled ? { cancelled: true } : {}),
-      ...(outcome.actualEndedAt === null ? {} : { endedAt: this.deps.clock.now().toISOString() }) };
+      ...(start.execution.observationIntent || outcome.actualEndedAt === null ? {} : { endedAt: this.deps.clock.now().toISOString() }) };
     await this.repo.update(ended);
     if (start.execution.observationIntent) await this.observation?.end(ended);
     return ended;
