@@ -1,7 +1,9 @@
 import type { RuntimeUsageMetrics, RuntimeTaskSummary, RuntimeAttemptFact, RuntimeSourceKind, RuntimeStatistics, RuntimeAgentStatistics } from '@crewstation/contracts';
 import type { Translate } from '../../../shared/lib/useT';
-export function runtimeTaskName(task: Pick<RuntimeTaskSummary, 'name' | 'source'>, t: Translate): string {
-  return task.source?.kind === 'development-agent' ? `${t('runtime.developmentExecution')} · ${task.source.identity.agentId.slice(-8)}` : task.name;
+export function runtimeTaskName(task: Pick<RuntimeTaskSummary, 'name' | 'source'> & { sourceKind?: RuntimeSourceKind }, t: Translate): string {
+  if ((task.source?.kind ?? task.sourceKind) !== 'development-agent') return task.name;
+  const agentId = task.source?.kind === 'development-agent' ? task.source.identity.agentId : task.name;
+  return `${t('runtime.developmentExecution')} · ${agentId.slice(-8)}`;
 }
 export function runtimeAttemptName(task: Pick<RuntimeTaskSummary, 'name' | 'source'>, attempt: RuntimeAttemptFact, t: Translate) { return task.source?.kind === 'development-agent' ? runtimeTaskName(task, t) : attempt.name; }
 export function runtimeComputeLabel(profile: { profileName?: string | null; profileRevision: number | null }, t: Translate) { return `${profile.profileName ?? t('runtime.nameUnavailable')} · r${profile.profileRevision ?? '—'}`; }

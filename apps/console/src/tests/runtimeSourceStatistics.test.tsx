@@ -74,3 +74,31 @@ test('business list retains multiple original compute profiles and detail labels
     page.unmount();page=undefined;
   }
 });
+
+// Formal acceptance exposed raw Agent UUIDs as primary labels in both contribution dialogs.
+test('project and system development contributions keep readable task names and full execution identities',async()=>{
+ const f=runtimeSourceStatisticsFixture(),last=f.development.at(-1)!,label='开发 Agent 执行 · '+last.attempts[0]!.agentId!.slice(-8);
+ for(const root of ['/admin/observability','/projects/'+f.projectId+'/observability'])for(const tab of ['agents','usage']){
+  page=await renderApp(root+'?tab='+tab+'&sourceKind=development-agent&'+f.query);
+  await page.click(tab==='agents'?label:'Accepted Dev Compute · r7');
+  const dialog=openDialog(),row=dialog.querySelector(`[data-runtime-task-id="${last.id}"]`)!;
+  expect(row.querySelector('td button')?.textContent).toBe(label);expect(row.textContent).toContain(last.id);
+  expect(row.textContent).toContain('7');expect(dialog.querySelectorAll('[data-runtime-task-id]').length).toBe(tab==='agents'?1:2);
+  await act(async()=>row.querySelector<HTMLButtonElement>('td button')!.click());await page.settle();
+  expect(page.path()).toBe(root+'/tasks/'+last.id);expect(document.querySelector('h1')?.textContent).toBe(label);
+  await page.click('返回统计列表');expect(openDialog().querySelector(`[data-runtime-task-id="${last.id}"] td button`)?.textContent).toBe(label);
+  page.unmount();page=undefined;
+ }
+});
+// The accepted-compute dialog must use the same task label as the originating task row.
+test('project and system accepted compute dialog titles use the existing development task label',async()=>{
+ const f=runtimeSourceStatisticsFixture(),last=f.development.at(-1)!,label='开发 Agent 执行 · '+last.attempts[0]!.agentId!.slice(-8);
+ for(const root of ['/admin/observability','/projects/'+f.projectId+'/observability']){
+  page=await renderApp(root+'?tab=tasks&sourceKind=development-agent&'+f.query);
+  const row=document.querySelector(`[data-runtime-task-id="${last.id}"]`)!;
+  await act(async()=>row.querySelector<HTMLButtonElement>('[data-runtime-accepted-profile]')!.click());await page.settle();
+  expect(openDialog().querySelector('h2')?.textContent).toBe(label+' · 查看全部算力与执行');
+  expect(openDialog().textContent).toContain('Accepted Dev Compute · r7');
+  page.unmount();page=undefined;
+ }
+});

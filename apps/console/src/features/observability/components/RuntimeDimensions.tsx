@@ -8,7 +8,7 @@ import {DataTable} from '../../../shared/ui/DataTable';
 import {Dialog} from '../../../shared/ui/dialog/Dialog';
 import {RuntimeRows,RuntimeItem} from './RuntimeRows';
 import {RuntimeMetrics,RuntimeTokenMetric,RuntimeTokenBuckets} from './RuntimeMetrics';
-import {runtimeAgentName,runtimeComputeLabel,runtimeSourceLabel} from '../model/runtimeFormat';
+import {runtimeAgentName,runtimeComputeLabel,runtimeSourceLabel,runtimeTaskName} from '../model/runtimeFormat';
 import {completeCount,completeCny} from '../model/completeFormat';
 import type {RuntimeSearch} from '../model/runtimeSearch';
 import styles from './RuntimeStatistics.module.css';
@@ -27,7 +27,7 @@ export function RuntimeUsage({header,summary,search,change,opener}:Omit<Props,'t
  </Stack>;
 }
 function Contributions({header,section,parent,task}:{header:RuntimeReportHeader;section:'agent-tasks'|'profile-tasks';parent:string;task:(id:string)=>void;opener?:RefObject<HTMLButtonElement|null>}) {
- const t=useT();return <RuntimeRows<CompleteRuntimeContribution> header={header} section={section} parent={parent}>{rows=><DataTable columns={['task','project','attempts','tokens','cost'].map(key=>t('runtime.'+key))}>{rows.map(row=><tr key={row.taskId} data-runtime-task-id={row.taskId}><td><Button size="small" variant="ghost" onClick={()=>task(row.taskId)}>{row.taskName}</Button><span className={styles.identity}>{runtimeSourceLabel(row.sourceKind,t)}</span></td><td>{row.projectName??t('runtime.nameUnavailable')}</td><td>{completeCount(row.attempts)}</td><td><RuntimeTokenMetric metrics={row.metrics}/></td><td>{completeCny(row.metrics,t)}</td></tr>)}</DataTable>}</RuntimeRows>;
+ const t=useT();return <RuntimeRows<CompleteRuntimeContribution> header={header} section={section} parent={parent}>{rows=><DataTable columns={['task','project','attempts','tokens','cost'].map(key=>t('runtime.'+key))}>{rows.map(row=><tr key={row.taskId} data-runtime-task-id={row.taskId}><td><Button size="small" variant="ghost" onClick={()=>task(row.taskId)}>{runtimeTaskName({name:row.taskName,sourceKind:row.sourceKind},t)}</Button><span className={styles.identity}>{runtimeSourceLabel(row.sourceKind,t)}</span><span className={styles.identity}>{row.taskId}</span></td><td>{row.projectName??t('runtime.nameUnavailable')}</td><td>{completeCount(row.attempts)}</td><td><RuntimeTokenMetric metrics={row.metrics}/></td><td>{completeCny(row.metrics,t)}</td></tr>)}</DataTable>}</RuntimeRows>;
 }
 export function RuntimeDimensionDetail({header,search,change,task,opener}:Props) {
  const t=useT(),selected=search.agent??search.profile;if(!selected)return null;
