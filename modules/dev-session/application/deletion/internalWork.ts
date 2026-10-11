@@ -19,6 +19,11 @@ export function developmentUsageWork(owner: DevelopmentUsageOwner, work: Develop
 }
 /** Cleanup commands retain their actual transport effects after a bounded caller response or disconnect. */
 export function developmentCleanupWork(participant: DevelopmentCleanupParticipant, work: DevelopmentProjectWork): DevelopmentCleanupParticipant {
-  return { advance: (input) => work.runOrigin({ originKind: 'task', originKey: input.identity.executionId, kind: 'ending',
-    reference: newResourceId(), inputDigest: jsonHash(input) }, () => participant.advance(input)) };
+  const run = (input: Parameters<DevelopmentCleanupParticipant['advance']>[0], action: 'advance' | 'completePrestart') =>
+    work.runOrigin({ originKind: 'task', originKey: input.identity.executionId, kind: 'ending',
+      reference: newResourceId(), inputDigest: jsonHash({ action, input }) }, () => {
+      const method = participant[action];
+      return method ? Reflect.apply(method, participant, [input]) : Promise.resolve({ kind: 'waiting' as const, reason: 'prestart-capability' });
+    });
+  return { advance: (input) => run(input, 'advance'), completePrestart: (input) => run(input, 'completePrestart') };
 }

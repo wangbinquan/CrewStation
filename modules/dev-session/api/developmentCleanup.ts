@@ -1,4 +1,4 @@
-import type { DevelopmentUsageClosure, DevelopmentUsageDrainReason, DevelopmentUsageRegistration, DevelopmentUsageStopReceipt, DevelopmentUsageIdentity } from '@crewstation/contracts';
+import type { DevelopmentUsageClosure, DevelopmentUsageDrainReason, DevelopmentUsageRegistration, DevelopmentUsageStopReceipt, DevelopmentUsageIdentity, WorkloadConsumer, WorkloadStopProof } from '@crewstation/contracts';
 
 /** Owner-private immutable selection; this is never a business or workbench HTTP payload. */
 export interface DevelopmentCleanupSelection {
@@ -11,7 +11,7 @@ export interface DevelopmentCleanupSelection {
   readonly renderStart: number;
   readonly selectionHash: string;
 }
-export interface DevelopmentCleanupEvidence {
+export interface DevelopmentBoundCleanupEvidence {
   readonly version: 1;
   readonly selection: DevelopmentCleanupSelection;
   readonly registration: DevelopmentUsageRegistration;
@@ -27,5 +27,20 @@ export interface DevelopmentCleanupEvidence {
     readonly priceBookRevision: number;
   };
 }
+export interface DevelopmentPrestartCleanupEvidence {
+  readonly version: 2;
+  readonly kind: 'unbound-no-grant';
+  readonly phase: 'stopping' | 'closed';
+  readonly numericState: 'unknown';
+  readonly selection: DevelopmentCleanupSelection;
+  readonly owner: DevelopmentBoundCleanupEvidence['owner'];
+  readonly consumer: WorkloadConsumer;
+  readonly stopProof: WorkloadStopProof | null;
+  readonly stopProofDigest: string | null;
+}
+export type DevelopmentCleanupEvidence = DevelopmentBoundCleanupEvidence | DevelopmentPrestartCleanupEvidence;
 export type DevelopmentCleanupResult = { readonly kind: 'waiting'; readonly reason: string } | { readonly kind: 'permitted'; readonly evidence: DevelopmentCleanupEvidence };
-export interface DevelopmentCleanupParticipant { advance(input: DevelopmentCleanupSelection): Promise<DevelopmentCleanupResult> }
+export interface DevelopmentCleanupParticipant {
+  advance(input: DevelopmentCleanupSelection): Promise<DevelopmentCleanupResult>;
+  completePrestart?(input: DevelopmentCleanupSelection): Promise<DevelopmentCleanupResult>;
+}

@@ -316,7 +316,7 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
   const runner = createSessionClient(settings.sessionInternalUrl);
   // 两类任务共用解析：受理固定档位修订，派发时取材料，凭据仅进入受控 Runner 通道。
   const computeCatalog = { pinLaunchVersion: core.agentRuntime.api.pinLaunchVersion, launchMaterialAt: core.agentRuntime.api.launchMaterialAt, resolve: (name: ComputeProfileSelector | undefined, usage: ComputeUsage, projectId: ProjectId) => core.agentRuntime.api.resolveForProject(projectId, name, usage), launchMaterial: core.agentRuntime.api.launchMaterial, launchMetadata: core.agentRuntime.api.launchMetadata };
-  const devSession = createDevSessionModule({ developmentDispatchSession: runner, developmentCleanupSession: runner,
+  const devSession = createDevSessionModule({ developmentDispatchSession: runner, developmentCleanupSession: runner, developmentCleanupWorkloadSafety: resources.api.workloadSafety,
     projectDeletionSession: developmentDeletionSession(project.api, createProjectDeletionSessionClient(settings.sessionInternalUrl)),
     ...(settings.platformPodUid ? { deletionWorkSources: developmentDeletionSources(project.api, taskRuntime.api, () => late.clusterManagement, projectCallbackOwners(k8s, settings.systemNamespace, settings.platformPodUid, 'crewstation.io/development-project-stop')) } : {}),
     developmentUsagePricing: developmentObservationAdmission(() => late.observability),

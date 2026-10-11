@@ -21,5 +21,5 @@ export async function developmentCleanupFixture(db: Database, bound = true) {
       environments: { ...base.environments, getEnvironment: f.environmentPort.getEnvironment }, clock: f.deps.clock,
       ...(enabled ? { developmentCleanupSession: session } : {}) });
   };
-  return { ...f, session, participant, input, cleanupControl: control, module };
+  return { ...f, deps, session, participant, input, cleanupControl: control, module };
 }

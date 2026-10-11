@@ -12,6 +12,7 @@ export function requestDevelopmentEndingJob(db: Database, raw: DevelopmentEnding
   const input = DevelopmentEndingRequestSchema.parse(raw);
   return withEndingTransaction(db, input.executionTaskId, async ({ tx, original, start, job }) => {
     if (jsonHash(original.binding) !== jsonHash(input.expectedRegistration)) throw conflict('结束请求期间原数字绑定已改变');
+    if (job?.stage === 'prestart-closed') return job;
     const result = input.receipt?.result ?? null;
     if (job?.logicalResult && result && job.logicalResult !== result) throw conflict('原执行结果不可替换');
     const changed = job && !job.logicalResult && result;

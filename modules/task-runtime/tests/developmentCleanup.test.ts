@@ -42,7 +42,9 @@ describe.skipIf(!available)('RFC-034 bound development native cleanup', () => {
       f = await developmentCleanupFixture(mode); const before = await f.load(f.env.id);
       await startStop();
       const waiting = await f.load(f.env.id); expect(waiting.native?.state).toBe('cleaning');
-      expect(waiting.native?.developmentCleanup?.closure.status).toBe('complete'); expect(waiting.connected).toBe(true); expect(waiting.runnerTokenHash).toBe(before.runnerTokenHash);
+      const evidence = waiting.native?.developmentCleanup;
+      expect(evidence?.version).toBe(1); if (!evidence || evidence.version !== 1) throw new Error('expected original bound receipt');
+      expect(evidence.closure.status).toBe('complete'); expect(waiting.connected).toBe(true); expect(waiting.runnerTokenHash).toBe(before.runnerTokenHash);
       expect((await f.resources.api.get(f.env.id))?.desired).toBe('present'); expect(await f.resources.api.occupancy(f.env.projectId)).toBe(2);
       expect(f.physical.state.deleteRequests.filter((s) => s.startsWith('Secret:'))).toEqual([]);
       expect((await f.safety.get(f.env.render!.workloadConsumerId!))?.stopProof?.podUid).toBe(f.env.native!.podUid);

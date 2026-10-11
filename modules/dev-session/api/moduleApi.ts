@@ -25,6 +25,7 @@ export interface DevSessionModuleApi extends NativeTerminalApi {
   readonly developmentUsage?: DevelopmentUsageOwner;
   readonly developmentCleanup?: DevelopmentCleanupParticipant;
   projectDeletionCleanup?(context: ProjectDeletionContext, input: Parameters<DevelopmentCleanupParticipant['advance']>[0]): ReturnType<DevelopmentCleanupParticipant['advance']>;
+  projectDeletionCompletePrestart?(context: ProjectDeletionContext, input: Parameters<DevelopmentCleanupParticipant['advance']>[0]): ReturnType<DevelopmentCleanupParticipant['advance']>;
   inspectClusterNative(actor: Actor, id: TaskId): Promise<Record<string, unknown>>;
   inspectClusterAgent(actor: Actor, id: TaskId): Promise<Record<string, unknown>>;
   manageClusterNative(actor: Actor, id: TaskId, restart: boolean, operationId: string): Promise<{ operationId: string }>;

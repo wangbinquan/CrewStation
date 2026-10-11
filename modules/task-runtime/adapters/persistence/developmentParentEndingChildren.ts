@@ -26,7 +26,7 @@ export function drizzleDevelopmentParentEndingChildren(db: Executor): Developmen
             IS DISTINCT FROM jsonb_build_array(member.snapshot->'native'->'parentTaskId',member.snapshot->'native'->'parentPodUid',member.snapshot->'native'->'pvcUid',
             member.snapshot->'native'->'nodeName',member.snapshot->'native'->'runnerId',member.snapshot->'native'->'agentId',member.snapshot->'native'->'terminalId',
             member.snapshot->'native'->'fingerprint',member.snapshot->'native'->'profile',member.snapshot->'native'->'image',member.snapshot->'native'->'purpose')
-          OR member.closure->>'kind'='protected-closed' AND child.native->'developmentCleanup' IS DISTINCT FROM member.closure->'numericEvidence')`);
+          OR member.closure->>'kind' IN ('protected-closed','protected-prestart-closed') AND child.native->'developmentCleanup' IS DISTINCT FROM member.closure->'numericEvidence')`);
       return Number(rows[0]?.['count'] ?? 0);
     },
     summary: async (endingId) => {

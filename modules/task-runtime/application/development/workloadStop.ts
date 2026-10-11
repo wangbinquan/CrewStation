@@ -39,3 +39,25 @@ export async function developmentPhysicalStop(safety: WorkloadSafetyPort | undef
   const admissionSecretUid = await developmentAdmissionSecretUid(safety, env);
   return { consumer, startPermit, stopProof, ...(admissionSecretUid ? { admissionSecretUid } : {}) };
 }
+
+/** A real original Resources read chooses the permit branch; absence is never a no-grant receipt. */
+export async function developmentHasStartPermit(safety: WorkloadSafetyPort | undefined, env: TaskEnvironment): Promise<boolean> {
+  const expected = originalConsumer(env), state = await safety?.get(expected.id);
+  if (!state || jsonHash(WorkloadConsumerSchema.parse(state.consumer)) !== jsonHash(expected)) throw precondition('原开发消费者尚未登记或身份已冲突');
+  if (state.startPermit !== null) WorkloadStartPermitSchema.parse(state.startPermit);
+  return state.startPermit !== null;
+}
+export async function developmentNoGrant(safety: WorkloadSafetyPort | undefined, env: TaskEnvironment) {
+  const expected = originalConsumer(env), state = await safety?.get(expected.id);
+  if (!state?.admissionClosed || !await safety?.admissionClosed(expected.id) || state.startPermit !== null
+    || jsonHash(WorkloadConsumerSchema.parse(state.consumer)) !== jsonHash(expected)) throw precondition('等待原消费者持久关闭且从未取得启动许可', { code: 'runtime_original_stop_waiting' });
+  return state;
+}
+export async function developmentPrestartPhysicalStop(safety: WorkloadSafetyPort | undefined, env: TaskEnvironment): Promise<DevelopmentPhysicalStopEvidence> {
+  const state = await developmentNoGrant(safety, env);
+  if (!state.stopProof) throw precondition('等待原未获准启动 Pod 的全部容器实际停止证明', { code: 'runtime_original_stop_waiting' });
+  const stopProof = WorkloadStopProofSchema.parse(state.stopProof), consumer = WorkloadConsumerSchema.parse(state.consumer);
+  if (jsonHash(stopProof.consumer) !== jsonHash(consumer) || stopProof.podUid !== env.native!.podUid
+    || stopProof.type === 'kubelet-terminated' && stopProof.nodeName !== env.native!.nodeName) throw precondition('未获准启动停止证明不属于原 Pod、节点与工作卷');
+  return { consumer, startPermit: null, stopProof };
+}

@@ -1,6 +1,6 @@
 import { developmentObservationProducer } from './application/development/observationProducer';
 import type { DevelopmentDispatchSession } from './ports/developmentDispatch';
-import type { DevelopmentCleanupSession } from './ports/developmentCleanup';
+import type { DevelopmentCleanupSession, DevelopmentCleanupWorkloadSafety } from './ports/developmentCleanup';
 import { developmentCleanupParticipant } from './application/development/cleanup';
 import { developmentEndingStore } from './adapters/persistence/ending/store';
 import type { DevelopmentRuntimeImages } from './ports/runtimeImages';
@@ -57,6 +57,7 @@ export interface DevSessionModuleDeps {
   deletionWorkSources?: DevelopmentWorkSources;
   developmentUsagePricing?: DevelopmentUsagePricing;
   developmentCleanupSession?: DevelopmentCleanupSession;
+  developmentCleanupWorkloadSafety?: DevelopmentCleanupWorkloadSafety;
   developmentDispatchSession?: DevelopmentDispatchSession;
   projectDeletionSession?: (context: ProjectDeletionContext, taskId: TaskId) => Promise<DevelopmentCleanupSession>;
   identities?: ResourceIdentityDirectory;
@@ -148,6 +149,7 @@ function developmentApi(deps: DevSessionModuleDeps, useCaseDeps: DevSessionUseCa
   const makeCleanup = (session: DevelopmentCleanupSession, closing = false) => developmentCleanupParticipant({ owner: rawUsage,
     store: projectWork ? guardedDevelopmentPort(endingStore, projectWork) : endingStore, environments: useCaseDeps.environments,
     session: projectWork ? guardedDevelopmentPort(session, projectWork) : session, clock: useCaseDeps.clock,
+    ...(deps.developmentCleanupWorkloadSafety ? { workloadSafety: projectWork ? guardedDevelopmentPort(deps.developmentCleanupWorkloadSafety, projectWork) : deps.developmentCleanupWorkloadSafety } : {}),
     ...(closing ? { closeOriginalAdmission: async (id: TaskId) => { await rawUsage.close(id, 'cancelled'); } } : {}) });
   const cleanup = deps.developmentCleanupSession ? makeCleanup(deps.developmentCleanupSession) : undefined;
   const api: DevSessionModuleApi = {
@@ -160,6 +162,14 @@ function developmentApi(deps: DevSessionModuleDeps, useCaseDeps: DevSessionUseCa
         reference: newResourceId(), inputDigest: jsonHash(input) }, async () => {
         const session = await deps.projectDeletionSession?.(context, TaskIdSchema.parse(input.identity.executionId));
         return (session ? makeCleanup(session, true) : cleanup!).advance(input);
+      });
+    }, projectDeletionCompletePrestart: (context, input) => {
+      if (context.phase !== 'stop') throw precondition('开发项目清理只接受当前停止阶段许可');
+      return projectWork.runGranted(context, { originKind: 'task', originKey: input.identity.executionId,
+        reference: newResourceId(), inputDigest: jsonHash({ action: 'completePrestart', input }) }, async () => {
+        const session = await deps.projectDeletionSession?.(context, TaskIdSchema.parse(input.identity.executionId));
+        const participant = session ? makeCleanup(session, true) : cleanup!;
+        return participant.completePrestart ? participant.completePrestart(input) : { kind: 'waiting' as const, reason: 'prestart-capability' };
       });
     } } : {}),
     invokeApi: apiInvocationUseCase(useCaseDeps),

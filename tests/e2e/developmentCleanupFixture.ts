@@ -22,7 +22,7 @@ import { developmentCleanupParticipant } from '../../modules/dev-session/applica
 import { developmentCleanupPort } from '../../modules/platform/application/developmentCleanupPorts';
 import type { DevelopmentCleanupSession } from '../../modules/dev-session/ports/developmentCleanup';
 
-async function originalOwner(f: DevelopmentCleanupFixture) {
+export async function originalOwner(f: Pick<DevelopmentCleanupFixture, 'deps' | 'tdb' | 'env' | 'input' | 'parent' | 'runtime'>) {
   const clock = f.deps.clock!, controls = { priceRevision: 3, priceCalls: 0 };
   const starts = drizzleAgentStarts(f.tdb.db), n = f.env.native!, profile = f.input.computeProfile!;
   await starts.insert({ agentId: n.agentId!, taskId: f.parent.id, createdBy: UserIdSchema.parse(newResourceId()),

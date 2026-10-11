@@ -23,6 +23,7 @@ export function originalSecret(secret: Secret, env: TaskEnvironment, stop: Devel
   if (!uid || !secret.immutable || secret.metadata.namespace !== env.namespace || secret.metadata.name !== (admission ? env.podName + '-admission' : runnerName(env))
     || secret.metadata.labels?.[LABELS.task] !== env.id) throw precondition('原开发凭据的不可变归属已变化');
   if (admission) {
+    if (!stop.startPermit) throw precondition('未获启动许可的准入 Secret 不能取得删除许可');
     if (env.render?.developmentRemovalProtection !== undefined && (!historicalUid || uid !== historicalUid || uid !== stop.admissionSecretUid)) throw precondition('同名准入 Secret 不是持久的原历史 UID');
     const fields = { podUid: stop.startPermit.podUid, nodeUid: stop.startPermit.nodeUid, consumerId: stop.consumer.id, volumeUid: stop.consumer.volumeUid };
     if (Object.entries(fields).some(([key, expected]) => value(secret, key) !== expected)) throw precondition('开发准入凭据不是原工作卷许可');
@@ -62,8 +63,9 @@ export function allOriginalContainers(env: TaskEnvironment, stopped: Development
 export async function cleanupDevelopmentExecution(k8s: K8sClient, env: TaskEnvironment, guard: DevelopmentCleanupGuard): Promise<void> {
   const selection = developmentCleanupSelection(env);
   if (!selection) throw precondition('原开发清理选择尚未固定');
-  requireDevelopmentCleanupEvidence(env.native!.developmentCleanup, selection);
-  const selected = env.render?.developmentRemovalProtection !== undefined;
+  const evidence = requireDevelopmentCleanupEvidence(env.native!.developmentCleanup, selection), noGrant = evidence.version === 2;
+  if (noGrant && !guard.beforeCredentials) throw precondition('原未获准启动闭合能力未装配');
+  const selected = !noGrant && env.render?.developmentRemovalProtection !== undefined;
   if (selected && !guard.admissionSecretUid) throw precondition('原准入 Secret 回执读取能力未装配');
   await guard.current();
   const historicalUid = selected ? await guard.admissionSecretUid!() : undefined;
@@ -72,6 +74,7 @@ export async function cleanupDevelopmentExecution(k8s: K8sClient, env: TaskEnvir
     await guard.current();
     if (selected && await guard.admissionSecretUid!() !== historicalUid) throw precondition('原准入 Secret 历史 UID 已冲突');
   };
+  if (noGrant && await k8s.get(Resources.Secret!, env.podName + '-admission', env.namespace, AbortSignal.timeout(15_000))) throw precondition('未获启动许可却存在准入 Secret，等待原身份核实');
   const pod = await k8s.get(Resources.Pod!, env.podName, env.namespace, AbortSignal.timeout(15_000));
   if (pod) {
     if (pod.metadata.uid !== env.native!.podUid) throw precondition('同名开发 Pod 已被替换');
@@ -80,6 +83,11 @@ export async function cleanupDevelopmentExecution(k8s: K8sClient, env: TaskEnvir
     if (await k8s.get(Resources.Pod!, env.podName, env.namespace, AbortSignal.timeout(15_000))) throw precondition('等待原开发 Pod 与 Controller 停止 finalizer 完成', { code: 'runtime_original_stop_waiting' });
   }
   const stopped = await guard.stopped(); allOriginalContainers(env, stopped);
+  if (noGrant) {
+    if (stopped.startPermit !== null) throw precondition('原未获准启动事实已冲突');
+    await guard.beforeCredentials!(); await current();
+    if (await k8s.get(Resources.Secret!, env.podName + '-admission', env.namespace, AbortSignal.timeout(15_000))) throw precondition('未获启动许可却存在准入 Secret，保留全部凭据');
+  }
   for (const admission of [false, true]) {
     const name = admission ? env.podName + '-admission' : runnerName(env);
     const secret = await k8s.get<Secret>(Resources.Secret!, name, env.namespace, AbortSignal.timeout(15_000));

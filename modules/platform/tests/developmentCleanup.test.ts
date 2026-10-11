@@ -37,3 +37,20 @@ describe('RFC-034 explicit Task-to-Dev cleanup composition', () => {
     await expect(developmentCleanupPort(task, { advance: async () => ({ kind: 'permitted', evidence: { ...evidence, selection: { ...s, selectionHash: 'c'.repeat(64) } } }) }).advance(s)).rejects.toMatchObject({ kind: 'precondition' });
   });
 });
+
+test('completePrestart preserves the owner receiver and rechecks Task selection after real owner I/O', async () => {
+  const { s } = values(); let selected: DevelopmentCleanupSelection | undefined = s, calls = 0;
+  const owner = { advance: async () => ({ kind: 'waiting' as const, reason: 'copy' }), marker: 'original',
+    completePrestart: async function(this: { marker: string }) { expect(this.marker).toBe('original'); calls++; return { kind: 'waiting' as const, reason: 'physical-proof' }; } };
+  const port = developmentCleanupPort({ inspectDevelopmentCleanupSelection: async () => selected }, owner);
+  expect(await port.completePrestart!(s)).toEqual({ kind: 'waiting', reason: 'physical-proof' }); expect(calls).toBe(1);
+  selected = undefined; expect(await port.completePrestart!(s)).toEqual({ kind: 'waiting', reason: 'task-selection' }); expect(calls).toBe(1);
+  selected = s; owner.completePrestart = async function() { calls++; selected = { ...s, selectionHash: 'f'.repeat(64) }; return { kind: 'waiting', reason: 'physical-proof' }; };
+  expect(await port.completePrestart!(s)).toEqual({ kind: 'waiting', reason: 'task-selection' }); expect(calls).toBe(2);
+});
+test('missing completePrestart and a bound numeric receipt cannot substitute the second action', async () => {
+  const { s, evidence } = values(), query = { inspectDevelopmentCleanupSelection: async () => s };
+  const oldOwner = { advance: async () => ({ kind: 'permitted' as const, evidence }) };
+  expect(await developmentCleanupPort(query, oldOwner).completePrestart!(s)).toEqual({ kind: 'waiting', reason: 'prestart-capability' });
+  await expect(developmentCleanupPort(query, { ...oldOwner, completePrestart: oldOwner.advance }).completePrestart!(s)).rejects.toThrow('独立闭合');
+});

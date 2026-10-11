@@ -1,18 +1,14 @@
 import { z } from 'zod';
-import { DevelopmentAgentIdentitySchema, DevelopmentUsageClosureSchema, DevelopmentUsageDrainReasonSchema, DevelopmentUsageRegistrationSchema, DevelopmentUsageStopReceiptSchema, ResourceIdSchema } from '@crewstation/contracts';
+import { DevelopmentUsageClosureSchema, DevelopmentUsageRegistrationSchema, DevelopmentUsageStopReceiptSchema } from '@crewstation/contracts';
 import { jsonHash, precondition } from '@crewstation/kernel';
 
-const revision = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
-export const DevelopmentCleanupSelectionSchema = z.strictObject({
-  version: z.literal(1), identity: DevelopmentAgentIdentitySchema, profileId: ResourceIdSchema, profileRevision: revision,
-  podUid: z.uuid(), consumerId: ResourceIdSchema, renderStart: revision, selectionHash: z.string().regex(/^[a-f0-9]{64}$/),
-});
-export const DevelopmentCleanupEvidenceSchema = z.strictObject({
+import { DevelopmentCleanupOwnerSchema, DevelopmentCleanupSelectionSchema, DevelopmentPrestartCleanupEvidenceSchema } from './prestartCleanup';
+export { DevelopmentCleanupSelectionSchema } from './prestartCleanup';
+
+const DevelopmentBoundCleanupEvidenceSchema = z.strictObject({
   version: z.literal(1), selection: DevelopmentCleanupSelectionSchema, registration: DevelopmentUsageRegistrationSchema,
   stop: DevelopmentUsageStopReceiptSchema, closure: DevelopmentUsageClosureSchema,
-  owner: z.strictObject({ payloadDigest: z.string().regex(/^[a-f0-9]{64}$/), firstReason: DevelopmentUsageDrainReasonSchema,
-    acceptedAt: z.iso.datetime(), profileId: ResourceIdSchema, profileRevision: revision, protocol: z.enum(['opencode', 'claude-code']),
-    priceBookRevision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER) }),
+  owner: DevelopmentCleanupOwnerSchema,
 }).superRefine((e, ctx) => {
   const s = e.selection, r = e.registration, stop = e.stop.receipt, c = e.closure, o = e.owner;
   const invalid = (message: string) => ctx.addIssue({ code: 'custom', message });
@@ -26,6 +22,7 @@ export const DevelopmentCleanupEvidenceSchema = z.strictObject({
   if (c.status === 'complete' ? c.tailUnknown || c.reason !== null || c.persistedThrough !== stop.finalThrough || stop.interruption !== null
     : !c.tailUnknown || !c.reason) invalid('完整与中断出口不能互相冒充');
 });
+export const DevelopmentCleanupEvidenceSchema = z.union([DevelopmentBoundCleanupEvidenceSchema, DevelopmentPrestartCleanupEvidenceSchema]);
 export type DevelopmentCleanupSelection = z.infer<typeof DevelopmentCleanupSelectionSchema>;
 export type DevelopmentCleanupEvidence = z.infer<typeof DevelopmentCleanupEvidenceSchema>;
 

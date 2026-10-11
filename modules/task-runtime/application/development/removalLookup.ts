@@ -5,7 +5,7 @@ import { requireDevelopmentRemovalEvidence } from '../../domain/development/remo
 import { developmentWorkloadProtection } from '../../domain/development/protection';
 import type { NativeExecutionCluster } from '../../ports/cluster';
 import type { TaskRuntimeUseCaseDeps } from '../dependencies';
-import { developmentAdmissionSecretUid, developmentPhysicalStop } from './workloadStop';
+import { developmentAdmissionSecretUid, developmentPhysicalStop, developmentNoGrant, developmentPrestartPhysicalStop } from './workloadStop';
 import { indexedDevelopmentParentRemoval } from './parent/removal';
 import { hasDevelopmentParentEnding } from '../../domain/development/parentEnding';
 
@@ -37,14 +37,20 @@ export function developmentRemovalLookup(deps: Deps) {
         || !!rebuild && Object.hasOwn(rebuild, 'developmentParentBinding'))) return waiting();
       // Presence, never truthiness: malformed explicit selections cannot fall back to legacy.
       if (env.render?.developmentRemovalProtection === undefined) return { kind: 'unselected' };
-      const { original } = requireDevelopmentRemovalEvidence(env), protection = developmentWorkloadProtection(original)!;
+      const { original, evidence } = requireDevelopmentRemovalEvidence(env), protection = developmentWorkloadProtection(original)!;
       const safety = deps.workloadSafety, state = await safety?.get(protection.consumer.id);
       if (!safety || !state?.admissionClosed || !await safety.admissionClosed(protection.consumer.id)) throw precondition('原开发准入尚未关闭');
       const consumer = WorkloadConsumerSchema.parse({ ...protection.consumer, resourceId: original.id,
         namespace: original.namespace, podName: original.podName, volumeUid: protection.expectedVolumeUid });
       if (jsonHash(WorkloadConsumerSchema.parse(state.consumer)) !== jsonHash(consumer)) throw precondition('原开发消费者身份不符');
-      await developmentAdmissionSecretUid(safety, original);
-      const stopped = target.kind === 'Secret' || target.operation === 'stop-finalizer' ? await developmentPhysicalStop(safety, original) : undefined;
+      const noGrant = evidence.version === 2;
+      if (noGrant) {
+        await developmentNoGrant(safety, original);
+        if (target.kind === 'Secret' && (evidence.phase !== 'closed' || target.name === original.podName + '-admission')) return waiting();
+      } else await developmentAdmissionSecretUid(safety, original);
+      const stopped = target.kind === 'Secret' || target.operation === 'stop-finalizer'
+        ? noGrant ? await developmentPrestartPhysicalStop(safety, original) : await developmentPhysicalStop(safety, original) : undefined;
+      if (noGrant && evidence.phase === 'closed' && stopped && evidence.stopProofDigest !== jsonHash(stopped.stopProof)) return waiting();
       if (!deps.nativeCluster.inspectDevelopmentRemoval) return waiting();
       return await deps.nativeCluster.inspectDevelopmentRemoval(original, target, stopped);
     } catch {

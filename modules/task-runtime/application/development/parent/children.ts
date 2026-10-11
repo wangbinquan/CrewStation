@@ -8,7 +8,7 @@ import type { DevelopmentParentEnding, DevelopmentParentEndingChild } from '../.
 import type { DevelopmentParentEndingJobLease } from '../../../ports/developmentParentEndingScope';
 import type { TaskRuntimeUseCaseDeps } from '../../dependencies';
 import { scheduleExecutionCleanup } from '../../nativeExecution';
-import { developmentPhysicalStop } from '../workloadStop';
+import { developmentPhysicalStop, developmentPrestartPhysicalStop } from '../workloadStop';
 import { advanceDevelopmentParent, withDevelopmentParent } from './current';
 
 function acceptedRender(value: unknown): unknown {
@@ -38,6 +38,13 @@ async function closure(deps: TaskRuntimeUseCaseDeps, member: DevelopmentParentEn
   if (!selection || n.podUid && n.podUid !== selection.podUid) throw precondition('原固定成员缺少数字退出选择');
   const evidence = requireDevelopmentCleanupEvidence(environment.native.developmentCleanup, selection);
   if (n.state === 'finished' && jsonHash(n.developmentCleanup) !== jsonHash(evidence)) throw precondition('原已结束成员的数字回执不可替换');
+  if (evidence.version === 2) {
+    if (evidence.phase !== 'closed') throw precondition('原未获准启动成员尚未物理闭合');
+    const stopped = await developmentPrestartPhysicalStop(deps.workloadSafety, environment);
+    if (evidence.stopProofDigest !== jsonHash(stopped.stopProof)) throw precondition('原未获准启动成员闭合与实际物理证明冲突');
+    return { version: 1, kind: 'protected-prestart-closed', selectionHash: selection.selectionHash, originalParentPodUid: member.originalParentPodUid,
+      numericDigest: jsonHash(evidence), numericEvidence: evidence, numericStatus: 'unknown', tailUnknown: true, stopProofDigest: jsonHash(stopped.stopProof) };
+  }
   const stopped = await developmentPhysicalStop(deps.workloadSafety, environment);
   return { version: 1, kind: 'protected-closed', selectionHash: selection.selectionHash, originalParentPodUid: member.originalParentPodUid,
     numericDigest: jsonHash(evidence), numericEvidence: evidence, numericStatus: evidence.closure.status, tailUnknown: evidence.closure.tailUnknown, stopProofDigest: jsonHash(stopped.stopProof) };
@@ -48,7 +55,7 @@ async function advanceMember(deps: TaskRuntimeUseCaseDeps, ending: DevelopmentPa
   if (!environment) throw precondition('原固定成员尚未恢复，不能当作已经退出');
   originalMember(member, environment);
   const closed = await closure(deps, member, environment);
-  if (!member.originalParentPodUid || member.originalParentPodUid !== ending.epoch.podUid && closed?.kind !== 'protected-closed')
+  if (!member.originalParentPodUid || member.originalParentPodUid !== ending.epoch.podUid && !['protected-closed', 'protected-prestart-closed'].includes(closed?.kind ?? ''))
     throw precondition('其他 epoch 或未绑定成员缺少自己的完整退出证明');
   await withDevelopmentParent(deps, ending.id, identity, async (scope, _parent, current) => {
     if (current.phase !== 'children') return;

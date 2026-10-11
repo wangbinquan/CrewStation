@@ -25,10 +25,23 @@ describe.skipIf(!available)('数字结束私表的旧库升级', () => {
       expect(await runMigrations(previous.db, [endingMigrations])).toEqual(['dev_session/0014_development_agent_endings.sql']);
       expect(await drizzleAgentStarts(previous.db).get(start.agentId)).toEqual(start);
       expect(await developmentUsageOwnerStore(previous.db).get(f.child.id)).toEqual(owner);
-      expect(await developmentEndingStore(previous.db).get(f.child.id)).toBeUndefined();
+      // Verify the historical 0014 table directly before using a reader for the current schema.
+      const historicalEndings = await previous.db.execute(sql`select execution_task_id from dev_session.development_agent_endings`);
+      expect(historicalEndings.map((row) => row.execution_task_id)).toEqual([]);
       expect(await runMigrations(previous.db, [endingMigrations])).toEqual([]);
       const rows = await previous.db.execute(sql`select logical_ending from dev_session.agent_starts where agent_id=${start.agentId}`);
       expect(rows[0]).toEqual({ logical_ending: false });
+      expect(await runMigrations(previous.db, [devSessionMigrations])).toEqual([
+        'dev_session/0015_project_work.sql',
+        'dev_session/0016_content_deletion.sql',
+        'dev_session/0017_deletion_cleanup.sql',
+        'dev_session/0018_cleanup_callback_metadata.sql',
+        'dev_session/0019_prestart_development_ending.sql',
+      ]);
+      expect(await drizzleAgentStarts(previous.db).get(start.agentId)).toEqual(start);
+      expect(await developmentUsageOwnerStore(previous.db).get(f.child.id)).toEqual(owner);
+      expect(await developmentEndingStore(previous.db).get(f.child.id)).toBeUndefined();
+      expect(await runMigrations(previous.db, [devSessionMigrations])).toEqual([]);
     } finally { await previous.drop(); await current.drop(); }
   });
 });

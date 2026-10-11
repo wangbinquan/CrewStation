@@ -11,11 +11,12 @@ import { developmentAgentUsage as owners } from '../developmentUsageTable';
 import { developmentAgentEndings as table } from './tables';
 import { withEndingTransaction } from './transaction';
 import { requestDevelopmentEndingJob } from './requests';
+import { completePrestartEnding, inspectPrestartEnding } from './prestart';
 
 const instant = (raw: string) => { const value = new Date(raw); if (!Number.isFinite(value.getTime())) throw new Error('Invalid ending clock'); return value.toISOString(); };
-const due = (now: string) => and(ne(table.stage, 'evidence-complete'), or(isNull(table.leaseUntil), lte(table.leaseUntil, now)));
+const due = (now: string) => and(ne(table.stage, 'evidence-complete'), ne(table.stage, 'prestart-closed'), or(isNull(table.leaseUntil), lte(table.leaseUntil, now)));
 function matches(lease: DevelopmentEndingLease, job: DevelopmentEndingLease['job'] | undefined, now: string): boolean {
-  return !!job && job.version === lease.job.version && job.fence === lease.job.fence && !!job.leaseUntil && job.leaseUntil > now;
+  return !!job && job.stage !== 'prestart-closed' && job.version === lease.job.version && job.fence === lease.job.fence && !!job.leaseUntil && job.leaseUntil > now;
 }
 function commitEnding(db: Database, clock: Clock, lease: DevelopmentEndingLease, evidence: DevelopmentEndingEvidence) {
   instant(evidence.observedAt); // Evidence observation is distinct from the authoritative lease clock.
@@ -31,12 +32,14 @@ function commitEnding(db: Database, clock: Clock, lease: DevelopmentEndingLease,
 }
 export function developmentEndingStore(db: Database, clock: Clock = systemClock): DevelopmentEndingStore {
   return {
+    inspectPrestart: (selection) => inspectPrestartEnding(db, selection),
+    completePrestart: (evidence) => completePrestartEnding(db, evidence),
     request: (input) => requestDevelopmentEndingJob(db, input),
     get: async (id) => { const row = (await db.select().from(table).where(eq(table.executionTaskId, id)))[0]; return row ? DevelopmentEndingJobSchema.parse(row) : undefined; },
     listPending: async (raw) => (await db.select({ id: table.executionTaskId }).from(table).where(due(instant(raw))).orderBy(asc(table.lastAttemptAt), asc(table.executionTaskId)).limit(DEVELOPMENT_ENDING_BATCH)).map((r) => r.id as TaskId),
     claim: (id, raw) => withEndingTransaction(db, id, async ({ tx, original, job }) => {
       instant(raw); const now = instant(clock.now().toISOString());
-      if (!job || job.stage === 'evidence-complete' || (job.leaseUntil && job.leaseUntil > now)) return undefined;
+      if (!job || ['evidence-complete', 'prestart-closed'].includes(job.stage) || (job.leaseUntil && job.leaseUntil > now)) return undefined;
       const next = DevelopmentEndingJobSchema.parse({ ...job, fence: job.fence + 1, lastAttemptAt: now, leaseUntil: developmentEndingDeadline(now) });
       await tx.update(table).set(next).where(eq(table.executionTaskId, id)); return { job: next, registration: original.binding };
     }),

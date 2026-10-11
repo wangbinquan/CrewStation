@@ -3,6 +3,7 @@ import { DevelopmentUsageClosureSchema, DevelopmentUsageDrainReasonSchema, Devel
 import type { DevelopmentUsageRegistration } from '@crewstation/contracts';
 import { conflict, jsonHash, precondition } from '@crewstation/kernel';
 import { developmentReceiptMatches } from './developmentDispatch';
+import { DevelopmentPrestartCleanupEvidenceSchema } from './development/prestartCleanup';
 
 const instant = z.iso.datetime().transform((s) => new Date(s).toISOString());
 export const DEVELOPMENT_ENDING_BATCH = 32;
@@ -24,8 +25,16 @@ export const DevelopmentEndingJobSchema = z.strictObject({
   logicalResult: z.enum(['completed', 'error', 'cancelled']).nullable(), actualEndedAt: z.null(),
   version: z.number().int().positive(), fence: z.number().int().nonnegative(), leaseUntil: instant.nullable(), lastAttemptAt: instant,
   stop: DevelopmentUsageStopReceiptSchema.nullable(), closure: DevelopmentUsageClosureSchema.nullable(),
-  stage: z.enum(['awaiting-stop', 'awaiting-closure', 'evidence-complete']),
+  prestartClosure: DevelopmentPrestartCleanupEvidenceSchema.nullable().default(null),
+  stage: z.enum(['awaiting-stop', 'awaiting-closure', 'evidence-complete', 'prestart-closed']),
 }).superRefine((value, ctx) => {
+  if (value.stage === 'prestart-closed') {
+    if (value.stop !== null || value.closure !== null || value.logicalResult !== null || value.prestartClosure?.phase !== 'closed'
+      || value.prestartClosure.selection.identity.executionId !== value.executionTaskId || value.prestartClosure.owner.firstReason !== value.firstReason)
+      ctx.addIssue({ code: 'custom', message: '未获准启动终态需要独立原物理闭合，不能制造数字或实际结束时间' });
+    return;
+  }
+  if (value.prestartClosure !== null) ctx.addIssue({ code: 'custom', message: '原数字结束阶段不能混入未获准启动物理闭合' });
   const stage = !value.stop ? 'awaiting-stop' : !value.closure ? 'awaiting-closure' : 'evidence-complete';
   if (value.stage !== stage || (value.stop && !['prevented', 'finished'].includes(value.stop.state)))
     ctx.addIssue({ code: 'custom', message: '结束阶段需要独立停止与排空证据' });
@@ -48,6 +57,7 @@ export function developmentEndingDeadline(now: string): string {
   return new Date(Date.parse(instant.parse(now)) + DEVELOPMENT_ENDING_LEASE_MS).toISOString();
 }
 export function mergeDevelopmentEnding(job: DevelopmentEndingJob, registration: DevelopmentUsageRegistration, raw: DevelopmentEndingEvidence): DevelopmentEndingJob {
+  if (job.stage === 'prestart-closed') throw conflict('未获准启动终态不能重新打开数字结束');
   const input = DevelopmentEndingEvidenceSchema.parse(raw), stored = developmentEndingStored(registration, input.stored);
   if (input.stop && !developmentReceiptMatches(registration, input.stop.receipt)) throw conflict('停止回执不是原执行');
   const stop = input.stop && ['prevented', 'finished'].includes(input.stop.state) ? input.stop : null;

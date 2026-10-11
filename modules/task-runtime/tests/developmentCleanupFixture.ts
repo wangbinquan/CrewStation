@@ -17,7 +17,7 @@ export function cleanupEvidenceFixture(s: DevelopmentCleanupSelection) {
     closure: { status: 'complete', persistedThrough: 0, reportedThrough: 0, missingAfter: null, missingThrough: null, tailUnknown: false, reason: null, closedAt: '2026-10-01T00:00:00.000Z' },
     owner: { payloadDigest: key.payloadDigest, firstReason: 'cancelled', acceptedAt: '2026-09-30T00:00:00.000Z', profileId: s.profileId, profileRevision: s.profileRevision, protocol: 'opencode', priceBookRevision: 3 } });
 }
-function eventWaiter() {
+export function eventWaiter() {
   const listeners = new Map<string, Array<() => void>>(), timers = new Set<ReturnType<typeof setTimeout>>();
   return { emit: (key: string) => { for (const done of listeners.get(key) ?? []) done(); listeners.delete(key); },
     wait: (key: string) => new Promise<void>((resolve, reject) => {
@@ -35,7 +35,7 @@ async function markContainers(f: Awaited<ReturnType<typeof developmentWorkloadFi
   } });
   await f.k8s.mergePatch(Resources.Lease!, 'worker-one', 'kube-node-lease', { spec: { renewTime: at } });
 }
-function stoppableApi(f: Awaited<ReturnType<typeof developmentWorkloadFixture>>, env: TaskEnvironment, event: ReturnType<typeof eventWaiter>) {
+export function stoppableApi(f: Awaited<ReturnType<typeof developmentWorkloadFixture>>, env: TaskEnvironment, event: ReturnType<typeof eventWaiter>, prestart = false) {
   const rawDelete = f.k8s.delete.bind(f.k8s), rawPatch = f.k8s.jsonPatch.bind(f.k8s);
   const state = { autoStop: true, holdPod: false, losePodAck: false, loseRunnerAck: false, loseAdmissionAck: false,
     beforeSecretDelete: undefined as (() => Promise<void>) | undefined, deleteRequests: [] as string[] };
@@ -46,7 +46,7 @@ function stoppableApi(f: Awaited<ReturnType<typeof developmentWorkloadFixture>>,
       if (options?.preconditions?.uid !== pod.metadata.uid) throw conflict('original UID precondition required');
       state.deleteRequests.push('Pod:' + name);
       await f.k8s.mergePatch(ref, name, namespace, { metadata: { deletionTimestamp: pod.metadata.deletionTimestamp ?? new Date().toISOString() } });
-      if (state.autoStop) await markContainers(f, env, true);
+      if (state.autoStop) { if (prestart) await markPrestartContainers(f, env, true); else await markContainers(f, env, true); }
       if (!pod.metadata.finalizers?.length && !state.holdPod) await rawDelete(...args);
       event.emit('pod-delete');
       if (state.losePodAck) { state.losePodAck = false; throw new Error('original Pod delete ACK lost'); }
@@ -110,3 +110,16 @@ export async function developmentCleanupFixture(mode: 'ledger' | 'native' = 'led
     close: async () => { event.close(); await close(); } };
 }
 export type DevelopmentCleanupFixture = Awaited<ReturnType<typeof developmentCleanupFixture>>;
+
+/** Actual API-server container status substitute: admission init ran; main never started. Controller derives its own proof. */
+export async function markPrestartContainers(f: Awaited<ReturnType<typeof developmentWorkloadFixture>>, env: TaskEnvironment, stopped: boolean) {
+  const pod = (await f.k8s.get(Resources.Pod!, env.podName, env.namespace))!;
+  const spec = pod.spec as { containers: Array<{ name: string }>; initContainers: Array<{ name: string }> }, at = new Date().toISOString();
+  await f.k8s.mergePatch(Resources.Pod!, env.podName, env.namespace, { status: { phase: stopped ? 'Failed' : 'Pending',
+    conditions: [{ type: 'PodReadyToStartContainers', status: stopped ? 'False' : 'True' }],
+    containerStatuses: spec.containers.map((c) => ({ name: c.name, restartCount: 0, started: false, imageID: '', lastState: {}, state: { waiting: { reason: 'PodInitializing' } } })),
+    initContainerStatuses: spec.initContainers.map((c) => ({ name: c.name, restartCount: 0, containerID: 'containerd://original-init',
+      state: stopped ? { terminated: { exitCode: 0, finishedAt: at } } : { running: { startedAt: at } } })),
+  } });
+  await f.k8s.mergePatch(Resources.Lease!, 'worker-one', 'kube-node-lease', { spec: { renewTime: at } });
+}

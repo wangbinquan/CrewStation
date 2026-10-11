@@ -36,10 +36,13 @@ test('finished receipt validates the original hash after rotation and preserves 
   expect(requireDevelopmentRemovalEvidence(finished).selection).toEqual(developmentCleanupSelection(env)!);
   expect(requireDevelopmentRemovalEvidence(finished).original.runnerTokenHash).toBe(env.runnerTokenHash);
   const raw = env.native!.developmentCleanup!;
+  expect(raw.version).toBe(1); if (raw.version !== 1) throw new Error('expected original bound receipt');
   const interrupted = { ...env, native: { ...env.native!, developmentCleanup: DevelopmentCleanupEvidenceSchema.parse({ ...raw,
     stop: { ...raw.stop, receipt: { ...raw.stop.receipt, acknowledgedSequence: 5 } },
     closure: { ...raw.closure, status: 'interrupted', persistedThrough: 5, missingAfter: 5, missingThrough: 10, tailUnknown: true, reason: 'journal-unavailable' } }) } };
-  expect(requireDevelopmentRemovalEvidence(interrupted).evidence.closure).toMatchObject({ persistedThrough: 5, reportedThrough: 10, missingAfter: 5, missingThrough: 10, tailUnknown: true });
+  const receipt = requireDevelopmentRemovalEvidence(interrupted).evidence;
+  expect(receipt.version).toBe(1); if (receipt.version !== 1) throw new Error('expected original bound receipt');
+  expect(receipt.closure).toMatchObject({ persistedThrough: 5, reportedThrough: 10, missingAfter: 5, missingThrough: 10, tailUnknown: true });
   expect(createDevelopmentRemovalSeal(interrupted).selectionHash).toBe(seal.selectionHash);
 });
 

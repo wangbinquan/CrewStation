@@ -44,6 +44,9 @@ describe.skipIf(!available)('development internal owner admission (actual factor
       await expect(module.api.developmentCleanup!.advance(DevelopmentCleanupSelectionSchema.parse({ version: 1, consumerId: newResourceId(), renderStart: 1,
         selectionHash: jsonHash('original-controlled-selection'), identity: bound.binding!.identity, podUid: info.podUid,
         profileId: start.profile.profileId, profileRevision: start.profile.revision }))).rejects.toThrow('封闭');
+      await expect(module.api.developmentCleanup!.completePrestart!(DevelopmentCleanupSelectionSchema.parse({ version: 1, consumerId: newResourceId(), renderStart: 1,
+        selectionHash: jsonHash('original-controlled-selection'), identity: bound.binding!.identity, podUid: info.podUid,
+        profileId: start.profile.profileId, profileRevision: start.profile.revision }))).rejects.toThrow('封闭');
       expect(prices).toBe(1); expect(commands).toBe(0);
       expect(JSON.stringify(await f.work.history(f.project))).not.toContain('ordinary-private-owner-prompt');
     } finally { await Promise.all(module.workers.map((worker) => worker.stop())); await f.drop(); }

@@ -5,7 +5,11 @@ import type { DevelopmentEndingEvidence, DevelopmentEndingJob, DevelopmentEnding
 export type { DevelopmentEndingEvidence, DevelopmentEndingJob, DevelopmentEndingLease, DevelopmentEndingRequest } from '../domain/developmentEnding';
 
 /** Owner-private evidence only; no operation in this port authorizes physical cleanup. */
+import type { DevelopmentCleanupSelectionSchema, DevelopmentPrestartCleanupEvidence } from '../domain/development/prestartCleanup';
+import type { z } from 'zod';
 export interface DevelopmentEndingStore {
+  inspectPrestart?(selection: z.infer<typeof DevelopmentCleanupSelectionSchema>): Promise<DevelopmentEndingJob | undefined>;
+  completePrestart?(evidence: DevelopmentPrestartCleanupEvidence): Promise<DevelopmentEndingJob | undefined>;
   request(input: DevelopmentEndingRequest): Promise<DevelopmentEndingJob>;
   get(executionTaskId: TaskId): Promise<DevelopmentEndingJob | undefined>;
   listPending(now: string): Promise<TaskId[]>;

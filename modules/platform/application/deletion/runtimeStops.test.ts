@@ -42,3 +42,17 @@ test('a replacement environment UID or an unrelated node receipt cannot authoriz
   f.setProof(f.receipt); f.expire();
   await expect(f.ports.stopped(f.context, f.environment)).rejects.toMatchObject({ kind: 'precondition' });
 });
+
+test('project deletion completePrestart requires the actual Dev context and the same live grant before and after transfer', async () => {
+  const f = fixture(); let valid = true, calls = 0;
+  const dev = ProjectDeletionContextSchema.parse({ ...f.context, confirmed: { ...f.context.confirmed, participant: 'dev-session' } });
+  const project = { projectDeletionParticipantContext: async (actual: typeof f.context, participant: string) => {
+    expect(actual).toEqual(f.context); expect(participant).toBe('dev-session'); return dev;
+  }, assertProjectDeletionGrant: async () => { if (!valid) throw precondition('original deletion grant expired'); } };
+  const port = runtimeProjectStops(project, async (_grant, selected: string) => selected,
+    { get: async () => undefined }, async () => ({ kind: 'ready' }), undefined,
+    async (grant, selected: string) => { expect(grant).toEqual(dev); calls++; return selected; });
+  expect(await port.development(f.context).completePrestart('original-selection')).toBe('original-selection'); expect(calls).toBe(1);
+  valid = false; await expect(port.development(f.context).completePrestart('original-selection')).rejects.toThrow('expired'); expect(calls).toBe(1);
+  const old = fixture(); await expect(old.ports.development(old.context).completePrestart('original-selection')).rejects.toThrow('尚未装配');
+});

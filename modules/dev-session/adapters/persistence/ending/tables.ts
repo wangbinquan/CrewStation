@@ -9,5 +9,6 @@ export const developmentAgentEndings = devSessionSchema.table('development_agent
   actualEndedAt: text('actual_ended_at').$type<null>(), version: integer('version').notNull(), fence: integer('fence').notNull(),
   leaseUntil: text('lease_until'), lastAttemptAt: text('last_attempt_at').notNull(),
   stop: jsonDocument('stop').$type<DevelopmentEndingJob['stop']>(), closure: jsonDocument('closure').$type<DevelopmentEndingJob['closure']>(),
+  prestartClosure: jsonDocument('prestart_closure').$type<DevelopmentEndingJob['prestartClosure']>(),
   stage: text('stage').$type<DevelopmentEndingJob['stage']>().notNull(),
 }, (t) => [index('development_agent_endings_pending').on(t.stage, t.lastAttemptAt, t.executionTaskId)]);

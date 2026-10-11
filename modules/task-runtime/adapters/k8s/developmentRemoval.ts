@@ -4,11 +4,15 @@ import { precondition } from '@crewstation/kernel';
 import type { DevelopmentRemovalDecision, DevelopmentRemovalTarget } from '../../api/developmentCleanup';
 import type { TaskEnvironment } from '../../domain/taskEnvironment';
 import type { DevelopmentPhysicalStopEvidence } from '../../ports/developmentCleanup';
+import { requireDevelopmentRemovalEvidence } from '../../domain/development/removalEvidence';
 import { admittedSpec, allOriginalContainers, originalSecret } from './developmentCleanup';
 
 /** Materials stay inside Task; Controller sees only a decision and the live CAS version. */
 export async function inspectDevelopmentRemoval(k8s: K8sClient, env: TaskEnvironment, target: DevelopmentRemovalTarget,
   stopped?: DevelopmentPhysicalStopEvidence): Promise<DevelopmentRemovalDecision> {
+  const { evidence } = requireDevelopmentRemovalEvidence(env);
+  if (evidence.version === 2 && target.kind === 'Secret' && (evidence.phase !== 'closed' || target.name === env.podName + '-admission'))
+    return { kind: 'waiting', reason: 'development-prestart-credentials-pending' };
   const object = await k8s.get<K8sObject>(Resources[target.kind]!, target.name, target.namespace, AbortSignal.timeout(15_000));
   if (!object) return { kind: 'absent' };
   if (target.namespace !== env.namespace || object.metadata.namespace !== env.namespace || object.metadata.name !== target.name

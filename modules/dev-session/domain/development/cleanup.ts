@@ -1,18 +1,14 @@
 import { z } from 'zod';
-import { DevelopmentAgentIdentitySchema, DevelopmentUsageClosureSchema, DevelopmentUsageDrainReasonSchema, DevelopmentUsageRegistrationSchema, DevelopmentUsageStopReceiptSchema, ResourceIdSchema } from '@crewstation/contracts';
+import { DevelopmentUsageClosureSchema, DevelopmentUsageRegistrationSchema, DevelopmentUsageStopReceiptSchema } from '@crewstation/contracts';
 import { jsonHash, precondition } from '@crewstation/kernel';
 
-const revision = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
-export const DevelopmentCleanupSelectionSchema = z.strictObject({
-  version: z.literal(1), identity: DevelopmentAgentIdentitySchema, profileId: ResourceIdSchema, profileRevision: revision,
-  podUid: z.uuid(), consumerId: ResourceIdSchema, renderStart: revision, selectionHash: z.string().regex(/^[a-f0-9]{64}$/),
-});
-export const DevelopmentCleanupEvidenceSchema = z.strictObject({
+import { DevelopmentCleanupOwnerSchema, DevelopmentCleanupSelectionSchema, DevelopmentPrestartCleanupEvidenceSchema } from './prestartCleanup';
+export { DevelopmentCleanupSelectionSchema } from './prestartCleanup';
+
+const DevelopmentBoundCleanupEvidenceSchema = z.strictObject({
   version: z.literal(1), selection: DevelopmentCleanupSelectionSchema, registration: DevelopmentUsageRegistrationSchema,
   stop: DevelopmentUsageStopReceiptSchema, closure: DevelopmentUsageClosureSchema,
-  owner: z.strictObject({ payloadDigest: z.string().regex(/^[a-f0-9]{64}$/), firstReason: DevelopmentUsageDrainReasonSchema,
-    acceptedAt: z.iso.datetime(), profileId: ResourceIdSchema, profileRevision: revision, protocol: z.enum(['opencode', 'claude-code']),
-    priceBookRevision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER) }),
+  owner: DevelopmentCleanupOwnerSchema,
 }).superRefine((e, ctx) => {
   const s = e.selection, r = e.registration, stop = e.stop.receipt, c = e.closure, o = e.owner;
   const invalid = (message: string) => ctx.addIssue({ code: 'custom', message });
@@ -26,6 +22,7 @@ export const DevelopmentCleanupEvidenceSchema = z.strictObject({
   if (c.status === 'complete' ? c.tailUnknown || c.reason !== null || c.persistedThrough !== stop.finalThrough || stop.interruption !== null
     : !c.tailUnknown || !c.reason) invalid('完整与中断出口不能互相冒充');
 });
+export const DevelopmentCleanupEvidenceSchema = z.union([DevelopmentBoundCleanupEvidenceSchema, DevelopmentPrestartCleanupEvidenceSchema]);
 export type DevelopmentCleanupSelection = z.infer<typeof DevelopmentCleanupSelectionSchema>;
 export type DevelopmentCleanupEvidence = z.infer<typeof DevelopmentCleanupEvidenceSchema>;
 
@@ -33,7 +30,7 @@ import { DevelopmentUsageOwnerRecordSchema } from '../developmentUsage';
 import { DevelopmentEndingJobSchema, developmentEndingStored } from '../developmentEnding';
 
 /** Derive a permit only from the owner's immutable ending and the actual durable Session copy. */
-export function developmentCleanupEvidence(input: DevelopmentCleanupSelection, ownerRaw: unknown, jobRaw: unknown, storedRaw: unknown): DevelopmentCleanupEvidence {
+export function developmentCleanupEvidence(input: DevelopmentCleanupSelection, ownerRaw: unknown, jobRaw: unknown, storedRaw: unknown): z.infer<typeof DevelopmentBoundCleanupEvidenceSchema> {
   const selection = DevelopmentCleanupSelectionSchema.parse(input), original = DevelopmentUsageOwnerRecordSchema.parse(ownerRaw), job = DevelopmentEndingJobSchema.parse(jobRaw);
   const binding = original.binding;
   if (!binding || original.unsupported || original.closeReason !== job.firstReason || job.stage !== 'evidence-complete' || !job.stop || !job.closure
@@ -43,7 +40,7 @@ export function developmentCleanupEvidence(input: DevelopmentCleanupSelection, o
   if (!stored.closure || !stored.drainReason || jsonHash(stored.closure) !== jsonHash(job.closure) || !receipt || receipt.phase !== 'finished'
     || receipt.result !== job.stop.receipt.result || receipt.lastSequence !== job.stop.receipt.lastSequence
     || receipt.finalThrough !== job.stop.receipt.finalThrough || receipt.interruption !== job.stop.receipt.interruption) throw precondition('原 Session 持久副本尚未闭合或终态已冲突');
-  return DevelopmentCleanupEvidenceSchema.parse({ version: 1, selection, registration: binding, stop: job.stop, closure: stored.closure,
+  return DevelopmentBoundCleanupEvidenceSchema.parse({ version: 1, selection, registration: binding, stop: job.stop, closure: stored.closure,
     owner: { payloadDigest: original.payloadDigest, firstReason: job.firstReason, acceptedAt: original.price.acceptedAt,
       profileId: original.price.profile.id, profileRevision: original.price.profile.revision, protocol: original.price.profile.protocol, priceBookRevision: original.price.priceBookRevision } });
 }
