@@ -65,3 +65,19 @@ test('a selected repository without the physical finalization participant reject
  const f=fixture();delete f.starts.finalizeEndedExecution;
  await expect(f.start()).rejects.toMatchObject({kind:'precondition'});expect(f.preparations).toHaveLength(0);expect(f.inputs).toHaveLength(0);expect(f.catalog.materials).toHaveLength(0);expect(f.routed).toHaveLength(0);
 });
+
+for (const dispatched of [false,true]) test((dispatched?'dispatched':'pending')+' diagnostic ready on cleaning never prepares, dispatches or routes another model start',async()=>{
+ const f=fixture(),dto=await f.start(),id=dto.execution!.taskId;
+ if(dispatched){f.connect(id);await f.lifecycle.dispatch(dto.agentId);}
+ const original=(await f.starts.get(dto.agentId))!;
+ expect(original.state).toBe(dispatched?'dispatched':'pending');
+ f.fail(id,'original cleanup');f.environments.get(id)!.connected=true;
+ const environment=structuredClone(f.environments.get(id)),before=structuredClone({calls:f.calls.filter(value=>value!=='end'),inputs:f.inputs,preparations:f.preparations,metadataRefs:f.metadataRefs,routed:f.routed,materials:f.catalog.materials});
+ for(let n=0;n<3;n++)await (n===2?new AgentExecutionLifecycle(f.deps,f.starts,f.participant):f.lifecycle).dispatch(dto.agentId);
+ const ended=(await f.starts.get(dto.agentId))!;
+ expect(ended.state).toBe('ended');expect(ended.endedAt).toBeUndefined();expect(ended.finalized).toBe(false);
+ expect(ended.execution).toEqual(original.execution);expect(ended.profile).toEqual(original.profile);
+ expect(f.environments.get(id)).toEqual(environment);
+ expect({calls:f.calls.filter(value=>value!=='end'),inputs:f.inputs,preparations:f.preparations,metadataRefs:f.metadataRefs,routed:f.routed,materials:f.catalog.materials}).toEqual(before);
+ expect(f.control.endCalls).toBeGreaterThan(0);expect(f.releases).toEqual([]);
+});
