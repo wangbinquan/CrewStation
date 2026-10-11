@@ -301,6 +301,7 @@ export const messages = {
   "runtime.native.issue.native-output-incomplete": "进程输出未全部收齐",
   "runtime.native.issue.native-process-not-started": "执行进程未能启动",
   "runtime.native.issue.other": "采集器报告了其他数据缺口，请查看运行日志。",
+  "runtime.report.rebuild": "重新统计",
   "runtime.report.building": "正在汇总全部原始记录",
   "runtime.reason.retained-report-page-unverified": "原报告明细未能完整核对，请重新读取报告",
   "runtime.receivedValue": "已记录 · 不完整",

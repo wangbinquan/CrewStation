@@ -28,12 +28,12 @@ async function fixture(options: { large?: boolean; rejectPending?: boolean; ones
   await mkdir(join(root, 'journal'), { mode: 0o700 });
   await mkdir(join(root, 'home'), { mode: 0o700 });
   const journal = new ExecutionJournal(join(root, 'journal'), 'owner', limits); disposals.push(() => journal.close());
-  const supervisor = new BusinessAgentSupervisor(journal, noopLogger), launched = deferred(), began = deferred(), prepared = deferred();
+  const supervisor = new BusinessAgentSupervisor(journal, noopLogger), launched = deferred(), resumed = deferred(), began = deferred(), prepared = deferred();
   const seenAtSpawn: string[][] = [], finalFrames: RunnerUsageCapture[] = [];
   let disposed = false;
   const readProofs = () => !journal.get(identity.executionId) ? [] : journal.replay(identity.executionId, 0, 1000).flatMap(({ frame }) => frame.type === 'agent' && frame.event.usageCapture?.nativeProof ? [frame.event.usageCapture.nativeProof.state] : []);
   const host: ProcessHost = {
-    spawnPiped: () => { seenAtSpawn.push(readProofs()); launched.resolve(); return { pid: 123, stdout: new ReadableStream({ start(c) { c.close(); } }), stderr: new ReadableStream({ start(c) { c.close(); } }), exitCode: 0, signalCode: null, exited: Promise.resolve(0) }; },
+    spawnPiped: () => { seenAtSpawn.push(readProofs()); launched.resolve(); if (seenAtSpawn.length === 2) resumed.resolve(); return { pid: 123, stdout: new ReadableStream({ start(c) { c.close(); } }), stderr: new ReadableStream({ start(c) { c.close(); } }), exitCode: 0, signalCode: null, exited: Promise.resolve(0) }; },
     spawnWithStdin: () => { throw new Error('unexpected stdin spawn'); }, killTree: async () => {}, pumpLines: async () => {}, chownToWorker: async () => {}, which: (binary) => binary,
   };
   const adapter: CliRuntimeAdapter = { protocol: 'opencode', supportsResidentStream: false, prepare: async () => {
@@ -64,7 +64,7 @@ async function fixture(options: { large?: boolean; rejectPending?: boolean; ones
     beforeStart: { profile: '01a0bf5d-8f4b-7001-8458-107366e7de39', revision: 1, contentHash: 'hash', steps: [], vars: {}, secrets: {}, configFile: { kind: 'none' }, captureOutput: false } });
   const original = journal.agent.bind(journal);
   journal.agent = (id, event) => { if (options.rejectPending && event.usageCapture?.nativeProof?.state === 'pending') throw new Error('journal unavailable'); return original(id, event); };
-  return { root, limits, journal, supervisor, launched, began, prepared, seenAtSpawn, finalFrames, readProofs, isDisposed: () => disposed,
+  return { root, limits, journal, supervisor, launched, resumed, began, prepared, seenAtSpawn, finalFrames, readProofs, isDisposed: () => disposed,
     create: () => factory(command, 1, { nativeUsageTreeV1: 1, nativeUsageLineageKey: 'stable-session' }) };
 }
 
@@ -75,6 +75,8 @@ test('first and resumed native turn wait for journal commit across the pending-r
   f.supervisor.start(identity, async () => agent); await f.launched.promise;
   expect(f.seenAtSpawn).toEqual([['pending']]);
   await agent.send('second turn');
+  // send acknowledges queue admission; observe the actual resumed spawn before inspecting its journal.
+  await f.resumed.promise;
   expect(f.seenAtSpawn[1]).toEqual(['pending', 'complete', 'pending']);
   await agent.cancel();
   expect((await f.supervisor.settled(identity.executionId)).result?.reason).toBe('cancelled');

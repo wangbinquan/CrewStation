@@ -84,8 +84,9 @@ export async function captureNativeProducerTurns(f: ReturnType<typeof nativeProd
   const driver = createCliDriverFactory({ which: () => '/bin/opencode' }); expect(driver.developmentNativePagesV2).toBe(2);
   const run = driver.forProtocol('opencode').start(spec, { cwd: f.directory, env: { HOME: f.directory, OPENCODE_DB: f.path }, launcher, logger: noopLogger,
     managed: { home: f.directory, runDir: join(f.directory, 'run') }, usageSink: (frame) => legacy.push(frame), developmentNativeProducer: f.usage.nativeProducer });
-  const events: AgentEvent[] = []; let ready!: () => void; const waiting = new Promise<void>((r) => { ready = r; });
-  const pump = (async () => { for await (const event of run.events) { events.push(event); f.usage.observe(event); if (event.type === 'status' && event.status === 'waiting') ready(); } })();
+  const events: AgentEvent[] = []; let ready!: () => void, resumed!: () => void, idleCount = 0;
+  const waiting = new Promise<void>((r) => { ready = r; }), resumedWaiting = new Promise<void>((r) => { resumed = r; });
+  const pump = (async () => { for await (const event of run.events) { events.push(event); f.usage.observe(event); if (event.type === 'status' && event.status === 'waiting') { idleCount++; if (idleCount === 1) ready(); else resumed(); } } })();
   await waiting; expect(modelTurns).toBe(1); const before = f.journal.info(f.admission.key).receipt!.lastSequence; expect(before).toBeGreaterThan(0);
   const first = f.journal.read(f.admission.key, 0).events; expect(first.every((e) => e.capture.version === 2)).toBe(true);
   const original = checkpoints[0]!, next = { ...original, turn: 'invalid-successor', turnIndex: 1, resumeSessionId: 'root', observedAt: new Date().toISOString() };
@@ -102,7 +103,7 @@ export async function captureNativeProducerTurns(f: ReturnType<typeof nativeProd
   finally { unchanged.close(); }
   expect(modelTurns).toBe(1);
   expect(f.journal.info(f.admission.key).receipt?.interruption).toBeNull();
-  await run.send('second'); expect(events.filter(event => event.type === 'error').map(event => event.error)).toEqual([]); expect(modelTurns).toBe(2); expect(bootstrapTurns).toBe(2); expect(commands).toHaveLength(4);
+  await run.send('second'); await resumedWaiting; expect(events.filter(event => event.type === 'error').map(event => event.error)).toEqual([]); expect(modelTurns).toBe(2); expect(bootstrapTurns).toBe(2); expect(commands).toHaveLength(4);
   await run.cancel(); await pump;
   expect(legacy).toEqual([]); expect(events.some((e) => e.type === 'usage')).toBe(false); expect(events.at(-1)?.type).toBe('cancelled');
   expect(headers[1]).toBe(headers[0]); expect(checkpoints[1]?.resumeSessionId).toBe('root');

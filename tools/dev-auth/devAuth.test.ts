@@ -118,15 +118,23 @@ test('生产源码不包含开发 Provider 或固定账号', async () => {
   // RFC-010 的已安装对象目录仅登记部署名；这不等于把本机 Provider、账号或登录流程放入生产。
   const componentMetadata = new Set(['modules/platform/domain/systemComponents.ts', 'modules/platform/tests/clusterManagement.test.ts']);
   let scanned = 0;
-  for (const root of ['apps', 'modules', 'packages', 'runtimes']) {
-    for await (const path of source.scan({ cwd: root, onlyFiles: true })) {
-      scanned += 1;
-      const fullPath = `${root}/${path}`, text = await Bun.file(fullPath).text();
+  const batch: string[] = [];
+  const readBatch = async (paths: string[]): Promise<void> => {
+    const rows = await Promise.all(paths.map(async fullPath => ({ fullPath, text: await Bun.file(fullPath).text() })));
+    for (const { fullPath, text } of rows) {
       const hasIdentity = /dev-roles|dev-role-(?:admin|developer|tester|member)/.test(text);
       const hasRuntimeReference = /crewstation-dev-auth/.test(text) && !componentMetadata.has(fullPath);
       if (hasIdentity || hasRuntimeReference) violations.push(fullPath);
     }
+  };
+  for (const root of ['apps', 'modules', 'packages', 'runtimes']) {
+    for await (const path of source.scan({ cwd: root, onlyFiles: true })) {
+      scanned += 1;
+      batch.push(`${root}/${path}`);
+      if (batch.length === 32) await readBatch(batch.splice(0));
+    }
   }
+  await readBatch(batch);
   expect(scanned).toBeGreaterThan(0);
   expect(violations).toEqual([]);
 });

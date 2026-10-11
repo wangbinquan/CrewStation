@@ -301,6 +301,7 @@ export const messages = {
   "runtime.native.issue.native-output-incomplete": "Process output was not fully drained",
   "runtime.native.issue.native-process-not-started": "Execution process did not start",
   "runtime.native.issue.other": "The collector reported another evidence gap. Check the run logs.",
+  "runtime.report.rebuild": "Rebuild statistics",
   "runtime.report.building": "Aggregating every original record",
   "runtime.reason.retained-report-page-unverified": "The original report detail could not be fully verified. Read the report again.",
   "runtime.receivedValue": "Recorded · incomplete",

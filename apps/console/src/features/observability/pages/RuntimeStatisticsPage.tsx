@@ -3,11 +3,13 @@ import { useState } from 'react';
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import {runtimeCompleteReportContent,type CompleteRuntimeTaskSummary} from '@crewstation/contracts';
 import { api } from '../../../shared/api/client';
+import { isApiClientError } from '../../../shared/api/useApi';
 import { useT } from '../../../shared/lib/useT';
 import { useProjectScope } from '../../../shared/project/ProjectScope';
 import { PageHeader } from '../../../shared/ui/PageHeader';
 import { Stack } from '../../../shared/ui/Stack';
 import { Button } from '../../../shared/ui/Button';
+import { ActionRow } from '../../../shared/ui/ActionRow';
 import { Tabs } from '../../../shared/ui/Tabs';
 import { QueryStatus } from '../../../shared/ui/QueryStatus';
 import { ButtonLink } from '../../../shared/ui/navigation/ButtonLink';
@@ -29,11 +31,17 @@ interface PageProps {projectId?:string;taskId?:string;go:(search:RuntimeSearch,t
 function RuntimeViewTabs({projectId,search,change,children}:{projectId?:string;search:RuntimeSearch;change:(next:RuntimeSearch)=>void;children:ReactNode}) {
  const t=useT();return <Tabs label={t('runtime.title')} value={search.tab??'overview'} items={RUNTIME_TABS.map(tab=>({value:tab,label:t(tab==='health'&&!projectId?'runtime.tab.platform':'runtime.tab.'+tab)}))} onChange={tab=>change({...search,tab:RUNTIME_TABS.find(value=>value===tab)})}>{children}</Tabs>;
 }
+function RuntimeReportRecovery({error,search,rebuild}:{error:unknown;search:RuntimeSearch;rebuild:()=>void}) {
+ const t=useT();
+ if(!search.reportId||!isApiClientError(error)||error.status!==404||error.kind!=='not_found')return null;
+ return <ActionRow><Button size="small" variant="secondary" onClick={rebuild}>{t('runtime.report.rebuild')}</Button></ActionRow>;
+}
 function RuntimeTaskPage({projectId,taskId,go}:PageProps&{taskId:string}) {
  const t=useT(),search=parseRuntimeSearch(useSearch({strict:false}));
  const query=useRuntimeReport(['task',projectId??'system',taskId],()=>projectId?api.observability.projectRuntimeTask(projectId,taskId):api.observability.systemRuntimeTask(taskId),projectId,search.reportId,true,'native-pages/2');
  const report=query.error?undefined:query.data,data=report?runtimeCompleteReportContent(report):undefined,back=()=>go(search);
  return <Stack className={styles.page}><QueryStatus isPending={query.isPending} error={query.error}/>
+  <RuntimeReportRecovery error={query.error} search={search} rebuild={()=>go({...search,reportId:undefined},taskId)}/>
   {report&&data?<><RuntimeReportState report={report}/><RuntimeItem<CompleteRuntimeTaskSummary> header={data.header} section="tasks" rowKey={taskId}>{task=><RuntimeTaskView task={task} header={data.header} back={back}/>}</RuntimeItem></>:<><PageHeader title={t('runtime.task')} actions={<Button size="small" variant="ghost" onClick={back}>{t('runtime.back')}</Button>}/>{report?<RuntimeReportState report={report}/>:null}</>}
  </Stack>;
 }
@@ -53,6 +61,7 @@ function RuntimeOverviewPage({projectId,go}:PageProps) {
   {!operations?<RuntimeFilters key={window.from+window.to} window={window} search={search} change={change} states={runtimeStates}/>:null}
   {!operations?<RuntimeSourceFilter search={search} change={change}/>:null}
   {!operations?<QueryStatus isPending={query.isPending} error={query.error}/>:null}
+  {!operations?<RuntimeReportRecovery error={query.error} search={search} rebuild={()=>go({...current,reportId:undefined})}/>:null}
   <RuntimeViewTabs projectId={projectId} search={search} change={change}>{search.tab==='resources'?<RuntimeResourceMetrics projectId={projectId} search={search} change={change}/>:search.tab==='health'?<RuntimeHealth projectId={projectId}/>:data?<Stack>{report&&(search.tab??'overview')==='overview'?<RuntimeReportState report={report} compact/>:null}<RuntimeAnalysis summary={data.summary} header={data.header} search={search} change={change} task={openTask}/></Stack>:report?<RuntimeReportState report={report}/>:null}</RuntimeViewTabs>
  </Stack>;
 }

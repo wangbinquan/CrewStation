@@ -41,26 +41,32 @@ async function numericWork(tx: NativeDevelopmentTransaction, passKey: string, re
     const qualified: NativeDevelopmentWork = { ...work, baselineState };
     await tx.nativeWorkCommit(qualified, qualified.valuationEof && qualified.held === '0'); return qualified;
   }
-  const source = await pages(pass, work.ordinal);
-  const issues = new Set([...work.issues, ...source.page.issues, ...(baselineState === 'unknown' && baseline.state === 'unknown' ? baseline.issues : [])]);
-  let held = BigInt(work.held), visited = BigInt(work.visited);
-  const through = Math.min(source.page.steps.length, work.index + 100);
-  for (let index = work.index; index < through; index++) {
-    const original = originalNativeStep(source, index);
-    if (pass.progress.identity.phase === 'final') {
-      const ref = before && baseline.state === 'complete-before' ? await tx.nativeStepReference(before.key, original.step.stepId) : undefined;
-      const beforeStep = ref ? originalNativeStep(await pages(before!, ref.ordinal), ref.index) : undefined;
-      if (beforeStep && (beforeStep.fingerprint !== ref!.fingerprint || beforeStep.step.stepId !== original.step.stepId))
-        throw conflict('原生 before 步骤未匹配其独立原页引用');
-      const gaps = await commitNativeOriginalStep({ tx, original, baseline, ...(beforeStep ? { before: beforeStep } : {}), observedAt });
-      if (gaps.length) { held++; for (const issue of gaps) issues.add(issue); }
+  let next = work, remaining = 100;
+  // The original step scheduling batch spans transport pages; every cursor remains durable through actual EOF.
+  while (remaining > 0 && !next.numericEof) {
+    const source = await pages(pass, next.ordinal);
+    const issues = new Set([...next.issues, ...source.page.issues,
+      ...(baselineState === 'unknown' && baseline.state === 'unknown' ? baseline.issues : [])]);
+    let held = BigInt(next.held), visited = BigInt(next.visited);
+    const through = Math.min(source.page.steps.length, next.index + remaining);
+    for (let index = next.index; index < through; index++) {
+      const original = originalNativeStep(source, index);
+      if (pass.progress.identity.phase === 'final') {
+        const ref = before && baseline.state === 'complete-before' ? await tx.nativeStepReference(before.key, original.step.stepId) : undefined;
+        const beforeStep = ref ? originalNativeStep(await pages(before!, ref.ordinal), ref.index) : undefined;
+        if (beforeStep && (beforeStep.fingerprint !== ref!.fingerprint || beforeStep.step.stepId !== original.step.stepId))
+          throw conflict('原生 before 步骤未匹配其独立原页引用');
+        const gaps = await commitNativeOriginalStep({ tx, original, baseline, ...(beforeStep ? { before: beforeStep } : {}), observedAt });
+        if (gaps.length) { held++; for (const issue of gaps) issues.add(issue); }
+      }
+      visited++;
     }
-    visited++;
+    remaining -= through - next.index;
+    const pageDone = through === source.page.steps.length;
+    next = { ...next, baselineState, index: pageDone ? 0 : through,
+      ordinal: pageDone ? String(BigInt(next.ordinal) + 1n) : next.ordinal, visited: String(visited), held: String(held),
+      issues: [...issues], numericEof: pageDone && source.page.eof !== null, valuationEof: false };
   }
-  const pageDone = through === source.page.steps.length;
-  const next: NativeDevelopmentWork = { ...work, baselineState, index: pageDone ? 0 : through,
-    ordinal: pageDone ? String(BigInt(work.ordinal) + 1n) : work.ordinal, visited: String(visited), held: String(held),
-    issues: [...issues], numericEof: pageDone && source.page.eof !== null, valuationEof: false };
   await tx.nativeWorkCommit(next, false);
   return next;
 }

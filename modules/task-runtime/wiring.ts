@@ -186,11 +186,11 @@ function taskRuntimeParticipants(deps: TaskRuntimeModuleDeps) {
   const query = developmentRemovalLookup(executionDeps);
   const recoveryCluster = kubernetesTaskRecoveryCluster(deps.k8s, forward), provisioner = kubernetesRebuildProvisioner(deps.k8s, deps.settings.workerUid, forward);
   const recoveryDeps = { ...useCaseDeps, recoveryCluster: work ? guardedRuntimePort(recoveryCluster, work) : recoveryCluster, provisioner: work ? guardedRuntimePort(provisioner, work) : provisioner };
-  return { useCaseDeps, executionDeps, recoveryDeps, work, stopping };
+  return { useCaseDeps, executionDeps, recoveryDeps, work, stopping, readEnvironment: raw.uow.read.environments.getById };
 }
 
 export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntimeModule {
-  const { useCaseDeps, executionDeps, recoveryDeps, work, stopping } = taskRuntimeParticipants(deps);
+  const { useCaseDeps, executionDeps, recoveryDeps, work, stopping, readEnvironment } = taskRuntimeParticipants(deps);
   const create = createEnvironmentUseCase(useCaseDeps);
   const { archiveStore, archives } = runtimeArchives(deps, useCaseDeps, work);
   const testRunner = deps.testRunner && (work ? guardedRuntimePort(deps.testRunner, work) : deps.testRunner);
@@ -240,7 +240,8 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     onRunnerConnected: lifecycle.onRunnerConnected,
     onRunnerDisconnected: lifecycle.onRunnerDisconnected,
     onRunnerRejected: lifecycle.onRunnerRejected,
-    getEnvironment: async (taskId) => { const env = await queries.getEnvironment(taskId); return env ? environmentToDto(env) : undefined; },
+    // This public identity read is not a Task effect inside another owner's admitted callback.
+    getEnvironment: async (taskId) => { const env = await readEnvironment(taskId); return env ? environmentToDto(env) : undefined; },
     describeEnvironment: queries.describeEnvironment,
     listEnvironments: queries.listEnvironments,
     findDevSession: async (projectId, options) => { const env = await queries.findDevSession(projectId, options); return env ? environmentToDto(env) : undefined; },

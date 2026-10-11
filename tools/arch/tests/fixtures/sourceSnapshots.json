@@ -1,0 +1,4 @@
+{
+  "before": "export const value = 1;\n",
+  "after": "import value from 'new-dependency';\nexport default value;\n"
+}

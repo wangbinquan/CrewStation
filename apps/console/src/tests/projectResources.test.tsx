@@ -44,6 +44,8 @@ test('项目信息只读：最上面是直接展开的项目信息卡（末行�
   const f = projectResourcesFixture(); page = await renderApp(`/projects/${id}/settings?tab=info`);
   expect(page.text()).toContain('尚未设置配额'); expect(page.text()).toContain('尚未选择服务套餐'); expect(page.text()).toContain('demo/demo'); expect(page.text()).toContain('https://preview.demo.test');
   expect(page.text()).not.toContain('X-User-Id'); expect(page.text()).not.toContain('CS_DATABASE_URL');
+  // The repository query can settle after the initial router renders; assert its actual links after React settles.
+  for (let attempt = 0; attempt < 40 && document.querySelectorAll('a[href="https://gitlab.web.test/crew/demo"]').length !== 2; attempt++) await page.settle();
   expect(document.querySelectorAll('a[href="https://gitlab.web.test/crew/demo"]').length).toBe(2);
   // 只读组不画输入框。
   expect(document.querySelector('main form')).toBeNull();

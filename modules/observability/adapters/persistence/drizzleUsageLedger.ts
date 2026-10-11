@@ -32,6 +32,19 @@ function transaction(db: Executor, taskKey: string, sourceId: string, head: numb
   let sequence = head, nativeRevision = BigInt(initialNative);
   const dependencies = { value: async () => sequence + ":" + nativeRevision, changed: () => { nativeRevision++; } };
   const repairKeys = new Set<string>();
+  // The task-head transaction owns these reads; never share projections across transactions.
+  const projections = new Map<string, Promise<Awaited<ReturnType<typeof currentUsage>>>>();
+  const current = async (value: UsageMeasurementRef) => {
+    const key = meterKeyOf(value);
+    let pending = projections.get(key);
+    if (!pending) { pending = currentUsage(db, key); projections.set(key, pending); }
+    const document = await pending;
+    return document === undefined ? undefined : structuredClone(document);
+  };
+  const invalidate = async <T>(work: () => Promise<T>) => {
+    projections.clear();
+    try { return await work(); } finally { projections.clear(); }
+  };
   const tx: DevelopmentUsageTransaction = {
     developmentPaths: async (passKey) => {
       const count = async () => (await db.execute<{ count: string }>(sql`SELECT count(*)::text AS count FROM observability.development_native_paths WHERE pass_key=${passKey}`))[0]!.count;
@@ -45,25 +58,29 @@ function transaction(db: Executor, taskKey: string, sourceId: string, head: numb
       return result;
     },
     developmentModel: (value) => persistDevelopmentModel(db, value),
-    developmentCapture: async (context, frame) => { sequence = await persistDevelopmentFrame(db, taskKey, context, frame, sequence); },
+    developmentCapture: (context, frame) => invalidate(async () => { sequence = await persistDevelopmentFrame(db, taskKey, context, frame, sequence); }),
     cursor: () => sourceCursor(db, taskKey, sourceId),
     pageFingerprint: async (cursor) => (await db.select().from(usagePages).where(and(eq(usagePages.taskKey, taskKey), eq(usagePages.sourceId, sourceId), eq(usagePages.cursor, cursor))).limit(1))[0]?.fingerprint,
     eventFingerprint: async (eventId) => (await db.select().from(usageEvents).where(and(eq(usageEvents.taskKey, taskKey), eq(usageEvents.sourceId, sourceId), eq(usageEvents.eventId, eventId))).limit(1))[0]?.fingerprint,
     revisionFingerprint: async (value) => (await db.select().from(usageEvidence).where(and(eq(usageEvidence.meterKey, meterKeyOf(value)), eq(usageEvidence.revision, value.revision))).limit(1))[0]?.fingerprint,
     evidence: async (value, after, limit) => (await db.select().from(usageEvidence).where(and(eq(usageEvidence.meterKey, meterKeyOf(value)), gt(usageEvidence.revision, after))).orderBy(asc(usageEvidence.revision)).limit(limit)).map((row) => row.document),
-    current: async (value) => (await db.select().from(usageProjections).where(eq(usageProjections.meterKey, meterKeyOf(value))).limit(1))[0]?.document,
+    current,
     append: async (event, fingerprint) => {
       await db.insert(usageEvidence).values({ meterKey: meterKeyOf(event.measurement), revision: event.measurement.revision, fingerprint, document: event.measurement }).onConflictDoNothing();
       await db.insert(usageEvents).values({ taskKey, sourceId, eventId: event.eventId, fingerprint });
     },
     project: async (value, originalModelEvidence) => {
-      const meterKey = meterKeyOf(value), previous = await currentUsage(db, meterKey), retained = await currentRepair(db, meterKey);
+      const meterKey = meterKeyOf(value), previous = await current(value), retained = await currentRepair(db, meterKey);
       if (retained && !isNativeLedgerReference(retained.document)) repairKeys.add(retained.nativeKey);
-      const document = await nativeProjection(db, meterKey, value, previous, originalModelEvidence);
-      if (document !== previous) sequence = await writeUsageProjection(db, taskKey, document, sequence);
+      const document = await nativeProjection(db, meterKey, value, previous, retained, originalModelEvidence);
+      if (document !== previous) {
+        sequence = await writeUsageProjection(db, taskKey, document, sequence);
+        // Match the actual JSON document written above, including omitted undefined fields.
+        projections.set(meterKey, Promise.resolve(JSON.parse(JSON.stringify(document)) as typeof document));
+      }
     },
-    capture: async (identity, frame) => { sequence = await persistNativeFrame(db, taskKey, sourceId, identity, frame, sequence); },
-    advance: async (cursor, fingerprint) => {
+    capture: (identity, frame) => invalidate(async () => { sequence = await persistNativeFrame(db, taskKey, sourceId, identity, frame, sequence); }),
+    advance: (cursor, fingerprint) => invalidate(async () => {
       // A late raw revision can invalidate an old capture's scope even when its
       // new turn has no native frame. Revisit after every raw event is retained.
       const affected = new Set<string>(), meters = new Set<string>();
@@ -72,7 +89,7 @@ function transaction(db: Executor, taskKey: string, sourceId: string, head: numb
       for (const id of affected) sequence = await projectNativeCapture(db, taskKey, id, sequence);
       await db.insert(usagePages).values({ taskKey, sourceId, cursor, fingerprint });
       await db.update(usageSources).set({ cursor }).where(sourceWhere(taskKey, sourceId));
-    },
+    }),
   };
   return { tx, dependencies, flush: async () => {
     if (sequence !== head || String(nativeRevision) !== initialNative)
@@ -82,8 +99,7 @@ function transaction(db: Executor, taskKey: string, sourceId: string, head: numb
 
 async function currentUsage(db: Executor, key: string) { return (await db.select().from(usageProjections).where(eq(usageProjections.meterKey, key)).limit(1))[0]?.document; }
 async function currentRepair(db: Executor, key: string) { return (await db.select().from(nativeRepairs).where(eq(nativeRepairs.meterKey, key)).limit(1))[0]; }
-async function applicableRepair(db: Executor, key: string, value: NonNullable<Awaited<ReturnType<typeof currentUsage>>>) {
-  const repair = await currentRepair(db, key);
+async function applicableRepair(db: Executor, key: string, value: NonNullable<Awaited<ReturnType<typeof currentUsage>>>, repair: Awaited<ReturnType<typeof currentRepair>>) {
   if (!repair?.active || isNativeLedgerReference(repair.document)) return;
   const document = reconcileNativeRepairModel(value, repair.document);
   if (!document) await db.update(nativeRepairs).set({ active: false }).where(eq(nativeRepairs.meterKey, key));
@@ -99,13 +115,12 @@ async function nativeModelProof(db: Executor, value: NonNullable<Awaited<ReturnT
   return model && evidence ? { model, evidence } : undefined;
 }
 async function nativeProjection(db: Executor, key: string, value: NonNullable<Awaited<ReturnType<typeof currentUsage>>>,
-  previous: Awaited<ReturnType<typeof currentUsage>>, original?: UsageEvidence) {
-  const repair = await currentRepair(db, key);
+  previous: Awaited<ReturnType<typeof currentUsage>>, repair: Awaited<ReturnType<typeof currentRepair>>, original?: UsageEvidence) {
   if (repair?.active && isNativeLedgerReference(repair.document))
     return projectNativeLedgerReference(value, previous, repair.document, await readNativeReferenceProjection(db, repair.document), {
       incoming: await nativeModelProof(db, value, original), previous: previous && await nativeModelProof(db, previous),
     });
-  return projectNativeRepair(value, previous, await applicableRepair(db, key, value));
+  return projectNativeRepair(value, previous, await applicableRepair(db, key, value, repair));
 }
 async function writeUsageProjection(db: Executor, taskKey: string, value: NonNullable<Awaited<ReturnType<typeof currentUsage>>>, sequence: number) {
   if (sequence >= Number.MAX_SAFE_INTEGER) throw new RangeError('Usage synchronization sequence exhausted');
@@ -125,7 +140,7 @@ async function reprojectNativeMeter(db: Executor, taskKey: string, key: string, 
     after = rows.at(-1)!.revision;
   }
   const base = rebuildUsageProjection(evidence);
-  const document = await nativeProjection(db, key, base, previous);
+  const document = await nativeProjection(db, key, base, previous, await currentRepair(db, key));
   return document === previous ? sequence : writeUsageProjection(db, taskKey, document, sequence);
 }
 

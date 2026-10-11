@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { INFRA_SCHEMA_OWNERS, moduleSchemaName } from '../policy';
-import { readText } from '../sourceFiles';
+import { readSourceText } from '../sourceFiles';
 import type { Unit, Violation, Workspace } from '../archModel';
 
 const RULE = 'persistence-ownership';
@@ -15,7 +15,7 @@ export function persistenceOwnership(ws: Workspace): Violation[] {
   const out: Violation[] = [];
   for (const file of ws.files) {
     if (file.unit.kind === 'tool') continue;
-    for (const m of readText(file.path).matchAll(PG_SCHEMA_RE)) {
+    for (const m of readSourceText(file).matchAll(PG_SCHEMA_RE)) {
       const expected = expectedSchema(file.unit);
       if (m[1] !== expected) {
         out.push({ rule: RULE, file: file.path, message: expected ? `只能使用 pgSchema('${expected}')，实际 '${m[1]}'` : '该单元不允许声明 pgSchema' });

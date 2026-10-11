@@ -53,7 +53,7 @@ export interface DriverLaunchContext {
 }
 
 export interface DriverAgentProcess {
-  /** 交互模式下投递后续消息；oneshot 或已结束时抛 DriverStateError。 */
+  /** 交互消息受理后返回；完成与失败由 events 报告。oneshot 或已结束时抛 DriverStateError。 */
   send(text: string): Promise<void>;
   cancel(): Promise<void>;
   readonly events: AsyncIterable<AgentEvent>;

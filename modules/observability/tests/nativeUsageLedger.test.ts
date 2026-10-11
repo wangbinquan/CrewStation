@@ -1,6 +1,8 @@
 // RFC-034: native proofs share the usage watermark and reconcile resumed steps against their original owner.
+// Transaction-local read reuse must retain JSON value semantics and late-capture repair; see native-transaction-read-reuse.md.
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/postgres-js';
 import { ExecutionObservationIdentitySchema, type ExecutionObservationIdentity, type NativeUsageProof, type NativeUsageStep, type RunnerUsageCapture, type RunnerUsageMeasurement, type RunnerUsageSourcePage, type Actor, type SaveTokenPrice } from '@crewstation/contracts';
 import { fixedClock, jsonHash } from '@crewstation/kernel';
 import { createTestDatabase, testDatabaseAvailable, type TestDatabase } from '@crewstation/testkit';
@@ -11,7 +13,7 @@ import { tokenPricingUseCases } from '../application/tokenPricing';
 import { drizzleExecutionValuations, drizzleUsageLedger } from '../adapters/persistence/drizzleUsageLedger';
 import { nativeCaptures, nativeSteps } from "../adapters/persistence/tables";
 import { runnerUsageReconciliation, usageIngestion } from '../application/usageIngestion';
-import { nativeCaptureId, nativeRecordId } from '../domain/usageProjection';
+import { nativeCaptureId, nativeRecordId, rebuildUsageProjection } from '../domain/usageProjection';
 import type { UsageLedgerStore, UsageSourcePage, RunnerUsageSource } from '../ports/usageLedger';
 import { observabilityMigrations } from '../wiring';
 
@@ -49,6 +51,71 @@ function setup(db: Database = tdb.db) {
 }
 
 describe.skipIf(!available)('RFC-034 native proof ledger', () => {
+  test('one original repair lookup per projected record retains every known bucket without an N+1 repair reread', async () => {
+    const repairs: string[] = [], projections: string[] = [];
+    const database = drizzle({ client: tdb.handle.client, logger: { logQuery(query) {
+      if (query.startsWith('select ') && query.includes(['from', '"observability"."native_repairs"'].join(' '))) repairs.push(query);
+      if (query.startsWith('select ') && query.includes(['from', '"observability"."usage_projections"'].join(' '))) projections.push(query);
+    } } });
+    const f = setup(database), count = 211;
+    const input = await f.input(Array.from({ length: count }, (_, n) => numberFrame(step('original-repair-read-' + n, String(n + 1)))));
+    // This is the actual ordinary numerical ledger path; no source capture or proof is manufactured.
+    await f.ingest({ ...input, native: [] });
+    expect(repairs).toHaveLength(count);
+    expect(projections).toHaveLength(count);
+    const rows = await tdb.handle.client`SELECT count(*)::text AS records,
+      sum((document->'projection'->'contribution'->>'input')::numeric)::text AS input,
+      sum((document->'projection'->'contribution'->>'cacheRead')::numeric)::text AS cache_read,
+      sum((document->'projection'->'contribution'->>'cacheWrite')::numeric)::text AS cache_write,
+      sum((document->'projection'->'contribution'->>'output')::numeric)::text AS output
+      FROM observability.usage_projections WHERE document->'identity'->>'executionId'=${f.identity.executionId}`;
+    expect(rows[0]).toEqual({ records: '211', input: '22366', cache_read: '0', cache_write: '0', output: '0' });
+    const changes = await f.store.changes(f.scope, 0, 500);
+    expect(changes.items).toHaveLength(count); expect(changes.persistedThrough).toBe(count);
+    expect(changes.hasMore).toBe(false);
+  }, 60_000);
+
+  test('same-transaction unknown, persisted writes and copied reads use the complete meter key; the next transaction reads again', async () => {
+    const reads: string[] = [];
+    const database = drizzle({ client: tdb.handle.client, logger: { logQuery(query) {
+      if (query.startsWith('select ') && query.includes(['from', '"observability"."usage_projections"'].join(' '))) reads.push(query);
+    } } });
+    const f = setup(database), page = await f.input([numberFrame()]), event = page.events[0]!, measurement = event.measurement;
+    await f.store.change(f.scope, 'runner', async (tx) => {
+      expect(await tx.current(measurement)).toBeUndefined();
+      expect(await tx.current(measurement)).toBeUndefined();
+      await tx.append(event, jsonHash(measurement));
+      await tx.project(rebuildUsageProjection([measurement]));
+      const first = (await tx.current(measurement))!;
+      first.projection.contribution.input = '999'; first.usage.input = '888';
+      expect(await tx.current(measurement)).toMatchObject({ usage: { input: '10' }, projection: { contribution: { input: '10' } } });
+      expect(reads).toHaveLength(1);
+      expect(await tx.current({ ...measurement, sourceId: 'other-source' })).toBeUndefined();
+      expect(reads).toHaveLength(2);
+      await tx.advance(page.nextCursor, jsonHash(page));
+      expect(await tx.current(measurement)).toMatchObject({ usage: { input: '10' }, projection: { contribution: { input: '10' } } });
+      expect(reads).toHaveLength(3);
+    });
+    await f.store.change(f.scope, 'runner', async (tx) => {
+      expect(await tx.current(measurement)).toMatchObject({ usage: { input: '10' }, projection: { contribution: { input: '10' } } });
+      expect(reads).toHaveLength(4);
+    });
+  });
+
+  test('a late original capture repairs an already-read meter within the same transaction', async () => {
+    const f = setup(); await f.send(orderedOwner());
+    const measurement = (await f.input([numberFrame()])).events[0]!.measurement;
+    const resumed = { ...f.identity, executionGeneration: 2 };
+    await f.store.change(f.scope, 'same-tx-resume', async (tx) => {
+      expect(await tx.current(measurement)).toMatchObject({ projection: { contribution: { input: '10' } } });
+      for (const frame of orderedResume(step('S', '15'), 3)) await tx.capture(resumed, frame);
+      expect(await tx.current(measurement)).toMatchObject({ usage: { input: '10' }, projection: { contribution: { input: '15' } } });
+      await tx.advance('same-tx-resume:complete', 'same-tx-resume-fingerprint');
+      expect(await tx.current(measurement)).toMatchObject({ projection: { contribution: { input: '15' } } });
+    });
+    expect((await f.store.snapshot(f.scope, { limit: 20 }, Date.parse(at), 0)).items[0]).toMatchObject({ projection: { contribution: { input: '15' } } });
+  });
+
   test('pending, numeric evidence and final proof commit in order and frozen snapshots retain their own gap', async () => {
     const f = setup();
     await f.send([proofFrame(proof('pending')), numberFrame(), numberFrame(step('T', '5'))]);

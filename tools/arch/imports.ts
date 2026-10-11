@@ -1,5 +1,5 @@
 import { dirname, resolve } from 'node:path';
-import { readText } from './sourceFiles';
+import { readSourceText } from './sourceFiles';
 import type { ImportRef, SourceFile, Unit, Workspace } from './archModel';
 
 const FROM_RE = /\bfrom\s+['"]([^'"]+)['"]/g;
@@ -8,7 +8,7 @@ const DYNAMIC_RE = /\bimport\(\s*['"]([^'"]+)['"]\s*\)/g;
 
 export function resolveImports(file: SourceFile, ws: Workspace): ImportRef[] {
   const refs: ImportRef[] = [];
-  readText(file.path).split('\n').forEach((line, index) => {
+  readSourceText(file).split('\n').forEach((line, index) => {
     if (/^\s*(\/\/|\*)/.test(line)) return;
     for (const spec of specsInLine(line)) refs.push(classify(spec, index + 1, file, ws));
   });

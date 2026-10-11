@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { EXTRA_TEST_ROOTS, ROOT_TEST_LOOSE_FILES, ROOT_TEST_TIERS } from '../policy';
-import { isTestPath, readText, walk } from '../sourceFiles';
+import { isTestPath, readSourceText, readText, walk } from '../sourceFiles';
 import type { Violation, Workspace } from '../archModel';
 
 const RULE = 'test-discipline';
@@ -24,7 +24,8 @@ const FOREIGN_TEST_NAME = /(?:\.spec\.(?:ts|tsx|js|jsx|mjs|cjs)|_(?:test|spec)\.
 export function testDiscipline(ws: Workspace): Violation[] {
   const out: Violation[] = [];
   for (const path of testFiles(ws)) {
-    const code = stripComments(readText(path));
+    const source = ws.byPath.get(path);
+    const code = stripComments(source ? readSourceText(source) : readText(path));
     for (const banned of BANNED) {
       if (banned.pattern.test(code)) out.push({ rule: RULE, file: path, message: banned.message });
     }

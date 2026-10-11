@@ -55,7 +55,8 @@ describe.skipIf(!available)('actual Session PG original-page work after ordinary
     const f = await nativeNumericFixture(database);
     try {
       const execution = await f.execution(false); await nativeNumericPrice(database, execution.registration);
-      f.populate(3, 0); await execution.persist('final'); const retained = await execution.copy();
+      // A failure on the second original page must roll back numeric data and the cursor across page boundaries.
+      f.populate(3, 0); await execution.persist('final', 1); const retained = await execution.copy();
       const ledger = drizzleUsageLedger(database.db); let claims = 0;
       const failing: NativeDevelopmentLedgerStore = { ...ledger, changeNativeDevelopment: (scope, source, work) =>
         ledger.changeNativeDevelopment(scope, source, tx => work({ ...tx, nativeClaim: async (receipt, path) => {

@@ -21,7 +21,7 @@ for (const cancel of [false, true]) test(`original upstream bootstrap ${cancel ?
   const run = createOpencodeDriver(() => '/bin/opencode').start({ agentId: f.admission.intent.identity.agentId, compute: 'validation-only', profileRevision: 2,
     launch: f.admission.intent.launch, permission: 'full', mode: 'oneshot', initialPrompt: 'first', mcp: [],
     usageObservationsV1: 1, nativeUsageTreeV1: 1, developmentNativePagesV2: 2, nativeUsageLineageKey: f.admission.intent.nativeUsageLineageKey },
-    { cwd: f.directory, env: { HOME: f.directory, OPENCODE_DB: f.path }, host, logger: noopLogger,
+    { cwd: f.directory, runDir: join(f.directory, 'run'), env: { HOME: f.directory, OPENCODE_DB: f.path }, host, logger: noopLogger,
       managed: { home: f.directory, runDir: join(f.directory, 'run') }, developmentNativeProducer: f.usage.nativeProducer });
   const events: AgentEvent[] = [];
   const pump = (async () => { for await (const event of run.events) { events.push(event); f.usage.observe(event); } })();

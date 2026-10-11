@@ -36,12 +36,20 @@ describe.skipIf(!available)('actual native v2 live consumer and durable ordinary
       f.populate(211, 0); await f.execution.persist('final', 1); await f.execution.copySession();
       expect(await f.module.api.reconcileExecutionUsage()).toBe(20);
       expect(await f.session.api.nextDevelopmentUsageSource()).toBeDefined();
-      const module = f.reopen();
+      const module = f.reopen(), numericProgress: string[] = [];
       for (;;) {
         await module.api.reconcileExecutionUsage();
-        const [state] = await database.handle.client`SELECT work_state FROM observability.development_native_passes`;
+        const [state] = await database.handle.client`SELECT pass.work_state,work.document->>'visited' AS visited
+          FROM observability.development_native_passes pass
+          LEFT JOIN observability.development_native_work work USING(pass_key)`;
+        if (state!.visited && state!.visited !== '0' && state!.visited !== numericProgress.at(-1)) {
+          // Regression: one-step transport pages previously reduced the original 100-step batch to one and timed out.
+          if (numericProgress.length === 0) expect(state!.visited).toBe('100');
+          numericProgress.push(state!.visited);
+        }
         if (state!.work_state === 'processed') break;
       }
+      expect(numericProgress).toEqual(['100', '200', '211']);
       expect(await f.session.api.nextDevelopmentUsageSource()).toBeUndefined();
       const usage = await database.handle.client`SELECT document FROM observability.usage_projections`;
       const values = await database.handle.client`SELECT document FROM observability.execution_valuations`;
