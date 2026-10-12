@@ -23,3 +23,7 @@
 先保留原实现红例，再改这一生产调用、运行同一目标的绿例与相关原回归。原断言、超时和环境跳过条件不修改。候选冻结后复核源码并只执行一次新候选完整检查；通过后精确提交、六项准确源码 CI 全绿后部署，再观察原 B 的正常清理和原额度恢复。当前 fda 的本地全绿和 CI 不能替代新候选检查。
 
 补充实际跨 owner 回归：在原 `tests/e2e/developmentPrestartCleanup.test.ts` 追加一项原 error/null-binding/no-grant 链路，用同一真实 PG Dev/Session/Task/Resources 与原 Controller 构造链先保存原 error 和普通 ended，再调用正常 native worker，核对 firstReason=error、未制造数字流、停止证明前保留凭据和额度、实际 Controller 全容器证明后 closed/unknown、原 Session absent、原价格与结束时间不被替换、额度仅释放一次。复用原夹具，不修改它或任何原用例／预算。完整发布候选增加这一根 E2E 文件；不是以受控传输的测试证明本机 B 已停止。
+
+## 2026-10-12 实际接续验收
+
+本片源码 6311b894 的准确六 CI 全部成功、七后端正常部署后，获准扩容恢复原数据库。同一原 B 已通过正常原清理作业闭合；原 firstReason=error、原 endedAt、无 binding／start permit 和数字 unknown 保持，原 Pod UID 的真实停止证明与精确 Pod 不存在均已核对。原 A 数字不变，临时项目配额通过公开产品接口恢复 3。详见 [完整部署与恢复记录](./deployment-and-restoration-20261012.md)。这关闭本片原 B 接续与配额收尾，不关闭 RFC-034 的其余原退出项；上述设计和旧故障记录保留。
