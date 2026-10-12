@@ -21,7 +21,8 @@ async function prestart(deps: DevelopmentCleanupDeps, selection: DevelopmentClea
   if (!original || original.binding || !deps.workloadSafety || !deps.session.lookupDevelopmentUsage || !deps.store.inspectPrestart || !deps.store.completePrestart)
     return { kind: 'waiting' as const, reason: 'prestart-capability' };
   await deps.closeOriginalAdmission?.(id);
-  await requestDevelopmentEnding(deps, id, original.closeReason ?? 'cancelled');
+  // Close unstarted admission; the original transaction retains any existing first reason.
+  await requestDevelopmentEnding(deps, id, 'cancelled');
   // Re-read actual owner/start/job after the original null-binding close transaction.
   const owner = await inspectOriginal(deps, selection), job = await deps.store.inspectPrestart(selection);
   if (!owner || owner.binding || !owner.closeReason || job?.firstReason !== owner.closeReason

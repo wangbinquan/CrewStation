@@ -9,6 +9,7 @@ import { WorkloadConsumerSchema } from '@crewstation/contracts';
 import { devSessionMigrations } from '../wiring';
 import { developmentCleanupFixture } from './developmentCleanupFixture';
 import { developmentCleanupParticipant } from '../application/development/cleanup';
+import { requestDevelopmentEnding } from '../application/development/ending';
 
 const available = await testDatabaseAvailable();
 describe.skipIf(!available)('RFC-034 unbound/no-grant original ending', () => {
@@ -33,6 +34,41 @@ describe.skipIf(!available)('RFC-034 unbound/no-grant original ending', () => {
     expect((await db.db.select().from(agentStarts).where(eq(agentStarts.executionTaskId, f.child.id)))[0]).toMatchObject({ state: 'ended', logicalEnding: true });
     expect(await f.store.get(f.child.id)).toMatchObject({ stage: 'awaiting-stop', logicalResult: null, stop: null, closure: null, actualEndedAt: null });
     expect(f.calls).toEqual([]); expect(f.registrations).toEqual([]);
+  });
+  test.each(['error', 'completed'] as const)('an unbound original %s reason closes admission without a fabricated terminal receipt', async (firstReason) => {
+    db = await createTestDatabase([devSessionMigrations]);
+    const f = await developmentCleanupFixture(db.db, false);
+    await f.owner.close(f.child.id, firstReason);
+    await f.starts.update({ ...f.start, state: 'ended', endedAt: f.endingControl.now, finalized: false });
+    const originalOwner = await f.owner.get(f.child.id);
+    const [originalStart] = await db.db.select().from(agentStarts).where(eq(agentStarts.executionTaskId, f.child.id));
+    if (!originalStart) throw new Error('original AgentStart row missing');
+    expect(originalStart).toMatchObject({ state: 'ended', logicalEnding: false, cancelled: false, finalized: false, dispatchedAt: null, endedAt: f.endingControl.now });
+    expect(await requestDevelopmentEnding(f.deps, f.child.id, firstReason)).toEqual({ kind: 'waiting', reason: 'terminal-receipt-unavailable' });
+    expect(await f.store.get(f.child.id)).toBeUndefined();
+    const consumer = WorkloadConsumerSchema.parse({ id: f.input.consumerId, resourceId: f.child.id, taskId: f.workspace.id,
+      revision: 1, namespace: 'cs-qa', podName: f.child.podName, volumeUid: crypto.randomUUID(), purpose: 'agent', finalization: null });
+    let lookups = 0;
+    const deps = { ...f.deps, environments: f.environmentPort, session: { ...f.session, lookupDevelopmentUsage: async () => {
+      lookups++; return { version: 1 as const, kind: 'absent' as const, runtimeTaskId: f.child.id };
+    } }, workloadSafety: { get: async () => ({ consumer, admissionClosed: true, startPermit: null, stopProof: null }), admissionClosed: async () => true } };
+    const participant = developmentCleanupParticipant(deps);
+    const result = await participant.advance(f.input);
+    expect(result).toMatchObject({ kind: 'permitted', evidence: { version: 2, kind: 'unbound-no-grant', phase: 'stopping', numericState: 'unknown', stopProof: null,
+      owner: { firstReason, payloadDigest: originalOwner!.payloadDigest, acceptedAt: originalOwner!.price.acceptedAt } } });
+    expect(lookups).toBeGreaterThan(0);
+    expect(await f.owner.get(f.child.id)).toEqual(originalOwner);
+    const [closedStart] = await db.db.select().from(agentStarts).where(eq(agentStarts.executionTaskId, f.child.id));
+    if (!closedStart) throw new Error('original AgentStart row missing');
+    expect(closedStart).toMatchObject({ logicalEnding: true });
+    expect({ ...closedStart, logicalEnding: originalStart.logicalEnding }).toEqual(originalStart);
+    const ending = await f.store.get(f.child.id);
+    expect(ending).toMatchObject({ firstReason, stage: 'awaiting-stop', logicalResult: null, stop: null, closure: null, actualEndedAt: null, prestartClosure: null });
+    expect(await participant.advance(f.input)).toEqual(result);
+    expect(await f.store.get(f.child.id)).toEqual(ending);
+    expect(await f.owner.get(f.child.id)).toEqual(originalOwner);
+    await expect(f.owner.bind(f.child.id, f.info)).rejects.toThrow();
+    expect(f.calls).toEqual([]); expect(f.registrations).toEqual([]); expect(f.drains).toEqual([]);
   });
 });
 
