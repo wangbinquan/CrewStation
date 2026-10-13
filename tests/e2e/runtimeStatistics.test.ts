@@ -2,7 +2,7 @@ import { RuntimeCompleteReportSchema } from '../../packages/contracts';
 import { afterAll, describe, expect, test } from 'bun:test';
 import { e2eAvailable, open, settle } from './consoleSession';
 import { openAdminSession } from './session';
-import { installRuntimeStatisticsFixture, measureRuntimeOverview } from './runtimeStatisticsFixture';
+import { installRuntimeStatisticsFixture, measureRuntimeOverview, measureRuntimeTimeline } from './runtimeStatisticsFixture';
 
 const session = await e2eAvailable() ? await openAdminSession() : undefined;
 afterAll(async () => { await session?.close(); }, 30_000);
@@ -60,7 +60,7 @@ describe.skipIf(!session)('RFC-034 formal runtime observation', () => {
     expect(page.takeErrors()).toEqual([]);
   });
   test('24 trend columns, standard card gaps and five views fit both levels in Chinese/English and light/dark', async () => {
-    const page = session!.admin, f = await installRuntimeStatisticsFixture(page);
+    const page = session!.admin, f = await installRuntimeStatisticsFixture(page, { taskDelayMs: 400 });
     for (const [width, locale, scheme] of [[1280, 'zh-CN', 'light'], [390, 'zh-CN', 'light'], [390, 'en-US', 'dark']] as const) {
       await page.cmd('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 1, mobile: false });
       await page.cmd('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: scheme }] });
@@ -90,8 +90,9 @@ describe.skipIf(!session)('RFC-034 formal runtime observation', () => {
       }
       await open(page, '/admin/observability/tasks/' + f.taskId + '?' + f.query);
       await page.eval(`document.querySelector('header button[lang="${locale}"]').click()`); await settle(page);
-      const scroll = '[data-runtime-task] [role="region"]';
-      expect(await page.eval<boolean>(`document.querySelector('${scroll}').scrollWidth > document.querySelector('${scroll}').clientWidth`)).toBe(width < 680);
+      const scroll = '[data-runtime-task] [role="region"]:has([data-runtime-section="swimlane"])';
+      // English loading text is not the global settle helper's Chinese marker; measure the actual loaded attempt region atomically.
+      expect((await measureRuntimeTimeline(page, scroll)).overflow).toBe(width < 680);
       const lane = scroll + ' [data-runtime-section="swimlane"] button[aria-label]:not(:disabled)';
       // Readiness and the original click share one DOM evaluation: background refresh can replace the region between CDP awaits.
       await page.waitUntil(`(() => {const bar=document.querySelector('${lane}');if(!bar)return false;bar.click();return true})()`);

@@ -33,7 +33,7 @@ async function archiveReport(archive:Archive,alias:string,query:string) {
 }
 
 /** Only layout uses fixtures; the preceding endpoint test reads the deployed original report. */
-export async function installRuntimeStatisticsFixture(page: Page) {
+export async function installRuntimeStatisticsFixture(page: Page, { taskDelayMs = 0 }: { taskDelayMs?: number } = {}) {
  const original=globalThis.fetch,f=runtimeStatisticsFixture(),archive:Archive={responses:{},pages:{}};
  try {
   for(const path of ['/v1/me','/v1/projects','/v1/projects/page','/v1/projects/'+f.projectId])archive.responses[path]=await (await fetch(path)).json();
@@ -58,6 +58,7 @@ export async function installRuntimeStatisticsFixture(page: Page) {
    if(url.pathname.includes('/observability/statistics')&&(url.searchParams.get('from')!==${JSON.stringify(f.from)}||url.searchParams.get('to')!==${JSON.stringify(f.to)}||[...url.searchParams.keys()].some(key=>!['from','to','timezone'].includes(key))))throw new Error('Unknown statistical cohort request');
    const value=archive.responses[url.pathname];
    if(value===undefined)throw new Error('Unknown fixture request: '+url.pathname+url.search);
+   if(url.pathname.includes('/observability/tasks/') && ${JSON.stringify(taskDelayMs)}>0)await new Promise(resolve=>setTimeout(resolve,${JSON.stringify(taskDelayMs)}));
    return Response.json(value);
   };
  })()`;
@@ -84,4 +85,19 @@ export async function measureRuntimeOverview(page: Page) {
       bars:bars.length,chartOverflow:Math.max(0,...bars.map(bar=>bar.getBoundingClientRect().right-rect.left-chart.parentElement.scrollWidth)),
       tokenLabels:bars.map(bar=>bar.firstElementChild.textContent),tokenBuckets:tokenRows.map(row=>row.querySelector('dd').textContent),bucketPairsAligned,stackPercent:segments.map(segment=>segment.style.height),alignedRange,noExport:![...document.querySelectorAll('button')].some(b=>/CSV/.test(b.textContent))};
   })()`);
+}
+
+/** Read readiness and widths together so a background refresh cannot invalidate a separate readiness check. */
+export async function measureRuntimeTimeline(page: Page, selector: string): Promise<{ overflow: boolean; clientWidth: number; scrollWidth: number }> {
+ const result = await page.eval<{ state: 'ready'; overflow: boolean; clientWidth: number; scrollWidth: number } | { state: 'timeout'; diagnostics: Record<string, unknown> }>(`(async () => {
+  const selector=${JSON.stringify(selector)},started=performance.now();
+  for(;;) {
+   const region=document.querySelector(selector),bar=region?.querySelector('[data-runtime-section="swimlane"] button[aria-label]:not(:disabled)');
+   if(region?.clientWidth>0 && bar && !region.closest('[hidden]'))return {state:'ready',overflow:region.scrollWidth>region.clientWidth,clientWidth:region.clientWidth,scrollWidth:region.scrollWidth};
+   if(performance.now()-started>15000)return {state:'timeout',diagnostics:{selector,regionCount:document.querySelectorAll(selector).length,clientWidth:region?.clientWidth??null,barCount:region?.querySelectorAll('[data-runtime-section="swimlane"] button[aria-label]:not(:disabled)').length??null,hidden:!!region?.closest('[hidden]'),href:location.href,main:document.querySelector('main')?.innerText.slice(0,1000)??null}};
+   await new Promise(resolve=>setTimeout(resolve,100));
+  }
+ })()`);
+ if(result.state==='timeout')throw new Error('Original timeline did not settle: '+JSON.stringify(result.diagnostics));
+ return result;
 }

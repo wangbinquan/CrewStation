@@ -54,6 +54,8 @@ describe.skipIf(!available)('original parent durable recovery fairness (real PG)
 
   test('three families keep separate persistent positions, rotate fairly across recreation, and bound malformed candidate scanning', async () => {
     f = await developmentParentEndingStorageFixture(); const endings: string[] = [], rebuilds: string[] = [], claims: string[] = [];
+    // CI/R6: clock_timestamp() can exceed a same-millisecond JS cutoff. Synthetic candidates must be unambiguously due.
+    const rebuiltAt = new Date(0).toISOString();
     const columns = await f.db.execute<{ column_name: string }>(sql`SELECT column_name FROM information_schema.columns
       WHERE table_schema='task_runtime' AND table_name='environments' AND is_generated='NEVER' ORDER BY ordinal_position`);
     const names = sql.join(columns.map((c) => sql.identifier(c.column_name)), sql`, `);
@@ -65,7 +67,7 @@ describe.skipIf(!available)('original parent durable recovery fairness (real PG)
       // Synthetic SQL candidates exercise only bounded scanning. No completion witness or readiness is fabricated.
       await f.db.execute(sql`INSERT INTO task_runtime.environment_rebuilds
         (id,task_id,project_id,input,namespace,original_pod_name,pod_name,pvc_name,secret_name,image,state,creation,created_at,updated_at,development_parent_binding)
-        VALUES (${id},${taskId},${f.projectId},'{}'::jsonb,${f.parent.namespace},'old','new','retained','new-runner','test','queued','owner',clock_timestamp(),clock_timestamp(),${JSON.stringify(i === 0 ? false : { storageOnly: true })}::jsonb)`);
+        VALUES (${id},${taskId},${f.projectId},'{}'::jsonb,${f.parent.namespace},'old','new','retained','new-runner','test','queued','owner',${rebuiltAt},${rebuiltAt},${JSON.stringify(i === 0 ? false : { storageOnly: true })}::jsonb)`);
       await f.db.execute(sql`INSERT INTO task_runtime.environments (${names}) SELECT ${values} FROM task_runtime.environments original
         CROSS JOIN LATERAL jsonb_populate_record(NULL::task_runtime.environments,to_jsonb(original)||jsonb_build_object(
           'id',${taskId}::text,'pod_name','new','state','creating','rebuild_id',${id}::text,'parent_ending',NULL,'render',NULL,'native',NULL)) copy WHERE original.id=${f.parent.id}`);
