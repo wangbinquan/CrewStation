@@ -1,3 +1,4 @@
+import {incrementRuntimeSignal} from '@crewstation/kernel';
 import type { RunnerMessage, TaskId } from '@crewstation/contracts';
 import { RunnerMessageSchema, TASKRUNNER_PROTOCOL_VERSION } from '@crewstation/contracts';
 import { persistRunnerMessage } from './runnerEvent';
@@ -45,6 +46,7 @@ export function runnerHub(deps: SessionUseCaseDeps) {
         await lifetime.finish(connection, 'TaskRunner 握手未完成', true);
         throw error;
       }
+      incrementRuntimeSignal('runner.connected','connections');if(previous||resumeFromSeq>0)incrementRuntimeSignal('runner.reconnected','connections');
       deps.taskAccess.onRunnerReady?.(hello.taskId);
       connection.broadcast(JSON.stringify({ type: 'runnerReconnected' }));
       logger.info('runner connected', { taskId: hello.taskId, resumeFromSeq, protocols: hello.capabilities.protocols });

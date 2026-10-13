@@ -1,3 +1,4 @@
+import {retainRuntimeReport} from './reportLifetime';
 import {sql} from 'drizzle-orm';
 import type {Database,Executor} from '@crewstation/persistence';
 import {RuntimeCompleteReportSchema} from '@crewstation/contracts';
@@ -15,10 +16,12 @@ async function owned(db:Executor,id:string,owner:string) {
  if(!row||row['owner']!==owner||row['state']!=='building')throw new Error('Original runtime report publication ownership changed');
  return row;
 }
+/** Qualification witnesses the original committed source clock, independently of derived publications. */
+export async function originalRuntimeSourceIdentity(db:Executor){const [row]=await db.execute(sql`SELECT (SELECT oid::text FROM pg_database WHERE datname=current_database()) AS generation,(revision+(SELECT count(*) FROM observability.runtime_report_revisions))::text AS revision FROM observability.runtime_report_clock WHERE singleton=true`);if(!row)throw Error('Original runtime source witness missing');return {generation:String(row['generation']),revision:String(row['revision'])};}
 export async function originalRuntimeReportIdentity(db:Executor) {
- const [row]=await db.execute(sql`SELECT (SELECT oid::text FROM pg_database WHERE datname=current_database()) AS generation,(revision+(SELECT count(*) FROM observability.runtime_report_revisions))::text AS revision FROM observability.runtime_report_clock WHERE singleton=true`);
+ const [row]=await db.execute(sql`SELECT (SELECT oid::text FROM pg_database WHERE datname=current_database()) AS generation,b.done AS bootstrap_completed,CASE WHEN b.done AND h.revision>0 THEN h.revision::text ELSE (c.revision+(SELECT count(*) FROM observability.runtime_report_revisions))::text END AS revision FROM observability.runtime_report_clock c CROSS JOIN observability.runtime_task_bootstrap b CROSS JOIN observability.runtime_projection_head h WHERE c.singleton=true AND b.singleton=true AND h.singleton=true`);
  if(!row||!/^(0|[1-9]\d*)$/.test(String(row['revision']))||!/^[1-9]\d*$/.test(String(row['generation'])))throw new Error('Original runtime report authority identity missing');
- return {generation:String(row['generation']),revision:String(row['revision'])};
+ return {generation:String(row['generation']),revision:String(row['revision']),bootstrapCompleted:row['bootstrap_completed']===true};
 }
 async function stageReportPage(db:Database,id:string,owner:string,page:CompleteReportTransferPage) {
  await db.transaction(async tx=>{
@@ -50,7 +53,7 @@ async function publishReport(db:Database,id:string,owner:string,manifest:Complet
  });
 }
 export function completeRuntimeReportCache(db:Database):CompleteRuntimeReportCache {
- const get=async(id:string)=>db.transaction(async tx=>{await admitRuntimeReport(tx);const [row]=await tx.execute(sql`SELECT * FROM observability.runtime_reports WHERE id=${id}`);if(!row)return undefined;await assertRuntimeReportProjects(tx,id,(row['request'] as CompleteReportRequest).projectId);const report=stored(row);await assertPublishedRuntimeReport(tx,id,report.report,row['manifest'] as CompleteReportManifest|null);return report;});
+ const get=async(id:string)=>db.transaction(async tx=>{await admitRuntimeReport(tx);const [row]=await tx.execute(sql`SELECT * FROM observability.runtime_reports WHERE id=${id}`);if(!row||!await retainRuntimeReport(tx,id,'legacy'))return undefined;await assertRuntimeReportProjects(tx,id,(row['request'] as CompleteReportRequest).projectId);const report=stored(row);await assertPublishedRuntimeReport(tx,id,report.report,row['manifest'] as CompleteReportManifest|null);return report;});
  const terminal=async(id:string,owner:string,state:'not-ready'|'failed',report:unknown)=>{const value=RuntimeCompleteReportSchema.parse(report);await db.transaction(async tx=>{await owned(tx,id,owner);await tx.execute(sql`DELETE FROM observability.runtime_report_pages WHERE report_id=${id}`);await tx.execute(sql`DELETE FROM observability.runtime_report_rows WHERE report_id=${id}`);await tx.execute(sql`DELETE FROM observability.runtime_report_counts WHERE report_id=${id}`);await tx.execute(sql`DELETE FROM observability.runtime_report_receipts WHERE report_id=${id}`);await tx.execute(sql`UPDATE observability.runtime_reports SET state=${state},report=${json(value)}::jsonb WHERE id=${id}`);});};
  return {identity:()=>originalRuntimeReportIdentity(db),get,
   async hasVisibleTaskCosts(id){const [row]=await db.execute(sql`SELECT EXISTS(SELECT 1 FROM observability.runtime_report_rows WHERE report_id=${id} AND section='tasks' AND parent='' AND ((document->'metrics'->>'state'='ready' AND COALESCE(document->'metrics'->'cost'->>'state','')<>'hidden') OR document->'metrics'->'recordedCost'->>'amount' IS NOT NULL)) AS visible`);return row?.['visible']===true;},
@@ -65,11 +68,11 @@ export function completeRuntimeReportCache(db:Database):CompleteRuntimeReportCac
    return stored(row);
   });},
   async renew(id,owner){const rows=await db.execute(sql`UPDATE observability.runtime_reports SET lease_until=clock_timestamp()+interval '45 seconds' WHERE id=${id} AND owner=${owner} AND state='building' RETURNING id`);return rows.length===1;},
-  async ensure(request,requestKey,owner,id){return db.transaction(async tx=>{await admitRuntimeReport(tx);await assertRuntimeReportProjects(tx,id,request.projectId);await tx.execute(sql`INSERT INTO observability.runtime_reports(id,request_key,owner,request,state,report) VALUES(${id},${requestKey},${owner},${json(request)}::jsonb,'building',${json({state:'building',reportId:id,phase:'queued'})}::jsonb) ON CONFLICT(request_key) DO NOTHING`);const [row]=await tx.execute(sql`SELECT * FROM observability.runtime_reports WHERE request_key=${requestKey}`);if(!row)throw new Error('Original report request missing');await assertRuntimeReportProjects(tx,String(row['id']),request.projectId);return stored(row);});},
+  async ensure(request,requestKey,owner,id){return db.transaction(async tx=>{await admitRuntimeReport(tx);await assertRuntimeReportProjects(tx,id,request.projectId);await tx.execute(sql`INSERT INTO observability.runtime_reports(id,request_key,owner,request,state,report) VALUES(${id},${requestKey},${owner},${json(request)}::jsonb,'building',${json({state:'building',reportId:id,phase:'queued'})}::jsonb) ON CONFLICT(request_key) DO NOTHING`);const [row]=await tx.execute(sql`SELECT * FROM observability.runtime_reports WHERE request_key=${requestKey}`);if(!row)throw new Error('Original report request missing');await retainRuntimeReport(tx,String(row['id']),'legacy');await assertRuntimeReportProjects(tx,String(row['id']),request.projectId);return stored(row);});},
   async phase(id,owner,phase){await db.execute(sql`UPDATE observability.runtime_reports SET report=${json({reportId:id,state:'building',phase})}::jsonb WHERE id=${id} AND owner=${owner} AND state='building'`);},
   stage:(id,owner,page)=>stageReportPage(db,id,owner,page),publish:(id,owner,manifest)=>publishReport(db,id,owner,manifest),
   unavailable:(id,owner,gaps)=>terminal(id,owner,'not-ready',{reportId:id,state:'not-ready',gaps}),
   fail:(id,owner,error)=>terminal(id,owner,'failed',{reportId:id,state:'failed',error,retryable:true}),
-  page:(report,query,after)=>db.transaction(async tx=>{await admitRuntimeReport(tx);await assertRuntimeReportProjects(tx,report.id,report.request.projectId);return completeRuntimeReportPage(tx,report,query,after);}),
+  page:(report,query,after)=>db.transaction(async tx=>{await admitRuntimeReport(tx);await assertRuntimeReportProjects(tx,report.id,report.request.projectId);if(!await retainRuntimeReport(tx,report.id,'legacy'))throw new Error('Original report expired');return completeRuntimeReportPage(tx,report,query,after);}),
  };
 }

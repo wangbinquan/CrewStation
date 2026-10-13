@@ -70,10 +70,11 @@ export function subtractTokenBaseline(current: TokenUsage, baseline: TokenUsage)
 
 
 class NativeCoverageConflict extends Error {}
+type CoverageRecord = Omit<UsageRecord, 'identity'> & {identity: unknown};
 type LegacyUsageScope = Extract<NonNullable<UsageRecord['scope']>, { ancestors: unknown }>;
-type ScopedUsage<T extends UsageRecord = UsageRecord> = T & { scope: LegacyUsageScope };
-export interface SelectedRuntimeUsage<T extends UsageRecord = UsageRecord> { record: T; contribution: TokenUsage; whole: boolean }
-function coverageRelation(a: ScopedUsage, b: ScopedUsage, bucket: TokenBucket) {
+type ScopedUsage<T extends CoverageRecord = UsageRecord> = T & { scope: LegacyUsageScope };
+export interface SelectedRuntimeUsage<T extends CoverageRecord = UsageRecord> { record: T; contribution: TokenUsage; whole: boolean }
+function coverageRelation(a: ScopedUsage<CoverageRecord>, b: ScopedUsage<CoverageRecord>, bucket: TokenBucket) {
   const x = a.scope, y = b.scope;
   const inside = x.session === y.session || x.level === 'tree-total' && y.ancestors.includes(x.session);
   const contains = y.level === 'tree-total' && x.ancestors.includes(y.session);
@@ -85,7 +86,7 @@ function coverageRelation(a: ScopedUsage, b: ScopedUsage, bucket: TokenBucket) {
   const modelCovered = a.modelRef === null || a.modelRef === b.modelRef;
   return inside && modelCovered && x.turnIndex <= y.turnIndex && aEnd >= bEnd ? 'covered' : 'partial';
 }
-function selectCoverageGroup<T extends UsageRecord>(records: ScopedUsage<T>[]) {
+function selectCoverageGroup<T extends CoverageRecord>(records: ScopedUsage<T>[]) {
   const rank = { 'tree-total': 0, 'self-total': 1, request: 2 };
   const ordered = [...records].sort((a, b) => rank[a.scope.level] - rank[b.scope.level] || a.scope.ancestors.length - b.scope.ancestors.length || a.scope.turnIndex - b.scope.turnIndex || a.recordId.localeCompare(b.recordId));
   const allocated = new Map<ScopedUsage<T>, Record<TokenBucket, string | null>>(), ancestry = new Map<string, string>();
@@ -115,7 +116,7 @@ function selectCoverageGroup<T extends UsageRecord>(records: ScopedUsage<T>[]) {
 }
 
 /** Parent and child measurements are allocated once, independently for each token bucket. */
-export function selectRuntimeUsage<T extends UsageRecord>(records: T[]): { selected: SelectedRuntimeUsage<T>[]; incomplete: boolean; conflicts: number } {
+export function selectRuntimeUsage<T extends CoverageRecord>(records: T[]): { selected: SelectedRuntimeUsage<T>[]; incomplete: boolean; conflicts: number } {
   const groups = new Map<string, ScopedUsage<T>[]>(), selected: SelectedRuntimeUsage<T>[] = [];
   let incomplete = false, conflicts = 0;
   for (const record of records) {

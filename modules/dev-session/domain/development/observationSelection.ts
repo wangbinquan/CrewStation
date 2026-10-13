@@ -2,6 +2,7 @@ import type { AgentPermission, DevelopmentStartIntent, LaunchSpec, ProfileRevisi
 import { DevelopmentStartIntentSchema } from '@crewstation/contracts';
 /** Pure accepted facts used by the domain; repositories and platform settings stay in application/ports. */
 interface ObservationSettings {
+  readonly developmentNativeObservationEnabled?: boolean;
   readonly developmentNativeObservationAdmissions?: readonly { projectId: string; profileId: string; profileRevision: number }[];
 }
 interface ObservationStart {
@@ -13,7 +14,8 @@ interface ObservationStart {
   readonly execution: { readonly taskId: TaskId };
 }
 
-export function developmentObservationSelected(settings: ObservationSettings, projectId: ProjectId, profile: ProfileRevisionRef): boolean {
+export function developmentObservationSelected(settings: ObservationSettings, projectId: ProjectId, profile: ProfileRevisionRef, protocol?: LaunchSpec['protocol']): boolean {
+  if (settings.developmentNativeObservationEnabled && protocol === 'opencode') return true;
   return settings.developmentNativeObservationAdmissions?.some((entry) => entry.projectId === projectId
     && entry.profileId === profile.profileId && entry.profileRevision === profile.revision) ?? false;
 }

@@ -21,6 +21,7 @@ function fixture() {
     if (url.pathname === '/v1/admin/cluster/resources' && url.searchParams.get('scope') === 'system') return Response.json({ snapshotId: 'platform-' + state.generation, complete: !state.incomplete, total: state.incomplete ? 0 : 2, ...(url.searchParams.has('cursor') ? {} : { nextCursor: 'next' }), items: state.incomplete ? [] : [{ ...f.row, kind: 'Pod', view: 'pods', uid: 'platform-uid-' + state.generation, ownership: { scope: 'system', component: 'cs-api' } }] });
     if (url.pathname.endsWith('/cluster-history')) return Response.json({ requestedFrom: url.searchParams.get('from'), requestedTo: url.searchParams.get('to'), stepSeconds: 60, source: 'prometheus', state: 'fresh', series: [{ metric: 'cpu', unit: 'cores', points: [{ at: f.capacity.observedAt, average: null, peak: null, coverage: 0, complete: false }] }] });
     if (url.pathname.endsWith('/health')) return Response.json({ items: [{ slot: 'prod', state: 'healthy', readyReplicas: 1, replicas: 1, restarts: 0, lastTransitionAt: '2026-09-20T00:00:00.000Z' }] });
+    if (url.pathname.endsWith('/observability/telemetry')) return Response.json({scope:url.pathname.startsWith('/v1/admin')?'system':'project',projectId:url.pathname.startsWith('/v1/admin')?null:f.projectId,from:url.searchParams.get('from'),to:url.searchParams.get('to'),source:'prometheus',state:'partial',observedAt:f.capacity.observedAt,gaps:['sampling-boundary'],rows:[{key:'original-http',component:'cs-api',route:'/v1/projects/:projectId',physicalService:null,requests:'14',errors4xx:'4',errors5xx:'1',limited:'4',p95UpperMs:250,samples:'14',streamOpened:'3',streamClosed:'2',streamCancelled:'1',activeStreams:1}]});
     if (url.pathname.endsWith('/alerts')) return Response.json({ items: [{ id: 'alert-1', projectId: f.projectId, type: 'health-failing', state: 'resolved', detail: 'Recovered service check', firedAt: '2026-09-20T00:00:00.000Z', resolvedAt: '2026-09-20T00:01:00.000Z' }] });
     return fallback(raw, init);
   }) as typeof fetch;
@@ -35,11 +36,11 @@ test('project resources keep snapshot pagination, original UID, stale values and
   expect(f.reads.some((u) => u.pathname === '/v1/admin/cluster/usage' || u.pathname === '/v1/admin/cluster/history' || u.pathname === '/v1/admin/cluster/capacity')).toBe(false);
   f.state.failed = true; await page.reread(); expect(page.text()).toContain('Resource source unavailable'); expect(page.text()).not.toContain('UID ' + f.pvc.uid); expect(page.text()).toContain('资源采样历史');
 });
-test('system capacity keeps scope and incomplete coverage; oversized history is explained without an invalid query', async () => {
+test('system capacity keeps scope and incomplete coverage for the entire requested history', async () => {
   const f = fixture(), to = new Date().toISOString(), from = new Date(Date.now() - 30 * 86400000).toISOString();
   page = await renderApp('/admin/observability?tab=resources&from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to));
-  expect(page.text()).toContain('集群当前容量'); expect(page.text()).toContain('全部受管资源'); expect(page.text()).toContain('平台资源'); expect(page.text()).toContain('node-b: 403'); expect(page.text()).toContain('最多七天');
-  expect(f.reads.some((u) => u.pathname.endsWith('/history'))).toBe(false);
+  expect(page.text()).toContain('集群当前容量'); expect(page.text()).toContain('全部受管资源'); expect(page.text()).toContain('平台资源'); expect(page.text()).toContain('node-b: 403'); expect(page.text()).not.toContain('最多七天');
+  expect(f.reads.some((u)=>u.pathname.endsWith('/history')&&u.searchParams.get('from')===from&&u.searchParams.get('to')===to)).toBe(true);
   await page.click('近 24 小时'); expect(f.reads.some((u) => u.pathname.endsWith('/history') && u.searchParams.get('scope') === 'cluster')).toBe(true); expect(page.text()).not.toContain('最多七天');
 });
 test('service health keeps change time distinct from missing sample time and displays recovery', async () => {

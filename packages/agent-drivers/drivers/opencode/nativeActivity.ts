@@ -10,9 +10,6 @@ interface Turn {
   assistant?: Extract<OpencodeActivityInput, { type: 'assistant' }>;
 }
 
-const MAX_TURNS = 128;
-const MAX_SESSIONS = 128;
-const MAX_REQUESTS = 64;
 
 /** 固定版本的官方插件事件。工具消息完成只是候选，必须等该会话 idle 后确认整轮。 */
 export class OpencodeNativeActivity {
@@ -27,7 +24,8 @@ export class OpencodeNativeActivity {
     if (this.seen.has(input.eventId)) return;
     this.seen.add(input.eventId);
     if (this.seen.size > 2048) this.seen.delete(this.seen.values().next().value!);
-    if (input.type === 'session') { this.registerSession(input); return; }
+    if (input.type === 'session') { this.emit({source:'opencode/1.18.29',sourceEventId:input.eventId+':session',kind:'session-observed',occurredAt:input.at,nativeSessionId:input.sessionId,parentSessionId:input.parentId,turnId:null});this.registerSession(input); return; }
+    if(input.type==='tool'){this.emit({source:'opencode/1.18.29',sourceEventId:input.eventId+':tool',kind:input.state==='running'?'tool-started':'tool-completed',occurredAt:input.at,nativeSessionId:input.sessionId,turnId:null,tool:{id:input.callId,name:input.name,messageId:input.messageId,state:input.state}});return;}
     const session = this.sessions.get(input.sessionId);
     // 未确认父子关系的会话不能冒充用户的主会话。
     if (!session?.root || !this.healthy) return;
@@ -53,7 +51,7 @@ export class OpencodeNativeActivity {
   }
 
   private registerSession(input: Extract<OpencodeActivityInput, { type: 'session' }>): void {
-    if (!this.sessions.has(input.sessionId) && this.sessions.size >= MAX_SESSIONS) { this.gap(input.at, input.eventId, 'capacity'); return; }
+    if(input.parentId!==null)return;
     this.sessions.set(input.sessionId, { idle: false, ...this.sessions.get(input.sessionId), root: input.parentId === null });
   }
 
@@ -62,12 +60,6 @@ export class OpencodeNativeActivity {
     if (this.turns.has(id)) return;
     const session = this.sessions.get(input.sessionId)!;
     if (session.lastPromptAt && (input.at < session.lastPromptAt || (input.at === session.lastPromptAt && input.messageId <= session.lastPromptId!))) return;
-    if (this.turns.size >= MAX_TURNS) {
-      const old = [...this.turns.values()].find((turn) => turn.settled || turn.uncertain);
-      if (!old) { this.gap(input.at, input.eventId, 'capacity'); return; }
-      this.turns.delete(old.id);
-      for (const [messageId, turnId] of this.messages) if (turnId === old.id) this.messages.delete(messageId);
-    }
     const turn: Turn = { id, sessionId: input.sessionId, messageId: input.messageId, settled: false, uncertain: false, requests: new Map() };
     this.turns.set(id, turn);
     session.currentTurn = id;
@@ -83,7 +75,6 @@ export class OpencodeNativeActivity {
     if (previous && (input.createdAt < previous.createdAt || (input.createdAt === previous.createdAt && input.messageId < previous.messageId))) return;
     if (previous?.messageId === input.messageId && previous.completed && !input.completed) return;
     this.messages.set(input.messageId, turn.id);
-    if (this.messages.size > 4096) { this.gap(input.at, input.eventId, 'capacity'); return; }
     turn.assistant = input;
     if (this.sessions.get(turn.sessionId)?.idle) this.finish(turn, input);
   }
@@ -92,7 +83,6 @@ export class OpencodeNativeActivity {
     const turn = input.messageId ? this.turns.get(this.messages.get(input.messageId) ?? '') : undefined;
     if (!turn || turn.sessionId !== input.sessionId || turn.settled) { this.gap(input.at, input.eventId, 'unmatched-event'); return; }
     if (turn.requests.has(input.requestId)) return;
-    if (turn.requests.size >= MAX_REQUESTS) { this.gap(input.at, input.eventId, 'capacity'); return; }
     turn.requests.set(input.requestId, input.requestKind);
     this.publish(turn, input, 'request-opened', { id: input.requestId, kind: input.requestKind });
   }

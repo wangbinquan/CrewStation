@@ -32,6 +32,38 @@ data:
         sample_limit: 100000
         label_limit: 16
         body_size_limit: 32MB
+      - job_name: crewstation-runtime
+        metrics_path: /internal/runtime/metrics
+        authorization:
+          credentials_file: /etc/metrics-secret/CS_CLUSTER_METRICS_TOKEN
+        dns_sd_configs:
+          - names: ['cs-api-runtime-metrics.crewstation-system.svc.cluster.local']
+            type: A
+            port: 8080
+          - names: ['cs-auth-runtime-metrics.crewstation-system.svc.cluster.local']
+            type: A
+            port: 8081
+          - names: ['cs-controller-runtime-metrics.crewstation-system.svc.cluster.local']
+            type: A
+            port: 8082
+          - names: ['cs-session-runtime-metrics.crewstation-system.svc.cluster.local']
+            type: A
+            port: 8083
+          - names: ['cs-events-runtime-metrics.crewstation-system.svc.cluster.local']
+            type: A
+            port: 8084
+          - names: ['mcp-capabilities-runtime-metrics.crewstation-system.svc.cluster.local']
+            type: A
+            port: 8085
+          - names: ['mcp-operations-runtime-metrics.crewstation-system.svc.cluster.local']
+            type: A
+            port: 8086
+      - job_name: crewstation-gateway
+        metrics_path: /metrics
+        dns_sd_configs:
+          - names: ['traefik-runtime-metrics.crewstation-system.svc.cluster.local']
+            type: A
+            port: 9000
       - job_name: prometheus
         basic_auth:
           username: crewstation
@@ -209,3 +241,117 @@ spec:
         - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: kube-system } }
           podSelector: { matchLabels: { k8s-app: kube-dns } }
       ports: [{ protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }]
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cs-api-runtime-metrics
+  namespace: crewstation-system
+spec:
+  clusterIP: None
+  selector: { app.kubernetes.io/name: cs-api }
+  ports: [{ name: http, port: 8080, targetPort: 8080 }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cs-auth-runtime-metrics
+  namespace: crewstation-system
+spec:
+  clusterIP: None
+  selector: { app.kubernetes.io/name: cs-auth }
+  ports: [{ name: http, port: 8081, targetPort: 8081 }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cs-controller-runtime-metrics
+  namespace: crewstation-system
+spec:
+  clusterIP: None
+  selector: { app.kubernetes.io/name: cs-controller }
+  ports: [{ name: http, port: 8082, targetPort: 8082 }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cs-session-runtime-metrics
+  namespace: crewstation-system
+spec:
+  clusterIP: None
+  selector: { app.kubernetes.io/name: cs-session }
+  ports: [{ name: http, port: 8083, targetPort: 8083 }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cs-events-runtime-metrics
+  namespace: crewstation-system
+spec:
+  clusterIP: None
+  selector: { app.kubernetes.io/name: cs-events }
+  ports: [{ name: http, port: 8084, targetPort: 8084 }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-capabilities-runtime-metrics
+  namespace: crewstation-system
+spec:
+  clusterIP: None
+  selector: { app.kubernetes.io/name: mcp-capabilities }
+  ports: [{ name: http, port: 8085, targetPort: 8085 }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-operations-runtime-metrics
+  namespace: crewstation-system
+spec:
+  clusterIP: None
+  selector: { app.kubernetes.io/name: mcp-operations }
+  ports: [{ name: http, port: 8086, targetPort: 8086 }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik-runtime-metrics
+  namespace: crewstation-system
+spec:
+  clusterIP: None
+  selector: { app.kubernetes.io/name: traefik }
+  ports: [{ name: http, port: 9000, targetPort: 9000 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: crewstation-runtime-metrics
+  namespace: crewstation-system
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: [cs-api, cs-auth, cs-controller, cs-session, cs-events, mcp-capabilities, mcp-operations, traefik]
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{ podSelector: { matchLabels: { app.kubernetes.io/name: prometheus } } }]
+      ports: [{ protocol: TCP, port: 8080 }, { protocol: TCP, port: 8081 }, { protocol: TCP, port: 8082 }, { protocol: TCP, port: 8083 }, { protocol: TCP, port: 8084 }, { protocol: TCP, port: 8085 }, { protocol: TCP, port: 8086 }, { protocol: TCP, port: 9000 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: crewstation-runtime-metrics-egress
+  namespace: crewstation-system
+spec:
+  podSelector: { matchLabels: { app.kubernetes.io/name: prometheus } }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values: [cs-api, cs-auth, cs-controller, cs-session, cs-events, mcp-capabilities, mcp-operations, traefik]
+      ports: [{ protocol: TCP, port: 8080 }, { protocol: TCP, port: 8081 }, { protocol: TCP, port: 8082 }, { protocol: TCP, port: 8083 }, { protocol: TCP, port: 8084 }, { protocol: TCP, port: 8085 }, { protocol: TCP, port: 8086 }, { protocol: TCP, port: 9000 }]

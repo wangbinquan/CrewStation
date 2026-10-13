@@ -1,4 +1,4 @@
-.page { min-width: 0; padding: var(--cs-space-4); }
+.page { min-width: 0; padding: var(--cs-space-4); font-size: var(--cs-font-size); line-height: var(--cs-line-height); }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: var(--cs-space-4); min-width: 0; }
 .value { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .hint { color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); overflow-wrap: anywhere; }
@@ -6,20 +6,20 @@
 .identity { display: block; max-width: 26rem; overflow-wrap: anywhere; font-size: var(--cs-font-size-sm); color: var(--cs-color-text-muted); }
 .table { min-width: 680px; }
 .chart { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(max-content, 1fr); align-items: end; gap: var(--cs-space-2); }
-.chartColumn { min-width: 32px; display: flex; flex-direction: column; gap: var(--cs-space-1); padding: var(--cs-space-1); border: 0; border-radius: var(--cs-radius-sm); color: var(--cs-color-text); background: transparent; cursor: pointer; }
+.chartColumn { min-width: 32px; display: flex; flex-direction: column; gap: var(--cs-space-1); padding: var(--cs-space-1); border: 0; border-radius: var(--cs-radius-sm); color: var(--cs-color-text); background: transparent; cursor: pointer; font-size: var(--cs-font-size-sm); line-height: var(--cs-line-height); }
 .chartColumn:focus-visible { outline: 2px solid var(--cs-color-text); outline-offset: -2px; }
 .chartValue { font-size: var(--cs-font-size-sm); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .chartTrack { height: 140px; width: 100%; display: flex; align-items: end; border-bottom: 1px solid var(--cs-color-border); }
 .chartBar { display: flex; flex-direction: column-reverse; overflow: hidden; width: 100%; border-radius: var(--cs-radius-sm) var(--cs-radius-sm) 0 0; }
 .chartBar[data-positive="true"] { min-height: 2px; }
 .chartBar[data-partial="true"] .chartSegment { background-image: repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, var(--cs-color-surface) 40%, transparent) 4px 8px); }
-.range { display: flex; justify-content: space-between; gap: var(--cs-space-3); }
+.range { display: flex; justify-content: space-between; gap: var(--cs-space-3); color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }
 .scroll { min-width: 0; overflow-x: auto; }
 .timeline { min-width: 680px; }
 .lane { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: var(--cs-space-3); align-items: center; min-height: 52px; border-bottom: 1px solid var(--cs-color-border); }
 .laneLabel { min-width: 0; overflow-wrap: anywhere; }
 .track { position: relative; height: 38px; border-left: 1px solid var(--cs-color-border); background: repeating-linear-gradient(to right, transparent 0%, transparent calc(25% - 1px), var(--cs-color-border) 25%); }
-.bar { position: absolute; top: 5px; height: 28px; min-width: 4px; border: 1px solid var(--cs-tone-info-fg); background: var(--cs-tone-info-bg); color: var(--cs-tone-info-fg); border-radius: var(--cs-radius-sm); overflow: hidden; white-space: nowrap; cursor: pointer; padding: 0 var(--cs-space-1); }
+.bar { position: absolute; top: 5px; height: 28px; min-width: 4px; border: 1px solid var(--cs-tone-info-fg); background: var(--cs-tone-info-bg); color: var(--cs-tone-info-fg); border-radius: var(--cs-radius-sm); overflow: hidden; white-space: nowrap; cursor: pointer; padding: 0 var(--cs-space-1); font-size: var(--cs-font-size-sm); line-height: var(--cs-line-height); }
 .failed { background: var(--cs-tone-danger-bg); color: var(--cs-tone-danger-fg); border-color: var(--cs-tone-danger-fg); }
 .open { border-style: dashed; }
 .bar:focus-visible { outline: 2px solid var(--cs-color-text); outline-offset: 2px; }
@@ -43,3 +43,16 @@ td > .tokenMetric { min-width: 12rem; }
 .chartSegment[data-token-color="cacheWrite"], .tokenLegend [data-token-color="cacheWrite"] { background-color: var(--cs-tone-warning-fg); }
 .chartSegment[data-token-color="output"], .tokenLegend [data-token-color="output"] { background-color: var(--cs-tone-danger-fg); }
 .trendDetail { min-width: 0; }
+
+.phaseTrack { position: relative; min-height: 76px; border-left: 1px solid var(--cs-color-border); background: repeating-linear-gradient(to right, transparent 0%, transparent calc(25% - 1px), var(--cs-color-border) 25%); }
+.phaseBar[data-phase="residence"], .phaseBar[data-phase="retention"] { top: 42px; background: var(--cs-color-surface); color: var(--cs-color-text-muted); border-color: var(--cs-color-border); }
+.phaseBar[data-phase="waiting"], .phaseBar[data-phase="queue"] { background: var(--cs-tone-warning-bg); color: var(--cs-tone-warning-fg); border-color: var(--cs-tone-warning-fg); }
+.phaseBar[data-phase="cleanup"] { background: var(--cs-tone-danger-bg); color: var(--cs-tone-danger-fg); border-color: var(--cs-tone-danger-fg); }
+
+/* The resource history reuses TimeSeries. Override only its public semantic
+   text slots within observation pages, keeping other callers unchanged. */
+.page .resourceCharts figcaption { font-size: var(--cs-font-size); }
+.page .resourceCharts figcaption span, .page .resourceCharts time, .page .resourceCharts label, .page .resourceCharts output { font-size: var(--cs-font-size-sm); line-height: var(--cs-line-height); }
+
+.metricNotes { display: inline-block; margin-left: var(--cs-space-2); max-width: 100%; vertical-align: baseline; }
+.metricNotes[open] { display: block; margin: var(--cs-space-1) 0; }

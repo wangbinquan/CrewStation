@@ -22,6 +22,7 @@ export const TraceIdSchema = z.string().regex(/^[0-9a-f]{32}$/, 'traceId 必须�
 /** 对外可见的短名：项目 slug、服务名、代理名、事件类型片段都用它。 */
 export const SlugSchema = z.string().regex(/^[a-z][a-z0-9-]{1,38}[a-z0-9]$/, 'slug 只允许小写字母、数字与连字符，3–40 位');
 
+export type ResourceId = z.infer<typeof ResourceIdSchema>;
 export type ProjectId = z.infer<typeof ProjectIdSchema>;
 export type ServiceId = z.infer<typeof ServiceIdSchema>;
 export type UserId = z.infer<typeof UserIdSchema>;

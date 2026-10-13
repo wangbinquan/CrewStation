@@ -64,7 +64,7 @@ export function withoutProjectObservation(input: MetricsObservation, scope: Clus
   const counters = Object.fromEntries(Object.entries(input.counters).filter(([key]) => !key.split('/').some(removedUid)));
   const nodes = input.nodes.map((node) => ({ ...node, managedPodIds: node.managedPodIds.filter((id) => !removedId(id)), ...(node.managedPods ? { managedPods: node.managedPods.filter((pod) => !removedId(pod.resourceId)) } : {}) }));
   return { ...input, nodes, usages: cleanUsages, identities, counters, storageTargets: input.storageTargets.filter((target) => !removedUid(target.uid)),
-    capacity: { ...input.capacity, projects, managed: usageSummary(cleanUsages, Date.parse(input.at), Date.parse(input.capacity.observedAt)) } };
+    capacity: { ...input.capacity, projects, ...(input.capacity.projectNames ? {projectNames:Object.fromEntries(Object.entries(input.capacity.projectNames).filter(([id])=>!projectKey(scope,id)))} : {}), managed: usageSummary(cleanUsages, Date.parse(input.at), Date.parse(input.capacity.observedAt)) } };
 }
 export function withoutProjectHistory(input: ClusterHistoryResource, scope: ClusterProjectScope): ClusterHistoryResource | null {
   const own = projectKey(scope, input.projectId) || input.scope === 'unresolved' && knownPair(scope, input.resourceId, input.uid);

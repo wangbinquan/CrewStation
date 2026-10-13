@@ -3,27 +3,28 @@ import { jsonHash } from '@crewstation/kernel';
 import { developmentNativeRootChanged, developmentNativeRootUsable, type DevelopmentNativeState } from './developmentNative';
 import { subtractTokenBaseline, TOKEN_BUCKETS, type TokenUsage } from './tokenUsage';
 
-export type UsageEvidence = Omit<UsageRecord, 'projection'>;
+export type UsageEvidence<Identity = UsageExecutionIdentity> = Omit<UsageRecord, 'projection' | 'identity'> & { identity: Identity };
+export type ProjectedUsageRecord<Identity = UsageExecutionIdentity> = Omit<UsageRecord, 'identity'> & { identity: Identity };
 type Projection = UsageRecord['projection'];
 type Issue = Projection['issues'][number];
-interface Fold {
-  reported: UsageEvidence;
-  usable: UsageEvidence;
+interface Fold<Identity = UsageExecutionIdentity> {
+  reported: UsageEvidence<Identity>;
+  usable: UsageEvidence<Identity>;
   projection: Omit<Projection, 'projectionRevision'>;
 }
 const unknown: TokenUsage = { input: null, cacheRead: null, cacheWrite: null, output: null };
 const emptyWatermarks = { input: null, cacheRead: null, cacheWrite: null, output: null };
 
-function identity(value: UsageEvidence) {
+function identity<I>(value: UsageEvidence<I>) {
   return jsonHash({ identity: value.identity, sourceId: value.sourceId, recordId: value.recordId,
     reporting: value.reporting, inclusion: value.inclusion, scope: value.scope, basis: value.basis });
 }
-function modelRevision(next: UsageEvidence, before?: Fold): number | undefined {
+function modelRevision<I>(next: UsageEvidence<I>, before?: Fold<I>): number | undefined {
   if (next.modelRef === null) return before?.projection.modelRevision;
   return before?.usable.modelRef === next.modelRef
     ? before.projection.modelRevision ?? before.usable.revision : next.revision;
 }
-function diagnostic(next: UsageEvidence, before: Fold | undefined, issue: Issue): Fold {
+function diagnostic<I>(next: UsageEvidence<I>, before: Fold<I> | undefined, issue: Issue): Fold<I> {
   // A rejected numeric decrease may still prove the previously unknown model.
   const refine = issue === 'unexplained-decrease' && before?.usable.modelRef === null && next.modelRef !== null;
   const reported = before?.reported ?? next, usable = before?.usable ?? { ...next, usage: unknown };
@@ -36,20 +37,20 @@ function diagnostic(next: UsageEvidence, before: Fold | undefined, issue: Issue)
     complete: false, issues: [...new Set([...(before?.projection.issues ?? []), issue])],
   } };
 }
-function knownUsage(next: UsageEvidence, before?: Fold): TokenUsage {
+function knownUsage<I>(next: UsageEvidence<I>, before?: Fold<I>): TokenUsage {
   return { input: next.usage.input ?? before?.usable.usage.input ?? null,
     cacheRead: next.usage.cacheRead ?? before?.usable.usage.cacheRead ?? null,
     cacheWrite: next.usage.cacheWrite ?? before?.usable.usage.cacheWrite ?? null,
     output: next.usage.output ?? before?.usable.usage.output ?? null };
 }
-function watermarks(next: UsageEvidence, contribution: TokenUsage, before?: Fold): Projection['coveredThrough'] {
+function watermarks<I>(next: UsageEvidence<I>, contribution: TokenUsage, before?: Fold<I>): Projection['coveredThrough'] {
   if (!next.scope) return null;
   const through = (bucket: typeof TOKEN_BUCKETS[number]) => contribution[bucket] === null ? null
     : next.usage[bucket] === null ? before?.projection.coveredThrough?.[bucket] ?? null
       : next.coveredThroughTurn ?? next.scope!.turnIndex;
   return { input: through('input'), cacheRead: through('cacheRead'), cacheWrite: through('cacheWrite'), output: through('output') };
 }
-function fold(next: UsageEvidence, before?: Fold): Fold {
+function fold<I>(next: UsageEvidence<I>, before?: Fold<I>): Fold<I> {
   if (before && (identity(next) !== identity(before.usable) ||
       (before.usable.modelRef !== null && next.modelRef !== before.usable.modelRef))) return diagnostic(next, before, 'identity-conflict');
   if (next.validity === 'invalid-final') return diagnostic(next, before, 'invalid-final');
@@ -77,15 +78,15 @@ function fold(next: UsageEvidence, before?: Fold): Fold {
 
 /** Rebuild one meter from retained native evidence, in native revision order.
  * A late older sample may change the projection without changing observedRevision. */
-export function rebuildUsageProjection(evidence: readonly UsageEvidence[], previous?: UsageRecord): UsageRecord {
+export function rebuildUsageProjection<I = UsageExecutionIdentity>(evidence: readonly UsageEvidence<I>[], previous?: ProjectedUsageRecord<I>): ProjectedUsageRecord<I> {
   if (evidence.length === 0) throw new RangeError('Cannot rebuild usage without retained evidence');
-  const byRevision = new Map<number, UsageEvidence>();
+  const byRevision = new Map<number, UsageEvidence<I>>();
   for (const sample of evidence) {
     const prior = byRevision.get(sample.revision);
     if (prior && jsonHash(prior) !== jsonHash(sample)) throw new RangeError('Conflicting native usage revision');
     byRevision.set(sample.revision, sample);
   }
-  let state: Fold | undefined;
+  let state: Fold<I> | undefined;
   for (const sample of [...byRevision.values()].sort((a, b) => a.revision - b.revision)) state = fold(sample, state);
   const result = state!;
   const projectionRevision = previous?.projection.projectionRevision ?? 0;

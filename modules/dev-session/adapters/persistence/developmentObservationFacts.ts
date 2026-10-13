@@ -1,3 +1,4 @@
+import {legacyDevelopmentObservationRows,legacyDevelopmentObservationFact,type OriginalDevelopmentParentReader} from './observability/legacyDevelopmentObservationFacts';
 import { sql } from 'drizzle-orm';
 import { DevelopmentAgentIdentitySchema, RuntimeTaskFactSchema, RuntimeTaskHeaderFactSchema, type RuntimeFactQuery, type RuntimeFactPage, type RuntimeOwnerPageQuery, type RuntimeOwnerPage, type RuntimeTaskHeaderFact, type RuntimeAttemptFact } from '@crewstation/contracts';
 import { conflict, jsonHash, validation } from '@crewstation/kernel';
@@ -8,11 +9,11 @@ import { agentStarts as starts } from './agentStartTable';
 /** Only safe columns leave the owner. Never select a prompt, request or full prepared document. */
 export async function readDevelopmentObservationFacts(db: Executor, query: RuntimeFactQuery): Promise<RuntimeFactPage> {
   if (query.sourceKind === 'business-task') return { items: [], partial: false };
-  const rows = await developmentRows(db, query, 200);
+  const rows = await selectedDevelopmentRows(db, query, 200);
   return { items: rows.slice(0, 200).map(developmentFact), partial: rows.length > 200 };
 }
 
-async function developmentRows(db: Executor, query: RuntimeFactQuery, pageSize: number, after?: { at: string; id: string }) {
+async function selectedDevelopmentRows(db: Executor, query: RuntimeFactQuery, pageSize: number, after?: { at: string; id: string }) {
   return db.execute(sql`SELECT o.execution_task_id, o.project_id, o.workspace_task_id, o.accepted_at,
     to_char(o.accepted_at::timestamptz AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS position_at,
     o.prepared->'intent'->'identity' AS identity, o.prepared->'price'->'identity' AS price_identity,
@@ -24,14 +25,14 @@ async function developmentRows(db: Executor, query: RuntimeFactQuery, pageSize: 
     s.agent_id, s.task_id, s.execution_task_id AS start_execution_id, s.execution->>'taskId' AS execution_id,
     s.compute, s.compute_name, s.profile, s.state, s.cancelled, s.failure IS NOT NULL AS failed, s.logical_ending
     FROM ${owners} o LEFT JOIN ${starts} s ON s.execution_task_id=o.execution_task_id
-    WHERE ${query.projectId ? sql`o.project_id=${query.projectId}` : sql`true`}
+    WHERE o.prepared->'intent'->'identity'->>'sourceKind'='development-agent' AND ${query.projectId ? sql`o.project_id=${query.projectId}` : sql`true`}
       AND ${query.taskId ? sql`o.execution_task_id=${query.taskId}` : sql`o.accepted_at::timestamptz >= ${query.from}::timestamptz AND o.accepted_at::timestamptz < ${query.to}::timestamptz`}
       AND (${after ? sql`o.accepted_at::timestamptz < ${after.at}::timestamptz OR (o.accepted_at::timestamptz=${after.at}::timestamptz AND o.execution_task_id>${after.id})` : sql`true`})
     ORDER BY o.accepted_at::timestamptz DESC, o.execution_task_id LIMIT ${pageSize + 1}`);
 }
 
 /** Complete original admission headers; page size does not restrict the cohort. */
-export async function readDevelopmentObservationTaskPage(db: Executor, query: RuntimeOwnerPageQuery): Promise<RuntimeOwnerPage<RuntimeTaskHeaderFact>> {
+export async function readDevelopmentObservationTaskPage(db: Executor, query: RuntimeOwnerPageQuery,parents?:OriginalDevelopmentParentReader): Promise<RuntimeOwnerPage<RuntimeTaskHeaderFact>> {
   if (!Number.isInteger(query.pageSize) || query.pageSize < 1 || query.pageSize > 500) throw validation('开发运行事实每页大小无效');
   const { pageSize: _size, after, ...filters } = query, scope = jsonHash(filters);
   let position: { at: string; id: string } | undefined;
@@ -41,21 +42,22 @@ export async function readDevelopmentObservationTaskPage(db: Executor, query: Ru
     position = { at: value[2], id: value[3] };
   }
   if (query.sourceKind === 'business-task') return { items: [], nextCursor: null };
-  const rows = await developmentRows(db, query, query.pageSize, position), selected = rows.slice(0, query.pageSize), last = selected.at(-1);
+  const rows = await completeDevelopmentRows(db, query, query.pageSize, position,parents), selected = rows.slice(0, query.pageSize), last = selected.at(-1);
   return { items: selected.map((row) => { const { attempts: _attempts, attemptsPartial: _partial, ...header } = developmentFact(row); return RuntimeTaskHeaderFactSchema.parse(header); }),
     nextCursor: rows.length > query.pageSize && last ? JSON.stringify([1, scope, last['position_at'], last['execution_task_id']]) : null };
 }
 /** The immutable original admission is one development execution and one original AgentStart. */
-export async function readDevelopmentObservationAttemptPage(db: Executor, query: RuntimeOwnerPageQuery & { readonly taskId: string }): Promise<RuntimeOwnerPage<RuntimeAttemptFact>> {
+export async function readDevelopmentObservationAttemptPage(db: Executor, query: RuntimeOwnerPageQuery & { readonly taskId: string },parents?:OriginalDevelopmentParentReader): Promise<RuntimeOwnerPage<RuntimeAttemptFact>> {
   if (!Number.isInteger(query.pageSize) || query.pageSize < 1 || query.pageSize > 500) throw validation('开发运行事实每页大小无效');
   if (query.after !== undefined) throw validation('单开发执行的原 AgentStart 已结束，没有后续游标');
   if (query.sourceKind === 'business-task') return { items: [], nextCursor: null };
-  const rows = await developmentRows(db, query, 1);
+  const rows = await completeDevelopmentRows(db, query, 1,undefined,parents);
   if (rows.length > 1) throw conflict('开发执行的原受理身份不唯一');
   return { items: rows.length ? developmentFact(rows[0]!).attempts : [], nextCursor: null };
 }
 
 function developmentFact(row: Record<string, unknown>) {
+  if(row['legacy_observation']===true)return legacyDevelopmentObservationFact(row);
   const identity = DevelopmentAgentIdentitySchema.parse(row['identity']);
   const profile = row['profile'] as { profileId?: string; revision?: number } | null;
   const price = row['price_profile'] as { id?: string; revision?: number; protocol?: string } | null;
@@ -75,3 +77,5 @@ function developmentFact(row: Record<string, unknown>) {
       executionId: identity.executionId, agentId: identity.agentId, profileId: row['profile_id'], profileName: row['compute_name'] ?? null, profileRevision: revision,
       createdAt: acceptedAt, startedAt: null, endedAt: null }] });
 }
+
+async function completeDevelopmentRows(db:Executor,query:RuntimeFactQuery,size:number,after:{at:string;id:string}|undefined,parents:OriginalDevelopmentParentReader|undefined){const selected=await selectedDevelopmentRows(db,query,size,after),legacy=await legacyDevelopmentObservationRows(db,query,size,parents,after);return [...selected,...legacy].sort((a,b)=>String(b['position_at']).localeCompare(String(a['position_at']))||String(a['execution_task_id']).localeCompare(String(b['execution_task_id']))).slice(0,size+1);}

@@ -9,7 +9,7 @@ afterEach(async()=>{await fixture?.close();fixture=undefined;});
 async function allTasks(f:Awaited<ReturnType<typeof completeFactsFixture>>,projectId:ProjectId|null,report:RuntimeCompleteReport,expected=201) {
  const rows=[];let after:string|undefined;
  do {const page=await f.module.api.runtimeCompleteReportPage(f.actor,projectId,report.reportId,{section:'tasks',pageSize:37,after});expect(page.total).toBe(String(expected));expect(page.snapshotId).toBe(runtimeCompleteReportContent(report)!.header.snapshotId);rows.push(...page.items.map(row=>CompleteRuntimeTaskSummarySchema.parse(row)));after=page.nextCursor??undefined;}while(after!==undefined);
- expect(rows).toHaveLength(expected);expect(new Set(rows.map(row=>row.id))).toEqual(new Set(f.f.tasks.map(row=>row.id)));return rows;
+ expect(rows).toHaveLength(expected);expect(rows.map(row=>row.id)).toEqual([...f.f.tasks].sort((a,b)=>b.createdAt.localeCompare(a.createdAt)||a.id.localeCompare(b.id)).map(row=>row.id));expect(new Set(rows.map(row=>row.id))).toEqual(new Set(f.f.tasks.map(row=>row.id)));return rows;
 }
 function assertUnknown(report:RuntimeCompleteReport,expected=201) {
  const content=runtimeCompleteReportContent(report)!;expect(report.state).toBe('not-ready');expect(content.summary.tasks).toBe(String(expected));
@@ -25,6 +25,7 @@ describe.skipIf(!available)('independent ordinary Task metrics within sealed who
   const lifecycle=await f.settle(projectId,f.sibling!.task.id);expect(lifecycle.state).toBe('ready');expect(runtimeCompleteReportContent(lifecycle)!.summary.metrics).toEqual(complete.metrics);
   const one=await f.module.api.runtimeCompleteReportPage(f.actor,projectId,lifecycle.reportId,{section:'tasks',pageSize:37});expect(one.total).toBe('1');expect(CompleteRuntimeTaskSummarySchema.parse(one.items[0]).metrics).toEqual(complete.metrics);expect(one.nextCursor).toBeNull();
   const agents:unknown[]=[];let after:string|undefined;do{const page=await f.module.api.runtimeCompleteReportPage(f.actor,projectId,report.reportId,{section:'agents',pageSize:37,after});agents.push(...page.items);after=page.nextCursor??undefined;}while(after!==undefined);expect(agents).toHaveLength(1002);expect(agents.find(row=>(row as {agentId:string}).agentId===f.sibling!.attempt.agentId)).toMatchObject({metrics:complete.metrics});
+  for(const [index,attempt]of f.f.attempts.entries()){const agent=agents.find(row=>(row as {agentId:string}).agentId===attempt.agentId);const tokens={input:String(index+1),cacheRead:'3',cacheWrite:'5',output:'7',total:String(index+16)};if(index===1000)expect(agent).toMatchObject({metrics:{state:'not-ready',recordedUsage:{records:'1',tokens}}});else expect(agent).toMatchObject({metrics:{state:'ready',records:'1',tokens,cost:{state:scope==='system'?'complete':'hidden',amount:scope==='system'?f.f.decimal(f.f.pico(index)):null}}});}
   for(const section of ['profiles','projects'] as const){const page=await f.module.api.runtimeCompleteReportPage(f.actor,projectId,report.reportId,{section,pageSize:37});for(const row of page.items){const metrics=(row as {metrics:{state:string}}).metrics;expect(metrics.state).toBe('not-ready');expect(metrics).not.toHaveProperty('tokens');expect(metrics).not.toHaveProperty('cost');expect(metrics).toHaveProperty('recordedUsage');}}
  },60000);
  test('project fee hiding revokes an existing visible sibling cost while a new report retains all exact Token bins',async()=>{
@@ -35,10 +36,24 @@ describe.skipIf(!available)('independent ordinary Task metrics within sealed who
   await expect(f.module.api.runtimeCompleteReportStatus(f.actor,projectId,report.reportId)).rejects.toThrow('项目费用显示配置已改变');await expect(f.module.api.runtimeCompleteReportPage(f.actor,projectId,report.reportId,{section:'tasks',pageSize:37})).rejects.toThrow('项目费用显示配置已改变');
   const fresh=await f.settle(projectId);expect(fresh.reportId).not.toBe(report.reportId);assertUnknown(fresh,3);expect((await allTasks(f,projectId,fresh,3)).find(row=>row.id===f.sibling!.task.id)!.metrics).toMatchObject({state:'ready',tokens:{input:'3',cacheRead:'9',cacheWrite:'15',output:'21',total:'48'},cost:{state:'hidden',amount:null}});
  },60000);
- test.each(['wrong-total','unknown-number'] as const)('retained ordinary Task %s cannot expose malformed values from a later response page',async damage=>{
+ test.each(['invalid-subtotal','unknown-number'] as const)('retained ordinary Task %s cannot expose malformed values from a later response page',async damage=>{
   const f=fixture=await completeFactsFixture({completeSibling:true}),report=await f.settle(null);assertUnknown(report);await allTasks(f,null,report);
-  const metrics=damage==='wrong-total'?{state:'ready',tokens:{input:'3',cacheRead:'9',cacheWrite:'15',output:'21',total:'47'},executions:'1',observedExecutions:'1',records:'1',cost:{currency:'CNY',state:'complete',amount:'0.0002235'}}:{state:'not-ready',gaps:['missing'],tokens:{total:'48'}};
-  await f.tdb.db.execute(sql`UPDATE observability.runtime_report_rows SET document=jsonb_set(document,'{metrics}',${JSON.stringify(metrics)}::jsonb) WHERE report_id=${report.reportId} AND section='tasks' AND parent='' AND key=${f.sibling!.task.id}`);
-  await expect(f.module.api.runtimeCompleteReportPage(f.actor,null,report.reportId,{section:'tasks',rowKey:f.sibling!.task.id,pageSize:37})).rejects.toThrow(damage==='wrong-total'?'child subtotals':'Incomplete usage');
+  // Keep the original shared document immutable. Retain a distinct, correctly
+  // keyed malformed producer document, then point only this test report at it.
+  // The API must reject the damaged fold itself, without client-side parsing.
+  const broken=damage==='invalid-subtotal'?'-1':'not-a-token-counter';
+  const [original]=await f.tdb.db.execute(sql`SELECT r.document_key,v.document FROM observability.runtime_report_task_views v JOIN observability.runtime_report_task_refs r USING(report_id,ordinal,task_id,version,project_id) WHERE v.report_id=${report.reportId} AND v.task_id=${f.sibling!.task.id}`);if(!original)throw new Error('Original sibling document missing');
+  const inserted=await f.tdb.db.execute(sql`WITH damaged AS(SELECT jsonb_set(document,'{fold,tokens,input}',to_jsonb(${broken}::text)) AS document FROM observability.runtime_report_task_documents WHERE key=${String(original['document_key'])}) INSERT INTO observability.runtime_report_task_documents(key,document) SELECT encode(sha256(convert_to(document::text,'UTF8')),'hex'),document FROM damaged RETURNING key`);expect(inserted).toHaveLength(1);
+  const changed=await f.tdb.db.execute(sql`UPDATE observability.runtime_report_task_refs SET document_key=${String(inserted[0]!['key'])} WHERE report_id=${report.reportId} AND task_id=${f.sibling!.task.id} RETURNING task_id`);expect(changed).toHaveLength(1);
+  const [unchanged]=await f.tdb.db.execute(sql`SELECT document FROM observability.runtime_report_task_documents WHERE key=${String(original['document_key'])}`);expect(unchanged?.['document']).toEqual(original['document']);
+  await expect(f.module.api.runtimeCompleteReportPage(f.actor,null,report.reportId,{section:'tasks',rowKey:f.sibling!.task.id,pageSize:37})).rejects.toThrow();
+
  },60000);
 });
+
+test.skipIf(!available).each(['system','project'] as const)('%s individual Task detail uses its full lifecycle when the original owner clock is later than the report clock',async scope=>{
+ const f=fixture=await completeFactsFixture({feePolicyCohort:true,completeSibling:true,laterSibling:true}),project=scope==='system'?null:f.sibling!.task.projectId;
+ const period=await f.settle(project);expect(runtimeCompleteReportContent(period)?.summary.tasks).toBe('2');
+ const detail=await f.settle(project,f.sibling!.task.id);expect(detail.state).toBe('ready');expect(runtimeCompleteReportContent(detail)?.summary).toMatchObject({tasks:'1',metrics:{state:'ready',tokens:{input:'3',cacheRead:'9',cacheWrite:'15',output:'21',total:'48'}}});
+ const page=await f.module.api.runtimeCompleteReportPage(f.actor,project,detail.reportId,{section:'tasks',pageSize:37});expect(page.total).toBe('1');expect(page.nextCursor).toBeNull();expect(CompleteRuntimeTaskSummarySchema.parse(page.items[0]).id).toBe(f.sibling!.task.id);
+},30000);

@@ -1,4 +1,4 @@
-import type { DevelopmentUsageInfo, DevelopmentUsageKey, DevelopmentUsageRegistration, DevelopmentStartIntent, DevelopmentUsageDrainReason, ServiceId, TaskId, TraceId, UsageExecutionIdentity } from '@crewstation/contracts';
+import type { DevelopmentUsageInfo, DevelopmentUsageKey, DevelopmentUsageRegistration, DevelopmentStartIntent, DevelopmentUsageDrainReason, ServiceId, TaskId, TraceId, UsageExecutionIdentity, RunnerHello } from '@crewstation/contracts';
 
 export interface DevelopmentPriceInput {
   identity: UsageExecutionIdentity;
@@ -19,6 +19,7 @@ export interface DevelopmentUsagePrepared extends DevelopmentUsagePreparation {
 export interface DevelopmentUsageOwnerRecord extends DevelopmentUsagePrepared {
   binding: DevelopmentUsageRegistration | null;
   unsupported: boolean;
+  unsupportedProof?: {version:1; podUid:string; capabilities:RunnerHello['capabilities']};
   closeReason: DevelopmentUsageDrainReason | null;
   /** Once observed, capability cannot disappear into a legacy fallback; bound to the actual original Pod. */
   capabilityPodUid?: string;
@@ -35,7 +36,7 @@ export interface DevelopmentUsageOwner {
   get(executionTaskId: TaskId): Promise<DevelopmentUsageOwnerRecord | undefined>;
   bind(executionTaskId: TaskId, info: DevelopmentUsageInfo): Promise<DevelopmentUsageOwnerRecord>;
   observeSupported(executionTaskId: TaskId): Promise<DevelopmentUsageOwnerRecord>;
-  unsupported(executionTaskId: TaskId): Promise<DevelopmentUsageOwnerRecord>;
+  unsupported(executionTaskId: TaskId, capabilities?:RunnerHello['capabilities']): Promise<DevelopmentUsageOwnerRecord>;
   close(executionTaskId: TaskId, reason: DevelopmentUsageDrainReason): Promise<DevelopmentUsageOwnerRecord>;
   resolve(key: DevelopmentUsageKey): Promise<DevelopmentUsageResolved | undefined>;
 }

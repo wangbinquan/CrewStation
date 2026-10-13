@@ -45,7 +45,7 @@ export function terminalDevelopmentMaintenanceOriginal(env: TaskEnvironment): Ta
   if (!protection || !n.podUid || !n.computeProfile) throw precondition('原开发终态缺工作卷保护');
   const evidence = DevelopmentCleanupEvidenceSchema.parse(n.developmentCleanup);
   requireDevelopmentCleanupEvidence(evidence, DevelopmentCleanupSelectionSchema.parse({ ...evidence.selection,
-    identity: { sourceKind: 'development-agent', projectId: env.projectId, taskId: n.parentTaskId,
+    identity: { sourceKind: n.purpose==='cli'?'development-cli':'development-agent', projectId: env.projectId, taskId: n.parentTaskId,
       agentId: n.agentId, executionId: env.id, executionGeneration: 1 },
     profileId: n.computeProfile.profileId, profileRevision: n.computeProfile.revision, podUid: n.podUid,
     consumerId: protection.consumer.id, renderStart: env.render!.start }));

@@ -2,7 +2,7 @@ import type { K8sClient, K8sObject } from '@crewstation/k8s';
 import { LABELS, protectWorkloadPod, taskPodObject as renderTaskPod, taskPreviewObjects } from '@crewstation/k8s';
 import { precondition } from '@crewstation/kernel';
 import { developmentWorkloadProtection } from '../../domain/development/protection';
-import { runnerSecretOf } from '../../domain/taskEnvironment';
+import { purposeOf, runnerSecretOf } from '../../domain/taskEnvironment';
 import { canonicalNativeIntent, EXECUTION_INTENT_ANNOTATION, WORKSPACE_TASK_LABEL } from '../../domain/physicalIdentity';
 import { WORKLOAD_LABELS } from '../../domain/taskEnvironment';
 import type { TaskEnvironment, WorkloadRender } from '../../domain/taskEnvironment';
@@ -15,7 +15,7 @@ export function taskPodObject({ env, image, envVars, resources, source, envSecre
   if (protection && (source !== undefined || workVolume === 'emptyDir' || envSecretName !== runnerSecretOf(env as TaskEnvironmentWithRender)
     || image !== env.render!.image || workerUid !== env.render!.workerUid || nodeName !== undefined && nodeName !== env.native!.nodeName
     || !['cpu', 'memory', 'storage'].every((key) => resources[key as keyof typeof resources] === env.render!.resources[key as keyof typeof resources]))) throw precondition('独立开发 Agent 的创建参数与原保护快照冲突');
-  if (env.render?.developmentUsageStorage && (env.kind !== 'dev-session' || env.native?.purpose !== 'agent')) throw new Error('只有独立开发 Agent 可选择数值日志布局');
+  if (env.render?.developmentUsageStorage && (env.kind !== 'dev-session' || !env.native || !['agent', 'cli'].includes(purposeOf(env.native)))) throw new Error('只有独立开发 Agent 可选择数值日志布局');
   const object = renderTaskPod({
     ...(env.render?.developmentUsageStorage ? { developmentUsageStorage: env.render.developmentUsageStorage } : {}),
     ...(env.render?.runtimeImage ? { runtimeInitialization: true } : {}),

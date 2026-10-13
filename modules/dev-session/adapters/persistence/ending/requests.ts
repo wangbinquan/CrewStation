@@ -1,4 +1,5 @@
-import { eq } from 'drizzle-orm';
+import {nativeTerminalStarts} from '../nativeTerminalTable';
+import {sql, eq } from 'drizzle-orm';
 import type { Database } from '@crewstation/persistence';
 import { conflict, jsonHash } from '@crewstation/kernel';
 import { DevelopmentEndingJobSchema, DevelopmentEndingRequestSchema } from '../../../domain/developmentEnding';
@@ -22,7 +23,8 @@ export function requestDevelopmentEndingJob(db: Database, raw: DevelopmentEnding
     });
     await tx.update(developmentAgentUsage).set({ closeReason: next.firstReason }).where(eq(developmentAgentUsage.executionTaskId, input.executionTaskId));
     // Preserve old public finalized/endedAt. Neither is a digital exit or actual-time proof.
-    await tx.update(agentStarts).set({ logicalEnding: true, state: 'ended' }).where(eq(agentStarts.agentId, start.agentId));
+    if(start.sourceKind==='development-cli')await tx.update(nativeTerminalStarts).set({execution:sql`jsonb_set(${nativeTerminalStarts.execution},'{stopRequested}','true')`}).where(eq(nativeTerminalStarts.executionTaskId,input.executionTaskId));
+    else await tx.update(agentStarts).set({ logicalEnding: true, state: 'ended' }).where(eq(agentStarts.agentId, start.agentId));
     await tx.insert(table).values(next).onConflictDoUpdate({ target: table.executionTaskId, set: { logicalResult: next.logicalResult, version: next.version } });
     return next;
   });

@@ -1,3 +1,4 @@
+import {DevelopmentUsageIdentitySchema} from './usageLedger';
 import { z } from 'zod';
 import { UsageNativeCaptureSchema } from './usageLedger';
 import { DevelopmentAgentIdentitySchema } from '../../taskrunner/developmentUsage';
@@ -6,7 +7,7 @@ import { ProjectIdSchema, ResourceIdSchema, ServiceIdSchema, TaskIdSchema } from
 const at = z.iso.datetime();
 const count = z.string().regex(/^(0|[1-9]\d{0,79})$/);
 const amount = z.string().regex(/^(0|[1-9]\d{0,79})(\.\d{1,12})?$/).nullable();
-export const RuntimeStatisticsQuerySchema = z.strictObject({ from: at, to: at, timezone: z.string().min(1).max(100).default('Asia/Shanghai'), q: z.string().max(1000).optional(), state: z.string().max(100).optional(), quality: z.string().max(100).optional(), sourceKind: z.enum(['business-task', 'development-agent']).optional() })
+export const RuntimeStatisticsQuerySchema = z.strictObject({ from: at, to: at, timezone: z.string().min(1).max(100).default('Asia/Shanghai'), q: z.string().max(1000).optional(), state: z.string().max(100).optional(), quality: z.string().max(100).optional(), sourceKind: z.enum(['business-task', 'development-agent', 'development-cli']).optional() })
   .refine((q) => Date.parse(q.from) < Date.parse(q.to), { message: '统计开始时间必须早于结束时间' })
   .refine((q) => { try { new Intl.DateTimeFormat('en', { timeZone: q.timezone }); return true; } catch { return false; } }, { message: '时区无效' });
 export type RuntimeStatisticsQuery = z.infer<typeof RuntimeStatisticsQuerySchema>;
@@ -18,9 +19,9 @@ export const RuntimeAttemptFactSchema = z.strictObject({
   agentId: ResourceIdSchema.nullable(), profileId: ResourceIdSchema.nullable(), profileName: z.string().nullish(), profileRevision: z.number().int().nonnegative().nullable(),
   createdAt: at, startedAt: at.nullable(), endedAt: at.nullable(),
 });
-export const RuntimeSourceKindSchema = z.enum(['business-task', 'development-agent']);
+export const RuntimeSourceKindSchema = z.enum(['business-task', 'development-agent', 'development-cli']);
 export type RuntimeSourceKind = z.infer<typeof RuntimeSourceKindSchema>;
-export const RuntimeTaskSourceSchema = z.union([z.strictObject({ kind: z.literal('business-task') }), z.strictObject({ kind: z.literal('development-agent'), identity: DevelopmentAgentIdentitySchema, workspaceName: z.string().nullable() })]);
+export const RuntimeTaskSourceSchema = z.union([z.strictObject({ kind: z.literal('business-task') }), z.strictObject({ kind: z.literal('development-agent'), identity: DevelopmentAgentIdentitySchema, workspaceName: z.string().nullable() }), z.strictObject({kind:z.literal('development-cli'),identity:DevelopmentUsageIdentitySchema.refine(i=>i.sourceKind==='development-cli'),workspaceName:z.string().nullable()})]);
 export const RuntimeTaskFactSchema = z.strictObject({
   source: RuntimeTaskSourceSchema.optional(),
   id: TaskIdSchema, projectId: ProjectIdSchema, projectName: z.string().nullish(), serviceId: ServiceIdSchema, name: z.string(),

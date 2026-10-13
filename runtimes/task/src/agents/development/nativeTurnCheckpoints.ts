@@ -54,7 +54,7 @@ export class DevelopmentNativeTurnCheckpoints {
         'SELECT turn,turn_index,document FROM development_native_turn_checkpoints WHERE execution_id=? ORDER BY turn_index DESC LIMIT 1').get(key.executionId);
       let previousFinalPassId: string | null = null;
       if (!previous) {
-        if (turnIndex !== 0 || resumeSessionId !== header.nativeAdmission.resumeSessionId)
+        if (turnIndex !== 0 || header.identity.sourceKind !== 'development-cli' && resumeSessionId !== header.nativeAdmission.resumeSessionId)
           throw new Error('Initial native turn changed the original resume intent');
         // Existing initial-only owners are not promoted into successor-turn authority.
         const prepared = this.db.query<Stored, [string]>(
@@ -62,7 +62,7 @@ export class DevelopmentNativeTurnCheckpoints {
         if (prepared) throw new Error('Cannot start a new turn chain over existing original preparations');
       } else {
         const prior = this.read(key, previous.turn);
-        if (turnIndex !== previous.turn_index + 1 || !prior.rootSessionId || resumeSessionId !== prior.rootSessionId ||
+        if (turnIndex !== previous.turn_index + 1 || !prior.rootSessionId || header.identity.sourceKind !== 'development-cli' && resumeSessionId !== prior.rootSessionId ||
             !isDeepStrictEqual(store, prior.store) || Date.parse(observedAt) < Date.parse(prior.observedAt))
           throw new Error('Successor native turn changed original root, source, time or order');
         previousFinalPassId = this.previousFinal(key, prior);
@@ -107,14 +107,14 @@ export class DevelopmentNativeTurnCheckpoints {
         (saved.rootCreatedAt !== null && (!Number.isSafeInteger(saved.rootCreatedAt) || saved.rootCreatedAt < 0 || saved.rootCreatedAt >= 253402300800000)))
       throw new Error('Original native turn checkpoint changed its binding');
     if (saved.turnIndex === 0) {
-      if (saved.resumeSessionId !== header.nativeAdmission.resumeSessionId || saved.previousFinalPassId !== null)
+      if (header.identity.sourceKind !== 'development-cli' && saved.resumeSessionId !== header.nativeAdmission.resumeSessionId || saved.previousFinalPassId !== null)
         throw new Error('Initial native turn changed its original intention');
     } else {
       const previous = this.db.query<Previous, [string, number]>(
         'SELECT turn,turn_index,document FROM development_native_turn_checkpoints WHERE execution_id=? AND turn_index=?').get(key.executionId, saved.turnIndex - 1);
       if (!previous) throw new Error('Native turn lost its original predecessor');
       const prior = JSON.parse(previous.document) as DevelopmentNativeTurnCheckpoint;
-      if (!prior.rootSessionId || saved.resumeSessionId !== prior.rootSessionId || !isDeepStrictEqual(saved.store, prior.store) ||
+      if (!prior.rootSessionId || header.identity.sourceKind !== 'development-cli' && saved.resumeSessionId !== prior.rootSessionId || !isDeepStrictEqual(saved.store, prior.store) ||
           saved.previousFinalPassId !== this.previousFinal(key, prior))
         throw new Error('Native turn lost its actual original final predecessor');
     }
@@ -159,7 +159,7 @@ export class DevelopmentNativeTurnCheckpoints {
     return pass.pass_id;
   }
 
-  private header(value: string): { nativeAdmission: { lineageKey: string; resumeSessionId: string | null } } {
+  private header(value: string): { identity:{sourceKind:string}; nativeAdmission: { lineageKey: string; resumeSessionId: string | null } } {
     const header = JSON.parse(value);
     if (header.nativeSource?.version !== 2 || !header.nativeAdmission || typeof header.nativeAdmission.lineageKey !== 'string')
       throw new Error('Original admission did not select native pages v2');

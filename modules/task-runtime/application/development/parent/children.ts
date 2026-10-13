@@ -47,7 +47,7 @@ async function closure(deps: TaskRuntimeUseCaseDeps, member: DevelopmentParentEn
   }
   const stopped = await developmentPhysicalStop(deps.workloadSafety, environment);
   return { version: 1, kind: 'protected-closed', selectionHash: selection.selectionHash, originalParentPodUid: member.originalParentPodUid,
-    numericDigest: jsonHash(evidence), numericEvidence: evidence, numericStatus: evidence.closure.status, tailUnknown: evidence.closure.tailUnknown, stopProofDigest: jsonHash(stopped.stopProof) };
+    numericDigest: jsonHash(evidence), numericEvidence: evidence, numericStatus: evidence.version===3?'unknown':evidence.closure.status, tailUnknown: evidence.version===3?true:evidence.closure.tailUnknown, stopProofDigest: jsonHash(stopped.stopProof) };
 }
 async function advanceMember(deps: TaskRuntimeUseCaseDeps, ending: DevelopmentParentEnding,
   member: DevelopmentParentEndingChild, identity: DevelopmentParentEndingJobLease) {

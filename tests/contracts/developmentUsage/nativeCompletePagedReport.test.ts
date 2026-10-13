@@ -28,7 +28,7 @@ describe.skipIf(!available)('actual complete native report pagination without a 
      counts:{sessions:'1',parts:'211',steps:'211'},pages:original!.pages,cursor:{ordinal:original!.pages,index:0},
      visitedSteps:'211',heldSteps:'0',numericEof:true,valuationEof:true,baselineState:'complete-birth',pathsComplete:true,issues:[]});
     for(const key of ['usage','tokens','amount','metrics'])expect(item).not.toHaveProperty(key);
-    const [receipt]=await database.handle.client`SELECT document FROM observability.runtime_report_receipts WHERE report_id=${report.reportId}`;
+    const [receipt]=await database.handle.client`SELECT document->'build'->'sourceReceipts' AS document FROM observability.runtime_report_task_views WHERE report_id=${report.reportId} AND task_id=${f.task.id}`;
     expect(receipt!.document.map((r:{rows:string})=>r.rows)).toEqual(['1','211','0','1','211']);
     expect(receipt!.document.every((r:{eof:boolean})=>r.eof)).toBe(true);
    }

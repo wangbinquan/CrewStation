@@ -11,3 +11,6 @@ export type { Brand } from './brand';
 export { brand } from './brand';
 
 export { jsonHash, textHash } from './jsonHash';
+
+export {registerRuntimeSignals,setRuntimeSignal,incrementRuntimeSignal,renderRuntimeSignals} from './runtimeSignals';
+export type {RuntimeSignal} from './runtimeSignals';

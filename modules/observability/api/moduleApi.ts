@@ -1,3 +1,12 @@
+import type {RuntimeStorage} from '@crewstation/contracts';
+import type { ResourceId } from '@crewstation/contracts';
+import type { RuntimeAnomalyPage } from '@crewstation/contracts';
+import type {RuntimeAggregate,RuntimeProjectionState} from '@crewstation/contracts';
+import type { RunnerUsageSourceIdentity } from '@crewstation/contracts';
+export interface PlatformUsageAcceptance {testId:ResourceId;profileId:ResourceId;profileRevision:number;protocol:'opencode'|'claude-code'|'terminal'}
+export interface PlatformUsageBinding extends RunnerUsageSourceIdentity {testId:ResourceId}
+import type {PlatformUsageAdmission,PlatformUsagePage} from '@crewstation/contracts';
+import type { OperationalTelemetry, OperationalTelemetryQuery } from '@crewstation/contracts';
 import type {RuntimeCompleteReport,RuntimeReportPage,RuntimeReportPageQuery} from '@crewstation/contracts';
 import type { RuntimeStatisticsQuery, ExecutionCostVisibilityDto, ExecutionObservationV2Page, ExecutionObservationPage, ExecutionObservationQuery, SetExecutionCostVisibility, UsageValuation, UsageExecutionIdentity, UsageRecord, Actor, AlertDto, HealthDto, LogEntryDto, LogQuery, ProjectId, TaskId, TraceChainDto, TraceEventDto, TraceEventsQuery, TraceId, TraceListQuery, TraceSummaryDto, SaveTokenPrice, TokenPriceHistory, TokenPricePageQuery, TokenPriceProfile, TokenPriceVersion } from "@crewstation/contracts";
 import type { ProjectDeletionOwner } from '@crewstation/contracts';
@@ -18,8 +27,20 @@ export interface ExecutionValuationRequest {
 }
 export interface ExecutionObservationCaller { identity: string; token?: string }
 
+import type { RuntimeMaintenance, RuntimeMaintenanceRequest } from '@crewstation/contracts';
 export interface ObservabilityModuleApi extends TokenPricingApi {
+  runtimeStorage?(actor:Actor):Promise<RuntimeStorage>;
+  runtimeMaintenancePreview(actor:Actor,input:RuntimeMaintenanceRequest):Promise<RuntimeMaintenance>;
+  runtimeMaintenanceStatus(actor:Actor,id:string):Promise<RuntimeMaintenance>;
+  runtimeMaintenanceConfirm(actor:Actor,id:string,digest:string):Promise<RuntimeMaintenance>;
   readonly name: 'observability';
+  runtimeAnomalies(actor:Actor,projectId:ProjectId|null,query:RuntimeStatisticsQuery,after?:string):Promise<RuntimeAnomalyPage>;
+  runtimeAggregate(actor:Actor,projectId:ProjectId|null,query:RuntimeStatisticsQuery):Promise<RuntimeAggregate>;
+  runtimeProjectionState(actor:Actor,projectId:ProjectId|null):Promise<RuntimeProjectionState>;
+  acceptPlatformUsage(input:PlatformUsageAcceptance):Promise<PlatformUsageAdmission>;
+  bindPlatformUsage(input:PlatformUsageBinding):Promise<void>;
+  platformUsage(actor:Actor,query:RuntimeStatisticsQuery,after?:string):Promise<PlatformUsagePage>;
+  operationalTelemetry?(actor:Actor,projectId:ProjectId|null,query:OperationalTelemetryQuery):Promise<OperationalTelemetry>;
   runtimeCompleteTaskReport(actor:Actor,projectId:ProjectId|null,taskId:TaskId):Promise<RuntimeCompleteReport>;
   runtimeCompleteReport(actor:Actor,projectId:ProjectId|null,query:RuntimeStatisticsQuery):Promise<RuntimeCompleteReport>;
   runtimeCompleteReportStatus(actor:Actor,projectId:ProjectId|null,reportId:string):Promise<RuntimeCompleteReport>;

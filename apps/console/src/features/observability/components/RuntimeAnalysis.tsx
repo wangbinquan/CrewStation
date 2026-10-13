@@ -1,3 +1,6 @@
+import {RuntimeMaintenance} from './runtime/RuntimeMaintenance';
+import {RuntimeOccurrence} from './RuntimeOccurrence';
+import type {RuntimeAggregate} from '@crewstation/contracts';
 import {useRef} from 'react';
 import type {RuntimeCompleteSummary,RuntimeReportHeader,CompleteRuntimeTaskSummary} from '@crewstation/contracts';
 import {useT} from '../../../shared/lib/useT';
@@ -5,6 +8,7 @@ import {Stack} from '../../../shared/ui/Stack';
 import {Card} from '../../../shared/ui/Card';
 import {Button} from '../../../shared/ui/Button';
 import {DataTable} from '../../../shared/ui/DataTable';
+import {RuntimePlatformUsage} from './RuntimePlatformUsage';
 import {RuntimeSources} from './RuntimeSources';
 import {RuntimeMetrics} from './RuntimeMetrics';
 import {RuntimeRows} from './RuntimeRows';
@@ -19,12 +23,13 @@ function Performance({summary,header,search,change}:Omit<Props,'task'>) {
  const t=useT(),duration=summary.durations;return <Stack>{duration.state==='complete'?<div className={styles.grid}>{(['p50Ms','p95Ms','maxMs'] as const).map(key=><Card key={key} title={t('runtime.'+key)}><p className={styles.value}>{completeDuration(duration[key])}</p><p className={styles.hint}>{t('runtime.samples',{count:completeCount(duration.samples)})}</p></Card>)}</div>:<Card title={t('runtime.timingUnknown')}><p className={styles.hint}>{duration.gaps.map(reason=>t('runtime.reason.'+reason)).join(' · ')}</p></Card>}
  <Card title={t('runtime.quality')}><p>{t(header.coverage==='complete'?'runtime.report.complete':'runtime.report.factsAvailable')}</p><RuntimeRows<{taskId:string;taskName:string;reason:string}> header={header} section="quality">{rows=><DataTable columns={[t('runtime.reason'),t('runtime.task')]}>{rows.map(row=><tr key={JSON.stringify([row.reason,row.taskId])}><td><Button size="small" variant="ghost" onClick={()=>change({...search,quality:row.reason,tab:'tasks'})}>{t('runtime.reason.'+row.reason)}</Button></td><td>{row.taskName}</td></tr>)}</DataTable>}</RuntimeRows><p className={styles.hint}>{t('runtime.report.noPartial')}</p></Card></Stack>;
 }
-export function RuntimeAnalysis({summary,header,search,change,task}:Props) {
+export function RuntimeAnalysis({summary,header,search,change,task,liveSummary,liveFilters,occurrence}:Props&{liveSummary?:RuntimeCompleteSummary;liveFilters?:RuntimeReportHeader['filters'];occurrence?:RuntimeAggregate['occurrence']}) {
+ summary=liveSummary??summary;
  const t=useT(),tab=search.tab??'overview',agentOpener=useRef<HTMLButtonElement>(null),profileOpener=useRef<HTMLButtonElement>(null);return <>
-  {tab==='overview'?<Stack><RuntimeMetrics metrics={summary.metrics} tasks={summary.tasks} countLabel={t('runtime.objects')}/><RuntimeTrend summary={summary} header={header} search={search} change={change}/><RuntimeSources data={summary} search={search} change={change}/>{header.scope==='system'?<RuntimeProjects header={header} search={search} change={change}/>:null}<Card title={t('runtime.recent')}><RuntimeRows<CompleteRuntimeTaskSummary> header={header} section="tasks">{rows=><RuntimeTaskTable header={header} tasks={rows} open={task}/>}</RuntimeRows></Card></Stack>:null}
+  {tab==='overview'?<Stack><RuntimeMetrics metrics={summary.metrics} tasks={summary.tasks} countLabel={t('runtime.objects')}/><RuntimeTrend summary={summary} header={{filters:liveFilters??header.filters}} search={search} change={change}/><RuntimeSources data={summary} search={search} change={change}/>{occurrence?<RuntimeOccurrence data={occurrence} window={liveFilters??header.filters} search={search} change={change}/>:null}{header.scope==='system'?<RuntimePlatformUsage key={header.filters.from+header.filters.to} window={liveFilters??header.filters}/>:null}{header.scope==='system'?<RuntimeProjects header={header} search={search} change={change}/>:null}<Card title={t('runtime.recent')}><RuntimeRows<CompleteRuntimeTaskSummary> header={header} section="tasks">{rows=><RuntimeTaskTable header={header} tasks={rows} open={task}/>}</RuntimeRows></Card></Stack>:null}
   {tab==='tasks'?<Card title={t('runtime.objects')}><RuntimeRows<CompleteRuntimeTaskSummary> header={header} section="tasks">{rows=><RuntimeTaskTable header={header} tasks={rows} open={task}/>}</RuntimeRows></Card>:null}
   {tab==='agents'?<RuntimeAgents opener={agentOpener} header={header} search={search} change={change}/>:null}
-  {tab==='usage'?<RuntimeUsage opener={profileOpener} header={header} summary={summary.metrics} search={search} change={change}/>:null}
+  {tab==='usage'?<Stack>{header.scope==='system'?<RuntimeMaintenance scopeKey={JSON.stringify(search)} window={liveFilters??header.filters}/>:null}<RuntimeUsage opener={profileOpener} header={header} summary={summary.metrics} search={search} change={change}/></Stack>:null}
   {tab==='performance'?<Performance summary={summary} header={header} search={search} change={change}/>:null}
   <RuntimeDimensionDetail opener={search.agent?agentOpener:profileOpener} header={header} search={search} change={change} task={task}/>
  </>;

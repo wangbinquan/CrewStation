@@ -1,3 +1,7 @@
+import type { RuntimeAggregate } from '@crewstation/contracts';
+import {useRuntimeAggregate} from '../hooks/useRuntimeAggregate';
+import {RuntimeMetrics} from '../components/RuntimeMetrics';
+import {RuntimeTrend} from '../components/RuntimeTrend';
 import { rememberRuntimeList, runtimeReturnKey, useRuntimeListReturn } from '../hooks/useRuntimeListReturn';
 import { useState } from 'react';
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
@@ -38,7 +42,7 @@ function RuntimeReportRecovery({error,search,rebuild}:{error:unknown;search:Runt
 }
 function RuntimeTaskPage({projectId,taskId,go}:PageProps&{taskId:string}) {
  const t=useT(),search=parseRuntimeSearch(useSearch({strict:false}));
- const query=useRuntimeReport(['task',projectId??'system',taskId],()=>projectId?api.observability.projectRuntimeTask(projectId,taskId):api.observability.systemRuntimeTask(taskId),projectId,search.reportId,true,'native-pages/2');
+ const query=useRuntimeReport(['task',projectId??'system',taskId],()=>projectId?api.observability.projectRuntimeTask(projectId,taskId):api.observability.systemRuntimeTask(taskId),projectId,search.reportId,true,'native-pages/2',()=>go({...search,reportId:undefined},taskId));
  const report=query.error?undefined:query.data,data=report?runtimeCompleteReportContent(report):undefined,back=()=>go(search);
  return <Stack className={styles.page}><QueryStatus isPending={query.isPending} error={query.error}/>
   <RuntimeReportRecovery error={query.error} search={search} rebuild={()=>go({...search,reportId:undefined},taskId)}/>
@@ -48,21 +52,26 @@ function RuntimeTaskPage({projectId,taskId,go}:PageProps&{taskId:string}) {
 const runtimeStates=['admitting','creating','pending','running','awaiting-input','verifying','cancelling','cancelled','succeeded','failed','pausing','paused','finalizing','closing','closed','unknown'];
 const cohortKey=(search:RuntimeSearch)=>JSON.stringify([search.from,search.to,search.q,search.state,search.quality,search.sourceKind]);
 function RuntimeOverviewPage({projectId,go}:PageProps) {
- const t=useT(),search=parseRuntimeSearch(useSearch({strict:false})),[initialNow]=useState(()=>Date.now());
- const window=runtimeWindow(search,initialNow),operations=search.tab==='resources'||search.tab==='health',current={...search,from:window.from,to:window.to};
+ const t=useT(),search=parseRuntimeSearch(useSearch({strict:false})),[initialNow]=useState(()=>Date.now()),[liveNow,setLiveNow]=useState(()=>Date.now()),[acceptedAggregate,setAcceptedAggregate]=useState<{scope:string;data:RuntimeAggregate}>();
+ const window=runtimeWindow(search.reportId?{...search,period:'custom'}:search,liveNow),detailWindow=search.from&&search.to?{from:search.from,to:search.to,timezone:window.timezone}:runtimeWindow(search,initialNow),operations=search.tab==='resources'||search.tab==='health',current={...search,from:window.from,to:window.to};
  const filters={...window,q:search.q,state:search.state,quality:search.quality,sourceKind:search.sourceKind};
- const query=useRuntimeReport(['statistics',projectId??'system',filters],()=>projectId?api.observability.projectRuntimeStatistics(projectId,filters):api.observability.systemRuntimeStatistics(filters),projectId,search.reportId,!operations,'native-pages/2');
+ const aggregate=useRuntimeAggregate(projectId,filters,!operations&&!search.reportId,()=>{if(search.period!=='custom'&&(search.period||!search.from))setLiveNow(Date.now());});
+ const liveScope=JSON.stringify([projectId,search.period??(search.from?'custom':'day'),search.q,search.state,search.quality,search.sourceKind,search.period==='custom'||!search.period&&search.from?[search.from,search.to]:null]);
+ if(!aggregate.error&&aggregate.data?.projection.bootstrapCompleted&&(acceptedAggregate?.scope!==liveScope||acceptedAggregate.data!==aggregate.data))setAcceptedAggregate({scope:liveScope,data:aggregate.data});
+ const live=!aggregate.error&&acceptedAggregate?.scope===liveScope?acceptedAggregate.data:undefined,detailFilters={...filters,from:detailWindow.from,to:detailWindow.to};
+ const query=useRuntimeReport(['statistics',projectId??'system',detailFilters],()=>projectId?api.observability.projectRuntimeStatistics(projectId,detailFilters):api.observability.systemRuntimeStatistics(detailFilters),projectId,search.reportId,!operations,'native-pages/2',()=>go({...current,reportId:undefined}));
  const report=operations||query.error?undefined:query.data,data=report?runtimeCompleteReportContent(report):undefined;
  const change=(next:RuntimeSearch)=>{const candidate={...current,...next};go({...candidate,reportId:cohortKey(candidate)===cohortKey(current)?candidate.reportId:undefined});};
- const returnKey=runtimeReturnKey(projectId??'system',current);useRuntimeListReturn(returnKey,data!==undefined);
- const openTask=(id:string)=>{if(!data)return;rememberRuntimeList(returnKey,id);go({...current,reportId:data.header.reportId},id);};
+ const returnSearch=data?{...current,...data.header.filters}:current,returnKey=runtimeReturnKey(projectId??'system',returnSearch);useRuntimeListReturn(returnKey,data!==undefined);
+ const openTask=(id:string)=>{if(!data)return;rememberRuntimeList(returnKey,id);go({...returnSearch,reportId:data.header.reportId},id);};
  return <Stack className={styles.page} data-runtime-statistics>
-  <PageHeader title={t(projectId?'runtime.projectTitle':'runtime.systemTitle')} description={t(operations?'runtime.operationsDescription':'runtime.description')} meta={data?t('runtime.snapshot',{at:runtimeDate(data.header.asOf,window.timezone),zone:window.timezone}):undefined} actions={!operations&&!projectId?<ButtonLink to="/admin/compute" search={{tab:'pricing'}}>{t('runtime.configurePricing')}</ButtonLink>:undefined}/>
-  {!operations?<RuntimeFilters key={window.from+window.to} window={window} search={search} change={change} states={runtimeStates}/>:null}
+  <PageHeader title={t(projectId?'runtime.projectTitle':'runtime.systemTitle')} description={t(operations?'runtime.operationsDescription':'runtime.description')} meta={data?t('runtime.snapshot',{at:runtimeDate(data.header.asOf,window.timezone),zone:window.timezone}):undefined} actions={!operations?<ActionRow><Button size="small" variant="ghost" onClick={()=>{if(search.period&&search.period!=='custom'){const now=Date.now();setLiveNow(now);go({...current,...runtimeWindow({...search,reportId:undefined},now),reportId:undefined});}else if(search.reportId)go({...current,reportId:undefined});else void query.refetch();}}>{t('runtime.refreshDetails')}</Button>{!projectId?<ButtonLink to="/admin/compute" search={{tab:'pricing'}}>{t('runtime.configurePricing')}</ButtonLink>:null}</ActionRow>:undefined}/>
+  {!operations?<RuntimeFilters key={JSON.stringify([search.period,search.from,search.to])} window={window} search={search} change={change} states={runtimeStates}/>:null}
+  {!operations&&live?.projection.asOf?<p className={styles.hint}>{t('runtime.liveSummary',{at:runtimeDate(live.projection.asOf,window.timezone)})}</p>:null}
   {!operations?<RuntimeSourceFilter search={search} change={change}/>:null}
-  {!operations?<QueryStatus isPending={query.isPending} error={query.error}/>:null}
+  {!operations?<QueryStatus isPending={query.isPending&&!live} error={query.error}/>:null}
   {!operations?<RuntimeReportRecovery error={query.error} search={search} rebuild={()=>go({...current,reportId:undefined})}/>:null}
-  <RuntimeViewTabs projectId={projectId} search={search} change={change}>{search.tab==='resources'?<RuntimeResourceMetrics projectId={projectId} search={search} change={change}/>:search.tab==='health'?<RuntimeHealth projectId={projectId}/>:data?<Stack>{report&&(search.tab??'overview')==='overview'?<RuntimeReportState report={report} compact/>:null}<RuntimeAnalysis summary={data.summary} header={data.header} search={search} change={change} task={openTask}/></Stack>:report?<RuntimeReportState report={report}/>:null}</RuntimeViewTabs>
+  <RuntimeViewTabs projectId={projectId} search={search} change={change}>{search.tab==='resources'?<RuntimeResourceMetrics window={window} projectId={projectId} search={search} change={change}/>:search.tab==='health'?<RuntimeHealth projectId={projectId} window={window}/>:data?<Stack>{report&&(search.tab??'overview')==='overview'?<RuntimeReportState report={report} compact/>:null}<RuntimeAnalysis key={data.header.reportId} summary={data.summary} header={data.header} search={search} change={change} task={openTask} liveSummary={live?.summary} liveFilters={live?.filters} occurrence={live?.occurrence}/></Stack>:live&&(search.tab??'overview')==='overview'?<Stack><RuntimeMetrics metrics={live.summary.metrics} tasks={live.summary.tasks} countLabel={t('runtime.objects')}/><RuntimeTrend summary={live.summary} header={{filters:window}} search={search} change={change}/></Stack>:report?<RuntimeReportState report={report}/>:null}</RuntimeViewTabs>
  </Stack>;
 }
 export function SystemRuntimeStatisticsPage() {

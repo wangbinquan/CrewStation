@@ -34,6 +34,7 @@ export async function nativeReportFixture(database:TestDatabase,options:Paramete
  }
  const actor=live.price.actor,window={from:new Date(Date.parse(accepted.acceptedAt)-60_000).toISOString(),to:new Date(Date.parse(accepted.acceptedAt)+60_000).toISOString(),timezone:'Asia/Shanghai'};
  async function settle(projectId:ProjectId|null=null,detail=false) {
+  for(const worker of module.reportWorkers)await worker.drain();
   let report:RuntimeCompleteReport=detail?await module.api.runtimeCompleteTaskReport(actor,projectId,task.id):await module.api.runtimeCompleteReport(actor,projectId,window);
   while(report.state==='building'){for(const worker of module.reportWorkers)await worker.drain();report=await module.api.runtimeCompleteReportStatus(actor,projectId,report.reportId);}return report;
  }

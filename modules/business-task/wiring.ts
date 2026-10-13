@@ -218,3 +218,5 @@ export function createBusinessTaskModule(deps: BusinessTaskModuleDeps): Business
 export { readBusinessObservationFacts } from './adapters/persistence/task-list/repository';
 
 export { readBusinessObservationTaskPage, readBusinessObservationAttemptPage } from './adapters/persistence/task-list/observationPages';
+
+export {readBusinessObservationRuntimeOrigins} from './adapters/persistence/task-list/observationRuntimeOrigins';

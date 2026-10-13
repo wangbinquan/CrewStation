@@ -1,3 +1,4 @@
+import {jsonHash} from '@crewstation/kernel';
 import type { UsageValuation } from '@crewstation/contracts';
 import { completeUsageIdentity } from '../domain/completeRuntimeIdentity';
 import { TOKEN_BUCKETS } from '../domain/tokenUsage';
@@ -20,6 +21,7 @@ export async function allocateCompleteTaskUsage(context:CompleteTaskEvidenceCont
   for await (const page of completeWorkingPages<CompleteRuntimeAllocation>(context.input.rows,context.usage.allocationsNamespace,context.input.signal)) {
     const valueKeys=page.map(row=>context.input.keyOf(completeUsageIdentity(row.document.record.original)));
     const values=new Map((await context.input.rows.getMany<UsageValuation>(context.space('valuations'),valueKeys)).map(row=>[row.key,row.document]));
+    const models=await context.input.ledger.models?.(page.map(row=>row.document.record.original));
     const valued=[];
     for(const row of page) {
       const {record,contribution,quality}=row.document,original=record.original;
@@ -30,7 +32,7 @@ export async function allocateCompleteTaskUsage(context:CompleteTaskEvidenceCont
       const whole=TOKEN_BUCKETS.every(bucket=>contribution[bucket]===original.projection.contribution[bucket]);
       const valuation=values.get(context.input.keyOf(completeUsageIdentity(original)));
       addCompleteRuntimeAllocation(entry.fold,contribution,valuation,whole,original.projection.projectionRevision,!quality.ambiguous&&!quality.unavailable);
-      valued.push({key:row.key,document:{...row.document,valuation:valuation??null,whole}});
+      valued.push({key:row.key,document:{...row.document,actualModel:models?.get(jsonHash({identity:original.identity,sourceId:original.sourceId,recordId:original.recordId}))??null,valuation:valuation??null,whole}});
       await context.attempts.put(key,entry);
     }
     await context.input.rows.upsert(context.usage.allocationsNamespace,valued);
@@ -60,6 +62,6 @@ export async function finishCompleteTaskUsage(context:CompleteTaskEvidenceContex
     await context.input.rows.upsert(context.space('attempts'),page);
     await context.input.rows.insert(context.space('attempt-summaries'),summaries);
   }
-  if (context.input.task.source?.kind==='development-agent' && count!==1n) throw new Error('Original development execution must have exactly one admitted Agent');
+  if ((context.input.task.source?.kind==='development-agent'||context.input.task.source?.kind==='development-cli') && count!==1n) throw new Error('Original development execution must have exactly one admitted Agent');
   return count.toString();
 }

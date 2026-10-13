@@ -1,5 +1,5 @@
 import type { Logger } from '@crewstation/kernel';
-import { noopLogger } from '@crewstation/kernel';
+import { incrementRuntimeSignal,noopLogger } from '@crewstation/kernel';
 import type { Database } from '@crewstation/persistence';
 import type { ClaimedJob } from './jobs';
 import { claimJobs, completeJob, failJob, heartbeatJob } from './jobs';
@@ -40,7 +40,7 @@ export function createWorker(options: WorkerOptions): Worker {
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   const runJob = async (job: ClaimedJob): Promise<void> => {
-    inFlight += 1;
+    inFlight += 1;const measuredAt=performance.now();
     const ctx: JobContext = { heartbeat: () => heartbeatJob(db, job.id, job.fencingToken, leaseSeconds) };
     try {
       await handler(job, ctx);
@@ -49,6 +49,7 @@ export function createWorker(options: WorkerOptions): Worker {
       const outcome = await failJob(db, job, error instanceof Error ? error.stack ?? error.message : String(error));
       logger.error('job failed', { jobId: job.id, kind: job.kind, attempts: job.attempts, outcome });
     } finally {
+      incrementRuntimeSignal('queue.handler.completed','jobs',1n,{queue:job.kind});incrementRuntimeSignal('queue.handler.elapsed','microseconds',BigInt(Math.round((performance.now()-measuredAt)*1000)),{queue:job.kind});
       inFlight -= 1;
     }
   };

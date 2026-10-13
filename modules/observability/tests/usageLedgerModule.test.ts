@@ -28,6 +28,23 @@ function page(measurement: UsageEvidence, patch: Partial<UsageSourcePage> = {}):
 function setup() { const store = drizzleUsageLedger(tdb.db); return { store, ingest: usageIngestion(store) }; }
 
 describe.skipIf(!available)('RFC-034 durable evidence and synchronization sequence', () => {
+  test('211 distinct records prefetch absence in one task transaction without per-record reads',async()=>{
+    const {store,ingest}=setup(),first=sample(),events=Array.from({length:211},(_,n)=>({eventId:'batch:'+n,measurement:{...first,recordId:'batch:'+n}})),prior=tdb.handle.client.options.debug;let reads=0;
+    tdb.handle.client.options.debug=(_connection,query)=>{if(/^select/i.test(query.trim()))reads++;};
+    try{expect(await ingest(page(first,{events}))).toMatchObject({applied:211,duplicate:0});}finally{tdb.handle.client.options.debug=prior;}
+    expect(reads).toBeLessThan(20);
+    const ids=new Set<string>();let after=0;
+    for(;;){const result=await store.changes(page(first),after,37);for(const row of result.items)ids.add(usage(row).recordId);after=result.nextCursor;if(!result.hasMore)break;}
+    expect(ids.size).toBe(211);expect(after).toBe(211);
+  });
+  test('a repeated meter and event in one prefetched page sees preceding writes and keeps correction conflicts',async()=>{
+    const {store,ingest}=setup(),first=sample(),second={...first,revision:2,usage:{...first.usage,input:'130'}},input=page(first,{events:[{eventId:'one',measurement:first},{eventId:'two',measurement:second},{eventId:'one',measurement:first}]});
+    expect(await ingest(input)).toMatchObject({applied:2,duplicate:1});
+    const changes=await store.changes(input,0,20);expect(changes.items.map(row=>usage(row).projection.contribution.input)).toEqual(['100','130']);
+    await expect(ingest(page(first,{expectedCursor:'page:1',nextCursor:'page:2',events:[{eventId:'fresh',measurement:{...first,recordId:'another'}},{eventId:'conflict',measurement:{...second,usage:{...second.usage,input:'999'}}}]}))).rejects.toMatchObject({kind:'conflict'});
+    expect(await store.cursor(input,first.sourceId)).toBe('page:1');expect((await store.changes(input,0,20)).persistedThrough).toBe(2);
+  });
+
   test('replay across later pages and reopening never rolls back the source cursor', async () => {
     const { store, ingest } = setup(), first = sample(), input = page(first);
     expect(await ingest(input)).toMatchObject({ applied: 1, duplicate: 0, cursor: 'page:1' });

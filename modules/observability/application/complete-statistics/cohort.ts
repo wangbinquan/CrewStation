@@ -9,9 +9,10 @@ import {completeRuntimeDurations} from './durations';
 /** Retain both original header populations through EOF before any task or child statistics. */
 async function retainCompleteCohortHeaders(input:CompleteRuntimeCohortInput) {
   const receipts=[];
-  for(const kind of ['business-task','development-agent'] as const) {
+  for(const kind of ['business-task','development-agent','development-cli'] as const) {
+    const reader=input.facts.tasks[kind];if(!reader)continue;
     const source=input.namespace+'/headers/'+kind;
-    receipts.push(await consumeCompleteSource({source,snapshotId:input.snapshotId,reader:input.facts.tasks[kind],signal:input.signal,workspace:{
+    receipts.push(await consumeCompleteSource({source,snapshotId:input.snapshotId,reader,signal:input.signal,workspace:{
       claimCursor:async(_,cursor)=>input.rows.insert(input.namespace+'/header-cursors',[{key:input.keyOf(JSON.stringify([kind,cursor])),document:cursor}]),
       append:async(_,items)=>{
         if(items.some(task=>completeRuntimeSourceKind(task)!==kind))throw new Error('Original task owner source changed');

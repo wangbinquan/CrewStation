@@ -20,7 +20,7 @@ export function developmentWorkloadProtection(env: TaskEnvironment): Development
   if (render?.developmentUsageProtection === undefined) return undefined;
   const n = env.native, flag = DevelopmentUsageStorageSchema.safeParse(render.developmentUsageProtection);
   const layout = DevelopmentUsageStorageSchema.safeParse(render.developmentUsageStorage);
-  if (!flag.success || !layout.success || env.kind !== 'dev-session' || n?.purpose !== 'agent' || n.terminalId !== undefined
+  if (!flag.success || !layout.success || env.kind !== 'dev-session' || !n || !['agent','cli'].includes(n.purpose??'cli') || (n.purpose==='agent' ? n.terminalId !== undefined : !ResourceIdSchema.safeParse(n.terminalId).success)
     || env.businessWorkspace !== undefined || env.rebuildId !== undefined || render.rebuild !== undefined
     || render.businessStorage !== undefined || render.completionPolicy !== undefined || render.checkout !== undefined || render.workVolume !== undefined
     || !TaskIdSchema.safeParse(env.id).success || !ProjectIdSchema.safeParse(env.projectId).success || !TaskIdSchema.safeParse(n.parentTaskId).success || env.id === n.parentTaskId
@@ -32,7 +32,7 @@ export function developmentWorkloadProtection(env: TaskEnvironment): Development
     || render.developmentUsageRequestHash !== undefined && !/^[0-9a-f]{64}$/.test(render.developmentUsageRequestHash)
     || env.podUid !== undefined && !uid.safeParse(env.podUid).success || n.podUid !== undefined && !uid.safeParse(n.podUid).success
     || env.podUid !== undefined && n.podUid !== undefined && env.podUid !== n.podUid) throw precondition('独立开发 Agent 的原工作卷保护快照不完整或冲突');
-  const consumer = WorkloadConsumerIntentSchema.safeParse({ id: render.workloadConsumerId, taskId: n.parentTaskId, revision: render.start, purpose: 'agent', finalization: null });
+  const consumer = WorkloadConsumerIntentSchema.safeParse({ id: render.workloadConsumerId, taskId: n.parentTaskId, revision: render.start, purpose: n.purpose, finalization: null });
   if (!consumer.success) throw precondition('独立开发 Agent 的原消费者和启动修订不完整');
   return { developmentUsageProtection: flag.data, ...(render.developmentRemovalProtection !== undefined ? { developmentRemovalProtection: DevelopmentRemovalProtectionSchema.parse(render.developmentRemovalProtection) } : {}), consumer: consumer.data, expectedVolumeUid: n.pvcUid };
 }

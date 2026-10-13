@@ -16,6 +16,8 @@ import { sessionDeletionOwner, sessionTransportCloser } from './application/proj
 import { sessionDeletionRoutes } from './http/projectDeletionRoutes';
 import type { SessionDeletionSources } from './ports/projectDeletion';
 import type { ResourceIdentityDirectory } from '@crewstation/persistence';
+import {registerSessionSignals} from './adapters/persistence/runtimeSignals';
+import {registerRuntimeSignals} from '@crewstation/kernel';
 import { join } from 'node:path';
 import type { ServerWebSocket } from 'bun';
 import type { UserId } from '@crewstation/contracts';
@@ -91,6 +93,7 @@ export function createSessionModule(deps: SessionModuleDeps): SessionModule {
   const usageSources = drizzleBusinessUsageSourceStore(workDb);
   const developmentSources = drizzleDevelopmentUsageSourceStore(workDb);
   const hub = runnerHub(useCaseDeps);
+  registerSessionSignals(deps.db);registerRuntimeSignals('session.runners',()=>[{kind:'session.runners.connected',unit:'connections',value:String(hub.connections.size)}]);
   const deletionRepository = deps.deletionSources ? sessionDeletionRepository(deps.db, deps.deletionSources) : undefined;
   const close = deps.deletionSources && deletionRepository ? sessionTransportCloser(deletionRepository, deps.deletionSources, hub.drain, deps.settings.selfAddress) : undefined;
   const transport = close ? sessionDeletionTransport(deps.settings.selfAddress, (context, birth) => close(context, birth.id), deps.deletionRequest) : undefined;
@@ -145,3 +148,5 @@ export function createSessionModule(deps: SessionModuleDeps): SessionModule {
     migrations: sessionMigrations,
   };
 }
+
+export {readOriginalRunnerFragments} from './adapters/persistence/observationFragments';

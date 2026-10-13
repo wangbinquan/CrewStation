@@ -5,10 +5,10 @@ import type { Executor } from '@crewstation/persistence';
 import { sql } from 'drizzle-orm';
 import { SessionBirthSchema, SessionDeletionScopeSchema } from '../../../domain/projectDeletion';
 import type { SessionDeletionSources } from '../../../ports/projectDeletion';
-import { readSessionTask, registeredSessionContent, SESSION_CONTENT } from './identity';
+import { readSessionTask, registeredSessionContent } from './identity';
 import { sessionWorkHistory } from './workHistory';
 
-async function taskKeys(db: Executor, sources: SessionDeletionSources, target: ProjectDeletionTarget) {
+async function taskKeys(db: Executor, sources: SessionDeletionSources, target: ProjectDeletionTarget, tables: readonly string[]) {
   const own = new Set<string>(), all = new Set<string>();
   let after: string | null = null;
   for (;;) {
@@ -21,7 +21,7 @@ async function taskKeys(db: Executor, sources: SessionDeletionSources, target: P
       after = id; all.add(id);
     }
   }
-  const union = sql.join([...SESSION_CONTENT.map((name) => sql`SELECT task_id AS task_key FROM ${sql.raw('session.' + name)}`), sql`SELECT task_key FROM session.connection_births`, sql`SELECT task_key FROM session.original_callbacks`], sql` UNION `);
+  const union = sql.join([...tables.map((name) => sql`SELECT task_id AS task_key FROM ${sql.raw('session.' + name)}`), sql`SELECT task_key FROM session.connection_births`, sql`SELECT task_key FROM session.original_callbacks`], sql` UNION `);
   after = null;
   for (;;) {
     const rows: { task_key: string }[] = await db.execute(sql`SELECT task_key FROM (${union}) contents ${after === null ? sql`` : sql`WHERE task_key>${after}`} ORDER BY task_key COLLATE "C" LIMIT 200`);
@@ -40,10 +40,10 @@ async function taskKeys(db: Executor, sources: SessionDeletionSources, target: P
 
 /** Hash all private columns in the database; only minimum identities, counts and digests leave this adapter. */
 export async function inspectSessionDeletion(db: Executor, sources: SessionDeletionSources, target: ProjectDeletionTarget) {
-  await registeredSessionContent(db);
-  const { keys, origins } = await taskKeys(db, sources, target), resources = [];
+  const tables = await registeredSessionContent(db);
+  const { keys, origins } = await taskKeys(db, sources, target, tables), resources = [];
   const selected = sql`SELECT jsonb_array_elements_text(${JSON.stringify(keys)}::jsonb)`;
-  if (keys.length) for (const table of SESSION_CONTENT) {
+  if (keys.length) for (const table of tables) {
     const body = table === 'connections' ? sql`to_jsonb(content)-'last_seen_at'` : sql`to_jsonb(content)`;
     const rows = await db.execute<{ id: string; count: string; identity: string }>(sql`SELECT task_id AS id,count(*)::text AS count,
       encode(sha256(convert_to(string_agg(session.digest(${body}),',' ORDER BY session.digest(${body})),'UTF8')),'hex') AS identity

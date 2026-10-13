@@ -19,6 +19,11 @@ export function installRuntimeCompleteFixture(details:()=>RuntimeTaskObservation
    const selected=stored.rows.filter(row=>row.section===section&&(!parent||row.parent===parent)&&(!rowKey||row.key===rowKey)),start=after===null?0:Number(after),page=selected.slice(start,start+size);
    return Response.json({reportId:route[1],snapshotId:stored.report.header.snapshotId,section,parent,total:String(selected.length),items:page.map(row=>row.document),nextCursor:start+page.length<selected.length?String(start+page.length):null});
   }
+  if(url.pathname.endsWith('/observability/platform-usage'))return Response.json({scope:'system-platform',window:{from:url.searchParams.get('from'),to:url.searchParams.get('to'),timezone:url.searchParams.get('timezone')??'Asia/Shanghai'},windowBasis:'test-admission',asOf:new Date().toISOString(),summary:{executions:'0',observedExecutions:'0',records:'0',tokens:{input:'0',cacheRead:'0',cacheWrite:'0',output:'0',total:'0'},tokenComplete:false,currency:'CNY',amount:null,priceComplete:false,gaps:[]},items:[],nextCursor:null});
+  if(url.pathname.endsWith('/observability/aggregate')){
+   // This fixture has no background task projection. Its original report remains the sole acceptance source.
+   return Response.json({scope:url.pathname.startsWith('/v1/projects/')?'project':'system',projectId:url.pathname.startsWith('/v1/projects/')?url.pathname.split('/')[3]:null,filters:{from:url.searchParams.get('from'),to:url.searchParams.get('to'),timezone:url.searchParams.get('timezone')??'Asia/Shanghai'},windowBasis:'task-admission',projection:{generation:'1',revision:'0',asOf:null,bootstrapCompleted:false,pending:true},pendingTasks:'1',summary:{tasks:'0',metrics:{state:'not-ready',gaps:['projection-initializing']},durations:{state:'not-ready',gaps:['timing-missing']},trend:[],sources:[]}});
+  }
   const response=await delegate(raw,init);if(!response.ok||!url.pathname.match(/\/observability\/(statistics|tasks\/[^/]+)$/))return response;
   const original=await response.json() as RuntimeStatistics|RuntimeTaskObservation,project=url.pathname.startsWith('/v1/projects/'),single='attempts' in original;
   const tasks=single?[original]:original.tasks.map(task=>({...details().find(row=>row.id===task.id)!,...task}));

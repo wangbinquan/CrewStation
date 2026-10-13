@@ -51,9 +51,10 @@ function setup(db: Database = tdb.db) {
 }
 
 describe.skipIf(!available)('RFC-034 native proof ledger', () => {
-  test('one original repair lookup per projected record retains every known bucket without an N+1 repair reread', async () => {
-    const repairs: string[] = [], projections: string[] = [];
+  test('one transaction-wide absence lookup retains every known bucket without per-record repair or projection rereads', async () => {
+    const repairs: string[] = [], projections: string[] = [], absence: string[] = [];
     const database = drizzle({ client: tdb.handle.client, logger: { logQuery(query) {
+      if(query.startsWith('SELECT k.key')&&query.includes('observability.usage_evidence')&&query.includes('observability.usage_projections')&&query.includes('observability.native_repairs'))absence.push(query);
       if (query.startsWith('select ') && query.includes(['from', '"observability"."native_repairs"'].join(' '))) repairs.push(query);
       if (query.startsWith('select ') && query.includes(['from', '"observability"."usage_projections"'].join(' '))) projections.push(query);
     } } });
@@ -61,8 +62,9 @@ describe.skipIf(!available)('RFC-034 native proof ledger', () => {
     const input = await f.input(Array.from({ length: count }, (_, n) => numberFrame(step('original-repair-read-' + n, String(n + 1)))));
     // This is the actual ordinary numerical ledger path; no source capture or proof is manufactured.
     await f.ingest({ ...input, native: [] });
-    expect(repairs).toHaveLength(count);
-    expect(projections).toHaveLength(count);
+    expect(absence).toHaveLength(1);
+    expect(repairs).toHaveLength(0);
+    expect(projections).toHaveLength(0);
     const rows = await tdb.handle.client`SELECT count(*)::text AS records,
       sum((document->'projection'->'contribution'->>'input')::numeric)::text AS input,
       sum((document->'projection'->'contribution'->>'cacheRead')::numeric)::text AS cache_read,

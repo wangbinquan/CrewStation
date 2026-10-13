@@ -1,0 +1,4 @@
+import {sql} from 'drizzle-orm';
+import type {Executor} from '@crewstation/persistence';
+/** Safe historical facts: no allowlist members, actor tokens, or free-form maintenance body. */
+export async function readObservationMaintenance(db:Executor,serviceId:string){const result:Array<{at:string;enabled:boolean}>=[];let after:string|undefined;for(;;){const rows=await db.execute(sql`SELECT id,at,kind,body->'switches' AS switches FROM gateway.maintenance_events WHERE service_id=${serviceId} AND ${after?sql`id>${after}`:sql`true`} ORDER BY id LIMIT 200`);if(!rows.length)break;for(const row of rows){const switches=row['switches'] as Record<string,boolean>|undefined;result.push({at:new Date(String(row['at'])).toISOString(),enabled:row['kind']!=='exited'&&Boolean(switches?.['services']||switches?.['users'])});}after=String(rows.at(-1)!['id']);}return result.sort((a,b)=>a.at.localeCompare(b.at));}

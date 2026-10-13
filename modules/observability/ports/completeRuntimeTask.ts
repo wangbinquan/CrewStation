@@ -1,6 +1,7 @@
+import type { RuntimeFragment, RuntimePhase, NativeActivityEvent, RuntimePhaseTiming } from '@crewstation/contracts';
 import type {CompleteTaskTiming} from '../domain/completeRuntimeTiming';
 import type { CompleteUsageWorkspaceFactory } from './completeUsageWorkspace';
-import type { RuntimeTaskHeaderFact,RuntimeAttemptFact,UsageRecord,UsageValuation } from '@crewstation/contracts';
+import type { RuntimeTaskHeaderFact,RuntimeAttemptFact} from '@crewstation/contracts';
 import type { CompleteRuntimeFold,CompleteRuntimeMetrics } from '../domain/completeRuntimeMetrics';
 import type { runtimeContributionEvidence } from '../domain/completeUsageEvidence';
 import type { CompleteSourceReader,CompleteSourceReceipt } from './completeReport';
@@ -16,6 +17,9 @@ export interface CompleteAttemptWorking {
   nativeComplete:boolean;
 }
 export interface CompleteRuntimeTaskInput {
+  readonly fragments?:CompleteSourceReader<RuntimeFragment>;
+  readonly lifecycle?:readonly RuntimePhase[];
+  readonly activity?:CompleteSourceReader<NativeActivityEvent>;
   readonly task:RuntimeTaskHeaderFact;
   readonly snapshotId:string;
   readonly asOf:string;
@@ -29,14 +33,13 @@ export interface CompleteRuntimeTaskInput {
   readonly signal?:AbortSignal;
 }
 export type CompleteRuntimeEvidence=ReturnType<typeof runtimeContributionEvidence>;
-export interface CompleteRuntimeAllocation {
-  readonly record:CompleteRuntimeEvidence;
-  readonly contribution:UsageRecord['usage'];
-  readonly quality:{readonly ambiguous:boolean;readonly unavailable:boolean};
-  readonly valuation?:UsageValuation|null;
-  readonly whole?:boolean;
-}
+export type {CompleteRuntimeAllocation} from '../domain/runtime/completeRuntimeAllocation';
+
 export interface CompleteRuntimeTaskBuild {
+  readonly fragmentsNamespace?:string;
+  readonly phaseTiming?:RuntimePhaseTiming;
+  readonly phasesNamespace?:string;
+  readonly projection?:{readonly capturedAt:string;readonly sourceRevision:string;readonly pending:boolean};
   readonly task:RuntimeTaskHeaderFact;
   readonly attemptCount:string;
   readonly fold:CompleteRuntimeFold;

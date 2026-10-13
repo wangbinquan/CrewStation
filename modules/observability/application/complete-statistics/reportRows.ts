@@ -16,6 +16,7 @@ export function completeReportRows(input:Pick<CompleteRuntimeCohortInput,'rows'|
     await counts.flush();
   }
   return {namespace,countsNamespace,flush,
+    prefetchCounts:(groups:readonly {section:RuntimeReportSection;parent:string|null}[])=>counts.prefetch(groups.map(group=>input.keyOf(JSON.stringify([group.section,group.parent])))),
     async append(section:RuntimeReportSection,parent:string|null,key:string,document:unknown) {
       input.signal?.throwIfAborted();const identity=input.keyOf(JSON.stringify([section,parent]));
       const previous=await counts.get(identity);

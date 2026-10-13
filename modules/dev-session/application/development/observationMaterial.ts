@@ -12,7 +12,7 @@ export async function developmentObservationMaterial(deps: DevSessionUseCaseDeps
     projectId: intent.identity.projectId, serviceId: original.context.serviceId, userId: start.createdBy });
   const launch = await profileLaunchFields(deps, { profileId: intent.profileId, revision: intent.profileRevision }, start.agentId);
   return { id: `start-${start.agentId}`, type: 'startAgent', agentId: intent.identity.agentId, ...launch,
-    permission: intent.permission, mode: intent.mode,
+    permission: intent.permission, mode: intent.mode === 'cli' ? 'interactive' : intent.mode,
     ...(intent.cwd !== null ? { cwd: intent.cwd } : {}), ...(intent.initialPrompt !== null ? { initialPrompt: intent.initialPrompt } : {}),
     ...(intent.resumeSessionId !== null ? { resumeSessionId: intent.resumeSessionId } : {}), ...(intent.systemPrompt !== null ? { systemPrompt: intent.systemPrompt } : {}),
     mcp: intent.mcp.map((m) => ({ ...m, headers: { [IDENTITY_HEADERS.devSessionToken]: credential.token } })), env: {} };

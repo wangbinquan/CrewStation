@@ -76,6 +76,10 @@ spec:
             - --api.dashboard=false
             - --log.level=INFO
             - --accesslog=true
+            - --metrics.prometheus=true
+            - --metrics.prometheus.entryPoint=traefik
+            - --metrics.prometheus.addServicesLabels=true
+            - --metrics.prometheus.addRoutersLabels=false
             - --providers.kubernetescrd=true
             - --providers.kubernetescrd.allowCrossNamespace=true
             - --providers.kubernetescrd.allowEmptyServices=true

@@ -1,0 +1,6 @@
+// RFC-034: logical Task lifecycle joins every original physical child, not only a guessed same-ID environment.
+import {expect,test} from 'bun:test';
+import type {RuntimeTaskHeaderFact,TaskId,RuntimePhase} from '@crewstation/contracts';
+import {newResourceId} from '@crewstation/kernel';
+import {originalRuntimePhases} from './originalRuntimePhases';
+test('all owner pages are visited and each physical original identity stays attached to its logical task',async()=>{const id=newResourceId() as TaskId,children=Array.from({length:201},()=>newResourceId() as TaskId),seen:string[]=[],task={id,source:{kind:'business-task'}} as RuntimeTaskHeaderFact,read=originalRuntimePhases({origins:async(_e:unknown,_t,after)=>{const i=after?Number(after):0;return {items:children.slice(i,i+100),nextCursor:i+100<children.length?String(i+100):null};},phases:async(_e:unknown,t)=>{seen.push(t.id);return [{key:t.id,taskId:t.id,agentId:t.id,turnId:null,kind:'queue',source:'task-runtime',quality:'known',startedAt:'2026-10-13T00:00:00.000Z',endedAt:'2026-10-13T00:00:01.000Z',durationMs:'1000',open:false,reason:null} as RuntimePhase];}}),result=await read({},task,'2026-10-13T00:01:00.000Z');expect(seen).toEqual(children);expect(result).toHaveLength(201);expect(result.every(row=>row.taskId===id)).toBe(true);expect(result.at(-1)?.runtimeTaskId).toBe(children.at(-1));});

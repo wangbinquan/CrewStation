@@ -3,7 +3,8 @@ import {afterEach,expect,test} from 'bun:test';
 import {testDatabaseAvailable} from '@crewstation/testkit';
 import {jsonHash,newResourceId} from '@crewstation/kernel';
 import {RuntimeStatisticsQuerySchema,runtimeCompleteReportContent,type ProjectId,type RuntimeCompleteReport,type RuntimeReportSection,type CompleteRuntimeMetricsDto} from '@crewstation/contracts';
-import {completeRuntimeReportCache} from '../../adapters/persistence/reports/reportStore';
+import {runtimeProjectionState} from '../../adapters/persistence/projection/runtimeAggregate';
+import {completeRuntimeReportCache,originalRuntimeSourceIdentity} from '../../adapters/persistence/reports/reportStore';
 import {cnyPicos} from '../../domain/cnyPricing';
 import {completeFactsFixture} from '../completeFactsFixture';
 import {completeCohortWindow} from '../completeCohortFixture';
@@ -29,7 +30,7 @@ test.skipIf(!available)('system/project and task facts retain every partial allo
  }
 },60000);
 test.skipIf(!available)('the original executionFactsVersion three report is immutable while version four retains known partial CNY at the same source revision',async()=>{
- const f=fixture=await completeFactsFixture({partialCnyCohort:true}),cache=completeRuntimeReportCache(f.tdb.db),identity=await cache.identity(),request={actor:f.actor,projectId:null,filters:RuntimeStatisticsQuerySchema.parse(completeCohortWindow)},owner='partial-legacy/'+newResourceId(),old=await cache.ensure(request,jsonHash({projectionVersion:2,executionFactsVersion:3,identity,request}),owner,newResourceId()),gaps=[{source:'old-known-partial-mask',reason:'native-capture-unobserved'}];
+ const f=fixture=await completeFactsFixture({partialCnyCohort:true}),cache=completeRuntimeReportCache(f.tdb.db),identity=await cache.identity(),sourceIdentity=await originalRuntimeSourceIdentity(f.tdb.db),request={actor:f.actor,projectId:null,filters:RuntimeStatisticsQuerySchema.parse(completeCohortWindow)},owner='partial-legacy/'+newResourceId(),old=await cache.ensure(request,jsonHash({projectionVersion:2,executionFactsVersion:3,identity,request}),owner,newResourceId()),gaps=[{source:'old-known-partial-mask',reason:'native-capture-unobserved'}];
  await cache.unavailable(old.id,owner,gaps);const legacy:RuntimeCompleteReport={reportId:old.id,state:'not-ready',gaps};expect(await f.module.api.runtimeCompleteReportStatus(f.actor,null,old.id)).toEqual(legacy);
- const current=await f.settle(null),facts=runtimeCompleteReportContent(current)!;expect(current.reportId).not.toBe(old.id);expect(facts.header.generation).toBe(identity.generation);expect(facts.header.sourceRevision).toBe(identity.revision);expect(facts.header.projectionVersion).toBe(2);expect(facts.summary.metrics).toMatchObject(received);expect(await f.module.api.runtimeCompleteReportStatus(f.actor,null,old.id)).toEqual(legacy);expect(await cache.identity()).toEqual(identity);expect((await f.settle(null)).reportId).toBe(current.reportId);
+ const current=await f.settle(null),facts=runtimeCompleteReportContent(current)!;expect(current.reportId).not.toBe(old.id);expect(facts.header.generation).toBe(identity.generation);expect(facts.header.sourceRevision).toBe((await runtimeProjectionState(f.tdb.db)).revision);expect(facts.header.projectionVersion).toBe(2);expect(facts.summary.metrics).toMatchObject(received);expect(await f.module.api.runtimeCompleteReportStatus(f.actor,null,old.id)).toEqual(legacy);expect(await originalRuntimeSourceIdentity(f.tdb.db)).toEqual(sourceIdentity);expect((await f.settle(null)).reportId).toBe(current.reportId);
 },60000);

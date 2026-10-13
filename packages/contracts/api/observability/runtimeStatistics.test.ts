@@ -47,7 +47,8 @@ test('unknown output remains distinct from a known zero with incomplete coverage
 
 test('development source identity and collection state are additive, strict and never business subtasks', () => {
   expect(RuntimeStatisticsQuerySchema.parse({ ...window, sourceKind:'development-agent' }).sourceKind).toBe('development-agent');
-  expect(RuntimeStatisticsQuerySchema.safeParse({ ...window, sourceKind:'development-cli' }).success).toBe(false);
+  expect(RuntimeStatisticsQuerySchema.safeParse({ ...window, sourceKind:'development-cli' }).success).toBe(true);
+  expect(RuntimeStatisticsQuerySchema.safeParse({...window,sourceKind:'unsupported'}).success).toBe(false);
   const source={ kind:'development-agent',workspaceName:null,identity:{sourceKind:'development-agent',projectId:id,taskId:id,agentId:id,executionId:id,executionGeneration:1} };
   const task={id,projectId:id,serviceId:id,name:'dev',protocol:'development',state:'closed',createdAt:window.from,closedAt:null,traceId:null,attempts:[],attemptsPartial:false,source};
   expect(RuntimeTaskFactSchema.parse(task).source).toEqual(RuntimeTaskSourceSchema.parse(source));

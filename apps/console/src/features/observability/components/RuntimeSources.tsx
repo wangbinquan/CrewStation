@@ -12,7 +12,7 @@ import {completeCount,completeTokens,completeCny} from '../model/completeFormat'
 interface FilterProps { search: RuntimeSearch; change: (search: RuntimeSearch) => void }
 export function RuntimeSourceFilter({ search, change }: FilterProps) {
   const t = useT(); return <ActionRow role="group" aria-label={t('runtime.source.title')}>
-    {([undefined, 'business-task', 'development-agent'] as const).map((kind) => <Button key={kind ?? 'all'} size="small" variant="ghost" aria-pressed={search.sourceKind === kind}
+    {([undefined, 'business-task', 'development-agent','development-cli'] as const).map((kind) => <Button key={kind ?? 'all'} size="small" variant="ghost" aria-pressed={search.sourceKind === kind}
       onClick={() => change({ ...search, sourceKind: kind, agent: undefined, profile: undefined })}>{kind ? runtimeSourceLabel(kind, t) : t('runtime.source.all')}</Button>)}
   </ActionRow>;
 }

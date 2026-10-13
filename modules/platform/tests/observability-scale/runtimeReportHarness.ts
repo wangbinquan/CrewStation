@@ -33,9 +33,13 @@ export async function runtimeReportHarness(spoolRoot?: string) {
   return { tdb, module, root,
     async build(project: ProjectId | null) {
       const started = performance.now();
-      const initial = await module.api.runtimeCompleteReport(actor, project, populationWindow);
       for (const worker of module.reportWorkers) await worker.drain();
-      const report = await module.api.runtimeCompleteReportStatus(actor, project, initial.reportId);
+      const initial = await module.api.runtimeCompleteReport(actor, project, populationWindow);
+      let report = initial;
+      while (report.state === 'building') {
+        for (const worker of module.reportWorkers) await worker.drain();
+        report = await module.api.runtimeCompleteReportStatus(actor, project, initial.reportId);
+      }
       return { report, elapsedMs: performance.now() - started };
     },
     async close() { for (const worker of module.reportWorkers) await worker.stop(); await tdb.drop(); if (spoolRoot === undefined) await rm(root, { recursive: true, force: true }); },

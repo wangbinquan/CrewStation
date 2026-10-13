@@ -31,7 +31,7 @@ async function sourceCursor(db: Executor, taskKey: string, sourceId: string) {
 function transaction(db: Executor, taskKey: string, sourceId: string, head: number, initialNative: string) {
   let sequence = head, nativeRevision = BigInt(initialNative);
   const dependencies = { value: async () => sequence + ":" + nativeRevision, changed: () => { nativeRevision++; } };
-  const repairKeys = new Set<string>();
+  const repairKeys = new Set<string>(), fresh = new Set<string>(), prefetchedEvents = new Set<string>(), eventFingerprints = new Map<string,string>();
   // The task-head transaction owns these reads; never share projections across transactions.
   const projections = new Map<string, Promise<Awaited<ReturnType<typeof currentUsage>>>>();
   const current = async (value: UsageMeasurementRef) => {
@@ -42,10 +42,19 @@ function transaction(db: Executor, taskKey: string, sourceId: string, head: numb
     return document === undefined ? undefined : structuredClone(document);
   };
   const invalidate = async <T>(work: () => Promise<T>) => {
-    projections.clear();
-    try { return await work(); } finally { projections.clear(); }
+    projections.clear();fresh.clear();
+    try { return await work(); } finally { projections.clear();fresh.clear(); }
   };
   const tx: DevelopmentUsageTransaction = {
+    prefetch: async(events)=>{
+      if(!events.length)return;
+      const ids=[...new Set(events.map(e=>e.eventId))],keys=[...new Set(events.map(e=>meterKeyOf(e.measurement)))];
+      const prior=await db.select({id:usageEvents.eventId,fingerprint:usageEvents.fingerprint}).from(usageEvents).where(and(eq(usageEvents.taskKey,taskKey),eq(usageEvents.sourceId,sourceId),inArray(usageEvents.eventId,ids)));
+      for(const id of ids)prefetchedEvents.add(id);for(const row of prior)eventFingerprints.set(row.id,row.fingerprint);
+      // The task-head lock already serializes this page with all writers. Absence is proved in this same transaction.
+      const absent=await db.execute<{key:string}>(sql`SELECT k.key FROM (VALUES ${sql.join(keys.map(k=>sql`(${k}::text)`),sql`,`)}) k(key) WHERE NOT EXISTS(SELECT 1 FROM observability.usage_evidence e WHERE e.meter_key=k.key) AND NOT EXISTS(SELECT 1 FROM observability.usage_projections p WHERE p.meter_key=k.key) AND NOT EXISTS(SELECT 1 FROM observability.native_repairs n WHERE n.meter_key=k.key)`);
+      for(const row of absent){fresh.add(row.key);projections.set(row.key,Promise.resolve(undefined));}
+    },
     developmentPaths: async (passKey) => {
       const count = async () => (await db.execute<{ count: string }>(sql`SELECT count(*)::text AS count FROM observability.development_native_paths WHERE pass_key=${passKey}`))[0]!.count;
       const before = await count(), result = await qualifyDevelopmentNativePaths(db, taskKey, sourceId, passKey);
@@ -61,16 +70,17 @@ function transaction(db: Executor, taskKey: string, sourceId: string, head: numb
     developmentCapture: (context, frame) => invalidate(async () => { sequence = await persistDevelopmentFrame(db, taskKey, context, frame, sequence); }),
     cursor: () => sourceCursor(db, taskKey, sourceId),
     pageFingerprint: async (cursor) => (await db.select().from(usagePages).where(and(eq(usagePages.taskKey, taskKey), eq(usagePages.sourceId, sourceId), eq(usagePages.cursor, cursor))).limit(1))[0]?.fingerprint,
-    eventFingerprint: async (eventId) => (await db.select().from(usageEvents).where(and(eq(usageEvents.taskKey, taskKey), eq(usageEvents.sourceId, sourceId), eq(usageEvents.eventId, eventId))).limit(1))[0]?.fingerprint,
-    revisionFingerprint: async (value) => (await db.select().from(usageEvidence).where(and(eq(usageEvidence.meterKey, meterKeyOf(value)), eq(usageEvidence.revision, value.revision))).limit(1))[0]?.fingerprint,
-    evidence: async (value, after, limit) => (await db.select().from(usageEvidence).where(and(eq(usageEvidence.meterKey, meterKeyOf(value)), gt(usageEvidence.revision, after))).orderBy(asc(usageEvidence.revision)).limit(limit)).map((row) => row.document),
+    eventFingerprint: async (eventId) => prefetchedEvents.has(eventId)?eventFingerprints.get(eventId):(await db.select().from(usageEvents).where(and(eq(usageEvents.taskKey, taskKey), eq(usageEvents.sourceId, sourceId), eq(usageEvents.eventId, eventId))).limit(1))[0]?.fingerprint,
+    revisionFingerprint: async (value) => fresh.has(meterKeyOf(value))?undefined:(await db.select().from(usageEvidence).where(and(eq(usageEvidence.meterKey, meterKeyOf(value)), eq(usageEvidence.revision, value.revision))).limit(1))[0]?.fingerprint,
+    evidence: async (value, after, limit) => fresh.has(meterKeyOf(value))?[]:(await db.select().from(usageEvidence).where(and(eq(usageEvidence.meterKey, meterKeyOf(value)), gt(usageEvidence.revision, after))).orderBy(asc(usageEvidence.revision)).limit(limit)).map((row) => row.document),
     current,
     append: async (event, fingerprint) => {
-      await db.insert(usageEvidence).values({ meterKey: meterKeyOf(event.measurement), revision: event.measurement.revision, fingerprint, document: event.measurement }).onConflictDoNothing();
-      await db.insert(usageEvents).values({ taskKey, sourceId, eventId: event.eventId, fingerprint });
+      // A repeated revision under a new event still retains that event, as in the original sequential INSERTs.
+      await db.execute(sql`WITH retained AS(INSERT INTO observability.usage_evidence(meter_key,revision,fingerprint,document) VALUES(${meterKeyOf(event.measurement)},${event.measurement.revision},${fingerprint},${JSON.stringify(event.measurement)}::jsonb) ON CONFLICT DO NOTHING RETURNING meter_key) INSERT INTO observability.usage_events(task_key,source_id,event_id,fingerprint) SELECT ${taskKey},${sourceId},${event.eventId},${fingerprint} FROM (SELECT count(*) FROM retained) acknowledged`);
+      fresh.delete(meterKeyOf(event.measurement));eventFingerprints.set(event.eventId,fingerprint);
     },
     project: async (value, originalModelEvidence) => {
-      const meterKey = meterKeyOf(value), previous = await current(value), retained = await currentRepair(db, meterKey);
+      const meterKey = meterKeyOf(value), previous = await current(value), retained = fresh.has(meterKey)?undefined:await currentRepair(db, meterKey);
       if (retained && !isNativeLedgerReference(retained.document)) repairKeys.add(retained.nativeKey);
       const document = await nativeProjection(db, meterKey, value, previous, retained, originalModelEvidence);
       if (document !== previous) {
@@ -125,8 +135,7 @@ async function nativeProjection(db: Executor, key: string, value: NonNullable<Aw
 async function writeUsageProjection(db: Executor, taskKey: string, value: NonNullable<Awaited<ReturnType<typeof currentUsage>>>, sequence: number) {
   if (sequence >= Number.MAX_SAFE_INTEGER) throw new RangeError('Usage synchronization sequence exhausted');
   const meterKey = meterKeyOf(value);
-  await db.insert(usageProjections).values({ meterKey, taskKey, document: value }).onConflictDoUpdate({ target: usageProjections.meterKey, set: { document: value } });
-  await db.insert(usageChanges).values({ taskKey, meterKey, sequence: ++sequence, document: value });
+  await db.execute(sql`WITH projected AS(INSERT INTO observability.usage_projections(meter_key,task_key,document) VALUES(${meterKey},${taskKey},${JSON.stringify(value)}::jsonb) ON CONFLICT(meter_key) DO UPDATE SET document=excluded.document RETURNING meter_key) INSERT INTO observability.usage_changes(task_key,meter_key,sequence,document) SELECT ${taskKey},meter_key,${++sequence},${JSON.stringify(value)}::jsonb FROM projected`);
   return sequence;
 }
 async function reprojectNativeMeter(db: Executor, taskKey: string, key: string, sequence: number) {
@@ -217,6 +226,8 @@ async function persistValuation(db: Executor, input: ExecutionValuationRequest, 
 
 export function drizzleExecutionValuations(db: Database): ExecutionValuationStore {
   return {
+    retainModel:async(ref,evidence)=>db.transaction(async tx=>{await admitObservationWrite(tx,ref.identity.projectId);const current=await currentUsage(tx,meterKeyOf(ref));if(!current||evidence.recordId!==current.recordId||evidence.revision!==(current.projection.modelRevision??current.revision)||!evidence.actualModel||jsonHash(evidence.actualModel)!==current.modelRef)return;const document={identity:ref.identity,...evidence},digest=jsonHash(document);const [old]=await tx.execute(sql`SELECT document FROM observability.usage_model_evidence WHERE meter_key=${meterKeyOf(ref)} AND revision=${evidence.revision}`);if(old&&jsonHash(old['document'])!==digest)throw conflict('原实际模型证据修订冲突');await tx.execute(sql`INSERT INTO observability.usage_model_evidence VALUES(${meterKeyOf(ref)},${evidence.revision},${ref.identity.projectId},${ref.identity.taskId},${JSON.stringify(document)}::jsonb) ON CONFLICT DO NOTHING`);}),
+
     usage: async (ref) => (await db.select().from(usageProjections).where(eq(usageProjections.meterKey, meterKeyOf(ref))).limit(1))[0]?.document,
     receipt: (scope, requestKey) => valuationReceipt(db, taskKeyOf(scope), requestKey),
     pendingNativeRepairs: async (scope, limit) => {
@@ -228,8 +239,9 @@ export function drizzleExecutionValuations(db: Database): ExecutionValuationStor
         .where(and(eq(nativeRepairs.taskKey, taskKeyOf(scope)), sql`${executionValuations.document}->>'usageRevision' IS DISTINCT FROM ${usageProjections.document}->'projection'->>'projectionRevision'`))
         .orderBy(asc(nativeRepairs.meterKey)).limit(limit);
     },
-    commit: (input, fingerprint, basisFingerprint, draft) => db.transaction(async (tx) => {
+    commit: (input, fingerprint, basisFingerprint, draft,expectedPriceCorrection) => db.transaction(async (tx) => {
       await admitObservationWrite(tx, input.measurement.identity.projectId);
+      if(expectedPriceCorrection!==undefined){const i=input.measurement.identity;await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${'observability.execution-price/'+i.executionId+'/'+i.executionGeneration},0))`);const [pricePolicy]=await tx.execute(sql`SELECT revision::text AS value FROM observability.execution_price_corrections WHERE execution_id=${i.executionId} AND generation=${i.executionGeneration}`);if((pricePolicy?String(pricePolicy['value']):null)!==expectedPriceCorrection)throw conflict('原执行价格纠错已更新，旧估值未覆盖新价格');}
       const taskKey = taskKeyOf(input.measurement.identity);
       const [head] = await tx.select().from(usageHeads).where(eq(usageHeads.taskKey, taskKey)).for('update');
       const prior = await valuationReceipt(tx, taskKey, input.requestKey);

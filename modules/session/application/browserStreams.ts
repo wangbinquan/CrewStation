@@ -1,6 +1,6 @@
 import type { Actor, RunnerCommand, TaskId } from '@crewstation/contracts';
 import { RunnerCommandSchema } from '@crewstation/contracts';
-import { forbidden, isPlatformError } from '@crewstation/kernel';
+import {incrementRuntimeSignal,setRuntimeSignal, forbidden, isPlatformError } from '@crewstation/kernel';
 import type { EventSink } from '../domain/runnerConnection';
 import { authorizedSink } from './authorizedSink';
 import { openBrowserReplay } from './browserReplay';
@@ -18,6 +18,7 @@ export interface BrowserStream {
 
 /** 浏览器（工作台）到某任务的流：先回放持久事件到 sinceSeq 之后，再接实时广播；命令经同一派发口。 */
 export function browserStreams(deps: SessionUseCaseDeps, hub: RunnerHub, dispatch: ReturnType<typeof commandDispatch>) {
+  let active=0;
   return {
     /** `viewerName` 是网关注入的显示名，取得输入控制时随用户 ID 一起交给 Runner，别的查看者据此看到是谁在输入。 */
     open: async (actor: Actor, taskId: TaskId, sink: EventSink, sinceSeq: number, options: BrowserReplayOptions & { readonly viewerName?: string } = {}): Promise<BrowserStream> => {
@@ -29,6 +30,7 @@ export function browserStreams(deps: SessionUseCaseDeps, hub: RunnerHub, dispatc
       unsubscribe = replay.unsubscribe;
       const { complete } = replay;
       try { await guarded.drain(); await deps.connectionHistory?.check(taskId); if (!(await guarded.check())) throw forbidden('项目权限已变化'); } catch (error) { unsubscribe(); throw error; }
+      incrementRuntimeSignal('websocket.opened','connections');if(sinceSeq>0)incrementRuntimeSignal('websocket.reconnected','connections');setRuntimeSignal('websocket.active','connections',String(++active));let closed=false;
       const viewId = crypto.randomUUID(), holder = { userId: actor.userId, name: options.viewerName ?? '' };
       const controlled = new Set<string>();
       return {
@@ -49,6 +51,7 @@ export function browserStreams(deps: SessionUseCaseDeps, hub: RunnerHub, dispatc
           }
         },
         close: () => {
+          if(closed)return;closed=true;incrementRuntimeSignal('websocket.closed','connections');setRuntimeSignal('websocket.active','connections',String(--active));
           guarded.close(); unsubscribe();
           for (const terminalId of controlled) void dispatch.sendCommand(taskId, { id: crypto.randomUUID(), type: 'detachTerminal', terminalId, viewId }).catch(() => undefined);
         },

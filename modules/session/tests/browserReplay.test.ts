@@ -1,3 +1,4 @@
+import {renderRuntimeSignals} from '@crewstation/kernel';
 import { expect, test } from 'bun:test';
 import type { RunnerEvent, TaskId, UserId } from '@crewstation/contracts';
 import { TASKRUNNER_PROTOCOL_VERSION } from '@crewstation/contracts';
@@ -164,3 +165,5 @@ test('首次打开带 replay=tail 只回放最近一页并注明起点；续接�
   expect(next.at(-1)).toMatchObject({ type: 'streamReady', replayComplete: true }); expect(next.at(-1)!.replayFromSeq).toBeUndefined();
   continued.close();
 });
+
+test('observed reconnect and replay continuation signals use the actual original stream cursor',async()=>{const f=fixture(async(_task,since,options)=>[stored(1),stored(2),stored(3),stored(4)].filter(row=>row.seq>since).slice(0,options.limit),2,4),frames:unknown[]=[];const stream=await f.streams.open(actor,taskId,{send:raw=>frames.push(JSON.parse(raw))},1);expect(frames).toContainEqual(expect.objectContaining({type:'streamReady',replayComplete:false,resumeFromSeq:3}));const text=await renderRuntimeSignals('session');expect(text).toContain('kind="websocket.reconnected"');expect(text).toContain('kind="websocket.replay.continuations"');expect(text).toContain('kind="websocket.replay.observedRemaining",unit="events"} 1');stream.close();});

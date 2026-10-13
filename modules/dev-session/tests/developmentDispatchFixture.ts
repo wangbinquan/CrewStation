@@ -5,9 +5,10 @@ import type { DevelopmentDispatchDeps, DevelopmentDispatchSession } from '../por
 import type { DevelopmentUsageOwnerRecord } from '../ports/developmentUsage';
 import { developmentUsageFixture } from './developmentUsageFixture';
 
-export async function developmentDispatchFixture(db: Database, options: { bound?: boolean; selected?: boolean } = {}) {
+export async function developmentDispatchFixture(db: Database, options: { bound?: boolean; selected?: boolean; automatic?: boolean } = {}) {
   const f = await developmentUsageFixture(db);
-  f.preparation.intent.nativeSource = { version: 1 };
+  f.preparation.intent.nativeSource = { version: options.automatic ? 2 : 1 };
+  if(options.automatic) { await f.starts.update({ ...f.start, execution: { ...f.start.execution, observationLegacyFallback: true } }); f.preparation.legacyFallbackAllowed = true; }
   if (options.selected !== false) await f.owner.prepare(f.preparation);
   if (options.bound) await f.owner.bind(f.child.id, f.info);
   const calls: RunnerCommand[] = [], registrations: DevelopmentUsageRegistration[] = [], stored = new Map<TaskId, StoredDevelopmentUsage>();

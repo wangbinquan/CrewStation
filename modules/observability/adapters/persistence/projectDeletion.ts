@@ -1,3 +1,5 @@
+import {retireRuntimeProjectProjection} from './projection/retireRuntimeProject';
+import {replaceRuntimeOccurrenceHours} from './runtimeOccurrenceHours';
 import type { ProjectDeletionContext, ProjectDeletionTarget, ProjectId } from '@crewstation/contracts';
 import { PROJECT_DELETION_PHASES, ProjectDeletionContextSchema, ProjectDeletionInventorySchema } from '@crewstation/contracts';
 import { jsonHash, precondition } from '@crewstation/kernel';
@@ -9,6 +11,54 @@ import {runtimeReportAdmissionKey} from '../../ports/completeRuntimeReportCache'
 import type { ObservabilityReportLifecycle, ObservabilityDeletionRepository, ObservabilityDeletionTasks, ObservabilityProjectDirectory } from '../../ports/projectDeletion';
 
 const columns: Readonly<Record<string, readonly string[]>> = {
+  runtime_maintenance:['actor_id','confirmed_order','document','id','lease_id','lease_until','request_key'],
+  runtime_maintenance_members:['row_through','version','cursor','error','header','operation_id','project_id','state','task_id','task_key','through'],
+  runtime_maintenance_rows:['document','key','operation_id','project_id','task_id','task_key'],
+  execution_price_correction_records:['document','execution_id','generation','operation_id','project_id','record_id','source_id','task_id','task_key'],
+  execution_price_corrections:['document','execution_id','generation','project_id','revision','task_id','task_key'],
+  execution_price_correction_audit:['document','execution_id','generation','operation_id','project_id','task_id','task_key'],
+  usage_model_evidence:['document','meter_key','project_id','revision','task_id'],
+  runtime_anomaly_state:['document','id','key','project_id','task_id'],
+  runtime_anomaly_history:['document','id','project_id','sequence','task_id'],
+  runtime_occurrence_hour_executions:['execution_key','hour','project_id','source_kind','task_id'],
+  runtime_occurrence_task_hours:['gap_counts','document','hour','project_id','source_kind','task_id'],
+  runtime_occurrence_hours:["cache_read","cache_read_records","cache_write","cache_write_records","day","executions","gaps","input","input_records","observed","output","output_records","partial_records","picos","priced_records","records","scope","source_kind","tasks","unpriced_tasks"],
+  runtime_occurrence:['document','execution_key','key','occurred_at','project_id','source_kind','task_id'],
+  runtime_daily_aggregates:["cache_read", "cache_read_records", "cache_write", "cache_write_records", "day", "executions", "gaps", "input", "input_records", "observed", "output", "output_records", "partial_records", "picos", "priced_records", "records", "scope", "source_kind", "tasks", "unpriced_tasks"],
+  runtime_projection_scopes:['as_of','project_id','revision'],
+  runtime_projection_head:['as_of','revision','singleton'],
+  runtime_storage_guard:['cache_cursor','generation','history_cursor','last_error','last_success','reclaimed','singleton'],
+  runtime_storage_samples:['day','document','sampled_at'],
+  runtime_report_task_documents:['document','key'],
+  runtime_report_task_views:['document','ordinal','project_id','report_id','task_id','version'],
+  runtime_report_leases:['expires_at','id','kind','retiring'],
+  platform_usage_record_folds:['document','key','test_id'],
+  platform_usage_fold_totals:['document','fast','gap_counts','test_id'],
+  platform_usage_proofs:['document','key','test_id','turn'],
+  platform_usage_observed_executions:['key','test_id'],
+  platform_usage_admissions:["accepted_at", "document", "fingerprint", "test_id"],
+  platform_usage_bindings:["document", "fingerprint", "key", "test_id"],
+  platform_usage_pages:["fingerprint", "key", "through"],
+  platform_usage_cursors:["key", "through"],
+  platform_usage_evidence:["document", "fingerprint", "key", "revision"],
+  platform_usage_projections:["document", "key", "model", "test_id"],
+  platform_usage_captures:["document", "key", "sequence", "test_id"],
+  platform_usage_totals:["amount_picos", "cache_read", "cache_read_records", "cache_write", "cache_write_records", "executions", "gaps", "input", "input_records", "observed", "output", "output_records", "partial_priced", "price_complete", "priced", "records", "test_id", "token_complete"],
+  runtime_task_work:['key','polled_at','project_id','queued_at','requires_full','revision'],
+  runtime_source_quality:['ended_at','gaps','project_id','source_kind','started_at','task_id'],
+  runtime_task_metadata_work:['task_id'],
+  runtime_task_proof_work:['key','kind','task_id'],
+  runtime_task_record_work:['meter_key','task_id'],
+  runtime_task_current_rows:['document','key','role','task_id'],
+  runtime_task_row_history:['document','key','role','sequence','task_id'],
+  runtime_task_metadata:['created_at','document','project_id','source_kind','task_id'],
+  runtime_lazy_reports:['created_at','id','owner','report','request','request_key','state'],
+  runtime_report_task_refs:['document','document_key','ordinal','project_id','report_id','task_id','version'],
+  runtime_task_cache:["created_at", "document", "project_id", "source_kind", "source_revision", "task_id", "version"],
+  runtime_task_cache_rows:["document", "key", "role", "task_id", "version"],
+  runtime_task_bootstrap:["done", "failed_at", "last_error", "singleton"],
+  runtime_task_publications:["revision"],
+
   development_native_owners: ["document", "fingerprint", "meter_key", "project_id", "session_id", "source_namespace", "step_id", "task_id", "task_key"],
   development_native_work: ["document", "pass_key", "project_id", "source_id", "task_id", "task_key"],
   development_native_paths: ["depth", "parent_session_id", "pass_key", "path_digest", "project_id", "session_id", "source_namespace", "task_id", "task_key"],
@@ -52,7 +102,7 @@ const columns: Readonly<Record<string, readonly string[]>> = {
   deletion_entities: ["kind", "entity_id", "project_id"],
 };
 
-const excluded = new Set(['token_prices', 'token_price_heads', 'resource_identity_aliases', 'deletion_fences', 'deletion_entities', 'deletion_drain_admissions','runtime_report_clock','runtime_report_revisions','runtime_reports','runtime_report_pages','runtime_report_rows','runtime_report_counts','runtime_report_receipts']);
+const excluded = new Set(['runtime_report_task_views','runtime_storage_guard','runtime_storage_samples','runtime_report_task_documents','runtime_report_leases','platform_usage_record_folds','platform_usage_fold_totals','platform_usage_proofs','platform_usage_observed_executions','runtime_projection_scopes','runtime_maintenance','runtime_task_record_work','runtime_task_current_rows','runtime_task_row_history','runtime_task_metadata','runtime_lazy_reports','runtime_report_task_refs','runtime_anomaly_state','runtime_anomaly_history','runtime_occurrence_hours','runtime_daily_aggregates','runtime_projection_head',"platform_usage_admissions","platform_usage_bindings","platform_usage_pages","platform_usage_cursors","platform_usage_evidence","platform_usage_projections","platform_usage_captures","platform_usage_totals","runtime_task_work","runtime_task_cache","runtime_task_cache_rows","runtime_task_bootstrap","runtime_task_publications",'token_prices', 'token_price_heads', 'resource_identity_aliases', 'deletion_fences', 'deletion_entities', 'deletion_drain_admissions','runtime_report_clock','runtime_report_revisions','runtime_reports','runtime_report_pages','runtime_report_rows','runtime_report_counts','runtime_report_receipts']);
 const contentTables = Object.keys(columns).filter((name) => !excluded.has(name));
 const table = (name: string) => sql`${sql.identifier('observability')}.${sql.identifier(name)}`;
 const admissionKey = (projectId: string) => 'observability.project:' + projectId;
@@ -182,10 +232,16 @@ async function retainEntities(tx: Transaction, scope: Scope, rows: ContentRow[])
 async function clearReports(input:Input,tx:Transaction):Promise<boolean>{
   const [lock]=await tx.execute<{held:boolean}>(sql`SELECT pg_try_advisory_xact_lock(hashtextextended(${runtimeReportAdmissionKey},0)) AS held`);
   if(!lock?.held)return false;
-  const [cache]=await tx.execute<{count:string}>(sql`SELECT count(*)::text AS count FROM observability.runtime_reports`);
+  const [cache]=await tx.execute<{count:string}>(sql`SELECT ((SELECT count(*) FROM observability.runtime_reports)+(SELECT count(*) FROM observability.runtime_lazy_reports))::text AS count`);
   if(!input.reports&&cache?.count!=='0')throw precondition('派生报告的原物理清理 owner 尚未接入');
   await input.reports?.clear();
+  await tx.execute(sql`DELETE FROM observability.runtime_lazy_reports`);
+  await tx.execute(sql`DELETE FROM observability.runtime_report_task_documents WHERE NOT EXISTS(SELECT 1 FROM observability.runtime_report_task_refs r WHERE r.document_key=observability.runtime_report_task_documents.key)`);
   await tx.execute(sql`DELETE FROM observability.runtime_reports`);
+
+  await tx.execute(sql`UPDATE observability.runtime_storage_guard SET generation=generation+1,history_cursor=NULL,cache_cursor=NULL WHERE singleton=true`);
+  await tx.execute(sql`DELETE FROM observability.runtime_report_leases l WHERE NOT EXISTS(SELECT 1 FROM observability.runtime_lazy_reports r WHERE r.id=l.id) AND NOT EXISTS(SELECT 1 FROM observability.runtime_reports r WHERE r.id=l.id)`);
+
   const [remaining]=await tx.execute<{count:string}>(sql`SELECT count(*)::text AS count FROM observability.runtime_reports`);
   if(remaining?.count!=='0'||input.reports&&!(await input.reports.empty()))throw precondition('派生报告或原工作根仍有残留');
   return true;
@@ -207,6 +263,7 @@ async function sealQuiesced(input: Input, raw: ProjectDeletionContext): Promise<
       if (tasks?.complete) for (const id of tasks.ids) for (const entity of [{ kind: 'task', id }, { kind: 'task-key', id: jsonHash({ projectId: scope.projectId, taskId: id }) }])
         await tx.execute(sql`INSERT INTO observability.deletion_entities(kind,entity_id,project_id) VALUES(${entity.kind},${entity.id},${scope.projectId}) ON CONFLICT(kind,entity_id) DO NOTHING`);
     }
+    if (verified) await retireRuntimeProjectProjection(tx,scope.projectKeys);
     const count = current.own.length;
     await tx.execute(sql`INSERT INTO observability.deletion_fences(project_id,operation_id,generation,revision,original,verified,phase_index,completed_count)
       VALUES(${scope.projectId},${context.operationId},${context.generation},${context.confirmed.revision},${JSON.stringify(scope)}::jsonb,${verified},-1,${count})
@@ -215,6 +272,7 @@ async function sealQuiesced(input: Input, raw: ProjectDeletionContext): Promise<
   }); } catch (error) { if (lockTimeout(error)) return 'waiting'; throw error; }
 }
 async function erase(tx: Transaction, rows: ContentRow[]): Promise<void> {
+  for(const id of new Set(rows.filter(row=>row.table==='runtime_occurrence_task_hours').map(row=>String(row.body['task_id']))))await replaceRuntimeOccurrenceHours(tx,null,id);
   // ctid is used only within this locked transaction; the confirmed identity is the full row digest.
   for (const name of contentTables.filter((name) => name !== 'usage_heads').concat('usage_heads')) {
     const tids = rows.filter((row) => row.table === name).map((row) => row.tid);
@@ -230,6 +288,7 @@ async function stepQuiesced(input: Input, raw: ProjectDeletionContext): Promise<
     if (!fence?.verified || fence.revision !== context.confirmed.revision) throw precondition('观测原范围尚未确认或世代已变化');
     if (fence.phase_index < index - 1 || fence.phase_index > index && context.phase !== 'metadata') throw precondition('观测清理需要原前序阶段，不能跳步');
     if(context.phase==='verify'&&!(await clearReports(input,tx)))return 'waiting' as const;
+    if(context.phase==='verify')await retireRuntimeProjectProjection(tx,scope.projectKeys);
     let stoppedRevision = fence.stopped_revision, stoppedCount = fence.stopped_count;
     if (context.phase === 'stop' && fence.phase_index === 0) {
       const current = await scan(tx, scope, tasks);
@@ -240,6 +299,7 @@ async function stepQuiesced(input: Input, raw: ProjectDeletionContext): Promise<
       const current = await scan(tx, scope, tasks);
       if (!current.inventory.complete || current.inventory.revision !== stoppedRevision || current.own.length !== stoppedCount) throw precondition('观测原停止后的清理范围已经变化');
       await erase(tx, current.own);
+      await tx.execute(sql`DELETE FROM observability.runtime_anomaly_state WHERE project_id=${scope.projectId}`);await tx.execute(sql`DELETE FROM observability.runtime_anomaly_history WHERE project_id=${scope.projectId}`);
     }
     if (context.phase === 'verify') {
       const current = await scan(tx, scope, tasks);

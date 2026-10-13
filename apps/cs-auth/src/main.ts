@@ -10,7 +10,7 @@ import { loadPlatformSettings, portFrom } from '@crewstation/settings';
 const name = 'cs-auth';
 const logger = createJsonLogger({ service: name });
 const settings = loadPlatformSettings();
-const { db, close } = connectDatabase(settings.databaseUrl);
+const { db, close } = connectDatabase(settings.databaseUrl,{name});
 const k8s = createK8sClient(loadClusterConfig());
 const platform = createPlatformModule({ db, k8s, settings, logger, instance: `${name}-${hostname()}` });
 await platform.api.storageContract.check();

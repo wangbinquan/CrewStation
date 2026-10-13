@@ -4,7 +4,7 @@ import type { Executor } from '@crewstation/persistence';
 import { sql } from 'drizzle-orm';
 import type { SessionDeletionSources } from '../../../ports/projectDeletion';
 
-export const SESSION_CONTENT = ['runner_events', 'connections', 'business_execution_events', 'business_usage_events', 'business_usage_sources',
+export const SESSION_CONTENT = ['observation_fragment_history','runner_events', 'connections', 'business_execution_events', 'business_usage_events', 'business_usage_sources',
   'business_stopped_executions', 'execution_completion_proofs', 'business_executions', 'development_usage_events', 'development_usage_streams'] as const;
 export async function readSessionTask(sources: SessionDeletionSources, key: string) {
   const source = await sources.resolve(key);
@@ -25,6 +25,9 @@ export async function registerSessionTask(db: Executor, sources: SessionDeletion
 }
 export async function registeredSessionContent(db: Executor) {
   const actual = await db.execute<{ table_name: string }>(sql`SELECT DISTINCT table_name FROM information_schema.columns WHERE table_schema='session' AND column_name IN('task_id','task_key','project_id') ORDER BY table_name`);
-  const expected = [...SESSION_CONTENT, 'task_origins', 'connection_births', 'original_callbacks', 'project_deletions'].sort();
+  const [history] = await db.execute<{installed:boolean}>(sql`SELECT EXISTS(SELECT 1 FROM platform_infra.migrations WHERE module='session' AND name='0016_observation_fragment_history.sql') AS installed`);
+  const tables = history!.installed ? [...SESSION_CONTENT] : SESSION_CONTENT.filter(name=>name!=='observation_fragment_history');
+  const expected = [...tables, 'task_origins', 'connection_births', 'original_callbacks', 'project_deletions'].sort();
   if (jsonHash(actual.map((row) => row.table_name)) !== jsonHash(expected)) throw precondition('会话内容表未完整登记');
+  return tables;
 }

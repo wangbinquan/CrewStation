@@ -40,9 +40,12 @@ describe.skipIf(!available)('TaskRuntime content inventory (actual read-only PG;
         CROSS JOIN LATERAL jsonb_populate_record(NULL::task_runtime.environments,to_jsonb(original)||jsonb_build_object('id',item#>>'{}','pod_name',item#>>'{}')) copy WHERE original.id=${f.parent}`);
       const before = await f.database.db.execute('SELECT id,runner_token_hash,render,message FROM task_runtime.environments ORDER BY id');
       const result = await f.inspect();
-      expect(RUNTIME_CONTENT).toHaveLength(11); expect(result.inventory.complete).toBe(true); expect(result.inventory.resources).toHaveLength(10);
+      expect(RUNTIME_CONTENT).toHaveLength(12); expect(result.inventory.complete).toBe(true); expect(result.inventory.resources).toHaveLength(11);
       expect(result.traversal.counts.environments).toBe(209); expect(result.inventory.resources.find((row) => row.id === 'environments')?.count).toBe(208);
-      expect(result.contents).toHaveLength(217); expect(result.contents.some((row) => row.key.includes(f.otherParent))).toBe(false);
+      const [history] = await f.database.db.execute<{count:string}>(sql`SELECT count(*)::text AS count FROM task_runtime.observation_lifecycle WHERE project_id=${f.project}`);
+      expect(Number(history!.count)).toBe(208);
+      expect(result.contents.filter(row=>row.table!=='observation_lifecycle')).toHaveLength(217);
+      expect(result.contents).toHaveLength(217+Number(history!.count)); expect(result.contents.some((row) => row.key.includes(f.otherParent))).toBe(false);
       expect(result.origins.find((row) => row.kind === 'task' && row.key === seeded.reserved)?.projectId).toBe(f.project);
       for (const secret of ['runner_token_hash', '111111111111', 'original-rebuild-input', 'original-stop-intent', 'original-numeric-tail', 'archive-private-DSN', 'never-provisioned-private'])
         expect(JSON.stringify(result)).not.toContain(secret);

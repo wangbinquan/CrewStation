@@ -11,11 +11,11 @@ export function completeAttemptTiming(task:RuntimeTaskHeaderFact,attempt:Runtime
   return {durationMs:valid?String(end-start):null,open:open&&valid,interval:valid?{start,end}:null};
 }
 export function completeTaskWallMs(task:RuntimeTaskHeaderFact,asOf:number) {
-  if(task.source?.kind==='development-agent') return null;
+  if((task.source?.kind==='development-agent'||task.source?.kind==='development-cli')) return null;
   const start=Date.parse(task.createdAt),end=task.closedAt===null?terminal.has(task.state)?null:asOf:Date.parse(task.closedAt);
   return Number.isSafeInteger(start)&&end!==null&&Number.isSafeInteger(end)&&start<=end&&end<=asOf?String(end-start):null;
 }
-export const completeDurationSample=(task:RuntimeTaskHeaderFact)=>task.source?.kind!=='development-agent'&&terminal.has(task.state);
+export const completeDurationSample=(task:RuntimeTaskHeaderFact)=>task.source?.kind!=='development-agent'&&task.source?.kind!=='development-cli'&&terminal.has(task.state);
 /** Nearest-rank quantiles have integer arithmetic even beyond JS Number's exact range. */
 export function completePercentileRank(count:bigint,numerator:bigint,denominator:bigint) {
   if(count<0n||numerator<=0n||denominator<=0n||numerator>denominator) throw new RangeError('Invalid original percentile rank');

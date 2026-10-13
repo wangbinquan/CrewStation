@@ -16,3 +16,10 @@ test('all 10001 installation tuples contribute to the digest and the last tuple 
  const projectId=project(),admissions=Array.from({length:10001},(_,n)=>({projectId,profileId:newResourceId(),profileRevision:n+1})),sorted=[...admissions].sort((a,b)=>JSON.stringify(a)<JSON.stringify(b)?-1:1);
  const selected=developmentCollectionConfiguration(admissions);expect(selected(null)).toEqual({development:'validation-selected',configurationDigest:jsonHash({version:2,admissions:sorted})});expect(selected(projectId)).toEqual(selected(null));expect(developmentCollectionConfiguration(admissions.slice(0,-1))(null)).not.toEqual(selected(null));
 });
+
+test('production collection metadata applies to every project without using installation tuples as a population filter',()=>{
+ const a=project(),b=project(),admissions=[{projectId:a,profileId:newResourceId(),profileRevision:2}],read=developmentCollectionConfiguration(admissions,true);
+ expect(read(a)?.development).toBe('available');expect(read(b)?.development).toBe('available');expect(read(null)?.development).toBe('available');
+ expect(read(a)?.configurationDigest).not.toBe(read(b)?.configurationDigest);
+ expect(developmentCollectionConfiguration([],true)(b)?.development).toBe('available');
+});

@@ -1,3 +1,4 @@
+import type { ProfileUsage } from './ports/profileUsage';
 import { resourceEndingHandler } from './application/development/parent/retention';
 import { originalProjectTaskIds } from './adapters/persistence/infrastructure/origins';
 import { originalRuntimeWorkInfrastructure } from './adapters/persistence/deletion/workOrigin';
@@ -101,6 +102,7 @@ export interface TaskRuntimeModuleDeps {
   checkout?: SourceCheckoutSource;
   /** 档位测试用的 Runner 通道（RFC-006）；不给则测试报“未配置测试执行通道”。 */
   testRunner?: TestRunner;
+  profileUsage?:ProfileUsage;
   testTiming?: Partial<ProfileTestTiming>;
   /** 平台两个 MCP 的服务域地址，供档位测试展开步骤里的 `{{mcp.*}}`（RFC-006 C16）。 */
   testMcp?: ReadonlyArray<{ name: string; url: string }>;
@@ -201,11 +203,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
   const createNative = createNativeExecutionUseCase(executionDeps);
   const rebuild = rebuildUseCases(recoveryDeps);
   const createTestEnvironment = createTestEnvironmentUseCase(useCaseDeps);
-  const runProfileTest = runProfileTestUseCase(useCaseDeps, {
-    createTestEnvironment: (input) => createTestEnvironment({ ...input, labels: { [LABELS.project]: PROFILE_TEST_LABELS.project, [LABELS.service]: PROFILE_TEST_LABELS.service, ...input.labels } }),
-    release: (taskId) => lifecycle.releaseEnvironment(taskId, 'profile-test'),
-    ...(testRunner ? { runner: testRunner } : {}), ...(deps.testTiming ? { timing: deps.testTiming } : {}), ...(deps.testMcp ? { mcp: deps.testMcp } : {}),
-  });
+  const runProfileTest = profileTestRunner(deps, useCaseDeps, createTestEnvironment, lifecycle, testRunner);
   const api: TaskRuntimeModuleApi = {
     ...(stopping && deps.deletionWorkSources ? { deletionOwner: runtimeDeletionOwner(runtimeDeletionRepository(deps.db, deps.deletionWorkSources), deps.deletionWorkSources, stopping) } : {}),
     ...(archives ? { archiveExecution: archives } : {}),
@@ -291,4 +289,17 @@ function businessRecoveryApi(deps: TaskRuntimeUseCaseDeps): Pick<TaskRuntimeModu
 async function captureStartupLog(deps: TaskRuntimeUseCaseDeps, taskId: TaskId) {
   const env = await deps.uow.read.environments.getById(taskId);
   return env ? startupLogTail(deps, env, env.podName) : undefined;
+}
+
+export {readDevelopmentParentObservationContexts} from './adapters/persistence/observability/observationContexts';
+
+export {readRuntimeLifecyclePhases} from './adapters/persistence/observability/observationPhases';
+
+function profileTestRunner(deps:TaskRuntimeModuleDeps,useCaseDeps:TaskRuntimeUseCaseDeps,createTestEnvironment:ReturnType<typeof createTestEnvironmentUseCase>,lifecycle:ReturnType<typeof lifecycleUseCases>,testRunner:TaskRuntimeModuleDeps['testRunner']) {
+  return runProfileTestUseCase(useCaseDeps, {
+    createTestEnvironment: (input) => createTestEnvironment({ ...input, labels: { [LABELS.project]: PROFILE_TEST_LABELS.project, [LABELS.service]: PROFILE_TEST_LABELS.service, ...input.labels } }),
+    release: (taskId) => lifecycle.releaseEnvironment(taskId, 'profile-test'),
+    ...(deps.profileUsage?{usage:deps.profileUsage}:{}),
+    ...(testRunner ? { runner: testRunner } : {}), ...(deps.testTiming ? { timing: deps.testTiming } : {}), ...(deps.testMcp ? { mcp: deps.testMcp } : {}),
+  });
 }

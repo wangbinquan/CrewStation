@@ -84,6 +84,7 @@ function userResponse(c: Context<AppEnv>, decision: UserAuthDecision, api: Ident
  * 槽「已结束」时路由改指 cs-api 的说明页，错误体仍是 `not-deployed`＋`details`。
  */
 function unavailableResponse(c: Context<AppEnv>, entry: Extract<UserAuthDecision, { kind: 'unavailable' }>['entry'], api: IdentityModuleApi): Response {
+  c.set('runtimeMetricContext',{plannedMaintenanceRefusal:true,projectSlug:entry.projectSlug});
   if (entry.retryAfterSeconds) c.header('retry-after', String(entry.retryAfterSeconds));
   if ((c.req.header('accept') ?? '').includes('text/html')) return c.html(api.unavailablePage(entry, { scheme: c.req.header('x-forwarded-proto') }), 503);
   return c.json({ error: 'maintenance', message: `${entry.projectSlug} 正在维护：${entry.reason}`, details: { reason: entry.reason, ...(entry.expectedEndAt ? { expectedEndAt: entry.expectedEndAt } : {}) } }, 503);
@@ -96,6 +97,7 @@ function serviceResponse(c: Context<AppEnv>, decision: ServiceAuthDecision): Res
     return c.body(null, 200);
   }
   if (decision.kind === 'unavailable') {
+    c.set('runtimeMetricContext',{plannedMaintenanceRefusal:true});
     if (decision.retryAfterSeconds) c.header('retry-after', String(decision.retryAfterSeconds));
     return c.json({ error: 'maintenance', message: decision.message, details: {} }, 503);
   }

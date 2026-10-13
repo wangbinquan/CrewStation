@@ -1,3 +1,4 @@
+import {registerEventSignals} from './adapters/persistence/runtimeSignals';
 import { join } from 'node:path';
 import { DomainTopic } from '@crewstation/contracts';
 import type { EventConsumer } from '@crewstation/eventbus';
@@ -83,6 +84,7 @@ export const eventsMigrations: MigrationSet = {
 };
 
 export function createEventsModule(deps: EventsModuleDeps): EventsModule {
+  registerEventSignals(deps.db);
   const settings: EventsSettings = { ...DEFAULT_SETTINGS, ...deps.settings };
   const logger = deps.logger ? { logger: deps.logger } : {};
   const useCaseDeps: EventsUseCaseDeps = {

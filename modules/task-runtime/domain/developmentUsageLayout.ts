@@ -10,7 +10,7 @@ export function developmentUsageLayoutSnapshot(executionTaskId: TaskId, env?: Ta
   const layout = env.render?.developmentUsageStorage;
   if (layout === undefined) return DevelopmentUsageLayoutLookupSchema.parse({ version: 1, executionTaskId, kind: 'legacy' });
   const parsed = DevelopmentUsageStorageSchema.safeParse(layout), native = env.native;
-  if (!parsed.success || env.kind !== 'dev-session' || native?.purpose !== 'agent' || native.terminalId !== undefined || !native.computeProfile)
+  if (!parsed.success || env.kind !== 'dev-session' || !native || !['agent','cli'].includes(native.purpose??'cli') || (native.purpose==='agent' ? native.terminalId !== undefined : !native.terminalId) || !native.computeProfile)
     throw precondition('Selected development layout requires the original independent Agent and compute revision');
   if (env.podUid !== undefined && native.podUid !== undefined && env.podUid !== native.podUid)
     throw precondition('Selected development layout has conflicting original Pod instances');

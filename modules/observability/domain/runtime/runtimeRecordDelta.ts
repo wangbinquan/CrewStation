@@ -1,0 +1,13 @@
+import {jsonHash} from '@crewstation/kernel';
+import type {CompleteRuntimeAllocation} from './completeRuntimeAllocation';
+import {emptyCompleteRuntimeFold,addCompleteRuntimeAllocation,type CompleteRuntimeFold} from '../completeRuntimeMetrics';
+import type {UsageRecord} from '@crewstation/contracts';
+/** Only an independently qualified disjoint self record takes this path. Coverage changes retain canonical component qualification. */
+export function canDeltaRuntimeRecord(before:CompleteRuntimeAllocation|undefined,record:UsageRecord){if(record.inclusion!=='self'||record.reporting!=='delta'||!record.projection.complete||record.projection.issues.length||Object.values(record.projection.contribution).some(v=>v===null))return false;
+
+ return !before||before.whole===true&&!before.quality.ambiguous&&!before.quality.unavailable&&before.record.original.projection.complete&&before.record.original.projection.issues.length===0&&before.record.original.inclusion==='self'&&before.record.original.reporting==='delta'&&jsonHash([before.record.original.identity,before.record.original.sourceId,before.record.original.recordId,before.record.original.scope,before.record.original.basis])===jsonHash([record.identity,record.sourceId,record.recordId,record.scope,record.basis]);}
+export function runtimeAllocationFold(a:CompleteRuntimeAllocation){const fold=emptyCompleteRuntimeFold(true);addCompleteRuntimeAllocation(fold,a.contribution,a.valuation??undefined,a.whole===true,a.record.original.projection.projectionRevision,!a.quality.ambiguous&&!a.quality.unavailable);return fold;}
+export function runtimeRecordDelta(fold:CompleteRuntimeFold,before:CompleteRuntimeAllocation|undefined,after:CompleteRuntimeAllocation|null){const result=structuredClone(fold),old=before?runtimeAllocationFold(before):emptyCompleteRuntimeFold(true),next=after?runtimeAllocationFold(after):emptyCompleteRuntimeFold(true);const delta=(a:string,b:string,c:string)=>{if(BigInt(a)<BigInt(b))throw Error('Original record delta lost prior membership');const value=BigInt(a)-BigInt(b)+BigInt(c);if(value<0n)throw Error('Original record delta lost prior membership');return String(value);};
+ for(const bucket of ['input','cacheRead','cacheWrite','output'] as const){result.tokens[bucket]=delta(result.tokens[bucket],old.tokens[bucket],next.tokens[bucket]);result.bucketRecords[bucket]=delta(result.bucketRecords[bucket],old.bucketRecords[bucket],next.bucketRecords[bucket]);}
+ for(const key of ['records','pricedRecords','picos'] as const)result[key]=delta(result[key],old[key],next[key]);result.partiallyPricedRecords=delta(result.partiallyPricedRecords??'0',old.partiallyPricedRecords??'0',next.partiallyPricedRecords??'0');
+ return result;}

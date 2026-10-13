@@ -1,3 +1,7 @@
+import {RuntimeStorage} from './runtime/RuntimeStorage';
+import {RuntimeAnomalies} from './RuntimeAnomalies';
+import {RuntimeOperationalTelemetry} from './runtime/RuntimeOperationalTelemetry';
+import type {OperationalTelemetryQuery} from '@crewstation/contracts';
 import { useState } from 'react';
 import { AlertDtoSchema, ClusterPageSchema, HealthDtoSchema } from '@crewstation/contracts';
 import { api } from '../../../shared/api/client';
@@ -21,7 +25,6 @@ function ProjectHealth({ projectId }: { projectId: string }) {
     <Badge tone={row.state === 'healthy' ? 'success' : row.state === 'unknown' ? 'neutral' : 'warning'}>{t('runtime.health.' + row.state)}</Badge><p>{t('runtime.replicas')}: {row.state === 'unknown' ? '—' : `${row.readyReplicas} / ${row.replicas}`}</p><p>{t('runtime.restarts')}: {row.state === 'unknown' ? '—' : row.restarts}</p><p className={styles.hint}>{t('runtime.healthObserved')}</p><p className={styles.hint}>{t('runtime.healthRead', { at: runtimeDate(new Date(health.dataUpdatedAt).toISOString()) })}</p><p className={styles.hint}>{t('runtime.transition')}: {runtimeDate(row.lastTransitionAt)}</p>
   </Card>)}</div> : null}</Card>
     <Card title={t('runtime.serviceAlerts')} footer={t('runtime.alertScope')}><QueryStatus isPending={alerts.isPending} error={alerts.error} />{!alerts.error && alerts.data ? alerts.data.items.length ? <DataTable columns={[t('runtime.state'), t('runtime.reason'), t('runtime.start'), t('runtime.end')]}>{alerts.data.items.map((row) => <tr key={row.id}><td>{t('runtime.alert.' + row.state)}</td><td>{row.detail}</td><td>{runtimeDate(row.firedAt)}</td><td>{row.resolvedAt ? runtimeDate(row.resolvedAt) : '—'}</td></tr>)}</DataTable> : <EmptyState title={t('runtime.noAlerts')} /> : null}</Card>
-    <Card title={t('runtime.serviceTelemetry')}><p className={styles.hint}>{t('runtime.serviceTelemetryHint')}</p></Card>
   </Stack>;
 }
 function PlatformHealth() {
@@ -33,7 +36,6 @@ function PlatformHealth() {
       {data.items.length ? <DataTable columns={[t('runtime.component'), t('runtime.state'), t('runtime.restarts'), t('runtime.observed')]}>{data.items.map((row) => <tr key={row.uid}><td>{row.ownership.scope === 'system' ? row.ownership.component : row.name}<span className={styles.identity}>{row.namespace} / {row.name} · UID {row.uid}</span></td><td><Badge tone={row.abnormal ? 'warning' : row.ready && data.complete ? 'success' : 'neutral'}>{row.ready ? t('runtime.ready') : row.phase}</Badge><span className={styles.identity}>{row.reason}</span></td><td>{row.restarts}</td><td>{runtimeDate(row.observedAt)}</td></tr>)}</DataTable> : data.complete ? <EmptyState title={t('runtime.noResources')} /> : null}
       <p className={styles.hint}>{t(data.complete ? 'runtime.resourcePage' : 'runtime.resourcePartialPage', { shown: data.items.length, total: data.total })}</p>{data.nextCursor ? <Button onClick={() => setPage({ snapshotId: data.snapshotId, cursor: data.nextCursor })}>{t('runtime.nextResources')}</Button> : null}
     </> : null}</Card>
-    <Card title={t('runtime.applicationTelemetry')}><p className={styles.hint}>{t('runtime.applicationTelemetryHint')}</p></Card>
   </Stack>;
 }
-export function RuntimeHealth({ projectId }: { projectId?: string }) { return projectId ? <ProjectHealth key={projectId} projectId={projectId} /> : <PlatformHealth />; }
+export function RuntimeHealth({ projectId, window }: { projectId?: string; window?:OperationalTelemetryQuery }) {const [initialRange]=useState(()=>{const now=Date.now();return {from:new Date(now-86400000).toISOString(),to:new Date(now).toISOString()};}),range=window??initialRange;return <Stack>{projectId?<ProjectHealth key={projectId} projectId={projectId}/>:<><RuntimeStorage/><PlatformHealth/></>}<RuntimeOperationalTelemetry projectId={projectId} window={range}/><RuntimeAnomalies key={projectId??'system'} projectId={projectId} window={{...range,timezone:'Asia/Shanghai'}}/></Stack>;}

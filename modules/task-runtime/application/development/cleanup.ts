@@ -30,22 +30,22 @@ async function requireHeartbeat(renew: () => Promise<boolean>): Promise<void> {
   if (!await renew()) throw precondition('开发清理作业租约已被接管');
 }
 function prestartBase(evidence: DevelopmentCleanupEvidence) {
-  return evidence.version === 2 ? { ...evidence, phase: 'stopping', stopProof: null, stopProofDigest: null } : evidence;
+  return evidence.version !== 1 ? { ...evidence, phase: 'stopping', stopProof: null, stopProofDigest: null } : evidence;
 }
 /** Only the same no-grant stopping proof may advance to closed; all other evidence replacement is a conflict. */
 async function saveEvidence(deps: Deps, original: TaskEnvironment, identity: NativeExecutionJobLease | undefined, selection: DevelopmentCleanupSelection, evidence: DevelopmentCleanupEvidence) {
   return withCurrent(deps, original, identity, selection, async (scope, env) => {
     const old = env.native!.developmentCleanup && requireDevelopmentCleanupEvidence(env.native!.developmentCleanup, selection);
     if (old && jsonHash(old) === jsonHash(evidence)) return env;
-    if (old && !(old.version === 2 && old.phase === 'stopping' && evidence.version === 2 && evidence.phase === 'closed'
+    if (old && !(old.version !== 1 && old.phase === 'stopping' && evidence.version === old.version && evidence.phase === 'closed'
       && jsonHash(prestartBase(old)) === jsonHash(prestartBase(evidence)))) throw precondition('原开发清理凭证不可替换');
     const next = { ...env, native: { ...env.native!, developmentCleanup: evidence }, updatedAt: deps.clock.now() };
     await scope.environments.update(next); return next;
   });
 }
 async function finishCleanup(deps: Deps, original: TaskEnvironment, identity: NativeExecutionJobLease | undefined, selection: DevelopmentCleanupSelection, evidence: DevelopmentCleanupEvidence) {
-  if (evidence.version === 2) {
-    const stop = await developmentPrestartPhysicalStop(deps.workloadSafety, original);
+  if (evidence.version !== 1) {
+    const stop = evidence.version===2?await developmentPrestartPhysicalStop(deps.workloadSafety, original):await developmentPhysicalStop(deps.workloadSafety,original);
     if (evidence.phase !== 'closed' || jsonHash(stop.stopProof) !== evidence.stopProofDigest) throw precondition('未获准启动释放尚无匹配实际物理闭合');
   }
   await withCurrent(deps, original, identity, selection, async (scope, env) => {
@@ -89,13 +89,13 @@ export async function cleanupDevelopmentWorkload(deps: Deps, original: TaskEnvir
     if (!complete) throw precondition('等待原 Dev 未获准启动闭合能力', { code: 'runtime_original_stop_waiting' });
     const result = await Reflect.apply(complete, deps.developmentCleanup!, [selection]);
     if (result.kind !== 'permitted') throw precondition('等待原未获准启动闭合：' + result.reason, { code: 'runtime_original_stop_waiting' });
-    const next = requireDevelopmentCleanupEvidence(result.evidence, selection), stop = await developmentPrestartPhysicalStop(deps.workloadSafety, current);
-    if (next.version !== 2 || next.phase !== 'closed' || jsonHash(prestartBase(next)) !== jsonHash(prestartBase(evidence))
+    const next = requireDevelopmentCleanupEvidence(result.evidence, selection), stop = noGrant?await developmentPrestartPhysicalStop(deps.workloadSafety, current):await developmentPhysicalStop(deps.workloadSafety,current);
+    if (next.version !== evidence.version || next.version===1 || next.phase !== 'closed' || jsonHash(prestartBase(next)) !== jsonHash(prestartBase(evidence))
       || next.stopProofDigest !== jsonHash(stop.stopProof)) throw precondition('原未获准启动闭合与原实际停止证明冲突');
     await fence(); current = await saveEvidence(deps, original, identity, selection, next); evidence = next;
   };
   await fence(); await closeDevelopmentAdmission(deps.workloadSafety, current);
   await deps.nativeCluster.cleanupDevelopment(current, { current: fence, stopped: () => noGrant ? developmentPrestartPhysicalStop(deps.workloadSafety, current) : developmentPhysicalStop(deps.workloadSafety, current),
-    ...(noGrant ? { beforeCredentials } : current.render?.developmentRemovalProtection !== undefined ? { admissionSecretUid: async () => { const uid = await developmentAdmissionSecretUid(deps.workloadSafety, current); if (!uid) throw precondition('原准入 UID 回执缺失'); return uid; } } : {}) });
+    ...((noGrant||evidence.version===3) ? { beforeCredentials, ...(!noGrant&&current.render?.developmentRemovalProtection!==undefined?{admissionSecretUid:async()=>{const uid=await developmentAdmissionSecretUid(deps.workloadSafety,current);if(!uid)throw precondition('原准入 UID 回执缺失');return uid;}}:{}) } : current.render?.developmentRemovalProtection !== undefined ? { admissionSecretUid: async () => { const uid = await developmentAdmissionSecretUid(deps.workloadSafety, current); if (!uid) throw precondition('原准入 UID 回执缺失'); return uid; } } : {}) });
   await fence(); await finishCleanup(deps, original, identity, selection, evidence);
 }

@@ -24,7 +24,7 @@ export function executionValuations(deps: { store: ExecutionValuationStore; pric
   return async (raw: ExecutionValuationRequest): Promise<UsageValuation> => {
     const parsed = request.safeParse(raw);
     if (!parsed.success) throw validation('估值证据无效');
-    const input = parsed.data, fingerprint = jsonHash(input);
+    const correctionRevision=await deps.pricing.correctionRevision?.(parsed.data.measurement.identity),input=correctionRevision?{...parsed.data,requestKey:jsonHash([parsed.data.requestKey,correctionRevision])}:parsed.data,fingerprint = jsonHash(input);
     const receipt = await deps.store.receipt(input.measurement.identity, input.requestKey);
     if (receipt) {
       if (receipt.fingerprint !== fingerprint) throw conflict('估值请求标识对应不同证据');
@@ -34,12 +34,13 @@ export function executionValuations(deps: { store: ExecutionValuationStore; pric
     if (!usage) throw notFound('尚无已提交的用量投影');
     if (usage.projection.projectionRevision !== input.usageRevision) throw conflict('用量投影已更新，请基于当前修订重新估值');
     // Price lookup finishes before the ledger transaction, including with a one-connection pool.
-    const price = await deps.pricing.price(input.measurement.identity, input.model);
+    const price = await deps.pricing.price(input.measurement.identity, input.model,{sourceId:input.measurement.sourceId,recordId:input.measurement.recordId});
     const basisFingerprint = jsonHash({ usageRevision: input.usageRevision, model: input.model, priceVersion: price?.id ?? null });
     const draft = UsageValuationSchema.parse({ ...input.measurement, kind: 'valuation',
       valuationId: jsonHash(input.measurement), revision: 1, valuationRevision: 1, usageRevision: input.usageRevision,
       occurredAt: usage.occurredAt, observedAt: deps.clock.now().toISOString(), currency: 'CNY', ...amount(price, usage) });
-    return deps.store.commit(input, fingerprint, basisFingerprint, draft);
+    if(await deps.pricing.correctionRevision?.(input.measurement.identity)!==correctionRevision)throw conflict('原执行价格纠错已更新，请重新估值');
+    return deps.store.commit(input, fingerprint, basisFingerprint, draft,correctionRevision??null);
   };
 }
 
@@ -52,6 +53,7 @@ export function valueRunnerUsagePage(deps: { store: ExecutionValuationStore; sou
       if (!current) throw notFound('已提交用量投影尚不可读取');
       const evidence = await deps.source.measurement(sourcePage, ref.recordId, current.projection.modelRevision ?? current.revision);
       if (!evidence) throw notFound('已提交用量缺少对应原生模型证据');
+      await deps.store.retainModel?.(ref,evidence);
       const actual = evidence.actualModel;
       const model = actual?.provider && actual.model && jsonHash(actual) === current.modelRef ? { provider: actual.provider, model: actual.model, condition: actual.condition } : null;
       const input = { measurement: ref, usageRevision: current.projection.projectionRevision, model };

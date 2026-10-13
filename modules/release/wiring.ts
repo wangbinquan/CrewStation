@@ -185,3 +185,5 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
     migrations: releaseMigrations,
   };
 }
+
+export {readReleaseObservationRoles} from './adapters/persistence/observationRoles';

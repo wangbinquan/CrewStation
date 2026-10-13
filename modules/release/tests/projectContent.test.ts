@@ -44,7 +44,7 @@ describe.skipIf(!available)('发布完整保留内容来源', () => {
     const result = await f.read(f.target);
     expect(result.inventory.complete).toBe(true); expect(result.inventory.blockers).toEqual([]);
     for (const kind of ['releases', 'service_slots', 'traffic_switches', 'replica_overrides', 'slot_events', 'slot_maintenance', 'execution_handoffs']) expect(count(result, kind)).toBe(1);
-    expect(result.rows).toHaveLength(7); expect(result.consumers).toHaveLength(5);
+    expect(count(result, 'observation_roles')).toBe(1); expect(result.rows).toHaveLength(8); expect(result.consumers).toHaveLength(5);
     expect(result.consumers.find((entry) => entry.kind === 'release')).toMatchObject({ id: own.id, state: 'failed', aliases: [own.id] });
     expect(result.rows.every((row) => /^[a-f0-9]{64}$/.test(row.identity))).toBe(true);
     expect(JSON.stringify(result)).not.toContain('do-not-export'); expect(JSON.stringify(result)).not.toContain(foreign.id);

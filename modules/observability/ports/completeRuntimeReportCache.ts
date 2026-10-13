@@ -1,8 +1,8 @@
 import type {Actor,ProjectId,RuntimeStatisticsQuery,RuntimeCompleteReport,RuntimeReportPage,RuntimeReportPageQuery,TaskId} from '@crewstation/contracts';
 export const runtimeReportAdmissionKey='observability.runtime-reports';
 /** Frozen admission metadata for this immutable report; never a task population filter. */
-export interface CompleteReportSourceCollection {readonly development:'validation-selected';readonly configurationDigest:string}
-export interface CompleteReportRequest {readonly actor:Actor;readonly projectId:ProjectId|null;readonly filters:RuntimeStatisticsQuery;readonly taskId?:TaskId;readonly sourceCollection?:CompleteReportSourceCollection}
+export interface CompleteReportSourceCollection {readonly development:'validation-selected'|'available';readonly configurationDigest:string}
+export interface CompleteReportRequest {readonly actor:Actor;readonly projectId:ProjectId|null;readonly filters:RuntimeStatisticsQuery;readonly taskId?:TaskId;readonly sourceCollection?:CompleteReportSourceCollection;readonly costPolicy?:{readonly revision:number;readonly visibility:'hidden'|'project-members-and-services'}}
 export interface CompleteReportStored {readonly id:string;readonly request:CompleteReportRequest;readonly requestKey:string;readonly owner:string;readonly state:'building'|'not-ready'|'failed'|'ready';readonly report:RuntimeCompleteReport}
 export type {CompleteReportTransferItem,CompleteReportTransferPage,CompleteReportManifest} from '../domain/completeReportEnvelope';
 import type {CompleteReportTransferItem,CompleteReportTransferPage,CompleteReportManifest} from '../domain/completeReportEnvelope';
@@ -14,7 +14,8 @@ export interface CompleteReportSpool {
  empty():Promise<boolean>;
 }
 export interface CompleteRuntimeReportCache {
- identity():Promise<{generation:string;revision:string}>;
+ readonly incremental?:true;
+ identity():Promise<{generation:string;revision:string;bootstrapCompleted?:boolean}>;
  ensure(request:CompleteReportRequest,requestKey:string,owner:string,id:string):Promise<CompleteReportStored>;
  get(id:string):Promise<CompleteReportStored|undefined>;
  hasVisibleTaskCosts(id:string):Promise<boolean>;

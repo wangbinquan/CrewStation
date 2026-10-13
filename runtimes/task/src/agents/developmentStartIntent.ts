@@ -10,6 +10,7 @@ export function developmentIntentDigest(admission: Pick<DevelopmentUsageAdmissio
 }
 export function validateDevelopmentStart(command: StartAgentCommand, raw: DevelopmentUsageAdmission): DevelopmentUsageAdmission {
   const admission = DevelopmentUsageAdmissionSchema.parse(raw);
+  if(admission.intent.identity.sourceKind!=='development-agent'||admission.intent.mode==='cli')throw new RunnerCommandError('development_intent_conflict','headless 不能受理 CLI 的数字配置');
   const actual = DevelopmentStartIntentSchema.parse({ ...admission.intent,
     identity: { ...admission.intent.identity, agentId: command.agentId },
     profileRevision: command.profileRevision, launch: command.launch, permission: command.permission, mode: command.mode,

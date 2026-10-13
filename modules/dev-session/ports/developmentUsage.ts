@@ -1,4 +1,4 @@
-import type { DevelopmentUsageInfo, DevelopmentUsageKey, DevelopmentUsageRegistration, DevelopmentStartIntent, DevelopmentUsageDrainReason, ServiceId, TaskId, TraceId, UsageExecutionIdentity } from '@crewstation/contracts';
+import type { DevelopmentUsageInfo, DevelopmentUsageKey, DevelopmentUsageRegistration, DevelopmentStartIntent, DevelopmentUsageDrainReason, ServiceId, TaskId, TraceId, UsageExecutionIdentity, RunnerHello } from '@crewstation/contracts';
 
 export interface DevelopmentPriceInput {
   identity: UsageExecutionIdentity;
@@ -9,6 +9,8 @@ export interface DevelopmentUsagePricing { accept(input: DevelopmentPriceInput):
 /** Internal owner participant only; never a workbench or business HTTP payload. */
 export interface DevelopmentUsagePreparation {
   intent: DevelopmentStartIntent;
+  /** Only automatic new admissions may preserve an independently unsupported legacy Runner. */
+  legacyFallbackAllowed?: boolean;
   context: { serviceId: ServiceId; traceId: TraceId; branch: string | null };
 }
 export interface DevelopmentUsagePrepared extends DevelopmentUsagePreparation {
@@ -19,6 +21,7 @@ export interface DevelopmentUsagePrepared extends DevelopmentUsagePreparation {
 export interface DevelopmentUsageOwnerRecord extends DevelopmentUsagePrepared {
   binding: DevelopmentUsageRegistration | null;
   unsupported: boolean;
+  unsupportedProof?: {version:1; podUid:string; capabilities:RunnerHello['capabilities']};
   closeReason: DevelopmentUsageDrainReason | null;
   /** Numeric or selected-layout fence capability forbids legacy fallback; bound to the original Pod, not proof of a healthy journal. */
   capabilityPodUid?: string;
@@ -29,7 +32,7 @@ export interface DevelopmentUsageOwnerStore {
   get(executionTaskId: TaskId): Promise<DevelopmentUsageOwnerRecord | undefined>;
   bind(executionTaskId: TaskId, binding: DevelopmentUsageRegistration): Promise<DevelopmentUsageOwnerRecord>;
   observeSupported(executionTaskId: TaskId, podUid: string): Promise<DevelopmentUsageOwnerRecord>;
-  unsupported(executionTaskId: TaskId): Promise<DevelopmentUsageOwnerRecord>;
+  unsupported(executionTaskId: TaskId, proof?:DevelopmentUsageOwnerRecord['unsupportedProof']): Promise<DevelopmentUsageOwnerRecord>;
   close(executionTaskId: TaskId, reason: DevelopmentUsageDrainReason): Promise<DevelopmentUsageOwnerRecord>;
 }
 /** Frozen non-sensitive source choice; consumer still verifies independent Session registration. */
@@ -44,7 +47,7 @@ export interface DevelopmentUsageOwner {
   get(executionTaskId: TaskId): Promise<DevelopmentUsageOwnerRecord | undefined>;
   bind(executionTaskId: TaskId, info: DevelopmentUsageInfo): Promise<DevelopmentUsageOwnerRecord>;
   observeSupported(executionTaskId: TaskId): Promise<DevelopmentUsageOwnerRecord>;
-  unsupported(executionTaskId: TaskId): Promise<DevelopmentUsageOwnerRecord>;
+  unsupported(executionTaskId: TaskId, capabilities?:RunnerHello['capabilities']): Promise<DevelopmentUsageOwnerRecord>;
   close(executionTaskId: TaskId, reason: DevelopmentUsageDrainReason): Promise<DevelopmentUsageOwnerRecord>;
   resolve(key: DevelopmentUsageKey): Promise<DevelopmentUsageResolved | undefined>;
 }

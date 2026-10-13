@@ -1,3 +1,27 @@
+import {observeRuntimeStorageAnomalies} from './adapters/persistence/projection/runtimeAnomalies';
+import type { OperationalMetricSeries } from './ports/operationalTelemetry';
+import {prepareRuntimeMetadata} from './application/runtime/prepareRuntimeMetadata';
+import {prepareRuntimePublicRows} from './application/runtime/qualifiedRuntimeRows';
+import {runtimeMaintenanceStore} from './adapters/persistence/maintenance/runtimeMaintenance';
+import {runtimeStorageStatus} from './adapters/persistence/reports/runtimeStorageStatus';
+import {collectRuntimeStorage} from './adapters/persistence/reports/runtimeStorageGc';
+import {runtimeStorageWorker} from './workers/runtimeStorage';
+import {runtimeMaintenanceRoutes} from './http/runtimeMaintenanceRoutes';
+import {pinnedRuntimeReports} from './adapters/persistence/projection/pinnedRuntimeReports';
+import {runtimeAggregateRoutes} from './http/runtimeAggregateRoutes';
+import {runtimeAggregateStore,runtimeProjectionState} from './adapters/persistence/projection/runtimeAggregate';
+import {runtimeAggregateQueries} from './application/runtime/runtimeAggregate';
+import {incrementalRuntimeTasks} from './workers/incrementalRuntimeTasks';
+import {prepareIncrementalRuntimeTasks} from './adapters/persistence/projection/incrementalRuntimeTaskPreparation';
+import {completeWorkingTraversal} from './application/completeWorkingTraversal';
+import {incrementalRuntimeTaskReader} from './adapters/persistence/projection/incrementalRuntimeTaskCache';
+import {completeRuntimeGap,completeRuntimeMetrics} from './domain/completeRuntimeMetrics';
+import {runtimeAnomalyStore} from './adapters/persistence/projection/runtimeAnomalies';
+import {forbidden} from '@crewstation/kernel';
+import {readPlatformAggregateFold,platformUsageStore} from './adapters/persistence/platformUsage';
+import {platformUsageQueries} from './application/runtime/platformUsage';
+import { operationalTelemetryQueries } from './application/runtime/operationalTelemetry';
+import type { OperationalMetricSource } from './ports/operationalTelemetry';
 import { observationDeletionUsageDatabase } from './adapters/persistence/deletionUsageDatabase';
 import type { ObservabilityDeletionInput } from './adapters/persistence/projectDeletion';
 import { drainOriginalObservationUsage } from './application/deletion/usage';
@@ -69,11 +93,14 @@ import type { ObservationOriginalUsage } from './ports/deletionUsage';
 
 export interface ObservabilityModuleDeps {
   db: Database;
+  platformProfileName?:(id:string)=>Promise<string|null>;
+  operationalMetrics?:OperationalMetricSource;
   reportSnapshot?:ReportSnapshotSession;
   reportFacts?:CompleteRuntimeFactSourceFactory<Executor>;
   reportDataRoot?:string;
   /** Explicit validation configuration metadata, independent of historical report selection. */
   developmentNativeObservationAdmissions?:readonly DevelopmentCollectionAdmission[];
+  developmentNativeObservationEnabled?:boolean;
   deletion?: { identities: ObservabilityProjectDirectory; tasks?: ObservabilityDeletionTasks; originalTarget?: ObservabilityDeletionInput['originalTarget']; originalUsage?: ObservationOriginalUsage; assertGrant(context: ProjectDeletionContext): Promise<void> };
   pricingProfiles?: PricingProfileDirectory;
   executionAccess?: ExecutionObservationAccess;
@@ -117,11 +144,12 @@ export function createObservabilityModule(deps: ObservabilityModuleDeps): Observ
     authorizer: deps.authorizer, services: deps.services, slots: deps.slots, ...(deps.records ? { records: deps.records } : {}), clock: deps.clock ?? systemClock, logger,
   };
   const alerting = alertingUseCases(useCaseDeps);
+  const platformUsage=platformUsageStore(deps.db,deps.platformProfileName??(async()=>null));
   const ledger = drizzleUsageLedger(deps.db), executionPricing = drizzleExecutionPricing(deps.db);
   const observations = executionObservationUseCases({ ledger, visibility: drizzleCostVisibility(deps.db), authorizer: deps.authorizer, clock: useCaseDeps.clock,
     access: deps.executionAccess ?? { task: async () => { throw precondition('执行观测来源尚未接入'); } } });
   const valuations = drizzleExecutionValuations(deps.db), valueUsage = executionValuations({ store: valuations, pricing: executionPricing, clock: useCaseDeps.clock });
-  const reconcileBusinessUsage = deps.usageSource ? runnerUsageReconciliation({ source: deps.usageSource, store: ledger, logger, value: valueRunnerUsagePage({ store: valuations, source: deps.usageSource, value: valueUsage }) }) : async () => 0;
+  const reconcileBusinessUsage = deps.usageSource ? runnerUsageReconciliation({ source: deps.usageSource, store: ledger, logger, platform:platformUsage, value: valueRunnerUsagePage({ store: valuations, source: deps.usageSource, value: valueUsage }) }) : async () => 0;
   const reconcileDevelopment = deps.developmentUsageSource ? originalDevelopmentReconciliation({ source: deps.developmentUsageSource,
     store: ledger, pricing: executionPricing, logger, value: valueDevelopmentUsagePage({ models: ledger, store: valuations, value: valueUsage }),
     native: originalDevelopmentWorker(ledger, valuations, valueUsage, async (pass, ordinal) => {
@@ -135,8 +163,15 @@ export function createObservabilityModule(deps: ObservabilityModuleDeps): Observ
     return results.reduce((sum, result) => sum + (result.status === 'fulfilled' ? result.value : 0), 0);
   })()
     .finally(() => { pendingUsage = undefined; }) : reconcileBusinessUsage;
+  const maintenance=runtimeMaintenanceStore(deps.db,valueUsage,deps.isAdmin);
   const completeReports=completeRuntimeReports(deps);
-  const api: ObservabilityModuleApi = {
+  const incrementalTasks=deps.reportSnapshot&&deps.reportFacts?incrementalRuntimeTasks(prepareIncrementalRuntimeTasks({metadata:prepareRuntimeMetadata,publicRows:prepareRuntimePublicRows,db:deps.db,snapshot:deps.reportSnapshot,facts:deps.reportFacts,records:completeWorkingTraversal,build:async(snapshot,task,namespace,signal)=>{
+    const nativeCache:CompleteNativeCacheFactory=<T>(space:string)=>completeWorkingCache<T>(snapshot.workspace,space,signal),nativeSource=completeDevelopmentNativeScopeSource({db:snapshot.executor,rows:snapshot.workspace,namespace:namespace+'/original-native-source',keyOf:jsonHash,cache:nativeCache,signal});
+    return buildCompleteRuntimeTask({task,snapshotId:snapshot.snapshotId,asOf:snapshot.asOf,rows:snapshot.workspace,namespace,keyOf:jsonHash,system:true,usageWorkspace:candidate=>completeStatisticsWorkspace({...candidate,nativeSource,nativeCache}),signal,fragments:deps.reportFacts!(snapshot.executor,{from:'0001-01-01T00:00:00.000Z',to:'9999-12-31T23:59:59.999Z',timezone:'UTC',taskId:task.id},snapshot.snapshotId).fragments?.(task),lifecycle:await deps.reportFacts!(snapshot.executor,{from:'0001-01-01T00:00:00.000Z',to:'9999-12-31T23:59:59.999Z',timezone:'UTC',taskId:task.id},snapshot.snapshotId).lifecycle?.(task,snapshot.asOf),activity:deps.reportFacts!(snapshot.executor,{from:'0001-01-01T00:00:00.000Z',to:'9999-12-31T23:59:59.999Z',timezone:'UTC',taskId:task.id},snapshot.snapshotId).activity?.(task),attempts:deps.reportFacts!(snapshot.executor,{from:'0001-01-01T00:00:00.000Z',to:'9999-12-31T23:59:59.999Z',timezone:'UTC',taskId:task.id},snapshot.snapshotId).attempts(task),ledger:completeRuntimeLedgerSources(snapshot.executor,task,snapshot.snapshotId)});
+   }}),logger):undefined;
+  const aggregateQueries=runtimeAggregateQueries({authorizer:deps.authorizer,read:runtimeAggregateStore(deps.db,readPlatformAggregateFold),head:(projectId)=>runtimeProjectionState(deps.db,projectId),collection:id=>developmentCollectionConfiguration(deps.developmentNativeObservationAdmissions,deps.developmentNativeObservationEnabled)(id)?.development??'production-disabled'});
+  const anomalies=runtimeAnomalyStore(deps.db),storage=runtimeStorageStatus(deps.db);
+  const api: ObservabilityModuleApi = {runtimeStorage:async(actor)=>{if(!actor.isAdmin)throw forbidden();return storage.read();},runtimeMaintenancePreview:async(actor,input)=>{if(!actor.isAdmin)throw forbidden();return maintenance.create(actor.userId,input);},runtimeMaintenanceStatus:async(actor,id)=>{if(!actor.isAdmin)throw forbidden();return maintenance.read(id);},runtimeMaintenanceConfirm:async(actor,id,digest)=>{if(!actor.isAdmin)throw forbidden();return maintenance.confirm(id,digest);},runtimeAnomalies:async(actor,projectId,q,after)=>{if(projectId)await deps.authorizer.authorize(actor,projectId,'view');else if(!actor.isAdmin)throw forbidden();return anomalies.read(projectId,q,after);},runtimeAggregate:aggregateQueries.summary,runtimeProjectionState:aggregateQueries.head,
     runtimeCompleteTaskReport:(actor,projectId,taskId)=>{if(!completeReports)throw precondition('完整运行报告原来源尚未接入');return completeReports.request(actor,projectId,{from:'0001-01-01T00:00:00.000Z',to:useCaseDeps.clock.now().toISOString(),timezone:'Asia/Shanghai'},taskId);},
     runtimeCompleteReport:(actor,projectId,query)=>{if(!completeReports)throw precondition('完整运行报告原来源尚未接入');return completeReports.request(actor,projectId,query);},
     projectRuntimeStatistics:(actor,projectId,query)=>{if(!completeReports)throw precondition('完整运行报告原来源尚未接入');return completeReports.request(actor,projectId,query);},
@@ -145,20 +180,23 @@ export function createObservabilityModule(deps: ObservabilityModuleDeps): Observ
     systemRuntimeTask:(actor,taskId)=>{if(!completeReports)throw precondition('完整运行报告原来源尚未接入');return completeReports.request(actor,null,{from:'0001-01-01T00:00:00.000Z',to:useCaseDeps.clock.now().toISOString(),timezone:'Asia/Shanghai'},taskId);},
     runtimeCompleteReportStatus:(actor,projectId,id)=>{if(!completeReports)throw precondition('完整运行报告原来源尚未接入');return completeReports.status(actor,projectId,id);},
     runtimeCompleteReportPage:(actor,projectId,id,query)=>{if(!completeReports)throw precondition('完整运行报告原来源尚未接入');return completeReports.page(actor,projectId,id,query);},
-    ...(deps.deletion ? { deletionOwner: observabilityDeletionOwner(observabilityDeletionRepository({ db: deps.db, ...deps.deletion,...(completeReports?{reports:completeReports.deletionLifecycle}: {}) }),
+    ...(deps.deletion ? { deletionOwner: observabilityDeletionOwner(observabilityDeletionRepository({ db: deps.db, ...deps.deletion,...(completeReports?{reports:{...completeReports.deletionLifecycle,async quiesce<T>(work:()=>Promise<T>):Promise<T>{const wasStarted=incrementalTasks?.isStarted();await incrementalTasks?.stop();try{return await completeReports.deletionLifecycle.quiesce(work);}finally{incrementalTasks?.resume(wasStarted??false);}}}}: {}) }),
       deps.deletion.originalUsage ? originalObservationDrain({ db: deps.db, ...deps.deletion }, deps.deletion.originalUsage, useCaseDeps.clock) : undefined) } : {}),
+    acceptPlatformUsage:(input)=>platformUsage.accept(input,useCaseDeps.clock.now()),bindPlatformUsage:platformUsage.bind,platformUsage:platformUsageQueries(platformUsage),
+    operationalTelemetry:operationalTelemetryQueries({source:deps.operationalMetrics,authorizer:deps.authorizer,services:deps.services}),
     name: 'observability', reconcileExecutionUsage: reconcileUsage, valueExecutionUsage: valueUsage,
     acceptExecutionPrice: (input) => executionPricing.accept(input, useCaseDeps.clock.now()), ...observations, ingestExecutionUsage: usageIngestion(ledger), ...logsAndHealthUseCases(useCaseDeps), ...alerting,
     ...tokenPricingUseCases({ store: drizzleTokenPriceStore(deps.db), profiles: deps.pricingProfiles ?? { list: async () => [] }, clock: useCaseDeps.clock }),
     ...traceChainUseCases({ authorizer: deps.authorizer, chains: deps.traces, clock: useCaseDeps.clock }),
   };
-  let timer: ReturnType<typeof setInterval> | undefined;
-  const sweepAll = async (): Promise<void> => { for (const projectId of await (deps.listProjectIds?.() ?? Promise.resolve([]))) await alerting.sweepProject(projectId).catch((e: unknown) => logger.warn('alert sweep failed', { projectId, error: String(e) })); };
+  let timer: ReturnType<typeof setInterval> | undefined,pendingSweep:Promise<void>|undefined;
+  const sweepAll = async (): Promise<void> => {await anomalies.sweep();const to=useCaseDeps.clock.now().toISOString(),query={from:new Date(Date.parse(to)-60000).toISOString(),to};const sample=async(projectId:ProjectId|null)=>{let series:readonly OperationalMetricSeries[]|undefined;try{const namespace=projectId?(await deps.services.resolveServiceOfProject(projectId))?.namespace:undefined;if(projectId&&!namespace)return;series=await deps.operationalMetrics?.read(query,namespace);}catch{}await anomalies.operational(projectId,query,series);};await sample(null);for(const projectId of await(deps.listProjectIds?.()??Promise.resolve([])))await sample(projectId).catch(()=>logger.warn('operational anomaly source unavailable')); for (const projectId of await (deps.listProjectIds?.() ?? Promise.resolve([]))) await alerting.sweepProject(projectId).catch((e: unknown) => logger.warn('alert sweep failed', { projectId, error: String(e) })); };
+  const reportWorkers=[runtimeStorageWorker({...storage,sample:async()=>{await storage.sample();await observeRuntimeStorageAnomalies(deps.db,await storage.read());},failed:async(error)=>{await storage.failed(error);await observeRuntimeStorageAnomalies(deps.db,await storage.read());},collect:async()=>{let scanned=0;const removed=await collectRuntimeStorage(deps.db,rows=>{scanned=rows;});return {removed,scanned};}},logger),maintenance.worker,...(incrementalTasks?[incrementalTasks]:[]),...(completeReports?[completeReports.worker]:[])];
   return {
     api,
-    http: [observabilityRoutes(api, deps.isAdmin), tokenPricingRoutes(api, deps.isAdmin), executionObservationRoutes(api, deps.isAdmin),completeRuntimeReportRoutes(api,deps.isAdmin)],
-    reportWorkers:completeReports?[completeReports.worker]:[],
-    workers: [...(deps.usageSource || deps.developmentUsageSource ? [executionUsageWorker(reconcileUsage, logger)] : []), { start: () => { timer ??= setInterval(() => void sweepAll(), 30_000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; } }],
+    http: [runtimeMaintenanceRoutes(api,deps.isAdmin),runtimeAggregateRoutes(api,deps.isAdmin),observabilityRoutes(api, deps.isAdmin), tokenPricingRoutes(api, deps.isAdmin), executionObservationRoutes(api, deps.isAdmin),completeRuntimeReportRoutes(api,deps.isAdmin)],
+    reportWorkers:[{start(){for(const worker of reportWorkers)worker.start();},async drain(){for(const worker of reportWorkers)await worker.drain();},async stop(){await Promise.all(reportWorkers.map(worker=>worker.stop()));}}],
+    workers: [...(deps.usageSource || deps.developmentUsageSource ? [executionUsageWorker(reconcileUsage, logger)] : []), { start: () => { timer ??= setInterval(() => {pendingSweep??=sweepAll().catch(()=>logger.warn('anomaly sweep source unavailable')).finally(()=>{pendingSweep=undefined;});}, 30_000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined;await pendingSweep; } }],
     migrations: observabilityMigrations,
   };
 }
@@ -176,9 +214,9 @@ export const completeStatisticsWorkspace:CompleteUsageWorkspaceFactory=(input)=>
 function completeRuntimeReports(deps:ObservabilityModuleDeps) {
  const session=deps.reportSnapshot,factory=deps.reportFacts,root=deps.reportDataRoot;
  if(!session||!factory||!root)return undefined;
- const spool=completeRuntimeFileSpool(root),store=completeRuntimeReportCache(deps.db),owner=randomUUID(),sourceCollection=developmentCollectionConfiguration(deps.developmentNativeObservationAdmissions);
+ const spool=completeRuntimeFileSpool(root),store=pinnedRuntimeReports(deps.db,completeRuntimeReportCache(deps.db)),owner=randomUUID(),sourceCollection=developmentCollectionConfiguration(deps.developmentNativeObservationAdmissions,deps.developmentNativeObservationEnabled);
  const costVisible=async(projectId:ProjectId)=> (await drizzleCostVisibility(deps.db).read(projectId))?.visibility==='project-members-and-services';
- return completeRuntimeReportUseCases({store,spool,owner,authorizer:deps.authorizer,costVisible,sourceCollection,
+ return completeRuntimeReportUseCases({store,spool,owner,authorizer:deps.authorizer,costVisible,costPolicy:async projectId=>{const value=await drizzleCostVisibility(deps.db).read(projectId);return {revision:value.revision,visibility:value.visibility};},sourceCollection,
   build:async(report,signal)=>{
    const started=Date.now(),query={...report.request.filters,...(report.request.taskId?{taskId:report.request.taskId}:{}),...(report.request.projectId?{projectId:report.request.projectId}:{} )};
    return session.run(async(snapshot)=>{
@@ -187,7 +225,12 @@ function completeRuntimeReports(deps:ObservabilityModuleDeps) {
     const nativeSource=completeDevelopmentNativeScopeSource({db:snapshot.executor,rows:snapshot.workspace,namespace:namespace+'/original-native-source',keyOf:jsonHash,cache:nativeCache,signal});
     const usageWorkspace:CompleteUsageWorkspaceFactory=(candidate)=>completeStatisticsWorkspace({...candidate,nativeSource,nativeCache});
     const build=await buildCompleteRuntimeCohort({query,facts,sourceCollection:report.request.sourceCollection,snapshotId:snapshot.snapshotId,asOf:snapshot.asOf,rows:snapshot.workspace,namespace,keyOf:jsonHash,system:report.request.projectId===null,usageWorkspace,signal,
-      task:(task,privateNamespace)=>buildCompleteRuntimeTask({task,snapshotId:snapshot.snapshotId,asOf:snapshot.asOf,rows:snapshot.workspace,namespace:privateNamespace,keyOf:jsonHash,system:report.request.projectId===null,usageWorkspace,signal,attempts:facts.attempts(task),ledger:completeRuntimeLedgerSources(snapshot.executor,task,snapshot.snapshotId)}),
+      task:async(task,privateNamespace)=>{
+     const projected=incrementalRuntimeTaskReader(snapshot.executor),cached=await projected.task(task.id);
+     if(cached){const ledger=completeRuntimeLedgerSources(snapshot.executor,task,snapshot.snapshotId),visible=report.request.projectId===null||await ledger.costVisible(),pending=!await projected.current(task.id),build=await projected.restore(cached,snapshot.workspace,privateNamespace,visible,signal);if(pending)completeRuntimeGap(build.fold,'projection-pending');return {...build,task,metrics:completeRuntimeMetrics(build.fold),projection:{capturedAt:cached.capturedAt,sourceRevision:cached.sourceRevision,pending}};}
+     // Only the first original Task allocation lacks a cache. Complete population is preserved while bootstrap runs.
+     return buildCompleteRuntimeTask({task,snapshotId:snapshot.snapshotId,asOf:snapshot.asOf,rows:snapshot.workspace,namespace:privateNamespace,keyOf:jsonHash,system:report.request.projectId===null,usageWorkspace,signal,fragments:facts.fragments?.(task),lifecycle:await facts.lifecycle?.(task,snapshot.asOf),activity:facts.activity?.(task),attempts:facts.attempts(task),ledger:completeRuntimeLedgerSources(snapshot.executor,task,snapshot.snapshotId)});
+    },
     });
     if(report.request.taskId&&build.summary.tasks!=='1')throw precondition('原任务不存在或原受理身份不唯一');
     const header={reportId:report.id,projectionVersion:2 as const,scope:report.request.projectId===null?'system' as const:'project' as const,projectId:report.request.projectId,filters:report.request.filters,asOf:snapshot.asOf,snapshotId:snapshot.snapshotId,generation:identity.generation,sourceRevision:identity.revision,...(report.request.taskId?{taskId:report.request.taskId}:{}),coverage:build.summary.metrics.state==='not-ready'?'complete-facts' as const:'complete' as const,buildMs:Date.now()-started};
@@ -234,3 +277,5 @@ function originalDevelopmentWorker(ledger: ReturnType<typeof drizzleUsageLedger>
   return nativeDevelopmentWork({ store: ledger, read, now: () => clock.now().toISOString(),
     value: async refs => { for (const ref of refs) await price(ref); } });
 }
+
+export {prometheusOperationalSource} from './adapters/http/operationalTelemetry';

@@ -2,18 +2,19 @@ import { DevelopmentUsageLookupSchema, TaskIdSchema, WorkloadConsumerSchema, Wor
 import { jsonHash, precondition } from '@crewstation/kernel';
 import { DevelopmentCleanupSelectionSchema, developmentCleanupEvidence } from '../../domain/development/cleanup';
 import type { DevelopmentCleanupSelection } from '../../domain/development/cleanup';
+import {DevelopmentUnsupportedCliEvidenceSchema} from '../../domain/development/unsupportedCliCleanup';
 import { DevelopmentPrestartCleanupEvidenceSchema } from '../../domain/development/prestartCleanup';
 import type { DevelopmentCleanupDeps, DevelopmentCleanupParticipant } from '../../ports/developmentCleanup';
 import { requestDevelopmentEnding, advanceDevelopmentEnding } from './ending';
 
 async function inspectOriginal(deps: DevelopmentCleanupDeps, selection: DevelopmentCleanupSelection) {
   const id = TaskIdSchema.parse(selection.identity.executionId), owner = await deps.owner.get(id);
-  if (!owner || owner.unsupported || !owner.binding && (!deps.workloadSafety || !deps.session.lookupDevelopmentUsage || !deps.store.inspectPrestart || !deps.store.completePrestart)) return undefined;
+  if (!owner || (!owner.unsupported && !owner.binding && (!deps.workloadSafety || !deps.session.lookupDevelopmentUsage || !deps.store.inspectPrestart || !deps.store.completePrestart))) return undefined;
   const env = await deps.environments.getEnvironment(id), n = env?.native, i = owner.intent;
   if (jsonHash(i.identity) !== jsonHash(selection.identity) || i.profileId !== selection.profileId || i.profileRevision !== selection.profileRevision
     || owner.binding && (owner.binding.podUid !== selection.podUid || owner.binding.runtimeTaskId !== id) || !env || env.id !== id || env.projectId !== i.identity.projectId
-    || env.state !== 'releasing' || n?.purpose !== 'agent' || n.state !== 'cleaning' || n.parentTaskId !== i.identity.taskId
-    || n.agentId !== i.identity.agentId || n.podUid !== selection.podUid || n.terminalId !== undefined) throw precondition('原开发 owner、Agent 与实际清理环境不匹配');
+    || !n || env.state !== 'releasing' || (n.purpose??'cli') !== (i.identity.sourceKind==='development-cli'?'cli':'agent') || n.state !== 'cleaning' || n.parentTaskId !== i.identity.taskId
+    || n.agentId !== i.identity.agentId || n.podUid !== selection.podUid || (i.identity.sourceKind==='development-cli' ? !n.terminalId : n.terminalId !== undefined)) throw precondition('原开发 owner、Agent 与实际清理环境不匹配');
   return owner;
 }
 async function prestart(deps: DevelopmentCleanupDeps, selection: DevelopmentCleanupSelection, completing: boolean) {
@@ -56,12 +57,23 @@ async function guardedPrestart(deps: DevelopmentCleanupDeps, selection: Developm
   try { return await prestart(deps, selection, completing); }
   catch { return { kind: 'waiting' as const, reason: 'prestart-original-evidence' }; }
 }
+async function unsupportedCli(deps:DevelopmentCleanupDeps,selection:DevelopmentCleanupSelection,complete:boolean){
+ const id=TaskIdSchema.parse(selection.identity.executionId),owner=await inspectOriginal(deps,selection);
+ if(!owner?.unsupported||!owner.unsupportedProof||owner.binding||!deps.workloadSafety||!deps.session.lookupDevelopmentUsage||!deps.owner.close)return {kind:'waiting' as const,reason:'legacy-cli-original'};
+ await deps.owner.close(id,owner.closeReason??'cancelled');await deps.closeOriginalAdmission?.(id);
+ const current=await inspectOriginal(deps,selection),state=await deps.workloadSafety.get(selection.consumerId),lookup=DevelopmentUsageLookupSchema.parse(await deps.session.lookupDevelopmentUsage(id));
+ if(!current?.closeReason||!state?.admissionClosed||!await deps.workloadSafety.admissionClosed(selection.consumerId)||!state.startPermit||lookup.kind!=='absent'||lookup.runtimeTaskId!==id||current.unsupportedProof?.podUid!==selection.podUid)return {kind:'waiting' as const,reason:'legacy-cli-physical-admission'};
+ const price=current.price,base={version:3,kind:'unsupported-cli',numericState:'unknown',selection,capability:current.unsupportedProof,consumer:state.consumer,startPermit:state.startPermit,owner:{payloadDigest:current.payloadDigest,firstReason:current.closeReason,acceptedAt:price.acceptedAt,profileId:price.profile!.id,profileRevision:price.profile!.revision,protocol:price.profile!.protocol,priceBookRevision:price.priceBookRevision}};
+ if(complete&&!state.stopProof)return {kind:'waiting' as const,reason:'legacy-cli-physical-stop'};
+ return {kind:'permitted' as const,evidence:DevelopmentUnsupportedCliEvidenceSchema.parse({...base,phase:complete?'closed':'stopping',stopProof:complete?state.stopProof:null,stopProofDigest:complete?jsonHash(state.stopProof):null})};
+}
 /** No timers, legacy fallback or physical I/O. Each replay rechecks the actual original PG copy. */
 export function developmentCleanupParticipant(deps: DevelopmentCleanupDeps): DevelopmentCleanupParticipant {
-  return { completePrestart: (raw) => guardedPrestart(deps, DevelopmentCleanupSelectionSchema.parse(raw), true), advance: async (raw) => {
+  return { completePrestart: async(raw) => {const s=DevelopmentCleanupSelectionSchema.parse(raw);const o=await deps.owner.get(TaskIdSchema.parse(s.identity.executionId));return o?.unsupported?unsupportedCli(deps,s,true):guardedPrestart(deps,s,true);}, advance: async (raw) => {
     const selection = DevelopmentCleanupSelectionSchema.parse(raw), id = TaskIdSchema.parse(selection.identity.executionId);
     const original = await inspectOriginal(deps, selection);
     if (!original) return { kind: 'waiting', reason: 'unbound' };
+    if(original.unsupported)return unsupportedCli(deps,selection,false);
     if (!original.binding) return guardedPrestart(deps, selection, false);
     await deps.closeOriginalAdmission?.(id);
     await requestDevelopmentEnding(deps, id, original.closeReason ?? 'cancelled');

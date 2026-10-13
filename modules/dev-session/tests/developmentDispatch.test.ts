@@ -266,4 +266,26 @@ describe.skipIf(!available)('开发原键派发 participant', () => {
     }
     expect(await unsupported.owner.get(unsupported.child.id)).toEqual(original);
   });
+  // RFC-034: only automatic unsupported admissions preserve the original legacy execution path.
+  test('automatic v2 persists unsupported once, freezes its accepted price, and never upgrades after a later hello', async () => {
+    const f=await developmentDispatchFixture(database.db,{automatic:true});
+    f.control.capabilities={protocols:['opencode'],pty:true,preview:false};
+    expect(await dispatchDevelopmentAgent(f.deps,f.child.id)).toEqual({kind:'legacy',reason:'unsupported'});
+    const original=(await f.owner.get(f.child.id))!;
+    expect(original.legacyFallbackAllowed).toBe(true);expect(original.unsupported).toBe(true);expect(original.binding).toBeNull();
+    f.control.capabilities={protocols:['opencode'],pty:true,preview:false,developmentNativePagesV2:2,developmentUsageV1:1,developmentUsageStopV1:1,usageObservationsV1:1,developmentNativeSourceV1:1,nativeUsageTreeV1:1};
+    expect(await dispatchDevelopmentAgent(f.deps,f.child.id)).toEqual({kind:'legacy',reason:'unsupported'});
+    expect(await f.owner.get(f.child.id)).toEqual(original);expect(f.startsSent()).toHaveLength(0);expect(f.controls.priceCalls).toBe(1);
+  });
+  test('automatic collection never falls back after a selected-layout fence or unknown capabilities',async()=>{
+    for(const fenced of [false,true]) {
+      const f=await developmentDispatchFixture(database.db,{automatic:true});
+      f.control.capabilities=fenced?{protocols:['opencode'],pty:true,preview:false,developmentStartAgentFenceV1:1}:undefined;
+      expect((await dispatchDevelopmentAgent(f.deps,f.child.id)).kind).toBe('waiting');
+      expect((await f.owner.get(f.child.id))?.unsupported).toBe(false);
+      if(fenced) { f.control.capabilities={protocols:['opencode'],pty:true,preview:false};expect((await dispatchDevelopmentAgent(f.deps,f.child.id)).kind).toBe('waiting'); }
+      expect(f.startsSent()).toHaveLength(0);
+    }
+  });
+
 });

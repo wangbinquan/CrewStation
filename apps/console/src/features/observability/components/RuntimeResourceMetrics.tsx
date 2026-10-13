@@ -45,24 +45,25 @@ function SystemResources() {
       <dl className={styles.facts}><dt>{t('runtime.cpuRequested')}</dt><dd>{amount(data.demand.requests.cpu, 'cores')} / {amount(data.allocatable.cpu, 'cores')}</dd><dt>{t('runtime.memoryRequested')}</dt><dd>{amount(data.demand.requests.memory)} / {amount(data.allocatable.memory)}</dd></dl>
       {data.errors.length ? <p role="status">{data.errors.join(' · ')}</p> : null}</Card>
     <div className={styles.grid}><ResourceSummary title={t('runtime.managedResources')} data={data.managed} /><ResourceSummary title={t('runtime.platformResources')} data={data.system} /></div>
-    <Card title={t('runtime.projectResourceTotals')} footer={t('runtime.capacityScope')}><DataTable columns={[t('runtime.project'), 'Pod / PVC', 'CPU', t('runtime.memory')]}>{Object.entries(data.projects).map(([id, row]) => <tr key={id}><td className={styles.identity}>{id}</td><td>{row.pods} / {row.pvcs}</td><td><MetricValue metric={row.metrics.cpu} coverage={row.coverage.cpu} compact /></td><td><MetricValue metric={row.metrics.memory} coverage={row.coverage.memory} compact /></td></tr>)}</DataTable></Card>
+    <Card title={t('runtime.projectResourceTotals')} footer={t('runtime.capacityScope')}><DataTable columns={[t('runtime.project'), 'Pod / PVC', 'CPU', t('runtime.memory')]}>{Object.entries(data.projects).map(([id, row]) => <tr key={id}><td>{data.projectNames?.[id]??t('runtime.unknown')}<span className={styles.identity}>{id}</span></td><td>{row.pods} / {row.pvcs}</td><td><MetricValue metric={row.metrics.cpu} coverage={row.coverage.cpu} compact /></td><td><MetricValue metric={row.metrics.memory} coverage={row.coverage.memory} compact /></td></tr>)}</DataTable></Card>
   </> : null}</Stack>;
 }
-function ResourceHistory({ projectId, search, change }: { projectId?: string; search: RuntimeSearch; change: (value: RuntimeSearch) => void }) {
-  const t = useT(), [now] = useState(() => Date.now()), from = search.from ?? new Date(now - 86400000).toISOString(), to = search.to ?? new Date(now).toISOString();
-  const valid = Date.parse(to) - Date.parse(from) <= 7 * 86400000;
+function ResourceHistory({ projectId, search, change,window:requestedWindow }: {window?:{from:string;to:string}; projectId?: string; search: RuntimeSearch; change: (value: RuntimeSearch) => void }) {
+  const t = useT(), [now] = useState(() => Date.now()), from = requestedWindow?.from??search.from ?? new Date(now - 86400000).toISOString(), to = requestedWindow?.to??search.to ?? new Date(now).toISOString();
+  const valid = Date.parse(to)>Date.parse(from);
   const window = { from, to, metrics: ['cpu', 'memory', projectId ? 'volumeUsed' : 'fsUsed'] as ('cpu' | 'memory' | 'volumeUsed' | 'fsUsed')[] };
   const query = useApiQuery(['runtime-resource-history', projectId ?? 'system', window], async () => ClusterHistorySchema.parse(await (projectId ? api.cluster.projectHistory(projectId, window) : api.cluster.history({ ...window, scope: 'cluster' }))), { ...AUTO_REFRESH, enabled: valid });
   return <Card title={t('runtime.resourceHistory')} stacked footer={t('runtime.historyHint')}>
-    <ActionRow>{[1, 24, 168].map((hours) => <Button key={hours} onClick={() => { const at = Date.now(); change({ ...search, from: new Date(at - hours * 3600000).toISOString(), to: new Date(at).toISOString() }); }}>{t('runtime.hours', { hours })}</Button>)}</ActionRow>
+    <ActionRow>{[1, 24, 168,720].map((hours) => <Button key={hours} onClick={() => { const at = Date.now(); change({ ...search, from: new Date(at - hours * 3600000).toISOString(), to: new Date(at).toISOString(),period:'custom' }); }}>{t('runtime.hours', { hours })}</Button>)}</ActionRow>
     <p className={styles.hint}>{runtimeDate(from)} — {runtimeDate(to)}</p>
     {!valid ? <p role="status">{t('runtime.historyLimit')}</p> : <><QueryStatus isPending={query.isPending} error={query.error} />{!query.error && query.data ? <>
       {query.data.state !== 'fresh' ? <p role="status">{query.data.reason ?? t('runtime.historyUnavailable')}</p> : null}
       {query.data.availableFrom ? <p>{t('runtime.historyAvailable', { at: runtimeDate(query.data.availableFrom) })}</p> : null}
-      <div className={styles.grid}>{query.data.series.map((series) => <TimeSeries key={series.metric} title={series.metric === 'cpu' ? 'CPU' : t('runtime.' + series.metric)} points={series.points} format={(n) => amount(n, series.unit)} labels={{ average: t('runtime.average'), peak: t('runtime.peak'), coverage: t('runtime.sampleCoverage'), select: t('runtime.selectTime'), gap: t('runtime.sampleGap') }} />)}</div>
+      {query.data.integrals?.length?<ActionRow>{query.data.integrals.map(row=><span key={row.metric}>{t(row.metric==='cpu'?'runtime.cpuHours':'runtime.gibHours')} · {row.metric}: {row.known===null?'—':row.known.toLocaleString(undefined,{maximumFractionDigits:6})} {row.complete?'':t('runtime.samplePartial')}</span>)}</ActionRow>:null}
+      <div className={`${styles.grid} ${styles.resourceCharts}`}>{query.data.series.map((series) => <TimeSeries key={series.metric} title={series.metric === 'cpu' ? 'CPU' : t('runtime.' + series.metric)} points={series.points} format={(n) => amount(n, series.unit)} labels={{ average: t('runtime.average'), peak: t('runtime.peak'), coverage: t('runtime.sampleCoverage'), select: t('runtime.selectTime'), gap: t('runtime.sampleGap') }} />)}</div>
     </> : null}</>}
   </Card>;
 }
-export function RuntimeResourceMetrics(props: { projectId?: string; search: RuntimeSearch; change: (value: RuntimeSearch) => void }) {
+export function RuntimeResourceMetrics(props: {window?:{from:string;to:string}; projectId?: string; search: RuntimeSearch; change: (value: RuntimeSearch) => void }) {
   const t = useT(); return <Stack><p className={styles.hint}>{t('runtime.resourceScope')}</p>{props.projectId ? <ProjectResources key={props.projectId} projectId={props.projectId} /> : <SystemResources />}<ResourceHistory {...props} /></Stack>;
 }

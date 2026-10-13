@@ -36,7 +36,7 @@ describe.skipIf(!available)('development content inventory (actual read-only PG;
         VALUES(${f.otherWorkspace},${newResourceId()},1,'{"private":"other-project-layout"}')`);
       const before = await f.database.db.execute('SELECT task_id,user_id,layout FROM dev_session.workspace_layouts ORDER BY task_id,user_id');
       const inspected = await f.inspect();
-      expect(DEVELOPMENT_CONTENT).toHaveLength(14); expect(inspected.inventory.complete).toBe(true); expect(inspected.inventory.resources).toHaveLength(13);
+      expect(DEVELOPMENT_CONTENT).toHaveLength(15); expect(inspected.inventory.complete).toBe(true); expect(inspected.inventory.resources).toHaveLength(13);
       expect(inspected.traversal.counts.workspace_layouts).toBe(207);
       expect(inspected.inventory.resources.find((row) => row.id === 'workspace_layouts')?.count).toBe(206);
       expect(inspected.contents).toHaveLength(218); expect(inspected.contents.some((row) => row.key.includes(f.otherWorkspace))).toBe(false);

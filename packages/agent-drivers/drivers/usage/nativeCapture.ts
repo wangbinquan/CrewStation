@@ -7,11 +7,12 @@ import type { DevelopmentRunnerUsageCapture } from '@crewstation/contracts';
 export interface NativeCaptureInput { lineageKey: string; turn: string; turnIndex: number; resumeSessionId?: string; developmentNativeSourceV1?: 1; nextRevision: () => number }
 export interface NativeUsageCapture {
   normalizeUsage?: UsageNormalizer;
-  begin(at: number): DevelopmentRunnerUsageCapture;
+  begin(at: number): DevelopmentRunnerUsageCapture|Promise<DevelopmentRunnerUsageCapture>;
   includesRecord(sessionId: string, partId: string): boolean;
   observeSession(sessionId: string): void;
-  finish(root: string | undefined, at: number, issues?: string[]): DevelopmentRunnerUsageCapture[];
+  finish(root: string | undefined, at: number, issues?: string[]): Iterable<DevelopmentRunnerUsageCapture>|AsyncIterable<DevelopmentRunnerUsageCapture>;
 }
+export interface SynchronousNativeUsageCapture extends NativeUsageCapture { begin(at:number):DevelopmentRunnerUsageCapture; finish(root:string|undefined,at:number,issues?:string[]):DevelopmentRunnerUsageCapture[] }
 const equivalent = (before: NativeUsageStep, after: NativeUsageStep) => jsonHash(before) === jsonHash(after);
 function measurement(input: NativeCaptureInput, step: NativeUsageStep, root: string, at: number): RunnerUsageMeasurement {
   return { recordId: `opencode:step:${jsonHash({ session: step.sessionId, id: step.id })}`, revision: input.nextRevision(),
@@ -41,7 +42,7 @@ function chunks<T>(items: T[], build: (rows: T[], offset: number) => RunnerUsage
   return output;
 }
 /** One bounded collector per process turn. The final proof follows every numeric frame. */
-export function createNativeUsageCapture(input: NativeCaptureInput, read: (root: string) => NativeUsageSnapshot): NativeUsageCapture {
+export function createNativeUsageCapture(input: NativeCaptureInput, read: (root: string) => NativeUsageSnapshot): SynchronousNativeUsageCapture {
   const snapshotOf = (root: string): NativeUsageSnapshot => {
     try { return read(root); }
     catch { return { steps: [], sessions: 0, fingerprint: null, issues: ['native-read-failed'] }; }
@@ -91,7 +92,7 @@ export function createNativeUsageCapture(input: NativeCaptureInput, read: (root:
     },
   };
 }
-export function unsupportedNativeUsageCapture(input: NativeCaptureInput): NativeUsageCapture {
+export function unsupportedNativeUsageCapture(input: NativeCaptureInput): SynchronousNativeUsageCapture {
   return { begin: (at) => frame(proof(input, undefined, at, { state: 'unsupported', issues: ['native-tree-unsupported'] })),
     includesRecord: () => true, observeSession: () => undefined, finish: () => [] };
 }

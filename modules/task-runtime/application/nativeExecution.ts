@@ -45,7 +45,7 @@ export function createNativeExecutionUseCase(deps: NativeExecutionDeps) {
       if (input.image && input.image !== input.runtimeImage.image) throw precondition('档位镜像与显式运行镜像冲突');
     }
     const purpose = input.purpose ?? 'cli', rule = ADMISSION[purpose];
-    if (input.developmentUsageStorage !== undefined && (purpose !== 'agent' || !DevelopmentUsageStorageSchema.safeParse(input.developmentUsageStorage).success)) throw precondition('只有独立开发 Agent 可选择数值日志布局 v1');
+    if (input.developmentUsageStorage !== undefined && (!['agent','cli'].includes(purpose) || !DevelopmentUsageStorageSchema.safeParse(input.developmentUsageStorage).success)) throw precondition('只有独立开发 Agent 可选择数值日志布局 v1');
     const original = await deps.uow.read.environments.getById(input.parentTaskId);
     if (!original) throw notFound(rule.parentLabel, input.parentTaskId);
     if (input.developmentUsageProtection !== undefined || input.developmentRemovalProtection !== undefined) return createDevelopmentWorkload(deps, input, original, (env) => sameRequest(env, input), (parent, workspace, profile) => executionEnvironment(deps, input, parent, workspace, profile));

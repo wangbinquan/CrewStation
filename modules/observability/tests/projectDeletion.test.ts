@@ -48,7 +48,7 @@ describe.skipIf(!available)('observability project permanent cleanup', () => {
     for (const phase of PROJECT_DELETION_PHASES) expect((await restored.run({ ...f.context(confirmed, phase, 2), target: current })).kind).toBe('done');
     expect((await contentCounts(database!)).usage_heads).toBe(1);
   });
-  test('clears all twenty content tables without query caps, preserves another project and platform prices, and blocks late writes', async () => {
+  test('clears all twenty-one content families without query caps, preserves another project and platform prices, and blocks late writes', async () => {
     const f = await setup(), own = await seed(database!, target.id), other = await seed(database!, otherId);
     await raw(sql`INSERT INTO observability.alerts(id,project_id,type,key,state,detail,fired_at) SELECT 'dense-' || value,${target.id},'health-failing','health-failing:prod','firing','private-dense',now() FROM generate_series(1,2001) AS value`);
     const profileId = newResourceId(), prices = drizzleTokenPriceStore(database!.db);
@@ -56,8 +56,10 @@ describe.skipIf(!available)('observability project permanent cleanup', () => {
       await store.append({ id: newResourceId(), profileId, profileRevision: 1, revision: 1, protocol: 'opencode', provider: 'provider', model: 'model', condition: null,
         effectiveFrom: new Date().toISOString(), createdAt: new Date().toISOString(), createdBy: UserIdSchema.parse(newResourceId()), currency: 'CNY', rates: { input: '1', output: '2', cacheRead: '3', cacheWrite: '4' }, sourceNote: 'platform' }, newResourceId(), 'platform-price');
     });
-    const confirmed = await f.owner.inspect(target); expect(confirmed.complete).toBe(true); expect(confirmed.resources).toHaveLength(20);
-    expect(confirmed.resources.reduce((sum, row) => sum + row.count, 0)).toBe(2021); expect(JSON.stringify(confirmed)).not.toContain('private-');
+    const confirmed = await f.owner.inspect(target); expect(confirmed.complete).toBe(true); expect(confirmed.resources).toHaveLength(21);
+    expect(confirmed.resources.find(row=>row.id==='runtime_task_proof_work')?.count).toBe(1);
+    expect(confirmed.resources.filter(row=>row.id!=='runtime_task_proof_work').reduce((sum,row)=>sum+row.count,0)).toBe(2021);
+    expect(confirmed.resources.reduce((sum, row) => sum + row.count, 0)).toBe(2022); expect(JSON.stringify(confirmed)).not.toContain('private-');
     const restored = observabilityDeletionOwner(observabilityDeletionRepository(f.input));
     expect((await restored.run(f.context(confirmed, 'seal'))).kind).toBe('done');
     for (const phase of PROJECT_DELETION_PHASES.slice(1)) {

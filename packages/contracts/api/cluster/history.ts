@@ -6,9 +6,9 @@ export const ClusterHistoryQuerySchema = z.object({ scope: z.enum(['cluster', 'n
   if (v.scope === 'container' && !v.container) c.addIssue({ code: 'custom', message: 'container is required', path: ['container'] });
   if (v.scope === 'project' && !v.projectId) c.addIssue({ code: 'custom', message: 'projectId is required', path: ['projectId'] });
   const duration = Date.parse(v.to) - Date.parse(v.from);
-  if (duration <= 0 || duration > 7 * 86_400_000) c.addIssue({ code: 'custom', message: 'Choose a positive range of at most 7 days', path: ['to'] });
+  if (duration <= 0) c.addIssue({ code: 'custom', message: 'Choose a positive historical range', path: ['to'] });
 });
-export const ClusterHistorySchema = z.object({ requestedFrom: z.string(), requestedTo: z.string(), availableFrom: z.string().optional(), stepSeconds: z.number(), source: z.literal('prometheus'), state: z.enum(['fresh', 'unavailable', 'error']), reason: z.string().optional(), series: z.array(z.object({ metric: ClusterMetricNameSchema, unit: z.string(), points: z.array(z.object({ at: z.string(), average: z.number().nullable(), peak: z.number().nullable(), coverage: z.number(), complete: z.boolean() })) })) });
+export const ClusterHistorySchema = z.object({ requestedFrom: z.string(), requestedTo: z.string(), availableFrom: z.string().optional(), stepSeconds: z.number(), source: z.literal('prometheus'), state: z.enum(['fresh', 'unavailable', 'error']), reason: z.string().optional(), integrals:z.array(z.object({metric:ClusterMetricNameSchema,unit:z.string(),known:z.number().nullable(),coveredSeconds:z.number(),windowSeconds:z.number(),complete:z.boolean()})).optional(),series: z.array(z.object({ metric: ClusterMetricNameSchema, unit: z.string(), points: z.array(z.object({ at: z.string(), average: z.number().nullable(), peak: z.number().nullable(), coverage: z.number(), complete: z.boolean() })) })) });
 export const ClusterHistoryResourceSchema = z.object({ resourceId: z.string(), uid: z.string(), kind: z.string(), namespace: z.string(), name: z.string(), scope: z.string(), projectId: z.string().optional(), firstSeen: z.string(), lastSeen: z.string(), deleted: z.boolean(), versions: z.array(z.object({ from: z.string(), to: z.string().optional(), name: z.string(), namespace: z.string(), scope: z.string(), projectId: z.string().optional() })) });
 export const ClusterHistoryResourcesQuerySchema = z.object({ cursor: z.coerce.number().int().nonnegative().default(0), limit: z.coerce.number().int().min(1).max(100).default(50), kind: z.enum(['Node', 'Pod', 'PersistentVolumeClaim']).optional(), projectId: z.string().uuid().optional(), q: z.string().max(200).optional() });
 export const ClusterHistoryResourcesSchema = z.object({ items: z.array(ClusterHistoryResourceSchema), total: z.number(), nextCursor: z.number().optional() });
@@ -19,6 +19,6 @@ export type ClusterHistoryResourcesQuery = z.infer<typeof ClusterHistoryResource
 export type ClusterHistoryResources = z.infer<typeof ClusterHistoryResourcesSchema>;
 
 export const ProjectResourceHistoryQuerySchema = z.object({ from: ClusterHistoryQuerySchema.shape.from, to: ClusterHistoryQuerySchema.shape.to, metrics: ClusterHistoryQuerySchema.shape.metrics }).strict().refine((v) => {
-  const duration = Date.parse(v.to) - Date.parse(v.from); return duration > 0 && duration <= 7 * 86_400_000;
-}, { message: 'Choose a positive range of at most 7 days' });
+  const duration = Date.parse(v.to) - Date.parse(v.from); return duration > 0;
+}, { message: 'Choose a positive historical range' });
 export type ProjectResourceHistoryQuery = z.infer<typeof ProjectResourceHistoryQuerySchema>;

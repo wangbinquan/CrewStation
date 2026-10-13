@@ -1,3 +1,4 @@
+import {isApiClientError} from '@crewstation/api-client';
 import {useQueryClient} from '@tanstack/react-query';
 import {runtimeCompleteReportContent,type RuntimeCompleteReport,type RuntimeReportHeader,type RuntimeReportPageQuery} from '@crewstation/contracts';
 import {api} from '../../../shared/api/client';
@@ -12,6 +13,7 @@ export function useRuntimeReportPage<T>(key:readonly unknown[],header:RuntimeRep
    return page;
   } catch(error) {
    client.setQueriesData<RuntimeCompleteReport>({predicate:q=>q.queryKey[0]==='runtime-complete'&&!!q.state.data&&runtimeCompleteReportContent(q.state.data as RuntimeCompleteReport)?.header.reportId===header.reportId},():RuntimeCompleteReport=>({reportId:header.reportId,state:'not-ready',gaps:[{source:'retained-report',reason:'retained-report-page-unverified'}]}));
+   if(isApiClientError(error)&&error.status===404)void client.invalidateQueries({queryKey:['runtime-complete']});
    throw error;
   }
  });

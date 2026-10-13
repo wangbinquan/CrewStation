@@ -45,7 +45,8 @@ test('history returns averages/peaks, explicit gaps, custom tails and stable del
   expect((await queryHistory(f.deps, { range: async () => { throw new Error('history offline'); } }, query)).reason).toBe('history offline');
   expect((await queryHistory(f.deps, { range: async () => [{ metric: { scope: 'pod', metric: 'cpu' }, values: [] }] }, query)).state).toBe('error');
   await expect(queryHistory(f.deps, reader, { ...query, scope: 'pod', resourceId: crypto.randomUUID() })).rejects.toMatchObject({ kind: 'not_found' });
-  await expect(queryHistory(f.deps, reader, { ...query, from: '2000-01-01T00:00:00Z' })).rejects.toMatchObject({ kind: 'validation' });
+  const long=await queryHistory(f.deps,{range:async()=>[]},{...query,from:'2000-01-01T00:00:00Z'});
+  expect(long.requestedFrom).toBe('2000-01-01T00:00:00Z');expect(long.series.every(series=>series.points.every(p=>!p.complete))).toBe(true);
   const identities = await f.deps.repository.identities(); identities[0]!.deleted = true;
   expect((await historyResources(f.deps, { cursor: 0, limit: 1, q: identities[0]!.name })).items[0]?.deleted).toBe(true);
 });

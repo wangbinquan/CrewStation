@@ -1,3 +1,4 @@
+import type { DevelopmentUsageOwner } from './developmentUsage';
 import type { DevelopmentUsageKey, DevelopmentUsageLookup, WorkloadConsumer, WorkloadStopProof, WorkloadStartPermit, StoredDevelopmentUsage, TaskId } from '@crewstation/contracts';
 import type { DevelopmentCleanupEvidence, DevelopmentCleanupSelection } from '../domain/development/cleanup';
 import type { DevelopmentEndingDeps, DevelopmentEndingSession } from './developmentEnding';
@@ -12,6 +13,7 @@ export interface DevelopmentCleanupWorkloadSafety {
   admissionClosed(id: string): Promise<boolean>;
 }
 export interface DevelopmentCleanupDeps extends Omit<DevelopmentEndingDeps, 'session'> {
+  owner:DevelopmentEndingDeps['owner'] & {close?:DevelopmentUsageOwner['close']};
   session: DevelopmentCleanupSession;
   workloadSafety?: DevelopmentCleanupWorkloadSafety;
   environments: Pick<Environments, 'getEnvironment'>;

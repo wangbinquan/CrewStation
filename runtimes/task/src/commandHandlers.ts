@@ -46,6 +46,7 @@ export function buildCommandHandlers(targets: CommandTargets): CommandHandlers {
   return {
     stopDevelopmentAgent: async (c) => {
       development();
+      if(c.admission.intent.identity.sourceKind==='development-cli')return targets.nativeTerminals.stopDevelopmentUsage(c.admission,c.podUid);
       if (!targets.agents.stopDevelopmentAgent) throw new RunnerCommandError('development_usage_stop_unsupported', '当前监督器不支持原键停止');
       return targets.agents.stopDevelopmentAgent(c.admission, c.podUid);
     },

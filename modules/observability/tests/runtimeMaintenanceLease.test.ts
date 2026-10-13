@@ -1,0 +1,11 @@
+// RFC-034: a reclaimed maintenance lease cannot publish stale progress, and original rows remain intact.
+import {afterEach,describe,expect,test} from 'bun:test';
+import {sql} from 'drizzle-orm';
+import {newResourceId} from '@crewstation/kernel';
+import {createTestDatabase,testDatabaseAvailable,type TestDatabase} from '@crewstation/testkit';
+import {observabilityMigrations} from '../wiring';
+import {runtimeMaintenanceLease,MaintenanceLeaseLost} from '../adapters/persistence/maintenance/lease';
+const available=await testDatabaseAvailable();let database:TestDatabase|undefined;afterEach(async()=>{await database?.drop();database=undefined;});
+describe.skipIf(!available)('original maintenance lease recovery',()=>{
+ test('after real lease expiry the new worker commits and the delayed original worker is rejected',async()=>{database=await createTestDatabase([observabilityMigrations]);const id=newResourceId(),actor=newResourceId(),document={id,state:'preparing',createdAt:'2026-10-13T00:00:00.000Z'};await database.db.execute(sql`INSERT INTO observability.runtime_maintenance(id,request_key,actor_id,document) VALUES(${id},${newResourceId()},${actor},${JSON.stringify(document)}::jsonb)`);const entered=Promise.withResolvers<void>(),resume=Promise.withResolvers<void>(),first=runtimeMaintenanceLease(database.db)(async db=>{entered.resolve();await resume.promise;await db.execute(sql`UPDATE observability.runtime_maintenance SET document=document||'{"result":"stale"}'::jsonb WHERE id=${id}`);}).catch(error=>error);await entered.promise;await database.db.execute(sql`UPDATE observability.runtime_maintenance SET lease_until=clock_timestamp()-interval '1 second' WHERE id=${id}`);await runtimeMaintenanceLease(database.db)(async db=>{await db.execute(sql`UPDATE observability.runtime_maintenance SET document=document||'{"state":"complete","result":"resumed"}'::jsonb WHERE id=${id}`);});resume.resolve();expect(await first).toBeInstanceOf(MaintenanceLeaseLost);const [row]=await database.db.execute(sql`SELECT document,lease_id FROM observability.runtime_maintenance WHERE id=${id}`);expect(row?.['document']).toMatchObject({state:'complete',result:'resumed'});expect(row?.['lease_id']).toBeNull();});
+});

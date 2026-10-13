@@ -6,6 +6,7 @@ interface ContentTable {
 }
 const columns = (value: string) => value.split(' ').sort();
 const documents: Readonly<Record<string, readonly string[]>> = {
+  observation_lifecycle:['document'],
   environments: ['labels', 'native', 'render', 'legacy_native', 'legacy_cluster', 'parent_ending', 'business_workspace', 'preview', 'release', 'runner_rejection', 'startup', 'runtime_initialization'],
   environment_rebuilds: ['input', 'legacy_input', 'legacy_cluster', 'development_parent_binding'],
   archive_executions: ['body'], unprovisioned_storage: ['body'],
@@ -17,6 +18,7 @@ const entry = (table: string, keys: readonly string[], names: string): ContentTa
 
 /** Every current payload column is accounted for, including legacy documents and generated presence witnesses. */
 export const RUNTIME_CONTENT: readonly ContentTable[] = [
+  entry('observation_lifecycle',['sequence'],'document observed_at project_id sequence task_id'),
   entry('environments', ['id'], 'admission_fingerprint branch business_workspace connected created_at created_by id kind labels last_activity_at legacy_cluster legacy_native message namespace native parent_ending parent_ending_kind parent_ending_present pod_name pod_uid preview profile project_id pvc_name rebuild_id release render runner_rejection runner_token_hash runtime_initialization service_id startup state trace_id updated_at volume_mode'),
   entry('admissions', ['project_id'], 'project_id running'),
   entry('environment_rebuilds', ['id'], 'attempts created_at creation development_parent_binding development_parent_binding_kind development_parent_binding_present failure_reason id image input legacy_cluster legacy_input message namespace node_name original_pod_name pod_name pod_uid project_id pvc_name secret_name secret_uid state task_id updated_at'),

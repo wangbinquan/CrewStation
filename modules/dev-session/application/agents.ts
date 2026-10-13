@@ -1,3 +1,4 @@
+import { developmentObservationSelected } from '../domain/development/observationSelection';
 import type {
   Actor, AgentEvent, AgentInstanceDto, AgentInstanceState, BeforeStartExecution, RunnerEvent, SendAgentMessageRequest, StartDevAgentV2Request, TaskId,
 } from '@crewstation/contracts';
@@ -44,7 +45,7 @@ export function agentUseCases(deps: DevSessionUseCaseDeps, starts: AgentStartRep
       };
       const observationIntent = await freezeDevelopmentObservation(deps, env.projectId, candidate, resolved);
       const runtimeImage = await reserveDevelopmentImage(deps, actor, env.projectId, { type: 'agent', id: imageTaskId }, input.runtimeImageVersionId, { profileId: resolved.id, revision: resolved.revision });
-      const start: AgentStart = { ...candidate, execution: { ...candidate.execution, ...(observationIntent ? { observationIntent } : {}), ...(runtimeImage ? { runtimeImage, image: runtimeImage.image } : {}) } };
+      const start: AgentStart = { ...candidate, execution: { ...candidate.execution, ...(observationIntent ? { observationIntent, ...(deps.settings.developmentNativeObservationEnabled && !developmentObservationSelected(deps.settings, env.projectId, candidate.profile) ? { observationLegacyFallback: true } : {}) } : {}), ...(runtimeImage ? { runtimeImage, image: runtimeImage.image } : {}) } };
       await starts.insert(start);
       if (runtimeImage) await deps.runtimeImages!.confirm(runtimeImage, { type: 'agent', id: imageTaskId });
       const execution = await executions.admit(start);

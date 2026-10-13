@@ -12,7 +12,7 @@ const available = await testDatabaseAvailable();
 describe.skipIf(!available)('数字结束私表的旧库升级', () => {
   test('0014 preserves old finalized execution and accepted owner without leaking new bookkeeping into either value', async () => {
     const endingMigrations = { ...devSessionMigrations, files: devSessionMigrations.files.filter((m) => m.name < '0015_') };
-    const current = await createTestDatabase([endingMigrations]);
+    const current = await createTestDatabase([devSessionMigrations]);
     const previous = await createTestDatabase([{ ...endingMigrations, files: endingMigrations.files.filter((m) => m.name < '0014_') }]);
     try {
       const f = await developmentEndingFixture(current.db), start = { ...f.start, state: 'ended' as const, finalized: true, endedAt: '2026-09-30T00:15:00.000Z' }, owner = (await f.owner.get(f.child.id))!;
@@ -24,7 +24,7 @@ describe.skipIf(!available)('数字结束私表的旧库升级', () => {
         values (${start.execution.taskId},${owner.intent.identity.projectId},${start.taskId},${owner.price.acceptedAt},${JSON.stringify(prepared)}::jsonb,${JSON.stringify(binding)}::jsonb,${unsupported},${closeReason})`);
       expect(await runMigrations(previous.db, [endingMigrations])).toEqual(['dev_session/0014_development_agent_endings.sql']);
       expect(await drizzleAgentStarts(previous.db).get(start.agentId)).toEqual(start);
-      expect(await developmentUsageOwnerStore(previous.db).get(f.child.id)).toEqual(owner);
+      const [legacyOwner]=await previous.db.execute(sql`SELECT prepared,binding,unsupported,close_reason,capability_pod_uid FROM dev_session.development_agent_usage WHERE execution_task_id=${f.child.id}`);expect(legacyOwner).toEqual({prepared,binding,unsupported,close_reason:closeReason,capability_pod_uid:null});
       // Verify the historical 0014 table directly before using a reader for the current schema.
       const historicalEndings = await previous.db.execute(sql`select execution_task_id from dev_session.development_agent_endings`);
       expect(historicalEndings.map((row) => row.execution_task_id)).toEqual([]);
@@ -37,6 +37,8 @@ describe.skipIf(!available)('数字结束私表的旧库升级', () => {
         'dev_session/0017_deletion_cleanup.sql',
         'dev_session/0018_cleanup_callback_metadata.sql',
         'dev_session/0019_prestart_development_ending.sql',
+        'dev_session/0020_observation_activity_history.sql',
+        'dev_session/0021_cli_original_capability.sql',
       ]);
       expect(await drizzleAgentStarts(previous.db).get(start.agentId)).toEqual(start);
       expect(await developmentUsageOwnerStore(previous.db).get(f.child.id)).toEqual(owner);

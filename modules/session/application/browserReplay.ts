@@ -1,3 +1,4 @@
+import {incrementRuntimeSignal,setRuntimeSignal} from '@crewstation/kernel';
 import type { TaskId } from '@crewstation/contracts';
 import type { EventSink } from '../domain/runnerConnection';
 import { RunnerConnection } from '../domain/runnerConnection';
@@ -30,6 +31,7 @@ export async function openBrowserReplay(deps: SessionUseCaseDeps, hub: RunnerHub
       type: 'streamReady', connected: complete && hub.connections.has(taskId), replayed: replay.length,
       replayComplete: complete, ...(from > sinceSeq ? { replayFromSeq: from } : {}), ...(!complete ? { resumeFromSeq: replay.at(-1)?.seq ?? from } : {}),
     }));
+    const observedHead=await deps.events.maxSeq(taskId);incrementRuntimeSignal('websocket.replay.records','events',BigInt(replay.length));setRuntimeSignal('websocket.replay.observedRemaining','events',String(Math.max(0,observedHead-(replay.at(-1)?.seq??from))));if(!complete)incrementRuntimeSignal('websocket.replay.continuations','packets');
     return { complete, unsubscribe };
   } catch (error) { unsubscribe(); throw error; }
 }

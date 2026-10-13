@@ -1,0 +1,2 @@
+import type {RuntimePhase} from '@crewstation/contracts';
+export function runtimePhaseLanes(rows:readonly RuntimePhase[]){const lanes=new Map<string,{key:string;name:string|null;segments:RuntimePhase[]}>();for(const row of rows){const key=JSON.stringify([row.agentId,row.runtimeTaskId??null]),lane=lanes.get(key)??{key,name:row.agentName??null,segments:[]};lane.segments.push(row);lanes.set(key,lane);}return [...lanes.values()];}

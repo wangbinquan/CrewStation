@@ -2,9 +2,9 @@ import { z } from 'zod';
 import { ExecutionObservationIdentitySchema, ExecutionObservationUsageSchema } from '../api/observability/executionObservations';
 
 const key = z.string().min(1).max(512);
-const size = z.number().int().nonnegative().max(10000);
+const size = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 export const NativeUsageStepSchema = z.strictObject({
-  id: key, sessionId: key, parentSessionId: key.nullable(), ancestors: z.array(key).max(64),
+  id: key, sessionId: key, parentSessionId: key.nullable(), ancestors: z.array(key),
   occurredAt: z.iso.datetime().nullable(), usage: ExecutionObservationUsageSchema,
   actualModel: z.strictObject({ provider: z.string().min(1).max(200), model: z.string().min(1).max(300), condition: z.null() }).nullable(),
 });

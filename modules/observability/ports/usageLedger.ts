@@ -12,6 +12,8 @@ export interface UsageSourcePage extends UsageTaskScope {
   native?: Array<{ identity: UsageExecutionIdentity; capture: RunnerUsageCapture }>;
 }
 export interface UsageLedgerTransaction {
+  /** Optional transaction-local read prefetch; every write and conflict check keeps its original order. */
+  prefetch?(events: UsageSourcePage['events']): Promise<void>;
   cursor(): Promise<string | null>;
   pageFingerprint(nextCursor: string): Promise<string | undefined>;
   eventFingerprint(eventId: string): Promise<string | undefined>;
@@ -58,11 +60,12 @@ export interface ExecutionValuationRequest {
 }
 export interface ExecutionValuationReceipt { fingerprint: string; document: UsageValuation }
 export interface ExecutionValuationStore {
+  retainModel?(ref:UsageMeasurementRef,evidence:RunnerUsageMeasurement):Promise<void>;
   pendingNativeRepairs(scope: UsageTaskScope, limit: number): Promise<Array<{ usage: UsageRecord; modelEvidence: RunnerUsageMeasurement | null }>>;
   usage(ref: UsageMeasurementRef): Promise<UsageRecord | undefined>;
   receipt(scope: UsageTaskScope, requestKey: string): Promise<ExecutionValuationReceipt | undefined>;
   /** Compare the current usage revision, replace the valuation and append its sync change atomically. */
-  commit(input: ExecutionValuationRequest, fingerprint: string, basisFingerprint: string, draft: UsageValuation): Promise<UsageValuation>;
+  commit(input: ExecutionValuationRequest, fingerprint: string, basisFingerprint: string, draft: UsageValuation, expectedPriceCorrection?: string | null): Promise<UsageValuation>;
 }
 
 /** Cross-owner operations are bound only by platform wiring. */

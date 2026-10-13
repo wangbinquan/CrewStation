@@ -17,7 +17,7 @@ export function completePrestartEnding(db: Database, raw: DevelopmentPrestartCle
     const price = original.price;
     const owner = { payloadDigest: original.payloadDigest, firstReason: original.closeReason, acceptedAt: price.acceptedAt,
       profileId: price.profile!.id, profileRevision: price.profile!.revision, protocol: price.profile!.protocol, priceBookRevision: price.priceBookRevision };
-    if (original.binding || original.unsupported || !original.closeReason || !start.logicalEnding || start.state !== 'ended' || !job
+    if (original.binding || original.unsupported || !original.closeReason || !start.logicalEnding || (start.sourceKind==='development-agent' && start.state !== 'ended') || !job
       || jsonHash(original.intent.identity) !== jsonHash(selection.identity) || original.intent.profileId !== selection.profileId
       || original.intent.profileRevision !== selection.profileRevision || job.firstReason !== original.closeReason
       || jsonHash(owner) !== jsonHash(evidence.owner)) throw precondition('原未绑定 owner、AgentStart 与结束作业尚未闭合');
@@ -36,7 +36,7 @@ export function completePrestartEnding(db: Database, raw: DevelopmentPrestartCle
 export function inspectPrestartEnding(db: Database, raw: z.infer<typeof DevelopmentCleanupSelectionSchema>) {
   const selection = DevelopmentCleanupSelectionSchema.parse(raw);
   return withEndingTransaction(db, TaskIdSchema.parse(selection.identity.executionId), async ({ original, start, job }) => {
-    if (original.binding || original.unsupported || !original.closeReason || !start.logicalEnding || start.state !== 'ended' || !job
+    if (original.binding || original.unsupported || !original.closeReason || !start.logicalEnding || (start.sourceKind==='development-agent' && start.state !== 'ended') || !job
       || jsonHash(original.intent.identity) !== jsonHash(selection.identity) || original.intent.profileId !== selection.profileId
       || original.intent.profileRevision !== selection.profileRevision || job.firstReason !== original.closeReason || job.stop || job.closure || job.logicalResult)
       throw precondition('原未绑定 owner、AgentStart 与结束作业尚未闭合');

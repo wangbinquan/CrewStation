@@ -120,7 +120,7 @@ class TaskRunner implements RunnerHandle {
     const execs = createExecSupervisor({ launcher, paths, emit, logger: logger.child({ component: 'exec' }) });
     const business = createBusinessCommands({ launcher, paths, logger: logger.child({ component: 'business-exec' }) }, config.businessJournalDir, { outputBytes: 64 * 1024 * 1024, spoolBytes: 64 * 1024 * 1024, eventBytes: 256 * 1024 }, businessAgentFactory({ drivers, launcher, paths, beforeStart, logger }, config.businessSessionDir));
     const terminals = createTerminalSupervisor({ choice: config.terminalBackend, launcher, paths, emit, logger: logger.child({ component: 'terminal' }) });
-    const nativeTerminals = new NativeTerminalSupervisor({ backend: terminals.backend, launcher, paths, beforeStart, emit, runnerId: config.nativeRunnerId, logger: logger.child({ component: 'native-terminal' }) });
+    const nativeTerminals = new NativeTerminalSupervisor({ backend: terminals.backend, launcher, paths, beforeStart, developmentUsage, emit, runnerId: config.nativeRunnerId, logger: logger.child({ component: 'native-terminal' }) });
     const preview = createPreviewSupervisor({ config: config.preview, policy: config.previewPolicy, launcher, workdir: paths.root, emit, logger: logger.child({ component: 'preview' }) });
     const files = createFileCommands({ paths, launcher, emit, logger: logger.child({ component: 'files' }) });
     const verifyContract = createContractVerifier({ paths, logger: logger.child({ component: 'contract' }) });
@@ -129,14 +129,17 @@ class TaskRunner implements RunnerHandle {
     const apiInvoker = createApiInvoker(config.internalApiBase);
     const runnerRef: { current?: TaskRunner } = {};
     const handlers = buildCommandHandlers({ developmentUsage, initialization, agents, probes, execs, business, terminals, nativeTerminals, files, preview, verifyContract, invokeApi: apiInvoker.invoke, workspaceStatus: () => readWorkspaceStatus(git, paths), comparisons, fetchComparisonHistory: (url, sha) => fetchComparisonHistory(git, url, sha), requestShutdown: (grace) => void runnerRef.current?.shutdown(grace) });
-    const hello = (): RunnerHello => ({
+    const hello = (): RunnerHello => {
+      const nativePages = developmentNativePageCapabilities(config.developmentUsage ? { taskId: config.taskId, podUid: config.developmentUsage.podUid } : undefined, developmentUsage, drivers.developmentNativePagesV2);
+      return ({
       type: 'hello',
       protocolVersion: TASKRUNNER_PROTOCOL_VERSION,
       taskId: config.taskId,
       runnerToken: config.runnerToken,
       workdir: paths.root,
-      capabilities: { ...developmentNativePageCapabilities(config.developmentUsage ? { taskId: config.taskId, podUid: config.developmentUsage.podUid } : undefined, developmentUsage, drivers.developmentNativePagesV2), ...(developmentUsageRequired ? { developmentStartAgentFenceV1: 1 as const } : {}), ...(developmentUsage ? { developmentUsageV1: 1 as const, developmentUsageStopV1: 1 as const, developmentNativeSourceV1: 1 as const, usageObservationsV1: 1 as const, nativeUsageTreeV1: 1 as const } : {}), ...(config.businessJournalDir && process.platform === 'linux' ? { businessExecutionV3: 1 as const, usageObservationsV1: 1 as const, nativeUsageTreeV1: 1 as const } : {}), protocols: [...RUNNER_PROTOCOLS], pty: terminals.backend !== undefined, preview: preview.enabled, ...(apiInvoker.enabled ? { apiInvocations: 1 as const } : {}), previewControl: 1 as const, terminalControl: 1 as const, runtimeInitialization: 1 as const, interpreters: interpreters.list },
+      capabilities: { ...nativePages, ...(developmentUsageRequired ? { developmentStartAgentFenceV1: 1 as const, developmentCliFenceV1: 1 as const } : {}), ...(nativePages.developmentNativePagesV2 === 2 && terminals.backend?.kind === 'native' ? { developmentNativeCliV2: 2 as const } : {}), ...(developmentUsage ? { developmentUsageV1: 1 as const, developmentUsageStopV1: 1 as const, developmentNativeSourceV1: 1 as const, usageObservationsV1: 1 as const, nativeUsageTreeV1: 1 as const } : {}), ...(config.businessJournalDir && process.platform === 'linux' ? { businessExecutionV3: 1 as const, usageObservationsV1: 1 as const, nativeUsageTreeV1: 1 as const } : {}), protocols: [...RUNNER_PROTOCOLS], pty: terminals.backend !== undefined, preview: preview.enabled, ...(apiInvoker.enabled ? { apiInvocations: 1 as const } : {}), previewControl: 1 as const, terminalControl: 1 as const, runtimeInitialization: 1 as const, interpreters: interpreters.list },
     });
+    };
     const dispatcherRef: { current?: CommandDispatcher } = {};
     const link = createSessionLink({
       url: config.sessionUrl,

@@ -1,3 +1,4 @@
+import { installRuntimeTelemetry } from './runtimeTelemetry';
 import { Hono } from 'hono';
 import { mapErrorToResponse } from './errorHandler';
 import type { AppEnv } from './identity';
@@ -5,6 +6,8 @@ import { identityFromHeaders } from './identity';
 
 export interface AppOptions {
   name: string;
+  /** Internal exporter token; unset exporters keep their actual unknown collection state. */
+  telemetryToken?: string;
   /**
    * 就绪探针：通常是走同一连接池的 `select 1`。拒绝或超过 `readinessTimeoutMs` 时 `/healthz` 返回 503，
    * 让 Kubernetes 把进程摘出路由并按 liveness 重启。2026-09-16 实机：cs-api 进程空闲、健康检查 200，
@@ -24,6 +27,7 @@ async function bounded(promise: Promise<unknown>, timeoutMs: number): Promise<vo
 /** 每个 cs-* 进程的 Hono 骨架：健康检查与统一错误映射；路由由各模块的 http/ 挂载。 */
 export function createApp(options: AppOptions): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
+  installRuntimeTelemetry(app, options.name, options.telemetryToken ?? process.env['CS_CLUSTER_METRICS_TOKEN']);
   app.use('*', identityFromHeaders());
   app.get('/healthz', async (c) => {
     if (!options.readiness) return c.json({ ok: true, service: options.name });

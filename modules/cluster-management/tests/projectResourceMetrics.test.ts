@@ -38,13 +38,14 @@ test('project source failures and expired pages remain errors; freshness never c
   f.deps.repository.latest = async () => { throw new Error('sample store failed'); };
   await expect(f.api.projectUsage(admin, f.projectId, { cursor: 0, limit: 100 })).rejects.toThrow('sample store failed');
 });
-test('project history forces the project series and preserves missing samples, with the existing seven day contract', async () => {
+test('project history forces the project series and preserves missing samples, without an artificial seven day range cap', async () => {
   const f = await fixture(), to = f.deps.clock.now().toISOString(), from = new Date(Date.parse(to) - 3600000).toISOString();
   const query = ProjectResourceHistoryQuerySchema.parse({ from, to, metrics: 'cpu,memory,volumeUsed' });
   const result = await f.api.projectHistory(admin, f.projectId, query);
   expect(result.state).toBe('fresh'); expect(result.series).toHaveLength(3); expect(result.series[0]!.points.every((p) => p.average === null && !p.complete)).toBe(true);
   expect(f.expressions.every((s) => s.includes('scope="project"') && s.includes(`project_id="${f.projectId}"`))).toBe(true);
-  expect(ProjectResourceHistoryQuerySchema.safeParse({ from: new Date(Date.parse(to) - 8 * 86400000).toISOString(), to }).success).toBe(false);
+  expect(ProjectResourceHistoryQuerySchema.safeParse({ from: new Date(Date.parse(to) - 8 * 86400000).toISOString(), to }).success).toBe(true);
+  expect(ProjectResourceHistoryQuerySchema.safeParse({from:to,to:from}).success).toBe(false);
   expect(ProjectResourceMetricsQuerySchema.safeParse({ cursor: 1 }).success).toBe(false);
   expect(ProjectResourceMetricsQuerySchema.safeParse({ cursor: 1, observationId: 'snapshot' }).success).toBe(true);
 });

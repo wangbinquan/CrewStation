@@ -1,0 +1,4 @@
+// RFC-034: actual gauges have independent availability and cannot turn source failure into healthy zero.
+import {expect,test} from 'bun:test';
+import {registerRuntimeSignals,renderRuntimeSignals} from './runtimeSignals';
+test('all 1,001 controlled source series are retained and source failure is distinct',async()=>{const release=registerRuntimeSignals('controlled-all',()=>Array.from({length:1001},(_,i)=>({kind:'queue',unit:'events',value:String(i),labels:{queue:'owned-'+i}}))),failed=registerRuntimeSignals('controlled-offline',()=>{throw Error('offline');});try{const output=await renderRuntimeSignals('controlled');expect(output.match(/kind="queue"/g)).toHaveLength(1001);expect(output).toContain('queue="owned-1000"');expect(output).toContain('source="controlled-offline"} 0');expect(output).not.toContain('source="controlled-offline",kind=');}finally{release();failed();}});

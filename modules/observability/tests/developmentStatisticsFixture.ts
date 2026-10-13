@@ -58,7 +58,7 @@ export async function developmentStatisticsFixture(tdb: TestDatabase, sharedProf
     while(report.state==='building'){await Promise.all(module.reportWorkers.map(worker=>worker.drain()));report=RuntimeCompleteReportSchema.parse(await module.api.runtimeCompleteReportStatus(actor,project,report.reportId));}
     return report;
   };
-  const ready=async(pending:Promise<RuntimeCompleteReport>,actor:Actor=admin,project:ProjectId|null=null)=>{const report=await settle(pending,actor,project);if(report.state!=='ready')throw new Error(JSON.stringify(report));return report;};
+  const ready=async(pending:Promise<RuntimeCompleteReport>,actor:Actor=admin,project:ProjectId|null=null)=>{let report=await settle(pending,actor,project);if(report.state==='not-ready'&&report.facts&&report.gaps.some(gap=>gap.reason==='projection-pending')){for(const worker of module.reportWorkers)await worker.drain();const header=report.facts.header;report=await settle(header.taskId?module.api.runtimeCompleteTaskReport(actor,project,header.taskId):module.api.runtimeCompleteReport(actor,project,header.filters),actor,project);}if(report.state!=='ready')throw new Error(JSON.stringify(report));return report;};
   const page=async<T,>(report:Extract<RuntimeCompleteReport,{state:'ready'}>,section:RuntimeReportSection,parent?:string,actor:Actor=admin)=>{
     const items:T[]=[];let after:string|undefined;
     do {const current=await module.api.runtimeCompleteReportPage(actor,report.header.projectId,report.reportId,{section,pageSize:37,...(parent?{parent}:{}),...(after?{after}:{})}) as RuntimeReportPage<T>;items.push(...current.items);after=current.nextCursor??undefined;}while(after);

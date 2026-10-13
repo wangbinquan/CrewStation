@@ -85,10 +85,15 @@ describe.skipIf(!available)('numeric selection survives admission, PG, projectio
     }
   });
 
-  test('CLI, business subtask, unknown numeric version and unknown selection fields never get admitted', async () => {
+  test('CLI numeric layout reaches actual Runner configuration; subtask and invalid selections stay rejected', async () => {
     f = await rebuildFixture({ running: true }); f.state.quota = 6;
-    for (const purpose of ['cli', 'subtask'] as const) await expect(f.runtime.api.createNativeExecution({ ...request(), purpose })).rejects.toMatchObject({ kind: 'precondition' });
+    const cli=await f.runtime.api.createNativeExecution({...request(),purpose:'cli'});
+    const saved=(await f.uow.read.environments.getById(cli.id))!;expect(saved.render?.developmentUsageStorage).toEqual({version:1});
+    await f.runNative();
+    const pod=await f.k8s.get(Resources.Pod!,saved.podName,saved.namespace),secret=await f.k8s.get(Resources.Secret!,`${saved.podName}-runner`,saved.namespace);
+    assertLayout(pod!.spec,f.env.pvcName);expect(DevelopmentUsageRuntimeConfigSchema.parse(JSON.parse((secret!.stringData as Record<string,string>).CS_RUNNER_DEVELOPMENT_USAGE!))).toMatchObject({version:1,projectId:f.projectId,workspaceTaskId:f.env.id});
+    await expect(f.runtime.api.createNativeExecution({...request(),purpose:'subtask'})).rejects.toMatchObject({kind:'precondition'});
     for (const invalid of [null, { version: 2 }, { version: 1, directory: '/work' }]) await expect(f.runtime.api.createNativeExecution({ ...request(), developmentUsageStorage: invalid as DevelopmentUsageStorage })).rejects.toMatchObject({ kind: 'precondition' });
-    expect(await f.runtime.api.runningTaskCount(f.projectId)).toBe(1);
+    expect(await f.runtime.api.runningTaskCount(f.projectId)).toBe(2);
   });
 });

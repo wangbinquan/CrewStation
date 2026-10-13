@@ -2,21 +2,31 @@ import { randomBytes } from 'node:crypto';
 import type { TaskId } from '@crewstation/contracts';
 import { DevelopmentUsageInfoSchema } from '@crewstation/contracts';
 import { conflict, jsonHash, notFound, precondition } from '@crewstation/kernel';
+import { assertOriginalCliPreparation } from './development/cliPreparation';
+import type { NativeTerminalRepository } from '../ports/nativeTerminals';
 import type { AgentStartRepository } from '../ports/agentStarts';
 import type { Environments } from '../ports/runtime';
 import type { DevelopmentUsageOwner, DevelopmentUsageOwnerStore, DevelopmentUsagePreparation, DevelopmentUsagePricing } from '../ports/developmentUsage';
 import { DevelopmentUsagePreparationSchema, DevelopmentUsagePreparedSchema, developmentOwnerIntentDigest } from '../domain/developmentUsage';
 
-export function developmentUsageOwner(store: DevelopmentUsageOwnerStore, starts: AgentStartRepository, environments: Pick<Environments, 'getEnvironment'>, pricing?: DevelopmentUsagePricing): DevelopmentUsageOwner {
+export function developmentUsageOwner(store: DevelopmentUsageOwnerStore, starts: AgentStartRepository, environments: Pick<Environments, 'getEnvironment'>, pricing?: DevelopmentUsagePricing, terminals?: Pick<NativeTerminalRepository, 'findExecution'>): DevelopmentUsageOwner {
   const prepare = async (raw: DevelopmentUsagePreparation) => {
     const input = DevelopmentUsagePreparationSchema.parse(raw), { intent } = input, id = intent.identity.executionId as TaskId;
     const original = await store.get(id);
     if (original) {
-      if (jsonHash({ intent: original.intent, context: original.context }) !== jsonHash(input)) throw conflict('开发执行已有另一份稳定启动意图');
+      if (jsonHash({ intent: original.intent, context: original.context, ...(original.legacyFallbackAllowed === undefined ? {} : { legacyFallbackAllowed: original.legacyFallbackAllowed }) }) !== jsonHash(input)) throw conflict('开发执行已有另一份稳定启动意图');
       return original;
+    }
+    if (intent.identity.sourceKind === 'development-cli') {
+      await assertOriginalCliPreparation(input, terminals, environments);
+      if (!pricing) throw precondition('开发执行人民币受理尚未装配');
+      const price = await pricing.accept({ identity: intent.identity, profile: { id: intent.profileId, revision: intent.profileRevision, protocol: intent.launch.protocol } });
+      const digestNonce = randomBytes(32).toString('hex');
+      return store.prepare(DevelopmentUsagePreparedSchema.parse({ ...input, price, digestNonce, payloadDigest: developmentOwnerIntentDigest({ intent, digestNonce }) }));
     }
     const start = await starts.findByExecution(id);
     if (!start) throw notFound('开发 Agent 受理', id);
+    if ((input.legacyFallbackAllowed ?? false) !== (start.execution.observationLegacyFallback ?? false)) throw conflict('旧 Runner 兼容选择不符合原始受理');
     if (start.state !== 'pending' || start.cancelled || start.finalized) throw precondition('只能在首次派发前登记开发数字意图');
     if (start.agentId !== intent.identity.agentId || start.taskId !== intent.identity.taskId || start.profile.profileId !== intent.profileId || start.profile.revision !== intent.profileRevision || start.permission !== intent.permission || intent.mode !== 'interactive'
       || start.request.prompt !== intent.initialPrompt || (start.request.cwd ?? null) !== intent.cwd || (start.request.resumeSessionId ?? null) !== intent.resumeSessionId || intent.systemPrompt !== null) throw conflict('开发数字意图不符合实际 Agent 受理');
@@ -29,18 +39,25 @@ export function developmentUsageOwner(store: DevelopmentUsageOwnerStore, starts:
     return store.prepare(prepared);
   };
   return {
-    prepare, get: store.get, unsupported: store.unsupported, close: store.close,
+    prepare, get: store.get, close: store.close,
+    unsupported: async(id,capabilities)=>{
+      const current=await store.get(id);if(!current)throw notFound('开发数字受理',id);
+      if(current.intent.identity.sourceKind!=='development-cli')return store.unsupported(id);
+      const env=await environments.getEnvironment(id),n=env?.native;
+      if(!capabilities||capabilities.developmentNativeCliV2===2||capabilities.developmentCliFenceV1===1||!env||!n?.podUid||(n.purpose??'cli')!=='cli'||n.agentId!==current.intent.identity.agentId||n.parentTaskId!==current.intent.identity.taskId||env.projectId!==current.intent.identity.projectId)throw conflict('旧 CLI 缺少原 Pod 的独立负能力证明');
+      return store.unsupported(id,{version:1,podUid:n.podUid,capabilities});
+    },
     observeSupported: async (id) => {
       const current = await store.get(id); if (!current) throw notFound('开发数字受理', id);
       const execution = await environments.getEnvironment(id), native = execution?.native;
-      if (!execution || !native?.podUid || native.purpose !== 'agent' || native.agentId !== current.intent.identity.agentId || native.parentTaskId !== current.intent.identity.taskId || execution.projectId !== current.intent.identity.projectId) throw conflict('能力观察缺少实际子执行 Pod 的归属证明');
+      if (!execution || !native?.podUid || (native.purpose??'cli') !== (current.intent.identity.sourceKind === 'development-cli' ? 'cli' : 'agent') || native.agentId !== current.intent.identity.agentId || native.parentTaskId !== current.intent.identity.taskId || execution.projectId !== current.intent.identity.projectId) throw conflict('能力观察缺少实际子执行 Pod 的归属证明');
       return store.observeSupported(id, native.podUid);
     },
     bind: async (id, raw) => {
       const current = await store.get(id); if (!current) throw notFound('开发数字受理', id);
       const info = DevelopmentUsageInfoSchema.parse(raw);
       const execution = await environments.getEnvironment(id), native = execution?.native;
-      if (!execution || !native?.podUid || native.purpose !== 'agent' || native.agentId !== current.intent.identity.agentId || native.parentTaskId !== current.intent.identity.taskId || execution.projectId !== current.intent.identity.projectId) throw conflict('数字绑定缺少实际子执行 Pod 的归属证明');
+      if (!execution || !native?.podUid || (native.purpose??'cli') !== (current.intent.identity.sourceKind === 'development-cli' ? 'cli' : 'agent') || native.agentId !== current.intent.identity.agentId || native.parentTaskId !== current.intent.identity.taskId || execution.projectId !== current.intent.identity.projectId) throw conflict('数字绑定缺少实际子执行 Pod 的归属证明');
       const expectedPodUid = native.podUid;
       if (info.runtimeTaskId !== id || info.podUid !== expectedPodUid || (current.capabilityPodUid && current.capabilityPodUid !== expectedPodUid)) throw conflict('Runner 数字来源不符合实际子执行 Pod');
       if (current.binding) {

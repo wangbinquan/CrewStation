@@ -1,0 +1,12 @@
+CREATE TABLE observability.platform_usage_admissions(test_id text PRIMARY KEY,fingerprint text NOT NULL,accepted_at text NOT NULL,document jsonb NOT NULL);
+CREATE INDEX platform_usage_admission_window ON observability.platform_usage_admissions(accepted_at,test_id);
+CREATE TABLE observability.platform_usage_bindings(key text PRIMARY KEY,test_id text NOT NULL,fingerprint text NOT NULL,document jsonb NOT NULL);
+CREATE INDEX platform_usage_binding_test ON observability.platform_usage_bindings(test_id,key);
+CREATE TABLE observability.platform_usage_pages(key text NOT NULL,through bigint NOT NULL,fingerprint text NOT NULL,PRIMARY KEY(key,through));
+CREATE TABLE observability.platform_usage_cursors(key text PRIMARY KEY,through bigint NOT NULL);
+CREATE TABLE observability.platform_usage_evidence(key text NOT NULL,revision bigint NOT NULL,fingerprint text NOT NULL,document jsonb NOT NULL,PRIMARY KEY(key,revision));
+CREATE TABLE observability.platform_usage_projections(key text PRIMARY KEY,test_id text NOT NULL,document jsonb NOT NULL,model jsonb);
+CREATE INDEX platform_usage_projection_test ON observability.platform_usage_projections(test_id,key);
+CREATE TABLE observability.platform_usage_captures(key text NOT NULL,sequence bigint NOT NULL,test_id text NOT NULL,document jsonb NOT NULL,PRIMARY KEY(key,sequence));
+CREATE INDEX platform_usage_capture_test ON observability.platform_usage_captures(test_id,key,sequence);
+CREATE TABLE observability.platform_usage_totals(test_id text PRIMARY KEY,executions numeric NOT NULL,observed numeric NOT NULL,records numeric NOT NULL,input numeric NOT NULL,cache_read numeric NOT NULL,cache_write numeric NOT NULL,output numeric NOT NULL,amount_picos numeric NOT NULL,priced numeric NOT NULL,partial_priced numeric NOT NULL,input_records numeric NOT NULL,cache_read_records numeric NOT NULL,cache_write_records numeric NOT NULL,output_records numeric NOT NULL,token_complete integer NOT NULL,price_complete integer NOT NULL,gaps jsonb NOT NULL);

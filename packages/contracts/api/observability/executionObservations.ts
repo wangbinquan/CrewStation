@@ -11,7 +11,7 @@ export const ExecutionObservationIdentitySchema = z.strictObject({
   executionId: ResourceIdSchema, executionGeneration: revision,
 });
 const envelope = { identity: ExecutionObservationIdentitySchema, sourceId: key, recordId: key, revision, occurredAt: z.iso.datetime().nullable(), observedAt: z.iso.datetime() };
-export const ExecutionObservationScopeSchema = z.strictObject({ root: key, session: key, parentSession: key.nullable(), ancestors: z.array(key).max(64),
+export const ExecutionObservationScopeSchema = z.strictObject({ root: key, session: key, parentSession: key.nullable(), ancestors: z.array(key),
   turn: key, turnIndex: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), level: z.enum(['request', 'self-total', 'tree-total']) });
 type UsageScopeFields = Omit<z.infer<typeof ExecutionObservationScopeSchema>, 'ancestors'>;
 /** Reuse numerical invariants; the default public scope keeps its original strict contract. */

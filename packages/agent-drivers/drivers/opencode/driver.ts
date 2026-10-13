@@ -1,7 +1,6 @@
 import { createOpencodeUsageNormalizer, opencodeUsageDatabasePath } from '../usage/opencodeModel';
 import { createDevelopmentNativeUsageCapture } from '../usage/developmentNativeCapture';
-import { createNativeUsageCapture } from '../usage/nativeCapture';
-import { readOrderedNativeUsageSnapshot } from '../usage/orderedNativeSnapshot';
+import {createStreamedNativeCapture} from '../usage/streamedNativeCapture';
 import { stageBusinessSkills, nativeSkillRoots } from '../../injection/businessSkills';
 // ← agent-workflow `runtime/opencode/driver.ts` 的装配段（`assembleOpencodePersonaSpawn`）。
 // 不复制的部分：清单插件物化、skill staging、工作区边界、SQLite 会话捕获、模型列举、
@@ -87,7 +86,7 @@ async function prepareOpencode(spec: DriverAgentSpec, context: DriverLaunchConte
     }),
     parseEvent,
     normalizeUsage: createOpencodeUsageNormalizer(env),
-    nativeUsageCapture: (input, finalEnv) => input.developmentNativeSourceV1 === 1 ? createDevelopmentNativeUsageCapture(input, finalEnv) : createNativeUsageCapture(input, (root) => readOrderedNativeUsageSnapshot(opencodeUsageDatabasePath(finalEnv), root)),
+    nativeUsageCapture: (input, finalEnv) => input.developmentNativeSourceV1 === 1 ? createDevelopmentNativeUsageCapture(input, finalEnv) : createStreamedNativeCapture(input,opencodeUsageDatabasePath(finalEnv)),
     detectSessionNotFound: detectOpencodeSessionNotFound,
     dispose: () => { skills?.dispose(); runDir.dispose(); },
   };

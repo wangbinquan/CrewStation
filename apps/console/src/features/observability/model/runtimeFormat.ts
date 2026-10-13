@@ -8,7 +8,7 @@ export function runtimeTaskName(task: Pick<RuntimeTaskSummary, 'name' | 'source'
 export function runtimeAttemptName(task: Pick<RuntimeTaskSummary, 'name' | 'source'>, attempt: RuntimeAttemptFact, t: Translate) { return task.source?.kind === 'development-agent' ? runtimeTaskName(task, t) : attempt.name; }
 export function runtimeComputeLabel(profile: { profileName?: string | null; profileRevision: number | null }, t: Translate) { return `${profile.profileName ?? t('runtime.nameUnavailable')} · r${profile.profileRevision ?? '—'}`; }
 export function runtimeAgentName(agent: Pick<RuntimeAgentStatistics, 'name' | 'sourceKind' | 'agentId'>, t: Translate) { return agent.sourceKind === 'development-agent' ? `${t('runtime.developmentExecution')} · ${agent.agentId?.slice(-8) ?? ''}` : agent.name; }
-export function runtimeSourceLabel(kind: RuntimeSourceKind | undefined, t: Translate) { return t(kind === 'development-agent' ? 'runtime.source.development-agent' : 'runtime.source.business-task'); }
+export function runtimeSourceLabel(kind: RuntimeSourceKind | undefined, t: Translate) { return t(kind === 'development-agent' ? 'runtime.source.development-agent' : kind === 'development-cli' ? 'runtime.source.development-cli' : 'runtime.source.business-task'); }
 export function runtimeObjectLabel(data: RuntimeStatistics, t: Translate) { return t(data.filters.sourceKind === 'business-task' ? 'runtime.tasks' : data.filters.sourceKind === 'development-agent' ? 'runtime.developmentExecutions' : data.sourceScope === 'project-executions' ? 'runtime.objects' : 'runtime.tasks'); }
 export const RUNTIME_TOKEN_BUCKETS = ['input', 'cacheRead', 'cacheWrite', 'output'] as const;
 const grouped = (count: string) => BigInt(count).toLocaleString();
@@ -26,4 +26,4 @@ export function runtimeCny(m: RuntimeUsageMetrics): string {
   return `${m.cost.complete ? '' : '≥ '}¥${grouped((micros / 1000000n).toString())}${tail ? '.' + tail : ''}`;
 }
 export function runtimeDuration(ms: number | null): string { if (ms === null) return '—'; return ms < 1000 ? `${ms} ms` : ms < 60000 ? `${(ms / 1000).toFixed(1)} s` : `${(ms / 60000).toFixed(1)} min`; }
-export function runtimeDate(at: string, zone?: string): string { return new Intl.DateTimeFormat(undefined, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', ...(zone ? { timeZone: zone } : {}) }).format(new Date(at)); }
+export function runtimeDate(at: string|null, zone?: string): string { if(at===null)return '—';return new Intl.DateTimeFormat(undefined, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', ...(zone ? { timeZone: zone } : {}) }).format(new Date(at)); }

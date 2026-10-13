@@ -61,6 +61,7 @@ export function usageIngestion(store: UsageLedgerStore) {
         return { cursor: await tx.cursor(), applied: 0, duplicate: input.events.length };
       }
       if (await tx.cursor() !== input.expectedCursor) throw conflict('来源游标已更新');
+      await tx.prefetch?.(input.events);
       let applied = 0;
       for (const event of input.events) if (await appendUsageEvidence(tx, event)) applied++;
       for (const row of input.native ?? []) await tx.capture(row.identity, row.capture);
@@ -88,7 +89,7 @@ export function runnerPage(page: RunnerUsageSourcePage, identity: UsageExecution
 }
 
 /** The source is acknowledged only after evidence, projection and cursor have committed together. */
-export function runnerUsageReconciliation(deps: { source: RunnerUsageSource; store: UsageLedgerStore; value: (sourcePage: RunnerUsageSourcePage, page: UsageSourcePage) => Promise<void>; logger: Pick<Logger, 'warn'> }) {
+export function runnerUsageReconciliation(deps: { source: RunnerUsageSource; store: UsageLedgerStore; value: (sourcePage: RunnerUsageSourcePage, page: UsageSourcePage) => Promise<void>; logger: Pick<Logger, 'warn'>; platform?:{ingest(page:RunnerUsageSourcePage):Promise<boolean>} }) {
   const ingest = usageIngestion(deps.store);
   let pending: Promise<number> | undefined;
   const drain = async () => {
@@ -98,7 +99,7 @@ export function runnerUsageReconciliation(deps: { source: RunnerUsageSource; sto
       if (!page) break;
       try {
         const identity = await deps.source.resolve(page);
-        if (!identity) throw precondition('执行数值来源尚未完成归属映射');
+        if (!identity) {if(await deps.platform?.ingest(page)){await deps.source.acknowledge(page.runtimeTaskId,page.executionId,page.through);completed++;continue;}throw precondition('执行数值来源尚未完成归属映射');}
         const input = runnerPage(page, identity);
         await ingest(input);
         await deps.value(page, input);

@@ -35,11 +35,13 @@ export type DevelopmentUsageLayoutLookup = z.infer<typeof DevelopmentUsageLayout
 export const DevelopmentUsageRuntimeConfigSchema = z.strictObject({ version: z.literal(1), directory: z.literal(DEVELOPMENT_USAGE_DIRECTORY), bindingDirectory: z.literal(DEVELOPMENT_USAGE_BINDING_DIRECTORY), projectId: ProjectIdSchema, workspaceTaskId: TaskIdSchema });
 export type DevelopmentUsageRuntimeConfig = z.infer<typeof DevelopmentUsageRuntimeConfigSchema>;
 export const DevelopmentAgentIdentitySchema = DevelopmentUsageIdentitySchema.extend({ sourceKind: z.literal('development-agent'), executionGeneration: z.literal(1) });
+export const DevelopmentCliIdentitySchema = DevelopmentUsageIdentitySchema.extend({ sourceKind: z.literal('development-cli'), executionGeneration: z.literal(1) });
+export const DevelopmentObservedIdentitySchema = z.union([DevelopmentAgentIdentitySchema, DevelopmentCliIdentitySchema]);
 /** Immutable owner intent. Signed tokens, decrypted material and ordinary output are excluded. */
 export const DevelopmentStartIntentSchema = z.strictObject({
-  version: z.literal(1), identity: DevelopmentAgentIdentitySchema,
+  version: z.literal(1), identity: DevelopmentObservedIdentitySchema,
   profileId: ResourceIdSchema, profileRevision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
-  launch: LaunchSpecSchema, permission: AgentPermissionSchema, mode: z.enum(['oneshot', 'interactive']),
+  launch: LaunchSpecSchema, permission: AgentPermissionSchema, mode: z.enum(['oneshot', 'interactive', 'cli']),
   initialPrompt: z.string().nullable(), cwd: z.string().nullable(), resumeSessionId: z.string().nullable(), systemPrompt: z.string().nullable(),
   mcp: z.array(z.strictObject({ name: z.string().min(1), url: z.url() })).max(100),
   nativeUsageLineageKey: z.string().min(1).max(512),
@@ -58,7 +60,7 @@ export const DevelopmentUsageAdmissionSchema = z.strictObject({
 }).refine((value) => value.key.executionId === value.intent.identity.executionId, '启动键必须绑定实际执行环境');
 export const DevelopmentUsageInterruptionSchema = z.enum(['journal-unavailable', 'journal-corrupt', 'journal-limit', 'invalid-capture', 'runner-restarted', 'missing-terminal']);
 export const DevelopmentUsageReceiptSchema = z.strictObject({
-  key: DevelopmentUsageKeySchema, podUid: z.string().min(1).max(128), identity: DevelopmentAgentIdentitySchema,
+  key: DevelopmentUsageKeySchema, podUid: z.string().min(1).max(128), identity: DevelopmentObservedIdentitySchema,
   profileId: ResourceIdSchema, profileRevision: z.number().int().positive(),
   phase: z.enum(['registered', 'running', 'finished', 'unknown']), lastSequence: sequence, acknowledgedSequence: sequence,
   finalThrough: sequence.nullable(), result: z.enum(['completed', 'error', 'cancelled']).nullable(),

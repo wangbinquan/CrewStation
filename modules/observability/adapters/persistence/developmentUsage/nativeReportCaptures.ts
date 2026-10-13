@@ -59,3 +59,7 @@ export function nativeReportCaptures(db:Executor,selected:SQL,pageSize:number) {
   return {items,nextCursor:rows.length>pageSize?selectedRows.at(-1)!.pass_key:null};
  };
 }
+
+export async function readNativeReportCapture(db:Executor,key:string){
+ const [row]=await db.execute<PassRow>(sql`SELECT p.pass_key,p.source_id,p.document,p.fingerprint,p.progress,p.state,p.work_state,p.work_cursor,w.document AS work FROM observability.development_native_passes p LEFT JOIN observability.development_native_work w USING(pass_key) WHERE p.pass_key=${key}`);return row?capture(db,row):undefined;
+}

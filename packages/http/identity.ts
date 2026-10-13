@@ -13,6 +13,7 @@ export type RequestIdentity =
   | { kind: 'service'; identity: string; project: string; service: string; slot?: string; token?: string };
 
 export interface AppVariables {
+  runtimeMetricContext?:{plannedMaintenanceRefusal:true;projectSlug?:string};
   identity?: RequestIdentity;
   requestId: string;
   traceId?: string;

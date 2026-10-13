@@ -4,7 +4,7 @@ import {mkdtempSync,rmSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {sql} from 'drizzle-orm';
-import {RuntimeReportHeaderSchema,RuntimeCompleteSummarySchema,type Actor,type RuntimeReportPage} from '@crewstation/contracts';
+import {RuntimeNativePagedCaptureSchema,RuntimeReportHeaderSchema,RuntimeCompleteSummarySchema,type Actor,type RuntimeReportPage} from '@crewstation/contracts';
 import {jsonHash,newResourceId} from '@crewstation/kernel';
 import {connectDatabase,originalReportSnapshotSession,type DatabaseHandle} from '@crewstation/persistence';
 import {createTestDatabase,testDatabaseAvailable,type TestDatabase} from '@crewstation/testkit';
@@ -14,13 +14,15 @@ import {completeRuntimeFileSpool} from '../adapters/persistence/reports/fileSpoo
 import type {CompleteReportTransferItem,CompleteReportStored} from '../ports/completeRuntimeReportCache';
 const available=await testDatabaseAvailable();let tdb:TestDatabase,handle:DatabaseHandle|undefined;const roots:string[]=[];
 afterEach(async()=>{await handle?.close();handle=undefined;await tdb?.drop();for(const root of roots.splice(0))rmSync(root,{recursive:true,force:true});});
-async function fixture() {
+async function fixture(nativePages=false) {
  tdb=await createTestDatabase([observabilityMigrations]);handle=connectDatabase(tdb.url,{max:1});const store=completeRuntimeReportCache(handle.db),identity=await store.identity(),reportId=newResourceId(),owner='original/'+newResourceId();
  const root=mkdtempSync(join(tmpdir(),'cs-complete-cache-'));roots.push(root);const spool=completeRuntimeFileSpool(root),filters={from:'2026-10-03T00:00:00.000Z',to:'2026-10-04T00:00:00.000Z',timezone:'Asia/Shanghai'};
  const request={actor:{userId:newResourceId(),isAdmin:true} as Actor,projectId:null,filters},requestKey=jsonHash({identity,request}),report=await store.ensure(request,requestKey,owner,reportId);
  const header=RuntimeReportHeaderSchema.parse({reportId,projectionVersion:2,scope:'system',projectId:null,filters,asOf:filters.to,snapshotId:'original-snapshot',generation:identity.generation,sourceRevision:identity.revision,coverage:'complete',buildMs:0});
  const summary=RuntimeCompleteSummarySchema.parse({tasks:'201',metrics:{state:'ready',tokens:{input:'1001',cacheRead:'3003',cacheWrite:'5005',output:'7007',total:'16016'},executions:'1001',observedExecutions:'1001',records:'1001',cost:{currency:'CNY',state:'complete',amount:'0.0735735'}},durations:{state:'complete',samples:'201',p50Ms:'10000',p95Ms:'10000',maxMs:'10000'},trend:[],sources:[]});
- const items=async function*():AsyncGenerator<CompleteReportTransferItem>{for(let n=0;n<201;n++)yield {kind:'row',row:{section:'tasks',parent:null,key:'task-'+n,document:{n}}};for(let n=0;n<1001;n++)yield {kind:'row',row:{section:'calls',parent:'task-0',key:'call-'+n,document:{n}}};yield {kind:'count',section:'tasks',parent:null,total:'201'};yield {kind:'count',section:'calls',parent:'task-0',total:'1001'};for(let n=0;n<201;n++)yield {kind:'receipt',key:'task-'+n,document:{eof:true,rows:'1'}};};
+ const nativeIdentity={sourceKind:'development-agent',projectId:newResourceId(),taskId:newResourceId(),executionId:newResourceId(),agentId:newResourceId(),executionGeneration:1};
+ const native=(n:number)=>RuntimeNativePagedCaptureSchema.parse({id:jsonHash(['original-native',n]),sourceVersion:2,identity:nativeIdentity,sourceId:'original-native',pass:{passId:'pass-'+n,turn:'turn-'+n,nativeSource:'original',sourceGeneration:'generation',rootSessionId:'root',lineageKey:'lineage',epoch:'epoch',phase:'final'},turnIndex:n,preparedAt:filters.from,sourceState:'source-eof',pages:'0',counts:{sessions:'0',parts:'0',steps:'0'},scanPosition:'0',sourceWatermark:'0',pathsComplete:true,workState:'processed',visitedSteps:'0',heldSteps:'0',cursor:{ordinal:'0',index:0},numericEof:true,valuationEof:true,baselineState:'complete-birth',issues:[],sourceDigest:jsonHash(n)});
+ const items=async function*():AsyncGenerator<CompleteReportTransferItem>{if(nativePages)for(let n=0;n<2001;n++)yield {kind:'row',row:{section:'native-pages',parent:'original-native',key:'native-'+n,document:native(n)}};for(let n=0;n<201;n++)yield {kind:'row',row:{section:'tasks',parent:null,key:'task-'+n,document:{n}}};for(let n=0;n<1001;n++)yield {kind:'row',row:{section:'calls',parent:'task-0',key:'call-'+n,document:{n}}};yield {kind:'count',section:'tasks',parent:null,total:'201'};yield {kind:'count',section:'calls',parent:'task-0',total:'1001'};if(nativePages)yield {kind:'count',section:'native-pages',parent:'original-native',total:'2001'};for(let n=0;n<201;n++)yield {kind:'receipt',key:'task-'+n,document:{eof:true,rows:'1'}};};
  const manifest=await originalReportSnapshotSession(handle).run(async snapshot=>spool.seal({reportId,buildOwner:owner,requestKey,generation:identity.generation,sourceRevision:identity.revision,header:{...header,snapshotId:snapshot.snapshotId,asOf:snapshot.asOf},summary,sourceHeaders:[]},items()));
  return {store,spool,report,manifest,owner,reportId};
 }
@@ -46,3 +48,12 @@ describe.skipIf(!available)('original complete report cache',()=>{
   for await(const page of f.spool.pages(manifest))await f.store.stage(f.reportId,replacement,page);await f.store.publish(f.reportId,replacement,manifest);const ready=(await f.store.get(f.reportId))!;expect(await all(f,ready,'tasks')).toHaveLength(201);expect(await all(f,ready,'calls','task-0')).toHaveLength(1001);
  },60000);
 });
+
+// Ordinal 900 is skipped by the old text-order seek after the first 1000
+// native rows. Physical tampering must be detected before any ready result.
+test.skipIf(!available)('all 2001 retained native capture documents are validated in numeric order before publication',async()=>{
+ const f=await fixture(true);for await(const page of f.spool.pages(f.manifest))await f.store.stage(f.reportId,f.owner,page);
+ const changed=await handle!.db.execute(sql`UPDATE observability.runtime_report_rows SET document=jsonb_set(document,'{sourceVersion}','0'::jsonb) WHERE report_id=${f.reportId} AND section='native-pages' AND ordinal=900 RETURNING ordinal`);expect(changed).toHaveLength(1);
+ await expect(f.store.publish(f.reportId,f.owner,f.manifest)).rejects.toThrow();expect((await f.store.get(f.reportId))?.state).toBe('building');
+ const [original]=await handle!.db.execute(sql`SELECT count(*)::text AS count FROM observability.runtime_report_rows WHERE report_id=${f.reportId} AND section='native-pages'`);expect(original?.['count']).toBe('2001');
+},30000);

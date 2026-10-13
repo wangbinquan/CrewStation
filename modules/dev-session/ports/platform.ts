@@ -78,6 +78,8 @@ export interface Notifier {
 }
 
 export interface DevSessionSettings {
+  /** New supported OpenCode executions collect automatically; accepted starts retain their original mode. */
+  readonly developmentNativeObservationEnabled?: boolean;
   /** Explicit new-execution validation selection; never a statistics population limit. */
   readonly developmentNativeObservationAdmissions?: readonly { projectId: string; profileId: string; profileRevision: number }[];
   readonly idleMinutes: number;

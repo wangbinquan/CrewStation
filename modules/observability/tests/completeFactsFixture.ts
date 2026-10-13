@@ -11,11 +11,13 @@ import {createObservabilityModule,observabilityMigrations} from '../wiring';
 import {completeCohortFixture,completeCohortWindow,seedCompleteCohort} from './completeCohortFixture';
 import {preparePartialCnyCohort,partialCnyValuation} from './partial-cny/fixture';
 import {seedCompleteSibling} from './completeSiblingFixture';
-export async function completeFactsFixture(options:{completeSibling?:boolean;feePolicyCohort?:boolean;partialCnyCohort?:boolean}={}) {
+export async function completeFactsFixture(options:{completeSibling?:boolean;feePolicyCohort?:boolean;partialCnyCohort?:boolean;emptyCohort?:boolean;laterSibling?:boolean}={}) {
  const tdb=await createTestDatabase([observabilityMigrations]),f=completeCohortFixture();
  // The fee-setting regression has its own complete three-Task population; the original 201/1001 EOF cohort is unchanged by default.
- if(options.partialCnyCohort)preparePartialCnyCohort(f);
+ if(options.emptyCohort){f.tasks.length=0;f.attempts.length=0;f.records.length=0;f.captures.length=0;}
+ else if(options.partialCnyCohort)preparePartialCnyCohort(f);
  else if(options.feePolicyCohort){f.tasks.splice(3);f.attempts.splice(1);f.records.splice(1);f.captures.length=0;}
+ if(options.laterSibling){f.tasks[1]!.createdAt='2026-10-05T00:00:00.000Z';f.tasks[1]!.closedAt='2026-10-05T00:00:10.000Z';}
  await seedCompleteCohort(tdb,f,true,options.partialCnyCohort?partialCnyValuation:undefined);
  const sibling=options.completeSibling?await seedCompleteSibling(tdb,f):undefined;
  const root=mkdtempSync(join(tmpdir(),'cs-sealed-facts-')),actor:Actor={userId:UserIdSchema.parse(newResourceId()),isAdmin:true},controls={broken:false};
@@ -28,6 +30,7 @@ export async function completeFactsFixture(options:{completeSibling?:boolean;fee
   traces:{environments:{traceKeys:async()=>[],activeTraceIds:async()=>[],list:async()=>[]},deliveries:{traceKeys:async()=>[],activeTraceIds:async()=>[],list:async()=>[]},businessTasks:{list:async()=>[]},sessions:{summarize:async()=>[],events:async()=>[]}},
  });
  async function settle(projectId:ProjectId|null,taskId?:typeof f.tasks[number]['id']) {
+  for(const worker of module.reportWorkers)await worker.drain();
   let report:RuntimeCompleteReport=taskId?await module.api.runtimeCompleteTaskReport(actor,projectId,taskId):await module.api.runtimeCompleteReport(actor,projectId,completeCohortWindow);
   while(report.state==='building'){for(const worker of module.reportWorkers)await worker.drain();report=await module.api.runtimeCompleteReportStatus(actor,projectId,report.reportId);}
   return report;

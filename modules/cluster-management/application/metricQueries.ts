@@ -1,3 +1,4 @@
+import {historyIntegrals} from '../domain/historyIntegral';
 import type { ProjectResourceMetrics, ProjectResourceMetricsQuery, ProjectResourceHistoryQuery, Actor, ClusterObservationQuery, ClusterUsageQuery, ClusterHistoryQuery, ClusterHistoryResourcesQuery, ClusterMetrics, UserId, ClusterHistory, ClusterHistoryResources, ClusterMetricName } from '@crewstation/contracts';
 import { forbidden, notFound, PlatformError, validation } from '@crewstation/kernel';
 import { type MetricsDeps, boundedMap } from './observeMetrics';
@@ -61,15 +62,16 @@ function valuesOf(rows: PrometheusMatrix[], query: ClusterHistoryQuery, metric: 
   for (const row of rows) if (row.metric.scope !== query.scope || row.metric.metric !== metric || (query.resourceId && row.metric.resource_id !== query.resourceId) || (query.container && row.metric.container !== query.container) || (query.projectId && row.metric.project_id !== query.projectId) || (row.metric.device ?? '') !== (query.device ?? '') || (row.metric.interface ?? '') !== (query.interface ?? '')) throw new Error('History labels do not match the selected resource');
   return new Map(rows.flatMap((row) => row.values.map(([at, value]) => [at, Number(value)] as const)));
 }
-async function series(reader: HistoryReader, query: ClusterHistoryQuery, name: ClusterMetricName, window: ReturnType<typeof historyWindow>, signal: AbortSignal): Promise<ClusterHistory['series'][number]> {
+async function series(reader: HistoryReader, query: ClusterHistoryQuery, name: ClusterMetricName, window: ReturnType<typeof historyWindow>, signal: AbortSignal,now:number): Promise<ClusterHistory['series'][number]> {
   const results = { average: new Map<number, number>(), peak: new Map<number, number>(), coverage: new Map<number, number>() };
   const read = async (seconds: number, start: number, end: number) => {
     const expressions = historyExpressions(query, name, seconds);
     await Promise.all((['average', 'peak', 'coverage'] as const).map(async (key) => { for (const [at, value] of valuesOf(await reader.range(expressions[key], start, end, window.step, signal), query, name)) results[key].set(at, value); }));
   };
+  const retainedFrom=Math.max(window.from,now/1000-8*86400);
   const fullEnd = window.to - window.remainder;
-  if (fullEnd > window.from) await read(window.step, window.from + window.step, fullEnd);
-  if (window.remainder) await read(window.remainder, window.to, window.to);
+  if (fullEnd > retainedFrom) await read(window.step, Math.max(window.from+window.step,retainedFrom), fullEnd);
+  if (window.remainder && window.to>=retainedFrom) await read(window.remainder, window.to, window.to);
   return { metric: name, unit: metricUnits[name], points: window.ends.map((at) => { const coverage = Math.min(1, Math.max(0, results.coverage.get(at) ?? 0)); return { at: new Date(at * 1000).toISOString(), average: results.average.get(at) ?? null, peak: results.peak.get(at) ?? null, coverage, complete: coverage >= 0.999 && results.average.has(at) }; }) };
 }
 export async function queryHistory(deps: MetricsDeps, reader: HistoryReader, query: ClusterHistoryQuery): Promise<ClusterHistory> {
@@ -78,11 +80,11 @@ export async function queryHistory(deps: MetricsDeps, reader: HistoryReader, que
   if (query.resourceId && !(await deps.repository.identities()).some((i) => i.resourceId === query.resourceId && ({ node: 'Node', pod: 'Pod', container: 'Pod', pvc: 'PersistentVolumeClaim' } as Record<string, string>)[query.scope] === i.kind)) throw notFound('历史资源', query.resourceId);
   const base = { requestedFrom: query.from, requestedTo: query.to, stepSeconds: window.step, source: 'prometheus' as const };
   try {
-    const signal = AbortSignal.timeout(30_000), rows = await boundedMap(query.metrics, 2, (name) => series(reader, query, name, window, signal));
+    const signal = AbortSignal.timeout(30_000), rows = await boundedMap(query.metrics, 2, (name) => series(reader, query, name, window, signal,deps.clock.now().getTime()));
     const firstExpression = `min_over_time(cs_cluster_source_timestamp_seconds{${historySelector(query, query.metrics[0]!)} }[8d])`;
     const start = await reader.range(query.resourceId && !query.projectId ? `min without(project_id) (${firstExpression})` : firstExpression, window.to, window.to, 15, signal);
     const first = [...valuesOf(start, query, query.metrics[0]!).values()].filter((n) => n > 0).sort((a, b) => a - b)[0];
-    return { ...base, state: 'fresh', ...(first ? { availableFrom: new Date(first * 1000).toISOString() } : {}), series: rows };
+    return { ...base,integrals:historyIntegrals({...base,series:rows}), state: 'fresh', ...(first ? { availableFrom: new Date(first * 1000).toISOString() } : {}), series: rows };
   } catch (error) { return { ...base, state: 'error', reason: error instanceof Error ? error.message : String(error), series: [] }; }
 }
 export async function historyResources(deps: MetricsDeps, query: ClusterHistoryResourcesQuery): Promise<ClusterHistoryResources> {

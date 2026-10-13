@@ -1,3 +1,4 @@
+import {DevelopmentUnsupportedCliEvidenceSchema} from './unsupportedCliCleanup';
 import { z } from 'zod';
 import { DevelopmentUsageClosureSchema, DevelopmentUsageRegistrationSchema, DevelopmentUsageStopReceiptSchema } from '@crewstation/contracts';
 import { jsonHash, precondition } from '@crewstation/kernel';
@@ -22,7 +23,7 @@ const DevelopmentBoundCleanupEvidenceSchema = z.strictObject({
   if (c.status === 'complete' ? c.tailUnknown || c.reason !== null || c.persistedThrough !== stop.finalThrough || stop.interruption !== null
     : !c.tailUnknown || !c.reason) invalid('完整与中断出口不能互相冒充');
 });
-export const DevelopmentCleanupEvidenceSchema = z.union([DevelopmentBoundCleanupEvidenceSchema, DevelopmentPrestartCleanupEvidenceSchema]);
+export const DevelopmentCleanupEvidenceSchema = z.union([DevelopmentBoundCleanupEvidenceSchema, DevelopmentPrestartCleanupEvidenceSchema,DevelopmentUnsupportedCliEvidenceSchema]);
 export type DevelopmentCleanupSelection = z.infer<typeof DevelopmentCleanupSelectionSchema>;
 export type DevelopmentCleanupEvidence = z.infer<typeof DevelopmentCleanupEvidenceSchema>;
 

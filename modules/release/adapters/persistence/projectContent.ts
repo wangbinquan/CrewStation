@@ -10,6 +10,7 @@ import type { ServiceResolver } from '../../ports/platform';
 import { validateJourneyContent } from './journey/content';
 
 const columns: Readonly<Record<string, readonly string[]>> = {
+  observation_roles:['active','at','blue_release','green_release','sequence','service_id'],
   release_journeys: ['id', 'project_id', 'service_id', 'release_id', 'kind', 'status', 'revision', 'request_key', 'body', 'created_at'],
   release_journey_events: ['id', 'project_id', 'service_id', 'release_id', 'journey_id', 'sequence', 'transition_key', 'body', 'created_at'],
   releases: ['id', 'service_id', 'project_id', 'tag', 'commit_sha', 'branch', 'status', 'target_slot', 'image', 'manifest', 'config_version', 'pipeline', 'message', 'created_by', 'created_at', 'updated_at', 'legacy_manifest', 'identity_provenance', 'legacy_resource_id'],
@@ -31,7 +32,7 @@ type Row = { table: string; body: Record<string, unknown>; key: string; owners: 
 const blocker = (code: string, message: string): ProjectDeletionBlocker => ({ participant: 'release', code, message });
 const string = (value: unknown): string | undefined => typeof value === 'string' && value.length > 0 ? value : undefined;
 const object = (value: unknown): Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
-export const releaseContentRowKey = (table: string, body: Record<string, unknown>) => table === 'replica_overrides' ? JSON.stringify([body.service_id, body.physical]) : string(body.id) ?? string(body.service_id) ?? '';
+export const releaseContentRowKey = (table: string, body: Record<string, unknown>) => table==='observation_roles'?String(body.sequence):table === 'replica_overrides' ? JSON.stringify([body.service_id, body.physical]) : string(body.id) ?? string(body.service_id) ?? '';
 
 export function releaseCallbackContent(body: Record<string, unknown>): ReleaseCallbackRecord | undefined {
   const parsed = ReleaseCallbackRecordSchema.safeParse({

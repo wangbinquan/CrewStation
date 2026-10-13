@@ -4,7 +4,7 @@ import type { ExecutionPriceStore, ExecutionPriceInput, AcceptedExecutionPrice }
 import { ExecutionCostVisibilityDtoSchema, SetExecutionCostVisibilitySchema } from '@crewstation/contracts';
 import { conflict, jsonHash, validation } from '@crewstation/kernel';
 import type { ExecutionCostVisibilityStore } from '../../ports/usageLedger';
-import { and, desc, eq, inArray, isNull, lt, lte } from 'drizzle-orm';
+import {sql, and, desc, eq, inArray, isNull, lt, lte } from 'drizzle-orm';
 import type { SaveTokenPrice, ProjectId, ExecutionCostVisibilityDto } from '@crewstation/contracts';
 import type { Database, Executor } from '@crewstation/persistence';
 import type { TokenPriceScope, TokenPriceStore, TokenPriceSelection } from '../../ports/tokenPricing';
@@ -120,12 +120,13 @@ export function drizzleExecutionPricing(db: Database): ExecutionPriceStore {
   return {
     accept: (input, now) => acceptPrice(db, input, now),
     get: async (identity) => (await acceptedPrice(db, UsageExecutionIdentitySchema.parse(identity)))?.document,
-    price: async (identity, actual) => {
+correctionRevision:async identity=>{const [r]=await db.execute(sql`SELECT revision::text FROM observability.execution_price_corrections WHERE execution_id=${identity.executionId} AND generation=${identity.executionGeneration} AND document->'identity'=${JSON.stringify(identity)}::jsonb`);return r?String(r['revision']):undefined;},
+    price: async (identity, actual,record) => {
       const binding = (await acceptedPrice(db, UsageExecutionIdentitySchema.parse(identity)))?.document;
       if (!binding?.profile || binding.profile.protocol === 'terminal' || actual === null) return undefined;
-      const model = pricingModel.parse(actual);
+      const model = pricingModel.parse(actual),[correction]=await db.execute(record?sql`SELECT document FROM observability.execution_price_correction_records WHERE execution_id=${identity.executionId} AND generation=${identity.executionGeneration} AND source_id=${record.sourceId} AND record_id=${record.recordId}`:sql`SELECT document FROM observability.execution_price_corrections WHERE execution_id=${identity.executionId} AND generation=${identity.executionGeneration}`),policy=correction?.['document'] as {identity:unknown;profileId:string;targetPriceBookRevision:number;repriceAt:string;originalAccepted:unknown}|undefined;if(policy&&(jsonHash(policy.identity)!==jsonHash(identity)||policy.profileId!==binding.profile.id||jsonHash(policy.originalAccepted)!==jsonHash(binding)))throw conflict('已批准价格纠错的原执行档位不匹配');
       return selected(db, { ...model, profileId: binding.profile.id, profileRevision: binding.profile.revision,
-        protocol: binding.profile.protocol, priceBookRevision: binding.priceBookRevision, acceptedAt: binding.acceptedAt });
+        protocol: binding.profile.protocol, priceBookRevision: policy?.targetPriceBookRevision??binding.priceBookRevision, acceptedAt: policy?.repriceAt??binding.acceptedAt });
     },
   };
 }

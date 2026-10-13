@@ -1,0 +1,2 @@
+/** Original Prometheus retention flag; unknown policy never fabricates available history. */
+export function retentionDuration(value:unknown):number|undefined{if(typeof value!=='string')return undefined;const parts=[...value.matchAll(/(\d+)(ms|[smhdwy])/g)];if(!parts.length||parts.map(p=>p[0]).join('')!==value)return undefined;const units:Record<string,number>={ms:1,s:1000,m:60000,h:3600000,d:86400000,w:604800000,y:31536000000};const n=parts.reduce((sum,p)=>sum+Number(p[1])*units[p[2]!]!,0);return Number.isSafeInteger(n)&&n>0?n:undefined;}

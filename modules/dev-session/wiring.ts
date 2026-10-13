@@ -1,3 +1,5 @@
+import { cliActivityCollection } from './application/development/cliActivityCollection';
+import { cliObservation } from './application/development/cliObservation';
 import { developmentObservationProducer } from './application/development/observationProducer';
 import type { DevelopmentDispatchSession } from './ports/developmentDispatch';
 import type { DevelopmentCleanupSession, DevelopmentCleanupWorkloadSafety } from './ports/developmentCleanup';
@@ -123,9 +125,10 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
 function developmentApi(deps: DevSessionModuleDeps, useCaseDeps: DevSessionUseCaseDeps, projectWork?: DevelopmentProjectWork): DevSessionModuleApi {
   const lifecycle = sessionLifecycleUseCases(useCaseDeps);
   const rawAgentStarts = drizzleAgentStarts(deps.db, !!projectWork), agentStarts = projectWork ? guardedDevelopmentPort(rawAgentStarts, projectWork) : rawAgentStarts;
+  const rawTerminals = drizzleNativeTerminals(deps.db, !!projectWork), terminals = projectWork ? guardedDevelopmentPort(rawTerminals, projectWork) : rawTerminals;
   const store = developmentUsageOwnerStore(deps.db), pricing = deps.developmentUsagePricing;
   const rawUsage = developmentUsageOwner(projectWork ? guardedDevelopmentPort(store, projectWork) : store, agentStarts, useCaseDeps.environments,
-    pricing && projectWork ? guardedDevelopmentPort(pricing, projectWork) : pricing);
+    pricing && projectWork ? guardedDevelopmentPort(pricing, projectWork) : pricing, terminals);
   const developmentUsage = projectWork ? developmentUsageWork(rawUsage, projectWork) : rawUsage;
   const endingStore = developmentEndingStore(deps.db, useCaseDeps.clock);
   const originalEndingStore = projectWork ? guardedDevelopmentPort(endingStore, projectWork) : endingStore;
@@ -137,9 +140,9 @@ function developmentApi(deps: DevSessionModuleDeps, useCaseDeps: DevSessionUseCa
   const agentExecutions = new AgentExecutionLifecycle(useCaseDeps, agentStarts, observation);
   const agents = agentUseCases(useCaseDeps, agentStarts, agentExecutions);
   const remind = idleReminderUseCase(useCaseDeps);
-  const rawTerminals = drizzleNativeTerminals(deps.db, !!projectWork), terminals = projectWork ? guardedDevelopmentPort(rawTerminals, projectWork) : rawTerminals;
   const rawActivity = drizzleNativeActivity(deps.db), activity = nativeActivityUseCases(useCaseDeps, projectWork ? guardedDevelopmentPort(rawActivity, projectWork) : rawActivity, terminals);
-  const native = nativeTerminalUseCases(useCaseDeps, terminals);
+  const cli=deps.developmentDispatchSession && deps.developmentCleanupSession ? cliObservation(useCaseDeps,{owner:rawUsage,store:originalEndingStore,dispatch:deps.developmentDispatchSession,ending:deps.developmentCleanupSession}):undefined;
+  const native = nativeTerminalUseCases(useCaseDeps, terminals, cli, cliActivityCollection(useCaseDeps.runner, projectWork ? guardedDevelopmentPort(rawActivity,projectWork):rawActivity));
   // 启动中名册每秒读一次（RFC-022），原生活动页不跟着每秒做：同一任务、同一人 5 秒内复用。
   const activityPage = rosterActivity((actor, taskId) => boundedNativeRead(activity.getAgentActivity(actor, taskId, { limit: 1 })).catch((error: unknown) => {
     if (isPlatformError(error) && ['forbidden', 'unauthenticated', 'not_found'].includes(error.kind)) throw error;
@@ -190,3 +193,7 @@ function developmentApi(deps: DevSessionModuleDeps, useCaseDeps: DevSessionUseCa
   return projectWork ? developmentWorkApi(api, projectWork) : api;
 
 }
+
+export {readCliObservationTaskPage,readCliObservationAttemptPage} from './adapters/persistence/observability/cliObservationFacts';
+
+export {readOriginalCliActivityPage} from './adapters/persistence/observability/observationActivityFacts';

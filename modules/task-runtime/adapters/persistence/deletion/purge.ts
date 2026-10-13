@@ -9,7 +9,7 @@ import { RUNTIME_CONTENT } from './contentTables';
 import { inspectRuntimeScope } from './scopeStore';
 import { runtimeContentKey } from './rowStore';
 
-const order = ['development_parent_ending_children', 'development_parent_ending_objects', 'development_parent_rebuild_claims',
+const order = ['observation_lifecycle', 'development_parent_ending_children', 'development_parent_ending_objects', 'development_parent_rebuild_claims',
   'archive_executions', 'unprovisioned_storage', 'blocked_admissions', 'development_parent_endings', 'environment_rebuilds', 'environments', 'admissions', 'original_callbacks'];
 const payload = (scope: RuntimeDeletionScope['contents']) => scope.filter((row) => row.table !== 'original_callbacks');
 /** Physical cleanup may add granted callback births; it cannot rewrite the stopped payload or invent ordinary work. */

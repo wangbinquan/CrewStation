@@ -1,3 +1,4 @@
+import {registerRuntimeSignals,incrementRuntimeSignal} from '@crewstation/kernel';
 import type { Logger } from '@crewstation/kernel';
 import type { LeasePort } from '@crewstation/resource-runtime';
 import { createWorkQueue, withLease } from '@crewstation/resource-runtime';
@@ -41,12 +42,12 @@ export function ledgerReconciler(ledger: LedgerObservations, feed: ManagedObject
     const route = (await ledger.get(id))?.kind === 'route';
     // 路由仲裁会修改同入口的多条记录；统一租约同时防止跨入口改名与多副本并发。
     if (route && routeBusy) { enqueue(id, options.retryMs ?? 2000); return; }
-    if (route) routeBusy = true;
+    if (route) routeBusy = true;const started=performance.now();
     try {
       if (!leases) return await reconcile(id, enqueue);
       const outcome = await withLease(leases.port, route ? 'route-arbitration' : id, route ? `${leases.holder}/${id}` : leases.holder, leases.ttlMs ?? LEASE_TTL_MS, (signal) => reconcile(id, enqueue, signal));
       if (!outcome.acquired) enqueue(id, leases.retryMs ?? LEASE_RETRY_MS);
-    } finally { if (route) routeBusy = false; }
+    } finally {incrementRuntimeSignal('controller.reconcile.completed','records');incrementRuntimeSignal('controller.reconcile.elapsed','microseconds',BigInt(Math.round((performance.now()-started)*1000)));if (route) routeBusy = false; }
   };
   // 处理一条记录时可以把相关记录（例如上级结束后的工作卷）再排进同一个去重队列，或约一个到期复核（例如崩溃重启的窗口过去之后）。
   const queue: ReturnType<typeof createWorkQueue> = createWorkQueue((id) => process(id, (next, afterMs) => (afterMs ? queue.addAfter(next, afterMs) : queue.add(next))), { logger, concurrency: options.concurrency ?? 4 });
@@ -55,6 +56,7 @@ export function ledgerReconciler(ledger: LedgerObservations, feed: ManagedObject
   let tailTimer: ReturnType<typeof setTimeout> | undefined;
   let resyncTimer: ReturnType<typeof setInterval> | undefined;
 
+  const releaseSignals=registerRuntimeSignals('controller.reconcile',()=>[{kind:'controller.reconcile.queue',unit:'records',value:String(queue.size())},{kind:'controller.reconcile.running',unit:'boolean',value:running?'1':'0'},{kind:'controller.reconcile.synced',unit:'boolean',value:synced?'1':'0'}]);
   const resync = async () => {
     try { for (const id of options.pendingRecordIds?.() ?? []) queue.add(id); } catch (error) { logger.warn('original admission receipt resync failed', { error: String(error) }); }
     try { for (const record of await ledger.listLive()) queue.add(record.id); } catch (error) { logger.warn('resource reconcile resync failed', { error: String(error) }); }
@@ -93,7 +95,7 @@ export function ledgerReconciler(ledger: LedgerObservations, feed: ManagedObject
     /** 观测到调和器渲染的对象有变化时直接排进来（改标签、改额度上限不变 generation，台账不记变更）；同步完成之前的忽略——首轮全量会处理。 */
     enqueue: (id: string) => { if (running && synced) queue.add(id); },
     stop: async () => {
-      running = false;
+      running = false;releaseSignals();
       if (tailTimer) clearTimeout(tailTimer);
       if (resyncTimer) clearInterval(resyncTimer);
       await queue.stop();

@@ -1,5 +1,5 @@
 import type { DevelopmentNativeProducer } from '@crewstation/agent-drivers';
-import type { AgentEvent, DevelopmentRunnerUsageCapture, StartAgentCommand } from '@crewstation/contracts';
+import type { AgentEvent, DevelopmentRunnerUsageCapture, StartAgentCommand, DevelopmentUsageAdmission } from '@crewstation/contracts';
 import { RunnerCommandError } from '../commandError';
 import { validateDevelopmentStart } from './developmentStartIntent';
 import type { DevelopmentUsageJournal } from './developmentUsageJournal';
@@ -18,7 +18,7 @@ export function reserveDevelopmentUsage(command: StartAgentCommand, journal?: De
 
 export class DevelopmentAgentUsage {
   private terminal = false;
-  constructor(private readonly journal: DevelopmentUsageJournal, private readonly admission: NonNullable<StartAgentCommand['developmentUsage']>, readonly replayed: boolean) {}
+  constructor(private readonly journal: DevelopmentUsageJournal, private readonly admission: DevelopmentUsageAdmission, readonly replayed: boolean) {}
   private get key() { return this.admission.key; }
   matches(key: typeof this.key): boolean { const own = this.key; return key.executionId === own.executionId && key.journalId === own.journalId && key.incarnation === own.incarnation && key.payloadDigest === own.payloadDigest; }
   stop() { return this.journal.requestStop(this.admission, this.journal.context.podUid); }
@@ -43,6 +43,7 @@ export class DevelopmentAgentUsage {
   };
 
   /** Final native capture has already been persisted by the driver before its terminal event. */
+  running():void {this.journal.running(this.key);}
   observe(event: AgentEvent): boolean {
     if (event.type === 'usage') { if (event.usageCapture) this.capture(event.usageCapture, event.at); return false; }
     if (event.type === 'started') {

@@ -22,14 +22,14 @@ function snapshot(scope:'system'|'project',gap=false,tokens='12'):RuntimeComplet
 }
 const key=(scope:'system'|'project',range=filters)=>['statistics',scope==='project'?projectId:'system',range];
 const queryKey=(scope:'system'|'project',range=filters,pinned?:string)=>['runtime-complete','recorded-scope-metrics/3',...key(scope,range),pinned];
-async function setup(initial:RuntimeCompleteReport,scope:'system'|'project',options:{cached?:boolean;pinned?:string}={}) {
+async function setup(initial:RuntimeCompleteReport,scope:'system'|'project',options:{cached?:boolean;pinned?:string;task?:boolean}={}) {
  client=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:Infinity,staleTime:Infinity}}});
  if(options.cached)client.setQueryData(queryKey(scope,filters,options.pinned),initial);
  const requests:RuntimeCompleteReport[]=[initial],statuses:RuntimeCompleteReport[]=[],counts={requests:0,status:0},reads:string[]=[];
  let currentScope=scope,currentFilters=filters,pinned=options.pinned;
  globalThis.fetch=Object.assign(async(input:Parameters<typeof fetch>[0])=>{counts.status++;reads.push(String(input));const report=statuses.shift();if(!report)throw new Error('Unexpected original report status read');return new Response(JSON.stringify(report),{headers:{'content-type':'application/json'}});},{preconnect:originalFetch.preconnect});
  const request=async()=>{counts.requests++;const report=requests.shift();if(!report)throw new Error('Unexpected duplicate new report request');return report;};
- function Probe(){const query=useRuntimeReport(key(currentScope,currentFilters),request,currentScope==='project'?projectId:undefined,pinned),report=query.data,content=report&&runtimeCompleteReportContent(report);return content?<main data-accepted-report={content.header.reportId}><output>{content.header.reportId}</output><RuntimeMetrics metrics={content.summary.metrics} tasks={content.summary.tasks}/><button>Retained task focus</button><ol>{Array.from({length:201},(_,n)=><li key={n}>Original task {n}</li>)}</ol></main>:<output data-report-state>{report?.state??'pending'}</output>;}
+ function Probe(){const query=useRuntimeReport(options.task?['task',...key(currentScope,currentFilters)]:key(currentScope,currentFilters),request,currentScope==='project'?projectId:undefined,pinned),report=query.data,content=report&&runtimeCompleteReportContent(report);return content?<main data-accepted-report={content.header.reportId}><output>{content.header.reportId}</output><RuntimeMetrics metrics={content.summary.metrics} tasks={content.summary.tasks}/><button>Retained task focus</button><ol>{Array.from({length:201},(_,n)=><li key={n}>Original task {n}</li>)}</ol></main>:<output data-report-state>{report?.state??'pending'}</output>;}
  host=document.createElement('div');document.body.append(host);root=createRoot(host);
  const render=async()=>{await act(async()=>root!.render(<QueryClientProvider client={client!}><I18nProvider catalog={{'zh-CN':messages,'en-US':messages}}><Probe/></I18nProvider></QueryClientProvider>));await settle();};
  const settle=async()=>{for(let n=0;n<3;n++)await act(async()=>{await new Promise(resolve=>setTimeout(resolve,0));});};
@@ -77,9 +77,9 @@ test('an initial building report and a changed pinned identity remain actual sta
 });
 
 test('returning to the foreground refreshes in place and never resets the current task focus',async()=>{
- const old=snapshot('system',true),next=snapshot('system',true,'41'),f=await setup(old,'system'),main=host!.querySelector('main')!,button=main.querySelector('button')!;
+ const old=snapshot('system',true),next=snapshot('system',true,'41'),f=await setup(old,'system',{task:true}),main=host!.querySelector('main')!,button=main.querySelector('button')!;
  button.focus();main.scrollTop=420;f.requests.push({reportId:next.reportId,state:'building',phase:'original-worker'});f.statuses.push(next);
- focusManager.setFocused(false);await act(async()=>{client!.setQueryData(queryKey('system'),old,{updatedAt:Date.now()-31000});focusManager.setFocused(true);});await f.settle();
+ focusManager.setFocused(false);await act(async()=>{client!.setQueryData(['runtime-complete','recorded-scope-metrics/3','task',...key('system'),undefined],old,{updatedAt:Date.now()-31000});focusManager.setFocused(true);});await f.settle();
  expect(host!.querySelector('main')===main).toBe(true);expect(main.getAttribute('data-accepted-report')).toBe(old.reportId);expect(document.activeElement===button).toBe(true);expect(main.scrollTop).toBe(420);expect(f.counts).toEqual({requests:2,status:0});
  await f.reread();expect(main.getAttribute('data-accepted-report')).toBe(next.reportId);expect(f.counts).toEqual({requests:2,status:1});
 });

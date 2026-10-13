@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { DevelopmentAgentIdentitySchema, DevelopmentUsageDrainReasonSchema, ResourceIdSchema, WorkloadConsumerSchema, WorkloadStopProofSchema } from '@crewstation/contracts';
+import { DevelopmentObservedIdentitySchema, DevelopmentUsageDrainReasonSchema, ResourceIdSchema, WorkloadConsumerSchema, WorkloadStopProofSchema } from '@crewstation/contracts';
 import { jsonHash } from '@crewstation/kernel';
 
 const revision = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 export const DevelopmentCleanupSelectionSchema = z.strictObject({
-  version: z.literal(1), identity: DevelopmentAgentIdentitySchema, profileId: ResourceIdSchema, profileRevision: revision,
+  version: z.literal(1), identity: DevelopmentObservedIdentitySchema, profileId: ResourceIdSchema, profileRevision: revision,
   podUid: z.uuid(), consumerId: ResourceIdSchema, renderStart: revision, selectionHash: z.string().regex(/^[a-f0-9]{64}$/),
 });
 export const DevelopmentCleanupOwnerSchema = z.strictObject({

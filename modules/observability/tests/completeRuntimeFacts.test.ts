@@ -1,8 +1,9 @@
-// A missing native proof may withhold numeric totals, never independently sealed Task/time facts.
+// A missing native proof withholds complete totals, while the original Task/time
+// facts and every known native usage record remain readable with exact values.
 import {afterEach,describe,expect,test} from 'bun:test';
 import {sql} from 'drizzle-orm';
 import {testDatabaseAvailable} from '@crewstation/testkit';
-import {CompleteRuntimeTaskSummarySchema,CompleteRuntimeAttemptSummarySchema,RUNTIME_REPORT_FACT_SECTIONS,runtimeCompleteReportContent,type RuntimeReportPage,type RuntimeReportSection} from '@crewstation/contracts';
+import {CompleteRuntimeTaskSummarySchema,CompleteRuntimeAttemptSummarySchema,CompleteRuntimeModelSchema,CompleteRuntimeCallSchema,RUNTIME_REPORT_FACT_SECTIONS,runtimeCompleteReportContent,type RuntimeReportPage,type RuntimeReportSection} from '@crewstation/contracts';
 import {completeFactsFixture} from './completeFactsFixture';
 const available=await testDatabaseAvailable();let fixture:Awaited<ReturnType<typeof completeFactsFixture>>|undefined;
 afterEach(async()=>{await fixture?.close();fixture=undefined;});
@@ -18,12 +19,19 @@ describe.skipIf(!available)('sealed original execution facts',()=>{
    do {const page:RuntimeReportPage<unknown>=await f.module.api.runtimeCompleteReportPage(f.actor,projectId,report.reportId,{section,parent,pageSize:37,after});expect(page.reportId).toBe(report.reportId);expect(page.snapshotId).toBe(content.header.snapshotId);rows.push(...page.items);after=page.nextCursor??undefined;}while(after!==undefined);
    return rows;
   }
+  const attempts:ReturnType<typeof CompleteRuntimeAttemptSummarySchema.parse>[]=[];
   const tasks=(await all('tasks')).map(row=>CompleteRuntimeTaskSummarySchema.parse(row));expect(tasks).toHaveLength(201);expect(new Set(tasks.map(row=>row.id))).toEqual(new Set(f.f.tasks.map(row=>row.id)));expect(tasks.every(row=>row.projectName==='Original Project Name')).toBe(true);expect(tasks.find(row=>row.id===f.f.tasks[0]!.id)!.metrics.state).toBe('not-ready');expect(tasks.filter(row=>row.metrics.state==='not-applicable')).toHaveLength(200);
-  for(const section of ['attempts','swimlane'] as const){const rows=(await all(section,f.f.tasks[0]!.id)).map(row=>CompleteRuntimeAttemptSummarySchema.parse(row));expect(rows).toHaveLength(1001);expect(new Set(rows.map(row=>row.key)).size).toBe(1001);expect(rows.every(row=>row.profileName==='Original Compute Name'&&row.durationMs==='10000')).toBe(true);expect(rows.filter(row=>row.metrics.state==='ready')).toHaveLength(1000);expect(rows.filter(row=>row.metrics.state==='not-ready')).toHaveLength(1);}
+  for(const section of ['attempts','swimlane'] as const){const rows=(await all(section,f.f.tasks[0]!.id)).map(row=>CompleteRuntimeAttemptSummarySchema.parse(row));expect(rows).toHaveLength(1001);expect(new Set(rows.map(row=>row.key)).size).toBe(1001);expect(rows.every(row=>row.profileName==='Original Compute Name'&&row.durationMs==='10000')).toBe(true);expect(rows.filter(row=>row.metrics.state==='ready')).toHaveLength(1000);expect(rows.filter(row=>row.metrics.state==='not-ready')).toHaveLength(1);if(section==='attempts')attempts.push(...rows);}
   const quality=await all('quality') as {taskId:string;reason:string}[];expect(quality.length).toBeGreaterThan(0);expect(new Set(quality.map(row=>JSON.stringify([row.taskId,row.reason]))).size).toBe(quality.length);for(const row of quality){expect(row.taskId).toBe(f.f.tasks[0]!.id);expect((await all('quality',row.reason)).some(raw=>(raw as {taskId:string}).taskId===row.taskId)).toBe(true);}
   for(const section of ['agents','agent-tasks','profiles','profile-tasks','projects'] as const)expect(RUNTIME_REPORT_FACT_SECTIONS).toContain(section);
-  for(const section of ['models','calls','captures'] as const)await expect(f.module.api.runtimeCompleteReportPage(f.actor,projectId,report.reportId,{section,pageSize:37})).rejects.toThrow('不能读取数值明细');
-  await f.tdb.db.execute(sql`DELETE FROM observability.runtime_report_rows WHERE report_id=${report.reportId} AND section='tasks' AND key=${f.f.tasks.at(-1)!.id}`);
+  // The approved recorded-usage behavior also applies to native detail sections.
+  // Traverse every original call; the whole Task still has an explicit proof gap.
+  const models=(await all('models')).map(row=>CompleteRuntimeModelSchema.parse(row));expect(models).toHaveLength(1);expect(models[0]).toMatchObject({modelRef:'original-model-reference',tasks:'1',metrics:{state:'ready',records:'1001',tokens:{input:'501501',cacheRead:'3003',cacheWrite:'5005',output:'7007',total:'516516'},cost:{state:scope==='system'?'complete':'hidden',amount:scope==='system'?f.f.decimal(f.f.records.reduce((sum,_row,index)=>sum+f.f.pico(index),0n)):null}}});
+  const calls=(await all('calls',f.f.tasks[0]!.id)).map(row=>CompleteRuntimeCallSchema.parse(row));expect(calls).toHaveLength(1001);expect(new Set(calls.map(row=>row.recordId))).toEqual(new Set(f.f.records.map(row=>row.recordId)));
+  for(const call of calls){const index=Number(call.recordId.slice('record-'.length));expect(call).toMatchObject({taskId:f.f.tasks[0]!.id,identity:f.f.identity(index),sourceId:'original-runner',profileName:'Original Compute Name',metrics:{state:'ready',records:'1',tokens:{input:String(index+1),cacheRead:'3',cacheWrite:'5',output:'7',total:String(index+16)},cost:{state:scope==='system'?'complete':'hidden',amount:scope==='system'?f.f.decimal(f.f.pico(index)):null}}});}
+  const attempt=attempts.find(row=>row.executionId===f.f.attempts[0]!.executionId)!,captures=await all('captures',attempt.key) as {id:string;identity:unknown;proof:unknown}[];const originals=f.f.captures.filter(row=>row.identity.executionId===attempt.executionId);expect(captures).toHaveLength(originals.length);expect(new Set(captures.map(row=>row.id))).toEqual(new Set(originals.map(row=>row.id)));for(const original of originals)expect(captures.find(row=>row.id===original.id)).toMatchObject({identity:original.identity,proof:original.proof});
+  const [nativePopulation]=await f.tdb.db.execute(sql`SELECT count(*)::text AS total FROM observability.native_captures`);expect(nativePopulation?.['total']).toBe('2000');
+  const removed=await f.tdb.db.execute(sql`DELETE FROM observability.runtime_report_task_refs WHERE report_id=${report.reportId} AND task_id=${f.f.tasks.at(-1)!.id} RETURNING task_id`);expect(removed).toHaveLength(1);
   await expect(f.module.api.runtimeCompleteReportStatus(f.actor,projectId,report.reportId)).rejects.toThrow('population missing');
   await expect(f.module.api.runtimeCompleteReportPage(f.actor,projectId,report.reportId,{section:'tasks',pageSize:37})).rejects.toThrow('population missing');
  },60000);
@@ -38,6 +46,6 @@ describe.skipIf(!available)('sealed original execution facts',()=>{
  test('an original Task source failure has neither facts nor any retained child row',async()=>{
   const f=fixture=await completeFactsFixture();f.controls.broken=true;const report=await f.settle(null);
   expect(report).toMatchObject({state:'failed',error:'Original Task source unavailable'});expect(report).not.toHaveProperty('facts');expect(runtimeCompleteReportContent(report)).toBeUndefined();
-  const [rows]=await f.tdb.db.execute(sql`SELECT count(*)::text AS total FROM observability.runtime_report_rows WHERE report_id=${report.reportId}`);expect(rows!['total']).toBe('0');
+  const [rows]=await f.tdb.db.execute(sql`SELECT count(*)::text AS total FROM observability.runtime_report_task_refs WHERE report_id=${report.reportId}`);expect(rows!['total']).toBe('0');const [original]=await f.tdb.db.execute(sql`SELECT count(*)::text AS total FROM observability.usage_projections`);expect(original?.['total']).toBe('1001');const [bootstrap]=await f.tdb.db.execute(sql`SELECT done,last_error FROM observability.runtime_task_bootstrap WHERE singleton=true`);expect(bootstrap).toEqual({done:false,last_error:'Original Task source unavailable'});f.controls.broken=false;const recovered=await f.settle(null);expect(recovered.reportId).not.toBe(report.reportId);expect(runtimeCompleteReportContent(recovered)?.summary.tasks).toBe('201');expect(await f.module.api.runtimeCompleteReportStatus(f.actor,null,report.reportId)).toEqual(report);
  },60000);
 });

@@ -17,7 +17,7 @@ export function developmentCleanupSelection(env: TaskEnvironment): DevelopmentCl
     native: { purpose: n.purpose, parentTaskId: n.parentTaskId, parentPodUid: n.parentPodUid, pvcUid: n.pvcUid, nodeName: n.nodeName,
       agentId: n.agentId, runnerId: n.runnerId, fingerprint: n.fingerprint, requestedProfile: n.requestedProfile, profile: n.profile,
       image: n.image, computeProfile: n.computeProfile, podUid: n.podUid, secretUid: n.secretUid } });
-  return DevelopmentCleanupSelectionSchema.parse({ version: 1, identity: { sourceKind: 'development-agent', projectId: env.projectId,
+  return DevelopmentCleanupSelectionSchema.parse({ version: 1, identity: { sourceKind: (n.purpose??'cli')==='cli'?'development-cli':'development-agent', projectId: env.projectId,
     taskId: n.parentTaskId, agentId: n.agentId, executionId: env.id, executionGeneration: 1 }, profileId: n.computeProfile!.profileId,
     profileRevision: n.computeProfile!.revision, podUid: n.podUid, consumerId: protection.consumer.id, renderStart: render.start, selectionHash });
 }

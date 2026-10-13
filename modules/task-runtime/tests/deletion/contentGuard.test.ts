@@ -18,6 +18,7 @@ describe.skipIf(!available)('TaskRuntime complete content write fence (actual PG
       await db.execute(sql`UPDATE task_runtime.environments SET message='ordinary-before-seal' WHERE id=${f.parent}`);
       await f.seal();
       const updates = [
+        sql`UPDATE task_runtime.observation_lifecycle SET document=document||'{"late":true}'::jsonb WHERE task_id=${f.parent}`,
         sql`UPDATE task_runtime.environments SET message='late' WHERE id=${f.parent}`,
         sql`UPDATE task_runtime.admissions SET running=running+1 WHERE project_id=${f.project}`,
         sql`UPDATE task_runtime.environment_rebuilds SET message='late' WHERE id=${seeded.rebuild}`,

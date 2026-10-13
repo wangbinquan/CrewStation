@@ -27,7 +27,7 @@ export function runtimeSealedFactsFixture() {
   const route=url.pathname.match(/\/reports\/([^/]+)(\/pages)?$/);
   if(route){const value=stored.get(route[1]!);if(!value)return Response.json({error:'not_found',message:'Original report missing',details:{}},{status:404});if(!route[2])return Response.json(value.report);
    const section=url.searchParams.get('section')!,parent=url.searchParams.get('parent'),rowKey=url.searchParams.get('rowKey'),after=url.searchParams.get('after'),size=Number(url.searchParams.get('pageSize')??100);
-   if(['models','calls','captures'].includes(section))throw new Error('Incomplete native usage must not request numeric sections');
+   if(['models','captures'].includes(section)||(section==='calls'&&value.rows.filter(row=>row.section==='tasks').every(row=>{const metrics=(row.document as {metrics:{state:string}}).metrics;return metrics.state!=='ready';})))throw new Error('Incomplete native usage must not request numeric sections');
    if(controls.failedPage&&section==='tasks'&&after!==null)return Response.json({error:'precondition',message:'Original retained report population missing',details:{}},{status:412});
    const rows=value.rows.filter(row=>row.section===section&&row.parent===parent&&(!rowKey||row.key===rowKey)),start=after===null?0:Number(after),page=rows.slice(start,start+size),content=runtimeCompleteReportContent(value.report)!;reads.push({section,parent,count:page.length,after});
    return Response.json({reportId:route[1],snapshotId:controls.brokenSnapshot?'different-original-snapshot':content.header.snapshotId,section,parent,total:String(rows.length),items:page.map(row=>row.document),nextCursor:start+page.length<rows.length?String(start+page.length):null});

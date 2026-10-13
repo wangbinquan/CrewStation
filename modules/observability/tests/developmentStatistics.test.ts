@@ -15,7 +15,7 @@ describe.skipIf(!available)('development runtime statistics persisted complete r
     const f = await fixture(); for (const [n, value] of ['11','13','5'].entries()) await f.feed(f.facts[n]!, value);
     const report=await f.ready(f.module.api.systemRuntimeStatistics(f.admin,statisticsWindow)),page=report.summary;
     expect(report.header.scope).toBe('system');expect(page.tasks).toBe('3');expect((await f.page(report,'tasks')).length).toBe(3);expect(page.metrics).toMatchObject({state:'ready',tokens:{total:'29'},cost:{state:'complete',amount:'0.000058'}});
-    expect(page.sources.map(s=>[s.kind,s.tasks,s.metrics.state==='ready'?s.metrics.tokens.total:null])).toEqual([['business-task','1','5'],['development-agent','2','24']]);
+    expect(page.sources.map(s=>[s.kind,s.tasks,s.metrics.state==='ready'?s.metrics.tokens.total:null])).toEqual([['business-task','1','5'],['development-agent','2','24'],['development-cli','0',null]]);
     expect((await f.page(report,'agents')).length).toBe(3);const projects=await f.page<CompleteRuntimeProject>(report,'projects');expect(projects[0]?.projectName).toBe('Named project');expect(projects[0]?.metrics).toMatchObject({state:'ready',tokens:{total:'29'}});expect(page.durations).toMatchObject({state:'complete',samples:'1'});
     const profiles=await f.page<CompleteRuntimeProfile>(report,'profiles');expect(profiles.map(p=>p.profileName)).toContain('Accepted Compute A');expect(profiles.map(p=>p.profileName)).toContain('Accepted Compute B');
     expect(page.sources[1]?.collectionState).toBe('production-disabled');expect(page.trend.reduce((n,r)=>n+BigInt(r.metrics.state==='ready'?r.metrics.tokens.total:'0'),0n)).toBe(29n);expect(f.state.transaction).toBe(true);
@@ -44,7 +44,7 @@ describe.skipIf(!available)('development runtime statistics persisted complete r
   });
   test('wrong Agent evidence cannot publish any Token or CNY statistics', async () => {
     const f=await fixture();await f.feed(f.facts[0]!,'999',{agentId:newResourceId()},false);
-    const report=await f.settle(f.module.api.systemRuntimeTask(f.admin,f.facts[0]!.id));expect(report).toMatchObject({state:'failed',error:'Original native capture admitted attempt missing'});expect('summary' in report).toBe(false);expect('metrics' in report).toBe(false);
+    const report=await f.settle(f.module.api.systemRuntimeTask(f.admin,f.facts[0]!.id));expect(report.state).toBe('not-ready');if(report.state!=='not-ready'||!report.facts)throw Error('Invalid owner must remain pending');expect(report.facts.summary.metrics).toMatchObject({state:'not-ready',gaps:['projection-pending']});expect(report.facts.summary.metrics).not.toHaveProperty('tokens');expect(report.facts.summary.metrics).not.toHaveProperty('recordedUsage');expect(report.facts.summary.metrics).not.toHaveProperty('recordedCost');const [original]=await tdb.db.execute(sql`SELECT count(*)::text AS total FROM observability.usage_projections WHERE document->'identity'->>'executionId'=${f.facts[0]!.id}`);expect(original?.['total']).toBe('1');
   });
   test('20001 unselected workspace siblings never enter the selected complete population', async () => {
     const f=await fixture(),selected=f.facts[0]!,original=await f.feed(selected,'11');f.state.selected=[selected.id];

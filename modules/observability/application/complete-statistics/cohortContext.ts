@@ -12,7 +12,7 @@ export function completeCohortContext(input:CompleteRuntimeCohortInput) {
   const reportRows=completeReportRows(input),dimensions=completeRuntimeDimensions(input,reportRows),fold=emptyCompleteRuntimeFold(true);
   const names=completeWorkingCache<string|null>(input.rows,input.namespace+'/names',input.signal);
   // A lifetime task lookup has its original birth bin, independent of the list's time window.
-  const trends=input.query.taskId?[]:completeTrendFolds(input.query,true),sources=new Map<RuntimeSourceKind,{count:string;fold:ReturnType<typeof emptyCompleteRuntimeFold>}>([['business-task',{count:'0',fold:emptyCompleteRuntimeFold(true)}],['development-agent',{count:'0',fold:emptyCompleteRuntimeFold(true)}]]);
+  const trends=input.query.taskId?[]:completeTrendFolds(input.query,true),sources=new Map<RuntimeSourceKind,{count:string;fold:ReturnType<typeof emptyCompleteRuntimeFold>}>([['business-task',{count:'0',fold:emptyCompleteRuntimeFold(true)}],['development-agent',{count:'0',fold:emptyCompleteRuntimeFold(true)}],['development-cli',{count:'0',fold:emptyCompleteRuntimeFold(true)}]]);
   let count=0n,missingDuration=false;
   const name=async(kind:'project'|'profile',id:string)=>{const key=JSON.stringify([kind,id]),existing=await names.get(key);if(existing!==undefined)return existing;const value=await(kind==='project'?input.facts.projectName(id):input.facts.profileName(id));await names.put(key,value);return value;};
   async function enrich(build:CompleteCohortTask['build']) {
@@ -28,7 +28,7 @@ export function completeCohortContext(input:CompleteRuntimeCohortInput) {
       await enrich(build);
       const quality=[...build.fold.gaps];if(build.timing.intervals.state==='not-ready'||completeDurationSample(task)&&build.timing.wallMs===null)quality.push('timing-missing');
       if(!matchesCompleteRuntimeCohort(task,quality,input.query)){await input.rows.clearTree(input.namespace+'/private-tasks/'+input.keyOf(task.id));return;}
-      const summary:CompleteRuntimeTaskSummary={...task,attemptCount:build.attemptCount,metrics:build.metrics,timing:build.timing};
+      const summary:CompleteRuntimeTaskSummary={...task,attemptCount:build.attemptCount,metrics:build.metrics,timing:build.timing,...(build.phaseTiming?{phaseTiming:build.phaseTiming}:{}),...(build.projection?{projection:build.projection}:{})};
       const sourceKind=completeRuntimeSourceKind(task),selected:CompleteCohortTask={build,summary,sourceKind};
       await input.rows.insert(input.namespace+'/tasks',[{key:task.id,document:summary}]);
       await input.rows.insert(input.namespace+'/source-receipts',[{key:task.id,document:build.sourceReceipts}]);

@@ -41,3 +41,10 @@ export type HealthDto = z.infer<typeof HealthDtoSchema>;
 export type AlertDto = z.infer<typeof AlertDtoSchema>;
 
 export * from './observability/completeRuntimeReport';
+export * from './observability/operationalTelemetry';
+
+export * from './observability/platformUsage';
+
+export * from './observability/runtimeAggregate';
+
+export * from './observability/runtimePhase';

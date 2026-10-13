@@ -25,6 +25,8 @@ spec:
             - configMapRef: { name: crewstation-env }
             - secretRef: { name: crewstation-secrets }
           env:
+            - name: CS_CLUSTER_METRICS_TOKEN
+              valueFrom: { secretKeyRef: { name: crewstation-metrics, key: CS_CLUSTER_METRICS_TOKEN, optional: true } }
             - { name: POD_IP, valueFrom: { fieldRef: { fieldPath: status.podIP } } }
 
           readinessProbe: { httpGet: { path: /healthz, port: 8081 }, periodSeconds: 5, timeoutSeconds: 5 }

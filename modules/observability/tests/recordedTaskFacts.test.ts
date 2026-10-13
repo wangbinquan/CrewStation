@@ -3,9 +3,10 @@ import {afterEach,expect,test} from 'bun:test';
 import {sql} from 'drizzle-orm';
 import {jsonHash,newResourceId} from '@crewstation/kernel';
 import {testDatabaseAvailable} from '@crewstation/testkit';
-import {runtimeCompleteReportContent,type RuntimeReportSection,type ProjectId,type RuntimeCompleteReport,UsageRecordSchema,NativeUsageProofSchema} from '@crewstation/contracts';
+import {runtimeCompleteReportContent,type RuntimeReportSection,type ProjectId,type RuntimeCompleteReport,type CompleteRuntimeTaskSummary,UsageRecordSchema,NativeUsageProofSchema} from '@crewstation/contracts';
 import {usageProjections,nativeCaptures,nativeSteps} from '../adapters/persistence/tables';
 import {nativeCaptureSummary,type NativeCaptureDocument} from '../domain/usageProjection';
+import {assertCompleteRuntimeFactItem} from '../domain/completeReportFacts';
 import {completeFactsFixture} from './completeFactsFixture';
 const available=await testDatabaseAvailable();let fixture:Awaited<ReturnType<typeof completeFactsFixture>>|undefined;
 afterEach(async()=>{await fixture?.close();fixture=undefined;});
@@ -34,5 +35,18 @@ test.skipIf(!available)('a visible received valuation in an incomplete Task is r
  await f.module.api.setExecutionCostVisibility(f.actor,projectId,{expectedRevision:1,requestKey:'received-fees-hide',visibility:'hidden'});
  await expect(f.module.api.runtimeCompleteReportStatus(f.actor,projectId,report.reportId)).rejects.toThrow('项目费用显示配置已改变');await expect(f.module.api.runtimeCompleteReportPage(f.actor,projectId,report.reportId,{section:'tasks',pageSize:37})).rejects.toThrow('项目费用显示配置已改变');
  const fresh=await f.settle(projectId),metrics=runtimeCompleteReportContent(fresh)!.summary.metrics;expect(fresh.reportId).not.toBe(report.reportId);expect(metrics).toMatchObject({state:'not-ready',recordedUsage:{tokens:{input:'1',cacheRead:'3',cacheWrite:'5',output:'7',total:'16'}},costCoverage:{records:'1',pricedRecords:'1',visibility:'hidden'}});expect(metrics).not.toHaveProperty('recordedCost');
- await f.tdb.db.execute(sql`UPDATE observability.runtime_report_rows SET document=jsonb_set(document,'{metrics,recordedUsage,tokens,total}','"15"'::jsonb) WHERE report_id=${fresh.reportId} AND section='tasks' AND parent=''`);await expect(f.module.api.runtimeCompleteReportPage(f.actor,projectId,fresh.reportId,{section:'tasks',pageSize:37})).rejects.toThrow();
+ // The pinned API derives totals from its immutable Task fold. The legacy row table is not read here.
+ // Retain the original 15-versus-16 subtotal failure at the real server DTO validator.
+ const tasks=await all(f,projectId,fresh,'tasks') as CompleteRuntimeTaskSummary[];expect(tasks).toHaveLength(f.f.tasks.length);
+ const task=tasks.find(row=>row.id===f.f.tasks[0]!.id);if(!task||task.metrics.state!=='not-ready'||!task.metrics.recordedUsage)throw new Error('Original received Task metrics missing');
+ expect(task.metrics).toMatchObject({state:'not-ready',recordedUsage:{tokens:{input:'1',cacheRead:'3',cacheWrite:'5',output:'7',total:'16'}},costCoverage:{visibility:'hidden'}});expect(task.metrics).not.toHaveProperty('recordedCost');
+ expect(()=>assertCompleteRuntimeFactItem({kind:'row',row:{section:'tasks',parent:null,key:task.id,document:task}})).not.toThrow();
+ const malformed={...task,metrics:{...task.metrics,recordedUsage:{...task.metrics.recordedUsage,tokens:{...task.metrics.recordedUsage.tokens,total:'15'}}}};
+ expect(()=>assertCompleteRuntimeFactItem({kind:'row',row:{section:'tasks',parent:null,key:task.id,document:malformed}})).toThrow('Incomplete usage cannot expose child subtotals');
+ // Also damage the actual producer fold through a correctly keyed new document. Only this report's reference changes.
+ const [original]=await f.tdb.db.execute(sql`SELECT r.document_key,v.document FROM observability.runtime_report_task_views v JOIN observability.runtime_report_task_refs r USING(report_id,ordinal,task_id,version,project_id) WHERE v.report_id=${fresh.reportId} AND v.task_id=${task.id}`);if(!original)throw new Error('Original received Task document missing');
+ const inserted=await f.tdb.db.execute(sql`WITH damaged AS(SELECT jsonb_set(document,'{fold,tokens,input}',to_jsonb('-1'::text)) AS document FROM observability.runtime_report_task_documents WHERE key=${String(original['document_key'])}) INSERT INTO observability.runtime_report_task_documents(key,document) SELECT encode(sha256(convert_to(document::text,'UTF8')),'hex'),document FROM damaged RETURNING key`);expect(inserted).toHaveLength(1);
+ const changed=await f.tdb.db.execute(sql`UPDATE observability.runtime_report_task_refs SET document_key=${String(inserted[0]!['key'])} WHERE report_id=${fresh.reportId} AND task_id=${task.id} RETURNING task_id`);expect(changed).toHaveLength(1);
+ const [unchanged]=await f.tdb.db.execute(sql`SELECT document FROM observability.runtime_report_task_documents WHERE key=${String(original['document_key'])}`);expect(unchanged?.['document']).toEqual(original['document']);
+ await expect(f.module.api.runtimeCompleteReportPage(f.actor,projectId,fresh.reportId,{section:'tasks',pageSize:37})).rejects.toThrow();
 },60000);

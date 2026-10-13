@@ -1,3 +1,4 @@
+import {RuntimePhaseTimingSchema} from './runtimePhase';
 import {z} from 'zod';
 import {RuntimeTaskHeaderFactSchema,RuntimeAttemptFactSchema,RuntimeStatisticsQuerySchema} from './runtimeStatistics';
 import {ResourceIdSchema,ProjectIdSchema,TaskIdSchema} from '../../ids';
@@ -31,7 +32,7 @@ export const CompleteTaskTimingSchema=z.strictObject({wallMs:count.nullable(),ra
   z.strictObject({state:z.literal('complete'),unknown:z.literal('0'),cumulativeMs:count,activeUnionMs:count}),
   z.strictObject({state:z.literal('not-ready'),unknown:count}),
 ])});
-export const CompleteRuntimeTaskSummarySchema=RuntimeTaskHeaderFactSchema.extend({attemptCount:count,metrics:CompleteRuntimeMetricsSchema,timing:CompleteTaskTimingSchema});
+export const CompleteRuntimeTaskSummarySchema=RuntimeTaskHeaderFactSchema.extend({attemptCount:count,metrics:CompleteRuntimeMetricsSchema,timing:CompleteTaskTimingSchema,phaseTiming:RuntimePhaseTimingSchema.optional(),projection:z.strictObject({capturedAt:z.iso.datetime(),sourceRevision:count,pending:z.boolean()}).optional()});
 export type CompleteRuntimeTaskSummary=z.infer<typeof CompleteRuntimeTaskSummarySchema>;
 export const CompleteRuntimeAttemptSummarySchema=RuntimeAttemptFactSchema.extend({key:z.string().min(1),metrics:CompleteRuntimeMetricsSchema,durationMs:count.nullable(),open:z.boolean()});
 export type CompleteRuntimeAttemptSummary=z.infer<typeof CompleteRuntimeAttemptSummarySchema>;
@@ -42,7 +43,7 @@ const duration=z.discriminatedUnion('state',[
 export const RuntimeCompleteSummarySchema=z.strictObject({
   tasks:count,metrics:CompleteRuntimeMetricsSchema,durations:duration,
   trend:z.array(z.strictObject({from:z.iso.datetime(),to:z.iso.datetime(),tasks:count,metrics:CompleteRuntimeMetricsSchema})),
-  sources:z.array(z.strictObject({kind:z.enum(['business-task','development-agent']),tasks:count,metrics:CompleteRuntimeMetricsSchema,collectionState:z.enum(['available','production-disabled','validation-selected'])})),
+  sources:z.array(z.strictObject({kind:z.enum(['business-task','development-agent','development-cli']),tasks:count,metrics:CompleteRuntimeMetricsSchema,collectionState:z.enum(['available','production-disabled','validation-selected'])})),
 });
 export type RuntimeCompleteSummary=z.infer<typeof RuntimeCompleteSummarySchema>;
 export const RuntimeReportHeaderSchema=z.strictObject({reportId:ResourceIdSchema,projectionVersion:z.literal(2),scope:z.enum(['project','system']),projectId:ProjectIdSchema.nullable(),filters:RuntimeStatisticsQuerySchema,asOf:z.iso.datetime(),snapshotId:z.string().min(1),generation:count,sourceRevision:count,taskId:TaskIdSchema.optional(),coverage:z.literal('complete'),buildMs:z.number().nonnegative()});
@@ -65,10 +66,10 @@ export interface RuntimeCompleteReportContent {readonly header:RuntimeReportHead
 export function runtimeCompleteReportContent(report:RuntimeCompleteReport):RuntimeCompleteReportContent|undefined {
  return report.state==='ready'?report:report.state==='not-ready'?report.facts:undefined;
 }
-export const RUNTIME_REPORT_FACT_SECTIONS:readonly RuntimeReportSection[]=['tasks','agents','agent-tasks','projects','profiles','profile-tasks','attempts','swimlane','quality'];
+export const RUNTIME_REPORT_FACT_SECTIONS:readonly RuntimeReportSection[]=['tasks','agents','agent-tasks','projects','profiles','profile-tasks','attempts','swimlane','fragments','phases','models','calls','captures','quality'];
 /** Native-pages/1 metadata has its own strict row contract; retain the original fact list. */
 export const RUNTIME_REPORT_NATIVE_FACT_SECTIONS:readonly RuntimeReportSection[]=[...RUNTIME_REPORT_FACT_SECTIONS,'native-pages'];
-export const RuntimeReportSectionSchema=z.enum(['tasks','agents','agent-tasks','projects','profiles','profile-tasks','models','attempts','calls','swimlane','captures','native-pages','quality']);
+export const RuntimeReportSectionSchema=z.enum(['tasks','agents','agent-tasks','projects','profiles','profile-tasks','models','attempts','calls','swimlane','fragments','phases','captures','native-pages','quality']);
 export type RuntimeReportSection=z.infer<typeof RuntimeReportSectionSchema>;
 export const RuntimeReportPageQuerySchema=z.strictObject({section:RuntimeReportSectionSchema,parent:z.string().optional(),rowKey:z.string().min(1).optional(),after:z.string().optional(),pageSize:z.coerce.number().int().min(1).max(500).default(100)});
 export type RuntimeReportPageQuery=z.infer<typeof RuntimeReportPageQuerySchema>;
@@ -78,10 +79,11 @@ export interface RuntimeReportPage<T> {readonly reportId:string;readonly snapsho
 const profileFields={profileId:ResourceIdSchema.nullable(),profileName:z.string().nullable(),profileRevision:z.number().int().nonnegative().nullable()};
 export const CompleteRuntimeProjectSchema=z.strictObject({projectId:ProjectIdSchema,projectName:z.string().nullable(),tasks:count,metrics:CompleteRuntimeMetricsSchema});
 export const CompleteRuntimeProfileSchema=z.strictObject({key:z.string(),...profileFields,tasks:count,metrics:CompleteRuntimeMetricsSchema});
-export const CompleteRuntimeAgentSchema=CompleteRuntimeProfileSchema.extend({projectId:ProjectIdSchema,projectName:z.string().nullable(),agentId:ResourceIdSchema.nullable(),name:z.string(),kind:z.literal('agent'),sourceKind:z.enum(['business-task','development-agent'])});
-export const CompleteRuntimeModelSchema=z.strictObject({modelRef:z.string().nullable(),tasks:count,metrics:CompleteRuntimeMetricsSchema});
-export const CompleteRuntimeContributionSchema=z.strictObject({taskId:TaskIdSchema,taskName:z.string(),projectId:ProjectIdSchema,projectName:z.string().nullable(),sourceKind:z.enum(['business-task','development-agent']),attempts:count,metrics:CompleteRuntimeMetricsSchema});
-export const CompleteRuntimeCallSchema=z.strictObject({taskId:TaskIdSchema,projectId:ProjectIdSchema,projectName:z.string().nullable(),identity:UsageExecutionIdentitySchema,sourceId:z.string(),recordId:z.string(),modelRef:z.string().nullable(),occurredAt:z.iso.datetime().nullable(),scope:UsageRecordSchema.shape.scope,agentName:z.string(),...profileFields,metrics:CompleteRuntimeMetricsSchema});
+export const CompleteRuntimeAgentSchema=CompleteRuntimeProfileSchema.extend({projectId:ProjectIdSchema,projectName:z.string().nullable(),agentId:ResourceIdSchema.nullable(),name:z.string(),kind:z.literal('agent'),sourceKind:z.enum(['business-task','development-agent','development-cli'])});
+const actualRuntimeModel=z.strictObject({provider:z.string().nullable(),model:z.string().nullable(),condition:z.string().nullable()}).nullable().optional();
+export const CompleteRuntimeModelSchema=z.strictObject({modelRef:z.string().nullable(),actualModel:actualRuntimeModel,tasks:count,metrics:CompleteRuntimeMetricsSchema});
+export const CompleteRuntimeContributionSchema=z.strictObject({taskId:TaskIdSchema,taskName:z.string(),projectId:ProjectIdSchema,projectName:z.string().nullable(),sourceKind:z.enum(['business-task','development-agent','development-cli']),attempts:count,metrics:CompleteRuntimeMetricsSchema});
+export const CompleteRuntimeCallSchema=z.strictObject({taskId:TaskIdSchema,projectId:ProjectIdSchema,projectName:z.string().nullable(),identity:UsageExecutionIdentitySchema,sourceId:z.string(),recordId:z.string(),modelRef:z.string().nullable(),actualModel:actualRuntimeModel,occurredAt:z.iso.datetime().nullable(),scope:UsageRecordSchema.shape.scope,agentName:z.string(),...profileFields,metrics:CompleteRuntimeMetricsSchema});
 export type CompleteRuntimeProject=z.infer<typeof CompleteRuntimeProjectSchema>;
 export type CompleteRuntimeProfile=z.infer<typeof CompleteRuntimeProfileSchema>;
 export type CompleteRuntimeAgent=z.infer<typeof CompleteRuntimeAgentSchema>;

@@ -48,8 +48,8 @@ export function historyExpressions(query: ClusterHistoryQuery, name: ClusterMetr
 }
 export function historyWindow(query: ClusterHistoryQuery, now: number) {
   const from = Math.floor(Date.parse(query.from) / 1000), to = Math.floor(Date.parse(query.to) / 1000), span = to - from;
-  if (from < Math.floor(now / 1000) - 7 * 86400 - 30 || to > now / 1000 + 30 || span <= 0 || span > 7 * 86400) throw new Error('History range must be within the latest 7 days');
-  const step = span <= 3600 ? 15 : span <= 86400 ? 60 : 600;
+  if (to > now / 1000 + 30 || span <= 0) throw new Error('Historical range is invalid');
+  const step = span <= 3600 ? 15 : span <= 86400 ? 60 : Math.max(600,Math.ceil(span/1440));
   const ends: number[] = []; for (let end = from + step; end < to; end += step) ends.push(end); ends.push(to);
   if (ends.length > 1440) throw new Error('History query exceeds 1440 buckets');
   return { from, to, step, ends, remainder: span % step };

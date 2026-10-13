@@ -73,7 +73,9 @@ export class AgentExecutionLifecycle {
         await this.end(start, { actualEndedAt: null,
           ...(result.reason === 'error' || result.reason === 'environment-lost' ? { failure: '原开发执行正在结束' } : result.reason === 'completed' ? {} : { cancelled: true }) });
       }
-      return; // Waiting or an unavailable selected producer never falls back to legacy startAgent.
+      if (result.kind !== 'legacy' || !start.execution.observationLegacyFallback) return;
+      // Only the durable automatic unsupported decision permits the original legacy path.
+      // Keep the accepted intent and price; advertised support never downgrades.
     }
     // 连接头在 spawn 时写死、事后改不了，所以派发时现签一枚（Design §5.9）；MCP 与数据身份仍是父开发会话。
     const credential = await this.deps.credentials.issueDevSessionToken({ taskId: start.taskId, projectId: env.projectId, serviceId: env.serviceId as ServiceId, userId: start.createdBy });

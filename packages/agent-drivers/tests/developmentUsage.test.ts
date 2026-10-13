@@ -24,7 +24,7 @@ test('explicit numeric sink gets real usage before terminal while ordinary event
   const host = createFakeProcessHost([{ stdout: lines }]), captured: RunnerUsageCapture[] = [];
   const ctx = context(host, (capture) => { captured.push(RunnerUsageCaptureSchema.parse(capture)); if (captured.length === 1) expect(host.spawns).toHaveLength(0); });
   const events = await collect(createClaudeCodeDriver(() => '/bin/claude').start(spec, ctx).events);
-  expect(events.map((e) => e.type)).toEqual(['started', 'session', 'completed']);
+  expect(events.map((e) => e.type)).toEqual(['started', 'status', 'session', 'completed']);
   expect(captured[0]?.nativeProof?.state).toBe('unsupported');
   expect(captured.flatMap((c) => c.measurements).find((m) => m.usage.input === '10')?.usage).toEqual({ input: '10', output: '5', cacheRead: '2', cacheWrite: '3' });
   expect(host.spawns[0]?.env.HOME).toBe('original-home'); expect(host.spawns[0]?.env.XDG_DATA_HOME).toBe('original-data');
@@ -55,7 +55,7 @@ test('selected unsupported Claude source is private and emits both begin and fin
   const events = await collect(createClaudeCodeDriver(() => '/bin/claude').start({ ...spec, developmentNativeSourceV1: 1 }, context(host, (frame) => frames.push(DevelopmentRunnerUsageCaptureSchema.parse(frame)))).events);
   expect(frames.filter((f) => f.nativeSource).map((f) => f.nativeSource?.stage)).toEqual(['begin', 'finish']);
   expect(frames.at(-1)).toMatchObject({ nativeProof: { state: 'unsupported' }, nativeSource: { finalStore: { state: 'unavailable' }, issues: ['native-source-unsupported'] } });
-  expect(frames.flatMap((f) => f.measurements).some((m) => m.usage.input === '10')).toBe(true); expect(events.map((e) => e.type)).toEqual(['started', 'session', 'completed']);
+  expect(frames.flatMap((f) => f.measurements).some((m) => m.usage.input === '10')).toBe(true); expect(events.map((e) => e.type)).toEqual(['started', 'status', 'session', 'completed']);
 });
 test('resident unsupported source finalization precedes process terminal without entering ordinary events', async () => {
   const host = createFakeProcessHost([{ stdout: [], onFrame: () => lines }]), frames: DevelopmentRunnerUsageCapture[] = [];

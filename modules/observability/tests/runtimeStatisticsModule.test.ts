@@ -15,7 +15,7 @@ import {nativeCaptureSummary,type NativeCaptureDocument} from '../domain/usagePr
 import { createObservabilityModule, observabilityMigrations } from '../wiring';
 import { costVisibility,nativeCaptures,nativeSteps } from "../adapters/persistence/tables";
 const available = await testDatabaseAvailable(); let tdb: TestDatabase;
-const roots:string[]=[],workers:Array<{stop():Promise<void>}>=[];
+const roots:string[]=[],workers:Array<{drain():Promise<void>;stop():Promise<void>}>=[];
 afterEach(async()=>{for(const worker of workers.splice(0))await worker.stop();await tdb?.drop();for(const root of roots.splice(0))rmSync(root,{recursive:true,force:true});});
 async function fixture() {
   tdb = await createTestDatabase([observabilityMigrations]); const projectId = ProjectIdSchema.parse(newResourceId()), taskId = newResourceId(), subtaskId = newResourceId(), executionId = newResourceId(), adminId = newResourceId() as UserId;
@@ -40,9 +40,9 @@ async function fixture() {
   return { app, state, task, from, to, headers: { 'x-cs-user-id': adminId }, query: '?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to) };
 }
 async function settled(f:Awaited<ReturnType<typeof fixture>>,path:string) {
- let response=await f.app.request(path,{headers:f.headers}),report=RuntimeCompleteReportSchema.parse(await response.json());
+ for(const worker of workers)await worker.drain();let response=await f.app.request(path,{headers:f.headers}),report=RuntimeCompleteReportSchema.parse(await response.json());
  expect([200,202]).toContain(response.status);const base=path.slice(0,path.indexOf('/observability/')+'/observability'.length);
- while(report.state==='building'){response=await f.app.request(base+'/reports/'+report.reportId,{headers:f.headers});report=RuntimeCompleteReportSchema.parse(await response.json());}
+ while(report.state==='building'){for(const worker of workers)await worker.drain();response=await f.app.request(base+'/reports/'+report.reportId,{headers:f.headers});report=RuntimeCompleteReportSchema.parse(await response.json());}
  return report;
 }
 async function rows<T>(f:Awaited<ReturnType<typeof fixture>>,projectId:string|null,reportId:string,section:string,parent?:string) {
@@ -58,10 +58,12 @@ describe.skipIf(!available)('RFC-034 persisted complete runtime statistics',()=>
   for(const projectId of [null,f.task.projectId]){const path=projectId?'/v1/projects/'+projectId:'/v1/admin',detail=await settled(f,path+'/observability/tasks/'+f.task.id);expect(detail.state).toBe('ready');if(detail.state!=='ready')throw new Error(JSON.stringify(detail));const attempts=await rows(f,projectId,detail.reportId,'attempts',f.task.id);expect(attempts.total).toBe('1');expect(CompleteRuntimeAttemptSummarySchema.parse(attempts.items[0]).metrics).toMatchObject({state:'ready',tokens:{total:'105'}});const tasks=await rows<{timing:{intervals:{activeUnionMs:string}}}>(f,projectId,detail.reportId,'tasks');expect(tasks.items[0]!.timing.intervals.activeUnionMs).toBe('10000');}
   expect((await f.app.request('/v1/admin/observability/statistics?from=invalid',{headers:f.headers})).status).toBe(400);
  });
- test('policy changes committed during the owner read do not drift into the same statistics snapshot',async()=>{
-  const f=await fixture();await tdb.db.insert(costVisibility).values({projectId:f.task.projectId,revision:1,document:{projectId:f.task.projectId,revision:1,visibility:'hidden',updatedAt:f.from}});f.state.changeVisibility=true;
+ test('committed policy revisions create a new report without drifting into the first pinned statistics snapshot',async()=>{
+  const f=await fixture();await tdb.db.insert(costVisibility).values({projectId:f.task.projectId,revision:1,document:{projectId:f.task.projectId,revision:1,visibility:'hidden',updatedAt:f.from}});
   const path='/v1/projects/'+f.task.projectId+'/observability/statistics'+f.query,first=await settled(f,path);expect(first).toMatchObject({state:'ready',summary:{metrics:{state:'ready',cost:{state:'hidden'}}}});
+  await tdb.db.update(costVisibility).set({revision:2,document:{projectId:f.task.projectId,revision:2,visibility:'project-members-and-services',updatedAt:f.to}}).where(eq(costVisibility.projectId,f.task.projectId));
   const second=await settled(f,path);expect(second).toMatchObject({state:'ready',summary:{metrics:{state:'ready',cost:{state:'unpriced'}}}});expect(second.reportId).not.toBe(first.reportId);
+  const kept=await f.app.request('/v1/projects/'+f.task.projectId+'/observability/reports/'+first.reportId,{headers:f.headers});expect(kept.status).toBe(200);expect(await kept.json()).toMatchObject({summary:{metrics:{cost:{state:'hidden',amount:null}}}});
  });
  test.each([true,false])('project report visibility keeps historical hidden snapshots and rechecks the current policy for admin=%s',async(admin)=>{
   const f=await fixture();if(!admin)f.headers={'x-cs-user-id':UserIdSchema.parse(newResourceId())};
@@ -69,7 +71,7 @@ describe.skipIf(!available)('RFC-034 persisted complete runtime statistics',()=>
   expect(hidden).toMatchObject({state:'ready',summary:{metrics:{state:'ready',cost:{state:'hidden',amount:null}}}});
   await tdb.db.insert(costVisibility).values({projectId:f.task.projectId,revision:1,document:{projectId:f.task.projectId,revision:1,visibility:'project-members-and-services',updatedAt:f.to}});
   const old=await f.app.request(base+'/reports/'+hidden.reportId,{headers:f.headers});expect(old.status).toBe(200);expect(await old.json()).toMatchObject({state:'ready',summary:{metrics:{cost:{state:'hidden',amount:null}}}});
-  expect((await rows(f,f.task.projectId,hidden.reportId,'tasks')).total).toBe('1');
+  const keptTasks=await rows<{metrics:{state:string;cost?:{currency:'CNY';state:string;amount:string|null}}}>(f,f.task.projectId,hidden.reportId,'tasks');expect(keptTasks.total).toBe('1');expect(keptTasks.items[0]?.metrics.cost).toEqual({currency:'CNY',state:'hidden',amount:null});
   const visible=await settled(f,base+'/statistics'+f.query);expect(visible).toMatchObject({state:'ready',summary:{metrics:{cost:{state:'unpriced',amount:null}}}});expect(visible.reportId).not.toBe(hidden.reportId);
   await tdb.db.update(costVisibility).set({revision:2,document:{projectId:f.task.projectId,revision:2,visibility:'hidden',updatedAt:f.to}}).where(eq(costVisibility.projectId,f.task.projectId));
   for(const suffix of ['', '/pages?section=tasks&pageSize=37']){const denied=await f.app.request(base+'/reports/'+visible.reportId+suffix,{headers:f.headers});expect(denied.status).toBe(412);expect('summary' in await denied.json()).toBe(false);}

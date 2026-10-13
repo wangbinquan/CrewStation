@@ -17,12 +17,12 @@ export async function assertPublishedRuntimeReport(db:Executor,id:string,report:
  const taskCount=await db.execute(sql`SELECT total::text FROM observability.runtime_report_counts WHERE report_id=${id} AND section='tasks' AND parent=''`);
  if(String(taskCount[0]?.['total']??'0')!==manifest.summary.tasks||manifest.receipts!==manifest.summary.tasks)throw new Error('Complete report original task EOF count changed');
  for(let after:string|null=null;;) {
-  const rows:readonly {ordinal:string;document:unknown}[]=await db.execute<{ordinal:string;document:unknown}>(sql`SELECT ordinal::text,document FROM observability.runtime_report_rows WHERE report_id=${id} AND section='native-pages' ${after===null?sql``:sql`AND ordinal>${after}::numeric`} ORDER BY ordinal LIMIT 1000`);
+  const rows:readonly {ordinal:string;document:unknown}[]=await db.execute<{ordinal:string;document:unknown}>(sql`SELECT ordinal::text,document FROM observability.runtime_report_rows WHERE report_id=${id} AND section='native-pages' ${after===null?sql``:sql`AND ordinal>${after}::numeric`} ORDER BY observability.runtime_report_rows.ordinal LIMIT 1000`);
   for(const row of rows)RuntimeNativePagedCaptureSchema.parse(row['document']);
   if(rows.length<1000)break;after=String(rows.at(-1)!['ordinal']);
  }
  if(content.header.coverage==='complete-facts') {
-  const sections=sql.join(RUNTIME_REPORT_NATIVE_FACT_SECTIONS.map(section=>sql`${section}`),sql`,`),invalid=await db.execute(sql`SELECT 1 FROM observability.runtime_report_rows WHERE report_id=${id} AND (section NOT IN (${sections}) OR (section<>'native-pages' AND (section<>'quality' OR document ? 'metrics') AND COALESCE(document->'metrics'->>'state','') NOT IN ('ready','not-applicable') AND (COALESCE(document->'metrics'->>'state','')<>'not-ready' OR document->'metrics' ? 'tokens' OR document->'metrics' ? 'cost'))) LIMIT 1`);
+  const sections=sql.join(RUNTIME_REPORT_NATIVE_FACT_SECTIONS.map(section=>sql`${section}`),sql`,`),invalid=await db.execute(sql`SELECT 1 FROM observability.runtime_report_rows WHERE report_id=${id} AND (section NOT IN (${sections}) OR (section NOT IN ('native-pages','phases','fragments') AND (section<>'quality' OR document ? 'metrics') AND COALESCE(document->'metrics'->>'state','') NOT IN ('ready','not-applicable') AND (COALESCE(document->'metrics'->>'state','')<>'not-ready' OR document->'metrics' ? 'tokens' OR document->'metrics' ? 'cost'))) LIMIT 1`);
   if(invalid.length)throw new Error('Incomplete usage cannot publish child subtotals or numeric collections');
  }
 }

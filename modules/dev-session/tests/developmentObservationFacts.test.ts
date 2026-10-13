@@ -38,7 +38,7 @@ describe.skipIf(!available)('development safe runtime owner facts', () => {
   test('mismatched Agent, workspace, profile and frozen price are rejected', async () => {
     // Corruption already present in an old database remains unreadable after the new write guards are installed.
     await tdb.drop();
-    tdb = await createTestDatabase([{ ...devSessionMigrations, files: devSessionMigrations.files.filter((m) => m.name < '0016_') }]);
+    tdb = await createTestDatabase([{ ...devSessionMigrations, files: devSessionMigrations.files.filter((m) => m.name < '0016_' || m.name === '0021_cli_original_capability.sql') }]);
     const f = await accepted();
     for (const patch of [{ agentId: newResourceId() }, { taskId: newResourceId() }, { compute: newResourceId() }, { profile: { profileId: f.start.profile.profileId, revision: 99 } }]) {
       await tdb.db.execute(sql`UPDATE dev_session.agent_starts SET agent_id=${patch.agentId ?? f.start.agentId},task_id=${patch.taskId ?? f.start.taskId},compute=${patch.compute ?? f.start.compute},profile=${JSON.stringify(patch.profile ?? f.start.profile)}::jsonb WHERE execution_task_id=${f.child.id}`);

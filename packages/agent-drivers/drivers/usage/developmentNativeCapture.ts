@@ -1,6 +1,6 @@
 import { DevelopmentRunnerUsageCaptureSchema, sameDevelopmentNativeStore, type DevelopmentNativeSource, type DevelopmentNativeStore, type DevelopmentRunnerUsageCapture, type RunnerUsageCapture } from '@crewstation/contracts';
 import { DevelopmentNativeObserver } from './developmentNativeObserver';
-import { createNativeUsageCapture, unsupportedNativeUsageCapture, type NativeCaptureInput, type NativeUsageCapture } from './nativeCapture';
+import { createNativeUsageCapture, unsupportedNativeUsageCapture, type NativeCaptureInput, type SynchronousNativeUsageCapture } from './nativeCapture';
 import { createDevelopmentOpencodeUsageNormalizer, opencodeUsageDatabasePath } from './opencodeModel';
 import { readNativeSnapshotWithinOrder } from './orderedNativeSnapshot';
 import type { NativeUsageSnapshot } from './nativeSnapshot';
@@ -23,7 +23,7 @@ function metadata(input: NativeCaptureInput, stage: DevelopmentNativeSource['sta
     beginStore, finalStore, continuity, issues: observer.issues() };
 }
 /** Snapshot and actual-model reads use one observer from this turn's final spawn environment. */
-export function createDevelopmentNativeUsageCapture(input: NativeCaptureInput, env: Readonly<Record<string, string | undefined>>): NativeUsageCapture {
+export function createDevelopmentNativeUsageCapture(input: NativeCaptureInput, env: Readonly<Record<string, string | undefined>>): SynchronousNativeUsageCapture {
   const observer = new DevelopmentNativeObserver(opencodeUsageDatabasePath(env));
   const read = (root: string): NativeUsageSnapshot => observer.read((path, sidecar) => readNativeSnapshotWithinOrder(sidecar, path, root)).value
     ?? { steps: [], sessions: 0, fingerprint: null, issues: ['native-store-unavailable', ...observer.issues()] };
@@ -43,7 +43,7 @@ export function createDevelopmentNativeUsageCapture(input: NativeCaptureInput, e
     },
   };
 }
-export function unsupportedDevelopmentNativeUsageCapture(input: NativeCaptureInput): NativeUsageCapture {
+export function unsupportedDevelopmentNativeUsageCapture(input: NativeCaptureInput): SynchronousNativeUsageCapture {
   const capture = unsupportedNativeUsageCapture(input);
   const frame = (stage: DevelopmentNativeSource['stage'], at: number) => sourceFrame(capture.begin(at), {
     version: 1, stage, lineageKey: input.lineageKey, turn: input.turn, turnIndex: input.turnIndex, observedAt: new Date(at).toISOString(), plannedPathDigest: null,

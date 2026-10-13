@@ -1,3 +1,5 @@
+import {timedSql} from './queryTiming';
+import {incrementRuntimeSignal,registerRuntimeSignals} from '@crewstation/kernel';
 import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
@@ -35,16 +37,18 @@ export function withSessionDefaults(url: string): string {
  */
 export const POOL_OPTIONS = { connect_timeout: 10, idle_timeout: 60, max_lifetime: 30 * 60, onnotice: () => undefined } as const;
 
-export function connectDatabase(url: string, options: { max?: number } = {}): DatabaseHandle {
-  const client = postgres(withSessionDefaults(url), { max: options.max ?? 10, ...POOL_OPTIONS });
+export function connectDatabase(url: string, options: { max?: number;name?:string } = {}): DatabaseHandle {
+  const rawClient = postgres(withSessionDefaults(url), { max: options.max ?? 10, ...POOL_OPTIONS,connection:{application_name:options.name??'crewstation'} });
+  const client=timedSql(rawClient,(state,micros)=>{incrementRuntimeSignal('database.queries','queries',1n,{state});incrementRuntimeSignal('database.query.elapsed','microseconds',micros,{state});});
   // 只有实际跨事务准入使用时才创建连接；不挤占普通查询／UOW 的连接池。
   let guardClient: postgres.Sql | undefined, guardDb: Database | undefined;
   const db = contextualDatabase(drizzle({ client }), () => {
     guardClient ??= postgres(withSessionDefaults(url), { max: 4, ...POOL_OPTIONS });
     return guardDb ??= drizzle({ client: guardClient });
   });
+  const release=registerRuntimeSignals('database.main',async()=>{const rows=await db.execute(sql`SELECT count(*)::text AS total,count(*) FILTER(WHERE state='active')::text AS active,count(*) FILTER(WHERE state='idle')::text AS idle,count(*) FILTER(WHERE state LIKE 'idle in transaction%')::text AS idle_transaction,coalesce(max(extract(epoch from clock_timestamp()-query_start)) FILTER(WHERE state='active' AND pid<>pg_backend_pid()),0)::text AS longest_query FROM pg_stat_activity WHERE application_name=${options.name??'crewstation'} AND datname=current_database()`),v=rows[0]!;return [...['total','active','idle','idle_transaction'].map(kind=>({kind:'database.connections.'+kind,unit:'connections',value:String(v[kind])})),{kind:'database.query.longest',unit:'seconds',value:String(v['longest_query'])},{kind:'database.pool.capacity',unit:'connections',value:String(options.max??10)}];});
   // 关闭时等进行中的查询最多 5 秒，再强制断开，落在终止宽限期之内。
-  return { db, client, close: async () => { await Promise.all([client.end({ timeout: 5 }), guardClient?.end({ timeout: 5 })]); } };
+  return { db, client, close: async () => { release();await Promise.all([client.end({ timeout: 5 }), guardClient?.end({ timeout: 5 })]); } };
 }
 
 /** 就绪探针用：走同一连接池的最小查询；池被占满或连接失步时它会和业务请求一起卡住，正是探针要发现的。 */

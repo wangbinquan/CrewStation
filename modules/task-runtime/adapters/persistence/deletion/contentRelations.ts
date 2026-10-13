@@ -66,6 +66,14 @@ export async function runtimeContentOwnership(table: string, row: RuntimeRawRow,
   const parents = new RuntimeParentSources(sources);
   let origin: RuntimeDeletionOrigin;
   switch (table) {
+    case 'observation_lifecycle': {
+      const task = await sources.task(runtimeString(row['task_id']));
+      if (row['project_id'] === null) {
+        if (task.scope !== 'platform') throw precondition('运行观测历史与原任务归属冲突');
+        origin = task;
+      } else origin = sameRuntimeScope([task, await sources.root('project', runtimeString(row['project_id']))]);
+      break;
+    }
     case 'environments': origin = await environment(row, sources, parents); break;
     case 'admissions': {
       const project = ProjectIdSchema.parse(row['project_id']);

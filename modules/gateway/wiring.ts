@@ -162,3 +162,5 @@ export function createGatewayModule(deps: GatewayModuleDeps): GatewayModule {
     migrations: gatewayMigrations,
   };
 }
+
+export {readObservationMaintenance} from './adapters/persistence/observationMaintenance';

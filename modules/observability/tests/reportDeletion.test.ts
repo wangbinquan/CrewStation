@@ -14,7 +14,7 @@ afterEach(async()=>{await f?.close();f=undefined;});
 async function setup(){return f=await reportDeletionFixture();}
 describe.skipIf(!available)('complete report lifecycle in permanent project deletion',()=>{
  test('seal erases mixed/project caches and sealed work, verify clears a new B report, B original exact CNY/Token evidence rebuilds',async()=>{
-  const f=await setup(),a=await f.ready(f.a.projectId),system=await f.ready(null),before=await f.preservedB();
+  const f=await setup(),a=await f.legacyReady(f.a.projectId),system=await f.legacyReady(null),before=await f.preservedB();
   const original=(await f.store.get(a.reportId))!,manifest=(await f.handle.db.execute(sql`SELECT manifest FROM observability.runtime_reports WHERE id=${a.reportId}`))[0]!['manifest'] as Parameters<typeof f.spool.pages>[0];
   const folder=join(f.root,'runtime-reports',a.reportId,jsonHash(original.owner));mkdirSync(folder,{recursive:true});writeFileSync(join(folder,'sealed.json'),JSON.stringify(manifest));
   const confirmed=await f.owner.inspect(f.target);expect(confirmed.complete).toBe(true);expect((await f.owner.run(f.context(confirmed,'seal'))).kind).toBe('done');expect(await f.population()).toEqual(['0','0','0','0','0']);expect(await f.spool.empty()).toBe(true);expect(existsSync(folder)).toBe(false);
@@ -34,8 +34,8 @@ describe.skipIf(!available)('complete report lifecycle in permanent project dele
  });
  test('the wired local owner cancels and drains in-progress work, resumes unrelated complete requests without stopping the process',async()=>{
   const f=await setup(),confirmed=await f.owner.inspect(f.target);let entered!:()=>void;const started=new Promise<void>(r=>entered=r);f.controls.hold=true;f.controls.entered=entered;
-  const building=await f.module.api.runtimeCompleteReport(f.actor,null,{from:'2026-10-03T00:00:00.000Z',to:'2026-10-04T00:00:00.000Z',timezone:'Asia/Shanghai'});expect(building.state).toBe('building');await started;
-  expect((await f.owner.run(f.context(confirmed,'seal'))).kind).toBe('done');expect(await f.population()).toEqual(['0','0','0','0','0']);expect(await f.spool.empty()).toBe(true);f.controls.hold=false;f.controls.entered=undefined;
+  const building=await f.module.api.runtimeCompleteReport(f.actor,null,{from:'2026-10-03T00:00:00.000Z',to:'2026-10-04T00:00:00.000Z',timezone:'Asia/Shanghai'});expect(building.state).toBe('building');for(const worker of f.module.reportWorkers)worker.start();await started;
+  expect((await f.owner.run(f.context(confirmed,'seal'))).kind).toBe('done');f.controls.hold=false;f.controls.entered=undefined;expect(await f.population()).toEqual(['0','0','0','0','0']);expect(await f.spool.empty()).toBe(true);
   const b=await f.ready(f.b.projectId);expect(b.state).toBe('ready');expect((await f.handle.db.execute(sql`SELECT 1 AS usable`))[0]).toEqual({usable:1});
  },30000);
  test('existing derived content without its physical owner blocks cleanup; unknown root entries are retained and never reported empty',async()=>{
@@ -47,4 +47,21 @@ describe.skipIf(!available)('complete report lifecycle in permanent project dele
   const repository=observabilityDeletionRepository({db:f.handle.db,identities:resourceIdentityDirectory(f.handle.db,()=>[]),tasks:{list:async()=>({ids:f.a.tasks.map(t=>t.id),complete:true})},assertGrant:async()=>{}});
   await expect(repository.seal(f.context(confirmed,'seal'))).rejects.toThrow('物理清理 owner');expect((await f.population())[0]).toBe('1');
  });
+});
+
+test.skipIf(!available)('deleting A preserves B current projection and exact original four buckets/CNY without reopening its owner source',async()=>{
+ const original=await setup(),b=await original.ready(original.b.projectId);await original.ready(original.a.projectId);
+ const id=original.b.tasks[0]!.id,before=await original.handle.db.execute(sql`SELECT version,document FROM observability.runtime_task_cache WHERE task_id=${id}`),rows=await original.handle.db.execute(sql`SELECT role,key,document FROM observability.runtime_task_current_rows WHERE task_id=${id} ORDER BY role,key`);
+ const confirmed=await original.owner.inspect(original.target);expect((await original.owner.run(original.context(confirmed,'seal'))).kind).toBe('done');
+ original.controls.broken=true;const reads=original.controls.reads,reopened=await original.ready(original.b.projectId);
+ expect(expectedReportMetrics(reopened)).toEqual(expectedReportMetrics(b));expect(original.controls.reads).toBe(reads);
+ expect(await original.handle.db.execute(sql`SELECT version,document FROM observability.runtime_task_cache WHERE task_id=${id}`)).toEqual(before);
+ expect(await original.handle.db.execute(sql`SELECT role,key,document FROM observability.runtime_task_current_rows WHERE task_id=${id} ORDER BY role,key`)).toEqual(rows);
+ expect((await original.handle.db.execute(sql`SELECT count(*)::text AS count FROM observability.runtime_task_cache WHERE project_id=${original.a.projectId}`))[0]?.['count']).toBe('0');
+},60000);
+
+// The production collection must abort the source before waiting for maintenance on the same one-connection pool.
+test('stopping the formal report workers drains a held original reader and leaves its database usable',async()=>{
+ const f=await setup();let entered!:()=>void;const enteredSource=new Promise<void>(resolve=>entered=resolve);f.controls.hold=true;f.controls.entered=entered;for(const worker of f.module.reportWorkers)worker.start();await enteredSource;
+ for(const worker of f.module.reportWorkers)await worker.stop();expect((await f.handle.db.execute(sql`SELECT 1 AS usable`))[0]).toEqual({usable:1});
 });

@@ -1,10 +1,13 @@
-import type { KnownAgentProtocol, NativeTerminalRecord, RunnerEvent, StartAgentTerminalCommand, TerminalControl, TerminalHolder, TerminalSnapshot } from '@crewstation/contracts';
+import type { OpencodeActivityInput } from '@crewstation/contracts';
+import type { DevelopmentUsageAdmission, DevelopmentUsageStopReceipt, KnownAgentProtocol, NativeTerminalRecord, RunnerEvent, StartAgentTerminalCommand, TerminalControl, TerminalHolder, TerminalSnapshot } from '@crewstation/contracts';
 import { TerminalSizeSchema, isKnownProtocol } from '@crewstation/contracts';
 import type { Logger } from '@crewstation/kernel';
 import type { ManagedRuntimeContext, PreparedNativeTerminal } from '@crewstation/agent-drivers';
 import { prepareNativeTerminal } from '@crewstation/agent-drivers';
 import type { BeforeStartRunner } from '../beforeStart/beforeStartRunner';
 import { BeforeStartFailure } from '../beforeStart/failure';
+import { reserveCliNumericUsage, type CliNumericUsage } from '../agents/usage/cliNumericUsage';
+import type { DevelopmentUsageJournal } from '../agents/developmentUsageJournal';
 import { createProcessHost } from '../agents/cliDriver';
 import type { NativeActivityObserver } from '../activity/nativeActivityChannel';
 import { createOpencodeActivityChannel } from '../activity/nativeActivityChannel';
@@ -19,6 +22,7 @@ import type { ReadinessInput, ReadinessLimits, ReadinessState } from './interfac
 import { DEFAULT_READINESS_LIMITS, startReadiness, stepReadiness } from './interfaceReadiness';
 
 export interface NativeSupervisorDeps {
+  developmentUsage?:DevelopmentUsageJournal;
   runnerId?: string;
   backend: PtyBackend | undefined;
   launcher: ProcessLauncher;
@@ -34,6 +38,7 @@ export interface NativeSupervisorDeps {
 }
 
 interface NativeEntry {
+  numeric?:CliNumericUsage;
   record: NativeTerminalRecord;
   fingerprint: string;
   start: Promise<NativeTerminalRecord>;
@@ -67,6 +72,7 @@ export class NativeTerminalSupervisor {
 
   start(command: StartAgentTerminalCommand): Promise<NativeTerminalRecord> {
     this.assertRunner(command.runnerId);
+    if(this.deps.developmentUsage && !command.developmentUsage) throw new RunnerCommandError('development_cli_admission_required','所选 CLI 日志布局必须保持原数字准入');
     const existing = this.entries.get(command.agentId);
     if (existing) {
       if (existing.fingerprint !== command.requestFingerprint || existing.record.terminalId !== command.terminalId) throw new RunnerCommandError('native_request_conflict', '启动标识已用于其他 CLI 配置');
@@ -80,8 +86,10 @@ export class NativeTerminalSupervisor {
       compute: command.compute, profileRevision: command.profileRevision, protocol: command.launch.protocol, permission: command.permission,
       revision: 0, lifecycle: 'starting', startedAt: new Date().toISOString(), cols: command.cols, rows: command.rows,
     };
+    const numeric=reserveCliNumericUsage(command,this.deps.developmentUsage);
+    if(numeric?.usage.replayed)throw new RunnerCommandError('development_usage_replayed','原 CLI 已受理，只能读取或停止原数字执行，不能重复启动');
     const control = createTerminalControl((state) => this.deps.emit({ kind: 'terminalControl', terminalId: command.terminalId, runnerId: this.runnerId, control: state }));
-    const entry: NativeEntry = { record, fingerprint: command.requestFingerprint, start: Promise.resolve(record), accepted: Promise.resolve(), control, screen: createTerminalScreen(command.cols, command.rows, { reply: (data) => this.reply(entry, data) }), outputSeq: 0, stopped: false };
+    const entry: NativeEntry = { numeric, record, fingerprint: command.requestFingerprint, start: Promise.resolve(record), accepted: Promise.resolve(), control, screen: createTerminalScreen(command.cols, command.rows, { reply: (data) => this.reply(entry, data) }), outputSeq: 0, stopped: false };
     this.entries.set(command.agentId, entry);
     this.byTerminal.set(command.terminalId, entry);
     this.emit(entry);
@@ -127,13 +135,17 @@ export class NativeTerminalSupervisor {
       const prepared = await (this.deps.prepare ?? prepareNativeTerminal)(command, { cwd, env: environment.env, host: createProcessHost(this.deps.launcher), logger: this.deps.logger, ...(entry.activity ? { nativeActivity: entry.activity.options } : {}), managed: environment.managed, runDir: environment.managed.runDir });
       entry.prepared = prepared;
       if (prepared.activityUnavailable) entry.activity?.unavailable(prepared.activityUnavailable);
+      entry.numeric?.prepare(prepared.plan.env);
+      if(entry.numeric && !entry.numeric.usage.permitLaunch())return this.endStopped(entry);
       const session = this.deps.backend!.open({ ...prepared.plan, cols: command.cols, rows: command.rows, onData: (data) => this.output(entry, data) });
       entry.session = session;
+      entry.numeric?.usage.running();
       entry.record = { ...entry.record, lifecycle: 'running', ...(prepared.nativeSessionId ? { nativeSessionId: prepared.nativeSessionId } : {}), ui: { state: 'waiting' } };
       this.emit(entry);
       this.watchInterface(entry);
       void session.exited.then((code) => this.exited(entry, code));
     } catch (error) {
+      await entry.numeric?.finish('error');
       entry.activity?.close();
       entry.prepared?.dispose();
       entry.control.dispose();
@@ -148,6 +160,7 @@ export class NativeTerminalSupervisor {
   }
 
   private endStopped(entry: NativeEntry): NativeTerminalRecord {
+    void entry.numeric?.finish('cancelled');
     this.deps.beforeStart.release(entry.record.agentId);
     entry.control.dispose();
     entry.record = { ...entry.record, lifecycle: 'ended', endedAt: new Date().toISOString(), reason: 'stopped' };
@@ -200,7 +213,7 @@ export class NativeTerminalSupervisor {
   private get limits(): ReadinessLimits { return this.deps.readinessLimits ?? DEFAULT_READINESS_LIMITS; }
 
   private observe(entry: NativeEntry, protocol: KnownAgentProtocol): NativeActivityObserver | undefined {
-    try { return (this.deps.activityFactory ?? (protocol === 'claude-code' ? createClaudeActivityChannel : createOpencodeActivityChannel))({ ...entry.record, emit: (activity) => this.deps.emit({ kind: 'nativeActivity', activity }) }); }
+    try { return (this.deps.activityFactory ?? (protocol === 'claude-code' ? createClaudeActivityChannel : createOpencodeActivityChannel))({ ...entry.record, emit: (activity) => this.deps.emit({ kind: 'nativeActivity', activity }), ...(protocol==='opencode' && entry.numeric ? {numeric:(event:OpencodeActivityInput)=>entry.numeric!.event(event)}:{}) }); }
     catch {
       this.deps.logger.warn('native activity channel unavailable; CLI remains usable', { agentId: entry.record.agentId });
       this.deps.emit({ kind: 'nativeActivity', activity: {
@@ -211,7 +224,8 @@ export class NativeTerminalSupervisor {
     }
   }
 
-  private exited(entry: NativeEntry, exitCode: number | null): void {
+  private async exited(entry: NativeEntry, exitCode: number | null): Promise<void> {
+    await entry.numeric?.finish(entry.stopped?'cancelled':exitCode===0?'completed':'error');
     entry.record = { ...entry.record, lifecycle: 'ended', exitCode, endedAt: new Date().toISOString(), reason: entry.stopped ? 'stopped' : 'exited' };
     this.stopInterface(entry);
     entry.prepared?.dispose();
@@ -220,6 +234,15 @@ export class NativeTerminalSupervisor {
     entry.activity?.close();
     this.emit(entry);
     this.deps.emit({ kind: 'terminalClosed', terminalId: entry.record.terminalId, exitCode });
+  }
+
+  async stopDevelopmentUsage(admission:DevelopmentUsageAdmission,podUid:string):Promise<DevelopmentUsageStopReceipt>{
+    const journal=this.deps.developmentUsage;if(!journal)throw new RunnerCommandError('development_usage_unsupported','CLI 原数字日志不可用');
+    const entry=this.entries.get(admission.intent.identity.agentId);
+    if(entry && (!entry.numeric || !entry.numeric.usage.matches(admission.key)))throw new RunnerCommandError('development_intent_conflict','CLI 停止不能改变原执行');
+    journal.requestStop(admission,podUid);
+    if(entry) await this.stop(entry.record.agentId,this.runnerId);
+    return journal.stopStatus(admission.key,Boolean(entry));
   }
 
   async attach(terminalId: string, runnerId: string): Promise<TerminalSnapshot> {

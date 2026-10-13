@@ -18,12 +18,12 @@ test.each([...scopes])('%s retained report404 recovers the exact overview and or
   const search={tab:'tasks',q:'Task',state:'closed',sourceKind:'business-task',from:'2026-09-28T00:00:00.347Z',to:'2026-09-29T00:00:00.567Z',reportId:missing};
   page=await renderApp(route(scope,f.projectId,detail?task.id:undefined)+'?'+new URLSearchParams(search));
   // The actual local page lost all usage behind an expired report id, although the original ledger still existed.
-  expect(page.text()).toContain('Report missing');
+  expect(page.text()).not.toContain('Report missing');
   const expected=scope==='system'?'/v1/admin/observability/':'/v1/projects/'+f.projectId+'/observability/';
   const oldReads=f.reads.filter(url=>url.includes('/reports/'+missing)&&!url.includes('/pages'));
   expect(oldReads.length).toBeGreaterThan(0);expect(oldReads.every(url=>url.startsWith(expected+'reports/'+missing))).toBe(true);
-  expect(f.reads.some(url=>url.includes('/statistics')||url.includes('/tasks/'))).toBe(false);
-  await page.click('重新统计');
+  // Original report404 automatically reopens only this exact scope. The request
+  // count below proves recovery does not duplicate task/window reads.
   expect(page.path()).toBe(route(scope,f.projectId,detail?task.id:undefined));
   expect(page.search()).toMatchObject({tab:'tasks',q:search.q,state:search.state,sourceKind:search.sourceKind,from:search.from,to:search.to});
   expect(page.search().reportId).toBeUndefined();expect(page.text()).not.toContain('Report missing');
@@ -61,4 +61,22 @@ test('an original missing task without a pinned report keeps404 without rebuildi
  expect(page.text()).toContain('Task missing');expect(page.text()).not.toContain('重新统计');
  expect(f.reads.filter(url=>url.includes('/tasks/'+missing))).toHaveLength(1);
  expect(f.reads.some(url=>url.includes('/statistics'))).toBe(false);expect(f.directory.writes()).toEqual([]);
+});
+
+// A late response for an abandoned scope must never move the current route.
+test.each([...scopes])('%s late expired report recovery cannot replace a newer filter scope',async scope=>{
+ const f=runtimeStatisticsFixture(),missing=Bun.randomUUIDv7();if(scope==='integration')f.directory.projects[12]!.project.kind='APIProxy';
+ const delegate=globalThis.fetch;let release:(()=>void)|undefined,started=false;
+ globalThis.fetch=Object.assign(async(input:Parameters<typeof fetch>[0],init?:Parameters<typeof fetch>[1])=>{
+  const url=new URL(String(input),'http://localhost'),response=await delegate(input,init);
+  if(url.pathname.endsWith('/statistics')&&url.searchParams.get('q')==='scope-A'){started=true;await new Promise<void>(resolve=>{release=resolve;});}
+  return response;
+ },{preconnect:originalFetch.preconnect});
+ const root=route(scope,f.projectId),search={tab:'tasks',from:'2026-09-28T00:00:00.347Z',to:'2026-09-29T00:00:00.567Z',q:'scope-A',reportId:missing};
+ page=await renderApp(root+'?'+new URLSearchParams(search));expect(started).toBe(true);
+ await page.navigate(root+'?'+new URLSearchParams({...search,q:'scope-B'}));expect(page.search().q).toBe('scope-B');expect(page.search().reportId).toBeUndefined();
+ if(!release)throw new Error('Original recovery was not held');release();await page.settle();
+ expect(page.path()).toBe(root);expect(page.search()).toMatchObject({tab:'tasks',from:search.from,to:search.to,q:'scope-B'});expect(page.search().reportId).toBeUndefined();
+ expect(f.reads.filter(url=>new URL(url,'http://localhost').pathname.endsWith('/statistics')&&new URL(url,'http://localhost').searchParams.get('q')==='scope-B')).toHaveLength(1);
+ expect(f.directory.writes()).toEqual([]);
 });

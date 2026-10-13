@@ -29,7 +29,7 @@ export function developmentRequestHash(input: CreateNativeExecutionInput): strin
 export function assertDevelopmentAdmission(deps: Deps, input: CreateNativeExecutionInput): void {
   if (input.developmentRemovalProtection !== undefined && (!DevelopmentRemovalProtectionSchema.safeParse(input.developmentRemovalProtection).success || !deps.workloadSafety?.get)) throw precondition('原开发准入回执选择或读取能力无效');
   if (!DevelopmentUsageStorageSchema.safeParse(input.developmentUsageProtection).success || !DevelopmentUsageStorageSchema.safeParse(input.developmentUsageStorage).success
-    || input.purpose !== 'agent' || input.terminalId !== undefined || input.businessSession !== undefined || !ResourceIdSchema.safeParse(input.agentId).success
+    || !['agent','cli'].includes(input.purpose??'cli') || (input.purpose==='agent' ? input.terminalId !== undefined : !ResourceIdSchema.safeParse(input.terminalId).success) || input.businessSession !== undefined || !ResourceIdSchema.safeParse(input.agentId).success
     || input.profile !== undefined && !ResourceIdSchema.safeParse(input.profile).success || !ResourceIdSchema.safeParse(input.computeProfile?.profileId).success
     || !Number.isSafeInteger(input.computeProfile?.revision) || input.computeProfile!.revision <= 0) throw precondition('只有原档位修订的独立开发 Agent 可选择工作卷保护 v1');
   if (!deps.uow.read.ledger || !deps.workloadSafety?.register) throw precondition('开发 Agent 的资源台账和持久消费者注册能力不可用');

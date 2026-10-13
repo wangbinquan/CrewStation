@@ -43,7 +43,8 @@ export interface AcceptedExecutionPrice extends ExecutionPriceInput {
 }
 export interface ActualPricingModel { provider: string; model: string; condition: string | null }
 export interface ExecutionPriceStore {
+  correctionRevision?(identity:UsageExecutionIdentity):Promise<string|undefined>;
   accept(input: ExecutionPriceInput, now: Date): Promise<AcceptedExecutionPrice>;
   get(identity: ExecutionPriceInput['identity']): Promise<AcceptedExecutionPrice | undefined>;
-  price(identity: ExecutionPriceInput['identity'], actual: ActualPricingModel | null): Promise<TokenPriceVersion | undefined>;
+  price(identity: ExecutionPriceInput['identity'], actual: ActualPricingModel | null,record?:{sourceId:string;recordId:string}): Promise<TokenPriceVersion | undefined>;
 }

@@ -1,3 +1,4 @@
+import type { DevelopmentUsageOwnerRecord } from '../../ports/developmentUsage';
 import { boolean, index, text } from 'drizzle-orm/pg-core';
 import { jsonDocument } from '@crewstation/persistence';
 import type { DevelopmentUsagePrepared } from '../../ports/developmentUsage';
@@ -12,6 +13,7 @@ export const developmentAgentUsage = devSessionSchema.table('development_agent_u
   binding: jsonDocument('binding').$type<DevelopmentUsageRegistration>(),
   unsupported: boolean('unsupported').notNull().default(false),
   capabilityPodUid: text('capability_pod_uid'),
+  unsupportedProof:jsonDocument('unsupported_proof').$type<DevelopmentUsageOwnerRecord['unsupportedProof']>(),
   /** Durable fair recovery bookkeeping, not part of the original owner payload. */
   endingCheckedAt: text('ending_checked_at'),
   closeReason: text('close_reason').$type<DevelopmentUsageDrainReason>(),

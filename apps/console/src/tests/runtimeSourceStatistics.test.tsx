@@ -41,7 +41,7 @@ test('admin project view keeps hidden amounts in groups, compute contribution an
   await act(async()=>openDialog().querySelector<HTMLButtonElement>('tbody button')!.click());await page.settle();expect(page.text()).not.toContain('¥');expect(page.text()).toContain('项目尚未开放费用查看');
 });
 test('source URL validation and return keys isolate source-specific cached views',()=>{
-  expect(parseRuntimeSearch({sourceKind:'development-agent'})).toEqual({sourceKind:'development-agent'});expect(parseRuntimeSearch({sourceKind:'development-cli'})).toEqual({});
+  expect(parseRuntimeSearch({sourceKind:'development-agent'})).toEqual({sourceKind:'development-agent'});expect(parseRuntimeSearch({sourceKind:'development-cli'})).toEqual({sourceKind:'development-cli'});expect(parseRuntimeSearch({sourceKind:'unsupported'})).toEqual({});
   expect(runtimeReturnKey('p',{sourceKind:'development-agent'})).not.toBe(runtimeReturnKey('p',{sourceKind:'business-task'}));
 });
 

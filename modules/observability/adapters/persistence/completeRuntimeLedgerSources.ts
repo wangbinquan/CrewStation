@@ -1,3 +1,4 @@
+import {readRuntimeModels} from './projection/runtimeModelEvidence';
 import { and, asc, eq, gt, sql, type SQL } from 'drizzle-orm';
 import { UsageRecordSchema, UsageValuationSchema, UsageNativeCaptureSchema, type RuntimeTaskHeaderFact } from '@crewstation/contracts';
 import { jsonHash, validation } from '@crewstation/kernel';
@@ -11,8 +12,8 @@ import { usageProjections, executionValuations, nativeCaptures, costVisibility, 
 
 function selectedIdentity(identity: SQL, task: RuntimeTaskHeaderFact) {
   const scope = runtimeLedgerScope(task), common = sql`${identity}->>'projectId'=${scope.projectId} AND ${identity}->>'taskId'=${scope.taskId}`;
-  return task.source?.kind === 'development-agent'
-    ? sql`(${common}) AND ${identity}->>'sourceKind'='development-agent' AND ${identity}->>'executionId'=${task.id} AND ${identity}->>'executionGeneration'='1'`
+  return (task.source?.kind === 'development-agent'||task.source?.kind==='development-cli')
+    ? sql`(${common}) AND ${identity}->>'sourceKind'=${task.source.kind} AND ${identity}->>'executionId'=${task.id} AND ${identity}->>'executionGeneration'='1'`
     : sql`(${common}) AND ${identity}->>'sourceKind' IS NULL`;
 }
 /** Original current projections only; no transaction, giant identity IN, or shared remaining budget. */
@@ -23,8 +24,8 @@ export function completeRuntimeLedgerSources(db: Executor, task: RuntimeTaskHead
     next: async (cursor) => { const page = await read(completeSourcePosition(cursor, snapshotId, source, parent)); return { items: page.items, snapshotId, nextCursor: page.nextCursor === null ? null : completeSourceCursor(snapshotId, source, parent, page.nextCursor) }; },
   });
   return {
-    snapshotId,
-    ...(task.source?.kind === 'development-agent' ? { pagedCaptures: reader('native-pages', nativeReportCaptures(db, selectedIdentity(sql`p.document->'registration'->'identity'`, task), pageSize)) } : {}),
+    snapshotId,models:records=>readRuntimeModels(db,records),
+    ...((task.source?.kind === 'development-agent'||task.source?.kind==='development-cli') ? { pagedCaptures: reader('native-pages', nativeReportCaptures(db, selectedIdentity(sql`p.document->'registration'->'identity'`, task), pageSize)) } : {}),
     usage: reader('usage', async (after) => {
       const rows = await db.select({ key: usageProjections.meterKey, document: usageProjections.document }).from(usageProjections)
         .where(and(eq(usageProjections.taskKey, taskKey), selectedIdentity(sql`${usageProjections.document}->'identity'`, task), after === undefined ? undefined : gt(usageProjections.meterKey, after)))

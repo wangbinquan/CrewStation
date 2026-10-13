@@ -1,6 +1,6 @@
 // The actual AgentStart identity and frozen launch drive v2 selection, never current dispatch material.
 import {expect,test} from 'bun:test';
-import {LaunchSpecSchema,type TaskId} from '@crewstation/contracts';
+import {LaunchSpecSchema,type ProjectId,type TaskId} from '@crewstation/contracts';
 import {newResourceId} from '@crewstation/kernel';
 import type {AgentStart} from '../ports/agentStarts';
 import type {DevSessionSettings,ComputeCatalog,ResolvedCompute} from '../ports/platform';
@@ -38,4 +38,14 @@ test('selection acquires only same-revision metadata before any image or materia
  const missing={...compute,launchMetadata:undefined};await expect(freezeDevelopmentObservation({compute:missing,settings:f.settings},workspaceProject,f.start,f.resolved)).rejects.toThrow('固定修订启动元数据');
  for(const patch of [{id:newResourceId()},{revision:3},{protocol:'claude-code' as const}])await expect(freezeDevelopmentObservation({compute:{...compute,launchMetadata:async()=>({...f.resolved,launch:f.launch,...patch})},settings:f.settings},workspaceProject,f.start,f.resolved)).rejects.toThrow('不匹配');
  await expect(freezeDevelopmentObservation({compute,settings:f.settings},workspaceProject,f.start,{...f.resolved,protocol:'claude-code'})).rejects.toThrow('OpenCode');
+});
+
+// RFC-034: normal new OpenCode starts now select numeric collection, without claiming support for other protocols.
+test('production selection covers every project and fixed OpenCode revision independently of validation tuples',async()=>{
+ const f=fixture(),settings={...f.settings,developmentNativeObservationEnabled:true,developmentNativeObservationAdmissions:[]};
+ expect(developmentObservationSelected(settings,workspaceProject,f.start.profile,'opencode')).toBe(true);
+ expect(developmentObservationSelected(settings,newResourceId() as ProjectId,{profileId:newResourceId(),revision:17},'opencode')).toBe(true);
+ for(const protocol of ['terminal','claude-code'] as const)expect(developmentObservationSelected(settings,workspaceProject,f.start.profile,protocol)).toBe(false);
+ const compute:ComputeCatalog={resolve:async()=>f.resolved,launchMaterial:async()=>{throw Error('dispatch only');},launchMetadata:async()=>({...f.resolved,launch:f.launch})};
+ expect((await freezeDevelopmentObservation({compute,settings},workspaceProject,f.start,f.resolved))?.nativeSource).toEqual({version:2});
 });

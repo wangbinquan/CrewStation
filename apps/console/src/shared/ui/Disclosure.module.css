@@ -1,0 +1,3 @@
+.disclosure { min-width: 0; color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); line-height: var(--cs-line-height); }
+.disclosure > summary { cursor: pointer; }
+.body { display: flex; flex-direction: column; gap: var(--cs-space-1); margin-top: var(--cs-space-1); }

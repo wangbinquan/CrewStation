@@ -159,3 +159,10 @@ export * from './api/resourceCenter/namespaceQuota';
 export * from './api/resourceCenter/usage';
 
 export * from './taskrunner/native-usage/pages';
+
+export * from './api/observability/runtimeAnomaly';
+
+export * from './api/observability/runtimeFragment';
+
+export * from './api/observability/runtimeMaintenance';
+export * from './api/observability/runtimeStorage';

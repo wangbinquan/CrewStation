@@ -9,6 +9,7 @@ export const OpencodeActivityInputSchema = z.discriminatedUnion('type', [
   z.object({ ...base, type: z.literal('status'), status: z.enum(['idle', 'busy', 'retry']) }).strict(),
   z.object({ ...base, type: z.literal('assistant'), messageId: id, parentId: id, createdAt: z.number().finite(), completed: z.boolean(), finish: z.string().max(64).optional(), error: z.string().max(128).optional() }).strict(),
   z.object({ ...base, type: z.literal('request'), requestId: id, requestKind: z.enum(['question', 'permission']), messageId: id.optional() }).strict(),
+  z.object({...base,type:z.literal('tool'),callId:id,messageId:id,name:z.string().min(1).max(200),state:z.enum(['running','completed','error'])}).strict(),
   z.object({ ...base, type: z.literal('resolved'), requestId: id, resolution: z.enum(['answered', 'rejected']) }).strict(),
 ]);
 export type OpencodeActivityInput = z.infer<typeof OpencodeActivityInputSchema>;

@@ -27,10 +27,11 @@ test('真实 HTTP 状态通道序号、轮次与请求身份完整，补发不�
   await f.send({ type: 'assistant', messageId: 'a1', parentId: 'u1', createdAt: 1, completed: true, finish: 'stop' });
   await f.send({ type: 'status', status: 'idle' });
   await f.post(8, { type: 'status', sessionId: 'session', eventId: 'event-8', at, status: 'idle' });
-  expect(f.kinds()).toEqual(['source-ready', 'turn-started', 'request-opened', 'request-resolved', 'turn-completed']);
-  expect(f.events.slice(1).every((event) => event.turnOrdinal === 1 && event.signal.turnId === 'session:u1')).toBe(true);
-  expect(f.events.map((event) => event.seq)).toEqual([1, 2, 3, 4, 5]);
-  expect(new Set(f.events.map((event) => event.eventId)).size).toBe(5);
+  expect(f.kinds()).toEqual(['source-ready', 'session-observed', 'turn-started', 'request-opened', 'request-resolved', 'turn-completed']);
+  expect(f.events.slice(2).every((event) => event.turnOrdinal === 1 && event.signal.turnId === 'session:u1')).toBe(true);
+  expect(f.events.map((event) => event.seq)).toEqual([1, 2, 3, 4, 5, 6]);
+  expect(new Set(f.events.map((event) => event.eventId)).size).toBe(6);
+  expect(f.events[1]).toMatchObject({ turnOrdinal: 0, signal: { kind: 'session-observed', nativeSessionId: 'session', parentSessionId: null, turnId: null } });
   f.observer.close(); f.observer.close();
   expect(f.kinds().filter((kind) => kind === 'process-ended')).toHaveLength(1);
 });
@@ -43,8 +44,9 @@ test('未授权调用不改变状态；源序号缺口永久降级而不接受�
   await f.post(3, { type: 'session', sessionId: 'session', eventId: 'e3', at, parentId: null });
   await f.post(4, { type: 'prompt', sessionId: 'session', eventId: 'e4', at, messageId: 'u1' });
   await f.post(5, { type: 'ready' });
-  expect(f.kinds()).toEqual(['source-ready', 'source-unavailable']);
+  expect(f.kinds()).toEqual(['source-ready', 'source-unavailable', 'session-observed']);
   expect(f.events[1]?.signal.reason).toBe('channel-gap');
+  expect(f.events[2]?.signal).toMatchObject({kind:'session-observed',nativeSessionId:'session',turnId:null});
 });
 
 test('正文／未知字段被严格拒绝，畸形事件不作为正常输入', async () => {

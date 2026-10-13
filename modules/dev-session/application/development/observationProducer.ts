@@ -17,10 +17,10 @@ export function developmentObservationProducer(deps: DevSessionUseCaseDeps, port
     const intent = start.execution.observationIntent;
     if (!intent) return;
     const original = await ports.owner.get(start.execution.taskId);
-    if (original) { await ports.owner.prepare({ intent, context: original.context }); return; }
+    if (original) { await ports.owner.prepare({ intent, context: original.context, ...(original.legacyFallbackAllowed === undefined ? {} : { legacyFallbackAllowed: original.legacyFallbackAllowed }) }); return; }
     const workspace = await deps.environments.getEnvironment(start.taskId);
     if (!workspace || workspace.native) throw precondition('原生验证执行的项目工作区不存在');
-    await ports.owner.prepare({ intent, context: { serviceId: workspace.serviceId as ServiceId,
+    await ports.owner.prepare({ intent, ...(start.execution.observationLegacyFallback ? { legacyFallbackAllowed: true } : {}), context: { serviceId: workspace.serviceId as ServiceId,
       traceId: workspace.traceId as TraceId, branch: workspace.branch ?? null } });
   };
   return {

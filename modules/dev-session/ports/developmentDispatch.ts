@@ -1,4 +1,4 @@
-import type { DevelopmentUsageRegistration, DevelopmentUsageDrainReason, RunnerCommand, RunnerHello, StartAgentCommand, StoredDevelopmentUsage, TaskId } from '@crewstation/contracts';
+import type { DevelopmentUsageRegistration, DevelopmentUsageDrainReason, RunnerCommand, RunnerHello, StartAgentCommand, StartAgentTerminalCommand, StoredDevelopmentUsage, TaskId } from '@crewstation/contracts';
 import type { DevelopmentUsageOwner, DevelopmentUsageOwnerRecord } from './developmentUsage';
 import type { DevelopmentDispatchDecision } from '../domain/developmentDispatch';
 export type { DevelopmentDispatchDecision, DevelopmentDispatchWaiting } from '../domain/developmentDispatch';
@@ -16,5 +16,5 @@ export interface DevelopmentDispatchDeps {
   owner: Pick<DevelopmentUsageOwner, 'get' | 'bind' | 'observeSupported' | 'unsupported'>;
   session: DevelopmentDispatchSession;
   /** Called only after the original healthy journal proves no acceptance. */
-  material(original: DevelopmentUsageOwnerRecord): Promise<StartAgentCommand>;
+  material(original: DevelopmentUsageOwnerRecord): Promise<StartAgentCommand | StartAgentTerminalCommand>;
 }

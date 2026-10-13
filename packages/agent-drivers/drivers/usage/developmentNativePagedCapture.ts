@@ -52,10 +52,11 @@ export async function beginDevelopmentNativePagedCapture(input: {
       if (finished) return;
       finished = true;
       try {
-        if (issues.length || !root) throw new Error('Original native process did not provide a reaped, drained root');
+        if (!root) throw new Error('Original native process did not provide a reaped, drained root');
         if (input.resumeSessionId !== undefined && root !== input.resumeSessionId)
           throw new Error('Actual native process changed its prepared resume root');
         await pass(root, 'final');
+        if(issues.length){input.producer.interrupted();throw new Error('Original CLI turn outcome remains incomplete: '+issues.join(','));}
       } catch (error) { input.producer.interrupted(); throw error; }
     },
   };

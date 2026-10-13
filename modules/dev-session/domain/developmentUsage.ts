@@ -1,13 +1,14 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { DevelopmentAgentIdentitySchema, DevelopmentStartIntentSchema, DevelopmentUsageDrainReasonSchema, DevelopmentUsageRegistrationSchema, ServiceIdSchema, TraceIdSchema } from '@crewstation/contracts';
+import { DevelopmentObservedIdentitySchema, DevelopmentStartIntentSchema, DevelopmentUsageDrainReasonSchema, DevelopmentUsageRegistrationSchema, ServiceIdSchema, TraceIdSchema, RunnerHelloSchema } from '@crewstation/contracts';
 
 export const DevelopmentUsagePreparationSchema = z.strictObject({
   intent: DevelopmentStartIntentSchema,
+  legacyFallbackAllowed: z.boolean().optional(),
   context: z.strictObject({ serviceId: ServiceIdSchema, traceId: TraceIdSchema, branch: z.string().max(1024).nullable() }),
 }).refine((value) => value.intent.launch.protocol !== 'terminal', '开发 headless 必须使用模型协议');
 const price = z.strictObject({
-  identity: DevelopmentAgentIdentitySchema,
+  identity: DevelopmentObservedIdentitySchema,
   profile: z.strictObject({ id: DevelopmentStartIntentSchema.shape.profileId, revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER), protocol: z.enum(['opencode', 'claude-code']) }),
   acceptedAt: z.iso.datetime(), priceBookRevision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
 });
@@ -22,8 +23,10 @@ export const DevelopmentUsagePreparedSchema = DevelopmentUsagePreparationSchema.
 export const DevelopmentUsageOwnerRecordSchema = DevelopmentUsagePreparedSchema.safeExtend({
   binding: DevelopmentUsageRegistrationSchema.nullable(), unsupported: z.boolean(), closeReason: DevelopmentUsageDrainReasonSchema.nullable(),
   capabilityPodUid: DevelopmentUsageRegistrationSchema.shape.podUid.optional(),
+  unsupportedProof:z.strictObject({version:z.literal(1),podUid:DevelopmentUsageRegistrationSchema.shape.podUid,capabilities:RunnerHelloSchema.shape.capabilities}).optional(),
 }).superRefine((value, ctx) => {
   const binding = value.binding;
+  if(value.unsupportedProof && (!value.unsupported || value.binding || value.capabilityPodUid || value.intent.identity.sourceKind!=='development-cli' || value.unsupportedProof.capabilities.developmentNativeCliV2===2 || value.unsupportedProof.capabilities.developmentCliFenceV1===1)) ctx.addIssue({code:'custom',message:'旧 CLI 能力证明必须属于从未声称数字支持的原 Pod'});
   if (value.capabilityPodUid && (value.unsupported || (binding && binding.podUid !== value.capabilityPodUid)))
     ctx.addIssue({ code: 'custom', message: '已观察数字能力的原 Pod 不能降级或替换' });
   if (binding && (value.unsupported || binding.key.payloadDigest !== value.payloadDigest || JSON.stringify(binding.identity) !== JSON.stringify(value.intent.identity) || binding.profileId !== value.intent.profileId || binding.profileRevision !== value.intent.profileRevision))

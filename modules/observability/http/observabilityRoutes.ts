@@ -1,5 +1,5 @@
 import type { ProjectId, TaskId, TraceId, UserId } from '@crewstation/contracts';
-import { RuntimeStatisticsQuerySchema, LogQuerySchema, ProjectIdSchema, TaskIdSchema, TraceEventsQuerySchema, TraceIdSchema, TraceListQuerySchema } from '@crewstation/contracts';
+import { OperationalTelemetryQuerySchema, RuntimeStatisticsQuerySchema, LogQuerySchema, ProjectIdSchema, TaskIdSchema, TraceEventsQuerySchema, TraceIdSchema, TraceListQuerySchema } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import { actorFrom, parseParams, parseQuery } from '@crewstation/http';
 import type { Context } from 'hono';
@@ -12,6 +12,9 @@ const projectParams = z.object({ projectId: ProjectIdSchema });
 export function observabilityRoutes(api: ObservabilityModuleApi, isAdmin: (userId: UserId) => Promise<boolean>): Hono<AppEnv> {
   const r = new Hono<AppEnv>();
   const actor = async (c: Context<AppEnv>) => { const a = await actorFrom(c, (id) => isAdmin(id as UserId)); return { userId: a.userId as UserId, isAdmin: a.isAdmin }; };
+  r.get('/v1/projects/:projectId/observability/telemetry',async c=>c.json(await api.operationalTelemetry!(await actor(c),pid(c),parseQuery(c,OperationalTelemetryQuerySchema))));
+  r.get('/v1/admin/observability/telemetry',async c=>c.json(await api.operationalTelemetry!(await actor(c),null,parseQuery(c,OperationalTelemetryQuerySchema))));
+  r.get('/v1/admin/observability/platform-usage',async c=>c.json(await api.platformUsage(await actor(c),parseQuery(c,RuntimeStatisticsQuerySchema),c.req.query('after'))));
   const pid = (c: Context<AppEnv>) => parseParams(c, projectParams).projectId as ProjectId;
   // 首版日志直接读 Pod 日志尾部，Kubernetes 的日志接口没有游标，因此只回 items、不回 nextCursor：
   // 往前翻要等 T2.13 的采集与保留落地。查询里的 cursor 字段是给那时预留的，现在不生效。

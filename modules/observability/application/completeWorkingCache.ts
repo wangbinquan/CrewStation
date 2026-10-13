@@ -18,6 +18,10 @@ export function completeWorkingCache<T>(rows:CompleteWorkingRows,namespace:strin
   }
   return {
     flush,
+    async prefetch(keys:readonly string[]) {
+      signal?.throwIfAborted();const pending=[...new Set(keys)].filter(key=>!cache.has(key)&&!dirty.has(key));
+      for(let offset=0;offset<pending.length;offset+=500){signal?.throwIfAborted();const part=pending.slice(offset,offset+500),found=new Map((await rows.getMany<T>(namespace,part)).map(row=>[row.key,row.document]));for(const key of part)await remember(key,found.get(key));}
+    },
     async get(key:string) {
       signal?.throwIfAborted();const found=cache.has(key)?cache.get(key):dirty.has(key)?dirty.get(key):await rows.get<T>(namespace,key);
       await remember(key,found);return found;

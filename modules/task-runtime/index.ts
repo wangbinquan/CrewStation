@@ -4,3 +4,7 @@ export { createTaskRuntimeModule, taskRuntimeMigrations } from './wiring';
 export type { TaskRuntimeModule, TaskRuntimeModuleDeps } from './wiring';
 export type { ProfileTestRunInput, ProfileTestRunProgress, ProfileTestRunResult } from './api/moduleApi';
 export type { BusinessRecoveryScope, BusinessWorkspaceProof, RebuildBusinessWorkspaceInput, RestartBusinessWorkspaceInput } from './api/businessRecovery';
+
+export {readDevelopmentParentObservationContexts} from './wiring';
+
+export {readRuntimeLifecyclePhases} from './wiring';

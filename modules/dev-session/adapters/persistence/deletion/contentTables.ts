@@ -30,6 +30,7 @@ export const DEVELOPMENT_CONTENT: readonly ContentTable[] = [
   workspace('native_activity_progress'),
   { ...terminalChild('native_activity_states', ['task_id', 'agent_id'], "r.projection->'state'->>'agentId' IS DISTINCT FROM r.agent_id"), legacyAgent: "r.legacy_projection->'state'->>'agentId'" },
   { ...terminalChild('native_activity_items', ['task_id', 'seq'], "r.item->>'agentId' IS DISTINCT FROM r.agent_id OR r.item->>'eventId' IS DISTINCT FROM r.event_id"), legacyAgent: "r.legacy_item->>'agentId'" },
+  { ...terminalChild('observation_activity_history',['source_task_id','source_seq'],"r.document->>'agentId' IS DISTINCT FROM r.agent_id OR r.document->>'eventId' IS DISTINCT FROM r.event_id"),runtime:'r.source_task_id' },
   terminalChild('native_activity_reads', ['task_id', 'user_id', 'agent_id', 'turn_id']),
   { ...workspace('native_activity_sources', ['task_id', 'source_task_id']), runtime: 'r.source_task_id',
     invalid: 'r.source_task_id<>r.task_id AND NOT EXISTS(SELECT 1 FROM dev_session.native_terminal_starts p WHERE p.task_id=r.task_id AND p.execution_task_id=r.source_task_id)' },

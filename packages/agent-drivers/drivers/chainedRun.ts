@@ -77,6 +77,7 @@ export class ChainedAgentRun extends AgentRunBase {
       return;
     }
     this.child = child;
+    this.push(this.emit('status',{status:'running'}));
     let result: Awaited<ReturnType<typeof pumpTurn>> | undefined;
     try {
       result = await pumpTurn(child, {
@@ -130,6 +131,7 @@ export class ChainedAgentRun extends AgentRunBase {
     const plan = this.prepared.nativePageBootstrap!(env);
     const child = this.context.host.spawnPiped({ ...plan, cwd: this.context.cwd });
     this.child = child;
+    this.push(this.emit('status',{status:'running'}));
     let timedOut = false, drained = false;
     let killed: Promise<void> | undefined;
     const timer = setTimeout(() => {

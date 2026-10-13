@@ -75,17 +75,17 @@ describe('oneshot 运行', () => {
   test('business execution opts into usage frames while preserving the final completion boundary', async () => {
     const host = createFakeProcessHost([CLAUDE_TURN('好的')]);
     const events = await collect(createClaudeCodeDriver(() => '/bin/claude').start({ ...spec(), businessEvents: true }, context(host)));
-    expect(events.map((event) => event.type)).toEqual(['started', 'session', 'text', 'usage', 'completed']);
+    expect(events.map((event) => event.type)).toEqual(['started', 'status', 'session', 'text', 'usage', 'completed']);
     expect(events.find((event) => event.type === 'usage')?.usage).toMatchObject({ mode: 'cumulative', inputTokens: 10, outputTokens: 5 });
   });
   test('started → session → text → completed，用量落在 completed 上', async () => {
     const host = createFakeProcessHost([CLAUDE_TURN('好的')]);
     const events = await collect(createClaudeCodeDriver(() => '/bin/claude').start(spec(), context(host)));
-    expect(events.map((e) => e.type)).toEqual(['started', 'session', 'text', 'completed']);
-    expect(events[1]?.sessionId).toBe('sess-1');
-    expect(events[2]?.text).toBe('好的');
-    expect(events[3]?.result?.usage).toMatchObject({ input: 10, output: 5, total: 15 });
-    expect(events[3]?.result?.exitCode).toBe(0);
+    expect(events.map((e) => e.type)).toEqual(['started', 'status', 'session', 'text', 'completed']);
+    expect(events[1]).toMatchObject({type:'status'});expect(events[2]?.sessionId).toBe('sess-1');
+    expect(events[3]?.text).toBe('好的');
+    expect(events[4]?.result?.usage).toMatchObject({ input: 10, output: 5, total: 15 });
+    expect(events[4]?.result?.exitCode).toBe(0);
   });
 
   test('started 事件只记规格摘要，不含任何环境变量或凭据', async () => {
@@ -370,12 +370,14 @@ test('native child capture uses final process environment and shares root revisi
   const frame = JSON.stringify({ type: 'step_finish', sessionID: 'root-native', part: { id: 'root-step', sessionID: 'root-native', messageID: 'root-message', tokens: { input: 9, output: 2, reasoning: 0, cache: { read: 3, write: 0 } } } });
   const host = createFakeProcessHost([{ stdout: [frame] }]), ctx = context(host), file = join(tmpdir(), `cs-native-driver-${crypto.randomUUID()}.db`); roots.push(file); ctx.env.OPENCODE_DB = file;
   const db = new Database(file);
-  db.exec('CREATE TABLE session(id TEXT PRIMARY KEY,parent_id TEXT); CREATE TABLE message(id TEXT PRIMARY KEY,session_id TEXT,data TEXT); CREATE TABLE part(id TEXT PRIMARY KEY,session_id TEXT,message_id TEXT,time_created INTEGER,data TEXT)');
+  db.exec('CREATE TABLE session(id TEXT PRIMARY KEY,parent_id TEXT,time_created INTEGER); CREATE TABLE message(id TEXT PRIMARY KEY,session_id TEXT,data TEXT); CREATE TABLE part(id TEXT PRIMARY KEY,session_id TEXT,message_id TEXT,time_created INTEGER,data TEXT)');
+  const originalPump=host.pumpLines;let seeded=false;host.pumpLines=(stream,onLine)=>originalPump(stream,line=>{if(!seeded){seeded=true;
   for (const [session, parent, id, input] of [['root-native', null, 'root', 9], ['child-native', 'root-native', 'child', 13]] as const) {
-    db.query('INSERT INTO session VALUES (?,?)').run(session, parent);
+    db.query('INSERT INTO session VALUES (?,?,?)').run(session, parent, Date.now());
     db.query('INSERT INTO message VALUES (?,?,?)').run(id + '-message', session, JSON.stringify({ role: 'assistant', providerID: 'actual-provider', modelID: 'actual-model' }));
     db.query('INSERT INTO part VALUES (?,?,?,?,?)').run(id + '-step', session, id + '-message', Date.now(), JSON.stringify({ type: 'step-finish', tokens: { input, output: 2, reasoning: 0, cache: { read: 3, write: 0 } } }));
   }
+  }onLine(line);});
   const events = await collect(createOpencodeDriver(() => '/bin/opencode').start(openSpec({ businessEvents: true, usageObservationsV1: 1, nativeUsageTreeV1: 1, nativeUsageLineageKey: 'business-session' }), ctx)); db.close();
   const captures = events.flatMap((event) => event.usageCapture ? [event.usageCapture] : []);
   expect(captures[0]!.nativeProof).toMatchObject({ state: 'pending', lineageKey: 'business-session' });
@@ -392,6 +394,6 @@ test('unavailable native store preserves business completion with a partial proo
   const host = createFakeProcessHost([{ stdout: [frame] }]), ctx = context(host); ctx.env.OPENCODE_DB = ':memory:';
   const events = await collect(createOpencodeDriver(() => '/bin/opencode').start(openSpec({ businessEvents: true, usageObservationsV1: 1, nativeUsageTreeV1: 1, nativeUsageLineageKey: 'lineage' }), ctx));
   // RFC-034: absent native storage also has no persisted snapshot order; business completion is unchanged.
-  expect(events.at(-1)?.type).toBe('completed'); expect(events.at(-2)?.usageCapture?.nativeProof).toMatchObject({ state: 'partial', issues: ['native-store-unavailable', 'native-order-unavailable'] });
+  expect(events.at(-1)?.type).toBe('completed'); expect(events.at(-2)?.usageCapture?.nativeProof).toMatchObject({ state: 'partial', issues: ['native-store-unavailable', 'native-order-unavailable', 'native-root-unavailable'] });
   expect(events.at(-2)?.usageCapture?.nativeProof?.order).toBeUndefined();
 });

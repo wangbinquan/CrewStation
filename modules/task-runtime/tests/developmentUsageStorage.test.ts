@@ -29,8 +29,7 @@ test('selected independent headless render has its own disk volume and trusted c
   expect(oldValues.CS_RUNNER_DEVELOPMENT_USAGE).toBeUndefined();
   expect((taskPodObject({ env: old, image: old.render!.image, resources: old.render!.resources, envVars: oldValues }, 10001).spec as typeof spec).volumes).toHaveLength(1);
   const cli = { ...env, native: { ...env.native!, purpose: 'cli' as const } };
-  expect(() => taskPodObject({ env: cli, image: env.render!.image, resources: env.render!.resources, envVars: {} }, 10001)).toThrow('独立开发 Agent');
-  await expect(containerEnv(deps, cli, { slug: 'name', name: 'service' }, 'token')).rejects.toThrow('独立开发 Agent');
+  const cliValues=await containerEnv(deps,cli,{slug:'name',name:'service'},'token');expect(DevelopmentUsageRuntimeConfigSchema.parse(JSON.parse(cliValues.CS_RUNNER_DEVELOPMENT_USAGE!))).toEqual(DevelopmentUsageRuntimeConfigSchema.parse(JSON.parse(values.CS_RUNNER_DEVELOPMENT_USAGE!)));const cliPod=taskPodObject({env:cli,image:env.render!.image,resources:env.render!.resources,envVars:cliValues},10001);expect((cliPod.spec as typeof spec).volumes).toEqual(spec.volumes);const parent={...env,native:undefined};expect(()=>taskPodObject({env:parent,image:env.render!.image,resources:env.render!.resources,envVars:{}},10001)).toThrow('独立开发 Agent');await expect(containerEnv(deps,parent,{slug:'name',name:'service'},'token')).rejects.toThrow('独立开发 Agent');
 });
 
 test('native recovery verifies only selected private layouts; a changed mount, medium or Pod UID binding is rejected', async () => {

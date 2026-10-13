@@ -68,7 +68,7 @@ export abstract class AgentRunBase implements DriverAgentProcess {
       resumeSessionId, ...(this.spec.developmentNativeSourceV1 === 1 ? { developmentNativeSourceV1: 1 as const } : {}), nextRevision: () => this.usageObserver!.nextRevision() };
     const capture = !resident && this.prepared.nativeUsageCapture ? this.prepared.nativeUsageCapture(input, env) : this.spec.developmentNativeSourceV1 === 1 ? unsupportedDevelopmentNativeUsageCapture(input) : unsupportedNativeUsageCapture(input);
     if (capture.normalizeUsage) this.usageObserver.setNormalizer(capture.normalizeUsage);
-    const begin = capture.begin(Date.now());
+    const begin = await capture.begin(Date.now());
     if (this.persistSource(begin)) return capture;
     const event = this.emit('usage', { usageCapture: begin });
     if (!this.persistUsage(event)) await this.events.writeProcessed(event);
@@ -76,7 +76,7 @@ export abstract class AgentRunBase implements DriverAgentProcess {
   }
 
   protected async finishNativeCapture(capture: NativeUsageCapture | undefined, issues: string[] = []): Promise<void> {
-    for (const usageCapture of capture?.finish(this.sessionId ?? this.spec.resumeSessionId, Date.now(), issues) ?? []) {
+    for await (const usageCapture of capture?.finish(this.sessionId ?? this.spec.resumeSessionId, Date.now(), issues) ?? []) {
       if (this.persistSource(usageCapture)) continue;
       const event = this.emit('usage', { usageCapture });
       // The final receipt also leaves room for the following business terminal event.

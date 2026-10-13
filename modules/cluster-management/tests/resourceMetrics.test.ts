@@ -77,7 +77,7 @@ test('seven day bucket bounds, custom tail and PromQL label escaping are determi
   const now = Date.parse('2026-09-21T12:00:00Z');
   const query = (seconds: number) => ClusterHistoryQuerySchema.parse({ scope: 'cluster', from: new Date(now - seconds * 1000).toISOString(), to: new Date(now).toISOString() });
   expect(historyWindow(query(86400), now).ends).toHaveLength(1440); expect(historyWindow(query(7 * 86400), now).ends).toHaveLength(1008); expect(historyWindow(query(3601), now).remainder).toBe(1);
-  expect(() => historyWindow({ ...query(60), from: '2000-01-01T00:00:00Z' }, now)).toThrow('7 days');
+  const extended=historyWindow({...query(60),from:'2000-01-01T00:00:00Z'},now);expect(extended.from).toBe(Date.parse('2000-01-01T00:00:00Z')/1000);expect(extended.ends.length).toBeLessThanOrEqual(1440);expect(extended.ends.at(-1)).toBe(Math.floor(now/1000));
   expect(ClusterHistoryQuerySchema.safeParse({ ...query(60), scope: 'container' }).success).toBe(false);
   expect(historyExpressions({ ...query(60), container: 'x"} or up' }, 'cpu', 60).average).toContain('container="x\\\"} or up"');
 });

@@ -7,7 +7,11 @@ export function matchesCompleteRuntimeCohort(task:RuntimeTaskHeaderFact,gaps:rea
 export interface CompleteTrendFold {readonly from:string;readonly to:string;count:string;readonly fold:CompleteRuntimeFold}
 /** Bucket count controls chart resolution, never the task or usage population. */
 export function completeTrendFolds(query:RuntimeFactQuery,visible:boolean):CompleteTrendFold[] {
-  const from=Date.parse(query.from),to=Date.parse(query.to),count=Math.min(24,Math.max(1,Math.ceil((to-from)/3600000))),step=(to-from)/count;
+  const from=Date.parse(query.from),to=Date.parse(query.to);
   if(!Number.isSafeInteger(from)||!Number.isSafeInteger(to)||from>=to) throw new Error('Original cohort interval is invalid');
-  return Array.from({length:count},(_,n)=>({from:new Date(Math.floor(from+step*n)).toISOString(),to:new Date(n===count-1?to:Math.floor(from+step*(n+1))).toISOString(),count:'0',fold:emptyCompleteRuntimeFold(visible)}));
+  // Whole calendar buckets reuse persisted sums; only the first/last fragment
+  // needs an exact boundary read. Resolution never removes a source record.
+  const unit=to-from>=86400000?86400000:3600000,step=Math.max(1,Math.ceil((to-from)/unit/24))*unit,bins:CompleteTrendFold[]=[];
+  for(let cursor=from;cursor<to;){const end=Math.min(to,(Math.floor(cursor/step)+1)*step);bins.push({from:new Date(cursor).toISOString(),to:new Date(end).toISOString(),count:'0',fold:emptyCompleteRuntimeFold(visible)});cursor=end;}
+  return bins;
 }

@@ -3,7 +3,7 @@ import { z } from 'zod';
 const id = z.string().min(1).max(256);
 export const NativeActivityKindSchema = z.enum([
   'source-ready', 'source-unavailable', 'turn-started', 'request-opened', 'request-resolved',
-  'turn-completed', 'turn-cancelled', 'turn-failed', 'turn-unconfirmed', 'process-ended',
+  'session-observed','tool-started','tool-completed', 'turn-completed', 'turn-cancelled', 'turn-failed', 'turn-unconfirmed', 'process-ended',
 ]);
 
 /** 原生状态专用通道。不能携带提示词、回答、工具参数，不能从 PTY 字节推断。 */
@@ -15,6 +15,8 @@ export const NativeActivitySignalSchema = z.object({
   nativeSessionId: id.nullable(),
   turnId: id.nullable(),
   request: z.object({ id, kind: z.enum(['question', 'permission']), resolution: z.enum(['answered', 'rejected', 'withdrawn']).optional() }).strict().optional(),
+  parentSessionId:id.nullable().optional(),
+  tool:z.strictObject({id,name:z.string().min(1).max(200),messageId:id,state:z.enum(['running','completed','error'])}).optional(),
   reason: z.enum(['channel-gap', 'unsupported-version', 'unmatched-event', 'capacity', 'source-error', 'no-outcome']).optional(),
 }).strict().superRefine((signal, ctx) => {
   if ((signal.kind.startsWith('turn-') || signal.kind.startsWith('request-')) && (!signal.turnId || !signal.nativeSessionId)) ctx.addIssue({ code: 'custom', message: '轮次事件必须关联原生会话与轮次' });

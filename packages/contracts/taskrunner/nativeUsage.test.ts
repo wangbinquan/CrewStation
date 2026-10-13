@@ -17,7 +17,8 @@ test('proof frames coexist with legacy numeric frames and bound baseline pages',
   expect(RunnerUsageCaptureSchema.parse(old)).toEqual(old);
   expect(RunnerUsageCaptureSchema.parse({ ...old, nativeProof: complete }).nativeProof?.state).toBe('complete');
   expect(NativeUsageBaselineSchema.safeParse({ lineageKey: 'session', turn: 'turn', root: 'root', offset: 0, steps: [] }).success).toBe(true);
-  expect(NativeUsageBaselineSchema.safeParse({ lineageKey: 'session', turn: 'turn', root: 'root', offset: 10001, steps: [] }).success).toBe(false);
+  expect(NativeUsageBaselineSchema.safeParse({ lineageKey: 'session', turn: 'turn', root: 'root', offset: 10001, steps: [] }).success).toBe(true);
+  for(const offset of [-1,0.5,Number.MAX_SAFE_INTEGER+1])expect(NativeUsageBaselineSchema.safeParse({lineageKey:'session',turn:'turn',root:'root',offset,steps:[]}).success).toBe(false);
 });
 test('native-tree capability is opt-in and depends on usage observations without a Runner protocol bump', () => {
   const hello = { type: 'hello', protocolVersion: TASKRUNNER_PROTOCOL_VERSION, taskId: Bun.randomUUIDv7(), runnerToken: 'fixture', workdir: '/work', capabilities: { protocols: ['opencode'], pty: false, preview: false } };
