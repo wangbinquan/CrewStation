@@ -76,17 +76,22 @@ jobs:
           POSTGRES_DB: crewstation
           # 原连接退出后的预备事务仍须阻断角色回收；CI 必须实际覆盖这条路径。
           POSTGRES_INITDB_ARGS: '--set=max_prepared_transactions=10'
-        ports: ['55432:5432']
+        ports: ['5432']
         options: >-
           --health-cmd "pg_isready -U crewstation" --health-interval 5s --health-timeout 5s --health-retries 20
     env:
-      CS_TEST_DATABASE_URL: postgres://crewstation:crewstation-dev@127.0.0.1:55432/crewstation
       # 数据库是这个作业自己起的：连不上是故障。不点名的话，依赖它的六十来组用例会整层跳过、作业照绿。
       CS_TEST_REQUIRE: database,prometheus,garage
       CS_TEST_GARAGE: '1'
       CS_TEST_PROMETHEUS_BIN: /tmp/prometheus-test/prometheus
       CS_TEST_PROMTOOL_BIN: /tmp/prometheus-test/promtool
     steps:
+      - name: bind the actual PostgreSQL host port
+        env:
+          CS_POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }}
+        run: |
+          test -n "$CS_POSTGRES_PORT"
+          printf 'CS_TEST_DATABASE_URL=postgres://crewstation:crewstation-dev@127.0.0.1:%s/crewstation\n' "$CS_POSTGRES_PORT" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-workspace
         with:
@@ -175,11 +180,10 @@ jobs:
           POSTGRES_USER: crewstation
           POSTGRES_PASSWORD: crewstation-dev
           POSTGRES_DB: crewstation
-        ports: ['55432:5432']
+        ports: ['5432']
         options: >-
           --health-cmd "pg_isready -U crewstation" --health-interval 5s --health-timeout 5s --health-retries 20
     env:
-      CS_TEST_DATABASE_URL: postgres://crewstation:crewstation-dev@127.0.0.1:55432/crewstation
       CREWSTATION_KUBE_CONTEXT: kind-crewstation
       CREWSTATION_NODE_CONTAINER: crewstation-control-plane
       # 必须落在 80：登录跳转地址由平台配置的用户域生成，不带端口。放在高位端口时浏览器会被
@@ -196,6 +200,12 @@ jobs:
       # 不点名的话整套用例会 skipIf 跳过、作业照绿，实机验收等于被悄悄关掉。
       CS_TEST_REQUIRE: e2e,database
     steps:
+      - name: bind the actual PostgreSQL host port
+        env:
+          CS_POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }}
+        run: |
+          test -n "$CS_POSTGRES_PORT"
+          printf 'CS_TEST_DATABASE_URL=postgres://crewstation:crewstation-dev@127.0.0.1:%s/crewstation\n' "$CS_POSTGRES_PORT" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-workspace
 

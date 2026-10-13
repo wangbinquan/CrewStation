@@ -13,7 +13,8 @@
 .chartBar { display: flex; flex-direction: column-reverse; overflow: hidden; width: 100%; border-radius: var(--cs-radius-sm) var(--cs-radius-sm) 0 0; }
 .chartBar[data-positive="true"] { min-height: 2px; }
 .chartBar[data-partial="true"] .chartSegment { background-image: repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, var(--cs-color-surface) 40%, transparent) 4px 8px); }
-.range { display: flex; justify-content: space-between; gap: var(--cs-space-3); color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }
+.range { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--cs-space-3); color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }
+.range > span { min-width: 0; overflow-wrap: anywhere; }
 .scroll { min-width: 0; overflow-x: auto; }
 .timeline { min-width: 680px; }
 .lane { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: var(--cs-space-3); align-items: center; min-height: 52px; border-bottom: 1px solid var(--cs-color-border); }

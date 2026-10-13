@@ -67,7 +67,7 @@ export async function installRuntimeStatisticsFixture(page: Page, { taskDelayMs 
 }
 
 export async function measureRuntimeOverview(page: Page) {
-  return page.eval<{ overflow: number; mainOverflow: number; gap: number; expectedGap: number; sectionGap: number; expectedSectionGap: number; bars: number; chartOverflow: number; tokenLabels: string[]; tokenBuckets: string[]; bucketPairsAligned: boolean; stackPercent: string[]; alignedRange: boolean; noExport: boolean }>(`(() => {
+  return page.eval<{ overflowElements: { tag: string; className: string; width: number; right: number; overflow: string; minWidth: string }[]; overflow: number; mainOverflow: number; gap: number; expectedGap: number; sectionGap: number; expectedSectionGap: number; bars: number; chartOverflow: number; tokenLabels: string[]; tokenBuckets: string[]; bucketPairsAligned: boolean; stackPercent: string[]; alignedRange: boolean; noExport: boolean }>(`(() => {
     const grid = document.querySelector('[data-runtime-metrics]'), cards = [...grid.children];
     const a = cards[0].getBoundingClientRect(), b = cards[1].getBoundingClientRect();
     const chart = document.querySelector('[data-runtime-statistics] [role="tabpanel"] [role="group"]');
@@ -77,7 +77,8 @@ export async function measureRuntimeOverview(page: Page) {
     const tokenRows = [...grid.querySelector('[data-token-buckets]').children], segments = [...bars[0].querySelectorAll('[data-token-bucket]')];
     const bucketPairsAligned = tokenRows.every(row => {const a=row.querySelector('dt').getBoundingClientRect(), b=row.querySelector('dd').getBoundingClientRect();return Math.abs((a.top+a.height/2)-(b.top+b.height/2))<1 && b.left>=a.right});
     const alignedRange = getComputedStyle(row).alignItems === 'flex-end' && (innerWidth < 800 || Math.abs(input.getBoundingClientRect().bottom-apply.getBoundingClientRect().bottom)<1);
-    return {overflow:document.documentElement.scrollWidth-innerWidth,mainOverflow:main.scrollWidth-main.clientWidth,
+    const overflowElements = [...document.querySelectorAll('[data-runtime-statistics] *')].filter(node => node.getBoundingClientRect().right > innerWidth + 1 && getComputedStyle(node).overflowX === 'visible').map(node => ({tag:node.tagName,className:node.getAttribute('class')??'',width:node.getBoundingClientRect().width,right:node.getBoundingClientRect().right,overflow:getComputedStyle(node).overflowX,minWidth:getComputedStyle(node).minWidth}));
+    return {overflowElements,overflow:document.documentElement.scrollWidth-innerWidth,mainOverflow:main.scrollWidth-main.clientWidth,
       gap:Math.abs(a.top-b.top)<1 ? b.left-a.right : b.top-a.bottom,
       sectionGap:trend.getBoundingClientRect().top-grid.getBoundingClientRect().bottom,
       expectedSectionGap:parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cs-space-3')),

@@ -23,3 +23,10 @@
 R7 原始完整检查在架构静态阶段停止，尚未执行全量测试：固定 XML 依赖除根安装声明外还需 `tools/testguard` 单元声明。现精确增加该单元 saxes 6.0.0 dependency；Bun 锁相对 R18 只有该 workspace dependencies 增量，所有既有包、版本、完整性摘要及原工作区配置保持。R7 失败日志不删除、不代签成功。此前严格解析/分片/网络 44 例通过且三个新 helper 覆盖 128/128 行，修正版原父恢复四例 80 个断言通过；新完整检查只运行改完依赖后的候选。
 
 远端 `970ef550c87a780b20a23bd12362ecdde90aaada` 的 `38437486065`：static、unit、console、四份 module 和 gate 均 success；E2E 119 pass / 64 原条件 skip / 1 fail。失败是布局归档遗漏任务父级的 fragments 页，实际页面正确拒绝未知页并撤销原统计资格，泳道因此没有渲染。现将 fragments/phases 与 attempts/swimlane/calls 一样从原夹具的实际报告按任务父级读至 EOF 后归档，新增 parent、snapshot、total 和 EOF 回归；未知父级仍拒绝，不伪造空成功，不放宽生产页面的明细核对。原 E2E 失败及原完整 R8 结果保留，修正版完整检查和远端结果另行核对。
+
+
+## 2026-10-14 R21：窄屏日期范围和 Runner 端口
+
+`832633a49b870d9a68e4a6f216342ce2a58d115a` 的本机 R9 原完整检查退出0，6757通过／176原条件跳过／0失败，全部5546份静态源输入前后相同；hosted `38448766645` 则保留两处新失败：module 1/4 在实际 PostgreSQL容器初始化前因host55432已占用而退出，未执行用例；E2E 的原窄屏全页面断言得到64px横向溢出，119通过／64原条件跳过／1失败。原失败不改写为通过。
+
+原日期范围flex行允许重排，并允许端点原字符串在窄列换行；不隐藏端点、不剪裁页面、不缩小字体、不删除24个趋势条和四类Token。原宽／窄、两层、中英文、明暗、Tab/Shift-Tab、焦点和1px溢出预言全部保持，失败信息增加当时视口／范围及所有实际越界的可见overflow元素，以精确定位剩余问题。主CI两处和仅手动的规模CI一处PostgreSQL映射改用Docker分配的空闲host端口及原job.services.postgres.ports[5432]连接值，实际端口只在允许job上下文的steps.env读取并写入原GITHUB_ENV，不在jobs.env使用不可用的job上下文；health／数据库必需项／真实数据人口／预算／触发条件均未改；这次不启动observability-scale。官方语义见GitHub Docs的 `Communicating with Docker service containers` 端口映射段落。全部补正与原回归收齐后集中验证；完整新CI和本机部署仍待通过。

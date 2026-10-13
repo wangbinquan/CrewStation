@@ -28,14 +28,19 @@ jobs:
           POSTGRES_PASSWORD: crewstation-dev
           POSTGRES_DB: crewstation
           POSTGRES_INITDB_ARGS: '--set=max_prepared_transactions=10'
-        ports: ['55432:5432']
+        ports: ['5432']
         options: >-
           --health-cmd "pg_isready -U crewstation" --health-interval 5s --health-timeout 5s --health-retries 20
     env:
-      CS_TEST_DATABASE_URL: postgres://crewstation:crewstation-dev@127.0.0.1:55432/crewstation
       CS_TEST_REQUIRE: database
       CS_OBSERVABILITY_SCALE_MODE: ${{ matrix.scenario }}
     steps:
+      - name: bind the actual PostgreSQL host port
+        env:
+          CS_POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }}
+        run: |
+          test -n "$CS_POSTGRES_PORT"
+          printf 'CS_TEST_DATABASE_URL=postgres://crewstation:crewstation-dev@127.0.0.1:%s/crewstation\n' "$CS_POSTGRES_PORT" >> "$GITHUB_ENV"
       - name: Check out the exact source
         uses: actions/checkout@v4
         with:
