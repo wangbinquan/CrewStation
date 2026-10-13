@@ -329,15 +329,15 @@ metadata:
   name: crewstation-runtime-metrics
   namespace: crewstation-system
 spec:
-  podSelector:
-    matchExpressions:
-      - key: app.kubernetes.io/name
-        operator: In
-        values: [cs-api, cs-auth, cs-controller, cs-session, cs-events, mcp-capabilities, mcp-operations, traefik]
+  # Application exporters retain the ingress posture of the original deployed
+  # version and its authenticated business ports. This policy must not isolate login.
+  podSelector: { matchLabels: { app.kubernetes.io/name: traefik } }
   policyTypes: [Ingress]
   ingress:
+    # Preserve exactly the three original public/object gateway entrypoints.
+    - ports: [{ protocol: TCP, port: 8000 }, { protocol: TCP, port: 8443 }, { protocol: TCP, port: 8088 }]
     - from: [{ podSelector: { matchLabels: { app.kubernetes.io/name: prometheus } } }]
-      ports: [{ protocol: TCP, port: 8080 }, { protocol: TCP, port: 8081 }, { protocol: TCP, port: 8082 }, { protocol: TCP, port: 8083 }, { protocol: TCP, port: 8084 }, { protocol: TCP, port: 8085 }, { protocol: TCP, port: 8086 }, { protocol: TCP, port: 9000 }]
+      ports: [{ protocol: TCP, port: 9000 }]
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
