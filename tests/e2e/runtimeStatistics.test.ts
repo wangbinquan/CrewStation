@@ -34,7 +34,7 @@ describe.skipIf(!session)('RFC-034 formal runtime observation', () => {
   test('layout archive preserves original attempt native pages and rejects unknown parents', async () => {
     const page = session!.admin, f = await installRuntimeStatisticsFixture(page);
     await open(page, '/admin/observability/tasks/' + f.taskId + '?' + f.query);
-    const result = await page.eval<{ pages: { section: string; parent: string; total: string; items: unknown[]; sameSnapshot: boolean; eof: boolean }[]; unknownParentRejected: boolean }>(`(async () => {
+    const result = await page.eval<{ pages: { section: string; parent: string; total: string; items: unknown[]; sameSnapshot: boolean; eof: boolean }[]; taskPages: { section: string; parent: string; total: string; items: unknown[]; sameSnapshot: boolean; eof: boolean }[]; unknownParentRejected: boolean }>(`(async () => {
       const report = await (await fetch('/v1/admin/observability/tasks/${f.taskId}')).json();
       const path = '/v1/admin/observability/reports/' + report.header.reportId + '/pages?';
       const attempts = await (await fetch(path + new URLSearchParams({section:'attempts',parent:'${f.taskId}',pageSize:'100'}))).json();
@@ -44,10 +44,16 @@ describe.skipIf(!session)('RFC-034 formal runtime observation', () => {
         pages.push({section,parent:original.parent,total:original.total,items:original.items,
           sameSnapshot:original.reportId===report.header.reportId && original.snapshotId===report.header.snapshotId,eof:original.nextCursor===null});
       }
+      const taskPages = [];
+      for (const section of ['fragments','phases']) {
+        const original = await (await fetch(path + new URLSearchParams({section,parent:'${f.taskId}',pageSize:'100'}))).json();
+        taskPages.push({section,parent:original.parent,total:original.total,items:original.items,
+          sameSnapshot:original.reportId===report.header.reportId && original.snapshotId===report.header.snapshotId,eof:original.nextCursor===null});
+      }
       let unknownParentRejected = false;
       try { await fetch(path + new URLSearchParams({section:'native-pages',parent:'unregistered-original-attempt',pageSize:'100'})); }
       catch (error) { unknownParentRejected = String(error).includes('Unknown immutable report page request'); }
-      return {pages,unknownParentRejected};
+      return {pages,taskPages,unknownParentRejected};
     })()`);
     expect(result.pages).toHaveLength(2);
     expect(result.pages.map(row => row.section)).toEqual(['captures', 'native-pages']);
@@ -56,6 +62,8 @@ describe.skipIf(!session)('RFC-034 formal runtime observation', () => {
       expect(row).toMatchObject({ total: '0', items: [], sameSnapshot: true, eof: true });
       expect(row.parent).toContain(f.taskId);
     }
+    expect(result.taskPages.map(row => row.section)).toEqual(['fragments', 'phases']);
+    for (const row of result.taskPages) expect(row).toMatchObject({ parent: f.taskId, total: '0', items: [], sameSnapshot: true, eof: true });
     expect(result.unknownParentRejected).toBe(true);
     expect(page.takeErrors()).toEqual([]);
   });

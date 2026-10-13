@@ -21,3 +21,5 @@
 网络修复提交 `8ba050288f769ecd2f55ebd0edb535a46aa453a0` 的 hosted CI 已通过登录及正式统计 API；E2E 当前失败来自未渲染的任务 region 直接解引用。现定向选择包含实际 swimlane 的 region，在同一 DOM 求值内等到可见且原执行条已加载后测量；保留原 15 秒等待和 120 秒总体预算。布局夹具的任务读取增加 400ms 固定延迟，确保英文字体/加载文案不会靠提前 settle 偶然通过。原 24 柱、四类 Token、两层级/三组视口语言主题、卡距、键盘、弹窗、zoom 和全部溢出断言保持。
 
 R7 原始完整检查在架构静态阶段停止，尚未执行全量测试：固定 XML 依赖除根安装声明外还需 `tools/testguard` 单元声明。现精确增加该单元 saxes 6.0.0 dependency；Bun 锁相对 R18 只有该 workspace dependencies 增量，所有既有包、版本、完整性摘要及原工作区配置保持。R7 失败日志不删除、不代签成功。此前严格解析/分片/网络 44 例通过且三个新 helper 覆盖 128/128 行，修正版原父恢复四例 80 个断言通过；新完整检查只运行改完依赖后的候选。
+
+远端 `970ef550c87a780b20a23bd12362ecdde90aaada` 的 `38437486065`：static、unit、console、四份 module 和 gate 均 success；E2E 119 pass / 64 原条件 skip / 1 fail。失败是布局归档遗漏任务父级的 fragments 页，实际页面正确拒绝未知页并撤销原统计资格，泳道因此没有渲染。现将 fragments/phases 与 attempts/swimlane/calls 一样从原夹具的实际报告按任务父级读至 EOF 后归档，新增 parent、snapshot、total 和 EOF 回归；未知父级仍拒绝，不伪造空成功，不放宽生产页面的明细核对。原 E2E 失败及原完整 R8 结果保留，修正版完整检查和远端结果另行核对。
