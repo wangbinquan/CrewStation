@@ -25,9 +25,10 @@
 .open { border-style: dashed; }
 .bar:focus-visible { outline: 2px solid var(--cs-color-text); outline-offset: 2px; }
 .filters > label { flex: 1 1 180px; min-width: 0; }
+.filters input { min-width: 0; max-width: 100%; }
 .facts { display: grid; align-items: center; grid-template-columns: minmax(100px, 1fr) minmax(0, 2fr); gap: var(--cs-space-2) var(--cs-space-4); }
 .facts dd { margin: 0; overflow-wrap: anywhere; }
-@media (max-width: 600px) { .page { padding: var(--cs-space-3); } .grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) { .page { padding: var(--cs-space-3); } .grid { grid-template-columns: minmax(0, 1fr); } .filters > label { flex-basis: 100%; } }
 
 .tokenMetric { min-width: 0; font-variant-numeric: tabular-nums; }
 .tokenBuckets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cs-space-1) var(--cs-space-3); margin: var(--cs-space-2) 0 0; font-size: var(--cs-font-size-sm); min-width: 0; font-variant-numeric: tabular-nums; }

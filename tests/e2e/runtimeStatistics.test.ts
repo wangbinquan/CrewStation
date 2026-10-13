@@ -88,7 +88,7 @@ describe.skipIf(!session)('RFC-034 formal runtime observation', () => {
         expect(await page.eval<boolean>(`document.activeElement===document.querySelector('[data-runtime-statistics] [role="tabpanel"] [role="group"] button')`)).toBe(true);
         expect(await page.eval<string[]>(`[...document.querySelectorAll('[data-runtime-statistics] [role="tabpanel"] [role="group"]')[1].querySelectorAll('[data-token-buckets] dd')].map(node=>node.textContent)`)).toEqual(['1,920', '0', '0', '480']);
         const layoutDiagnostic=JSON.stringify({width,locale,scheme,root,...actual});
-        expect(actual.overflow,layoutDiagnostic).toBeLessThanOrEqual(1); expect(actual.mainOverflow,layoutDiagnostic).toBeLessThanOrEqual(1); expect(actual.chartOverflow,layoutDiagnostic).toBeLessThanOrEqual(1);
+        expect(actual.overflow,layoutDiagnostic).toBeLessThanOrEqual(1); expect(actual.mainOverflow,layoutDiagnostic).toBeLessThanOrEqual(1); expect(actual.chartOverflow,layoutDiagnostic).toBeLessThanOrEqual(1); expect(actual.filterFits,layoutDiagnostic).toBe(true);
         for (const tab of ['tasks', 'agents', 'usage', 'performance']) {
           await open(page, root + '?tab=' + tab + '&' + f.query);
           await page.eval(`document.querySelector('header button[lang="${locale}"]').click()`); await settle(page);

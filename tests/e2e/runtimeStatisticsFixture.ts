@@ -67,7 +67,7 @@ export async function installRuntimeStatisticsFixture(page: Page, { taskDelayMs 
 }
 
 export async function measureRuntimeOverview(page: Page) {
-  return page.eval<{ overflowElements: { tag: string; className: string; width: number; right: number; overflow: string; minWidth: string }[]; overflow: number; mainOverflow: number; gap: number; expectedGap: number; sectionGap: number; expectedSectionGap: number; bars: number; chartOverflow: number; tokenLabels: string[]; tokenBuckets: string[]; bucketPairsAligned: boolean; stackPercent: string[]; alignedRange: boolean; noExport: boolean }>(`(() => {
+  return page.eval<{ filterFits: boolean; filterInputs: { type: string; clientWidth: number; scrollWidth: number; width: number; right: number; parentRight: number }[]; overflowElements: { tag: string; className: string; text: string; width: number; right: number; overflow: string; minWidth: string }[]; overflow: number; mainOverflow: number; gap: number; expectedGap: number; sectionGap: number; expectedSectionGap: number; bars: number; chartOverflow: number; tokenLabels: string[]; tokenBuckets: string[]; bucketPairsAligned: boolean; stackPercent: string[]; alignedRange: boolean; noExport: boolean }>(`(() => {
     const grid = document.querySelector('[data-runtime-metrics]'), cards = [...grid.children];
     const a = cards[0].getBoundingClientRect(), b = cards[1].getBoundingClientRect();
     const chart = document.querySelector('[data-runtime-statistics] [role="tabpanel"] [role="group"]');
@@ -77,8 +77,17 @@ export async function measureRuntimeOverview(page: Page) {
     const tokenRows = [...grid.querySelector('[data-token-buckets]').children], segments = [...bars[0].querySelectorAll('[data-token-bucket]')];
     const bucketPairsAligned = tokenRows.every(row => {const a=row.querySelector('dt').getBoundingClientRect(), b=row.querySelector('dd').getBoundingClientRect();return Math.abs((a.top+a.height/2)-(b.top+b.height/2))<1 && b.left>=a.right});
     const alignedRange = getComputedStyle(row).alignItems === 'flex-end' && (innerWidth < 800 || Math.abs(input.getBoundingClientRect().bottom-apply.getBoundingClientRect().bottom)<1);
-    const overflowElements = [...document.querySelectorAll('[data-runtime-statistics] *')].filter(node => node.getBoundingClientRect().right > innerWidth + 1 && getComputedStyle(node).overflowX === 'visible').map(node => ({tag:node.tagName,className:node.getAttribute('class')??'',width:node.getBoundingClientRect().width,right:node.getBoundingClientRect().right,overflow:getComputedStyle(node).overflowX,minWidth:getComputedStyle(node).minWidth}));
-    return {overflowElements,overflow:document.documentElement.scrollWidth-innerWidth,mainOverflow:main.scrollWidth-main.clientWidth,
+    const filterInputs = [...document.querySelectorAll('[data-runtime-statistics] input')].map(node => ({type:node.type,clientWidth:node.clientWidth,scrollWidth:node.scrollWidth,width:node.getBoundingClientRect().width,right:node.getBoundingClientRect().right,parentRight:node.closest('label').getBoundingClientRect().right}));
+    const filterFits = filterInputs.every(node => node.scrollWidth <= node.clientWidth + 1 && node.right <= node.parentRight + 1 && node.right <= innerWidth + 1);
+    // Tables, chart columns and tabs may extend inside their own horizontal
+    // scroll region. Only uncropped descendants can expand the document.
+    const overflowElements = [...document.querySelectorAll('[data-runtime-statistics] *')].filter(node => {
+      if(node.getBoundingClientRect().right <= innerWidth + 1)return false;
+      for(let parent=node.parentElement;parent&&parent!==document.body;parent=parent.parentElement)
+        if(['auto','scroll','hidden','clip'].includes(getComputedStyle(parent).overflowX)&&parent.getBoundingClientRect().right <= innerWidth + 1)return false;
+      return true;
+    }).map(node => ({tag:node.tagName,className:node.getAttribute('class')??'',text:(node.getAttribute('aria-label')??node.textContent??'').slice(0,80),width:node.getBoundingClientRect().width,right:node.getBoundingClientRect().right,overflow:getComputedStyle(node).overflowX,minWidth:getComputedStyle(node).minWidth}));
+    return {filterFits,filterInputs,overflowElements,overflow:document.documentElement.scrollWidth-innerWidth,mainOverflow:main.scrollWidth-main.clientWidth,
       gap:Math.abs(a.top-b.top)<1 ? b.left-a.right : b.top-a.bottom,
       sectionGap:trend.getBoundingClientRect().top-grid.getBoundingClientRect().bottom,
       expectedSectionGap:parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cs-space-3')),
