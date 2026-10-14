@@ -90,6 +90,7 @@ export class Browser {
 
 export class Page {
   private consoleErrors: string[] = [];
+  private closed = false;
 
   constructor(private readonly browser: Browser, readonly sessionId: string, readonly targetId: string) {}
 
@@ -108,6 +109,9 @@ export class Page {
   }
 
   cmd(method: string, params: Json = {}): Promise<Json> {
+    // CI 38500583431: Chrome may never answer a stale flattened session.
+    // Once our original close is acknowledged, fail before sending it.
+    if (this.closed) return Promise.reject(new Error('CDP page is closed'));
     return this.browser.send(method, params, this.sessionId);
   }
 
@@ -180,7 +184,10 @@ export class Page {
   }
 
   async close(): Promise<void> {
-    await this.browser.send('Target.closeTarget', { targetId: this.targetId });
+    if (this.closed) return;
+    const result = await this.browser.send('Target.closeTarget', { targetId: this.targetId });
+    if (result.success !== true) throw new Error('CDP target close was not acknowledged');
+    this.closed = true;
   }
 }
 

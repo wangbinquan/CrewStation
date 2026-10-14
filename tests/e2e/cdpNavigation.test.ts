@@ -47,3 +47,34 @@ test('停止旧加载超时后迟到回执不能再发起导航影响下一条�
   expect(f.commands).toEqual(['Page.stopLoading']);
   expect(f.listeners.size).toBe(0);
 });
+
+// RFC-034 CI 38500583431: a known-closed page must not leave a command
+// awaiting Chrome forever and block the following observation page tests.
+test('已确认关闭的原页面立即拒绝读取，重复关闭不再发送命令', async () => {
+  const commands: string[] = [];
+  const browser = { send: async (method: string) => { commands.push(method); return { success: true }; } };
+  const page = new Page(browser as unknown as Browser, 'original-session', 'original-target');
+  await page.close();
+  await expect(page.eval('Intl.DateTimeFormat().resolvedOptions().timeZone')).rejects.toThrow('CDP page is closed');
+  await expect(page.cmd('Page.enable')).rejects.toThrow('CDP page is closed');
+  await page.close();
+  expect(commands).toEqual(['Target.closeTarget']);
+});
+
+test('关闭未得到原回执不能将原页面伪装成已关闭', async () => {
+  const commands: string[] = [];
+  const browser = { send: async (method: string) => { commands.push(method); return { success: false }; } };
+  const page = new Page(browser as unknown as Browser, 'original-session', 'original-target');
+  await expect(page.close()).rejects.toThrow('CDP target close was not acknowledged');
+  await expect(page.cmd('Page.enable')).resolves.toEqual({ success: false });
+  expect(commands).toEqual(['Target.closeTarget', 'Page.enable']);
+});
+
+test('关闭回执缺少 success 时保持原页面可用并明确拒绝关闭', async () => {
+  const commands: string[] = [];
+  const browser = { send: async (method: string) => { commands.push(method); return {}; } };
+  const page = new Page(browser as unknown as Browser, 'original-session', 'original-target');
+  await expect(page.close()).rejects.toThrow('CDP target close was not acknowledged');
+  await expect(page.cmd('Page.enable')).resolves.toEqual({});
+  expect(commands).toEqual(['Target.closeTarget', 'Page.enable']);
+});
