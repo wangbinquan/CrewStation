@@ -24,15 +24,16 @@ async function history(db:Executor,cursor:unknown,onScanned?:(rows:number)=>void
  onScanned?.(rows.length);
  if(!rows.length){await db.execute(sql`UPDATE observability.runtime_storage_guard SET history_cursor=NULL WHERE singleton=true`);return 0;}
  const last=rows.at(-1)!,end=[String(last['task_id']),String(last['role']),String(last['key']),String(last['sequence'])];
- // Keep the newest anchor at/below the earliest protected watermark, including NULL tombstones.
- const removed=await db.execute(sql`WITH protected AS(
- SELECT task_id,(document->>'rowThrough')::numeric AS through FROM observability.runtime_task_cache
- UNION ALL SELECT r.task_id,(r.document->>'rowThrough')::numeric FROM observability.runtime_report_task_views r
- UNION ALL SELECT task_id,row_through FROM observability.runtime_maintenance_members WHERE state='pending'
- ),floors AS(SELECT task_id,min(through) AS through FROM protected GROUP BY task_id)
- DELETE FROM observability.runtime_task_row_history h WHERE (h.task_id,h.role,h.key,h.sequence)>(${at[0]!},${at[1]!},${at[2]!},${at[3]!}::numeric) AND (h.task_id,h.role,h.key,h.sequence)<=(${end[0]!},${end[1]!},${end[2]!},${end[3]!}::numeric)
- AND NOT EXISTS(SELECT 1 FROM observability.runtime_task_work w WHERE w.key=h.task_id)
- AND EXISTS(SELECT 1 FROM observability.runtime_task_row_history newer LEFT JOIN floors f ON f.task_id=newer.task_id WHERE newer.task_id=h.task_id AND newer.role=h.role AND newer.key=h.key AND newer.sequence>h.sequence AND (f.through IS NULL OR newer.sequence<=f.through)) RETURNING 1`);
+ // Each retained watermark protects its own preceding anchor. An old report must not pin every later revision.
+ // The next sequence is an indexed lookup per candidate; reference relations remain searchable by task_id.
+ const removed=await db.execute(sql`WITH candidates AS MATERIALIZED(
+ SELECT h.task_id,h.role,h.key,h.sequence,(SELECT n.sequence FROM observability.runtime_task_row_history n WHERE n.task_id=h.task_id AND n.role=h.role AND n.key=h.key AND n.sequence>h.sequence ORDER BY n.sequence LIMIT 1) AS next_sequence
+ FROM observability.runtime_task_row_history h WHERE (h.task_id,h.role,h.key,h.sequence)>(${at[0]!},${at[1]!},${at[2]!},${at[3]!}::numeric) AND (h.task_id,h.role,h.key,h.sequence)<=(${end[0]!},${end[1]!},${end[2]!},${end[3]!}::numeric)
+ ) DELETE FROM observability.runtime_task_row_history h USING candidates c WHERE h.task_id=c.task_id AND h.role=c.role AND h.key=c.key AND h.sequence=c.sequence AND c.next_sequence IS NOT NULL
+ AND NOT EXISTS(SELECT 1 FROM observability.runtime_task_work w WHERE w.key=c.task_id)
+ AND NOT EXISTS(SELECT 1 FROM observability.runtime_task_cache p WHERE p.task_id=c.task_id AND (p.document->>'rowThrough')::numeric>=c.sequence AND (p.document->>'rowThrough')::numeric<c.next_sequence)
+ AND NOT EXISTS(SELECT 1 FROM observability.runtime_report_task_views p WHERE p.task_id=c.task_id AND (p.document->>'rowThrough')::numeric>=c.sequence AND (p.document->>'rowThrough')::numeric<c.next_sequence)
+ AND NOT EXISTS(SELECT 1 FROM observability.runtime_maintenance_members p WHERE p.task_id=c.task_id AND p.state='pending' AND p.row_through>=c.sequence AND p.row_through<c.next_sequence) RETURNING 1`);
  await db.execute(sql`UPDATE observability.runtime_storage_guard SET history_cursor=${JSON.stringify(end)}::jsonb WHERE singleton=true`);return removed.length;
 }
 async function cache(db:Executor,cursor:unknown,onScanned?:(rows:number)=>void) {

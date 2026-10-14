@@ -1,4 +1,4 @@
-import {RuntimeCompleteReportSchema,RuntimeReportSectionSchema,type RuntimeCompleteReport,type RuntimeReportSection} from '../../packages/contracts';
+import {RuntimeAggregateSchema,PlatformUsagePageSchema,RuntimeCompleteReportSchema,RuntimeReportSectionSchema,type RuntimeCompleteReport,type RuntimeReportSection} from '../../packages/contracts';
 import type { Page } from './cdp';
 import { runtimeStatisticsFixture } from '../../apps/console/src/tests/runtimeStatisticsFixture';
 
@@ -30,19 +30,32 @@ async function archiveReport(archive:Archive,alias:string,query:string) {
  for(const agent of global.get('agents')??[])await archivePages(archive,path,report,'agent-tasks',String(agent['key']));
  for(const profile of global.get('profiles')??[])await archivePages(archive,path,report,'profile-tasks',String(profile['key']));
  for(const attempt of global.get('attempts')??[])for(const section of ['captures','native-pages'] as const)await archivePages(archive,path,report,section,String(attempt['key']));
+ return report;
 }
 
 /** Only layout uses fixtures; the preceding endpoint test reads the deployed original report. */
 export async function installRuntimeStatisticsFixture(page: Page, { taskDelayMs = 0 }: { taskDelayMs?: number } = {}) {
- const original=globalThis.fetch,f=runtimeStatisticsFixture(),archive:Archive={responses:{},pages:{}};
+ const timezone=await page.eval<string>('Intl.DateTimeFormat().resolvedOptions().timeZone');
+ const original=globalThis.fetch,f=runtimeStatisticsFixture(),archive:Archive={responses:{},pages:{}},auxiliaryTimezones:Record<string,string>={};
  try {
   for(const path of ['/v1/me','/v1/projects','/v1/projects/page','/v1/projects/'+f.projectId])archive.responses[path]=await (await fetch(path)).json();
-  await archiveReport(archive,'/v1/admin/observability/statistics',f.query);
+  const systemReport=await archiveReport(archive,'/v1/admin/observability/statistics',f.query);
   await archiveReport(archive,'/v1/projects/'+f.projectId+'/observability/statistics',f.query);
+  // Archive the same original auxiliary contracts read by the production overview;
+  // their pending/unknown state is retained rather than replaced with report values.
+  for(const [alias,schema,zone] of [
+   ['/v1/admin/observability/aggregate',RuntimeAggregateSchema,timezone],
+   ['/v1/projects/'+f.projectId+'/observability/aggregate',RuntimeAggregateSchema,timezone],
+   ['/v1/admin/observability/platform-usage',PlatformUsagePageSchema,systemReport.header.filters.timezone],
+  ] as const){
+   auxiliaryTimezones[alias]=zone;
+   const response=await fetch(alias+'?'+f.query+'&timezone='+encodeURIComponent(zone));if(!response.ok)throw new Error('Original auxiliary observation read failed: '+alias);
+   archive.responses[alias]=schema.parse(await response.json());
+  }
   for(const task of f.details)await archiveReport(archive,'/v1/admin/observability/tasks/'+task.id,'');
  }finally{globalThis.fetch=original;}
  const source=String.raw`(() => {
-  const archive=${JSON.stringify(archive)},original=window.fetch.bind(window);
+  const archive=${JSON.stringify(archive)},auxiliaryTimezones=${JSON.stringify(auxiliaryTimezones)},original=window.fetch.bind(window);
   window.fetch=async(input,init)=>{
    const url=new URL(typeof input==='string'?input:input.url,location.origin);
    if(!url.pathname.startsWith('/v1/'))return original(input,init);
@@ -55,7 +68,8 @@ export async function installRuntimeStatisticsFixture(page: Page, { taskDelayMs 
     const selected=rowKey===null?full.items:full.items.filter(row=>String(row.key??row.id??row.projectId??row.modelRef)===rowKey),offset=after===null?0:Number(after.slice(8)),items=selected.slice(offset,offset+size);
     return Response.json({...full,total:String(selected.length),items,nextCursor:offset+items.length<selected.length?'fixture-'+(offset+items.length):null});
    }
-   if(url.pathname.includes('/observability/statistics')&&(url.searchParams.get('from')!==${JSON.stringify(f.from)}||url.searchParams.get('to')!==${JSON.stringify(f.to)}||[...url.searchParams.keys()].some(key=>!['from','to','timezone'].includes(key))))throw new Error('Unknown statistical cohort request');
+   if(/\/observability\/(statistics|aggregate|platform-usage)$/.test(url.pathname)&&(url.searchParams.get('from')!==${JSON.stringify(f.from)}||url.searchParams.get('to')!==${JSON.stringify(f.to)}||[...url.searchParams.keys()].some(key=>!['from','to','timezone'].includes(key))))throw new Error('Unknown statistical cohort request');
+   if(/\/observability\/(aggregate|platform-usage)$/.test(url.pathname)&&(url.searchParams.get('timezone')??'Asia/Shanghai')!==auxiliaryTimezones[url.pathname])throw new Error('Unknown auxiliary observation window');
    const value=archive.responses[url.pathname];
    if(value===undefined)throw new Error('Unknown fixture request: '+url.pathname+url.search);
    if(url.pathname.includes('/observability/tasks/') && ${JSON.stringify(taskDelayMs)}>0)await new Promise(resolve=>setTimeout(resolve,${JSON.stringify(taskDelayMs)}));
@@ -63,7 +77,7 @@ export async function installRuntimeStatisticsFixture(page: Page, { taskDelayMs 
   };
  })()`;
  await page.cmd('Page.addScriptToEvaluateOnNewDocument',{source});
- return {projectId:f.projectId,taskId:f.details[0]!.id,query:f.query};
+ return {projectId:f.projectId,taskId:f.details[0]!.id,query:f.query,from:f.from,to:f.to,timezone,platformTimezone:auxiliaryTimezones['/v1/admin/observability/platform-usage']!};
 }
 
 export async function measureRuntimeOverview(page: Page) {
@@ -82,7 +96,7 @@ export async function measureRuntimeOverview(page: Page) {
     // Tables, chart columns and tabs may extend inside their own horizontal
     // scroll region. Only uncropped descendants can expand the document.
     const overflowElements = [...document.querySelectorAll('[data-runtime-statistics] *')].filter(node => {
-      if(node.getBoundingClientRect().right <= innerWidth + 1)return false;
+      if(node.getBoundingClientRect().right <= innerWidth + 1 && (getComputedStyle(node).overflowX !== 'visible' || node.scrollWidth <= node.clientWidth + 1))return false;
       for(let parent=node.parentElement;parent&&parent!==document.body;parent=parent.parentElement)
         if(['auto','scroll','hidden','clip'].includes(getComputedStyle(parent).overflowX)&&parent.getBoundingClientRect().right <= innerWidth + 1)return false;
       return true;

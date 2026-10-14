@@ -20,38 +20,44 @@ function encoded(row: ReportWorkingRow) {
   return { key: row.key, document };
 }
 /** The single fixed TEMP table is created by reportSnapshot before its read-only input transaction. */
-export function privateReportWorkspace(db: Executor, active: () => boolean, signal?: AbortSignal): ReportWorkspace {
+export function privateReportWorkspace(db: Executor, active: () => boolean, signal?: AbortSignal, initiallyEmpty = false): ReportWorkspace {
+  // Only the owner of a freshly created TEMP relation can prove a namespace has never been written.
+  // Once this bounded acceleration ledger fills, every read falls back to PostgreSQL; no row is excluded.
+  const written = new Set<string>(); let emptyKnown = initiallyEmpty;
+  const writing = (namespace: string) => { if (emptyKnown) { written.add(namespace); if (written.size > 256) { emptyKnown = false; written.clear(); } } };
+  const untouched = (namespace: string) => emptyKnown && !written.has(namespace);
   const check = (namespace: string) => { if (!active()) throw new Error('Report snapshot already closed'); if (!namespace) throw new Error('Report workspace namespace is empty'); signal?.throwIfAborted(); };
   return {
     async insert(namespace, rows) {
       check(namespace); if (rows.length > 500) throw new Error('Report workspace insert batch is too large');
       if (!rows.length) return;
-      const entries = rows.map(encoded);
+      const entries = rows.map(encoded); writing(namespace);
       await db.execute(sql`INSERT INTO pg_temp.cs_report_workspace (namespace,key,document) VALUES ${sql.join(entries.map((r) => sql`(${namespace},${r.key},${r.document})`),sql`,`)}`);
     },
     async upsert(namespace, rows) {
       check(namespace); if (rows.length > 500) throw new Error('Report workspace upsert batch is too large');
       if (!rows.length) return;
-      const entries = rows.map(encoded);
+      const entries = rows.map(encoded); writing(namespace);
       await db.execute(sql`INSERT INTO pg_temp.cs_report_workspace (namespace,key,document) VALUES ${sql.join(entries.map((r) => sql`(${namespace},${r.key},${r.document})`),sql`,`)} ON CONFLICT(namespace,key) DO UPDATE SET document=excluded.document`);
     },
     async put(namespace, row) {
-      check(namespace); const r = encoded(row);
+      check(namespace); const r = encoded(row); writing(namespace);
       await db.execute(sql`INSERT INTO pg_temp.cs_report_workspace (namespace,key,document) VALUES (${namespace},${r.key},${r.document}) ON CONFLICT(namespace,key) DO UPDATE SET document=excluded.document`);
     },
     async get<T>(namespace: string, key: string): Promise<T | undefined> {
-      check(namespace);
+      check(namespace); if (untouched(namespace)) return undefined;
       const rows = await db.execute(sql`SELECT document FROM pg_temp.cs_report_workspace WHERE namespace=${namespace} AND key=${key}`);
       return rows.length ? JSON.parse(String(rows[0]!['document'])) as T : undefined;
     },
     async getMany<T>(namespace: string, keys: readonly string[]): Promise<readonly ReportWorkingRow<T>[]> {
       check(namespace); if (keys.length>500 || keys.some(key=>!key)) throw new Error('Report workspace lookup batch is invalid');
-      if (!keys.length) return [];
+      if (!keys.length || untouched(namespace)) return [];
       const rows=await db.execute(sql`SELECT key,document FROM pg_temp.cs_report_workspace WHERE namespace=${namespace} AND key IN (${sql.join(keys.map(key=>sql`${key}`),sql`,`)}) ORDER BY key`);
       return rows.map(row=>({key:String(row['key']),document:JSON.parse(String(row['document'])) as T}));
     },
     async page<T>(namespace: string, after: string | null, size = 100): Promise<ReportWorkingPage<T>> {
       check(namespace); if (!Number.isInteger(size) || size < 1 || size > 500) throw new Error('Report workspace page size is invalid');
+      if (untouched(namespace)) return { items: [], nextCursor: null };
       const rows = await db.execute(sql`SELECT key,document FROM pg_temp.cs_report_workspace WHERE namespace=${namespace} AND ${after === null ? sql`true` : sql`key>${after}`} ORDER BY key LIMIT ${size+1}`);
       const selected = rows.slice(0,size);
       return { items: selected.map((r) => ({ key: String(r['key']), document: JSON.parse(String(r['document'])) as T })), nextCursor: rows.length > size ? String(selected.at(-1)!['key']) : null };

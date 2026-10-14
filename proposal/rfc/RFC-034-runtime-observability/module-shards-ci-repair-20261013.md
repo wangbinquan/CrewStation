@@ -39,3 +39,16 @@ R7 原始完整检查在架构静态阶段停止，尚未执行全量测试：�
 本机正式旧版本在相同 390px 下 document/main 均为 0，两个 native 日期编辑器实际宽 334/216px，说明不能用旧 Mac 页面代签新 Linux E2E。本次为窄屏日期控件分配完整一行并明确 min/max inline 约束，仍使用原 ActionRow/FormField、原字号、实际完整日期和全部快捷按钮，不裁切页面/表格/泳道。补 native input 自身及 label/viewport 尺寸断言；诊断排除被各自横向滚动容器正常容纳的图、表和页签，记录实际会扩展文档的元素/文本以及各日期编辑器的 client/scroll 宽度，避免原数百个合法滚动后代淹没日志。原总溢出、数值、键盘、视图、时间窗、任务、焦点及 15/120 秒预算保持。
 
 完整四路径修复/用例写完后执行有界 SOURCE 和新候选的唯一完整检查；当前还没有新 UI/CI 通过结论，未部署失败候选，原部署保持。并行 RFC-036 文档保持不动。
+
+
+## R23：补全实机布局归档的真实辅助读取
+
+`8abeb74f` 的 CI `38470197528` 为 8 success、e2e failure；390 中文浅色输入 client/scroll 均为317、border319，filterFits true，原 document/main 仍溢出64/79。原布局归档只含完整报告，漏了生产总览实际读取的 aggregate（两层）与 platform-usage；严格未知请求会呈现包含原路径的错误文字。现归档原夹具实际响应并逐份 schema 校验，保留 pending bootstrap 与平台未知估值，不借完整报告值伪造实时投影，也不放开未知 API。新增原辅助状态断言、总览零错误断言；诊断补入边框内但文字 scrollWidth 溢出的未裁切节点。原1px文档/main/chart、24柱/四桶数值、全部语言主题与层级、泳道/焦点/放大/EOF和预算保持。源码候选尚待独立功能检视、原完整检查及新 exact-SHA 实机 CI；旧失败保留，不部署红版本。
+
+R23 源码检视识别新断言读取 helper 未返回的 from/to；原完整 R12 在同两处 TS2339 退出2，未进入测试，三候选首末字节稳定。R24 仅把真实 f.from/f.to 随原 helper 返回，不猜时间、不改原辅助响应；旧失败保留，修复后再验。
+
+R23 正式门 VALID/FAIL P2=2：未返回真实窗口和新增辅助接口时区未绑定。R25 读取测试浏览器实际 Intl 时区（CI可为UTC），用该原参数归档原producer辅助响应，并只接受同一窗口时区，缺省按原producer Asia/Shanghai判；三辅助路径逐项补异时区拒绝预言。透传真实from/to/timezone，不将UTC响应伪称上海，不把pending改ready；增加 runtimeSearch 原时区控制。原报告、数值、人口、全部旧预算与FAIL回执保持。
+
+R25 原控制继续查到平台消费者在 pending aggregate 时取完整 header.filters 时区，而非 Intl时区。R26 按三个 alias 的真实消费者分别归档：两层aggregate取浏览器窗口，system platform取已归档 system report 的原filters；每alias拒绝未录的时区，负向按各自原时区构造。保持原report.header及原响应，未把任一时区统一改写；旧R23/R25发现和full R12失败保留。
+
+R25 检视另识别时区await在已安装宿主HTTP夹具的finally之外。R27 将真实浏览器时区读取置于安装之前，闭页/求值失败不触及宿主fetch；新增真实CDP闭页错误回归，并只回收其自建context。原全量R12在静态退出、未发生运行污染；新完整候选仍3文件，等待有限SOURCE后一次原完整检查，保留全部旧数据与原预算。

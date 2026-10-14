@@ -31,6 +31,15 @@ describe.skipIf(!session)('RFC-034 formal runtime observation', () => {
       expect(report).not.toHaveProperty('summary');expect(report).not.toHaveProperty('metrics');
     }
   });
+  // A closed real CDP Page must fail before installing a host HTTP fixture.
+  test('a failed browser timezone read leaves the original host fetch unchanged', async () => {
+    const browser=session!.browser,context=await browser.newContext(),original=globalThis.fetch;
+    try {
+      const page=await browser.newPage(context);await page.close();
+      await expect(installRuntimeStatisticsFixture(page)).rejects.toThrow();
+      expect(globalThis.fetch).toBe(original);
+    } finally {await browser.send('Target.disposeBrowserContext',{browserContextId:context});}
+  });
   test('layout archive preserves original attempt native pages and rejects unknown parents', async () => {
     const page = session!.admin, f = await installRuntimeStatisticsFixture(page);
     await open(page, '/admin/observability/tasks/' + f.taskId + '?' + f.query);
@@ -65,6 +74,28 @@ describe.skipIf(!session)('RFC-034 formal runtime observation', () => {
     expect(result.taskPages.map(row => row.section)).toEqual(['fragments', 'phases']);
     for (const row of result.taskPages) expect(row).toMatchObject({ parent: f.taskId, total: '0', items: [], sameSnapshot: true, eof: true });
     expect(result.unknownParentRejected).toBe(true);
+    // CI 38470197528: the strict browser archive omitted these real overview
+    // reads, displaying an unbroken unknown-request URL in place of their state.
+    const auxiliary=await page.eval<{system:unknown;project:unknown;platform:unknown}>(`(async()=>({
+      system:await(await fetch('/v1/admin/observability/aggregate?${f.query}&timezone=${encodeURIComponent(f.timezone)}')).json(),
+      project:await(await fetch('/v1/projects/${f.projectId}/observability/aggregate?${f.query}&timezone=${encodeURIComponent(f.timezone)}')).json(),
+      platform:await(await fetch('/v1/admin/observability/platform-usage?${f.query}&timezone=${encodeURIComponent(f.platformTimezone)}')).json(),
+    }))()`);
+    const filters={from:f.from,to:f.to,timezone:f.timezone};
+    expect(auxiliary.system).toMatchObject({scope:'system',projectId:null,filters,projection:{bootstrapCompleted:false,pending:true},pendingTasks:'1'});
+    expect(auxiliary.project).toMatchObject({scope:'project',projectId:f.projectId,filters,projection:{bootstrapCompleted:false,pending:true},pendingTasks:'1'});
+    expect(auxiliary.platform).toMatchObject({scope:'system-platform',window:{...filters,timezone:f.platformTimezone},summary:{currency:'CNY',amount:null,tokens:{total:'0'},tokenComplete:false},items:[],nextCursor:null});
+    const archiveZones=[f.timezone,f.timezone,f.platformTimezone];
+    const rejected=await page.eval<boolean[]>(`(async()=>{
+      const result=[];
+      for(const [index,path] of ['/v1/admin/observability/aggregate','/v1/projects/${f.projectId}/observability/aggregate','/v1/admin/observability/platform-usage'].entries()) {
+        const zone=${JSON.stringify(archiveZones)}[index],wrongTimezone=zone==='UTC'?'Asia/Shanghai':'UTC';
+        try {await fetch(path+'?${f.query}&timezone='+encodeURIComponent(wrongTimezone));result.push(false)}
+        catch(error){result.push(String(error).includes('Unknown auxiliary observation window'))}
+      }
+      return result;
+    })()`);
+    expect(rejected).toEqual([true,true,true]);
     expect(page.takeErrors()).toEqual([]);
   });
   test('24 trend columns, standard card gaps and five views fit both levels in Chinese/English and light/dark', async () => {
@@ -87,6 +118,7 @@ describe.skipIf(!session)('RFC-034 formal runtime observation', () => {
         await page.cmd('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers: 8 }); await settle(page);
         expect(await page.eval<boolean>(`document.activeElement===document.querySelector('[data-runtime-statistics] [role="tabpanel"] [role="group"] button')`)).toBe(true);
         expect(await page.eval<string[]>(`[...document.querySelectorAll('[data-runtime-statistics] [role="tabpanel"] [role="group"]')[1].querySelectorAll('[data-token-buckets] dd')].map(node=>node.textContent)`)).toEqual(['1,920', '0', '0', '480']);
+        expect(await page.eval<string[]>(`[...document.querySelectorAll('main [role="alert"]')].map(node=>node.textContent)`)).toEqual([]);
         const layoutDiagnostic=JSON.stringify({width,locale,scheme,root,...actual});
         expect(actual.overflow,layoutDiagnostic).toBeLessThanOrEqual(1); expect(actual.mainOverflow,layoutDiagnostic).toBeLessThanOrEqual(1); expect(actual.chartOverflow,layoutDiagnostic).toBeLessThanOrEqual(1); expect(actual.filterFits,layoutDiagnostic).toBe(true);
         for (const tab of ['tasks', 'agents', 'usage', 'performance']) {

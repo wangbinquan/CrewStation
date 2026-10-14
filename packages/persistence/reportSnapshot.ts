@@ -47,7 +47,7 @@ export function originalReportSnapshotSession(handle: Pick<DatabaseHandle,'clien
         const client = new Proxy(connection,{ get: (target,key,receiver) => key === 'options' ? handle.client.options : Reflect.get(target,key,receiver) });
         const executor = drizzle({ client }); active = true;
         const snapshotId = JSON.stringify([source.oid,source.position,randomUUID()]);
-        const result = await work({ executor, workspace: privateReportWorkspace(executor,() => active,signal), snapshotId, asOf: source.as_of });
+        const result = await work({ executor, workspace: privateReportWorkspace(executor,() => active,signal,true), snapshotId, asOf: source.as_of });
         signal?.throwIfAborted();
         const [current] = await connection.unsafe<{ position: string }[]>('SELECT pg_current_snapshot()::text AS position');
         if (current?.position !== source.position) throw new Error('Original report snapshot changed');

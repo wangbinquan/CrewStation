@@ -4,7 +4,7 @@ import { sql } from 'drizzle-orm';
 import { createTestDatabase, testDatabaseAvailable, type TestDatabase } from '@crewstation/testkit';
 import { connectDatabase } from './connection';
 import { originalReportSnapshotSession } from './reportSnapshot';
-import type { ReportWorkingPage, ReportWorkspace } from './reportWorkspace';
+import { privateReportWorkspace, type ReportWorkingPage, type ReportWorkspace } from './reportWorkspace';
 const available = await testDatabaseAvailable(); let tdb: TestDatabase;
 afterEach(async () => { await tdb?.drop(); });
 async function original() {
@@ -46,6 +46,36 @@ describe.skipIf(!available)('original report snapshot and private working rows',
       await single.run(async (s) => { expect(s.snapshotId).not.toBe(snapshotId); await s.workspace.insert('one',[{key:'ok',document:1}]); expect(await s.workspace.get<number>('one','ok')).toBe(1); });
       expect((await one.db.execute(sql`SELECT to_regclass('pg_temp.cs_report_workspace') AS table_name`))[0]!['table_name']).toBeNull();
     } finally { await one.close(); }
+  },30000);
+  // Real original report profiling found thousands of EOF probes against never-written namespaces.
+  test('fresh workspace proves untouched EOF, later writes remain visible and cache overflow falls back to the original database', async () => {
+    const session = await original();
+    await session.run(async (snapshot) => {
+      const original = tdb.handle.client.options.debug; let queries = 0;
+      tdb.handle.client.options.debug = (...args) => { queries++; if (typeof original === 'function') original(...args); };
+      try {
+        const before = queries;
+        for (let n = 0; n < 1001; n++) {
+          const name = 'untouched/'+n;
+          expect(await snapshot.workspace.page(name,null,37)).toEqual({items:[],nextCursor:null});
+          expect(await snapshot.workspace.get(name,'absent')).toBeUndefined();
+          expect(await snapshot.workspace.getMany(name,['absent'])).toEqual([]);
+        }
+        expect(queries).toBe(before);
+        await snapshot.workspace.put('untouched/0',{key:'actual',document:{fourBins:['1','3','5','7'],cny:'0.0000745'}});
+        expect(await snapshot.workspace.page('untouched/0',null,37)).toEqual({items:[{key:'actual',document:{fourBins:['1','3','5','7'],cny:'0.0000745'}}],nextCursor:null});
+        // A separately created reader receives no false empty-table assumption.
+        expect(await privateReportWorkspace(snapshot.executor,()=>true).get<{fourBins:string[];cny:string}>('untouched/0','actual')).toEqual({fourBins:['1','3','5','7'],cny:'0.0000745'});
+        for (let n = 1; n < 270; n++) await snapshot.workspace.insert('written/'+n,[{key:'actual',document:{ordinal:n}}]);
+        expect(await snapshot.workspace.get<{ordinal:number}>('written/1','actual')).toEqual({ordinal:1});
+        expect(await snapshot.workspace.get<{ordinal:number}>('written/269','actual')).toEqual({ordinal:269});
+        const overflowQueries = queries;
+        expect(await snapshot.workspace.page('still-empty',null,37)).toEqual({items:[],nextCursor:null});
+        expect(queries).toBeGreaterThan(overflowQueries);
+        await snapshot.workspace.clear('untouched/0');
+        expect(await snapshot.workspace.page('untouched/0',null,37)).toEqual({items:[],nextCursor:null});
+      } finally { tdb.handle.client.options.debug = original; }
+    });
   },30000);
   test('duplicate/invalid/abort/source-write errors never return a successful report and cleanup allows the next job', async () => {
     const session = await original();
