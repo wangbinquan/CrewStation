@@ -3,13 +3,13 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Database } from 'bun:sqlite';
-import { recordOpencodeBinaryVersion, resetOpencodeBinaryVersions, resetOpencodeProbes } from '@crewstation/agent-drivers';
+import { parseOpencodeEvent, recordOpencodeBinaryVersion, resetOpencodeBinaryVersions, resetOpencodeProbes } from '@crewstation/agent-drivers';
 import type { AgentEvent } from '@crewstation/contracts';
 import { noopLogger } from '@crewstation/kernel';
 import { RunnerCommandError } from '../commandError';
 import { createProcessLauncher, type PipedProcess } from '../process/launcher';
 import { probeCurrentUid, resolveIsolation } from '../process/privilege';
-import { createCliDriverFactory } from './cliDriver';
+import { createCliDriverFactory, createProcessHost } from './cliDriver';
 import type { AgentSpec } from './driver';
 
 async function collect(events: AsyncIterable<AgentEvent>): Promise<AgentEvent[]> {
@@ -17,6 +17,34 @@ async function collect(events: AsyncIterable<AgentEvent>): Promise<AgentEvent[]>
   for await (const event of events) out.push(event);
   return out;
 }
+
+describe('Runner CLI 协议行边界', () => {
+  const host = createProcessHost(createProcessLauncher({ isolation: resolveIsolation({ uid: 10001, gid: 10001, currentUid: 501, which: () => null }), processEnv: {}, workerHome: '/tmp', logger: noopLogger }));
+  const stream = (text: string, chunkBytes: number) => new ReadableStream<Uint8Array>({
+    start(controller) {
+      const bytes = new TextEncoder().encode(text);
+      for (let offset = 0; offset < bytes.length; offset += chunkBytes) controller.enqueue(bytes.slice(offset, offset + chunkBytes));
+      controller.close();
+    },
+  });
+
+  test('长工具回执跨输出帧和 UTF-8 分块仍是一条工具事件，后续正文完整', async () => {
+    const output = '贪吃蛇源文件\n'.repeat(8000);
+    const raw = JSON.stringify({ type: 'tool_use', sessionID: 'session', part: { type: 'tool', tool: 'read', callID: 'read-game', state: { status: 'completed', input: { filePath: '/work/src/game.ts' }, output } } });
+    const lines: string[] = [];
+    await host.pumpLines(stream(`${raw}\n${JSON.stringify({ type: 'text', part: { type: 'text', text: '已检查游戏规则。' } })}`, 32767), line => lines.push(line));
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toBe(raw);
+    expect(parseOpencodeEvent(lines[0]!)).toMatchObject({ kind: 'tool_use', text: null, tool: { name: 'read', callId: 'read-game', output } });
+    expect(parseOpencodeEvent(lines[1]!)?.text).toBe('已检查游戏规则。');
+  });
+
+  test.each(['', '\n'])('超限协议行明确失败，不把不完整 JSON 当作正文（结尾 %j）', async suffix => {
+    const lines: string[] = [];
+    await expect(host.pumpLines(stream('x'.repeat(1024 * 1024 + 1) + suffix, 32768), line => lines.push(line))).rejects.toThrow('Protocol output line exceeds 1048576 characters');
+    expect(lines).toEqual([]);
+  });
+});
 
 describe('CLI 驱动工厂（RFC-006：按协议取驱动，二进制随每次启动下发）', () => {
   test('两种已知协议各一个驱动，协议与契约一致', () => {

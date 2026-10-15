@@ -25,7 +25,8 @@ export interface DevAgentsHandle {
 /** 开发会话里的并行 Agent：名册与三个动作都走平台 API，输出走流。 */
 export function useDevAgents(taskId: string): DevAgentsHandle {
   const key = queryKeys.agents(taskId);
-  const query = useApiQuery(key, () => api.devSession.listAgents(taskId));
+  // Pod 被 OOM／节点驱逐时不一定来得及发 Agent 结束事件，定时对账避免永久显示执行中。
+  const query = useApiQuery(key, () => api.devSession.listAgents(taskId), { refetchIntervalMs: 5_000 });
   const { refetch } = query;
   return {
     agents: query.data?.items ?? [],

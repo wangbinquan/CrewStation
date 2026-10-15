@@ -1,14 +1,16 @@
 import './domSetup';
-import { afterEach, expect, test } from 'bun:test';
+import { afterEach, expect, setSystemTime, test } from 'bun:test';
+import { focusManager } from '@tanstack/react-query';
 import { act } from 'react';
 import { EditorView } from '@codemirror/view';
 import { renderDeliveryHarness } from './renderDeliveryHarness';
 import { historicalConversationFixture } from './historicalConversationFixture';
 import { activityProjectId } from './agentActivityFixture';
+import { createQueryClient } from '../shared/api/queryClient';
 
 let page: Awaited<ReturnType<typeof renderDeliveryHarness>> | undefined;
 let fixture: ReturnType<typeof historicalConversationFixture> | undefined;
-afterEach(() => { page?.unmount(); page = undefined; fixture?.restore(); fixture = undefined; sessionStorage.clear(); });
+afterEach(() => { page?.unmount(); page = undefined; fixture?.restore(); fixture = undefined; sessionStorage.clear(); setSystemTime(); focusManager.setFocused(undefined); });
 const path = `/projects/${activityProjectId}/dev-session`;
 function textarea() { return [...document.querySelectorAll<HTMLTextAreaElement>('textarea')].find(node => !node.closest('[hidden]'))!; }
 async function draft(value: string) {
@@ -61,4 +63,19 @@ test('刷新准备中的 Bot 仍显示已受理需求；原生输入事件回放
   expect(document.querySelectorAll('article[aria-label="你"]')).toHaveLength(1);
   await act(async () => { fixture!.receiveAgent({ agentId: agent.agentId, type: 'user-message', text: agent.initialPrompt }); await new Promise(resolve => setTimeout(resolve, 100)); });
   expect(document.querySelectorAll('article[aria-label="你"]')).toHaveLength(1); expect(fixture.starts).toHaveLength(0);
+});
+
+test('执行容器被 OOM 终止而没有 Agent 结束事件时，回到页面恢复真实失败状态并可新建需求', async () => {
+  fixture = historicalConversationFixture(); const agent = fixture.agents[0]!;
+  agent.state = 'running'; agent.initialPrompt = '实现贪吃蛇';
+  page = await renderDeliveryHarness(`${path}?view=guided`, createQueryClient());
+  expect(page.text()).toContain('Bot 正在处理');
+  await act(async () => { focusManager.setFocused(false); });
+  agent.state = 'failed'; agent.execution = { taskId: agent.taskId, state: 'finished', message: '容器运行失败：OOMKilled，退出码 137' };
+  setSystemTime(new Date(Date.now() + 6_000));
+  await act(async () => { focusManager.setFocused(true); }); await page.settle();
+  expect(page.text()).toContain('OOMKilled'); expect(page.text()).not.toContain('Bot 正在处理');
+  expect(page.text()).not.toContain('停止执行');
+  await page.click('新对话'); await draft('继续完成工作区里的贪吃蛇');
+  expect([...page.host.querySelectorAll('button')].find(node => node.textContent === '发送')?.disabled).toBe(false); expect(fixture.starts).toHaveLength(0);
 });

@@ -85,7 +85,8 @@ export function createProcessHost(launcher: ProcessLauncher): ProcessHost {
     // 断言成立的依据：交回来的句柄就是上面两个方法返回的 Bun Subprocess 本身，驱动只读了它的结构子集。
     killTree: (child, graceMs) => killProcessTree(child as Parameters<typeof killProcessTree>[0], graceMs),
     pumpLines: async (stream, onLine) => {
-      const splitter = createLineSplitter(onLine);
+      // 工具回执包含源码，常超过普通日志的 8 KiB；协议行必须完整解析，超限明确失败。
+      const splitter = createLineSplitter(onLine, 1024 * 1024, 'reject');
       await pumpStream(stream, (text) => splitter.push(text));
       splitter.flush();
     },

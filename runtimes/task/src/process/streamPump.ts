@@ -20,24 +20,28 @@ export function splitChunk(text: string, max = MAX_CHUNK_CHARS): string[] {
 }
 
 /** 行切分器：把任意分块的文本重组为完整行（尾部无换行的一段在 flush 时交出）。 */
-export function createLineSplitter(onLine: (line: string) => void, maxLineChars = 8 * 1024): { push(text: string): void; flush(): void } {
+export function createLineSplitter(onLine: (line: string) => void, maxLineChars = 8 * 1024, overflow: 'truncate' | 'reject' = 'truncate'): { push(text: string): void; flush(): void } {
   let pending = '';
+  const emit = (line: string) => {
+    if (overflow === 'reject' && line.length > maxLineChars) throw new Error(`Protocol output line exceeds ${maxLineChars} characters`);
+    onLine(line.slice(0, maxLineChars));
+  };
   return {
     push(text) {
       pending += text;
       let index = pending.indexOf('\n');
       while (index >= 0) {
-        onLine(pending.slice(0, index).slice(0, maxLineChars));
+        emit(pending.slice(0, index));
         pending = pending.slice(index + 1);
         index = pending.indexOf('\n');
       }
       if (pending.length > maxLineChars) {
-        onLine(pending.slice(0, maxLineChars));
+        emit(pending);
         pending = '';
       }
     },
     flush() {
-      if (pending.length > 0) onLine(pending.slice(0, maxLineChars));
+      if (pending.length > 0) emit(pending);
       pending = '';
     },
   };

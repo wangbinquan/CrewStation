@@ -24,7 +24,7 @@ import { messages as admin } from '../features/admin/i18n/zh-CN';
 import { interactiveScope } from './interactiveScope';
 
 /** 本次旅程的真实页面与 HTTP hooks；隔离其他 feature 的路由装配，不能替代整站验收。 */
-export async function renderDeliveryHarness(path: string) {
+export async function renderDeliveryHarness(path: string, client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })) {
   const rootRoute = createRootRoute({ component: () => <main><Outlet /></main> });
   const projectRoute = createRoute({ getParentRoute: () => rootRoute, path: '/projects/$projectId', component: Scope });
   const routes = rootRoute.addChildren([
@@ -40,7 +40,6 @@ export async function renderDeliveryHarness(path: string) {
     ]),
   ]);
   const router = createRouter({ routeTree: routes, history: createMemoryHistory({ initialEntries: [path] }) });
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
   const messages = { ...app, ...projects, ...release, ...dev, ...admin };
   const settle = async () => { for (let i = 0; i < 4; i++) await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); }); };
