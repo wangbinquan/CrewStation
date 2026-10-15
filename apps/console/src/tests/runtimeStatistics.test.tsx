@@ -31,6 +31,9 @@ describe('RFC-034 v2 runtime statistics: overview, time range and cost visibilit
     const f = runtimeStatisticsFixture(); page = await renderApp('/admin/observability');
     expect(page.text()).toContain('系统运行观测与统计');
     expect(tabs()).toEqual(['总览', '任务', 'Agent 与模型', '项目', '平台执行', '资源与容量', '服务与健康']);
+    // CI 38696784109（390px 英文溢出 4px）：时间范围在会换行的页头操作区，不在不收缩的页签附加槽里。
+    expect(document.querySelector('[data-runtime-statistics] header [role="group"][aria-label="时间范围"]')).not.toBeNull();
+    expect(document.querySelector('[role="tablist"]')!.parentElement!.querySelector('[role="group"]')).toBeNull();
     expect([...document.querySelectorAll('[data-runtime-overview] article')].map((node) => node.getAttribute('aria-label'))).toEqual(['Token 消耗', '人民币估值', 'Agent 执行', '执行时长（P50）']);
     // 有用量不完整的执行：合计是已知下界；有未定价的执行：人民币也是下界。
     expect(page.text()).toContain('≥ 93,000'); expect(page.text()).toContain('≥ ¥150.00');
