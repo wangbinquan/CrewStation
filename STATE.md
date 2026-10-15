@@ -1,3 +1,11 @@
+## 2026-10-15 RFC-039：真实贪吃蛇正式上线与首次交付闭环（Done）
+
+作者明确“批准你的动作”后，继续原流程 `01a13f7d-52ea-7000-a386-008b0aba56ba`，访问范围保存为全部登录用户（authenticated revision 1），并于 12:42:01.205 UTC 确认正式切流。游戏 v0.1.1 / SHA `12450292b0e8438a066391a08f53bcfa511559ed`，发布 `01a13f7d-526c-7000-bff7-15f1eae541bb`，prod 1/1 ready，发布流程 succeeded / 15 条事件；正式地址 `http://snake-bot-20261014.cs.localhost/`。真实 Pod 的镜像摘要与发布记录一致、Running / ready / restart 0。之前访问范围审批等待已解除。
+
+正式 Chrome 游戏的开始、计分、暂停、重开和方向控制通过，发布完成页与独立首次交付页均显示实际完成。正常 OIDC 负责人、已登录非成员均可 200 访问游戏，未登录 HTML 302 到登录、API 401；两种登录身份及非成员关系均实际核对。开发工作树未提交数 0、未推送数 0；发布临时令牌 683/684/685 均已撤销，main 保护保持。真实 Bot 开发、32 项游戏测试／类型、CLI 自动连接及真实模型回复、MCP 调用、桌面／手机布局与切换历史保留的前轮证据延续。RFC 三件套、索引和本记录按此完整链路收口 Done，见 [最终验收](proposal/rfc/RFC-039-first-delivery/acceptance.md#作者批准后正式上线与-rfc-done2026-10-15)。
+
+实际部署保持后台 dd85c40c、console 507d832d、runtime 946658e7，各自准确 SHA CI 全绿；上一笔验收文档 2c3093fb 的九项 CI 38734259928 全绿。本轮只更新本 RFC 文档和状态，不重新部署或修改业务代码；本次纯文档提交准确 CI 在最终交付记录。原 Linux 全量 25 项超时失败保留，按作者批准的 GitHub gate/e2e 门槛验收。原生 CLI 轮次事件降级、后台恢复后预览可能需重载、Git 追踪引用可能滞后和本机剩余磁盘偏低的边界继续如实记录。并行 RFC-036 与资源／拓扑在制品完整保留，以下历史原样保留。
+
 ## 2026-10-15 RFC-039：正式 CLI / Bot 已部署，游戏候选通过，等待访问范围确认
 
 本批 CLI / Bot 同级切换、满屏聊天与预览、确认代码提交及连续发布已进入正式代码并部署。本机后台为 `dd85c40c324fa4a576524c794af75e7c3cc4fcf3`（[九项 CI 全绿](https://github.com/wangbinquan/CrewStation/actions/runs/38730803101)），控制台为 `507d832d86173e26581eeb2f10746976ab543b54`，任务底座为 `946658e7d58f1de9090b9f854adbafad1c13d88b`，各自准确 CI 全绿后部署。七后台均 Ready，默认档位 revision 15 / 400m CPU / 2Gi，真实模型与业务探针 passed / available=true。实际 CLI 自动附着并回复 `CLI_AUTO_ATTACH_OK`；Bot 的两个预览 MCP 工具真实完成并回复 `MCP_PREVIEW_OK`，桌面／390px 布局及模式切换保留通过。原 Linux 完整门禁的 25 项超时失败保留；本次部署依据作者“允许”以准确 GitHub gate/e2e 为条件，不冒充本机整库绿色。

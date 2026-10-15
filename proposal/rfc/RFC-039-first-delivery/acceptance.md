@@ -1,5 +1,7 @@
 # RFC-039 实施与验收记录
 
+> 最新状态：Done · 2026-10-15。正式代码与本机部署、真实贪吃蛇创建至上线链路已验收完成。最终版本 v0.1.1 / 12450292，正式地址 `http://snake-bot-20261014.cs.localhost/`，范围为全部登录用户。文末有完整发布身份与访问验收；以下旧轮次的失败及等待按当时事实保留。
+
 2026-10-14。状态：实现已落入共享 main 工作树；CLI / Bot 双模式和满屏布局已实现，真实验收已开始；新版本部署与贪吃蛇完整发布仍开放。下文按各轮验收时点记录，最新情况见文末追加记录。
 
 ## 已实现行为
@@ -229,3 +231,30 @@ Chrome 打开实际候选地址 `http://preview.snake-bot-20261014.cs.localhost`
 数据库恢复后 Bot 仍 awaiting-input，真实 MCP 历史保留。1728×817 下文档同尺寸，main 1520×765、输入框底边 737.5，正式截图 `bot-production-final.png`。旧预览在恢复后需点击原有“重新加载”才能重新显示，此局限保留。候选截图 `snake-candidate-verified.png`。
 
 上线确认时，自动审批拒绝把“项目成员”扩大到“全部登录用户”并切流，认为此前授权未具体覆盖受众范围。已向作者明确呈现目标版本、访问范围和未登录者仍被阻止的后果，并请求选择；没有通过 API 或其他方式绕过。此段记录时尚未正式切流，页面和原流程保留，后续结果另记。
+
+### 作者批准后正式上线与 RFC Done（2026-10-15）
+
+作者随后明确回复“批准你的动作”，覆盖上一轮具体提出的“将贪吃蛇开放给全部登录用户并正式上线”。本轮在原 Chrome 发布页选择全部登录用户并提交一次上线确认，继续原 v0.1.1 / 原 SHA / 原流程，没有新建版本或绕过验证门。访问策略由 members revision 0 正常保存为 authenticated revision 1；切流于 2026-10-15T12:41:48.524Z 受理，2026-10-15T12:42:01.205Z 正式确认，耗时 12681ms。此前自动审批阻塞已由本次具体授权解除。
+
+| 对象 | 实际身份与终态 |
+|---|---|
+| 项目 | `01a13e16-9a55-7000-be84-b890e02e9b0d` / `snake-bot-20261014` |
+| 服务 | `01a13e16-9a55-7001-a192-f554cdb3301b` |
+| 游戏提交 | `12450292b0e8438a066391a08f53bcfa511559ed`，main，v0.1.1 |
+| 发布 | `01a13f7d-526c-7000-bff7-15f1eae541bb`，ready / prod |
+| 发布流程 | `01a13f7d-52ea-7000-a386-008b0aba56ba`，succeeded，revision 15，15 条事件保留 |
+| 正式切流 | `01a13f95-445a-7000-bc68-960cc463ca9c`，route observed / launch complete |
+| 目标代次 | `4ed75bc5fe3b00c663a9b793b86a33e32417b715b69514ad878e977331e883db` |
+| 正式镜像 | `registry.crewstation-system.svc.cluster.local:5000/snake-bot-20261014@sha256:46f2bb97f53382baafe407c178b17e2e1b6f5eacfe454891fad4920cfb99f360` |
+| 正式地址 | `http://snake-bot-20261014.cs.localhost/` |
+| 部署与物理实例 | `snake-bot-20261014-green` 1/1 ready；Pod `snake-bot-20261014-green-dc5494fcd-82h4w`，UID `c46b9412-3f4b-4b7e-bc42-439b03f372a5`，Running / ready，0 次重启，实际 imageID 与发布镜像一致 |
+
+正式 Chrome 发布页显示“已完成”“这次发布已确认正式生效”，范围为全部登录用户 / 配置版本 1。正式游戏实际操作开始、计分到 10、暂停、重新开始及方向控制通过；首次交付独立路由按真实槽事实显示创建、环境、开发预览、验证上线已完成，以及“正式应用已就绪”，版本与 SHA 一致。没有新增常驻首次交付导航。
+
+使用正常 OIDC 登录分别取得 dev-developer 与 dev-member 会话，先核对身份，并读取项目成员列表确认后者不是项目成员。负责人和非成员 GET 正式根页均 200，真实返回贪吃蛇标题与棋盘；非成员应用 access.granted=true。未登录浏览器导航（Accept: text/html）得到 302 到正式登录地址，未登录 API（Accept: application/json）得到 401，均不返回游戏。第一次验收脚本未声明 HTML Accept，却期待跳转；实际 401 符合 identity/forwardedRequest 的既有契约，随后明确分别检查 HTML / API 两种语义，生产代码没有为测试改变。
+
+真实工作区复读仍为确认 SHA，未提交数 0、未推送数 0。本地 origin/main 缓存引用滞后的边界保留，不宣称所有 Git 追踪引用都已同步。GitLab main 的 push/merge access=40、force push=false 保持；三次实际发布临时令牌 683/684/685 均 revoked=true / active=false。旧模板 v0.1.0 为 superseded，旧流程 interrupted 的原历史保留；唯一游戏 v0.1.1 流程为 succeeded。
+
+证据为 `.local/cli-bot-acceptance/snake-production-proof.json`、`snake-production-kubernetes.json`、`snake-publish-credential-receipts.json`、`snake-production-final.png`、`snake-release-completed.png` 和 `first-delivery-completed.png`。后台源码仍为 dd85c40c、控制台 507d832d、任务底座 946658e7，各自准确 SHA CI 全绿后部署；本轮只是已部署功能的真实上线与文档收口，没有再次改动或部署代码。验收文档 `2c3093fb81832e8c751207052c691632099d61f4` 的 [CI 38734259928](https://github.com/wangbinquan/CrewStation/actions/runs/38734259928) 九项全部成功。Done 文档本身的准确提交与 CI 另在最终交付中记录。
+
+RFC-039 的 T1–T10 与 FD-01–FD-09 在上述实现、相应层级回归和完整真实发布证据下收口为 Done。原 Linux 全量 25 项超时失败没有改写，沿用作者批准的准确 GitHub gate/e2e 部署门槛。CLI 原生轮次观测降级、升级后预览手动重载以及本机磁盘容量仍是明确保留的运行边界，不等同于此轮已全部修复。
