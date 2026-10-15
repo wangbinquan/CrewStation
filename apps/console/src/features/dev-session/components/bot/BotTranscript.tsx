@@ -37,7 +37,7 @@ export function BotTranscript({ lines, running, onSuggestion, hasConversation }:
       </div> : null}
       {items.map((item, index) => {
         if (item.kind === 'user') return <article key={item.line.id} className={styles.userMessage} aria-label={t('devSession.bot.you')}><div>{item.line.body}</div></article>;
-        if (item.kind === 'answer') return <article key={item.line.id} className={styles.botMessage}><div className={styles.author}><GlyphIcon name="assistant" plain /><strong>Crew Bot</strong></div><BotMessageBody text={item.line.body} /></article>;
+        if (item.kind === 'answer') return <article key={item.line.id} className={styles.botMessage} aria-label="Crew Bot"><div className={styles.author}><GlyphIcon name="assistant" plain /><strong>Crew Bot</strong></div><div className={styles.botBubble}><BotMessageBody text={item.line.body} /></div></article>;
         const failed = item.lines.some(line => line.failed || line.type === 'error');
         return <details key={`activity:${item.lines[0]?.id ?? index}`} className={styles.activity} open={failed || undefined}>
           <summary>{failed ? t('devSession.bot.activityFailed') : t('devSession.bot.activity')} <span>{item.lines.length}</span></summary>

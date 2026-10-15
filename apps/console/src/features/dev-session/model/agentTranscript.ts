@@ -42,20 +42,25 @@ function bodyOf(event: AgentEvent): string {
 }
 
 function lineOf(event: AgentEvent): TranscriptLine {
-  return { id: `${event.agentId}:${event.seq}`, type: event.type, body: bodyOf(event), at: event.at, failed: event.tool?.isError === true };
+  // c55d1c25 之前的 Runner 把长协议行截到 8192 字符，解析失败后以无 raw 的 text 保存。
+  // 仅兼容该旧 OpenCode 工具信封；正常原生文本带 raw，哪怕正文演示同样的 JSON 也不改类。
+  const legacyTool = event.type === 'text' && event.raw === undefined && event.text?.length === 8192
+    && /^\{"type":"tool_use","timestamp":\d+,"sessionID":"[^"\\]+","part":\{"type":"tool","tool":"[^"\\]+","callID":"[^"\\]+",/u.test(event.text);
+  return { id: `${event.agentId}:${event.seq}`, type: legacyTool ? 'tool-start' : event.type, body: bodyOf(event), at: event.at, failed: event.tool?.isError === true };
 }
 
 /** 连续的 text 增量属于同一段输出，合并成一行；其余事件各占一行。 */
-function mergeable(previous: TranscriptLine | undefined, event: AgentEvent): previous is TranscriptLine {
-  return previous !== undefined && previous.type === 'text' && event.type === 'text' && previous.body.length < MAX_MERGED_BODY;
+function mergeable(previous: TranscriptLine | undefined, line: TranscriptLine): previous is TranscriptLine {
+  return previous !== undefined && previous.type === 'text' && line.type === 'text' && previous.body.length < MAX_MERGED_BODY;
 }
 
 export function appendAgentEvent(current: TranscriptsByAgent, event: AgentEvent): TranscriptsByAgent {
   const lines = current[event.agentId] ?? [];
   const previous = lines[lines.length - 1];
-  const next = mergeable(previous, event)
-    ? [...lines.slice(0, -1), { ...previous, body: previous.body + (event.text ?? '') }]
-    : [...lines, lineOf(event)];
+  const line = lineOf(event);
+  const next = mergeable(previous, line)
+    ? [...lines.slice(0, -1), { ...previous, body: previous.body + line.body }]
+    : [...lines, line];
   return { ...current, [event.agentId]: next.slice(-MAX_TRANSCRIPT_LINES) };
 }
 

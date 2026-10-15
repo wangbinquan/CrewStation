@@ -6,9 +6,52 @@ import { BotTranscript } from '../features/dev-session/components/bot/BotTranscr
 import { appendAgentEvents } from '../features/dev-session/model/agentTranscript';
 import { messages } from '../features/dev-session/i18n/zh-CN';
 import { renderElement } from './renderElement';
+import type { AgentEvent } from '@crewstation/contracts';
 
 let view: Awaited<ReturnType<typeof renderElement>> | undefined;
 afterEach(() => { view?.unmount(); view = undefined; });
+
+const legacyTool = (name: string) => JSON.stringify({ type: 'tool_use', timestamp: 1792056444830, sessionID: 'ses_snake', part: {
+  type: 'tool', tool: 'read', callID: name, state: { status: 'completed', input: { filePath: `/work/${name}.ts` }, output: '旧文件内容\n'.repeat(2000) },
+} }).slice(0, 8192);
+const transcript = (events: readonly Partial<AgentEvent>[]) => appendAgentEvents({}, events.map((event, index) => ({
+  agentId: 'bot', seq: index + 1, at: '2026-10-15T12:00:00.000Z', type: 'text' as const, ...event,
+}))).bot!;
+
+test('旧贪吃蛇截断工具记录在合并增量前归入执行记录，前后回答仍完整', async () => {
+  const first = legacyTool('main'), second = legacyTool('test');
+  const lines = transcript([{ text: '开始检查。' }, { text: first }, { text: second }, { text: '完成。' }, { text: '游戏可用。' }]);
+  view = await renderElement(<BotTranscript lines={lines} running={false} hasConversation onSuggestion={() => {}} />, messages);
+  // 真实故障：旧宿主把每个工具 JSON 截到 8192 字符，fallback text 被合并并当成 Bot 正文。
+  const answers = [...view.host.querySelectorAll('article')];
+  expect(answers.map(answer => answer.textContent)).toEqual(['Crew Bot开始检查。', 'Crew Bot完成。游戏可用。']);
+  const records = view.host.querySelector('details')!;
+  expect(records.open).toBe(false);
+  expect(records.querySelectorAll('pre')).toHaveLength(2);
+  expect(records.textContent).toContain(first); expect(records.textContent).toContain(second);
+});
+
+test('正文提到 tool_use、展示 JSON 或来自有效原生文本帧时不会误归为工具', async () => {
+  const example = legacyTool('example');
+  const texts = ['tool_use 是工具事件。', '{"type":"tool_use","name":"read"}', '{"type":"tool_use","timestamp":1', example];
+  const lines = transcript(texts.flatMap((text, index) => [
+    { text, ...(index === 3 ? { raw: JSON.stringify({ type: 'text', part: { type: 'text', text } }) } : {}) },
+    { type: 'status' as const, status: 'waiting' },
+  ]));
+  view = await renderElement(<BotTranscript lines={lines} running={false} hasConversation onSuggestion={() => {}} />, messages);
+  expect([...view.host.querySelectorAll('article')].map(answer => answer.textContent)).toEqual(texts.map(text => `Crew Bot${text}`));
+});
+
+test('Bot 正文、列表和代码全部位于回答气泡内，执行记录保持独立', async () => {
+  const lines = transcript([{ type: 'tool-start', tool: { name: 'Read' } }, { text: '已完成。\n\n- 可以开始\n\n```ts\nstartGame();\n```' }]);
+  view = await renderElement(<BotTranscript lines={lines} running={false} hasConversation onSuggestion={() => {}} />, messages);
+  const answer = view.host.querySelector('article[aria-label="Crew Bot"]')!;
+  const bubble = answer?.lastElementChild;
+  expect(bubble?.querySelector('p')?.textContent).toBe('已完成。');
+  expect(bubble?.querySelector('ul')?.textContent).toBe('可以开始');
+  expect(bubble?.querySelector('pre code')?.textContent).toContain('startGame();');
+  expect(bubble?.contains(view.host.querySelector('details'))).toBe(false);
+});
 
 test('历史流恢复用户输入、工具失败及回答，代码安全转义，成功过程默认收起', async () => {
   const lines = appendAgentEvents({}, [

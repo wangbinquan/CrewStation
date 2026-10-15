@@ -258,3 +258,11 @@ Chrome 打开实际候选地址 `http://preview.snake-bot-20261014.cs.localhost`
 证据为 `.local/cli-bot-acceptance/snake-production-proof.json`、`snake-production-kubernetes.json`、`snake-publish-credential-receipts.json`、`snake-production-final.png`、`snake-release-completed.png` 和 `first-delivery-completed.png`。后台源码仍为 dd85c40c、控制台 507d832d、任务底座 946658e7，各自准确 SHA CI 全绿后部署；本轮只是已部署功能的真实上线与文档收口，没有再次改动或部署代码。验收文档 `2c3093fb81832e8c751207052c691632099d61f4` 的 [CI 38734259928](https://github.com/wangbinquan/CrewStation/actions/runs/38734259928) 九项全部成功。Done 文档本身的准确提交与 CI 另在最终交付中记录。
 
 RFC-039 的 T1–T10 与 FD-01–FD-09 在上述实现、相应层级回归和完整真实发布证据下收口为 Done。原 Linux 全量 25 项超时失败没有改写，沿用作者批准的准确 GitHub gate/e2e 部署门槛。CLI 原生轮次观测降级、升级后预览手动重载以及本机磁盘容量仍是明确保留的运行边界，不等同于此轮已全部修复。
+
+### Bot 旧工具记录重放与回答气泡修复（2026-10-15）
+
+作者指出贪吃蛇 Bot 把 `tool_use` 展示为回答，并要求回答放在浅绿色气泡内。Chrome 在旧 Agent `01a13ee2-6441-7000-a6e3-bea464a298bd` 复现；正常 OIDC 读取原执行 `01a13ee2-63f5-7000-a915-ecb32e67a3ed` 事件，确认 seq 9、20、21、23 的工具信封各被旧 Runner 截成 8192 字符，JSON 解析失败后保存为不含 `raw` 的 `text`。实际自然语言 seq 5、16 均保留原生 `raw`。前轮长行修复 c55d1c25 已阻止新的截断，但验收只覆盖新对话，遗漏了旧历史的展示兼容。
+
+转录投影在合并正文前，仅识别这种旧长度、缺失原生 `raw`、带完整 OpenCode 工具身份头的记录，归入折叠执行记录并保留原文；不改写持久事件，不对普通 JSON、讨论 `tool_use` 的正文或有效原生文本帧做关键词过滤。回答正文、列表和代码统一放入气泡，采用既有浅绿 `--cs-tone-success-bg`；执行记录独立呈现。实现仍属于 RFC-039 已批准的正式 Bot 对话界面修复。
+
+新增回归先红（旧工具污染正文、回答未包入气泡），修复后 Bot、原生 OpenCode 与长行协议三文件 21 pass / 0 fail / 80 断言；相邻历史、执行订阅、开发面板三文件 17 pass / 0 fail / 147 断言。精确 lint、console 类型和结构检查通过。实际旧事件回放得到两条正常回答，四条工具原文完整保留在执行记录。此处记录源码验收，准确 SHA CI、部署及 Chrome 最终结果在后续条目补记。原始证据位于 `.local/cli-bot-acceptance/bot-protocol-*`。
