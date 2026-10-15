@@ -1,6 +1,8 @@
-## 2026-10-15 RFC-036 部署架构视图候选已实现
+## 2026-10-15 RFC-036 部署架构资源视图（Done）
 
-作者明确要求按设计完成 RFC。资源中心已接入与运行诊断共用的事实读取，四视角、真实身份聚合、对象权限／实例／关系统一弹窗、来源不完整提示和有界分页已实现；既有动作合同与后端权限保持。控制台层 1184 pass／0 fail，最终英文及类型修正后的专项 18 pass／0 fail，真实 dev-developer 项目页、390／320px 嵌套弹窗和英文关系实看通过。25 个源文件冻结，独立 Linux／PostgreSQL 完整门禁运行中；尚未宣称准确 SHA CI 或正式部署完成。详见 [本次追加验收](proposal/rfc/RFC-036-project-resource-workspace/deployment-architecture-acceptance.md)。下方历史与并行内容原样保留。
+源码 `c02ca7a29a872f9e7bfc505cb1c2b414445e6d35` 已精确推送，准确 SHA [CI 38742516344](https://github.com/wangbinquan/CrewStation/actions/runs/38742516344) 九项全绿。共用运行事实、四视角、稳定身份聚合、对象权限／实例／关系统一弹窗、来源不完整提示和有界分页已实现；原型及并行历史完整保留。本地完整分层共 5650 pass／159 环境 skip／0 fail，1176 文件人口审计通过，改动行 374／374；原单进程 18 GiB OOM 和 Node 2 GiB 堆不足原件保留，未改变测试预算，不能表述为原单进程 check 全绿。
+
+13:38:57 UTC 完成仅 console 部署：源码 c02ca7a2，镜像 manifest `sha256:4df32c12d0bd1a541ff0af4819141fc80c2c99f4d1f3c8d2a584dca5c51214a6`，generation 308、Ready 1。其余 11 个系统组件的 UID／generation／镜像与 Runner 配置不变，演示项目 Pod UID 不变。正式 dev-developer 演示项目显示四视角、82 项能力、demo-blue 两个运行对象和十项资源权限；桌面／390px 详情、嵌套 Esc、筛选与稳定布局焦点恢复复验通过。部署前的真实接口英文／320px 检查与隔离角色用例分开记录，没有新增授权、配额或工作负载。本次自有测试容器、网络与只读预览已清理／关闭。RFC 三件套和索引已同步 Done，证据见 [本次验收](proposal/rfc/RFC-036-project-resource-workspace/deployment-architecture-acceptance.md)。本次收尾仅保存文档与证据，准确文档 SHA CI 在最终交付记录。下方历史原样保留。
 
 ## 2026-10-15 RFC-039：真实贪吃蛇正式上线与首次交付闭环（Done）
 

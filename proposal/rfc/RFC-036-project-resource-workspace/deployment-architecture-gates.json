@@ -1,0 +1,196 @@
+{
+  "sourceSha": "c02ca7a29a872f9e7bfc505cb1c2b414445e6d35",
+  "local": {
+    "sourceSha": "c02ca7a29a872f9e7bfc505cb1c2b414445e6d35",
+    "allRequiredLocalChecksCompleted": true,
+    "method": "repository CI tiers, sequential module shards, complete test-file audit",
+    "counts": {
+      "pass": 5650,
+      "skip": 159,
+      "fail": 0
+    },
+    "static": {
+      "architecture": "passed",
+      "lint": "passed",
+      "backendTypes": "passed with NODE_OPTIONS=--max-old-space-size=4096",
+      "consoleTypes": "passed with NODE_OPTIONS=--max-old-space-size=4096"
+    },
+    "tierAuditExitCode": 0,
+    "originalFailuresRetained": [
+      "full-check.log: timeout followed by container OOM; incomplete",
+      "tier-static.log: Node default 2 GiB heap exhausted; completed by typecheck-repair.log"
+    ],
+    "singleProcessBunRunCheckGreen": false
+  },
+  "tiers": {
+    "sourceSha": "c02ca7a29a872f9e7bfc505cb1c2b414445e6d35",
+    "elapsedSeconds": 1026.21,
+    "steps": [
+      {
+        "step": "static",
+        "exitCode": 134,
+        "seconds": 119.87
+      },
+      {
+        "step": "unit",
+        "exitCode": 0,
+        "seconds": 20.62,
+        "artifactsCopied": true
+      },
+      {
+        "step": "module-1",
+        "exitCode": 0,
+        "seconds": 275.91,
+        "artifactsCopied": true
+      },
+      {
+        "step": "module-2",
+        "exitCode": 0,
+        "seconds": 212.4,
+        "artifactsCopied": true
+      },
+      {
+        "step": "module-3",
+        "exitCode": 0,
+        "seconds": 109.64,
+        "artifactsCopied": true
+      },
+      {
+        "step": "module-4",
+        "exitCode": 0,
+        "seconds": 139.81,
+        "artifactsCopied": true
+      },
+      {
+        "step": "console",
+        "exitCode": 0,
+        "seconds": 143.34,
+        "artifactsCopied": true
+      },
+      {
+        "step": "e2e",
+        "exitCode": 0,
+        "seconds": 3.52,
+        "artifactsCopied": true
+      }
+    ],
+    "auditExitCode": 0,
+    "allPassed": false,
+    "note": "Existing CI tiers run sequentially after the original all-in-one process was OOM-killed; no assertions or timeouts changed."
+  },
+  "typecheckRepair": {
+    "sourceSha": "c02ca7a29a872f9e7bfc505cb1c2b414445e6d35",
+    "exitCode": 0,
+    "finishedAt": "2026-10-15T13:13:05.323676544Z",
+    "oomKilled": false,
+    "commands": [
+      "bun run typecheck",
+      "bun run typecheck:console"
+    ],
+    "nodeOptions": "--max-old-space-size=4096",
+    "purpose": "complete type checks after Debian Node default 2 GiB heap exhaustion; original structural and lint checks already passed"
+  },
+  "originalIncompleteRun": {
+    "exitCode": 137,
+    "elapsedSeconds": 1033.14,
+    "image": "sha256:a5e7b1bf0dc7c1593d06c93ad44abb9c47d8c0b89329f6e8cc4987af67682186",
+    "database": "dedicated PostgreSQL 17.11 with max_prepared_transactions=10",
+    "command": "bun run check",
+    "memoryLimitGiB": 18,
+    "loggedCasesBeforeOom": {
+      "pass": 4091,
+      "fail": 1,
+      "skip": 159
+    },
+    "oomKilled": true,
+    "failures": [
+      "(fail) runtime-environment: actual native unlink and independent final proof preserve a shared foreign layer; rebuilt factory replays the retained original scope [5000.00ms]"
+    ]
+  },
+  "changedExecutableLines": {
+    "covered": 374,
+    "total": 374
+  },
+  "sourceCi": {
+    "headSha": "c02ca7a29a872f9e7bfc505cb1c2b414445e6d35",
+    "status": "completed",
+    "conclusion": "success",
+    "updatedAt": "2026-10-15T13:34:03Z",
+    "url": "https://github.com/wangbinquan/CrewStation/actions/runs/38742516344",
+    "runId": 38742516344,
+    "jobs": [
+      {
+        "databaseId": 116447581579,
+        "name": "e2e（实机端到端）",
+        "status": "completed",
+        "conclusion": "success",
+        "completedAt": "2026-10-15T13:33:31Z",
+        "url": "https://github.com/wangbinquan/CrewStation/actions/runs/38742516344/job/116447581579"
+      },
+      {
+        "databaseId": 116447582024,
+        "name": "static（结构规则 · lint · 类型）",
+        "status": "completed",
+        "conclusion": "success",
+        "completedAt": "2026-10-15T13:26:49Z",
+        "url": "https://github.com/wangbinquan/CrewStation/actions/runs/38742516344/job/116447582024"
+      },
+      {
+        "databaseId": 116447582167,
+        "name": "console（工作台）",
+        "status": "completed",
+        "conclusion": "success",
+        "completedAt": "2026-10-15T13:27:10Z",
+        "url": "https://github.com/wangbinquan/CrewStation/actions/runs/38742516344/job/116447582167"
+      },
+      {
+        "databaseId": 116447582246,
+        "name": "module（模块级 UT 4/4）",
+        "status": "completed",
+        "conclusion": "success",
+        "completedAt": "2026-10-15T13:33:42Z",
+        "url": "https://github.com/wangbinquan/CrewStation/actions/runs/38742516344/job/116447582246"
+      },
+      {
+        "databaseId": 116447582266,
+        "name": "unit（方法级 UT）",
+        "status": "completed",
+        "conclusion": "success",
+        "completedAt": "2026-10-15T13:25:47Z",
+        "url": "https://github.com/wangbinquan/CrewStation/actions/runs/38742516344/job/116447582266"
+      },
+      {
+        "databaseId": 116447582287,
+        "name": "module（模块级 UT 3/4）",
+        "status": "completed",
+        "conclusion": "success",
+        "completedAt": "2026-10-15T13:32:06Z",
+        "url": "https://github.com/wangbinquan/CrewStation/actions/runs/38742516344/job/116447582287"
+      },
+      {
+        "databaseId": 116447582291,
+        "name": "module（模块级 UT 2/4）",
+        "status": "completed",
+        "conclusion": "success",
+        "completedAt": "2026-10-15T13:29:15Z",
+        "url": "https://github.com/wangbinquan/CrewStation/actions/runs/38742516344/job/116447582291"
+      },
+      {
+        "databaseId": 116447582486,
+        "name": "module（模块级 UT 1/4）",
+        "status": "completed",
+        "conclusion": "success",
+        "completedAt": "2026-10-15T13:30:45Z",
+        "url": "https://github.com/wangbinquan/CrewStation/actions/runs/38742516344/job/116447582486"
+      },
+      {
+        "databaseId": 116451810498,
+        "name": "gate（汇总 · 新增代码防护）",
+        "status": "completed",
+        "conclusion": "success",
+        "completedAt": "2026-10-15T13:34:02Z",
+        "url": "https://github.com/wangbinquan/CrewStation/actions/runs/38742516344/job/116451810498"
+      }
+    ]
+  }
+}

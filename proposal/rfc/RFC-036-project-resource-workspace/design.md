@@ -1,6 +1,6 @@
 # RFC-036｜技术设计（已批准）
 
-> 2026-10-01 修订，2026-10-15 已批准实施：作者要求以「运行与诊断」的部署架构组织资源。见 [以部署架构组织项目资源](./deployment-architecture.md) 与[交互原型](./deployment-prototype/README.md)。作者已明确要求按此设计完成 RFC，下面保留已经实施的历史设计。
+> 2026-10-01 修订，2026-10-15 已按批准设计完成实施与部署：作者要求以「运行与诊断」的部署架构组织资源。见 [以部署架构组织项目资源](./deployment-architecture.md)、[交互原型](./deployment-prototype/README.md) 与[实现验收](./deployment-architecture-acceptance.md)。下面保留已经实施的历史设计。
 
 > 基线：main `bebb3d9b3b2a879a8e8ecf9b56b818fc912b15b7`。作者已批准实施；结构决策见 ADR-0011。
 

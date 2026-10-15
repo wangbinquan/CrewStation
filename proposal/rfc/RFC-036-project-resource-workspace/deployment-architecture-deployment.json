@@ -1,0 +1,342 @@
+{
+  "completedAt": "2026-10-15T13:38:57.264Z",
+  "sourceSha": "c02ca7a29a872f9e7bfc505cb1c2b414445e6d35",
+  "sourceConfigId": "sha256:441c3b9a14ce5fc78750e7f25f9d870f24a8ee83cb0da9388b91de1d037c90da",
+  "image": "docker.io/library/cs-console@sha256:4df32c12d0bd1a541ff0af4819141fc80c2c99f4d1f3c8d2a584dca5c51214a6",
+  "previousImage": "docker.io/library/cs-console@sha256:f46fce95d5fd137bba0411f9cbba5704b1dc959dd9cd3e480435435f8b608759",
+  "previousSource": "507d832d86173e26581eeb2f10746976ab543b54",
+  "ci": {
+    "conclusion": "success",
+    "databaseId": 38742516344,
+    "headSha": "c02ca7a29a872f9e7bfc505cb1c2b414445e6d35",
+    "status": "completed",
+    "url": "https://github.com/wangbinquan/CrewStation/actions/runs/38742516344"
+  },
+  "requiredStorageContract": 1,
+  "componentsBefore": [
+    {
+      "name": "buildkitd",
+      "uid": "abc1b5e1-1ed9-4243-9010-3401831d66a4",
+      "generation": 1,
+      "observedGeneration": 1,
+      "ready": 1,
+      "images": [
+        "docker.io/moby/buildkit:v0.33.0-rootless"
+      ],
+      "runnerImage": []
+    },
+    {
+      "name": "console",
+      "uid": "c4874a0e-6415-4c2b-b141-74ac25ea10ed",
+      "generation": 307,
+      "observedGeneration": 307,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-console@sha256:f46fce95d5fd137bba0411f9cbba5704b1dc959dd9cd3e480435435f8b608759"
+      ],
+      "runnerImage": []
+    },
+    {
+      "name": "crewstation-dev-auth",
+      "uid": "a9ccb640-be5d-484a-8070-533af3ab53e9",
+      "generation": 23,
+      "observedGeneration": 23,
+      "ready": 1,
+      "images": [
+        "cs-control-plane:dev"
+      ],
+      "runnerImage": []
+    },
+    {
+      "name": "cs-api",
+      "uid": "b29a07a4-f251-46d4-8b67-d6c456c85749",
+      "generation": 305,
+      "observedGeneration": 305,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:533923ac94a3b763959bca0707b20d285113c807d2bdfee41392513b754e8709"
+      ],
+      "runnerImage": []
+    },
+    {
+      "name": "cs-auth",
+      "uid": "a9682e05-2aee-4b76-9842-223da720574e",
+      "generation": 200,
+      "observedGeneration": 200,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:533923ac94a3b763959bca0707b20d285113c807d2bdfee41392513b754e8709"
+      ],
+      "runnerImage": []
+    },
+    {
+      "name": "cs-controller",
+      "uid": "5107f19e-22d5-4d7b-8850-78204f329e82",
+      "generation": 271,
+      "observedGeneration": 271,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:533923ac94a3b763959bca0707b20d285113c807d2bdfee41392513b754e8709"
+      ],
+      "runnerImage": []
+    },
+    {
+      "name": "cs-events",
+      "uid": "483d82fb-89c0-41df-b03e-9b025822fe1a",
+      "generation": 170,
+      "observedGeneration": 170,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:533923ac94a3b763959bca0707b20d285113c807d2bdfee41392513b754e8709"
+      ],
+      "runnerImage": []
+    },
+    {
+      "name": "cs-session",
+      "uid": "68a3334b-917a-43b7-808e-e3d366fdc2ef",
+      "generation": 221,
+      "observedGeneration": 221,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:533923ac94a3b763959bca0707b20d285113c807d2bdfee41392513b754e8709"
+      ],
+      "runnerImage": []
+    },
+    {
+      "name": "mcp-capabilities",
+      "uid": "c53a1d73-3ec1-4848-a370-6c4579f31edc",
+      "generation": 165,
+      "observedGeneration": 165,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:533923ac94a3b763959bca0707b20d285113c807d2bdfee41392513b754e8709"
+      ],
+      "runnerImage": []
+    },
+    {
+      "name": "mcp-operations",
+      "uid": "e979a774-d521-4031-a3fa-af9c7dafb80a",
+      "generation": 165,
+      "observedGeneration": 165,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:533923ac94a3b763959bca0707b20d285113c807d2bdfee41392513b754e8709"
+      ],
+      "runnerImage": []
+    },
+    {
+      "name": "registry",
+      "uid": "b75afb9d-f078-471c-bd6d-c003d6e65857",
+      "generation": 1,
+      "observedGeneration": 1,
+      "ready": 1,
+      "images": [
+        "docker.io/library/registry:3.1.1"
+      ],
+      "runnerImage": []
+    },
+    {
+      "name": "traefik",
+      "uid": "ff9c3f8e-d3b1-4957-b064-04627223b15d",
+      "generation": 3,
+      "observedGeneration": 3,
+      "ready": 1,
+      "images": [
+        "docker.io/library/traefik:v3.7.13"
+      ],
+      "runnerImage": []
+    }
+  ],
+  "componentsAfter": [
+    {
+      "name": "buildkitd",
+      "uid": "abc1b5e1-1ed9-4243-9010-3401831d66a4",
+      "generation": 1,
+      "observedGeneration": 1,
+      "ready": 1,
+      "images": [
+        "docker.io/moby/buildkit:v0.33.0-rootless"
+      ],
+      "runnerImage": []
+    },
+    {
+      "name": "console",
+      "uid": "c4874a0e-6415-4c2b-b141-74ac25ea10ed",
+      "generation": 308,
+      "observedGeneration": 308,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-console@sha256:4df32c12d0bd1a541ff0af4819141fc80c2c99f4d1f3c8d2a584dca5c51214a6"
+      ],
+      "runnerImage": []
+    },
+    {
+      "name": "crewstation-dev-auth",
+      "uid": "a9ccb640-be5d-484a-8070-533af3ab53e9",
+      "generation": 23,
+      "observedGeneration": 23,
+      "ready": 1,
+      "images": [
+        "cs-control-plane:dev"
+      ],
+      "runnerImage": []
+    },
+    {
+      "name": "cs-api",
+      "uid": "b29a07a4-f251-46d4-8b67-d6c456c85749",
+      "generation": 305,
+      "observedGeneration": 305,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:533923ac94a3b763959bca0707b20d285113c807d2bdfee41392513b754e8709"
+      ],
+      "runnerImage": []
+    },
+    {
+      "name": "cs-auth",
+      "uid": "a9682e05-2aee-4b76-9842-223da720574e",
+      "generation": 200,
+      "observedGeneration": 200,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:533923ac94a3b763959bca0707b20d285113c807d2bdfee41392513b754e8709"
+      ],
+      "runnerImage": []
+    },
+    {
+      "name": "cs-controller",
+      "uid": "5107f19e-22d5-4d7b-8850-78204f329e82",
+      "generation": 271,
+      "observedGeneration": 271,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:533923ac94a3b763959bca0707b20d285113c807d2bdfee41392513b754e8709"
+      ],
+      "runnerImage": []
+    },
+    {
+      "name": "cs-events",
+      "uid": "483d82fb-89c0-41df-b03e-9b025822fe1a",
+      "generation": 170,
+      "observedGeneration": 170,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:533923ac94a3b763959bca0707b20d285113c807d2bdfee41392513b754e8709"
+      ],
+      "runnerImage": []
+    },
+    {
+      "name": "cs-session",
+      "uid": "68a3334b-917a-43b7-808e-e3d366fdc2ef",
+      "generation": 221,
+      "observedGeneration": 221,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:533923ac94a3b763959bca0707b20d285113c807d2bdfee41392513b754e8709"
+      ],
+      "runnerImage": []
+    },
+    {
+      "name": "mcp-capabilities",
+      "uid": "c53a1d73-3ec1-4848-a370-6c4579f31edc",
+      "generation": 165,
+      "observedGeneration": 165,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:533923ac94a3b763959bca0707b20d285113c807d2bdfee41392513b754e8709"
+      ],
+      "runnerImage": []
+    },
+    {
+      "name": "mcp-operations",
+      "uid": "e979a774-d521-4031-a3fa-af9c7dafb80a",
+      "generation": 165,
+      "observedGeneration": 165,
+      "ready": 1,
+      "images": [
+        "docker.io/library/cs-control-plane@sha256:533923ac94a3b763959bca0707b20d285113c807d2bdfee41392513b754e8709"
+      ],
+      "runnerImage": []
+    },
+    {
+      "name": "registry",
+      "uid": "b75afb9d-f078-471c-bd6d-c003d6e65857",
+      "generation": 1,
+      "observedGeneration": 1,
+      "ready": 1,
+      "images": [
+        "docker.io/library/registry:3.1.1"
+      ],
+      "runnerImage": []
+    },
+    {
+      "name": "traefik",
+      "uid": "ff9c3f8e-d3b1-4957-b064-04627223b15d",
+      "generation": 3,
+      "observedGeneration": 3,
+      "ready": 1,
+      "images": [
+        "docker.io/library/traefik:v3.7.13"
+      ],
+      "runnerImage": []
+    }
+  ],
+  "changedOtherComponents": [],
+  "projectPodUidsBefore": [
+    "88e8c9a6-7893-4e1d-97e7-4c175fb0db99"
+  ],
+  "projectPodUidsAfter": [
+    "88e8c9a6-7893-4e1d-97e7-4c175fb0db99"
+  ],
+  "context": "docker-desktop",
+  "namespace": "crewstation-system",
+  "postDeploymentBrowser": {
+    "observedAtUtc": "2026-10-15T13:43:29Z/2026-10-15T13:44:59Z",
+    "url": "http://console.cs.localhost/projects/01a0c12a-de0c-7009-83f4-d05f95c9a0a2/resource-center",
+    "identity": "dev-developer",
+    "projectRole": "developer",
+    "views": [
+      "服务部署",
+      "开发工作区",
+      "业务任务",
+      "构建与迁移"
+    ],
+    "ownedCapabilities": 82,
+    "sourceCount": 22,
+    "deploymentObject": "demo-blue",
+    "memberCount": 2,
+    "permissionCount": 10,
+    "desktop": {
+      "width": 1728,
+      "height": 817,
+      "documentWidth": 1728
+    },
+    "narrowNestedDetail": {
+      "width": 390,
+      "height": 844,
+      "documentWidth": 390,
+      "dialog": {
+        "x": 16,
+        "y": 16,
+        "width": 358,
+        "height": 812
+      }
+    },
+    "nestedEscape": {
+      "remainingDialogs": 1,
+      "filter": "service-plan",
+      "focus": "详情"
+    },
+    "stableNarrowLayoutClose": {
+      "remainingDialogs": 0,
+      "focus": "demo-blue运行对象 · 2运行中"
+    },
+    "viewportRestored": true,
+    "resourceMutations": false,
+    "screenshots": [
+      "acceptance-screenshots/deployment-architecture/deployed-desktop.jpg",
+      "acceptance-screenshots/deployment-architecture/deployed-mobile-detail.jpg"
+    ],
+    "scope": "Existing demo only. Other roles and complex runtime scenarios covered by regression tests; not new live role acceptance."
+  }
+}

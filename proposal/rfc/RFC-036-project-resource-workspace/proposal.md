@@ -1,7 +1,7 @@
 # RFC-036｜项目资源中心：授权、拓扑、配额与申请
 
 > 状态：Done · 2026-10-01 · 已按审核原型实施、发布并本机部署；主体与最后修正的精确 SHA 六项 CI 全部通过，实际页面、持久变更、拓扑归属和焦点复验见 [发布与部署后验收](./deployment.md)。
-> 当前追加：部署架构资源视图 In Progress · 2026-10-15 已获作者实施批准；此前 Done 仅指上述已交付版本。见 [追加设计](./deployment-architecture.md) 与 [实现验收](./deployment-architecture-acceptance.md)。
+> 当前追加：部署架构资源视图 Done · 2026-10-15 已按批准设计实施；源码 `c02ca7a2` 九项精确 CI 全绿、仅 console 部署与部署后浏览器验收完成。见 [追加设计](./deployment-architecture.md) 与 [实现验收](./deployment-architecture-acceptance.md)。
 > 配套：[技术设计](./design.md) · [实施计划](./plan.md) · [原型说明](./prototype/README.md)
 
 ## 1. 目标与已确认要求
