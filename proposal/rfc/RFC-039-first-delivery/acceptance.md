@@ -155,3 +155,9 @@ Chrome 打开实际页面组件的独立验收壳，最初标示“实现验收 
 `c55d1c25387f2bc5225d7fe0241ea73f4da207a1` 的 [CI 38714798459](https://github.com/wangbinquan/CrewStation/actions/runs/38714798459) 全部通过（unit 1523 / console 1164 / module 2924 / e2e 87，0 fail；差异行 10/10），八服务已滚动部署。默认算力先以 1 CPU / 2Gi 验证通过并启动游戏 Bot；同时启动 CLI 时本机 CPU 余量不足，已正常取消尚未调度的该验收 CLI，改用现有 400m CPU / 2Gi / 2Gi 临时存储档位。修订 14 自测 `01a13eff-7612-7000-8abe-df5c66a1c6bb` passed；未改动其他档位或清理其他项目资源。
 
 第二轮 Bot `01a13efc-55c0-7000-86c8-545583181bb5` / 执行 `01a13efc-5590-7000-bbf3-43c34d53e0a6` 已真实写入游戏文件。完整工具输出观察到 35248 字符，保持为工具事件，未再出现截断 JSON 正文。它调用 `operations_read_preview_status` 时得到 403：开发会话令牌白名单缺少已由 MCP 提供的预览接口。此次仅补齐绑定本项目的 GET 预览状态 / 日志和 POST start / stop / restart；真实 HTTP 令牌中间件回归覆盖成功、本项目错误方法 / 未知动作拒绝、跨项目拒绝、无效令牌拒绝，先红后绿。与现有 MCP 工具测试合计 34 pass / 0 fail / 155 断言。修复尚待准确 SHA CI 与后端部署，游戏尚在开发验证中。
+
+### 原生 CLI 实机回执与启动附着恢复
+
+在同一项目通过正式 CLI 页面创建原生会话 `CLI 536db6`，使用修订 14、400m CPU / 2Gi 和 Runner `sha256:6e5bfa4581bf…`。OpenCode 1.18.29 的真实 PTY 输入 `Do not edit files. Reply exactly CLI_BOT_SWITCH_OK.` 后，模型约 9 秒回显 `CLI_BOT_SWITCH_OK`；切回 Bot 后原游戏开发继续，未重复启动 Bot 或中断 CLI。原生更新提示通过 Esc 跳过，没有变更容器内 CLI 版本。
+
+首次附着先于 Runner 内终端创建，曾收到 `terminal … 不存在`，而启动流程就绪后页面不自动重试；点击“重新附着”立即恢复。现补充生命周期 / 启动阶段转变时，对已有附着错误重新请求一次屏幕，不重放输入、不重建终端。启动恢复回归先红后绿；启动、独立执行窗口、附着与模式切换共 28 pass / 0 fail / 160 断言，精确 lint 和控制台类型通过。此修复待准确 SHA CI 与 console 部署后再新建 CLI 验证自动恢复。

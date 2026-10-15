@@ -93,6 +93,24 @@ test('创建者的窗口：启动中就提前取得（新 Runner）；旧 Runner
   expect(f.claims()).toBe(2);
 });
 
+test('首次附着早于终端创建时，就绪回执自动恢复同一个屏幕，不要求用户重新附着', async () => {
+  const f = fakeChannel(), terminal = base(); let attaches = 0;
+  const channel: TaskStreamChannel = { ...f.channel, send: async command => {
+    if (command.type === 'attachTerminal' && ++attaches === 1) throw new Error(`terminal ${terminal.terminalId} 不存在`);
+    return f.channel.send(command);
+  } };
+  creatorClaims.remember(terminal.clientRequestId);
+  page = await renderElement(<Harness initial={terminal} channel={channel} />, messages);
+  const screen = page.host.querySelector('[role="region"]');
+  expect(page.text()).toContain('不存在');
+  await act(async () => update({ ...terminal, lifecycle: 'running', startup: { ...running, state: 'ready' } })); await page.settle();
+  expect(attaches).toBe(2); expect(page.text()).not.toContain('不存在');
+  expect(page.host.querySelector('[role="region"]')).toBe(screen);
+  expect(page.host.querySelector('[data-control]')?.getAttribute('data-control')).toBe('mine');
+  await act(async () => update({ ...terminal, lifecycle: 'running', revision: 9, startup: { ...running, state: 'ready' } })); await page.settle();
+  expect(attaches).toBe(2); expect(f.sent.some(command => command.type === 'terminalInput')).toBe(false);
+});
+
 test('创建者的窗口：用户这时正在别处输入就只取得、不抢焦点；不是本窗口创建的 CLI 不自动取得', async () => {
   const input = document.createElement('input');
   document.body.appendChild(input);

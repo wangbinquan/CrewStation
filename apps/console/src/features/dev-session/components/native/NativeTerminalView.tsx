@@ -90,6 +90,10 @@ function LiveNativeTerminalView({ terminal, channel, stream, onActivity, canDeve
     attachment.disconnect();
     if (stream.runnerConnected && terminal.connection === 'connected') attachment.connect();
   }, [attachment, stream.runnerConnected, stream.generation, terminal.connection]);
+  useEffect(() => {
+    // Runner 连上时终端可能还未创建；进程／界面就绪后补一次失败的附着，不重发输入。
+    if (terminal.lifecycle === 'running' && attachment.getState().phase === 'error') void attachment.refresh();
+  }, [attachment, terminal.lifecycle, terminal.startup?.state]);
   useEffect(() => surface.setControlled(state.controlled && state.phase === 'ready'), [surface, state.controlled, state.phase]);
   // 操作终端（点进、Tab 进、按键、切回来）即自动取得输入（2026-09-23 裁定）；被别人占着时取得会被拒，状态条显示是谁。
   const interactive = canDevelop && state.phase === 'ready' && terminal.lifecycle === 'running';
