@@ -201,3 +201,19 @@ Chrome 打开实际页面组件的独立验收壳，最初标示“实现验收 
 现保持原意图不可编辑，查询所有匹配标签的流程页并重新读取标签；没有记录且没有标签时，提供显式“重新发送相同发布请求”。点击时再次核对，迟到回执直接接回原流程；否则只发送原来完整的版本、SHA、来源、任务与说明。SCM 的固定标签唯一性阻止并发请求产生第二版本。已有记录／标签、读取失败、离线或权限不足均不重发，重发冲突仍保留原意图，刷新必须重新核对。不会自动重发或自动递增版本。
 
 新增回归先得到四项失败，再修复并补充冲突／刷新覆盖；发布准备及交付相邻两文件 28 pass / 0 fail / 173 断言。精确 lint、控制台类型与结构通过；此恢复入口尚待自己的准确 CI、控制台部署与原发布请求实测，游戏仍未切流。
+
+### 新部署后的真实 CLI、Bot 与布局复验
+
+后台 8f94ab22、控制台与任务底座 946658e7 的组合上，新建 CLI Agent `01a13f48-1a1e-7000-88ad-c32c2b50f957` / terminal `01a13f48-1a1e-7001-929f-5bda99bdb2c7` / execution `01a13f48-19f6-7000-b2a8-bc2d681a5cc4` 自动附着 OpenCode 1.18.29，无需点击重新附着。通过真实终端输入 `Do not edit any files or run tools. Reply exactly CLI_AUTO_ATTACH_OK.`，模型约 11.3 秒回复 `CLI_AUTO_ATTACH_OK`。CLI → Bot → CLI 后终端历史保留；Bot 未发送草稿往返保留，验收后已清空。
+
+新 Bot `01a13f4b-a087-7000-937a-b7dd1e34370d` / execution `01a13f4b-a05b-7000-afa7-b53d48f76ef7` 使用默认算力修订 15。只读 MCP `operations_read_preview_status` 与 `operations_read_preview_logs` 均实际 completed，不再返回 403；前者 ready / port 3000 / restarts 0，后者 10 条 listening 日志、dropped 0，模型回复 `MCP_PREVIEW_OK`。游戏源码仍为确认 SHA，没有在此只读验收修改文件。证据为 `.local/cli-bot-acceptance/actual-bot-mcp-snapshot.json`、`final-native-evidence.json`、`cli-auto-attached-final.png` 与 `bot-mcp-final.png`。
+
+开发页实际文档 1728×817，main 1520×765，无水平溢出，聊天输入保持在面板底部；桌面双栏与手机聊天／预览切换的先前真实组件证据保持。后台滚动部署期间已打开的预览曾变空白，使用原有“重新加载”后游戏恢复，不能把过程描述为完全无感更新。CLI 原生轮次事件有 `unmatched-event` 时标题保守显示“轮次状态未确认”；连接 connected / sync ready，真实输入与模型回复成功。该观测降级明确记录，不以猜测轮次冒充成功状态。
+
+### 推送完成后的发布准入交接
+
+恢复入口 `507d832d86173e26581eeb2f10746976ab543b54` 的 [CI 38728738482](https://github.com/wangbinquan/CrewStation/actions/runs/38728738482) 全部成功，控制台镜像 `sha256:f46fce95d5fd137bba0411f9cbba5704b1dc959dd9cd3e480435435f8b608759` 已部署。原开发者的 v0.1.1 草稿完整恢复，点击核对后出现手动重发按钮，精确原意图再次发送。
+
+本次 Git 推送后，开发入口仍包住整个发布调用；Release 在开发 shared admission 内取得自己完整的三把锁，被 `Cannot expand an active shared admission` 正确拒绝。现把开发检查／推送与 Release 受理顺序交接，开发方实际回调与锁全部退出后才调用 Release 公共 API；不放宽 persistence 守卫。真实开发模块 + PostgreSQL 回归原实现两项红，修复后 3 pass / 0 fail / 21 断言，证明推送期间原开发锁有效、Release 开始时全部开发回调已退出、发布持有自己的三把锁、封闭来源零命令／零发布，以及发布拒绝如实返回。后续准确 CI、后台部署与实际切流继续验收。
+
+该交接修复与开发删除生命周期、Git 发布、工作区预检、SCM 回调上下文相邻 11 文件合计 38 pass / 0 fail / 915 断言；类型、结构和精确 lint 通过。真实失败尝试的两枚临时发布令牌 683、684 均已 revoked=true / active=false。正式 Bot 手机视口 390×844 时文档同为 390×844，输入框 top 684.5 / bottom 764.5；聊天／预览往返保留真实 MCP 消息，截图 `bot-production-mobile.png`。

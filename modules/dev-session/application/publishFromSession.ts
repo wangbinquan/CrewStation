@@ -1,6 +1,6 @@
 import type { Actor, ProjectId, PublishDevSessionRequest, ReleaseDto } from '@crewstation/contracts';
 import { RunnerResultPayloads } from '@crewstation/contracts';
-import { notFound, precondition } from '@crewstation/kernel';
+import { jsonHash, newResourceId, notFound, precondition } from '@crewstation/kernel';
 import type { DevSessionUseCaseDeps } from './dependencies';
 import { inspectWorkspace } from './workspaceStatus';
 
@@ -13,7 +13,7 @@ export function publishFromSessionUseCase(deps: DevSessionUseCaseDeps) {
     const execId = `x-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     return RunnerResultPayloads.exec.parse(await runner.sendCommand(taskId, { id: execId, type: 'exec', execId, command, timeoutSeconds: 300, env, wait: true }));
   };
-  return async (actor: Actor, projectId: ProjectId, input: PublishDevSessionRequest): Promise<ReleaseDto> => {
+  const prepare = async (actor: Actor, projectId: ProjectId, input: PublishDevSessionRequest) => {
     await authorizer.authorize(actor, projectId, 'publish');
     const svc = await services.resolveServiceOfProject(projectId);
     if (!svc) throw notFound('项目服务', projectId);
@@ -36,6 +36,14 @@ export function publishFromSessionUseCase(deps: DevSessionUseCaseDeps) {
     }));
     if ((push.exitCode ?? 1) !== 0) throw precondition(`推送失败，未打标签：${(push.stderr ?? '').split('\n').filter((l) => !l.includes('@')).join(' ').slice(0, 500)}`);
     await environments.touch(env.id);
-    return releases.publish(actor, svc.serviceId, { ...releaseInput, expectedCommitSha: status.headSha }, { kind: 'session', taskId: env.id });
+    return { serviceId: svc.serviceId, taskId: env.id, releaseInput: { ...releaseInput, expectedCommitSha: status.headSha } };
+  };
+  return async (actor: Actor, projectId: ProjectId, input: PublishDevSessionRequest): Promise<ReleaseDto> => {
+    // Git preparation belongs to Development. Finish its actual callback and
+    // lock lifetime before Release acquires its own complete admission set.
+    const prepared = deps.projectWork ? await deps.projectWork.runOrigin({ originKind: 'project', originKey: projectId, kind: 'project-api',
+      reference: newResourceId(), inputDigest: jsonHash({ method: 'publish', args: [actor, projectId, input] }) }, () => prepare(actor, projectId, input))
+      : await prepare(actor, projectId, input);
+    return releases.publish(actor, prepared.serviceId, prepared.releaseInput, { kind: 'session', taskId: prepared.taskId });
   };
 }

@@ -5,18 +5,18 @@ import type { DevelopmentProjectWork } from '../../ports/deletion/work';
 const origins = {
   inspectSessionRebuild: 'project', rebuildSession: 'project', invokeApi: 'project', previewStatus: 'project', controlPreview: 'project', previewLogs: 'project',
   openSession: 'project', getSession: 'project', listBranches: 'project', workspaceStatus: 'project', commitWorkspace: 'project', versionComparison: 'project', versionComparisonDetails: 'project',
-  refreshComparisonHistory: 'project', releaseSession: 'project', publish: 'project', inspectClusterNative: 'task', inspectClusterAgent: 'task',
+  refreshComparisonHistory: 'project', releaseSession: 'project', publish: 'self-admitted', inspectClusterNative: 'task', inspectClusterAgent: 'task',
   manageClusterNative: 'task', manageClusterAgent: 'task', getAgentActivity: 'task', readAgentActivity: 'task', getWorkspaceLayout: 'task', saveWorkspaceLayout: 'task',
   startAgent: 'task', sendMessage: 'task', cancelAgent: 'task', listAgents: 'task', startNativeTerminal: 'task', listNativeTerminals: 'task',
   stopNativeTerminal: 'task', getNativeTerminalSnapshot: 'task', touch: 'task-key',
   dispatchPendingNativeExecution: 'background', reconcileNativeExecutions: 'background', sendIdleReminders: 'background',
-} satisfies Record<Exclude<keyof DevSessionModuleApi, 'name' | 'deletionOwner'>, 'project' | 'task' | 'task-key' | 'background'>;
+} satisfies Record<Exclude<keyof DevSessionModuleApi, 'name' | 'deletionOwner'>, 'project' | 'task' | 'task-key' | 'background' | 'self-admitted'>;
 
 /** One original callback for every project-facing response, with separate retained lifetimes for bounded child I/O. */
 export function developmentWorkApi(api: DevSessionModuleApi, work: DevelopmentProjectWork): DevSessionModuleApi {
   const guarded = { ...api };
   for (const [name, kind] of Object.entries(origins)) {
-    if (kind === 'background') continue;
+    if (kind === 'background' || kind === 'self-admitted') continue;
     Object.defineProperty(guarded, name, { enumerable: true,
     value: (...args: unknown[]) => {
       const project = kind === 'project', originKey = args[kind === 'task-key' ? 0 : 1];
