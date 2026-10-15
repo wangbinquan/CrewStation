@@ -42,6 +42,12 @@ describe('RFC-034 v2 runtime statistics: overview, time range and cost visibilit
     expect(document.querySelectorAll('[aria-label="按天消耗"] button')).toHaveLength(8);
     expect(document.querySelector('[aria-label="按天消耗"] button[aria-pressed="true"]')?.getAttribute('aria-label')).toContain('2026-10-14');
     expect(document.querySelector('[data-runtime-source="platform"]')?.textContent).toContain('未定价');
+    // 当天明细与总览卡同一口径（实机 2026-10-15：全未定价的一天显示成 ¥0.00）：不完整为下界，只有未定价时写「未定价」。
+    const day = (value: string) => document.querySelector(`[data-runtime-day="${value}"]`)?.textContent ?? '';
+    expect(day('2026-10-14')).toContain('≥ ¥150.00'); expect(day('2026-10-14')).toContain('≥ 60,000');
+    const unpricedDay = document.querySelector<HTMLButtonElement>('[aria-label="按天消耗"] button[aria-label^="2026-10-13"]')!;
+    await act(async () => unpricedDay.click()); await page.settle();
+    expect(day('2026-10-13')).toContain('未定价'); expect(day('2026-10-13')).not.toContain('¥'); expect(day('2026-10-13')).toContain('1,000');
     expect(page.text()).toContain('Token 最多的项目'); expect(page.text()).toContain('管理项目 12');
     const read = lastRead(f, '/overview');
     expect(read.pathname).toBe('/v1/admin/observability/overview');

@@ -124,8 +124,9 @@ export const ObservationOverviewSchema = z.strictObject({
   statuses: z.strictObject({ running: count, done: count, failed: count, canceled: count, interrupted: count }),
   /** 已结束执行的时长分布（毫秒）。 */
   durations: z.strictObject({ samples: count, p50: count.nullable(), p95: count.nullable(), max: count.nullable() }),
+  /** 日桶带上不完整与未定价的执行数：当天的合计同样是下界，全未定价的一天不能显示成 ¥0（未知不是 0）。 */
   daily: z.array(z.strictObject({
-    day: z.string(), calls: count, input: count, cacheRead: count, cacheWrite: count, output: count, costNano: nano.nullable(),
+    day: z.string(), calls: count, incompleteCalls: count, unpricedCalls: count, input: count, cacheRead: count, cacheWrite: count, output: count, costNano: nano.nullable(),
   })),
   topTasks: z.array(ObservationTaskRefSchema),
   topAgents: z.array(ObservationAgentRowSchema),
