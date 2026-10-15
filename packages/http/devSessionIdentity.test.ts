@@ -22,6 +22,9 @@ function app(): Hono<AppEnv> {
   probe.get('/v1/projects', user);
   probe.get('/v1/projects/:projectId/branches', user);
   probe.post('/v1/projects/:projectId/publish', user);
+  probe.get('/v1/projects/:projectId/dev-session/preview', user);
+  probe.get('/v1/projects/:projectId/dev-session/preview/logs', user);
+  probe.post('/v1/projects/:projectId/dev-session/preview/:action', user);
   probe.get('/v1/svc', (c) => c.json(requireService(c)));
   hono.route('/', probe);
   return hono;
@@ -59,6 +62,17 @@ describe('开发会话令牌中间件', () => {
     const res = await get('/v1/projects/prj_b/branches', 'good');
     expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({ error: 'forbidden' });
+  });
+
+  test('操作 MCP 的预览工具通过真实令牌中间件，只能访问所属项目', async () => {
+    for (const [method, suffix] of [['GET', ''], ['GET', '/logs?limit=25&stream=stderr'], ['POST', '/start'], ['POST', '/stop'], ['POST', '/restart']] as const) {
+      expect((await get(`/v1/projects/prj_a/dev-session/preview${suffix}`, 'good', method)).status).toBe(200);
+      expect((await get(`/v1/projects/prj_b/dev-session/preview${suffix}`, 'good', method)).status).toBe(403);
+      expect((await get(`/v1/projects/prj_a/dev-session/preview${suffix}`, 'bad', method)).status).toBe(401);
+    }
+    for (const [method, suffix] of [['POST', ''], ['GET', '/restart'], ['POST', '/logs'], ['POST', '/delete'], ['GET', '/logs/extra']] as const) {
+      expect((await get(`/v1/projects/prj_a/dev-session/preview${suffix}`, 'good', method)).status).toBe(403);
+    }
   });
 });
 

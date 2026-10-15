@@ -24,6 +24,8 @@ const RULES: readonly ScopeRule[] = [
   { methods: ['GET'], path: /^\/v1\/projects$/, bind: 'none' },
   // capabilities 是能力说明 MCP 用的那条：同一枚令牌注入两个 MCP，只读且同样绑本项目。
   { methods: ['GET'], path: /^\/v1\/projects\/([^/]+)\/(dev-session|branches|logs|health|capabilities)$/, bind: 'project' },
+  { methods: ['GET'], path: /^\/v1\/projects\/([^/]+)\/dev-session\/preview(?:\/logs)?$/, bind: 'project' },
+  { methods: ['POST'], path: /^\/v1\/projects\/([^/]+)\/dev-session\/preview\/(start|stop|restart)$/, bind: 'project' },
   { methods: ['POST'], path: /^\/v1\/projects\/([^/]+)\/publish$/, bind: 'project' },
   { methods: ['GET'], path: /^\/v1\/services\/([^/]+)\/slots$/, bind: 'service' },
   { methods: ['GET'], path: /^\/v1\/catalog\/operations$/, bind: 'query-service' },
