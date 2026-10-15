@@ -65,6 +65,52 @@ test('服务端明确拒绝的版本冲突保留草稿并允许修改，不困�
   expect(f.writes[1]?.body).toMatchObject({ version: 'v4.5.6', message: '保留说明' }); expect(page.path()).toBe(`/projects/${projectId}/release/journeys/${journeyId}`);
 });
 
+test.each(['repository', 'session'])('受理前 500 的 %s 发布核对记录和标签后可手动重发同一意图', async source => {
+  const f = releaseJourneyFixture(); f.state.publishError = 500; f.state.rows = [];
+  page = await renderApp(`/projects/${projectId}/release/publish?source=${source}`);
+  await input('message', '恢复原来的发布'); await page.click('开始构建与部署');
+  expect(button('重新发送相同发布请求')).toBeUndefined();
+  await page.click('核对已受理的发布');
+  // 真实故障发生在 push 之前，既无流程也无标签；不能把用户永远锁在只读核对。
+  expect(button('重新发送相同发布请求')).toBeDefined(); expect(f.writes).toHaveLength(1);
+  f.state.publishError = 0; await page.click('重新发送相同发布请求');
+  expect(f.writes).toHaveLength(2); expect(f.writes[1]).toEqual(f.writes[0]);
+  expect(page.path()).toBe(`/projects/${projectId}/release/journeys/${journeyId}`);
+});
+
+test('重发前重新核对，迟到的受理记录接回原流程，不发送第二次', async () => {
+  const f = releaseJourneyFixture(); f.state.loseResponse = true; f.state.rows = [];
+  page = await renderApp(`/projects/${projectId}/release/publish`); await page.click('开始构建与部署');
+  const accepted = { ...f.releases[1]! }; f.releases[1]!.tag = 'v1.1.0';
+  await page.click('核对已受理的发布'); expect(button('重新发送相同发布请求')).toBeDefined();
+  Object.assign(f.releases[1]!, accepted); f.state.rows = undefined;
+  await page.click('重新发送相同发布请求');
+  expect(page.path()).toBe(`/projects/${projectId}/release/journeys/${journeyId}`); expect(f.writes).toHaveLength(1);
+});
+
+test('手动重发遇到并发版本冲突仍保留原意图，刷新后必须重新核对', async () => {
+  const f = releaseJourneyFixture(); f.state.publishError = 500; f.state.rows = [];
+  page = await renderApp(`/projects/${projectId}/release/publish`); await page.click('开始构建与部署');
+  await page.click('核对已受理的发布'); f.state.publishError = 409; await page.click('重新发送相同发布请求');
+  expect(f.writes).toHaveLength(2); expect(button('开始构建与部署')).toBeUndefined();
+  expect(button('重新发送相同发布请求')).toBeUndefined();
+  page.unmount(); page = await renderApp(`/projects/${projectId}/release/publish`);
+  expect(page.text()).toContain('已发出 v1.1.1'); expect(button('重新发送相同发布请求')).toBeUndefined(); expect(f.writes).toHaveLength(2);
+});
+
+test('有标签无精确回执或读取失败时不允许重发，离线也不重发', async () => {
+  const f = releaseJourneyFixture(); f.state.loseResponse = true; f.state.rows = [];
+  page = await renderApp(`/projects/${projectId}/release/publish`); await page.click('开始构建与部署');
+  await page.click('核对已受理的发布'); expect(button('重新发送相同发布请求')).toBeUndefined();
+  expect(page.text()).toContain('版本标签已存在');
+  f.releases[1]!.tag = 'v1.1.0'; await page.click('核对已受理的发布');
+  await act(async () => onlineManager.setOnline(false)); await page.click('重新发送相同发布请求'); expect(f.writes).toHaveLength(1);
+  await act(async () => onlineManager.setOnline(true));
+  const base = globalThis.fetch;
+  globalThis.fetch = (async (raw, init) => String(raw).includes('/release-journeys?') ? Response.json({ error: 'unavailable', message: '记录暂不可读' }, { status: 503 }) : base(raw, init)) as typeof fetch;
+  await page.click('重新发送相同发布请求'); expect(f.writes).toHaveLength(1); expect(button('重新发送相同发布请求')).toBeUndefined();
+});
+
 test('受理成功之后的读取限流不能清除发送意图或允许再次发布', async () => {
   const f = releaseJourneyFixture(), base = globalThis.fetch; let denyRead = true;
   globalThis.fetch = (async (raw, init) => String(raw).includes(`/release-journeys/${journeyId}`) && denyRead

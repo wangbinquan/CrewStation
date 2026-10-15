@@ -30,6 +30,7 @@ function Preparation({ serviceId, userId, canPublish }: { readonly serviceId: st
   const footer = <>
     {fixed ? <Button variant="primary" disabled={p.busy} onClick={() => void p.recover()}>{t('release.wizard.recover')}</Button>
       : <Button variant="primary" disabled={!canPublish || p.busy || p.pending || !!p.queryError || !p.snapshot || !p.candidate || !!p.versionError || !!p.messageError} onClick={() => void p.submit()}>{t(p.busy ? 'release.publish.submitting' : 'release.wizard.build')}</Button>}
+    {fixed && p.canResend && canPublish ? <Button disabled={p.busy} onClick={() => void p.recover(true)}>{t('release.wizard.resend')}</Button> : null}
     <ButtonLink to={PROJECT_PATHS[space].release} params={{ projectId }} search={{ cursor: search.cursor, filter: search.filter }} variant="ghost">{t('release.wizard.later')}</ButtonLink>
     {!fixed ? <Button variant="ghost" disabled={p.busy} onClick={p.clear}>{t('release.wizard.clear')}</Button> : null}
   </>;
