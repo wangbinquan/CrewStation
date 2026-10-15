@@ -28,8 +28,10 @@ function RuntimeStatisticsView({ scope }: { scope: RuntimeScope }) {
     items={RUNTIME_PERIODS.map((value) => ({ value, label: t('runtime.period.' + value) }))}
     onChange={(value) => go({ ...search, period: value as RuntimePeriod })} /> : undefined;
   return <Stack className={styles.page} data-runtime-statistics="">
-    <PageHeader title={t(scope.kind === 'system' ? 'runtime.systemTitle' : 'runtime.projectTitle')} description={t(statistics ? 'runtime.description' : 'runtime.operationsDescription')} />
-    <Tabs label={t('runtime.title')} value={tab} extra={periodControl}
+    {/* 时间范围放在页头操作区：页头在窄屏整体换行，页签栏的附加槽不收缩（CI 38696784109 的 390px 英文溢出）。 */}
+    <PageHeader title={t(scope.kind === 'system' ? 'runtime.systemTitle' : 'runtime.projectTitle')} description={t(statistics ? 'runtime.description' : 'runtime.operationsDescription')}
+      actions={periodControl} />
+    <Tabs label={t('runtime.title')} value={tab}
       items={tabs.map((value) => ({ value, label: t('runtime.tab.' + value) }))} onChange={(value) => go({ ...search, tab: value as RuntimeTab })}>
       <RuntimePanel scope={scope} tab={tab} period={period} search={search} go={go} />
     </Tabs>
