@@ -23,9 +23,9 @@ const res = (over: Partial<ClusterResource> & { name: string; kind: string }): C
 });
 const resources: ClusterResource[] = [
   res({ name: 'demo-blue', kind: 'Deployment', slotRole: 'prod', physicalSlot: 'blue', desired: 1, readyReplicas: 1, releaseId: 'rel-blue' }),
-  res({ name: 'demo-blue-1', kind: 'Pod', slotRole: 'prod', physicalSlot: 'blue', node: 'node-a', restarts: 1, containers: [{ name: 'app', init: false, image: 'demo:v0.1.4', ready: true, restarts: 1, state: 'running', requests: {}, limits: {}, ports: [] }] }),
+  res({ name: 'demo-blue-1', kind: 'Pod', owners: [{ uid: 'uid-demo-blue', kind: 'Deployment', name: 'demo-blue' }], slotRole: 'prod', physicalSlot: 'blue', node: 'node-a', restarts: 1, containers: [{ name: 'app', init: false, image: 'demo:v0.1.4', ready: true, restarts: 1, state: 'running', requests: {}, limits: {}, ports: [] }] }),
   res({ name: 'demo-green', kind: 'Deployment', slotRole: 'preview', physicalSlot: 'green', desired: 1, readyReplicas: 0 }),
-  res({ name: 'demo-green-1', kind: 'Pod', slotRole: 'preview', physicalSlot: 'green', phase: 'Pending', ready: false, reason: 'ContainerCreating' }),
+  res({ name: 'demo-green-1', kind: 'Pod', owners: [{ uid: 'uid-demo-green', kind: 'Deployment', name: 'demo-green' }], slotRole: 'preview', physicalSlot: 'green', phase: 'Pending', ready: false, reason: 'ContainerCreating' }),
   res({ name: 'task-1', kind: 'Pod', purpose: 'development-workspace', taskId: 'task-1', references: ['cs-demo/PersistentVolumeClaim/task-1-work'] }),
   res({ name: 'agent-1', kind: 'Pod', purpose: 'development-cli', taskId: 'agent-1', parentTaskId: 'task-1', references: ['cs-demo/PersistentVolumeClaim/task-1-work'] }),
   res({ name: 'task-1-work', kind: 'PersistentVolumeClaim', phase: 'Bound', facts: { capacity: '{"storage":"10Gi"}', requested: '{"storage":"10Gi"}' } }),
@@ -167,7 +167,7 @@ describe('record-based task bands', () => {
   });
   test('slot bands take the route and Deployment status from the service-slot records when given; pods stay from the inventory', () => {
     const slotRecord = (role: string, name: string, phase: ResourceRecord['phase'], reason?: string) => resourceRecord({ id: `slot-${role}`, kind: 'service-slot', phase, display: { role }, ...(reason ? { reason: { code: 'x', message: reason } } : {}),
-      children: [{ kind: 'Deployment', namespace: 'cs-demo', name, phase: 'Unready', ready: false }] });
+      children: [{ kind: 'Deployment', namespace: 'cs-demo', name, uid: `uid-${name}`, phase: 'Unready', ready: false }] });
     const withSlots = buildProjectTopology({ ...input, devSession: session, records: [...records, slotRecord('prod', 'demo-blue', 'degraded', '副本 0／1 就绪'), slotRecord('preview', 'demo-green', 'starting', '副本 0／1 就绪')] }, t);
     const node = (id: string) => withSlots.nodes.find((n) => n.id === id)!;
     expect(node('uid-demo-blue')).toMatchObject({ status: 'pending', statusText: '降级 · 副本 0／1 就绪' });
@@ -180,7 +180,7 @@ describe('record-based task bands', () => {
 
   test('job nodes take their status from the build/migration job records when given; others stay from the inventory', () => {
     const jobRecord = resourceRecord({ id: 'job-migrate', kind: 'migration-job', phase: 'failed', reason: { code: 'job-failed', message: 'BackoffLimitExceeded' },
-      children: [{ kind: 'Job', namespace: 'cs-demo', name: 'migrate-1', phase: 'Failed', ready: false }] });
+      children: [{ kind: 'Job', namespace: 'cs-demo', name: 'migrate-1', uid: 'uid-migrate-1', phase: 'Failed', ready: false }] });
     const withJobs = buildProjectTopology({ ...input, records: [...records, jobRecord] }, t);
     expect(withJobs.nodes.find((n) => n.id === 'uid-migrate-1')).toMatchObject({ status: 'failed', statusText: '失败 · BackoffLimitExceeded' });
     expect(withJobs.nodes.find((n) => n.id === 'uid-build-1')?.statusText).toBe(topology().nodes.find((n) => n.id === 'uid-build-1')?.statusText);

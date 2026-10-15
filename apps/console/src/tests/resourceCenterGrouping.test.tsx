@@ -15,11 +15,10 @@ afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = original
 const dialog = () => [...document.querySelectorAll<HTMLDialogElement>('dialog[open]')].at(-1)!;
 async function escape() { await act(async () => dialog().dispatchEvent(new Event('cancel', { cancelable: true }))); await page!.settle(); }
 async function openGroup() {
-  const trigger = document.querySelector<SVGSVGElement>('[data-node-id="group:services"]');
-  expect(Boolean(trigger)).toBe(true);
-  await act(async () => { trigger!.focus(); trigger!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); });
-  await page!.settle();
-  return trigger!;
+  const trigger = [...document.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === '项目资源目录')!;
+  await act(async () => trigger.focus());
+  await page!.navigate(`${page!.path()}?node=group%3Aservices`, { resetScroll: false });
+  return trigger;
 }
 
 test('a domain has one stable card even for a single member or hundreds of members', () => {
@@ -66,7 +65,7 @@ test('ledger, observations and services share domain cards while retaining indep
   expect(snapshot.edges).toHaveLength(1);
 });
 
-test('group permissions are searchable and paginated; member close preserves the last row, context and SVG focus', async () => {
+test('group permissions are searchable and paginated; member close preserves the last row, context and opener focus through legacy group bookmarks', async () => {
   const f = resourceCenterFixture(); page = await renderApp(centerPath);
   const trigger = await openGroup(), group = dialog();
   expect(group.textContent).toContain('资源权限'); expect(group.textContent).toContain('仅查看');
@@ -109,16 +108,15 @@ test('archived group permission lists show read-only access even when a cached d
   expect(f.writes).toHaveLength(0);
 });
 
-test('narrow topology keeps grouped permissions instead of expanding every resource into the fallback list', async () => {
+test('narrow legacy group bookmarks retain a paginated permissions dialog without expanding the canvas', async () => {
   const originalMatchMedia = window.matchMedia;
-  window.matchMedia = (query) => ({ matches: query === '(max-width: 640px)', media: query, onchange: null, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => true });
+  window.matchMedia = (query) => ({ matches: /max-width/.test(query), media: query, onchange: null, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => true });
   try {
-    const f = resourceCenterFixture('developer'); page = await renderApp(centerPath);
-    const stage = document.querySelector('[role="tabpanel"]')!;
-    // 窄屏不能把已聚合类型重新展开成几十行，须复用同一组及其权限入口。
-    expect(stage.querySelector('table') === null).toBe(true); expect(stage.querySelectorAll('button')).toHaveLength(2);
-    await page.click('服务与算力');
+    const f = resourceCenterFixture('developer'); page = await renderApp(`${centerPath}?node=group%3Aservices`);
+    expect(document.querySelector('svg[aria-label="部署架构与资源"]')).toBeNull();
     expect(dialog().textContent).toContain('资源权限'); expect(dialog().textContent).toContain('仅查看');
+    expect(dialog().querySelectorAll('tbody tr')).toHaveLength(50);
+    await page.click('加载更多'); expect(dialog().querySelectorAll('tbody tr')).toHaveLength(79);
     expect(f.writes).toHaveLength(0);
   } finally { window.matchMedia = originalMatchMedia; }
 });

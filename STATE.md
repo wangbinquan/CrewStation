@@ -1,3 +1,7 @@
+## 2026-10-15 RFC-036 部署架构视图候选已实现
+
+作者明确要求按设计完成 RFC。资源中心已接入与运行诊断共用的事实读取，四视角、真实身份聚合、对象权限／实例／关系统一弹窗、来源不完整提示和有界分页已实现；既有动作合同与后端权限保持。控制台层 1184 pass／0 fail，最终英文及类型修正后的专项 18 pass／0 fail，真实 dev-developer 项目页、390／320px 嵌套弹窗和英文关系实看通过。25 个源文件冻结，独立 Linux／PostgreSQL 完整门禁运行中；尚未宣称准确 SHA CI 或正式部署完成。详见 [本次追加验收](proposal/rfc/RFC-036-project-resource-workspace/deployment-architecture-acceptance.md)。下方历史与并行内容原样保留。
+
 ## 2026-10-15 RFC-039：真实贪吃蛇正式上线与首次交付闭环（Done）
 
 作者明确“批准你的动作”后，继续原流程 `01a13f7d-52ea-7000-a386-008b0aba56ba`，访问范围保存为全部登录用户（authenticated revision 1），并于 12:42:01.205 UTC 确认正式切流。游戏 v0.1.1 / SHA `12450292b0e8438a066391a08f53bcfa511559ed`，发布 `01a13f7d-526c-7000-bff7-15f1eae541bb`，prod 1/1 ready，发布流程 succeeded / 15 条事件；正式地址 `http://snake-bot-20261014.cs.localhost/`。真实 Pod 的镜像摘要与发布记录一致、Running / ready / restart 0。之前访问范围审批等待已解除。

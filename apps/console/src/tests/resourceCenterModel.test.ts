@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { centerSnapshot, resourceNodeFixture } from './resourceCenterFixture';
 import { resourceTopology, filterResourceTopology } from '../features/project-resources/model/topology';
-import { parseCenterSearch, matches, formValues, initialDraft } from '../features/project-resources/model/workspace';
+import { parseCenterSearch, matches, formValues, initialDraft, metricUnit } from '../features/project-resources/model/workspace';
 import { messages as zh } from '../features/project-resources/i18n/zh-CN';
 import { messages as en } from '../features/project-resources/i18n/en-US';
 import { translate } from '../shared/lib/i18n';
@@ -16,6 +16,8 @@ test('aggregation preserves directed membership, never sums independent quota sc
   expect(graph.topology.nodes).toHaveLength(2); expect(graph.topology.edges).toEqual([expect.objectContaining({ from: 'group:services', to: 'group:project', evidence: 'observed' })]);
   for (const id of graph.groups.keys()) expect(graph.displayed.get(id)!.metrics).toEqual([]);
   expect(Object.keys(zh).sort()).toEqual(Object.keys(en).sort());
+  const enT = (key: string) => translate(en, key);
+  expect(['核', '个', 'GiB'].map((unit) => metricUnit(unit, enT))).toEqual(['cores', 'items', 'GiB']);
   expect(matches(resourceNodeFixture('private'), { q: 'PRIVATE', category: 'execution' })).toBe(true);
   expect(parseCenterSearch({ view: 'bad', category: 'secret', q: 'a'.repeat(200) })).toMatchObject({ view: undefined, category: undefined, q: 'a'.repeat(120) });
 });

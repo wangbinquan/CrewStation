@@ -3,11 +3,13 @@ import type { Translate } from '../../../shared/lib/useT';
 import { normalizeResourceDomain, resourceDomain } from './domains';
 
 export type CenterView = 'topology' | 'list' | 'requests';
-export interface CenterSearch { view?: CenterView; category?: string; access?: string; q?: string; node?: string; request?: string }
+export interface CenterSearch { view?: CenterView; category?: string; access?: string; q?: string; node?: string; request?: string; perspective?: 'services' | 'development' | 'business' | 'delivery'; page?: number }
 export function parseCenterSearch(raw: Record<string, unknown>): CenterSearch {
   const text = (key: string, max = 240) => typeof raw[key] === 'string' ? String(raw[key]).slice(0, max) : undefined;
   return { view: ['topology', 'list', 'requests'].includes(String(raw['view'])) ? raw['view'] as CenterView : undefined,
     category: normalizeResourceDomain(String(raw['category'])),
+    perspective: ['services', 'development', 'business', 'delivery'].includes(String(raw['perspective'])) ? raw['perspective'] as CenterSearch['perspective'] : undefined,
+    page: Number.isSafeInteger(Number(raw['page'])) && Number(raw['page']) > 0 ? Math.min(Number(raw['page']), 10000) : undefined,
     access: ['owned', 'requestable', 'pending', 'unavailable'].includes(String(raw['access'])) ? text('access') : undefined, q: text('q', 120), node: text('node', 500), request: text('request') };
 }
 export function matches(node: ProjectResourceNode, search: CenterSearch): boolean {
@@ -17,7 +19,8 @@ export function matches(node: ProjectResourceNode, search: CenterSearch): boolea
 export const isInFlight = (state: string) => ['pending', 'approved', 'applying', 'needs-review', 'apply-failed', 'requested'].includes(state);
 export function label(t: Translate, key: string, fallback: string): string { const value = t(`resourceCenter.${key}`); return value === `resourceCenter.${key}` ? fallback : value; }
 export const numberText = (value: number | null) => value === null ? '—' : new Intl.NumberFormat(undefined, { maximumFractionDigits: 3 }).format(value);
-export function metricLimit(metric: ResourceQuotaMetric, t: Translate) { return metric.limitKind === 'value' ? `${numberText(metric.limit)} ${metric.unit}` : t(`resourceCenter.limit.${metric.limitKind}`); }
+export function metricUnit(unit: string, t: Translate) { return unit === '核' ? t('resourceCenter.unit.cores') : unit === '个' ? t('resourceCenter.unit.items') : unit; }
+export function metricLimit(metric: ResourceQuotaMetric, t: Translate) { return metric.limitKind === 'value' ? `${numberText(metric.limit)} ${metricUnit(metric.unit, t)}` : t(`resourceCenter.limit.${metric.limitKind}`); }
 export function metricLabel(metric: ResourceQuotaMetric, t: Translate) { return label(t, `field.${metric.key}`, metric.label); }
 export function fieldLabel(field: ResourceField, t: Translate) { return `${label(t, `field.${field.key}`, field.label)}${field.unit ? ` (${field.unit})` : ''}`; }
 export function actionLabel(action: ResourceActionDescriptor, t: Translate) {

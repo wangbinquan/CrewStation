@@ -2,7 +2,8 @@ import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
 import { renderApp } from './renderApp';
-import { centerPath, centerProject, resourceCenterFixture, resourceNodeFixture } from './resourceCenterFixture';
+import { resourceDeploymentFixture } from './resourceDeploymentFixture';
+import { centerPath, centerProject, resourceCenterFixture } from './resourceCenterFixture';
 const originalFetch = globalThis.fetch; let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 const dialog = () => [...document.querySelectorAll<HTMLDialogElement>('dialog[open]')].at(-1)!;
@@ -10,17 +11,14 @@ const field = (label: string) => [...dialog().querySelectorAll('label')].find((l
 async function input(label: string, value: string) { await act(async () => { const node = field(label); node.focus(); const prototype = node.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(prototype, 'value')!.set!.call(node, value); node.dispatchEvent(new Event('input', { bubbles: true })); node.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true })); }); await page!.settle(); }
 async function escape() { await act(async () => dialog().dispatchEvent(new Event('cancel', { cancelable: true }))); await page!.settle(); }
 
-test('category filter compacts the topology while preserving project and real ownership context', async () => {
-  const f = resourceCenterFixture();
-  f.state.snapshot.nodes.push(resourceNodeFixture('project', { kind: 'project', category: 'foundation' }), resourceNodeFixture('service', { kind: 'resource', category: 'service' }), resourceNodeFixture('database', { kind: 'resource', category: 'data', resourceType: 'database' }));
-  f.state.snapshot.edges.push({ id: 'owner-service', sourceId: 'project', targetId: 'service', relation: 'owns', state: 'configured', label: '归属' }, { id: 'owner-database', sourceId: 'service', targetId: 'database', relation: 'owns', state: 'observed', label: '归属' });
-  page = await renderApp(`${centerPath}?category=data`);
-  const diagram = document.querySelector('svg[aria-label="项目资源中心"]')!;
-  // 原筛选仅降低透明度，仍留下完整图的高度，导致匹配资源可能远离当前视口。
-  expect([...diagram.querySelectorAll('[data-node-id]')].map((n) => n.getAttribute('data-node-id')).sort()).toEqual(['group:project', 'group:services', 'group:storage']);
-  expect(diagram.querySelectorAll('[data-evidence]')).toHaveLength(3);
+test('category filter compacts deployment objects while preserving actual consumers and route context', async () => {
+  const f = resourceDeploymentFixture(); page = await renderApp(`${centerPath}?category=data`);
+  const diagram = document.querySelector('svg[aria-label="部署架构与资源"]')!;
+  const expected = ['deployment:route:prod', 'deployment:slot-prod', 'deployment:db:production', 'deployment:route:preview', 'deployment:slot-preview', 'deployment:shared-space', 'deployment:dependency:event-declared'].sort();
+  expect([...diagram.querySelectorAll('[data-node-id]')].map((n) => n.getAttribute('data-node-id')).sort()).toEqual(expected);
+  expect(diagram.querySelectorAll('[data-evidence]').length).toBeGreaterThan(3);
   await page.click('放大拓扑');
-  expect([...dialog().querySelectorAll('[data-node-id]')].map((n) => n.getAttribute('data-node-id')).sort()).toEqual(['group:project', 'group:services', 'group:storage']);
+  expect([...dialog().querySelectorAll('[data-node-id]')].map((n) => n.getAttribute('data-node-id')).sort()).toEqual(expected);
   expect(f.writes).toHaveLength(0);
 });
 

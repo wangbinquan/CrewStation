@@ -6,6 +6,7 @@ import type { Topology, TopologyBand, TopologyEdge, TopologyNode } from '../ui/t
 import { appendStorage, resourceNode } from './storageTopology';
 import { appendObjectSpaces } from './objectSpaces';
 import { recordBands, recordStatus } from './recordBands';
+import { physicalWorkloadOwner } from './physicalIdentity';
 import { databaseNode, durationText, factText, podFacts, podStatus, purposeSemantic, workloadStatus } from './topologyText';
 
 /** 概览只有开发摘要（没有预览主机），完整页有整个会话；两者都够组装。 */
@@ -69,9 +70,9 @@ function slotBands(a: Assembly): void {
       for (const d of deployments) a.edges.push({ from: `route:${role}`, to: d.uid, kind: 'routes', label: t(slot.active ? 'topology.edge.label.live' : 'topology.edge.label.standby'), evidence: 'observed' });
     }
     for (const d of deployments) {
-      const { status, statusText } = recorded && record?.children.some((child) => child.kind === 'Deployment' && child.name === d.name) ? recorded : workloadStatus(d, t);
+      const { status, statusText } = recorded && record?.children.some((child) => child.kind === 'Deployment' && child.uid === d.uid && child.phase !== 'absent') ? recorded : workloadStatus(d, t);
       a.nodes.push({ id: d.uid, kind: 'workload', semantic: 'service', title: d.name, subtitle: `${d.kind}${slot.tag ? ` · ${slot.tag}` : ''}`, status, statusText, lane: LANE.workload, band, box: band, abnormal: d.abnormal, resourceId: d.resourceId, purpose: d.purpose, meta: [t('topology.workload.replicas', { ready: d.readyReplicas ?? 0, desired: d.desired ?? 0 }), ...(d.releaseId ? [`${t('topology.fact.releaseId')} ${d.releaseId.slice(0, 8)}…`] : [])], facts: [[t('topology.fact.kind'), d.kind], [t('topology.fact.slot'), `${physical} · ${role}`], ...(slot.tag ? [[t('topology.fact.version'), slot.tag] as const] : []), [t('topology.workload.replicasLabel'), `${d.readyReplicas ?? 0}／${d.desired ?? 0}`], ...(d.releaseId ? [[t('topology.fact.releaseId'), d.releaseId] as const] : [])] });
-      for (const p of slotPods) a.edges.push({ from: d.uid, to: p.uid, kind: 'owns', evidence: 'observed' });
+      for (const p of slotPods) if (physicalWorkloadOwner(p, input.resources)?.uid === d.uid) a.edges.push({ from: d.uid, to: p.uid, kind: 'owns', evidence: 'observed' });
     }
     for (const p of slotPods) { a.nodes.push(podNode(a, p, band, band)); if (production) a.edges.push({ from: p.uid, to: 'db:production', kind: 'uses', label: production.envVar, evidence: 'observed' }); }
     if (slot.active && production) a.nodes.push(databaseNode(production, band, t));
@@ -112,11 +113,13 @@ function recordTaskBands(a: Assembly, records: readonly ResourceRecord[]): void 
 function jobsBand(a: Assembly): void {
   const { t, production, input } = a;
   const jobs = a.workloads.filter((r) => JOB_PURPOSES.has(r.purpose)), jobPods = a.pods.filter((r) => JOB_PURPOSES.has(r.purpose));
-  if (jobs.length === 0 && jobPods.length === 0) return;
+  const recordedJobs = input.records?.filter((record) => ['build-job', 'migration-job'].includes(record.kind) && record.phase !== 'stopped') ?? [];
+  if (jobs.length === 0 && jobPods.length === 0 && !recordedJobs.length) return;
   a.bands.push({ id: 'jobs', title: t('topology.band.jobs'), semantic: 'build' });
   // RFC-025 第三期：构建、迁移 Job 有台账记录时，状态照记录的阶段（随推送流变化）；Pod 仍按盘点补详情。
-  const recordOf = (name: string) => input.records?.find((r) => (r.kind === 'build-job' || r.kind === 'migration-job') && r.children.some((c) => c.kind === 'Job' && c.name === name));
-  for (const j of jobs) { const record = recordOf(j.name), { status, statusText } = record ? recordStatus(record, t) : workloadStatus(j, t); a.nodes.push({ id: j.uid, kind: 'job', semantic: 'build', title: j.name, subtitle: `${j.kind} · ${t(`cluster.purpose.${j.purpose}`)}`, status, statusText, lane: LANE.workload, band: 'jobs', box: 'jobs', abnormal: j.abnormal, resourceId: j.resourceId, purpose: j.purpose, meta: [...(j.releaseId ? [`${t('topology.fact.releaseId')} ${j.releaseId.slice(0, 8)}…`] : [])], facts: [[t('topology.fact.kind'), j.kind], [t('topology.fact.phase'), j.phase], ...(j.releaseId ? [[t('topology.fact.releaseId'), j.releaseId] as const] : [])] }); }
+  const recordOf = (uid: string) => recordedJobs.find((r) => r.children.some((c) => c.kind === 'Job' && c.uid === uid && c.phase !== 'absent'));
+  for (const j of jobs) { const record = recordOf(j.uid), { status, statusText } = record ? recordStatus(record, t) : workloadStatus(j, t); a.nodes.push({ id: j.uid, kind: 'job', semantic: 'build', title: j.name, subtitle: `${j.kind} · ${t(`cluster.purpose.${j.purpose}`)}`, status, statusText, lane: LANE.workload, band: 'jobs', box: 'jobs', abnormal: j.abnormal, resourceId: j.resourceId, purpose: j.purpose, meta: [...(j.releaseId ? [`${t('topology.fact.releaseId')} ${j.releaseId.slice(0, 8)}…`] : [])], facts: [[t('topology.fact.kind'), j.kind], [t('topology.fact.phase'), j.phase], ...(j.releaseId ? [[t('topology.fact.releaseId'), j.releaseId] as const] : [])] }); }
+  for (const record of recordedJobs.filter((r) => !jobs.some((j) => recordOf(j.uid)?.id === r.id))) a.nodes.push({ id: record.id, kind: 'job', semantic: 'build', title: record.display?.name ?? record.id, lane: LANE.workload, band: 'jobs', ...recordStatus(record, t), facts: [[t('topology.fact.taskId'), record.id]] });
   for (const p of jobPods) {
     a.nodes.push(podNode(a, p, 'jobs', 'jobs'));
     for (const j of jobs) if (p.owners.some((o) => o.uid === j.uid)) a.edges.push({ from: j.uid, to: p.uid, kind: 'owns', evidence: 'observed' });
@@ -143,6 +146,7 @@ export function buildProjectTopology(input: ProjectTopologyInput, t: Translate):
   if (input.records) recordTaskBands(a, input.records);
   else { inventoryDevBand(a); inventoryBusinessBand(a); }
   jobsBand(a);
+  if (production && !a.nodes.some((node) => node.id === 'db:production') && a.edges.some((edge) => edge.to === 'db:production')) a.nodes.push(databaseNode(production, 'jobs', t));
   otherBand(a);
   for (const r of a.workloads) if (!resourceNode(a, r, input.records)) {
     if (!a.bands.some((b) => b.id === 'other')) a.bands.push({ id: 'other', title: t('topology.band.other'), semantic: 'platform' });

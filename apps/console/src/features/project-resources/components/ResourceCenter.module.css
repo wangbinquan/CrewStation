@@ -35,5 +35,17 @@
 .relations small { color: var(--cs-color-text-muted); }
 .reasonCell { max-width: 300px; overflow-wrap: anywhere; white-space: pre-wrap; }
 .empty { padding: 30px; text-align: center; color: var(--cs-color-text-muted); }
+.deployment { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.deploymentStage { min-width: 0; overflow: auto; }
+.boundary { padding: 12px; border: 1px solid var(--cs-color-border); border-radius: 10px; background: var(--cs-color-surface); }
+.boundary strong { overflow-wrap: anywhere; }
+.quotaSummary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 10px; }
+.quotaSummary > div { display: grid; gap: 4px; }
+.quotaSummary small { color: var(--cs-color-text-muted); }
+.quotaSummary strong { font-size: 14px; font-variant-numeric: tabular-nums; }
+.sources { color: var(--cs-color-text-muted); font-size: 12px; overflow-wrap: anywhere; }
+.deployment .tabs { flex-wrap: wrap; }
+.deployment .tabs button { white-space: normal; }
+@media (max-width: 760px) { .quotaSummary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1100px) { .page { height: var(--viewport-fill, auto); } .stage { flex: 1 1 0; min-height: 200px; overscroll-behavior: contain; } }
 @media (max-width: 760px) { .summary { grid-template-columns: repeat(3, minmax(0, 1fr)); } .summary > div { grid-column: 1 / -1; border-bottom: 1px solid var(--cs-color-border); } .stat { padding: 10px; flex-direction: column; gap: 4px; } .toolbar, .controls { align-items: stretch; } .controls input { flex: 1 1 100%; width: auto; } .controls select { max-width: 100%; } .fields { grid-template-columns: 1fr; } }
