@@ -127,3 +127,14 @@ Chrome 打开实际页面组件的独立验收壳，最初标示“实现验收 
 ### 提交前并发主干更新
 
 精确暂存脚本在任何索引写入之前检查 HEAD／origin/main，发现引用变化而退出，未暂存本候选。随后只读核对确认原会话已正常提交并推送 `3d7a680af4940daf9ae4aee8fc099ef28a3735c0`：此前 696 条暂存路径已处理，当前暂存区为空，上表四个依赖均存在于 HEAD。129 路径中的生产代码与测试内容指纹未变，只有 STATE 追加了原会话的接力段落，保留原样。此前的依赖阻塞已解除，本次精确提交改以该新主干为基线；继续检查准确候选 CI 与部署条件，不因 HEAD 移动重跑已验证且内容不变的层级。
+
+### 精确提交、Linux 全量与当前发布条件（2026-10-15）
+
+- 本批正式功能提交 `810b062bcc7e30ab6a82d09946943f0c8a843455`：129 个允许文件、2328 新增／120 删除行；路径、提交消息与 Codex co-author 核对通过，批外暂存区保持。独立观测重构及修复由原会话提交。其窄屏修复 `4d8cc2d9` 的 [CI 38699494497](https://github.com/wangbinquan/CrewStation/actions/runs/38699494497) 全部通过；这不是本批组合代码的 CI。当前组合代码 `31011a5c26c13aa03e12fdb08b549a47368d5f23` 另包含原会话日桶修复 `4990a699`，本批功能文件未变。
+- Linux 第一轮验收环境缺少原用例所需工具、使用 root 及共享文件挂载，结果 5331 pass／153 skip／155 fail／2 errors；原日志 `full-check-linux.log` 保留，不计为有效环境通过。修正环境后八文件预检 87 pass／0 fail／331 断言。随后一轮遇 Docker/Kubernetes 无响应，未获得完整汇总；已保存不完整结果并停止自有测试容器，未重启 Docker Desktop。
+- 最终一轮使用完整共享候选快照、Bun 1.3.13、非 root、UTF-8、独立 PostgreSQL，prepared transactions 开启且 `CS_TEST_REQUIRE=database`。静态检查通过，完整 `bun run check` 自然结束为 **5588 pass／158 skip／25 fail／40465 断言**，5771 用例、1170 文件、1643.48 秒，exit 1。候选对应 `df8fa0fd`，之后原会话仅合入新的观测修复。日志 `full-check-linux-final.log`、回执 `linux-final-receipt.json`。
+- 25 项失败均报时限：本批“合并进行中不走快捷提交，清单截断也拒绝提交”超过 5000ms；末段业务／任务回收 24 项超过原 5／15／30 秒预算。没有放宽预算或修改断言。另观察到 Bun 进程 VmHWM 22284956 KiB、Docker VM 内存等待与交换，这只能说明环境压力，不能据此宣称每个失败的根因都已关闭。
+- 先前 Ruby 中文路径问题在 UTF-8 下原 12 个独立案例通过；前一轮三个失败文件原测试 20 pass／0 fail／164 断言。实际 501 文件分段诊断全链约 909ms；快捷提交与接口表单原测试两文件 13 pass／0 fail／76 断言，其中快捷提交原用例 687ms。相关日志 `linux-failure-diagnostics.log`、`workspace-commit-timing.log`、`linux-two-seams.log`，不能替代失败的整库结果。
+- 已从确切提交 `df8fa0fd` 构建 backend／console／runtime，检查持久存储合同 1、Runner storage-contract、镜像配置 ID 与导入 manifest，准备不可变目标和迁移／八服务材料。没有应用迁移或替换任何平台服务。本机当下观测 0045 已由原会话应用，identity 0014 尚未应用；新发布需刷新包含 `4990a699` 的镜像，不能把旧材料当作当前 HEAD 已部署。
+- 真实贪吃蛇父工作区仍 running、preview ready，原模板与项目保留；默认档位仍为恢复后的 revision 11、原镜像与配置、自测 passed／available。新 Bot 未实际生成游戏、未提交或发布贪吃蛇。Chrome 对正式组件的桌面／窄屏及草稿保留验证已经通过；真实项目旧界面曾出现布局读取超时，须在新版部署与保留卷重建后复查。
+- 当前没有推送本批。依据开发规则 §3“推之前请在本地把它跑绿”，已请求作者确认是否允许转由当前准确 SHA 的 GitHub gate/e2e 全绿裁定部署；尚无回复。RFC 保持 In Progress，完整真实交付尚未完成。并行 RFC-034、RFC-036 文档在制品保持，未发跨会话消息。
