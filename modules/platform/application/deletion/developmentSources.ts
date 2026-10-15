@@ -1,4 +1,5 @@
 import type { Actor, BranchDto, ServiceId, SessionCredentialDto } from '@crewstation/contracts';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { precondition } from '@crewstation/kernel';
 import type { InfrastructureSourceModules } from '../../ports/infrastructureOrigins';
 import type { SessionProcessObservers, SessionProjectAdmission } from '../../ports/sessionDeletion';
@@ -28,7 +29,12 @@ export function developmentSourceControl(scm: DevelopmentSourceControl, actor: A
   return { listBranches: (id: ServiceId, compare: { previewSha?: string; prodSha?: string }) => scm.listBranches(actor, id, compare),
     pushUrl: async (id: ServiceId) => { const original = await scm.issueSessionCredential(id, 60); return {
       url: original.httpUrlWithCredentialTemplate.replace('{token}', encodeURIComponent(original.token)), expiresAt: original.expiresAt }; },
-    withPublishUrl: <T>(id: ServiceId, publish: (url: string) => Promise<T>) => scm.withPublishCredential(id,
-      original => publish(original.httpUrlWithCredentialTemplate.replace('{token}', encodeURIComponent(original.token)))),
+    withPublishUrl: <T>(id: ServiceId, publish: (url: string) => Promise<T>) => {
+      // SCM holds its own admission through revocation; the Runner callback
+      // must execute under the caller's still-live Development admission.
+      const withinCaller = AsyncLocalStorage.snapshot();
+      return scm.withPublishCredential(id,
+        original => withinCaller(publish, original.httpUrlWithCredentialTemplate.replace('{token}', encodeURIComponent(original.token))));
+    },
     readFile: (id: ServiceId, ref: string, path: string) => scm.readFile(id, ref, path) };
 }
