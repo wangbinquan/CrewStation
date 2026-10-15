@@ -4,7 +4,6 @@ import type { TaskEnvironment } from '../../domain/taskEnvironment';
 import type { NativeExecutionJobLease } from '../../ports/unitOfWork';
 import type { RuntimeOriginalStopSources } from '../../ports/deletion/originalStop';
 import type { NativeExecutionDeps } from '../nativeExecution';
-import { cleanupDevelopmentWorkload } from '../development/cleanup';
 import { closeStorageAdmission, storageStopProved } from '../business/storageStop';
 
 /** State, digital receipts and token invalidation may advance; original workload selection must stay fixed. */
@@ -35,17 +34,13 @@ export async function stopOriginalEnvironment(deps: NativeExecutionDeps, sources
   original: TaskEnvironment, identity: NativeExecutionJobLease | undefined, heartbeat: () => Promise<boolean>): Promise<{ digest: string } | { waiting: string }> {
   const fence = async () => { if (!await heartbeat()) throw precondition('原清理作业租约已失效'); await current(deps, original, identity); };
   await fence();
-  if (original.render?.developmentUsageProtection === undefined) {
-    const digital = await sources.digital(context, original);
-    if (digital.kind === 'waiting') return { waiting: digital.reason };
-  }
+  const digital = await sources.digital(context, original);
+  if (digital.kind === 'waiting') return { waiting: digital.reason };
   let env = await current(deps, original, identity, (value) => {
     if (value.native?.state === 'finished' || !value.native && value.state === 'released') return value;
     return { ...value, state: 'releasing', ...(value.native ? { native: { ...value.native, state: 'cleaning' } } : {}), updatedAt: deps.clock.now() };
   });
-  if (env.render?.developmentUsageProtection !== undefined && env.native?.state !== 'finished') {
-    await cleanupDevelopmentWorkload({ ...deps, developmentCleanup: sources.development(context) }, env, heartbeat, identity);
-  } else if (env.native?.state !== 'finished' && env.state !== 'released') {
+  if (env.native?.state !== 'finished' && env.state !== 'released') {
     await closeStorageAdmission(deps, env); await fence();
     const missingUid = !env.podUid && !env.native?.podUid;
     const alreadyStopped = missingUid ? await sources.stopped(context, env) : undefined;

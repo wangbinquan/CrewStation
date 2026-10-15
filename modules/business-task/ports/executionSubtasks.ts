@@ -1,4 +1,4 @@
-import type { BusinessSubtaskV3Dto, ExecutionObservationIdentity, RunnerBusinessReceipt, TaskId } from '@crewstation/contracts';
+import type { BusinessSubtaskV3Dto, RunnerBusinessReceipt, TaskId } from '@crewstation/contracts';
 import type { ExecutionAuthorization } from '../domain/executionControl';
 import type { ExecutionSubtask } from '../domain/executionSubtask';
 
@@ -17,10 +17,4 @@ export interface ExecutionSubtasks {
   claim(owner: string, id?: string): Promise<ExecutionSubtask | undefined>;
   checkpoint(claim: ExecutionSubtask, incarnation: string): Promise<boolean>;
   settle(claim: ExecutionSubtask, update: { dispatch: 'pending' | 'accepted' | 'unknown' | 'failed' | 'retryable-rejected'; receipt?: RunnerBusinessReceipt; runtimeAdmitted?: boolean; runtimeDispatched?: boolean; view: BusinessSubtaskV3Dto }): Promise<boolean>;
-}
-
-/** Composition injects the price owner; business-task never reads pricing storage. */
-export interface ExecutionObservationAdmission {
-  accept(input: { identity: ExecutionObservationIdentity;
-    profile: { id: string; revision: number; protocol: 'opencode' | 'claude-code' | 'terminal' } | null }): Promise<void>;
 }

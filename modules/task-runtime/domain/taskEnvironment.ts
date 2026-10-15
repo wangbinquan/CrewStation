@@ -1,5 +1,4 @@
-import type { DevelopmentCleanupEvidence } from './development/cleanupEvidence';
-import type { BusinessSessionStorage, DevelopmentUsageStorage } from '@crewstation/contracts';
+import type { BusinessSessionStorage } from '@crewstation/contracts';
 import type { RuntimeInitializationStatus, RuntimeImageExecutionSnapshot, ProjectId, ServiceId, StartupRecord, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
 import { cancelStartup, completeThrough, defaultFailureCode, failStartup } from './podStartup';
@@ -40,10 +39,6 @@ export interface NativeExecution {
   readonly secretUid?: string;
   readonly failureReason?: string;
   readonly preparedAt?: string;
-  /** Durable numeric exit only; physical stop and final reclaim remain independently required. */
-  readonly developmentCleanup?: DevelopmentCleanupEvidence;
-  /** Atomic final receipt; private original hash is never returned by removal queries. */
-  readonly developmentRemovalSeal?: { readonly version: 1; readonly originalRunnerTokenHash: string; readonly selectionHash: string };
 }
 
 /**
@@ -54,12 +49,6 @@ export interface NativeExecution {
 export interface WorkloadRender {
   /** 开会话所选分支的对象档位；保卷重建与子执行继承，不读取生产发布。 */
   readonly developmentObjectPlanId?: string;
-  /** RFC-034 opt-in for a newly admitted headless execution; legacy renders omit it. */
-  readonly developmentUsageStorage?: DevelopmentUsageStorage;
-  /** Explicit new protection selection; a missing field never upgrades an old environment. */
-  readonly developmentUsageProtection?: { readonly version: 1 };
-  readonly developmentRemovalProtection?: { readonly version: 1 };
-  readonly developmentUsageRequestHash?: string;
   readonly objectInputsGeneration?: number;
   readonly storageFinalization?: { readonly operationId: string; readonly revision: number; readonly volumeUid: string | null; readonly computeStopped?: true };
   readonly completionPolicy?: 'archive-and-delete';
@@ -87,9 +76,9 @@ export interface WorkloadRender {
    * 执行环境（I25 第二步）：父工作区受理那一刻的 Pod 名（重建过的工作区 Pod 换了名）。节点与父 Pod、工作卷的 UID 取自 `native`，
    * 调和器建之前照它们核对父工作区还是受理时那一个。
    */
-  readonly execution?: { readonly workspacePod: string; readonly creator?: 'native' };
+  readonly execution?: { readonly workspacePod: string };
   /** 保卷重建：确认的卷实例与不可变请求摘要；不创建卷、不重新检出。 */
-  readonly rebuild?: { readonly id: string; readonly volumeUid: string; readonly intent: string; readonly nodeName?: string; readonly developmentParentSelection?: unknown };
+  readonly rebuild?: { readonly id: string; readonly volumeUid: string; readonly intent: string; readonly nodeName?: string };
 }
 
 export interface RunnerRejection {
@@ -106,8 +95,6 @@ export interface BusinessWorkspaceLifecycle {
 }
 
 export interface TaskEnvironment {
-  /** Private admission seal: malformed explicit presence is never a legacy parent. */
-  readonly parentEnding?: unknown;
   readonly businessWorkspace?: BusinessWorkspaceLifecycle;
   readonly runtimeInitialization?: RuntimeInitializationStatus;
   readonly admissionFingerprint?: string;
@@ -214,7 +201,7 @@ export const WORKLOAD_LABELS: Readonly<Record<TaskKind, string>> = { 'dev-sessio
  * 没有的照旧由本模块建。
  */
 export function reconcilerCreates(env: TaskEnvironment): env is TaskEnvironment & { readonly render: WorkloadRender } {
-  return !!env.render && !(env.render.developmentUsageProtection !== undefined && env.render.execution?.creator === 'native') && (!env.rebuildId || env.render.rebuild?.id === env.rebuildId) && (!env.native || !!env.render.execution);
+  return !!env.render && (!env.rebuildId || env.render.rebuild?.id === env.rebuildId) && (!env.native || !!env.render.execution);
 }
 
 /**

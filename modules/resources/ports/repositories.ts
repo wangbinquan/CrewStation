@@ -27,7 +27,6 @@ export interface RecordRepository {
   /** 保留期已到（按数据库时间）、还没被转成「不要了」的失败记录（保留期巡检用）。 */
   retentionDue(limit: number): Promise<LedgerRecord[]>;
   maintenancePage(lease: MaintenanceSweepLease, compactAfterMs: number, limit: number): Promise<LedgerRecord[]>;
-  maintenanceOwnerRequired(id: string): Promise<boolean>;
   updateForMaintenance(record: LedgerRecord, lease: MaintenanceSweepLease): Promise<boolean>;
   compactForMaintenance(record: LedgerRecord, at: Date, lease: MaintenanceSweepLease): Promise<LedgerRecord | undefined>;
   /** 终态（期望已是「不要了」）且已结束早于某时刻、尚未压缩的记录。 */

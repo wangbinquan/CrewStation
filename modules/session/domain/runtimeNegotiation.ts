@@ -10,17 +10,10 @@ const BUSINESS_EXECUTION_COMMANDS: ReadonlySet<RunnerCommand['type']> = new Set(
  * 让原因以管理员能处理的话回到调用方，而不是让 Runner 半途失败。
  */
 export function assertLaunchSupported(command: RunnerCommand, capabilities: RunnerHello['capabilities']): void {
-  if (command.type === 'startAgent' && command.developmentUsage?.intent.nativeSource?.version === 1 && capabilities.developmentNativeSourceV1 !== 1) throw new PlatformError('precondition', '当前任务容器未声明开发实际原生来源能力', { code: 'unsupported_capability', capability: 'developmentNativeSourceV1' });
-  if (command.type === 'stopDevelopmentAgent' && (capabilities.developmentUsageV1 !== 1 || capabilities.developmentUsageStopV1 !== 1)) throw new PlatformError('precondition', '当前任务容器未声明开发数字持久停止能力', { code: 'unsupported_capability', capability: 'developmentUsageStopV1' });
-  if ((command.type === 'developmentUsageInfo' || command.type === 'readDevelopmentUsageEvents' || command.type === 'readDevelopmentNativePage' || command.type === 'ackDevelopmentUsageEvents' || (command.type === 'startAgent' && command.developmentUsage !== undefined)) && capabilities.developmentUsageV1 !== 1) throw new PlatformError('precondition', '当前任务容器未声明开发数值日志能力', { code: 'unsupported_capability', capability: 'developmentUsageV1' });
   if ((command.type === 'runtimeInitializationStatus' || command.type === 'cancelRuntimeInitialization') && capabilities.runtimeInitialization !== 1) throw new PlatformError('precondition', '当前任务容器未声明运行镜像初始化能力', { code: 'unsupported_capability', capability: 'runtimeInitialization' });
   if (BUSINESS_EXECUTION_COMMANDS.has(command.type) && capabilities.businessExecutionV3 !== 1) {
     throw new PlatformError('precondition', '当前任务容器未声明可靠业务执行能力', { code: 'unsupported_capability', capability: 'businessExecutionV3' });
   }
-  if ((command.type === 'startBusinessAgent' || command.type === 'businessExecutionInfo') && command.usageObservationsV1 === 1 && capabilities.usageObservationsV1 !== 1)
-    throw new PlatformError('precondition', '当前任务容器未声明扩展用量证据能力', { code: 'unsupported_capability', capability: 'usageObservationsV1' });
-  if ((command.type === 'startBusinessAgent' || command.type === 'businessExecutionInfo') && command.nativeUsageTreeV1 === 1 && capabilities.nativeUsageTreeV1 !== 1)
-    throw new PlatformError('precondition', '当前任务容器未声明原生子树采集能力', { code: 'unsupported_capability', capability: 'nativeUsageTreeV1' });
   if (command.type === 'startBusinessAgent') { assertLaunchSupported(command.agent, capabilities); return; }
   if (command.type !== 'startAgent' && command.type !== 'startAgentTerminal' && command.type !== 'probeTerminal') return;
   const material = command.beforeStart;

@@ -1,6 +1,5 @@
 import type { SessionOriginalTaskStorage } from '../../ports/projectDeletion';
 import { sessionStorageKey, sessionStoredTaskId } from './deletion/taskStorage';
-import { appendBusinessUsageSources } from './businessUsageSources';
 import { ordinarySessionTask } from './deletion/admission';
 import { assertBusinessStreamOpen, lockBusinessStream } from './stoppedExecutions';
 import { businessRetention } from './businessRetention';
@@ -79,7 +78,6 @@ export function drizzleBusinessExecutionStore(db: Database, storage?: SessionOri
         sameExecution(current.receipt, receipt);
         if (current.receipt.phase === 'finished' && batch.some((event) => event.sequence > current.receipt.lastSequence)) throw conflict('不能在最终水位之后追加事件');
         const added = await appendBatch(tx, taskId, receipt.executionId, batch);
-        await appendBusinessUsageSources(tx, taskId, receipt, added.map((item) => item.event));
         const outputBytes = current.outputBytes + added.reduce((sum, item) => sum + businessFrameOutputBytes(item.event.frame), 0);
         if (outputBytes > 64 * 1024 * 1024) throw validation('执行输出超过平台容量');
         const candidate = receipt.lastSequence >= current.receipt.lastSequence && current.receipt.phase !== 'finished' ? receipt : current.receipt;

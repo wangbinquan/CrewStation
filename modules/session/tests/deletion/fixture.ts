@@ -52,12 +52,8 @@ export async function sessionDeletionFixture(processes?: SessionCallbackProcesse
     await database.db.execute(sql`INSERT INTO session.runner_events(task_id,seq,at,kind,event,legacy_event) SELECT ${id},i,now(),'agent',jsonb_build_object('private','event payload'),jsonb_build_object('private','legacy payload') FROM generate_series(1,${count}) i`);
     await database.db.execute(sql`INSERT INTO session.business_executions(task_id,execution_id,receipt) VALUES(${id},'execution','{"private":"receipt"}')`);
     await database.db.execute(sql`INSERT INTO session.business_execution_events(task_id,execution_id,sequence,digest,event) VALUES(${id},'execution',1,${jsonHash('event')},'{"private":"output"}')`);
-    await database.db.execute(sql`INSERT INTO session.business_usage_sources(task_id,execution_id,attempt,incarnation,payload_digest) VALUES(${id},'execution',1,'original',${jsonHash('usage')})`);
-    await database.db.execute(sql`INSERT INTO session.business_usage_events(task_id,execution_id,sequence,agent_id,occurred_at,capture) VALUES(${id},'execution',1,'agent','2026-10-03T00:00:00Z','{"private":"usage"}')`);
     await database.db.execute(sql`INSERT INTO session.business_stopped_executions(task_id,execution_id) VALUES(${id},'execution')`);
     await database.db.execute(sql`INSERT INTO session.execution_completion_proofs(task_id,execution_id,record) VALUES(${id},'execution','{"private":"completion"}')`);
-    await database.db.execute(sql`INSERT INTO session.development_usage_streams(task_id,registration) VALUES(${id},'{"private":"registration"}')`);
-    await database.db.execute(sql`INSERT INTO session.development_usage_events(task_id,sequence,digest,event) VALUES(${id},1,${jsonHash('development')},'{"private":"development"}')`);
   };
   const drop = async () => {
     for (const server of servers) void server.stop(true);

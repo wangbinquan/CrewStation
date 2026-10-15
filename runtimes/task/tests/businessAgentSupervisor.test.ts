@@ -58,22 +58,22 @@ test('output capacity cancels execution and records explicit failure; preparing 
 });
 
 
-test('RFC-034 numeric evidence is durably replayed unchanged with the legacy usage frame', async () => {
+// RFC-034 v2：执行快照随业务 usage 帧原样持久化与重放，托管应用据此记账；raw 仍被剥掉。
+test('the execution usage snapshot is durably replayed unchanged with the business usage frame', async () => {
   const f = await fixture(1024, 4096), events = createEventQueue<AgentEvent>();
-  const usageCapture: NonNullable<AgentEvent['usageCapture']> = { version: 1, diagnostics: [], measurements: [{
-    recordId: 'native-step', revision: 1, occurredAt: null, observedAt: new Date().toISOString(), adapterVersion: 'test@1', actualModel: null,
-    reporting: 'delta', inclusion: 'self', coverage: 'complete', validity: 'valid', basis: { kind: 'invocation' }, coveredThroughTurn: null,
-    scope: { root: 'native', session: 'native', parentSession: null, ancestors: [], turn: 'turn', turnIndex: 0, level: 'request' },
-    usage: { input: '9007199254740993', output: '0', cacheRead: '2', cacheWrite: '0' },
-  }] };
+  const usageSnapshot: NonNullable<AgentEvent['usageSnapshot']> = { state: 'partial', models: [{ model: 'zhipu/glm-5', input: 9, cacheRead: 2, cacheWrite: 0, output: 3, reasoning: 1 }] };
   f.supervisor.start(identity, async () => ({ events, send: async () => {}, cancel: async () => {} }));
-  events.push(event('usage', { raw: 'private raw', usage: { measurementId: 'legacy', scope: 'legacy', mode: 'cumulative', inputTokens: null, outputTokens: 0, cacheReadTokens: 2, cacheWriteTokens: 0, complete: false }, usageCapture }));
-  events.push(event('completed', { result: { exitCode: 0 } })); events.close();
+  events.push(event('usage', { raw: 'private raw', usageSnapshot, usage: { measurementId: 'run:1', scope: 'run', mode: 'cumulative', inputTokens: 9, outputTokens: 3, cacheReadTokens: 2, cacheWriteTokens: 0, complete: false, snapshot: usageSnapshot } }));
+  events.push(event('completed', { result: { exitCode: 0 }, usageSnapshot })); events.close();
   expect((await f.supervisor.settled(identity.executionId)).result?.reason).toBe('exited');
   const reopened = new ExecutionJournal(f.root, 'two', { outputBytes: 1024, spoolBytes: 4096, eventBytes: 4096 }); journals.push(reopened);
-  const frame = reopened.replay(identity.executionId, 0).find(({ frame }) => frame.type === 'agent' && frame.event.type === 'usage')!.frame;
-  expect(frame.type === 'agent' && frame.event.usageCapture).toEqual(usageCapture);
-  expect(JSON.stringify(frame)).not.toContain('private raw');
+  const frames = reopened.replay(identity.executionId, 0).map(({ frame }) => frame);
+  const usage = frames.find((frame) => frame.type === 'agent' && frame.event.type === 'usage')!;
+  expect(usage.type === 'agent' && usage.event.usageSnapshot).toEqual(usageSnapshot);
+  expect(usage.type === 'agent' && usage.event.usage?.snapshot).toEqual(usageSnapshot);
+  const completed = frames.find((frame) => frame.type === 'agent' && frame.event.type === 'completed')!;
+  expect(completed.type === 'agent' && completed.event.usageSnapshot).toEqual(usageSnapshot);
+  expect(JSON.stringify(usage)).not.toContain('private raw');
 });
 
 

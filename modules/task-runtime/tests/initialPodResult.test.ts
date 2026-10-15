@@ -1,16 +1,11 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { noopLogger } from '@crewstation/kernel';
 import { testDatabaseAvailable } from '@crewstation/testkit';
 import { sql } from 'drizzle-orm';
-import { kubernetesTaskCluster } from '../adapters/k8s/taskCluster';
 import type { UnitOfWork } from '../ports/unitOfWork';
 import { recordPodInstance } from '../application/createEnvironment';
 import { recordInitialPodFailure } from '../application/environmentCreation/initialPodResult';
-import { readDevelopmentParentEnding } from '../domain/development/parentEnding';
 import type { InitialPodResultFixture } from './initialPodResultFixture';
 import { initialPodResultFixture } from './initialPodResultFixture';
-import { developmentParentPhysicalFixture } from './developmentParentPhysicalFixture';
-import { acceptParentRebuild, stopParentForRebuild } from './developmentParentRebuildFixture';
 
 const available = await testDatabaseAvailable();
 describe.skipIf(!available)('initial Pod results preserve original identity (real PG)', () => {
@@ -27,20 +22,6 @@ describe.skipIf(!available)('initial Pod results preserve original identity (rea
     expect(result.error).toBe(lostAck ? error : undefined);
     expect(await t.load(current.id)).toEqual(current);
     expect(await t.snapshot()).toEqual(before);
-  }, 15000);
-
-  for (const lostAck of [false, true]) test('actual protected child and parent ending remain unchanged on ' + (lostAck ? 'lost' : 'late') + ' ACK', async () => {
-    const t = await setup(), pending = await t.start();
-    await t.connect(pending.original); const child = await t.seal(pending.original), current = await t.load(pending.original.id);
-    const pointer = readDevelopmentParentEnding(current)!;
-    expect(pointer.phase).toBe('admission-sealed');
-    const ending = await t.uow.read.parentEnding!.endings.get(pointer.endingId);
-    expect(ending?.memberCount).toBe(1); expect((await t.load(child.id)).native?.state).toBe('queued');
-    const before = await t.snapshot(), error = new Error('original Pod ACK lost after sealing');
-    pending.finish(lostAck ? error : undefined);
-    expect((await pending.settled).error).toBe(lostAck ? error : undefined);
-    expect(await t.snapshot()).toEqual(before);
-    expect(await t.uow.read.parentEnding!.endings.get(pointer.endingId)).toEqual(ending);
   }, 15000);
 
   test('the unchanged unconnected legacy failure preserves the original error and existing failure/refund semantics', async () => {
@@ -90,16 +71,6 @@ describe.skipIf(!available)('initial Pod results preserve original identity (rea
     }, 15000);
   }
 
-  for (const marker of [null, false, { version: 1 }, { phase: 'complete' }]) test('explicit invalid parent marker ' + JSON.stringify(marker) + ' admits no result write', async () => {
-    const t = await setup(), pending = await t.start();
-    // Deliberately invalid input; no marker is presented as an actual ending/completion proof.
-    await t.tdb.db.execute(sql`UPDATE task_runtime.environments SET parent_ending=${JSON.stringify(marker)}::jsonb WHERE id=${pending.original.id}`);
-    const before = await t.snapshot();
-    pending.finish(); await pending.settled;
-    await recordInitialPodFailure(t.deps, pending.original, 'late original failure');
-    expect(await t.snapshot()).toEqual(before);
-  }, 15000);
-
   for (const capability of ['absent', 'error'] as const) test('maintenance reader ' + capability + ' has no fallback or writes', async () => {
     const t = await setup(), pending = await t.start(), before = await t.snapshot();
     const original = t.deps.uow;
@@ -123,26 +94,4 @@ describe.skipIf(!available)('initial Pod results preserve original identity (rea
     expect(await t.snapshot()).toEqual(before);
   }, 15000);
 
-  test('actual original ending and recovery publication reject results from the completed prior epoch', async () => {
-    const physical = await developmentParentPhysicalFixture('native');
-    try {
-      const original = await physical.load(physical.parent.id), accepted = await acceptParentRebuild(physical);
-      const sourceId = readDevelopmentParentEnding(await physical.load(original.id))!.endingId;
-      await stopParentForRebuild(physical);
-      const current = await physical.load(original.id);
-      expect(current).toMatchObject({ state: 'creating', rebuildId: accepted.id });
-      expect(current.podName).not.toBe(original.podName); expect(current.runnerTokenHash).not.toBe(original.runnerTokenHash);
-      const source = (await physical.uow.read.parentEnding!.endings.get(sourceId))!; expect(source.phase).toBe('complete');
-      const before = Array.from(await physical.tdb.db.execute(sql`SELECT row_to_json(e)::text AS value FROM task_runtime.environments e ORDER BY id`));
-      const resources = await physical.resources.api.list({ projectId: physical.projectId, includeStopped: true }), used = await physical.resources.api.occupancy(physical.projectId);
-      const deps = { ...physical.deps, uow: physical.uow, cluster: kubernetesTaskCluster(physical.k8s, physical.deps.settings.workerUid),
-        clock: { now: () => new Date() }, logger: noopLogger };
-      await recordPodInstance(deps, original, original.podUid);
-      await recordInitialPodFailure(deps, original, 'original epoch late error');
-      expect(Array.from(await physical.tdb.db.execute(sql`SELECT row_to_json(e)::text AS value FROM task_runtime.environments e ORDER BY id`))).toEqual(before);
-      expect(await physical.resources.api.list({ projectId: physical.projectId, includeStopped: true })).toEqual(resources);
-      expect(await physical.resources.api.occupancy(physical.projectId)).toBe(used);
-      expect(await physical.uow.read.parentEnding!.endings.get(sourceId)).toEqual(source);
-    } finally { await physical.close(); }
-  }, 30000);
 });

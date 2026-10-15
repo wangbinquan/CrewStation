@@ -4,8 +4,6 @@ import { precondition } from '@crewstation/kernel';
 import { taskLabelMatches } from '../../domain/physicalIdentity';
 import type { PodPhase } from '../../ports/cluster';
 import type { TaskRecoveryCluster } from '../../ports/recoveryCluster';
-import { taskRemovalVersion } from './taskRemovalGuard';
-import type { TaskDevelopmentRemovalQuery } from './taskRemovalGuard';
 
 type Pod = K8sObject & { status?: { phase?: string } };
 type Volume = K8sObject & { status?: { phase?: string; capacity?: { storage?: string } } };
@@ -19,7 +17,7 @@ function uid(object: K8sObject): string {
 }
 
 /** 同名对象不等于确认过的实例；恢复只清理失败 Pod，工作卷始终保留。 */
-export function kubernetesTaskRecoveryCluster(k8s: K8sClient, developmentRemoval?: TaskDevelopmentRemovalQuery): TaskRecoveryCluster {
+export function kubernetesTaskRecoveryCluster(k8s: K8sClient): TaskRecoveryCluster {
   return {
     inspect: async (env) => {
       const [pod, volume] = await Promise.all([
@@ -27,7 +25,7 @@ export function kubernetesTaskRecoveryCluster(k8s: K8sClient, developmentRemoval
         k8s.get<Volume>(Resources.PersistentVolumeClaim!, env.pvcName, env.namespace),
       ]);
       return {
-        pod: pod ? { uid: uid(pod), phase: phase(pod), deleting: Boolean(pod.metadata.deletionTimestamp), ...((pod.spec as { nodeName?: string } | undefined)?.nodeName ? { nodeName: (pod.spec as { nodeName: string }).nodeName } : {}) } : null,
+        pod: pod ? { uid: uid(pod), phase: phase(pod), deleting: Boolean(pod.metadata.deletionTimestamp) } : null,
         volume: volume ? { uid: uid(volume), phase: volume.status?.phase ?? 'Unknown', deleting: Boolean(volume.metadata.deletionTimestamp),
           belongsToTask: taskLabelMatches(volume.metadata.labels?.[LABELS.task], env),
           ...(volume.status?.capacity?.storage ? { capacity: volume.status.capacity.storage } : {}) } : null,
@@ -40,10 +38,9 @@ export function kubernetesTaskRecoveryCluster(k8s: K8sClient, developmentRemoval
       const confirmedUpgrade = reason === 'protocol_mismatch' && env.kind === 'dev-session' && !env.native && env.state === 'creating' && Boolean(env.rebuildId) && !env.connected && env.runnerRejection?.code === 'protocol_mismatch';
       const confirmedRestart = reason === 'administrator-restart' && env.kind === 'dev-session' && !env.native && env.state === 'creating' && Boolean(env.rebuildId) && !env.connected;
       if (!['Failed', 'Succeeded'].includes(phase(pod)) && !confirmedUpgrade && !confirmedRestart) throw precondition('原容器尚未结束，不能重建');
-      const version = await taskRemovalVersion(k8s, 'Pod', pod, developmentRemoval);
-      if (version === undefined || pod.metadata.deletionTimestamp) return;
+      if (pod.metadata.deletionTimestamp) return;
       await k8s.delete(Resources.Pod!, env.podName, env.namespace, { gracePeriodSeconds: 30,
-        preconditions: { uid: expectedUid, ...(version ? { resourceVersion: version } : {}) } });
+        preconditions: { uid: expectedUid, ...(pod.metadata.resourceVersion ? { resourceVersion: pod.metadata.resourceVersion } : {}) } });
     },
   };
 }

@@ -15,7 +15,7 @@ export interface RuntimeDeletionOrigin {
   readonly revision: string;
 }
 export interface RuntimeContentOrigin {
-  readonly kind: 'project' | 'service' | 'task' | 'rebuild' | 'parent-ending';
+  readonly kind: 'project' | 'service' | 'task' | 'rebuild';
   readonly key: string;
   readonly id: string;
   readonly projectId: ProjectId;

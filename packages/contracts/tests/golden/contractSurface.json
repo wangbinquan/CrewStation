@@ -2944,6 +2944,70 @@
                             "maxLength": 256,
                             "minLength": 1,
                             "type": "string"
+                          },
+                          "snapshot": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "models": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "cacheRead": {
+                                      "maximum": 9007199254740991,
+                                      "minimum": 0,
+                                      "type": "integer"
+                                    },
+                                    "cacheWrite": {
+                                      "maximum": 9007199254740991,
+                                      "minimum": 0,
+                                      "type": "integer"
+                                    },
+                                    "input": {
+                                      "maximum": 9007199254740991,
+                                      "minimum": 0,
+                                      "type": "integer"
+                                    },
+                                    "model": {
+                                      "maxLength": 300,
+                                      "type": "string"
+                                    },
+                                    "output": {
+                                      "maximum": 9007199254740991,
+                                      "minimum": 0,
+                                      "type": "integer"
+                                    },
+                                    "reasoning": {
+                                      "maximum": 9007199254740991,
+                                      "minimum": 0,
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "required": [
+                                    "cacheRead",
+                                    "cacheWrite",
+                                    "input",
+                                    "model",
+                                    "output",
+                                    "reasoning"
+                                  ],
+                                  "type": "object"
+                                },
+                                "maxItems": 100,
+                                "type": "array"
+                              },
+                              "state": {
+                                "enum": [
+                                  "complete",
+                                  "partial"
+                                ],
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "models",
+                              "state"
+                            ],
+                            "type": "object"
                           }
                         },
                         "required": [

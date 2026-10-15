@@ -2,24 +2,23 @@
 // ← agent-workflow `execution/managedProcess.ts` 的流泵与排水段，去掉 Windows spool、
 // 预激活 launcher、PID 收据与行截断回调（行上限由宿主 streamPump.ts 负责）。
 
-import type { UsageCapture } from './usage/capture';
 import type { AgentEvent, AgentEventType } from '@crewstation/contracts';
 import type { Logger } from '@crewstation/kernel';
 import type { DriverChildProcess, ProcessHost } from '../contract/processHost';
 import type { NormalizedEvent } from '../contract/normalizedEvent';
 import { createBoundedTail } from '../process/boundedTail';
-import type { AgentEventFields, TokenUsage } from './agentEventMapping';
-import { accumulateTokens, toAgentEvent } from './agentEventMapping';
+import type { AgentEventFields } from './agentEventMapping';
+import { toAgentEvent } from './agentEventMapping';
 
 /** 进程退出后等待管道读尽的上限；到期仍被孙进程占着就杀掉残余进程组。 */
 export const DRAIN_GRACE_MS = 2000;
 
 export interface TurnPumpDeps {
   businessEvents?: boolean;
-  captureUsage?: UsageCapture;
   host: ProcessHost;
   logger: Logger;
-  usage: TokenUsage;
+  /** 每条解析成功的 stdout 行交给本次执行的计量器（RFC-034 v2）。 */
+  observeUsage: (source: Record<string, unknown>) => void;
   emit: (type: AgentEventType, fields?: AgentEventFields, at?: number) => AgentEvent;
   push: (event: AgentEvent) => void;
   parseEvent: (line: string) => NormalizedEvent | null;
@@ -52,7 +51,7 @@ export async function pumpTurn(child: DriverChildProcess, deps: TurnPumpDeps): P
   await child.exited;
   const drained = await Promise.race([settled.then(() => true), Bun.sleep(DRAIN_GRACE_MS).then(() => false)]);
   if (!drained) await deps.host.killTree(child, 0);
-  if (deps.businessEvents || deps.captureUsage || drained) {
+  if (deps.businessEvents || drained) {
     const result = await settled;
     if (!result.ok) throw result.error;
   }
@@ -67,14 +66,11 @@ function handleStdoutLine(line: string, deps: TurnPumpDeps): void {
     deps.push(deps.emit('text', { text: line }));
     return;
   }
-  accumulateTokens(deps.usage, event);
-  if ((deps.businessEvents || deps.captureUsage) && event.businessUsage) {
-    const usageCapture = deps.captureUsage?.(event, Date.now());
-    if (deps.businessEvents || usageCapture) deps.push(deps.emit('usage', { usage: event.businessUsage, ...(usageCapture ? { usageCapture } : {}) }, event.timestamp));
-  }
   if (event.sessionId !== undefined) deps.onSessionId(event.sessionId);
   const mapped = toAgentEvent(event, deps.emit);
   if (mapped !== null) deps.push(mapped);
+  // 用量事件排在触发它的那条事件之后、本轮终止判定之前。
+  deps.observeUsage(event.source);
   if (event.kind === 'step_finish') {
     const terminalError = event.terminalError?.isError === true
       ? (event.terminalError.message.length > 0 ? event.terminalError.message : 'claude 报告了终止错误结果')

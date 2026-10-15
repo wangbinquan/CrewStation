@@ -1,16 +1,8 @@
 import type { ResourceChild } from '@crewstation/contracts';
 import type { TaskVolumeSafetyState, TaskVolumeTarget, TaskVolumeReclaimProof } from '@crewstation/contracts';
-import type { WorkloadAdmissionIdentity, WorkloadConsumer, WorkloadStartPermit, WorkloadStopProof, DevelopmentAdmissionReceipt, DevelopmentAdmissionState } from '@crewstation/contracts';
+import type { WorkloadAdmissionIdentity, WorkloadConsumer, WorkloadStartPermit, WorkloadStopProof } from '@crewstation/contracts';
 import type { LegacyTask } from '../domain/adoption';
 import type { ObservedCondition } from '../domain/observation';
-
-export interface DevelopmentRemovalTarget {
-  readonly kind: 'Pod' | 'Secret'; readonly namespace: string; readonly name: string; readonly uid: string;
-  readonly operation: 'delete' | 'stop-finalizer';
-}
-export type DevelopmentRemovalDecision = { readonly kind: 'unselected' } | { readonly kind: 'absent' }
-  | { readonly kind: 'waiting'; readonly reason: string } | { readonly kind: 'permitted'; readonly resourceVersion: string };
-export type DevelopmentRemovalQuery = (target: DevelopmentRemovalTarget) => Promise<DevelopmentRemovalDecision>;
 
 /** 台账记录里调和器用得到的部分（结构上是 resources 模块 LedgerRecord 的子集）。 */
 export interface LedgerRecordView {
@@ -45,12 +37,11 @@ export interface LedgerObservations {
   readonly workloadSafety?: {
     closeAdmission?(identity: WorkloadAdmissionIdentity): Promise<void>;
     admissionClosed?(id: string): Promise<boolean>;
-    get(id: string): Promise<{ consumer: WorkloadConsumer; admissionClosed: boolean; startPermit: WorkloadStartPermit | null; stopProof: WorkloadStopProof | null; developmentAdmission?: DevelopmentAdmissionState } | undefined>;
-    register?(consumer: WorkloadConsumer): Promise<{ consumer: WorkloadConsumer; admissionClosed: boolean; developmentAdmission?: DevelopmentAdmissionState }>;
+    get(id: string): Promise<{ consumer: WorkloadConsumer; admissionClosed: boolean; startPermit: WorkloadStartPermit | null; stopProof: WorkloadStopProof | null } | undefined>;
+    register?(consumer: WorkloadConsumer): Promise<{ consumer: WorkloadConsumer; admissionClosed: boolean }>;
     grantStart?(id: string, permit: Omit<WorkloadStartPermit, 'grantedAt'>): Promise<unknown>;
-    closeConsumer(id: string): Promise<{ consumer: WorkloadConsumer; admissionClosed: boolean; startPermit: WorkloadStartPermit | null; stopProof: WorkloadStopProof | null; developmentAdmission?: DevelopmentAdmissionState }>;
+    closeConsumer(id: string): Promise<{ consumer: WorkloadConsumer; admissionClosed: boolean; startPermit: WorkloadStartPermit | null; stopProof: WorkloadStopProof | null }>;
     recordStop(proof: WorkloadStopProof): Promise<WorkloadStopProof>;
-    bindDevelopmentAdmission?(receipt: DevelopmentAdmissionReceipt): Promise<{ consumer: WorkloadConsumer; admissionClosed: boolean; startPermit: WorkloadStartPermit | null; stopProof: WorkloadStopProof | null; developmentAdmission?: DevelopmentAdmissionState }>;
   };
   get(id: string): Promise<LedgerRecordView | undefined>;
   /** 在册的记录（不含已结束的）：调和器启动与定期全量核对时逐条排进队列。 */
@@ -93,7 +84,6 @@ export interface RebuildRendering {
 }
 
 export interface WorkloadOwners {
-  readonly inspectDevelopmentRemoval?: DevelopmentRemovalQuery;
   reconcileRebuild?(recordId: string, rebuildId: string, operations: RebuildRendering, heartbeat: () => Promise<boolean>): Promise<void>;
   runnerValues(recordId: string): Promise<Readonly<Record<string, string>>>;
   /** 建这一次启动检出用的 Git 凭据 Secret 之前要令牌（只读、短时，I25）；值只写进 Secret，不落台账。 */

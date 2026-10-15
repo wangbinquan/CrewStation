@@ -25,8 +25,6 @@
 //    见 permission/opencodePermission.ts。
 //  - 错误一律用 @crewstation/kernel 的 validation() 等助手，不再用 agent-workflow 的错误类型。
 
-export type { DevelopmentNativeProducer, DevelopmentNativeTurnInput, DevelopmentNativePagedCapture } from './contract/developmentNativeProducer';
-export { beginDevelopmentNativePagedCapture } from './drivers/usage/developmentNativePagedCapture';
 export type { DriverAgentProcess, DriverAgentSpec, DriverLaunchContext, CliAgentDriver } from './contract/agentDriver';
 export type { NativeTerminalSpec, PreparedNativeTerminal, NativeActivityChannel } from './contract/nativeTerminal';
 export type { ManagedRuntimeContext } from './contract/managedRuntime';
@@ -39,6 +37,7 @@ export { OpencodeNativeActivity } from './drivers/opencode/nativeActivity';
 export { ClaudeNativeActivity } from './drivers/claudeCode/nativeActivity';
 export { parseClaudeNativeHook, parseClaudeTranscriptNode } from './drivers/claudeCode/nativeObservation';
 export { parseClaudeNativeTelemetry } from './drivers/claudeCode/nativeTelemetry';
+export type { ClaudeApiRequest, ClaudeNativeTelemetry } from './drivers/claudeCode/nativeTelemetry';
 export type { ClaudeTranscriptNode } from './drivers/claudeCode/nativeTurnEvidence';
 export { DriverStateError } from './contract/agentDriver';
 export type {
@@ -50,7 +49,6 @@ export type {
 export type {
   NormalizedEvent,
   NormalizedEventKind,
-  NormalizedTokenDelta,
   NormalizedToolCall,
   SystemEventObservation,
 } from './contract/normalizedEvent';
@@ -87,7 +85,7 @@ export {
 } from './drivers/opencode/argv';
 export { OPENCODE_CONFIG_DIR_ENV, OPENCODE_CONFIG_DIR_NAME, buildOpencodeEnv, opencodeConfigDirEnv, opencodeConfigDirName } from './drivers/opencode/env';
 export { buildOpencodeInlineConfig, renderOpencodeAgentEntry } from './drivers/opencode/inlineConfig';
-export { computeTokenDelta, extractTextFromEvent, inferEventKind, observeSystemEvent as observeOpencodeSystemEvent, parseEvent as parseOpencodeEvent } from './drivers/opencode/events';
+export { extractTextFromEvent, inferEventKind, observeSystemEvent as observeOpencodeSystemEvent, parseEvent as parseOpencodeEvent } from './drivers/opencode/events';
 export { detectOpencodeSessionNotFound, ensureOpencodeBinaryVersion, probeOpencode, resetOpencodeProbes } from './drivers/opencode/probe';
 export { getOpencodeBinaryVersion, recordOpencodeBinaryVersion, resetOpencodeBinaryVersions } from './drivers/opencode/versionRegistry';
 
@@ -112,6 +110,12 @@ export { DEFAULT_VERSION_PROBE_TIMEOUT_MS, spawnVersionProbe } from './process/v
 export { MAX_STDERR_TAIL_CHARS, createBoundedTail } from './process/boundedTail';
 export { RUN_DIR_PREFIX, createRunDirectory, defaultRunDir } from './process/runDirectory';
 
-export type { NativeUsagePassOwner, PersistableNativeUsagePassReader } from './drivers/usage/nativeUsageOwner';
-export { openNativeUsagePass } from './drivers/usage/nativeUsagePass';
-export { persistNativeUsagePass } from './drivers/usage/persistNativeUsagePass';
+// RFC-034 v2：与 agent-workflow RFC-371 v2 同一计量规则（每次执行一份按实际模型拆分的可替换快照）。
+export type { UsageMeter, UsageMeterInput } from './drivers/usage/meter';
+export { UsageAccumulator, businessUsageOf, combineUsage, hasUsage, sameUsage, tokenCount } from './drivers/usage/meter';
+export { createOpencodeUsageMeter } from './drivers/usage/opencodeMeter';
+export { createClaudeUsageMeter } from './drivers/usage/claudeMeter';
+export type { OpencodeTreeUsage } from './drivers/usage/opencodeStore';
+export { OPENCODE_TREE_MAX_DEPTH, OPENCODE_TREE_MAX_SESSIONS, opencodeUsageDatabasePath, readOpencodeStoreUsage, readOpencodeTreeUsage } from './drivers/usage/opencodeStore';
+export type { TerminalUsageMeter } from './drivers/usage/terminalMeter';
+export { createTerminalUsageMeter } from './drivers/usage/terminalMeter';

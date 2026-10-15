@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { Actor, NativeTerminalDto, NativeTerminalList, NativeTerminalRoster, ProjectId, ServiceId, StartNativeTerminalV2Request, TaskId } from '@crewstation/contracts';
-import { DevelopmentStartIntentSchema, IDENTITY_HEADERS, NativeTerminalRecordSchema, PLATFORM_AGENT_PERMISSION, RunnerResultPayloads } from '@crewstation/contracts';
+import { IDENTITY_HEADERS, NativeTerminalRecordSchema, PLATFORM_AGENT_PERMISSION, RunnerResultPayloads } from '@crewstation/contracts';
 import { conflict, isPlatformError, newId, newResourceId, notFound, precondition } from '@crewstation/kernel';
 import type { NativeTerminalRepository, NativeTerminalStart } from '../ports/nativeTerminals';
 import { projectNativeTerminal } from '../domain/nativeTerminalProjection';
@@ -8,8 +8,6 @@ import type { DevSessionUseCaseDeps } from './dependencies';
 import { nativeCompute, nativeEnvironment } from './nativeTerminalAccess';
 import { NativeExecutionLifecycle, nativeEnded } from './nativeExecution';
 import { reserveDevelopmentImage } from './runtimeImageSelection';
-import { developmentObservationSelected } from '../domain/development/observationSelection';
-import type { CliObservationParticipant } from '../ports/cliObservation';
 import { profileLaunchFields } from './profileLaunch';
 
 // 升级前受理的请求里可能还存着 permission：不计入指纹，它已不影响启动（D59）。
@@ -17,7 +15,7 @@ const fingerprintOf = (input: StartNativeTerminalV2Request) => createHash('sha25
 
 class NativeTerminals {
   readonly execution: NativeExecutionLifecycle;
-  constructor(private readonly deps: DevSessionUseCaseDeps, private readonly repository: NativeTerminalRepository, observation?:CliObservationParticipant, collect?:(start:NativeTerminalStart,drain?:boolean)=>Promise<boolean>) { this.execution = new NativeExecutionLifecycle(deps, repository, observation, collect); }
+  constructor(private readonly deps: DevSessionUseCaseDeps, private readonly repository: NativeTerminalRepository) { this.execution = new NativeExecutionLifecycle(deps, repository); }
   private async readRunner(taskId: TaskId): Promise<NativeTerminalRoster> { return RunnerResultPayloads.listAgentTerminals.parse(await this.deps.runner.sendCommand(taskId, { id: newId('cmd'), type: 'listAgentTerminals' })); }
   private async reconcile(start: NativeTerminalStart, roster: NativeTerminalRoster | undefined, connection: NativeTerminalDto['connection']) {
     const dto = projectNativeTerminal(start, roster, connection, this.deps.clock.now().toISOString());
@@ -28,13 +26,10 @@ class NativeTerminals {
     const profile = await nativeCompute(this.deps, projectId, input.compute), now = this.deps.clock.now().toISOString();
     const imageTaskId = newId('tsk') as TaskId;
     const runtimeImage = await reserveDevelopmentImage(this.deps, actor, projectId, { type: 'agent', id: imageTaskId }, input.runtimeImageVersionId, { profileId: profile.id, revision: profile.revision });
-    const agentId=newId('agt'),terminalId=newId('pty');
-    const metadata=profile.protocol==='opencode' && developmentObservationSelected(this.deps.settings,projectId,{profileId:profile.id,revision:profile.revision},profile.protocol) ? await this.deps.compute.launchMetadata?.({profileId:profile.id,revision:profile.revision}) : undefined;
-    const observationIntent=metadata ? DevelopmentStartIntentSchema.parse({version:1,identity:{sourceKind:'development-cli',projectId,taskId,executionId:imageTaskId,executionGeneration:1,agentId},profileId:profile.id,profileRevision:profile.revision,launch:metadata.launch,permission:PLATFORM_AGENT_PERMISSION,mode:'cli',initialPrompt:null,cwd:input.cwd??null,resumeSessionId:null,systemPrompt:null,mcp:this.deps.settings.mcp.map(({name,url})=>({name,url})),nativeUsageLineageKey:`cs-development-workspace:${projectId}:${taskId}:opencode`,nativeSource:{version:2}}):undefined;
     const reserved = await this.repository.reserve({
       taskId, createdBy: actor.userId, clientRequestId: input.clientRequestId, fingerprint: fingerprintOf(input), input,
-      profile: { profileId: profile.id, revision: profile.revision }, execution: { ...(observationIntent?{observationIntent}:{}), taskId: imageTaskId, image: runtimeImage?.image ?? profile.image, ...(runtimeImage ? { runtimeImage } : {}), ...(profile.taskProfile ? { taskProfile: profile.taskProfile } : {}), acceptedAt: now },
-      record: { agentId, terminalId, runnerId: Bun.randomUUIDv7(), compute: profile.id, computeName: profile.name, permission: PLATFORM_AGENT_PERMISSION, revision: 0, lifecycle: 'starting', startedAt: now, cols: input.cols, rows: input.rows, profileRevision: profile.revision, protocol: profile.protocol },
+      profile: { profileId: profile.id, revision: profile.revision }, execution: { taskId: imageTaskId, image: runtimeImage?.image ?? profile.image, ...(runtimeImage ? { runtimeImage } : {}), ...(profile.taskProfile ? { taskProfile: profile.taskProfile } : {}), acceptedAt: now },
+      record: { agentId: newId('agt'), terminalId: newId('pty'), runnerId: Bun.randomUUIDv7(), compute: profile.id, computeName: profile.name, permission: PLATFORM_AGENT_PERMISSION, revision: 0, lifecycle: 'starting', startedAt: now, cols: input.cols, rows: input.rows, profileRevision: profile.revision, protocol: profile.protocol },
     });
     if (reserved.execution?.runtimeImage) await this.deps.runtimeImages!.confirm(reserved.execution.runtimeImage, { type: 'agent', id: reserved.execution.taskId });
     return reserved;
@@ -101,8 +96,8 @@ class NativeTerminals {
   }
 }
 
-export function nativeTerminalUseCases(deps: DevSessionUseCaseDeps, repository: NativeTerminalRepository, observation?:CliObservationParticipant, collect?:(start:NativeTerminalStart,drain?:boolean)=>Promise<boolean>) {
-  const cases = new NativeTerminals(deps, repository, observation, collect);
+export function nativeTerminalUseCases(deps: DevSessionUseCaseDeps, repository: NativeTerminalRepository) {
+  const cases = new NativeTerminals(deps, repository);
   return { startNativeTerminal: cases.start.bind(cases), listNativeTerminals: cases.list.bind(cases), stopNativeTerminal: cases.stop.bind(cases), getNativeTerminalSnapshot: cases.snapshot.bind(cases),
     dispatchPendingNativeExecution: cases.execution.dispatch.bind(cases.execution), reconcileNativeExecutions: cases.execution.sweep.bind(cases.execution) };
 }

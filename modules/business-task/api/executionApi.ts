@@ -1,4 +1,3 @@
-import type { ExecutionObservationIdentity, RunnerUsageSourceIdentity } from '@crewstation/contracts';
 import type { BusinessCapabilitiesDto, BusinessMigrationReady, BusinessSubtaskMessageV3, BusinessRecoveryClaim, BusinessRecoveryClaimReceipt, BusinessRecoveryRead, BusinessRecoveryReject, BusinessRecoveryRequest } from '@crewstation/contracts';
 import type { BusinessMaterialRequest, BusinessMaterialDto } from '@crewstation/contracts';
 import type { BusinessTaskMutation, RestartBusinessTask } from '@crewstation/contracts';
@@ -12,8 +11,6 @@ export interface BusinessExecutionApi {
   finalize(caller: BusinessExecutionCaller, taskId: TaskId, input: FinalizeBusinessTask): Promise<BusinessFinalizationDto>;
   finalization(caller: BusinessExecutionCaller, taskId: TaskId): Promise<BusinessFinalizationDto>;
   reviseArchive(caller: BusinessExecutionCaller, taskId: TaskId, input: ReviseBusinessArchive): Promise<BusinessFinalizationDto>;
-  /** Internal durable-source binding using immutable owner records. */
-  resolveUsageSource(input: RunnerUsageSourceIdentity): Promise<ExecutionObservationIdentity | undefined>;
   restartTask(caller: BusinessExecutionCaller, taskId: TaskId, input: RestartBusinessTask): Promise<{ task: BusinessTaskV3Dto; status: 200 | 201 | 202 }>;
   readRecovery(caller: BusinessExecutionCaller, id: string, input: BusinessRecoveryRead): Promise<BusinessRecoveryRequest>;
   claimRecovery(caller: BusinessExecutionCaller, input: BusinessRecoveryClaim): Promise<BusinessRecoveryClaimReceipt | null>;

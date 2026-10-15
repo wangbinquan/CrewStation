@@ -1,12 +1,12 @@
 import type { ServiceId, TaskId } from '@crewstation/contracts';
 import { IDENTITY_HEADERS, PLATFORM_AGENT_PERMISSION } from '@crewstation/contracts';
-import { isPlatformError, jsonHash, precondition } from '@crewstation/kernel';
+import { isPlatformError, jsonHash } from '@crewstation/kernel';
 import type { AgentStart, AgentStartRepository } from '../ports/agentStarts';
-import type { DevelopmentObservationParticipant } from '../ports/developmentObservation';
 import type { EnvironmentView } from '../ports/runtime';
 import type { DevSessionUseCaseDeps } from './dependencies';
 import { restoreDevelopmentImage } from './runtimeImageSelection';
 import { profileLaunchFields } from './profileLaunch';
+import { acceptDevelopmentCall, failDevelopmentCall } from './agentCalls';
 
 /** 定性失败：重试也不会成功，记录结束并把原因给用户；其余（网络、Runner 未就绪）留给后台接续。 */
 const DEFINITIVE = new Set(['precondition', 'validation', 'quota_exceeded', 'not_found', 'conflict']);
@@ -24,18 +24,13 @@ export class AgentExecutionLifecycle {
   private readonly rerun = new Set<string>();
   private after: string | undefined;
   private sweeping = false;
-  constructor(private readonly deps: DevSessionUseCaseDeps, private readonly repo: AgentStartRepository, private readonly observation?: DevelopmentObservationParticipant) {}
+  constructor(private readonly deps: DevSessionUseCaseDeps, private readonly repo: AgentStartRepository) {}
 
   /** 同步受理：额度满、父会话断开等定性原因直接抛给调用方，记录同时结束。 */
   async admit(start: AgentStart): Promise<EnvironmentView> {
     try {
-      if (start.execution.observationIntent) {
-        if (!this.observation || !this.repo.finalizeEndedExecution) throw precondition('原生验证执行 producer 或物理收尾持久化尚未装配');
-        await this.observation.prepare(start);
-      }
       await restoreDevelopmentImage(this.deps, start.execution.runtimeImage, start.taskId, start.execution.previousTaskId, start.execution.taskId);
       return await this.deps.environments.createNativeExecution({
-        ...(start.execution.observationIntent ? { developmentUsageStorage: { version: 1 as const }, developmentUsageProtection: { version: 1 as const } } : {}),
         id: start.execution.taskId, parentTaskId: start.taskId, purpose: 'agent', createdBy: start.createdBy, agentId: start.agentId, runnerId: start.execution.runnerId,
         fingerprint: `${start.agentId}:${start.profile.profileId}@${start.profile.revision}`, ...(start.execution.taskProfile ? { profile: start.execution.taskProfile } : {}),
         image: start.execution.image, ...(start.execution.runtimeImage ? { runtimeImage: start.execution.runtimeImage } : {}), computeProfile: { profileId: start.profile.profileId, revision: start.profile.revision },
@@ -46,40 +41,19 @@ export class AgentExecutionLifecycle {
     }
   }
 
-  async end(start: AgentStart, outcome: { failure?: string; cancelled?: boolean; actualEndedAt?: null }): Promise<AgentStart> {
-    if (start.state === 'ended') {
-      if (start.execution.observationIntent) await this.observation?.end(start);
-      return start;
-    }
-    // A recovered digital terminal receipt is logical evidence, without an actual end timestamp.
-    const ended: AgentStart = { ...start, state: 'ended', ...(outcome.failure ? { failure: outcome.failure } : {}), ...(outcome.cancelled ? { cancelled: true } : {}),
-      ...(start.execution.observationIntent || outcome.actualEndedAt === null ? {} : { endedAt: this.deps.clock.now().toISOString() }) };
+  async end(start: AgentStart, outcome: { failure?: string; cancelled?: boolean }): Promise<AgentStart> {
+    if (start.state === 'ended') return start;
+    const ended: AgentStart = { ...start, state: 'ended', ...(outcome.failure ? { failure: outcome.failure } : {}), ...(outcome.cancelled ? { cancelled: true } : {}), endedAt: this.deps.clock.now().toISOString() };
     await this.repo.update(ended);
-    if (start.execution.observationIntent) await this.observation?.end(ended);
     return ended;
   }
 
   private async send(start: AgentStart, env: EnvironmentView): Promise<void> {
-    if (start.execution.observationIntent) {
-      if (!this.observation) throw precondition('原生验证执行 producer 尚未装配');
-      const result = await this.observation.dispatch(start);
-      if (result.kind === 'accepted') {
-        await this.repo.update({ ...start, state: 'dispatched', dispatchedAt: this.deps.clock.now().toISOString() });
-        await this.deps.environments.touch(start.taskId);
-      } else if (result.kind === 'terminal') {
-        await this.end(start, { actualEndedAt: result.actualEndedAt,
-          ...(result.receipt.result === 'cancelled' ? { cancelled: true } : result.receipt.result === 'error' ? { failure: 'Agent 报错' } : {}) });
-      } else if (result.kind === 'ending') {
-        await this.end(start, { actualEndedAt: null,
-          ...(result.reason === 'error' || result.reason === 'environment-lost' ? { failure: '原开发执行正在结束' } : result.reason === 'completed' ? {} : { cancelled: true }) });
-      }
-      if (result.kind !== 'legacy' || !start.execution.observationLegacyFallback) return;
-      // Only the durable automatic unsupported decision permits the original legacy path.
-      // Keep the accepted intent and price; advertised support never downgrades.
-    }
     // 连接头在 spawn 时写死、事后改不了，所以派发时现签一枚（Design §5.9）；MCP 与数据身份仍是父开发会话。
     const credential = await this.deps.credentials.issueDevSessionToken({ taskId: start.taskId, projectId: env.projectId, serviceId: env.serviceId as ServiceId, userId: start.createdBy });
     const launch = await profileLaunchFields(this.deps, start.profile, start.agentId);
+    await acceptDevelopmentCall(this.deps, { kind: 'agent', sessionId: start.taskId, runtimeTaskId: env.id, agentId: start.agentId,
+      profile: { id: start.profile.profileId, revision: start.profile.revision, name: start.computeName ?? null }, protocol: launch.launch.protocol });
     await this.deps.runner.sendCommand(env.id, {
       id: `start-${start.agentId}`, type: 'startAgent', agentId: start.agentId, ...launch, permission: PLATFORM_AGENT_PERMISSION, mode: 'interactive',
       ...(start.request.cwd ? { cwd: start.request.cwd } : {}), initialPrompt: start.request.prompt, ...(start.request.resumeSessionId ? { resumeSessionId: start.request.resumeSessionId } : {}),
@@ -115,22 +89,15 @@ export class AgentExecutionLifecycle {
     start = (await this.repo.get(agentId))!;
     if (start.state === 'pending' && env?.connected && env.native?.state === 'running') {
       try { await this.send(start, env); }
-      catch (error) { if (definitive(error)) await this.end(start, { failure: error.message }); else throw error; }
+      catch (error) {
+        if (!definitive(error)) throw error;
+        await this.end(start, { failure: error.message }); await failDevelopmentCall(this.deps, env.id, start.agentId);
+      }
       start = (await this.repo.get(agentId))!;
     }
     if (start.state === 'dispatched' && env && !gone(env)) start = await this.observe(start, env);
     if (start.state !== 'ended' && gone(env) && (start.state === 'dispatched' || env)) start = await this.end(start, { failure: env?.native?.failureReason ?? env?.message ?? '此 Agent 的执行环境已结束' });
     if (start.state !== 'ended') return;
-    if (start.execution.observationIntent) {
-      await this.observation?.end(start);
-      if (!env || env.native?.state !== 'finished') {
-        if (env && !gone(env)) await this.deps.environments.releaseEnvironment(env.id, 'user');
-        return; // Selected unknown/unbound work retains occupancy until the original cleanup finishes.
-      }
-      if (!this.repo.finalizeEndedExecution) throw precondition('原生执行物理收尾持久化尚未装配');
-      await this.repo.finalizeEndedExecution(start.agentId, start.execution.taskId);
-      return;
-    }
     if (env && !gone(env)) await this.deps.environments.releaseEnvironment(env.id, 'user');
     await this.repo.update({ ...start, finalized: true });
   }

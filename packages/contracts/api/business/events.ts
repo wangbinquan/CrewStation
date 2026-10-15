@@ -1,11 +1,14 @@
 import { z } from 'zod';
 import { SubtaskIdSchema, TaskIdSchema } from '../../ids';
 import { BusinessDigestSchema, BusinessGenerationSchema, BusinessProcessStateSchema, BusinessSubtaskStateV3Schema, BusinessTaskStateV3Schema } from './executionValues';
+import { AgentUsageSnapshotSchema } from '../../taskrunner/usage';
 
 const count = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).nullable();
 export const BusinessUsageSchema = z.strictObject({
   measurementId: z.string().min(1).max(256), scope: z.string().min(1).max(256), mode: z.enum(['cumulative', 'delta']),
   inputTokens: count, outputTokens: count, cacheReadTokens: count, cacheWriteTokens: count, complete: z.boolean(),
+  /** RFC-034 v2：本次执行到目前为止按实际模型拆分的用量（整份替换）；四个总量字段即其合计。 */
+  snapshot: AgentUsageSnapshotSchema.optional(),
 });
 export const BusinessResultSchema = z.strictObject({
   exitCode: z.number().int().nullable(), reason: z.string().max(4096), stdout: z.string(), stderr: z.string(), truncated: z.boolean(),

@@ -1,4 +1,5 @@
-// RFC-034: actual routed resource pages preserve sample states, project scope and independent failures.
+// RFC-034: actual routed resource pages preserve sample states, project scope and independent failures
+// (RFC-034 v2 keeps the resources and health tabs; statistics now come from the on-demand v2 endpoints).
 import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
@@ -49,10 +50,10 @@ test('service health keeps change time distinct from missing sample time and dis
   expect(f.reads.some((u) => u.pathname.endsWith('/observability/statistics'))).toBe(false);
 });
 test('statistics failure does not hide independent operational tabs', async () => {
-  const f = runtimeStatisticsFixture(); f.state.error = true; page = await renderApp('/admin/observability?' + f.query);
-  expect(page.text()).toContain('Ledger temporarily unavailable');
+  const f = runtimeStatisticsFixture(); f.state.error = true; page = await renderApp('/admin/observability');
+  expect(page.text()).toContain('Statistics temporarily unavailable');
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((b) => b.textContent === '资源与容量')!.click()); await page.settle();
-  expect(page.search().tab).toBe('resources'); expect(page.text()).not.toContain('Ledger temporarily unavailable');
+  expect(page.search().tab).toBe('resources'); expect(page.text()).not.toContain('Statistics temporarily unavailable');
 });
 
 test('returning to the first page resumes current observations without a manual refresh action', async () => {
@@ -72,10 +73,10 @@ test('an incomplete empty project collection is unknown, not a complete zero-res
   expect(page.text()).toContain('资源来源不完整，当前列表不能代表全部组件。'); expect(page.text()).not.toContain('当前快照没有资源');
 });
 test('arrow-key navigation retains the same tab elements across statistics and operations in both directions', async () => {
-  const f = runtimeStatisticsFixture(); page = await renderApp('/admin/observability?tab=performance&' + f.query);
+  runtimeStatisticsFixture(); page = await renderApp('/admin/observability?tab=platform');
   const tab = (text: string) => [...document.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((b) => b.textContent === text)!;
-  const original = tab('性能与质量'); original.focus();
-  for (const [key, label] of [['ArrowRight', '资源与容量'], ['ArrowRight', '平台健康'], ['ArrowLeft', '资源与容量'], ['ArrowLeft', '性能与质量']]) {
+  const original = tab('平台执行'); original.focus();
+  for (const [key, label] of [['ArrowRight', '资源与容量'], ['ArrowRight', '服务与健康'], ['ArrowLeft', '资源与容量'], ['ArrowLeft', '平台执行']]) {
     await act(async () => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }))); await page.settle();
     expect(document.activeElement).toBe(tab(label!));
   }

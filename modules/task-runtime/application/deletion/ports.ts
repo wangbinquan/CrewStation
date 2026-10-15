@@ -22,13 +22,10 @@ export function scopedRuntimePorts(deps: TaskRuntimeUseCaseDeps, work: RuntimePr
     uow: { read: repositories(deps.uow.read, work), run: (callback) => work.whenActive(jsonHash('runtime-transaction'), () => deps.uow.run(callback)) },
     cluster: guardedRuntimePort(deps.cluster, work), authorizer: guardedRuntimePort(deps.authorizer, work), quotas: guardedRuntimePort(deps.quotas, work),
     profiles: guardedRuntimePort(deps.profiles, work), services: guardedRuntimePort(deps.services, work), sources: guardedRuntimePort(deps.sources, work),
-    ...(deps.developmentCleanup ? { developmentCleanup: guardedRuntimePort(deps.developmentCleanup, work) } : {}),
-    ...(deps.developmentParentPhysical ? { developmentParentPhysical: guardedRuntimePort(deps.developmentParentPhysical, work) } : {}),
     ...(deps.unprovisionedStorage ? { unprovisionedStorage: guardedRuntimePort(deps.unprovisionedStorage, work) } : {}),
     ...(deps.workloadSafety ? { workloadSafety: guardedRuntimePort(deps.workloadSafety, work) } : {}),
     ...(deps.taskVolumes ? { taskVolumes: guardedRuntimePort(deps.taskVolumes, work) } : {}),
     ...(deps.businessStorageInspector ? { businessStorageInspector: guardedRuntimePort(deps.businessStorageInspector, work) } : {}),
-    ...(deps.developmentParentInspector ? { developmentParentInspector: guardedRuntimePort(deps.developmentParentInspector, work) } : {}),
     ...(deps.initializationRunner ? { initializationRunner: guardedRuntimePort(deps.initializationRunner, work) } : {}),
     ...(deps.checkout ? { checkout: guardedRuntimePort(deps.checkout, work) } : {}),
   };

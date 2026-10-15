@@ -6,9 +6,7 @@ import type { AgentActivityPage, AgentActivityQuery, ReadAgentActivityRequest } 
 import type { ApiInvocationRequest, ApiInvocationResponse } from '@crewstation/contracts';
 import type { DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest } from '@crewstation/contracts';
 import type { PreviewAction, PreviewLogsDto, PreviewLogsQuery, PreviewStatusDto } from '@crewstation/contracts';
-import type { DevelopmentCleanupParticipant } from './developmentCleanup';
-import type { DevelopmentUsageOwner } from './developmentUsage';
-import type { ProjectDeletionContext, ProjectDeletionOwner } from '@crewstation/contracts';
+import type { ProjectDeletionOwner } from '@crewstation/contracts';
 
 /** dev-session 对外能力：一项目一会话、分支、并行流式 Agent、从会话发布、空闲提醒。 */
 export interface NativeTerminalApi {
@@ -21,11 +19,6 @@ export interface NativeTerminalApi {
 export interface DevSessionModuleApi extends NativeTerminalApi {
   readonly name: 'dev-session';
   readonly deletionOwner?: ProjectDeletionOwner;
-  /** Internal preparation only. This is not a production launch or cleanup capability flag. */
-  readonly developmentUsage?: DevelopmentUsageOwner;
-  readonly developmentCleanup?: DevelopmentCleanupParticipant;
-  projectDeletionCleanup?(context: ProjectDeletionContext, input: Parameters<DevelopmentCleanupParticipant['advance']>[0]): ReturnType<DevelopmentCleanupParticipant['advance']>;
-  projectDeletionCompletePrestart?(context: ProjectDeletionContext, input: Parameters<DevelopmentCleanupParticipant['advance']>[0]): ReturnType<DevelopmentCleanupParticipant['advance']>;
   inspectClusterNative(actor: Actor, id: TaskId): Promise<Record<string, unknown>>;
   inspectClusterAgent(actor: Actor, id: TaskId): Promise<Record<string, unknown>>;
   manageClusterNative(actor: Actor, id: TaskId, restart: boolean, operationId: string): Promise<{ operationId: string }>;

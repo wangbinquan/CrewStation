@@ -1,5 +1,3 @@
-import { TaskIdSchema, WORKLOAD_STOP_FINALIZER } from '@crewstation/contracts';
-import { assertWorkloadGate } from './safety/workloadGate';
 import { describe, expect, test } from 'bun:test';
 import { checkoutSecretObject, runnerSecretObject, volumeObject, workloadPodObject, workloadPreviewObjects } from './workloadObjects';
 
@@ -42,34 +40,4 @@ describe('调和器渲染的工作区对象', () => {
     expect(volumeObject({ name: 'task-1-work', namespace: 'cs-demo', size: '10Gi', labels: { 'crewstation.io/task': 'rec-1' } })).toMatchObject({ kind: 'PersistentVolumeClaim', spec: { resources: { requests: { storage: '10Gi' } } }, metadata: { labels: { 'crewstation.io/task': 'rec-1' } } });
     expect(workloadPreviewObjects({ name: 'task-1', namespace: 'cs-demo', taskId: 'rec-1', kind: 'dev-session', targetPort: 3000 }).map((o) => o.kind)).toEqual(['Service']);
   });
-});
-
-// RFC-034: the actual reconciler renderer must forward the optional layout to the common Pod constructor.
-test('selected development Agent renders both disk stores and the actual Pod UID while legacy volumes stay unchanged', () => {
-  const selected = { ...pod, workload: 'dev-session', nodeName: 'original-node', workspace: { pod: 'parent', podUid: 'original-pod', pvcUid: 'original-pvc' }, developmentUsageStorage: { version: 1 as const } };
-  const spec = workloadPodObject(selected).spec as { volumes: unknown[]; containers: Array<{ env: unknown[]; volumeMounts: unknown[] }> };
-  expect(spec.volumes).toEqual([{ name: 'work', persistentVolumeClaim: { claimName: pod.pvc } }, { name: 'development-usage', emptyDir: {} }, { name: 'development-usage-binding', emptyDir: {} }]);
-  expect(spec.containers[0]!.env).toContainEqual({ name: 'CS_RUNTIME_POD_UID', valueFrom: { fieldRef: { fieldPath: 'metadata.uid' } } });
-  expect(spec.containers[0]!.volumeMounts).toContainEqual({ name: 'development-usage', mountPath: '/run/crewstation/development-usage', readOnly: false });
-  expect(spec.containers[0]!.volumeMounts).toContainEqual({ name: 'development-usage-binding', mountPath: '/run/crewstation/development-usage-binding', readOnly: false });
-  for (const patch of [{ workload: 'business-task' }, { workspace: undefined }, { pvc: undefined }, { consumer: {} }, { archive: {} }, { businessStorage: {} }, { checkout: {} }]) expect(() => workloadPodObject({ ...selected, ...patch } as typeof selected)).toThrow('独立开发 Agent');
-  expect((workloadPodObject(pod).spec as { volumes: unknown[] }).volumes).toHaveLength(1);
-});
-
-// RFC-034: exercise the actual reconciler constructor; successful digital renders must carry both the durable gate and both private stores.
-test('protected numeric Agent Pod construction keeps the admission init and rejects a missing or conflicting original consumer', () => {
-  const parent = TaskIdSchema.parse('019f0000-0000-7000-8000-000000000002'), pvcUid = 'd7aa3cff-94e3-453a-9c04-c6f7a8678438';
-  const selected = { ...pod, taskId: '019f0000-0000-7000-8000-000000000003', workload: 'dev-session', nodeName: 'original-node',
-    workspace: { pod: 'parent', podUid: 'd624eb08-2bfa-46f6-812f-29bdecc0d961', pvcUid }, labels: { 'crewstation.io/workspace-task': parent }, annotations: { 'crewstation.io/cli-intent': 'a'.repeat(64) },
-    expectedVolumeUid: pvcUid, consumerVolumeUid: pvcUid, developmentUsageStorage: { version: 1 as const }, developmentUsageProtection: { version: 1 as const },
-    consumer: { id: '019f0000-0000-7000-8000-000000000007', taskId: parent, revision: 1, purpose: 'agent' as const, finalization: null } };
-  const object = workloadPodObject(selected), spec = object.spec as { initContainers?: Array<{ name: string; volumeMounts: unknown[] }>; volumes: unknown[]; containers: Array<{ env: unknown[] }> };
-  expect(() => assertWorkloadGate(object, selected)).not.toThrow();
-  expect(object.metadata.finalizers).toContain(WORKLOAD_STOP_FINALIZER);
-  expect(spec.initContainers).toHaveLength(1);
-  expect(spec.initContainers?.[0]).toMatchObject({ name: 'workload-admission', volumeMounts: [{ name: 'workload-admission', mountPath: '/run/admission', readOnly: true }] });
-  expect(spec.volumes).toContainEqual({ name: 'development-usage', emptyDir: {} });
-  expect(spec.volumes).toContainEqual({ name: 'development-usage-binding', emptyDir: {} });
-  for (const patch of [{ developmentUsageProtection: undefined }, { consumer: undefined }, { consumerVolumeUid: undefined }, { expectedVolumeUid: crypto.randomUUID() }, { consumer: { ...selected.consumer, purpose: 'business' } }])
-    expect(() => workloadPodObject({ ...selected, ...patch } as typeof selected)).toThrow();
 });

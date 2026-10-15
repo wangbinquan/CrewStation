@@ -5,7 +5,6 @@ import type { PodPhaseReading, TaskCluster } from '../../ports/cluster';
 import { podNameFor } from '../../domain/taskEnvironment';
 import { ensureTaskPreview, taskPodObject } from './taskObjects';
 import { removeTaskPod } from './taskRemoval';
-import type { TaskDevelopmentRemovalQuery } from './taskRemovalGuard';
 
 interface ContainerStatus {
   name: string;
@@ -44,7 +43,7 @@ function phaseOf(pod: PodObject): PodPhaseReading {
   return { phase, ...(pod.metadata.uid ? { uid: pod.metadata.uid } : {}), ...(pod.status?.podIP ? { ip: pod.status.podIP } : {}), ...(message ? { message } : {}), ...(imageId ? { imageId } : {}), ...(waitingReason ? { waitingReason } : {}) };
 }
 
-export function kubernetesTaskCluster(k8s: K8sClient, workerUid: number, developmentRemoval?: TaskDevelopmentRemovalQuery): TaskCluster {
+export function kubernetesTaskCluster(k8s: K8sClient, workerUid: number): TaskCluster {
   return {
     ensureVolume: async (env, size) => {
       const existing = await k8s.get(Resources.PersistentVolumeClaim!, env.pvcName, env.namespace);
@@ -74,7 +73,7 @@ export function kubernetesTaskCluster(k8s: K8sClient, workerUid: number, develop
       return (await new Response(stream).text()).slice(-65_536);
     },
     deletePod: async (env) => {
-      await removeTaskPod(k8s, env, developmentRemoval);
+      await removeTaskPod(k8s, env);
       if (env.preview) {
         const routeName = env.rebuildId ? podNameFor(env.id) : env.podName;
         await k8s.delete(Resources.Service!, routeName, env.namespace);

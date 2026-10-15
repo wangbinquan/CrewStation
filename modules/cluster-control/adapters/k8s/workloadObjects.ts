@@ -1,4 +1,3 @@
-import { DEVELOPMENT_REMOVAL_ANNOTATION } from '@crewstation/contracts';
 import type { K8sObject } from '@crewstation/k8s';
 import { LABELS, pvcObject, secretObject, taskPodObject, taskPreviewObjects } from '@crewstation/k8s';
 import type { VolumeRender, WorkloadPodRender, WorkloadPreviewRender } from '../../domain/workloadRender';
@@ -7,10 +6,8 @@ import { archivePodObject } from './safety/archivePod';
 
 /** 工作区的 Pod（RFC-025 I25）：与 task-runtime 自己建时同一个构造函数；环境只从 Runner Secret 引用，Pod 规格里没有凭据。 */
 export function workloadPodObject(pod: WorkloadPodRender): K8sObject {
-  if (pod.developmentUsageStorage && (pod.workload !== 'dev-session' || !pod.workspace || !pod.pvc || pod.businessStorage || pod.checkout || pod.archive || pod.developmentUsageProtection === undefined && pod.consumer)) throw new Error('只有独立开发 Agent 可选择数值日志布局');
   if (pod.archive) return archivePodObject(pod);
   const object = taskPodObject({
-    ...(pod.developmentUsageStorage ? { developmentUsageStorage: pod.developmentUsageStorage } : {}),
     ...(pod.runtimeInitialization ? { runtimeInitialization: true } : {}),
     name: pod.name, namespace: pod.namespace, taskId: pod.taskId, workload: pod.workload, project: pod.project, service: pod.service, image: pod.image,
     workerUid: pod.workerUid, resources: pod.resources, workVolume: pod.pvc ? { pvc: pod.pvc } : { emptyDir: true }, envFromSecret: pod.secret, ...(pod.checkout ? { checkout: pod.checkout } : {}),
@@ -18,7 +15,6 @@ export function workloadPodObject(pod: WorkloadPodRender): K8sObject {
     ...(pod.nodeName ? { nodeName: pod.nodeName } : {}), ...(pod.labels ? { labels: pod.labels } : {}),
   });
   if (pod.annotations) object.metadata.annotations = { ...object.metadata.annotations, ...pod.annotations };
-  if (pod.developmentRemovalProtection !== undefined) object.metadata.annotations = { ...object.metadata.annotations, [DEVELOPMENT_REMOVAL_ANNOTATION]: '1' };
   return protectWorkloadPod(object, pod);
 }
 
@@ -26,7 +22,6 @@ export function workloadPodObject(pod: WorkloadPodRender): K8sObject {
 export function runnerSecretObject(pod: WorkloadPodRender, values: Readonly<Record<string, string>>): K8sObject {
   const secret = { ...secretObject({ name: pod.secret, namespace: pod.namespace, stringData: { ...values }, labels: { ...pod.labels, [LABELS.task]: pod.taskId } }), immutable: true } as K8sObject;
   if (pod.annotations) secret.metadata.annotations = { ...pod.annotations };
-  if (pod.developmentRemovalProtection !== undefined) secret.metadata.annotations = { ...secret.metadata.annotations, [DEVELOPMENT_REMOVAL_ANNOTATION]: '1' };
   return secret;
 }
 

@@ -1,60 +1,63 @@
 .page { min-width: 0; padding: var(--cs-space-4); font-size: var(--cs-font-size); line-height: var(--cs-line-height); }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: var(--cs-space-4); min-width: 0; }
-.value { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: var(--cs-space-4); min-width: 0; align-items: start; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: var(--cs-space-4); min-width: 0; }
 .hint { color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); overflow-wrap: anywhere; }
 .notice { padding: var(--cs-space-3); border-radius: var(--cs-radius-sm); background: var(--cs-tone-warning-bg); color: var(--cs-tone-warning-fg); }
 .identity { display: block; max-width: 26rem; overflow-wrap: anywhere; font-size: var(--cs-font-size-sm); color: var(--cs-color-text-muted); }
-.table { min-width: 680px; }
-.chart { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(max-content, 1fr); align-items: end; gap: var(--cs-space-2); }
-.chartColumn { min-width: 32px; display: flex; flex-direction: column; gap: var(--cs-space-1); padding: var(--cs-space-1); border: 0; border-radius: var(--cs-radius-sm); color: var(--cs-color-text); background: transparent; cursor: pointer; font-size: var(--cs-font-size-sm); line-height: var(--cs-line-height); }
+.notes { display: flex; flex-wrap: wrap; gap: var(--cs-space-1); margin-top: var(--cs-space-1); }
+.amount { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.amount + a { margin-top: var(--cs-space-1); display: inline-flex; }
+.table { min-width: 720px; }
+.wideTable { min-width: 1080px; }
+.scroll { min-width: 0; overflow-x: auto; }
+
+/* 按天堆叠柱图：四桶自下而上为输入、缓存读、缓存写、输出。 */
+.chart { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(40px, 1fr); align-items: end; gap: var(--cs-space-2); }
+.chartColumn { min-width: 40px; display: flex; flex-direction: column; gap: var(--cs-space-1); padding: var(--cs-space-1); border: 0; border-radius: var(--cs-radius-sm); color: var(--cs-color-text); background: transparent; cursor: pointer; font-size: var(--cs-font-size-sm); line-height: var(--cs-line-height); }
+.chartColumn[aria-pressed="true"] { background: var(--cs-color-surface-muted); }
 .chartColumn:focus-visible { outline: 2px solid var(--cs-color-text); outline-offset: -2px; }
-.chartValue { font-size: var(--cs-font-size-sm); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chartValue, .chartLabel { font-size: var(--cs-font-size-sm); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: center; }
+.chartLabel { color: var(--cs-color-text-muted); }
 .chartTrack { height: 140px; width: 100%; display: flex; align-items: end; border-bottom: 1px solid var(--cs-color-border); }
 .chartBar { display: flex; flex-direction: column-reverse; overflow: hidden; width: 100%; border-radius: var(--cs-radius-sm) var(--cs-radius-sm) 0 0; }
 .chartBar[data-positive="true"] { min-height: 2px; }
-.chartBar[data-partial="true"] .chartSegment { background-image: repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, var(--cs-color-surface) 40%, transparent) 4px 8px); }
-.range { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--cs-space-3); color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }
-.range > span { min-width: 0; overflow-wrap: anywhere; }
-.scroll { min-width: 0; overflow-x: auto; }
-.timeline { min-width: 680px; }
-.lane { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: var(--cs-space-3); align-items: center; min-height: 52px; border-bottom: 1px solid var(--cs-color-border); }
-.laneLabel { min-width: 0; overflow-wrap: anywhere; }
-.track { position: relative; height: 38px; border-left: 1px solid var(--cs-color-border); background: repeating-linear-gradient(to right, transparent 0%, transparent calc(25% - 1px), var(--cs-color-border) 25%); }
-.bar { position: absolute; top: 5px; height: 28px; min-width: 4px; border: 1px solid var(--cs-tone-info-fg); background: var(--cs-tone-info-bg); color: var(--cs-tone-info-fg); border-radius: var(--cs-radius-sm); overflow: hidden; white-space: nowrap; cursor: pointer; padding: 0 var(--cs-space-1); font-size: var(--cs-font-size-sm); line-height: var(--cs-line-height); }
-.failed { background: var(--cs-tone-danger-bg); color: var(--cs-tone-danger-fg); border-color: var(--cs-tone-danger-fg); }
-.open { border-style: dashed; }
-.bar:focus-visible { outline: 2px solid var(--cs-color-text); outline-offset: 2px; }
-.filters > label { flex: 1 1 180px; min-width: 0; }
-.filters input { min-width: 0; max-width: 100%; }
-.facts { display: grid; align-items: center; grid-template-columns: minmax(100px, 1fr) minmax(0, 2fr); gap: var(--cs-space-2) var(--cs-space-4); }
-.facts dd { margin: 0; overflow-wrap: anywhere; }
-@media (max-width: 600px) { .page { padding: var(--cs-space-3); } .grid { grid-template-columns: minmax(0, 1fr); } .filters > label { flex-basis: 100%; } }
-
-.tokenMetric { min-width: 0; font-variant-numeric: tabular-nums; }
-.tokenBuckets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cs-space-1) var(--cs-space-3); margin: var(--cs-space-2) 0 0; font-size: var(--cs-font-size-sm); min-width: 0; font-variant-numeric: tabular-nums; }
-.tokenBuckets > div { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--cs-space-1); min-width: 0; }
-.tokenBuckets dt { color: var(--cs-color-text-muted); overflow-wrap: anywhere; }
-.tokenBuckets dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
-td > .tokenMetric { min-width: 12rem; }
-.tokenLegend { display: flex; flex-wrap: wrap; gap: var(--cs-space-2) var(--cs-space-4); font-size: var(--cs-font-size-sm); }
-.tokenLegend > span { display: inline-flex; align-items: center; gap: var(--cs-space-1); }
-.tokenLegend i { width: 10px; height: 10px; border-radius: 2px; }
 .chartSegment { display: block; flex-shrink: 0; width: 100%; }
 .chartSegment[data-token-color="input"], .tokenLegend [data-token-color="input"] { background-color: var(--cs-tone-info-fg); }
 .chartSegment[data-token-color="cacheRead"], .tokenLegend [data-token-color="cacheRead"] { background-color: var(--cs-tone-success-fg); }
 .chartSegment[data-token-color="cacheWrite"], .tokenLegend [data-token-color="cacheWrite"] { background-color: var(--cs-tone-warning-fg); }
 .chartSegment[data-token-color="output"], .tokenLegend [data-token-color="output"] { background-color: var(--cs-tone-danger-fg); }
+.tokenLegend { display: flex; flex-wrap: wrap; gap: var(--cs-space-2) var(--cs-space-4); font-size: var(--cs-font-size-sm); }
+.tokenLegend > span { display: inline-flex; align-items: center; gap: var(--cs-space-1); }
+.tokenLegend i { width: 10px; height: 10px; border-radius: 2px; }
 .trendDetail { min-width: 0; }
 
-.phaseTrack { position: relative; min-height: 76px; border-left: 1px solid var(--cs-color-border); background: repeating-linear-gradient(to right, transparent 0%, transparent calc(25% - 1px), var(--cs-color-border) 25%); }
-.phaseBar[data-phase="residence"], .phaseBar[data-phase="retention"] { top: 42px; background: var(--cs-color-surface); color: var(--cs-color-text-muted); border-color: var(--cs-color-border); }
-.phaseBar[data-phase="waiting"], .phaseBar[data-phase="queue"] { background: var(--cs-tone-warning-bg); color: var(--cs-tone-warning-fg); border-color: var(--cs-tone-warning-fg); }
-.phaseBar[data-phase="cleanup"] { background: var(--cs-tone-danger-bg); color: var(--cs-tone-danger-fg); border-color: var(--cs-tone-danger-fg); }
+/* Token 的四桶拆分：卡片与表格单元共用。 */
+.tokenMetric { min-width: 12rem; font-variant-numeric: tabular-nums; }
+.tokenBuckets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cs-space-1) var(--cs-space-3); margin: var(--cs-space-2) 0 0; font-size: var(--cs-font-size-sm); min-width: 0; font-variant-numeric: tabular-nums; }
+.tokenBuckets > div { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--cs-space-1); min-width: 0; }
+.tokenBuckets dt { color: var(--cs-color-text-muted); overflow-wrap: anywhere; }
+.tokenBuckets dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
 
-/* The resource history reuses TimeSeries. Override only its public semantic
-   text slots within observation pages, keeping other callers unchanged. */
+/* 执行泳道：按 Agent 分行，横轴为任务内首个执行开始到最后结束。 */
+.timeline { min-width: 680px; }
+.lane { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: var(--cs-space-3); align-items: center; min-height: 52px; border-bottom: 1px solid var(--cs-color-border); }
+.laneLabel { min-width: 0; overflow-wrap: anywhere; }
+.range { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--cs-space-3); color: var(--cs-color-text-muted); font-size: var(--cs-font-size-sm); }
+.range > span { min-width: 0; overflow-wrap: anywhere; }
+.track { position: relative; height: 38px; border-left: 1px solid var(--cs-color-border); background: repeating-linear-gradient(to right, transparent 0%, transparent calc(25% - 1px), var(--cs-color-border) 25%); }
+.bar { position: absolute; top: 5px; height: 28px; min-width: 4px; border: 1px solid var(--cs-tone-info-fg); background: var(--cs-tone-info-bg); color: var(--cs-tone-info-fg); border-radius: var(--cs-radius-sm); overflow: hidden; white-space: nowrap; cursor: pointer; padding: 0 var(--cs-space-1); font-size: var(--cs-font-size-sm); line-height: var(--cs-line-height); }
+.failed { background: var(--cs-tone-danger-bg); color: var(--cs-tone-danger-fg); border-color: var(--cs-tone-danger-fg); }
+.open { border-style: dashed; }
+.bar:focus-visible { outline: 2px solid var(--cs-color-text); outline-offset: 2px; }
+
+/* 资源与健康页签（原实现）。 */
+.facts { display: grid; align-items: center; grid-template-columns: minmax(100px, 1fr) minmax(0, 2fr); gap: var(--cs-space-2) var(--cs-space-4); }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
 .page .resourceCharts figcaption { font-size: var(--cs-font-size); }
 .page .resourceCharts figcaption span, .page .resourceCharts time, .page .resourceCharts label, .page .resourceCharts output { font-size: var(--cs-font-size-sm); line-height: var(--cs-line-height); }
 
-.metricNotes { display: inline-block; margin-left: var(--cs-space-2); max-width: 100%; vertical-align: baseline; }
-.metricNotes[open] { display: block; margin: var(--cs-space-1) 0; }
+@media (max-width: 600px) {
+  .page { padding: var(--cs-space-3); }
+  .grid, .tiles { grid-template-columns: minmax(0, 1fr); }
+  .lane { grid-template-columns: 120px minmax(0, 1fr); }
+}

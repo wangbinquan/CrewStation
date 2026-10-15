@@ -1,6 +1,3 @@
-import { wakeDevelopmentParentEnding } from './development/parent/admission';
-import { admitDevelopmentParentEnding, prepareDevelopmentParentEnding, selectedDevelopmentParent } from './development/parent/request';
-import { hasDevelopmentParentEnding } from '../domain/development/parentEnding';
 import { pauseBusinessWorkspace, resumeBusinessWorkspace } from './business/workspace';
 import type { TaskId } from '@crewstation/contracts';
 import { DomainTopic } from '@crewstation/contracts';
@@ -31,16 +28,10 @@ export function lifecycleUseCases(deps: TaskRuntimeUseCaseDeps) {
 
   const releaseEnvironment = async (taskId: TaskId, reason: ReleaseReason): Promise<TaskEnvironment> => {
     const original = await load(taskId);
-    const prepared = await prepareDevelopmentParentEnding(deps, original);
     const env = await uow.run(async (scope) => {
       await scope.admissions.lock(original.projectId);
       const current = (await scope.environments.getById(taskId))!;
       if (!current.native && current.render?.completionPolicy === 'archive-and-delete') throw precondition('此任务必须通过归档终结回收', { code: 'finalization_required' });
-      if (await wakeDevelopmentParentEnding(scope, current)) return current;
-      if (await selectedDevelopmentParent(scope, current)) {
-        if (!prepared) throw precondition('原工作区新增受保护执行，请重新核对释放');
-        return (await admitDevelopmentParentEnding(scope, prepared, 'release', { reason }, clock.now())).environment;
-      }
       if (current.state === 'released') return current;
       const rebuild = current.rebuildId ? await scope.rebuilds.get(current.rebuildId) : undefined;
       if (rebuild && rebuildIsActive(rebuild)) throw precondition('环境正在重建，请等待完成后再释放');
@@ -50,7 +41,7 @@ export function lifecycleUseCases(deps: TaskRuntimeUseCaseDeps) {
       await scope.environments.update(transition(current, 'releasing', clock.now(), { connected: false }));
       return current;
     });
-    if (env.state === 'released' || env.native || env.release || hasDevelopmentParentEnding(env)) return env;
+    if (env.state === 'released' || env.native || env.release) return env;
     const occupied = occupiesQuota(env.state);
     const releasing = transition(env, 'releasing', clock.now(), { connected: false });
     await cluster.deletePod(env);

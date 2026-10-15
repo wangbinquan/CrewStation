@@ -11,7 +11,6 @@ import type { OwnerLedger, ResourcesModuleApi } from './api/moduleApi';
 import type { ResourceActionHandler } from './api/types';
 import { retireNamespaceIn } from './application/namespaceRetirement';
 import { performAction } from './application/actions';
-import type { MaintenanceEndingHandler } from './api/maintenanceEnding';
 import { maintainLedger } from './application/maintenance';
 import { observationWriter } from './application/observe';
 import { occupancyIn, ownerWriter } from './application/ownerWrites';
@@ -82,7 +81,6 @@ export function createResourcesModule(deps: ResourcesModuleDeps): ResourcesModul
   const uow = drizzleLedgerUnitOfWork(deps.db);
   const hub = createStreamHub(uow.read, clock, logger, { ...DEFAULT_STREAM_OPTIONS, ...deps.stream });
   const handlers = new Map<string, ResourceActionHandler>();
-  const endingHandlers = new Map<string, MaintenanceEndingHandler>();
   const observer = observationWriter(uow, clock);
   // 执行者在装配后才登记（registerActionHandler），每次按当时的登记判定。
   const { projectAccess, adminAccess, accessFor } = viewerAccess({ authorizer: deps.authorizer, executable: (owner, action) => action in centerActions || handlers.has(owner) });
@@ -144,9 +142,8 @@ export function createResourcesModule(deps: ResourcesModuleDeps): ResourcesModul
       access: (who, record) => (record.projectId ? projectAccess(who, record.projectId) : adminAccess(who)),
     }, actor, id, action, request),
     registerActionHandler: (module, handler) => { handlers.set(module, handler); },
-    registerMaintenanceEndingHandler: (module, handler) => { endingHandlers.set(module, handler); },
   };
-  const { maintainOnce, maintenanceWorker } = maintenanceLifecycle(() => maintainLedger(uow, clock, logger, endingHandlers), deps.maintenanceMs ?? 60_000);
+  const { maintainOnce, maintenanceWorker } = maintenanceLifecycle(() => maintainLedger(uow, clock, logger), deps.maintenanceMs ?? 60_000);
   return {
     api,
     http: [resourceRoutes(api, (id) => deps.isAdmin(id as UserId))],

@@ -71,6 +71,15 @@ describe.skipIf(!available)('RFC-035 task-owned volume consumer safety', () => {
     expect((await workloadSafetyRepository(h.database.db).get(consumer.id))?.stopProof).toEqual(proof);
     expect(WorkloadStopProofSchema.safeParse({ ...proof, containers: [] }).success).toBe(false);
   });
+  // Locks the re-registration check: a prior open registration is admitted again only while its owner record is still admissible.
+  test('a prior open registration cannot be re-admitted after its workspace is released; a closed one stays a tombstone', async () => {
+    const { consumer, safety, owner, parent } = await fixture();
+    await safety.register(consumer);
+    await owner.requestRelease(parent.id, { code: 'ended', message: 'workspace ended' });
+    await expect(safety.register(consumer)).rejects.toMatchObject({ details: { code: 'workload_admission_closed' } });
+    expect((await safety.closeConsumer(consumer.id)).admissionClosed).toBe(true);
+    expect(await safety.register(consumer)).toMatchObject({ admissionClosed: true, startPermit: null });
+  });
   test('closure without a start grant is a durable no-writer tombstone; wrong ownership and reused Pod names fail', async () => {
     const { consumer, permit, safety, owner, parent } = await fixture();
     await expect(safety.register({ ...consumer, podName: 'unowned' })).rejects.toMatchObject({ kind: 'conflict' });

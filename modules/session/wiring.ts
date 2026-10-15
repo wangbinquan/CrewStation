@@ -1,7 +1,3 @@
-import { drizzleDevelopmentUsageStore } from './adapters/persistence/developmentUsage';
-import { drizzleDevelopmentUsageSourceStore } from './adapters/persistence/developmentUsageSources';
-import { developmentUsageWorker } from './workers/developmentUsageWorker';
-import { drizzleBusinessUsageSourceStore } from './adapters/persistence/businessUsageSources';
 import { legacyRunnerIdentity } from './adapters/persistence/legacyRunnerIdentity';
 import { sessionConnectionHistory } from './adapters/persistence/deletion/lifetime';
 import { originalSessionCopies } from './adapters/persistence/deletion/originalCopies';
@@ -16,14 +12,13 @@ import { sessionDeletionOwner, sessionTransportCloser } from './application/proj
 import { sessionDeletionRoutes } from './http/projectDeletionRoutes';
 import type { SessionDeletionSources } from './ports/projectDeletion';
 import type { ResourceIdentityDirectory } from '@crewstation/persistence';
-import {registerSessionSignals} from './adapters/persistence/runtimeSignals';
 import {registerRuntimeSignals} from '@crewstation/kernel';
 import { join } from 'node:path';
 import type { ServerWebSocket } from 'bun';
 import type { UserId } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import type { Clock, Logger } from '@crewstation/kernel';
-import { noopLogger, systemClock, notFound } from '@crewstation/kernel';
+import { noopLogger, systemClock } from '@crewstation/kernel';
 import type { Database, MigrationSet } from '@crewstation/persistence';
 import { readMigrationDir } from '@crewstation/persistence';
 import type { Hono } from 'hono';
@@ -42,6 +37,7 @@ import { internalRoutes } from './http/internalRoutes';
 import { runnerSocketRoutes } from './http/runnerSocket';
 import type { CommandForwarder, SessionSettings } from './ports/forwarding';
 import type { RunnerAuth, TaskAccess } from './ports/taskRuntime';
+import type { AgentCallSink } from './ports/agentCallSink';
 
 export interface SessionModuleDeps {
   deletionSources?: SessionDeletionSources;
@@ -53,6 +49,8 @@ export interface SessionModuleDeps {
   isAdmin: (userId: UserId) => Promise<boolean>;
   settings: SessionSettings;
   forwarder?: CommandForwarder;
+  /** RFC-034 v2：Agent 执行快照与终态的去处（组合根接到 observability）。 */
+  agentCalls?: AgentCallSink;
   clock?: Clock;
   logger?: Logger;
 }
@@ -78,7 +76,6 @@ export function createSessionModule(deps: SessionModuleDeps): SessionModule {
   const useCaseDeps: SessionUseCaseDeps = {
     projectWork,
     connectionHistory: deps.deletionSources ? sessionConnectionHistory(deps.db, deps.deletionSources) : undefined,
-    developmentUsage: drizzleDevelopmentUsageStore(workDb),
     businessExecutions: drizzleBusinessExecutionStore(workDb),
     events: drizzleRunnerEventStore(workDb),
     legacyRunners: deps.identities ? legacyRunnerIdentity(deps.identities) : undefined,
@@ -86,28 +83,26 @@ export function createSessionModule(deps: SessionModuleDeps): SessionModule {
     forwarder: deps.forwarder ?? fetchForwarder(),
     runnerAuth: deps.runnerAuth,
     taskAccess: deps.taskAccess,
+    ...(deps.agentCalls ? { agentCalls: deps.agentCalls } : {}),
     settings: deps.settings,
     clock: deps.clock ?? systemClock,
     logger: deps.logger ?? noopLogger,
   };
-  const usageSources = drizzleBusinessUsageSourceStore(workDb);
-  const developmentSources = drizzleDevelopmentUsageSourceStore(workDb);
   const hub = runnerHub(useCaseDeps);
-  registerSessionSignals(deps.db);registerRuntimeSignals('session.runners',()=>[{kind:'session.runners.connected',unit:'connections',value:String(hub.connections.size)}]);
+  registerRuntimeSignals('session.runners',()=>[{kind:'session.runners.connected',unit:'connections',value:String(hub.connections.size)}]);
   const deletionRepository = deps.deletionSources ? sessionDeletionRepository(deps.db, deps.deletionSources) : undefined;
   const close = deps.deletionSources && deletionRepository ? sessionTransportCloser(deletionRepository, deps.deletionSources, hub.drain, deps.settings.selfAddress) : undefined;
   const transport = close ? sessionDeletionTransport(deps.settings.selfAddress, (context, birth) => close(context, birth.id), deps.deletionRequest) : undefined;
   const cleanup = deletionRepository && deps.deletionSources && projectWork ? sessionCleanupCommands(deletionRepository, deps.deletionSources,
-    { clock: useCaseDeps.clock, businessExecutions: useCaseDeps.businessExecutions!, developmentUsage: useCaseDeps.developmentUsage!, projectWork }, hub, deps.settings.selfAddress) : undefined;
+    { clock: useCaseDeps.clock, businessExecutions: useCaseDeps.businessExecutions!, projectWork }, hub, deps.settings.selfAddress) : undefined;
   const cleanupTransport = cleanup ? sessionCleanupCommandTransport(deps.settings.selfAddress, cleanup, deps.deletionRequest) : undefined;
   const cleanupData = deletionRepository && deps.deletionSources && projectWork ? sessionCleanupData(deletionRepository, deps.deletionSources, projectWork,
-    { business: useCaseDeps.businessExecutions!, development: useCaseDeps.developmentUsage!, businessSources: usageSources, developmentSources }, originalSessionCopies(workDb)) : undefined;
+    { business: useCaseDeps.businessExecutions! }, originalSessionCopies(workDb)) : undefined;
   const dispatch = commandDispatch(useCaseDeps, hub);
   const streams = browserStreams(useCaseDeps, hub, dispatch);
   const ingestion = businessIngestionWorker({ store: useCaseDeps.businessExecutions!, send: dispatch.sendLocalOnly, logger: useCaseDeps.logger,
+    ...(deps.agentCalls ? { agentCalls: deps.agentCalls } : {}),
     connectedTasks: () => [...hub.connections].filter(([, connection]) => connection.hello.capabilities.businessExecutionV3 === 1).map(([taskId]) => taskId) });
-  const developmentIngestion = developmentUsageWorker({ store: useCaseDeps.developmentUsage!, send: dispatch.sendLocalOnly, logger: useCaseDeps.logger,
-    connectedTasks: () => [...hub.connections].filter(([, connection]) => connection.hello.capabilities.developmentUsageV1 === 1 && connection.hello.capabilities.usageObservationsV1 === 1).map(([taskId]) => taskId) });
   const { upgradeWebSocket, websocket } = createBunWebSocket<ServerWebSocket>();
   const api: SessionModuleApi = {
     name: 'session',
@@ -119,15 +114,6 @@ export function createSessionModule(deps: SessionModuleDeps): SessionModule {
       const { context, birth } = await originalSessionCleanup(deletionRepository, deps.deletionSources!, raw, consumerId);
       const payload = await cleanupTransport(context, birth, command); await deps.deletionSources!.assertGrant(context); return payload;
     } : undefined,
-    lookupDevelopmentUsage: useCaseDeps.developmentUsage!.lookup,
-    registerDevelopmentUsage: useCaseDeps.developmentUsage!.register, getDevelopmentUsage: useCaseDeps.developmentUsage!.get,
-    requestDevelopmentUsageDrain: useCaseDeps.developmentUsage!.requestDrain, markDevelopmentUsageUnavailable: useCaseDeps.developmentUsage!.unavailable,
-    nextDevelopmentUsageSource: developmentSources.next, readDevelopmentUsageMeasurement: developmentSources.measurement, acknowledgeDevelopmentUsageSource: developmentSources.acknowledge,
-    readDevelopmentNativePage: async (key, passId, ordinal) => {
-      const found = await useCaseDeps.developmentUsage!.nativePage(key, passId, ordinal);
-      if (!found) throw notFound('原生页副本', passId); return found;
-    },
-    readBusinessUsageMeasurement: usageSources.measurement, nextBusinessUsageSource: usageSources.next, acknowledgeBusinessUsageSource: usageSources.acknowledge,
     getExecutionCompletionProof: (taskId, executionId) => useCaseDeps.businessExecutions!.completionProof(taskId, executionId),
     consumeBusinessExecution: (taskId, executionId, through, stopped) => useCaseDeps.businessExecutions!.consume(taskId, executionId, through, stopped),
     getBusinessExecution: (taskId, executionId) => useCaseDeps.businessExecutions!.get(taskId, executionId),
@@ -144,9 +130,8 @@ export function createSessionModule(deps: SessionModuleDeps): SessionModule {
     api,
     http: { runner: runnerSocketRoutes(hub, upgradeWebSocket), stream: browserSocketRoutes(streams, deps.isAdmin, upgradeWebSocket), internal },
     websocket,
-    workers: [{ start: () => { timer ??= setInterval(() => void hub.tick(), 5000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; await hub.shutdown(); await projectWork?.drain(); } }, ingestion, developmentIngestion],
+    workers: [{ start: () => { timer ??= setInterval(() => void hub.tick(), 5000); }, stop: async () => { if (timer) clearInterval(timer); timer = undefined; await hub.shutdown(); await projectWork?.drain(); } }, ingestion],
     migrations: sessionMigrations,
   };
 }
 
-export {readOriginalRunnerFragments} from './adapters/persistence/observationFragments';

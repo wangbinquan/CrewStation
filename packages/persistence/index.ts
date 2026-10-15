@@ -14,6 +14,4 @@ export { reproduceIdentityDocument } from './identity/documentReproduction';
 export { readContentConfirmation, appendContentConfirmation } from './confirmations/content';
 export type { ContentConfirmation } from './confirmations/content';
 
-export { originalReportSnapshotSession } from './reportSnapshot';
-export type { OriginalReportSnapshot, ReportSnapshotSession } from './reportSnapshot';
 export type { ReportWorkingRow, ReportWorkingPage, ReportWorkspace } from './reportWorkspace';

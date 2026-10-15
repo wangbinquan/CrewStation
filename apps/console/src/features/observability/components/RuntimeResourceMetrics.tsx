@@ -54,7 +54,7 @@ function ResourceHistory({ projectId, search, change,window:requestedWindow }: {
   const window = { from, to, metrics: ['cpu', 'memory', projectId ? 'volumeUsed' : 'fsUsed'] as ('cpu' | 'memory' | 'volumeUsed' | 'fsUsed')[] };
   const query = useApiQuery(['runtime-resource-history', projectId ?? 'system', window], async () => ClusterHistorySchema.parse(await (projectId ? api.cluster.projectHistory(projectId, window) : api.cluster.history({ ...window, scope: 'cluster' }))), { ...AUTO_REFRESH, enabled: valid });
   return <Card title={t('runtime.resourceHistory')} stacked footer={t('runtime.historyHint')}>
-    <ActionRow>{[1, 24, 168,720].map((hours) => <Button key={hours} onClick={() => { const at = Date.now(); change({ ...search, from: new Date(at - hours * 3600000).toISOString(), to: new Date(at).toISOString(),period:'custom' }); }}>{t('runtime.hours', { hours })}</Button>)}</ActionRow>
+    <ActionRow>{[1, 24, 168,720].map((hours) => <Button key={hours} onClick={() => { const at = Date.now(); change({ ...search, from: new Date(at - hours * 3600000).toISOString(), to: new Date(at).toISOString() }); }}>{t('runtime.hours', { hours })}</Button>)}</ActionRow>
     <p className={styles.hint}>{runtimeDate(from)} — {runtimeDate(to)}</p>
     {!valid ? <p role="status">{t('runtime.historyLimit')}</p> : <><QueryStatus isPending={query.isPending} error={query.error} />{!query.error && query.data ? <>
       {query.data.state !== 'fresh' ? <p role="status">{query.data.reason ?? t('runtime.historyUnavailable')}</p> : null}

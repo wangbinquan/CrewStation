@@ -1,6 +1,7 @@
-import {completeRuntimeFactSources} from './application/completeRuntimeFactSources'; import {originalRuntimeFragments} from './application/observability/originalRuntimeFragments'; import {originalRuntimePhases} from './application/observability/originalRuntimePhases';
+import { agentCallReleaseConsumer } from './adapters/observability/agentCallRelease';
+import { businessCallPorts, developmentCallPorts, profileTestCallPorts, sessionCallSink } from './application/observability/agentCallPorts';
 import {withOperationalHistory} from './application/observability/operationalHistory';
-import { bindTaskMaintenance } from './adapters/observability/taskMaintenance'; import { clusterMetadata } from './application/cluster/metadata'; import { registryCreationAdmission } from './adapters/registryCreationAdmission'; import { forwardDevelopmentCleanup } from './application/developmentCleanupPorts';
+import { clusterMetadata } from './application/cluster/metadata'; import { registryCreationAdmission } from './adapters/registryCreationAdmission';
 import { resourceCatalogs } from './application/resource-center/resourceCatalogs'; import { sessionDeletionSources } from './application/deletion/sessionSources';
 import { businessRuntimePorts } from './application/deletion/businessSources'; import { deletionCurrentAssets } from './adapters/k8s/deletionCurrentAssets'; import { gatewayDevelopmentRetention } from './adapters/k8s/gatewayDevelopmentRetention';
 import { dataDeletionSources } from './application/deletion/dataSources';
@@ -11,16 +12,11 @@ import { projectHosts, provisioningRetry, provisioningProjects } from './applica
 import { developmentDeletionSources, developmentSourceControl } from './application/deletion/developmentSources';
 import { runtimeDeletionSources } from './application/deletion/runtimeSources';
 import { runtimeCleanupPorts } from './application/deletion/runtimeCleanup';
-import { developmentDeletionSession } from './application/deletion/developmentSession';
 import { runtimeCheckout } from './adapters/k8s/runtimeCheckout';
 import { projectResourceState } from './adapters/k8s/projectResourceState';
 import { projectResourceSources } from './application/resource-center/projectSources';
 import { createResourceAccessModule } from '@crewstation/module-resource-access';
 import { clusterOperationPorts } from './application/cluster/operations';
-import { originalObservationTasks, originalObservationUsage } from './application/deletion/observationUsage';
-import { developmentObservationSource } from './application/developmentObservationPorts';
-
-import { businessObservationAdmission, developmentObservationAdmission, observationPorts, observationUsageSource } from './application/observationPorts';
 import { executionWriterObserver, migrationWriterObserver, legacyOwnerObserver } from './adapters/executionWriters';
 import { webhookAwareAllowlist } from './application/webhookIngress';
 import { objectStorageSources } from './application/objectStorageSources';
@@ -39,23 +35,23 @@ import { runtimeImagePlatformPorts } from './application/runtimeImagePorts';
 import { assertRuntimeImageBuildIsolation } from './adapters/k8s/runtimeImageIsolation';
 import { projectHostAccess } from './application/projectHostAccess';
 import { rotateDataCredential } from './application/credentialRotation';
-import { resourceIdentityDirectory, type Database, type MigrationSet, type ResourceIdentityDirectory, type ReportSnapshotSession } from '@crewstation/persistence';
+import { resourceIdentityDirectory, type Database, type MigrationSet, type ResourceIdentityDirectory } from '@crewstation/persistence';
 import { createClusterManagementModule } from '@crewstation/module-cluster-management';
 import { createClusterControlModule, type ClusterControlModuleApi, type SlotSpec } from '@crewstation/module-cluster-control';
 import { createResourcesModule, type ResourcesModuleApi } from '@crewstation/module-resources';
 import { installedSystemComponents } from './domain/systemComponents';
-import { BUILTIN_RESOURCES, ServiceIdSchema, type ResourceId, type Actor, type ComputeProfileSelector, type ComputeUsage, type ProjectId, type ServiceId, type TaskId, type UserId } from '@crewstation/contracts';
+import { BUILTIN_RESOURCES, ServiceIdSchema, type Actor, type ComputeProfileSelector, type ComputeUsage, type ProjectId, type ServiceId, type TaskId, type UserId } from '@crewstation/contracts';
 import { eventbusMigrations, reproduceHistoricalRelease, type EventConsumer } from '@crewstation/eventbus';
 import { secretObject, type K8sClient } from '@crewstation/k8s';
 import { precondition, type Logger } from '@crewstation/kernel';
 import { createAgentRuntimeModule, readProfileObservationName, computeAllocationRevision, taskProfileAllocationRevision } from '@crewstation/module-agent-runtime';
 import { createApiCatalogModule, apiAllocationRevision } from '@crewstation/module-api-catalog';
-import { readBusinessObservationRuntimeOrigins, readBusinessObservationTaskPage, readBusinessObservationAttemptPage, createBusinessTaskModule, type BusinessTaskModuleApi } from '@crewstation/module-business-task';
+import { createBusinessTaskModule, type BusinessTaskModuleApi } from '@crewstation/module-business-task';
 import { createCapabilitiesModule } from '@crewstation/module-capabilities';
 import { createConfigModule } from '@crewstation/module-config';
 import { createDataModule, createDataObjectDeletionPhysics, objectPlanAllocationRevision, objectSpaceAllocationRevision } from '@crewstation/module-data';
 import { createDataControlModule, createObjectDeletionTransport, createGarageDeletionTransport, type DataControlModuleApi } from '@crewstation/module-data-control';
-import { readDevelopmentObservationTaskPage, readDevelopmentObservationAttemptPage, readCliObservationTaskPage, readCliObservationAttemptPage, readOriginalCliActivityPage, createDevSessionModule } from '@crewstation/module-dev-session';
+import { createDevSessionModule } from '@crewstation/module-dev-session';
 import { createEventsModule, type EventsModuleApi } from '@crewstation/module-events';
 import { readObservationMaintenance, createGatewayModule, gatewayAllocationRevision, projectRateLimitValues, UNAVAILABLE_PATH, type GatewayModuleApi } from '@crewstation/module-gateway';
 import { createIdentityModule } from '@crewstation/module-identity';
@@ -64,8 +60,8 @@ import { createProvisioningModule } from '@crewstation/module-provisioning';
 import { readProjectObservationName, createProjectModule, serviceAllocationRevision, namespaceQuotaRevision, executionQuotaRevision, type ProjectModuleApi, type ResolvedService } from '@crewstation/module-project';
 import { readReleaseObservationRoles, createReleaseModule, createNativeReleaseWorkPhysics, createReleaseRegistryDeletionPhysics, type ReleaseModuleApi } from '@crewstation/module-release';
 import { createScmModule, gitLabDeletionPhysicsAdapter, gitLabNativeOriginsAdapter } from '@crewstation/module-scm';
-import { readOriginalRunnerFragments, createSessionModule } from '@crewstation/module-session';
-import { readDevelopmentParentObservationContexts, readRuntimeLifecyclePhases, createTaskRuntimeModule, type TaskRuntimeModuleApi } from '@crewstation/module-task-runtime';
+import { createSessionModule } from '@crewstation/module-session';
+import { createTaskRuntimeModule, type TaskRuntimeModuleApi } from '@crewstation/module-task-runtime';
 import { registerQueueSignals, queueMigrations } from '@crewstation/queue';
 import { createProjectDeletionSessionClient, createSessionClient } from '@crewstation/session-client';
 import type { PlatformSettings } from '@crewstation/settings'; import type { AppEnv } from '@crewstation/http'; import type { Hono } from 'hono';
@@ -82,7 +78,7 @@ export interface PlatformModuleDeps {
     objects: NonNullable<NonNullable<Parameters<typeof createDataModule>[0]['deletion']>['physics']>;
     nativePostgres?: Parameters<typeof createDataControlModule>[0]['nativePostgresSource'];
   };
-  db: Database; runtimeReportSnapshot?: ReportSnapshotSession;
+  db: Database;
   k8s: K8sClient;
   settings: PlatformSettings;
   logger: Logger;
@@ -297,12 +293,12 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
   const testRunner = createSessionClient(settings.sessionInternalUrl);
   const mcp = [{ name: 'capabilities', url: settings.mcp.capabilitiesUrl }, { name: 'operations', url: settings.mcp.operationsUrl }];
   const ledger = resources.api.owner('task-runtime');
-  const taskRuntime = createTaskRuntimeModule({ developmentCleanup: forwardDevelopmentCleanup(() => taskRuntime.api, () => devSession.api.developmentCleanup),
-    deletionStops: runtimeCleanupPorts(project.api, resources.api, () => devSession.api, createProjectDeletionSessionClient(settings.sessionInternalUrl)),
+  const taskRuntime = createTaskRuntimeModule({
+    deletionStops: runtimeCleanupPorts(project.api, resources.api, createProjectDeletionSessionClient(settings.sessionInternalUrl)),
     ...(settings.platformPodUid ? { deletionWorkSources: runtimeDeletionSources(project.api, () => late.businessTask, projectCallbackOwners(k8s, settings.systemNamespace, settings.platformPodUid, 'crewstation.io/runtime-project-stop')) } : {}),
     ...(data.api.archiveHelper ? { archive: { credentials: data.api.archiveHelper, apiUrl: `http://cs-api.${settings.systemNamespace}.svc:8087` } } : {}),
     imageProbeLeases: { port: resources.api.leases, holder: deps.instance },
-    db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, quotas: { quotaLimit: project.api.quotaLimit }, testRunner, testMcp: mcp,profileUsage:{accept:async input=>{if(!late.observability)throw precondition('平台数值受理尚未装配');await late.observability.acceptPlatformUsage({testId:input.testId as ResourceId,profileId:input.profile as ResourceId,profileRevision:input.revision,protocol:input.launch.protocol as 'opencode'|'claude-code'|'terminal'});},bind:async input=>{if(!late.observability)throw precondition('平台数值归属尚未装配');await late.observability.bindPlatformUsage({...input,testId:input.testId as ResourceId});}},
+    db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, quotas: { quotaLimit: project.api.quotaLimit }, testRunner, testMcp: mcp, profileTestCalls: profileTestCallPorts(() => late.observability?.agentCalls, (id) => readProfileObservationName(db, id)),
     // RFC-025 第二期：环境落库时在同一事务里投影进资源台账；live 给补投影列出台账里还挂着的 task-runtime 记录。
     // 额度经台账受理（D31：按阶段数，结束中仍占），occupancy 是项目眼下占用的额度单位。
     workloadSafety: resources.api.workloadSafety, taskVolumes: resources.api.taskVolumes, ledger: { within: (tx) => ledger.within(tx as object), live: async () => (await resources.api.list({})).filter((record) => record.owner.module === 'task-runtime'), occupancy: resources.api.occupancy },
@@ -314,14 +310,12 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
     sources: { ...(data.api.objectEnv ? { objectEnv: data.api.objectEnv } : {}), taskInputEnv: (input) => { if (!data.api.taskInputs) throw precondition('任务对象输入不可用'); return data.api.taskInputs.environment(input); }, bindTaskInputs: (id, uid) => { if (!data.api.taskInputs) throw precondition('任务对象输入不可用'); return data.api.taskInputs.bind(id, uid); }, pinTaskImage: runtimeImages.pinPlatformImage, runtimeImageSecrets: runtimeImages.api.renderInitializationSecrets, configEnv: (projectId, env) => config.api.renderEnv(projectId, env), dataEnv: data.api.envFor, taskDataEnv: data.api.envForTask },
     settings: { taskImage: settings.taskImage, systemNamespace: settings.systemNamespace, sessionUrl: settings.sessionRunnerUrl, userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, workerUid: 10001, defaultProfile: settings.defaultTaskProfile, userAuthMiddleware: 'forward-auth-user', dropIdentityHeadersMiddleware: 'drop-identity-headers', previewRateMiddlewares: ['rate-limit-user', 'rate-limit-host'] },
   });
-  late.taskRuntime = bindTaskMaintenance(resources.api, taskRuntime.api);
+  late.taskRuntime = taskRuntime.api;
   const runner = createSessionClient(settings.sessionInternalUrl);
   // 两类任务共用解析：受理固定档位修订，派发时取材料，凭据仅进入受控 Runner 通道。
-  const computeCatalog = { pinLaunchVersion: core.agentRuntime.api.pinLaunchVersion, launchMaterialAt: core.agentRuntime.api.launchMaterialAt, resolve: (name: ComputeProfileSelector | undefined, usage: ComputeUsage, projectId: ProjectId) => core.agentRuntime.api.resolveForProject(projectId, name, usage), launchMaterial: core.agentRuntime.api.launchMaterial, launchMetadata: core.agentRuntime.api.launchMetadata };
-  const devSession = createDevSessionModule({ developmentDispatchSession: runner, developmentCleanupSession: runner, developmentCleanupWorkloadSafety: resources.api.workloadSafety,
-    projectDeletionSession: developmentDeletionSession(project.api, createProjectDeletionSessionClient(settings.sessionInternalUrl)),
+  const computeCatalog = { pinLaunchVersion: core.agentRuntime.api.pinLaunchVersion, launchMaterialAt: core.agentRuntime.api.launchMaterialAt, resolve: (name: ComputeProfileSelector | undefined, usage: ComputeUsage, projectId: ProjectId) => core.agentRuntime.api.resolveForProject(projectId, name, usage), launchMaterial: core.agentRuntime.api.launchMaterial };
+  const devSession = createDevSessionModule({ calls: developmentCallPorts(() => late.observability?.agentCalls),
     ...(settings.platformPodUid ? { deletionWorkSources: developmentDeletionSources(project.api, taskRuntime.api, () => late.clusterManagement, projectCallbackOwners(k8s, settings.systemNamespace, settings.platformPodUid, 'crewstation.io/development-project-stop')) } : {}),
-    developmentUsagePricing: developmentObservationAdmission(() => late.observability),
     runtimeImages: developmentImagePorts(runtimeImages.api),
     identities: deps.identities,
     // RFC-025 §11.2：名册的结束与失败照台账里执行记录的阶段（记录沿用执行环境的任务 ID，上级是工作区）。
@@ -335,9 +329,9 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
     // 注入 Agent 的远程 MCP 连接凭据由 identity 签发：一个签发者、一个密钥环、一份 JWKS。
     credentials: { issueDevSessionToken: (binding) => core.identity.api.issueDevSessionToken(binding) },
     compute: computeCatalog,
-    settings: { developmentNativeObservationEnabled: true, developmentNativeObservationAdmissions: settings.developmentNativeObservationAdmissions, idleMinutes: settings.idleMinutes, userDomain: settings.userDomain, mcp, defaultPreviewPort: 3000 },
+    settings: { idleMinutes: settings.idleMinutes, userDomain: settings.userDomain, mcp, defaultPreviewPort: 3000 },
   });
-  const businessTask = createBusinessTaskModule({ ...businessRuntimePorts(core.data.api, taskRuntime.api, project.api, () => late.businessTask, settings.platformPodUid ? projectCallbackOwners(k8s, settings.systemNamespace, settings.platformPodUid, 'crewstation.io/business-project-stop') : undefined, deletionCurrentAssets(k8s)), taskStorageStatus: (id) => settings.workloadCreation === 'ledger' ? core.data.api.taskStorageStatus(id) : Promise.resolve({ available: false, reason: 'workload_safety_unavailable' }), taskInputs: core.data.api.taskInputs, executionObservations: businessObservationAdmission(() => late.observability), storageControl: { apply: core.data.api.applyObjectWriteControl }, legacyRecoveryProof: legacyOwnerObserver(deps.k8s, settings.systemNamespace), ...businessExecutionPorts(runtimeImages.api, core.config.api, core.identity.api, SYSTEM_ACTOR),
+  const businessTask = createBusinessTaskModule({ ...businessRuntimePorts(core.data.api, taskRuntime.api, project.api, () => late.businessTask, settings.platformPodUid ? projectCallbackOwners(k8s, settings.systemNamespace, settings.platformPodUid, 'crewstation.io/business-project-stop') : undefined, deletionCurrentAssets(k8s)), taskStorageStatus: (id) => settings.workloadCreation === 'ledger' ? core.data.api.taskStorageStatus(id) : Promise.resolve({ available: false, reason: 'workload_safety_unavailable' }), taskInputs: core.data.api.taskInputs, agentCalls: businessCallPorts(() => late.observability?.agentCalls), storageControl: { apply: core.data.api.applyObjectWriteControl }, legacyRecoveryProof: legacyOwnerObserver(deps.k8s, settings.systemNamespace), ...businessExecutionPorts(runtimeImages.api, core.config.api, core.identity.api, SYSTEM_ACTOR),
     identities: deps.identities,
     db, logger, isAdmin: (id) => isAdmin(id), environments: taskRuntime.api, runner, authorizer: project.api,
     directory: { resolveServiceIdentity: async (identity) => { const r = await project.api.resolveServiceIdentity(identity); return r ? { serviceId: r.serviceId, projectId: r.projectId } : undefined; } },
@@ -354,6 +348,8 @@ function composeRuntime(deps: CompositionDeps, core: ReturnType<typeof composeCo
     worker: { owner: `${deps.instance}.events`, concurrency: 4 },
   });
   const session = createSessionModule({
+    // RFC-034 v2 §4.3：Runner 上报的用量快照与终态转交 Agent 执行记录（observability 晚于本模块装配）。
+    agentCalls: sessionCallSink(() => late.observability?.agentCalls, logger),
     identities: deps.identities, deletionSources: sessionDeletionSources(taskRuntime.api, project.api, settings.platformPodUid ? projectCallbackOwners(k8s, settings.systemNamespace, settings.platformPodUid, 'crewstation.io/session-project-stop') : undefined),
     db, logger, isAdmin: (id) => isAdmin(id),
     runnerAuth: { verifyRunnerToken: taskRuntime.api.verifyRunnerToken },
@@ -382,11 +378,14 @@ function composeAggregates(deps: CompositionDeps, late: Late, core: ReturnType<t
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, apiCatalog, isAdmin } = core;
   const serviceOfProject = project.api.resolveServiceOfProject;
-  const observability = createObservabilityModule({ platformProfileName:id=>readProfileObservationName(db,id), operationalMetrics:settings.clusterMetrics?.enabled?withOperationalHistory(prometheusOperationalSource(settings.clusterMetrics.prometheusUrl,settings.clusterMetrics.prometheusToken),async namespace=>{const projects=(await project.api.listClusterProjects()).filter(p=>p.serviceId&&p.serviceName&&(!namespace||p.namespace===namespace));return Promise.all(projects.map(async p=>({namespace:p.namespace,name:p.serviceName!,roles:await readReleaseObservationRoles(db,p.serviceId!),maintenance:await readObservationMaintenance(db,p.serviceId!)})));}):undefined, developmentNativeObservationEnabled:true, developmentNativeObservationAdmissions:settings.developmentNativeObservationAdmissions, reportSnapshot:deps.runtimeReportSnapshot,reportDataRoot:settings.runtimeReportDataRoot,reportFacts:completeRuntimeFactSources({business:{tasks:readBusinessObservationTaskPage,attempts:readBusinessObservationAttemptPage},development:{tasks:(executor,query)=>readDevelopmentObservationTaskPage(executor,query,ids=>readDevelopmentParentObservationContexts(executor,ids)),attempts:(executor,query)=>readDevelopmentObservationAttemptPage(executor,query,ids=>readDevelopmentParentObservationContexts(executor,ids))},cli:{tasks:(executor,query)=>readCliObservationTaskPage(executor,query,ids=>readDevelopmentParentObservationContexts(executor,ids)),attempts:(executor,query)=>readCliObservationAttemptPage(executor,query,ids=>readDevelopmentParentObservationContexts(executor,ids))},fragments:originalRuntimeFragments({origins:readBusinessObservationRuntimeOrigins,fragments:readOriginalRunnerFragments}),lifecycle:originalRuntimePhases({origins:readBusinessObservationRuntimeOrigins,phases:readRuntimeLifecyclePhases}),cliActivity:(executor,task,after)=>{if(task.source?.kind!=='development-cli')throw precondition('CLI 活动读取须有原身份');return readOriginalCliActivityPage(executor,{taskId:task.source.identity.taskId,agentId:task.source.identity.agentId,sourceTaskId:task.id},after);},projectName:readProjectObservationName,profileName:readProfileObservationName}),
-    deletion: { identities: deps.identities, assertGrant: project.api.assertProjectDeletionGrant, originalTarget: project.api.projectDeletionOriginalTarget,
-      tasks: { list: (target) => originalObservationTasks(runtime.taskRuntime.api, target.id) },
-      originalUsage: originalObservationUsage(project.api, createProjectDeletionSessionClient(settings.sessionInternalUrl), runtime.businessTask.api.v3, runtime.devSession.api.developmentUsage) },
-    ...(runtime.devSession.api.developmentUsage ? { developmentUsageSource: developmentObservationSource(runtime.devSession.api.developmentUsage, runtime.session.api) } : {}), usageSource: observationUsageSource(runtime.businessTask.api.v3, runtime.session.api), ...observationPorts(runtime.businessTask.api.v3, project.api, core.agentRuntime.api, resources.api),
+  const observability = createObservabilityModule({ operationalMetrics: settings.clusterMetrics?.enabled ? withOperationalHistory(prometheusOperationalSource(settings.clusterMetrics.prometheusUrl, settings.clusterMetrics.prometheusToken), async (namespace) => {
+    const projects = (await project.api.listClusterProjects()).filter((p) => p.serviceId && p.serviceName && (!namespace || p.namespace === namespace));
+    return Promise.all(projects.map(async (p) => ({ namespace: p.namespace, name: p.serviceName!, roles: await readReleaseObservationRoles(db, p.serviceId!), maintenance: await readObservationMaintenance(db, p.serviceId!) })));
+  }) : undefined,
+    deletion: { identities: deps.identities, assertGrant: project.api.assertProjectDeletionGrant, originalTarget: project.api.projectDeletionOriginalTarget },
+    // RFC-034 v2：价格目录列出算力档位，系统页的项目表与排行显示项目名。
+    pricingProfiles: { list: async (actor) => (await core.agentRuntime.api.listProfiles(actor)).items.map((p) => ({ id: p.id, name: p.name, protocol: p.protocol, model: p.model ?? null })) },
+    projectNames: { names: async (ids) => new Map((await Promise.all(ids.map(async (id) => [id, await readProjectObservationName(db, id)] as const))).filter((entry): entry is readonly [ProjectId, string] => entry[1] !== null)) },
     db, k8s, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, services: { resolveServiceOfProject: serviceOfProject }, slots: delivery.release.api,
     traces: {
       environments: { traceKeys: runtime.taskRuntime.api.traceKeys, activeTraceIds: runtime.taskRuntime.api.activeTraceIds, list: runtime.taskRuntime.api.listTraceEnvironments },
@@ -479,7 +478,7 @@ function composeControl(deps: CompositionDeps, core: ReturnType<typeof composeCo
     // D13：槽「已结束」时待验证与正式主机改指 cs-api 的说明页（Service 与端口同平台路由清单 deploy/k8s/platform/30-cs-api.yaml）。
     explainer: { namespace: deps.settings.systemNamespace, service: 'cs-api', port: 8080, path: UNAVAILABLE_PATH },
     // RFC-025 I25：建工作区与执行环境的 Runner Secret 时回头向 task-runtime 要内容（值不落台账），Pod 建出后交回实例；执行环境的父工作区变了交它判失败。
-    workloads: { inspectDevelopmentRemoval: runtime.taskRuntime.api.inspectDevelopmentRemoval, reconcileRebuild: (id, rebuildId, operations, heartbeat) => runtime.taskRuntime.api.reconcileRebuild(id as TaskId, rebuildId, operations, heartbeat), runnerValues: (id) => runtime.taskRuntime.api.runnerValues(id as TaskId), checkoutValues: (id) => runtime.taskRuntime.api.checkoutValues(id as TaskId), bindWorkload: (id, podUid, secretUid) => runtime.taskRuntime.api.bindWorkload(id as TaskId, podUid, secretUid),
+    workloads: { reconcileRebuild: (id, rebuildId, operations, heartbeat) => runtime.taskRuntime.api.reconcileRebuild(id as TaskId, rebuildId, operations, heartbeat), runnerValues: (id) => runtime.taskRuntime.api.runnerValues(id as TaskId), checkoutValues: (id) => runtime.taskRuntime.api.checkoutValues(id as TaskId), bindWorkload: (id, podUid, secretUid) => runtime.taskRuntime.api.bindWorkload(id as TaskId, podUid, secretUid),
       workloadUnavailable: (id, code) => runtime.taskRuntime.api.workloadUnavailable(id as TaskId, code) },
     // T8：建服务槽的环境 Secret、构建与迁移 Job 的凭据 Secret 时同样回头向 release 要内容；槽建不成交它判这一次部署失败。
     slots: { slotEnvValues: (ref) => release.api.slotEnvValues(ref), slotFailed: (ref, message) => release.api.slotFailed(ref, message) }, jobs: { jobEnvValues: (ref) => release.api.jobEnvValues(ref), imageBuildSecretValues: runtimeImages.imageBuildSecretValues },
@@ -576,9 +575,9 @@ export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
       events: [...m.events.http.ingress],
     },
     background: {
-      controller: [...m.cluster.workers, ...m.data.workers, ...m.release.workers, ...m.gateway.workers, consumerLifecycle(m.gateway.subscriptions), ...m.taskRuntime.workers, ...m.agentRuntime.workers, ...m.runtimeEnvironment.workers, ...m.devSession.workers, ...m.businessTask.workers, consumerLifecycle(m.businessTask.subscriptions), ...m.apiCatalog.subscriptions.map(consumerLifecycle), ...m.data.subscriptions.map(consumerLifecycle), ...m.observability.workers, ...m.provisioning.workers, ...m.provisioning.startupTasks, consumerLifecycle(m.provisioning.subscriptions), m.resources.maintenanceWorker, m.clusterControl.observer, m.dataControl.observer, m.scm.observer, ...m.resourceAccess.workers,m.events.recoveryWorker],
+      controller: [...m.cluster.workers, ...m.data.workers, ...m.release.workers, ...m.gateway.workers, consumerLifecycle(m.gateway.subscriptions), ...m.taskRuntime.workers, ...m.agentRuntime.workers, ...m.runtimeEnvironment.workers, ...m.devSession.workers, ...m.businessTask.workers, consumerLifecycle(m.businessTask.subscriptions), ...m.apiCatalog.subscriptions.map(consumerLifecycle), ...m.data.subscriptions.map(consumerLifecycle), ...m.observability.workers, consumerLifecycle(agentCallReleaseConsumer(deps.db, deps.logger, () => m.observability.api.agentCalls)), ...m.provisioning.workers, ...m.provisioning.startupTasks, consumerLifecycle(m.provisioning.subscriptions), m.resources.maintenanceWorker, m.clusterControl.observer, m.dataControl.observer, m.scm.observer, ...m.resourceAccess.workers,m.events.recoveryWorker],
       // 资源推送流的尾随器（RFC-025 设计 §8.2）：每个 cs-api 副本一个。
-      api: [m.resources.streamWorker,...m.observability.reportWorkers],
+      api: [m.resources.streamWorker],
       session: [...m.session.workers],
       events: [...m.events.workers, ...m.events.subscriptions.map(consumerLifecycle)],
     },

@@ -1,36 +1,31 @@
-import type { TokenPriceProfile } from '@crewstation/contracts';
-import { useState } from 'react';
+import type { ObservationPricingProfile } from '@crewstation/contracts';
 import { api } from '../../../../shared/api/client';
 import { useApiQuery } from '../../../../shared/api/useApi';
 import { useDateText } from '../../../../shared/lib/useDateText';
 import { useT } from '../../../../shared/lib/useT';
-import { Dialog } from '../../../../shared/ui/dialog/Dialog';
 import { DataTable } from '../../../../shared/ui/DataTable';
 import { QueryStatus } from '../../../../shared/ui/QueryStatus';
-import { Button } from '../../../../shared/ui/Button';
-import { ActionRow } from '../../../../shared/ui/ActionRow';
 import { Stack } from '../../../../shared/ui/Stack';
+import { Dialog } from '../../../../shared/ui/dialog/Dialog';
 import { priceBuckets } from '../../model/tokenPriceDraft';
 
-export function TokenPriceHistory({ profile, onClose }: { profile: TokenPriceProfile; onClose: () => void }) {
+/** 一条价格线的全部版本（只追加，新的在前）；执行按开始时生效且开始前已创建的版本计价。 */
+export function TokenPriceHistory({ profile, model, onClose }: { profile: ObservationPricingProfile; model: string; onClose: () => void }) {
   const t = useT(), dateText = useDateText();
-  const [cursors, setCursors] = useState<Array<number | undefined>>([undefined]);
-  const beforeRevision = cursors.at(-1);
-  const query = useApiQuery(['admin', 'token-pricing', profile.id, 'history', beforeRevision], () => api.observability.priceHistory(profile.id, { limit: 20, ...(beforeRevision === undefined ? {} : { beforeRevision }) }));
-  const next = query.data?.nextBeforeRevision;
-  return <Dialog title={t('admin.pricing.historyTitle', { name: profile.name })} size="large" onClose={onClose}>
+  const query = useApiQuery(['admin', 'token-pricing', profile.profileId, 'history', model], () => api.observability.priceHistory(profile.profileId, model));
+  const items = query.error ? [] : query.data?.items ?? [];
+  return <Dialog title={t('admin.pricing.historyTitle', { name: profile.name, model })} size="large" onClose={onClose}>
     <Stack>
       <p>{t('admin.pricing.historyHint')}</p>
-      <QueryStatus isPending={query.isPending} error={query.error} isEmpty={!query.data?.items.length} emptyTitle={t('admin.pricing.unpriced')} />
-      {query.data?.items.length ? <DataTable columns={['revision', 'model', 'effectiveFrom', ...priceBuckets].map((key) => t('admin.pricing.' + key))}>
-        {query.data.items.map((version) => <tr key={version.id}>
-          <td>{'CNY-v' + version.revision}<br />{version.sourceNote}</td><td>{version.provider} / {version.model}<br />{version.condition ?? '—'}</td>
+      <QueryStatus isPending={query.isPending} error={query.error} isEmpty={items.length === 0} emptyTitle={t('admin.pricing.unpriced')} />
+      {items.length ? <DataTable columns={['effectiveFrom', ...priceBuckets, 'createdAt', 'note'].map((key) => t('admin.pricing.' + key))}>
+        {items.map((version) => <tr key={version.id}>
           <td>{dateText(version.effectiveFrom)}</td>
-          {priceBuckets.map((bucket) => <td key={bucket}>{version.rates[bucket] === null ? t('admin.pricing.unpriced') : '¥' + version.rates[bucket]}</td>)}
+          {priceBuckets.map((bucket) => <td key={bucket}>{version.rates[bucket] === null ? t('admin.pricing.unknownRate') : '¥' + version.rates[bucket]}</td>)}
+          <td>{dateText(version.createdAt)}</td>
+          <td>{version.note || '—'}</td>
         </tr>)}
       </DataTable> : null}
-      <ActionRow><Button disabled={cursors.length === 1 || query.isPending} onClick={() => setCursors((current) => current.slice(0, -1))}>{t('admin.pricing.previous')}</Button>
-        <Button disabled={next === undefined || query.isPending} onClick={() => { if (next !== undefined) setCursors((current) => [...current, next]); }}>{t('admin.pricing.next')}</Button></ActionRow>
     </Stack>
   </Dialog>;
 }

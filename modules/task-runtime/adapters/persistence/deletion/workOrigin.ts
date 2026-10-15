@@ -18,7 +18,7 @@ export async function retainedRuntimeOrigin(db: Executor, kind: RuntimeWorkInput
   return RuntimeWorkOriginSchema.parse({ complete: true, id: row.id, scope: 'project', projectIds: [row.project_id], revision: row.revision });
 }
 /** The public original witness stays identical after this owner's payload is purged. */
-export async function originalRuntimeWorkInfrastructure(db: Database, kind: 'task' | 'rebuild' | 'parent-ending', key: string, mode: 'current' | 'legacy' = 'current') {
+export async function originalRuntimeWorkInfrastructure(db: Database, kind: 'task' | 'rebuild', key: string, mode: 'current' | 'legacy' = 'current') {
   const actual = await runtimeInfrastructureOrigin(db, kind, key, mode), saved = await retainedRuntimeOrigin(db, kind, key);
   const original = actual ? minimum(kind, RuntimeWorkOriginSchema.parse(actual)) : saved;
   if (saved && original && jsonHash(saved) !== jsonHash(original)) throw precondition('运行公共原归属与最小沿革冲突');

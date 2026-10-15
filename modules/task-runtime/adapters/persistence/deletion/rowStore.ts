@@ -17,11 +17,11 @@ export class RuntimeContentRows {
   private readonly cache = new Map<string, Promise<RuntimeRawRow | undefined>>();
   constructor(private readonly db: Executor) {}
   prime(table: string, row: RuntimeRawRow) {
-    if (!['environments', 'environment_rebuilds', 'development_parent_endings'].includes(table)) return;
+    if (!['environments', 'environment_rebuilds'].includes(table)) return;
     const cacheKey = JSON.stringify([table, runtimeString(row['id'])]);
     if (!this.cache.has(cacheKey)) this.cache.set(cacheKey, Promise.resolve(row));
   }
-  get(table: 'environments' | 'environment_rebuilds' | 'development_parent_endings', key: string) {
+  get(table: 'environments' | 'environment_rebuilds', key: string) {
     const cacheKey = JSON.stringify([table, key]); let pending = this.cache.get(cacheKey);
     if (!pending) {
       const entry = RUNTIME_CONTENT.find((value) => value.table === table)!;

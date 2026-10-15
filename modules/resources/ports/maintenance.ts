@@ -1,4 +1,5 @@
-import type { MaintenanceStep } from '../domain/maintenanceEnding';
+/** 资源中心维护作业的两步：失败保留期到期、已结束记录压缩。 */
+export type MaintenanceStep = 'retention' | 'compaction';
 
 /** 每步独立的持久扫描和真实作业代次；本地实例 nonce 不能充当 fencingToken。 */
 export interface MaintenanceSweepLease {

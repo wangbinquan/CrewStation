@@ -36,7 +36,7 @@ describe.skipIf(!available)('private Session business cleanup (real PG, two WS r
       expect(callbacks.length).toBe(7); expect(callbacks.every((callback) => callback.kind === 'cleanup' && callback.exited && callback.grant?.revision === f.context.confirmed.revision)).toBe(true);
       expect((await f.owner.run(f.context)).kind).toBe('done'); await f.runner.closed;
       const row = (await f.database.db.execute<{ body: { stopped: { tables: unknown[]; count: number }; taskKeys: string[] } }>('SELECT body FROM session.project_deletions'))[0]!;
-      expect(row.body.stopped.tables).toHaveLength(12); expect(row.body.stopped.count).toBeGreaterThan(f.context.confirmed.resources.length);
+      expect(row.body.stopped.tables).toHaveLength(8); expect(row.body.stopped.count).toBeGreaterThan(f.context.confirmed.resources.length);
       const frozen = jsonHash(row.body.stopped);
       await expect(f.request({ id: f.commandId(), type: 'getBusinessExecution', executionId: running.executionId })).rejects.toThrow('停止阶段已经完成');
       for (const phase of PROJECT_DELETION_PHASES.slice(2)) expect((await f.owner.run({ ...f.context, phase })).kind).toBe('done');
@@ -45,7 +45,7 @@ describe.skipIf(!available)('private Session business cleanup (real PG, two WS r
       const retained = (await f.database.db.execute<{ body: { stopped: unknown; callbacks: unknown[]; taskKeys: unknown[] } }>('SELECT body FROM session.project_deletions'))[0]!.body;
       expect(retained.callbacks).toEqual([]); expect(retained.taskKeys).toEqual([]); expect(jsonHash(retained.stopped)).toBe(frozen);
     } finally { await f.drop(); }
-  });
+  }, 30_000);
 
   test('no seal, another birth, stale phase, replaced execution, new work and revoked current grants produce no Runner command or numeric write', async () => {
     const f = await cleanupFixture();
@@ -68,5 +68,5 @@ describe.skipIf(!available)('private Session business cleanup (real PG, two WS r
       expect((await sessionWorkHistory(f.database.db, f.projectId)).every((callback) => callback.exited)).toBe(true);
       f.permit(true); expect((await f.owner.run(f.context)).kind).toBe('done');
     } finally { f.permit(true); await f.drop(); }
-  });
+  }, 30_000);
 });

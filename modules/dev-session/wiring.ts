@@ -1,20 +1,10 @@
-import { cliActivityCollection } from './application/development/cliActivityCollection';
-import { cliObservation } from './application/development/cliObservation';
-import { developmentObservationProducer } from './application/development/observationProducer';
-import type { DevelopmentDispatchSession } from './ports/developmentDispatch';
-import type { DevelopmentCleanupSession, DevelopmentCleanupWorkloadSafety } from './ports/developmentCleanup';
-import { developmentCleanupParticipant } from './application/development/cleanup';
-import { developmentEndingStore } from './adapters/persistence/ending/store';
 import type { DevelopmentRuntimeImages } from './ports/runtimeImages';
-import type { DevelopmentUsagePricing } from './ports/developmentUsage';
-import { developmentUsageOwnerStore } from './adapters/persistence/developmentUsage';
-import { developmentUsageOwner } from './application/developmentUsage';
+import type { DevelopmentCalls } from './ports/agentCalls';
 import { join } from 'node:path';
-import type { ProjectDeletionContext, TaskId, UserId } from '@crewstation/contracts';
-import { TaskIdSchema } from '@crewstation/contracts';
+import type { UserId } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import type { Clock, Logger } from '@crewstation/kernel';
-import { isPlatformError, jsonHash, newResourceId, noopLogger, precondition, systemClock } from '@crewstation/kernel';
+import { isPlatformError, noopLogger, systemClock } from '@crewstation/kernel';
 import type { Database, MigrationSet, ResourceIdentityDirectory } from '@crewstation/persistence';
 import { readMigrationDir } from '@crewstation/persistence';
 import type { Hono } from 'hono';
@@ -52,16 +42,12 @@ import { developmentDeletionRepository } from './adapters/persistence/deletion/r
 import { developmentDeletionOwner } from './application/deletion/owner';
 import { guardedDevelopmentPort, scopedDevelopmentPorts } from './application/deletion/ports';
 import { developmentWorkApi } from './application/deletion/api';
-import { developmentCleanupWork, developmentUsageWork } from './application/deletion/internalWork';
 import { developmentWorker } from './application/developmentWorker';
 
 export interface DevSessionModuleDeps {
   deletionWorkSources?: DevelopmentWorkSources;
-  developmentUsagePricing?: DevelopmentUsagePricing;
-  developmentCleanupSession?: DevelopmentCleanupSession;
-  developmentCleanupWorkloadSafety?: DevelopmentCleanupWorkloadSafety;
-  developmentDispatchSession?: DevelopmentDispatchSession;
-  projectDeletionSession?: (context: ProjectDeletionContext, taskId: TaskId) => Promise<DevelopmentCleanupSession>;
+  /** RFC-034 v2：开发执行记录（组合根接到 observability）；不给则不记录。 */
+  calls?: DevelopmentCalls;
   identities?: ResourceIdentityDirectory;
   /** 资源台账里 CLI／Agent 执行记录的阶段（RFC-025 §11.2）；缺省时名册照 Runner 的说法给出。 */
   runtimeImages?: DevelopmentRuntimeImages;
@@ -91,8 +77,6 @@ export interface DevSessionModule {
   readonly migrations: MigrationSet;
 }
 
-export { readDevelopmentObservationFacts, readDevelopmentObservationTaskPage, readDevelopmentObservationAttemptPage } from './adapters/persistence/developmentObservationFacts';
-
 export const devSessionMigrations: MigrationSet = {
   module: 'dev_session',
   layer: 5,
@@ -103,7 +87,7 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
   const projectWork = deps.deletionWorkSources ? developmentProjectWork(deps.db, deps.deletionWorkSources,
     (error) => (deps.logger ?? noopLogger).error('development original lifetime failed', { error: String(error) })) : undefined;
   const rawDeps: DevSessionUseCaseDeps = {
-    executions: deps.executions, runtimeImages: deps.runtimeImages,
+    executions: deps.executions, runtimeImages: deps.runtimeImages, ...(deps.calls ? { calls: deps.calls } : {}),
     comparisons: drizzleComparisonReferences(deps.db, deps.clock ?? systemClock, deps.identities),
     environments: deps.environments, runner: deps.runner, scm: deps.scm, releases: deps.releases, manifests: yamlManifestParser,
     authorizer: deps.authorizer, apiCatalog: deps.apiCatalog,
@@ -126,55 +110,19 @@ function developmentApi(deps: DevSessionModuleDeps, useCaseDeps: DevSessionUseCa
   const lifecycle = sessionLifecycleUseCases(useCaseDeps);
   const rawAgentStarts = drizzleAgentStarts(deps.db, !!projectWork), agentStarts = projectWork ? guardedDevelopmentPort(rawAgentStarts, projectWork) : rawAgentStarts;
   const rawTerminals = drizzleNativeTerminals(deps.db, !!projectWork), terminals = projectWork ? guardedDevelopmentPort(rawTerminals, projectWork) : rawTerminals;
-  const store = developmentUsageOwnerStore(deps.db), pricing = deps.developmentUsagePricing;
-  const rawUsage = developmentUsageOwner(projectWork ? guardedDevelopmentPort(store, projectWork) : store, agentStarts, useCaseDeps.environments,
-    pricing && projectWork ? guardedDevelopmentPort(pricing, projectWork) : pricing, terminals);
-  const developmentUsage = projectWork ? developmentUsageWork(rawUsage, projectWork) : rawUsage;
-  const endingStore = developmentEndingStore(deps.db, useCaseDeps.clock);
-  const originalEndingStore = projectWork ? guardedDevelopmentPort(endingStore, projectWork) : endingStore;
-  const observation = deps.developmentDispatchSession && deps.developmentCleanupSession ? developmentObservationProducer(useCaseDeps, {
-    owner: rawUsage, store: originalEndingStore,
-    dispatch: projectWork ? guardedDevelopmentPort(deps.developmentDispatchSession, projectWork) : deps.developmentDispatchSession,
-    ending: projectWork ? guardedDevelopmentPort(deps.developmentCleanupSession, projectWork) : deps.developmentCleanupSession,
-  }) : undefined;
-  const agentExecutions = new AgentExecutionLifecycle(useCaseDeps, agentStarts, observation);
+  const agentExecutions = new AgentExecutionLifecycle(useCaseDeps, agentStarts);
   const agents = agentUseCases(useCaseDeps, agentStarts, agentExecutions);
   const remind = idleReminderUseCase(useCaseDeps);
   const rawActivity = drizzleNativeActivity(deps.db), activity = nativeActivityUseCases(useCaseDeps, projectWork ? guardedDevelopmentPort(rawActivity, projectWork) : rawActivity, terminals);
-  const cli=deps.developmentDispatchSession && deps.developmentCleanupSession ? cliObservation(useCaseDeps,{owner:rawUsage,store:originalEndingStore,dispatch:deps.developmentDispatchSession,ending:deps.developmentCleanupSession}):undefined;
-  const native = nativeTerminalUseCases(useCaseDeps, terminals, cli, cliActivityCollection(useCaseDeps.runner, projectWork ? guardedDevelopmentPort(rawActivity,projectWork):rawActivity));
+  const native = nativeTerminalUseCases(useCaseDeps, terminals);
   // 启动中名册每秒读一次（RFC-022），原生活动页不跟着每秒做：同一任务、同一人 5 秒内复用。
   const activityPage = rosterActivity((actor, taskId) => boundedNativeRead(activity.getAgentActivity(actor, taskId, { limit: 1 })).catch((error: unknown) => {
     if (isPlatformError(error) && ['forbidden', 'unauthenticated', 'not_found'].includes(error.kind)) throw error;
     useCaseDeps.logger.warn('native activity query unavailable', { taskId });
     return undefined;
   }), useCaseDeps.clock);
-  const makeCleanup = (session: DevelopmentCleanupSession, closing = false) => developmentCleanupParticipant({ owner: rawUsage,
-    store: projectWork ? guardedDevelopmentPort(endingStore, projectWork) : endingStore, environments: useCaseDeps.environments,
-    session: projectWork ? guardedDevelopmentPort(session, projectWork) : session, clock: useCaseDeps.clock,
-    ...(deps.developmentCleanupWorkloadSafety ? { workloadSafety: projectWork ? guardedDevelopmentPort(deps.developmentCleanupWorkloadSafety, projectWork) : deps.developmentCleanupWorkloadSafety } : {}),
-    ...(closing ? { closeOriginalAdmission: async (id: TaskId) => { await rawUsage.close(id, 'cancelled'); } } : {}) });
-  const cleanup = deps.developmentCleanupSession ? makeCleanup(deps.developmentCleanupSession) : undefined;
   const api: DevSessionModuleApi = {
     ...(deps.deletionWorkSources ? { deletionOwner: developmentDeletionOwner(developmentDeletionRepository(deps.db, deps.deletionWorkSources), deps.deletionWorkSources) } : {}),
-    developmentUsage,
-    ...(cleanup ? { developmentCleanup: projectWork ? developmentCleanupWork(cleanup, projectWork) : cleanup } : {}),
-    ...((cleanup || deps.projectDeletionSession) && projectWork ? { projectDeletionCleanup: (context, input) => {
-      if (context.phase !== 'stop') throw precondition('开发项目清理只接受当前停止阶段许可');
-      return projectWork.runGranted(context, { originKind: 'task', originKey: input.identity.executionId,
-        reference: newResourceId(), inputDigest: jsonHash(input) }, async () => {
-        const session = await deps.projectDeletionSession?.(context, TaskIdSchema.parse(input.identity.executionId));
-        return (session ? makeCleanup(session, true) : cleanup!).advance(input);
-      });
-    }, projectDeletionCompletePrestart: (context, input) => {
-      if (context.phase !== 'stop') throw precondition('开发项目清理只接受当前停止阶段许可');
-      return projectWork.runGranted(context, { originKind: 'task', originKey: input.identity.executionId,
-        reference: newResourceId(), inputDigest: jsonHash({ action: 'completePrestart', input }) }, async () => {
-        const session = await deps.projectDeletionSession?.(context, TaskIdSchema.parse(input.identity.executionId));
-        const participant = session ? makeCleanup(session, true) : cleanup!;
-        return participant.completePrestart ? participant.completePrestart(input) : { kind: 'waiting' as const, reason: 'prestart-capability' };
-      });
-    } } : {}),
     invokeApi: apiInvocationUseCase(useCaseDeps),
     ...clusterAgentUseCases(useCaseDeps, agentStarts, agentExecutions), ...clusterNativeUseCases(useCaseDeps, terminals),
     name: 'dev-session', ...lifecycle, ...agents, ...native, ...activity, ...workspaceLayoutUseCases(useCaseDeps, projectWork ? guardedDevelopmentPort(drizzleWorkspaceLayouts(deps.db), projectWork) : drizzleWorkspaceLayouts(deps.db), terminals),
@@ -191,9 +139,4 @@ function developmentApi(deps: DevSessionModuleDeps, useCaseDeps: DevSessionUseCa
     },
   };
   return projectWork ? developmentWorkApi(api, projectWork) : api;
-
 }
-
-export {readCliObservationTaskPage,readCliObservationAttemptPage} from './adapters/persistence/observability/cliObservationFacts';
-
-export {readOriginalCliActivityPage} from './adapters/persistence/observability/observationActivityFacts';

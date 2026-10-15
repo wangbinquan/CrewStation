@@ -14,7 +14,7 @@ export interface RuntimeInitializationConfig {
   readonly containerIdentity: string;
   readonly journalDir: string;
 }
-const passiveCommands = new Set(['runtimeInitializationStatus', 'cancelRuntimeInitialization', 'shutdown', 'stopDevelopmentAgent', 'developmentUsageInfo', 'readDevelopmentUsageEvents', 'readDevelopmentNativePage', 'ackDevelopmentUsageEvents']);
+const passiveCommands = new Set(['runtimeInitializationStatus', 'cancelRuntimeInitialization', 'shutdown']);
 
 export class RuntimeInitialization {
   private readonly journal?: InitializationJournal;

@@ -30,8 +30,6 @@ async function drain(session: RuntimeSessionCopies, taskId: TaskId, receipt: Run
 export function runtimeDigitalStops(project: RuntimeStopProject, bind: RuntimeSessionBinding) {
   return async (context: ProjectDeletionContext, environment: { readonly id: TaskId }) => {
     const taskId = TaskIdSchema.parse(environment.id), grant = await project.projectDeletionParticipantContext(context, 'session'), session = bind(grant, taskId);
-    const development = await session.lookupDevelopmentUsage(taskId);
-    if (development.kind !== 'absent') return { kind: 'waiting' as const, reason: '原开发数字登记需要其独立数字清理参与者' };
     const transports = await session.transports();
     if (transports.length > 1) return { kind: 'waiting' as const, reason: '原业务执行通道尚未唯一确定' };
     let after: string | null = null, complete = true;

@@ -1,19 +1,21 @@
-import type { RunnerUsageSourceIdentity } from '@crewstation/contracts';
 import { randomBytes } from 'node:crypto';
 import type { AgentEvent, RunnerCommand, StartAgentCommand, TaskId } from '@crewstation/contracts';
 import { BusinessExecutionEventSchema, BusinessExecutionInfoSchema, StoredBusinessExecutionSchema, businessAgentDigestInput } from '@crewstation/contracts';
 import { isPlatformError, newResourceId } from '@crewstation/kernel';
 import type { TestRunner } from '../../ports/platform';
 
-export interface BusinessProbeTurnDeps { usage?:{testId:string;bind(input:RunnerUsageSourceIdentity&{testId:string}):Promise<void>}; runner: TestRunner; taskId: TaskId; budgetMs: number; pollMs: number; heartbeat(): Promise<boolean> }
+export interface BusinessProbeTurnDeps {
+  runner: TestRunner; taskId: TaskId; budgetMs: number; pollMs: number; heartbeat(): Promise<boolean>;
+  /** RFC-034 v2：派发前受理这一轮的执行记录；失败时不派发。 */
+  accept?(agent: StartAgentCommand): Promise<void>;
+}
 export interface BusinessProbeTurn { ok: boolean; sessionId?: string; events: AgentEvent[]; text: string }
 export async function businessProbeTurn(deps: BusinessProbeTurnDeps, agent: StartAgentCommand, expected: string): Promise<BusinessProbeTurn> {
   const info = BusinessExecutionInfoSchema.parse(await deps.runner.sendCommand(deps.taskId, { id: newResourceId(), type: 'businessExecutionInfo' }));
   const digestNonce = randomBytes(32).toString('hex'), executionId = agent.agentId;
   const payloadDigest = new Bun.CryptoHasher('sha256').update(businessAgentDigestInput(agent, digestNonce)).digest('hex');
-  const capabilities=(await deps.runner.connectionStatus(deps.taskId)).capabilities;
-  if(deps.usage)await deps.usage.bind({testId:deps.usage.testId,runtimeTaskId:deps.taskId,executionId,attempt:1,incarnation:info.incarnation,payloadDigest});
-  const command: RunnerCommand = { id: newResourceId(), type: 'startBusinessAgent', executionId, attempt: 1, incarnation: info.incarnation, payloadDigest, digestNonce, agent,...(deps.usage&&capabilities?.usageObservationsV1===1?{usageObservationsV1:1 as const,...(capabilities.nativeUsageTreeV1===1?{nativeUsageTreeV1:1 as const,nativeUsageLineageKey:'profile-test:'+deps.usage.testId}:{})}:{}) };
+  const command: RunnerCommand = { id: newResourceId(), type: 'startBusinessAgent', executionId, attempt: 1, incarnation: info.incarnation, payloadDigest, digestNonce, agent };
+  await deps.accept?.(agent);
   try { await deps.runner.sendCommand(deps.taskId, command); }
   catch (error) {
     if (isPlatformError(error) && error.kind !== 'unavailable') throw error;

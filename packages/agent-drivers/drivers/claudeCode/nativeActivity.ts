@@ -41,7 +41,8 @@ export class ClaudeNativeActivity {
   }
 
   telemetry(event: ClaudeNativeTelemetry): void {
-    if (this.degraded || event.type === 'heartbeat' || !this.sessions.has(event.sessionId)) return;
+    // 用量请求不参与状态判定（RFC-034 v2 由终端计量另行累加）。
+    if (this.degraded || event.type === 'heartbeat' || event.type === 'api-request' || !this.sessions.has(event.sessionId)) return;
     const id = `${event.traceId}:${event.spanId}`;
     let trace = this.traces.get(id);
     if (!trace) {

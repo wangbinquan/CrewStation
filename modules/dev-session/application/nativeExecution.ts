@@ -6,8 +6,8 @@ import type { NativeTerminalRepository, NativeTerminalStart } from '../ports/nat
 import type { EnvironmentView } from '../ports/runtime';
 import type { DevSessionUseCaseDeps } from './dependencies';
 import { restoreDevelopmentImage } from './runtimeImageSelection';
-import type { CliObservationParticipant } from '../ports/cliObservation';
 import { profileLaunchFields } from './profileLaunch';
+import { acceptDevelopmentCall, failDevelopmentCall } from './agentCalls';
 
 export const nativeEnded = (record: Pick<NativeTerminalRecord, 'lifecycle'>) => record.lifecycle === 'ended' || record.lifecycle === 'failed';
 const rejected = (error: unknown) => isPlatformError(error) && ['precondition', 'validation', 'quota_exceeded', 'not_found', 'conflict'].includes(error.kind);
@@ -22,7 +22,7 @@ async function unlessSlow<T>(promise: Promise<T>, ms: number): Promise<T | typeo
 
 /** 独立执行只派发已经持久受理的身份；重试沿用同一 Runner 与 CLI，结束后绝不重启。 */
 export class NativeExecutionLifecycle {
-  constructor(private readonly deps: DevSessionUseCaseDeps, private readonly repo: NativeTerminalRepository, private readonly observation?:CliObservationParticipant, private readonly collectActivity?:(start:NativeTerminalStart,drain?:boolean)=>Promise<boolean>) {}
+  constructor(private readonly deps: DevSessionUseCaseDeps, private readonly repo: NativeTerminalRepository) {}
   private readonly active = new Map<TaskId, Promise<void>>();
   private after: string | undefined;
   private sweeping = false;
@@ -35,9 +35,8 @@ export class NativeExecutionLifecycle {
   }
   private async admit(start: NativeTerminalStart): Promise<EnvironmentView | undefined> {
     try {
-      await this.observation?.prepare(start);
       await restoreDevelopmentImage(this.deps, start.execution!.runtimeImage, start.taskId, start.execution!.previousTaskId, start.execution!.taskId);
-      return await this.deps.environments.createNativeExecution({ id: start.execution!.taskId, parentTaskId: start.taskId, purpose: 'cli', ...(start.execution!.observationIntent?{developmentUsageStorage:{version:1 as const},developmentUsageProtection:{version:1 as const}}:{}), createdBy: start.createdBy, agentId: start.record.agentId,
+      return await this.deps.environments.createNativeExecution({ id: start.execution!.taskId, parentTaskId: start.taskId, purpose: 'cli', createdBy: start.createdBy, agentId: start.record.agentId,
         terminalId: start.record.terminalId, runnerId: start.record.runnerId, fingerprint: start.fingerprint, ...(start.execution!.taskProfile ? { profile: start.execution!.taskProfile } : {}),
         ...(start.execution!.runtimeImage ? { runtimeImage: start.execution!.runtimeImage } : {}),
         ...(start.execution!.image ? { image: start.execution!.image } : {}), ...(start.profile ? { computeProfile: { profileId: start.profile.profileId, revision: start.profile.revision } } : {}) });
@@ -124,10 +123,11 @@ export class NativeExecutionLifecycle {
     if (logTail) await this.repo.saveStartup(start.taskId, start.record.agentId, { ...startup, stages: startup.stages.map((stage) => (stage === failed ? { ...stage, logTail } : stage)) });
   }
   private async startCommand(start: NativeTerminalStart, env: EnvironmentView) {
-    if(start.execution?.observationIntent && this.observation && await this.observation.dispatch(start))return;
     const credential = await this.deps.credentials.issueDevSessionToken({ taskId: start.taskId, projectId: env.projectId, serviceId: env.serviceId as ServiceId, userId: start.createdBy });
     // 受理时固定的档位修订：后台重试与迟到派发都用它，不重新解析“当前最新”（RFC-006）。
     const profile = await profileLaunchFields(this.deps, start.profile, start.record.agentId);
+    await acceptDevelopmentCall(this.deps, { kind: 'cli', sessionId: start.taskId, runtimeTaskId: env.id, agentId: start.record.agentId,
+      profile: { id: profile.compute, revision: profile.profileRevision, name: start.record.computeName ?? null }, protocol: profile.launch.protocol });
     let record = RunnerResultPayloads.startAgentTerminal.parse(await this.deps.runner.sendCommand(env.id, {
       id: newId('cmd'), type: 'startAgentTerminal', agentId: start.record.agentId, terminalId: start.record.terminalId, runnerId: start.record.runnerId,
       // 一律完全权限（D59），升级前受理、记录里还是别的档的也一样。
@@ -140,8 +140,6 @@ export class NativeExecutionLifecycle {
     await this.deps.environments.touch(start.taskId);
   }
   private async cleanup(start: NativeTerminalStart, env?: EnvironmentView) {
-    if(start.execution?.observationIntent && this.observation && !await this.observation.end(start))return;
-    if(this.collectActivity){try{if(!await this.collectActivity(start,true))return;}catch{if(start.execution?.observationIntent)return;this.deps.logger.warn('legacy CLI activity source unavailable before cleanup',{executionTaskId:start.execution!.taskId});}}
     if (!start.execution!.screen) {
       if (env?.connected && !['cleaning', 'finished'].includes(env.native?.state ?? '')) {
         try {
@@ -176,7 +174,6 @@ export class NativeExecutionLifecycle {
     start = (await this.repo.findExecution(executionId))!;
     if (nativeEnded(start.record)) { await this.cleanup(start, env); return; }
     if (!env) return;
-    await this.collectActivity?.(start).catch(()=>false);
     const observed = await this.read(start);
     start = (await this.repo.findExecution(executionId))!;
     if (nativeEnded(start.record)) { await this.cleanup(start, env); return; }
@@ -191,8 +188,8 @@ export class NativeExecutionLifecycle {
     } else if (observed.connection === 'connected' && env.state === 'running' && start.record.lifecycle === 'starting') {
       try { await this.startCommand(start, env); }
       catch (error) {
-        if (isPlatformError(error) && ['pty_unavailable', 'terminal_limit', 'terminal_exists', 'native_request_conflict'].includes(String(error.details.code))) await this.finishRecord(start, 'start-failed', error.message);
-        else throw error;
+        if (!isPlatformError(error) || !['pty_unavailable', 'terminal_limit', 'terminal_exists', 'native_request_conflict'].includes(String(error.details.code))) throw error;
+        await this.finishRecord(start, 'start-failed', error.message); await failDevelopmentCall(this.deps, env.id, start.record.agentId);
       }
     }
   }

@@ -19,7 +19,6 @@ import { applyVolume, applyWorkload } from './workloadApply';
 import { applyArchive } from './archiveApply';
 import type { ArchiveOwners } from '../ports/ledger';
 import { reconcileWorkloadSafety } from './workloadSafety';
-import { replayDevelopmentAdmissionReceipts } from './development/admissionReceipts';
 import { reconcileTaskVolume } from './storage/taskVolume';
 
 /** 删的顺序（设计 §6.2）：先工作负载（Deployment、Job、Pod），再 Secret、Service、路由与它引用的中间件；PVC 只随工作卷记录删。 */
@@ -91,7 +90,7 @@ async function observeRecord(deps: ReconcileDeps, record: LedgerRecordView): Pro
  * 所以观测缓存里这个名字的实例都要删；删除带着缓存里那个实例的 UID，读缓存与删之间被换成新实例时 API Server 拒绝，下一轮再判断。
  * 删除中的不重复删；系统命名空间里不带任务标签的平台组件一律不碰。请求发出即可，对象消失由观测写回，删完记录进入「已结束」。
  */
-async function removeChildren(deps: ReconcileDeps, record: LedgerRecordView, enqueue: Enqueue, kinds: readonly ObservedKind[] = REMOVAL_ORDER): Promise<void> {
+async function removeChildren(deps: ReconcileDeps, record: LedgerRecordView, kinds: readonly ObservedKind[] = REMOVAL_ORDER): Promise<void> {
   const targets = targetsOf(record);
   for (const kind of kinds) {
     if (kind === 'PersistentVolumeClaim' && (record.kind !== 'volume' || record.spec['taskStorage'])) continue;
@@ -102,12 +101,7 @@ async function removeChildren(deps: ReconcileDeps, record: LedgerRecordView, enq
       // 旧调和快照可能先于预览认领移交；只删除此刻仍由本记录拥有的对象。
       if (await deps.ledger.claimOf(child) !== record.id) continue;
       if (cached.metadata.namespace === deps.systemNamespace && !cached.metadata.labels?.['crewstation.io/task'] && !cached.metadata.labels?.[RESOURCE_ID_LABEL]) continue;
-      const removed = await deps.cluster.remove({ kind, ...(cached.metadata.namespace ? { namespace: cached.metadata.namespace } : {}), name: cached.metadata.name, uid });
-      if (removed?.kind === 'waiting') {
-        deps.logger.info('resource child removal waiting', { resourceId: record.id, kind, namespace: cached.metadata.namespace, name: cached.metadata.name, reason: removed.reason });
-        enqueue(record.id, deps.retryMs ?? WAIT_MS);
-        continue;
-      }
+      await deps.cluster.remove({ kind, ...(cached.metadata.namespace ? { namespace: cached.metadata.namespace } : {}), name: cached.metadata.name, uid });
       deps.stats.removed += 1;
       deps.logger.info('resource child removed', { resourceId: record.id, kind, namespace: cached.metadata.namespace, name: cached.metadata.name, reason: record.releaseReason?.code });
     }
@@ -284,11 +278,10 @@ const APPLIERS: Readonly<Record<string, (deps: ReconcileDeps, record: LedgerReco
  * 重新排进队列（工作卷的「待回收」要在这之后判定）。只在观测缓存同步完成后调用。
  */
 export async function reconcileRecord(deps: ReconcileDeps, id: string, enqueue: Enqueue): Promise<void> {
-  await replayDevelopmentAdmissionReceipts(deps, id);
   const record = await deps.ledger.get(id);
   if (!record) return;
   await reconcileWorkloadSafety(deps, record, enqueue);
-  if (record.spec['workloadConsumerId'] && record.conditions.some((c) => c.type === 'Failed' && c.status === 'true')) await removeChildren(deps, record, enqueue, ['Pod']);
+  if (record.spec['workloadConsumerId'] && record.conditions.some((c) => c.type === 'Failed' && c.status === 'true')) await removeChildren(deps, record, ['Pod']);
   await observeRecord(deps, record);
   await observeControlledPods(deps, record, enqueue);
   // 槽变了（上线、下线、部署就绪）：指向它的路由重新核对该指槽还是指说明页（D13）。
@@ -296,7 +289,7 @@ export async function reconcileRecord(deps: ReconcileDeps, id: string, enqueue: 
   // 暂停保留记录和卷，但本次及旧启动凭据必须清掉，否则台账一直计作 stopping 并占额度。
   if (record.kind === 'business-workspace' && record.desired === 'present' && record.conditions.some((entry) => entry.type === 'Paused' && entry.status === 'true')) {
     const current = await deps.ledger.get(id);
-    if (current?.generation === record.generation && current.conditions.some((entry) => entry.type === 'Paused' && entry.status === 'true')) await removeChildren(deps, record, enqueue, ['Secret']);
+    if (current?.generation === record.generation && current.conditions.some((entry) => entry.type === 'Paused' && entry.status === 'true')) await removeChildren(deps, record, ['Secret']);
   }
   if (record.desired === 'present') {
     const apply = async () => {
@@ -312,7 +305,7 @@ export async function reconcileRecord(deps: ReconcileDeps, id: string, enqueue: 
   if (record.desired === 'absent') {
     if (record.kind === 'namespace') await retireNamespace(deps, record);
     if (record.kind === 'route') await arbitrateRoute(deps, record, enqueue);
-    await removeChildren(deps, record, enqueue);
+    await removeChildren(deps, record);
   }
   await settleVolume(deps, record);
   if (record.kind !== 'volume' && record.desired === 'absent' && record.phase === 'stopped') {

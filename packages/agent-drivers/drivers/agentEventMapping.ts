@@ -2,7 +2,7 @@
 // 源把归一事件直接落进自己的 execution_events 表，CrewStation 则要满足
 // `packages/contracts/taskrunner/agentEvents.ts` 的 11 种事件类型。
 
-import type { AgentEvent, AgentEventType } from '@crewstation/contracts';
+import type { AgentEvent, AgentEventType, AgentUsageSnapshot } from '@crewstation/contracts';
 import type { NormalizedEvent, NormalizedEventKind } from '../contract/normalizedEvent';
 
 export type AgentEventFields = Partial<Omit<AgentEvent, 'agentId' | 'seq' | 'at' | 'type'>>;
@@ -45,25 +45,13 @@ export function toAgentEvent(
   return emit(type, fields, event.timestamp);
 }
 
-/** 累加 token 用量，最终进 completed 事件的 `result.usage`。 */
-export interface TokenUsage {
-  input: number;
-  output: number;
-  cacheCreate: number;
-  cacheRead: number;
-  total: number;
-}
-
-export function emptyTokenUsage(): TokenUsage {
-  return { input: 0, output: 0, cacheCreate: 0, cacheRead: 0, total: 0 };
-}
-
-export function accumulateTokens(usage: TokenUsage, event: NormalizedEvent): void {
-  const delta = event.tokens;
-  if (delta === undefined) return;
-  usage.input += delta.input;
-  usage.output += delta.output;
-  usage.cacheCreate += delta.cacheCreate;
-  usage.cacheRead += delta.cacheRead;
-  usage.total = usage.input + usage.output + usage.cacheCreate + usage.cacheRead;
+/**
+ * 终态事件 `result.usage` 的四个合计（与 RFC-034 v2 快照同源）：各模型相加，`total` 为四桶之和。
+ * 快照为空（运行时尚未报告）时不给出，未知不写成 0。
+ */
+export function resultUsageOf(snapshot: AgentUsageSnapshot): Record<string, number> | undefined {
+  if (snapshot.models.length === 0) return undefined;
+  const sum = (key: 'input' | 'output' | 'cacheRead' | 'cacheWrite') => snapshot.models.reduce((total, row) => total + row[key], 0);
+  const usage = { input: sum('input'), output: sum('output'), cacheCreate: sum('cacheWrite'), cacheRead: sum('cacheRead') };
+  return { ...usage, total: usage.input + usage.output + usage.cacheCreate + usage.cacheRead };
 }

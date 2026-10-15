@@ -22,7 +22,7 @@ export async function registeredRuntimeContent(db: Executor) {
       WHERE table_schema='task_runtime' AND table_name=${entry.table} ORDER BY column_name`);
     if (jsonHash(columns.map((row) => row.column_name)) !== jsonHash(entry.columns)) throw precondition('运行环境内容或最小共享事实列存在未登记变化');
   }
-  const aliases = await db.execute(sql`SELECT 1 FROM task_runtime.resource_identity_aliases WHERE kind IN('task','rebuild','parent-ending','project','service','agent','runner','terminal')
+  const aliases = await db.execute(sql`SELECT 1 FROM task_runtime.resource_identity_aliases WHERE kind IN('task','rebuild','project','service','agent','runner','terminal')
     AND jsonb_array_length(key::jsonb)=1 AND key::jsonb->>0 ~ '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
     AND id IS DISTINCT FROM key::jsonb->>0 LIMIT 1`);
   if (aliases.length) throw precondition('运行环境当前原标识目录冲突');

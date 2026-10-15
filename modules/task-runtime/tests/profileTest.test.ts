@@ -8,6 +8,7 @@ import { queueMigrations } from '@crewstation/queue';
 import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import type { ProfileTestRunInput, ProfileTestRunProgress } from '../api/moduleApi';
+import type { ProfileTestCall } from '../ports/agentCalls';
 import { PROFILE_TEST_PROJECT_ID } from '../domain/profileTestEnvironment';
 import type { TaskRuntimeModule } from '../wiring';
 import { createTaskRuntimeModule, taskRuntimeMigrations } from '../wiring';
@@ -17,6 +18,8 @@ let tdb: TestDatabase;
 let k8s: FakeK8sClient;
 let runtime: TaskRuntimeModule;
 const commands: RunnerCommand[] = [];
+/** RFC-034 v2 §4：每次模型执行在派发前受理一条平台执行记录；记下受理时已发出的启动命令数。 */
+const accepted: Array<{ call: ProfileTestCall; startsBefore: number }> = [];
 const events = new Map<string, Array<{ seq: number; at: string; event: RunnerEvent }>>();
 const emit = (taskId: string, event: RunnerEvent) => { const list = events.get(taskId) ?? []; list.push({ seq: list.length + 1, at: new Date().toISOString(), event }); events.set(taskId, list); };
 const capabilities: Record<string, unknown> = { protocols: ['claude-code', 'opencode', 'terminal'], pty: true, preview: false, interpreters: [{ language: 'shell', command: '/bin/bash', version: '5.2' }] };
@@ -73,6 +76,7 @@ beforeAll(async () => {
     services: { resolveServiceById: async () => undefined },
     sources: { configEnv: async () => { throw new Error('测试任务不得读取项目配置'); }, dataEnv: async () => { throw new Error('测试任务不得读取项目数据'); }, taskDataEnv: async () => ({}) },
     isAdmin: async () => true,
+    profileTestCalls: { accept: async (call) => { accepted.push({ call, startsBefore: commands.filter((c) => c.type === 'startAgent').length }); } },
     testRunner: {
       sendCommand: async (taskId, command) => {
         commands.push(command);
@@ -122,6 +126,9 @@ describe.skipIf(!available)('档位测试执行器（RFC-006 §6）', () => {
     const start = commands.find((c) => c.type === 'startAgent') as Extract<RunnerCommand, { type: 'startAgent' }>;
     expect(start).toMatchObject({ compute: '01a0bf5d-8f4b-73a2-878b-c4235f8d1a92', profileRevision: 2, launch: { protocol: 'opencode', binaryPath: '/usr/local/bin/opencode' }, beforeStart: { captureOutput: true, secrets: { KEY: 'sk-test' } }, mode: 'oneshot', permission: 'full', processAttemptId: '01a0bf5d-8f4b-7435-8062-f84a0a1cba7b:1' });
     expect((commands.find((c) => c.type === 'exec') as Extract<RunnerCommand, { type: 'exec' }>).command).toEqual(['/usr/local/bin/opencode', '--version']);
+    expect(accepted).toEqual([{ startsBefore: 0, call: { testId: '01a0bf5d-8f4b-7435-8062-f84a0a1cba7b', runtimeTaskId: taskId, agentId: start.agentId, step: 'protocol',
+      profile: { id: '01a0bf5d-8f4b-73a2-878b-c4235f8d1a92', revision: 2 }, protocol: 'opencode' } }]);
+    accepted.length = 0;
     expect(await runtime.api.getEnvironment(taskId)).toMatchObject({ kind: 'profile-test', state: 'released', projectId: PROFILE_TEST_PROJECT_ID, message: 'released: profile-test' });
     // 测试任务的流只对管理员开放。
     expect(await runtime.api.canOpenStream({ userId: 'usr_' + '1'.repeat(32) as UserId, isAdmin: false }, taskId)).toBe(false);

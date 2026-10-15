@@ -1,4 +1,3 @@
-import { persistDevelopmentReply, prepareDevelopmentCommand } from './developmentCommandReceipt';
 import type { RunnerCommand, RunnerHello, TaskId } from '@crewstation/contracts';
 import { jsonHash, PlatformError } from '@crewstation/kernel';
 import type { SessionUseCaseDeps } from './dependencies';
@@ -12,12 +11,10 @@ import { persistBusinessReply, prepareBusinessCommand } from './businessCommandR
 const PREVIEW_CONTROL_COMMANDS: ReadonlySet<RunnerCommand['type']> = new Set(['startPreview', 'stopPreview', 'previewLogs']);
 
 /** 命令派发：本副本持有连接就直接发，否则按注册表转发到持有副本；无人持有即 TaskRunner 离线。 */
-export function commandDispatch(deps: Pick<SessionUseCaseDeps, 'registry' | 'forwarder' | 'settings' | 'clock' | 'businessExecutions' | 'developmentUsage' | 'connectionHistory' | 'projectWork'>, hub: Pick<RunnerHub, 'connections'>) {
+export function commandDispatch(deps: Pick<SessionUseCaseDeps, 'registry' | 'forwarder' | 'settings' | 'clock' | 'businessExecutions' | 'connectionHistory' | 'projectWork'>, hub: Pick<RunnerHub, 'connections'>) {
   const sendLocal = (taskId: TaskId, command: RunnerCommand): Promise<unknown> | undefined => {
     const connection = hub.connections.get(taskId);
     if (!connection) return undefined;
-    if (command.type === 'startAgent' && !command.developmentUsage && connection.hello.capabilities.developmentStartAgentFenceV1 === 1)
-      throw new PlatformError('precondition', '当前执行选择开发数字布局，普通 Agent 启动必须携带原数字受理', { code: 'development_usage_required' });
     // 在写入旧 Runner 的 socket 前协商，未知命令不得干扰正在运行的 CLI。
     if (command.type === 'invokeApi' && connection.hello.capabilities.apiInvocations !== 1) throw new PlatformError('precondition', '当前开发容器不支持 API 试调；请保存工作并在容器更新后重新开启会话', { code: 'api_invocations_unavailable' });
     // RFC-016：旧镜像的 Runner 不懂这三条；previewStatus 与 restartPreview 不在此列，存量会话照常可用。
@@ -29,12 +26,10 @@ export function commandDispatch(deps: Pick<SessionUseCaseDeps, 'registry' | 'for
       if (!handle && deps.connectionHistory) await deps.connectionHistory.check(taskId);
       // 普通命令保持同步入 pending 的旧行为；可靠命令先提交持久接收意图。
       if ((command.type === 'startBusinessCommand' || command.type === 'startBusinessAgent') || command.type === 'ackBusinessExecutionEvents' || command.type === 'cancelBusinessExecution') await prepareBusinessCommand(deps.businessExecutions, taskId, command);
-      if (command.type === 'stopDevelopmentAgent' || (command.type === 'startAgent' && command.developmentUsage) || command.type === 'ackDevelopmentUsageEvents') await prepareDevelopmentCommand(deps.developmentUsage, taskId, command);
       if (handle) await handle.check();
       const payload = await sendRunnerWire(connection, command, deps.clock, () => hub.connections.get(taskId) === connection);
       if (handle) await handle.check();
       await persistBusinessReply(deps.businessExecutions, taskId, command, payload);
-      await persistDevelopmentReply(deps.developmentUsage, taskId, command, payload);
       return payload;
     };
     return deps.projectWork

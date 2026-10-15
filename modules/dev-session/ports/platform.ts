@@ -50,8 +50,6 @@ export interface ComputeLaunch extends ComputeLaunchMetadata {
 export interface ComputeCatalog {
   resolve(selector: ComputeProfileSelector | undefined, usage: ComputeUsage, projectId: ProjectId): Promise<ResolvedCompute>;
   launchMaterial(ref: ProfileRevisionRef): Promise<ComputeLaunch>;
-  /** Optional for legacy implementations; a future numeric admission requires it without material fallback. */
-  launchMetadata?(ref: ProfileRevisionRef): Promise<ComputeLaunchMetadata>;
 }
 
 /** 由 release 模块提供。 */
@@ -78,10 +76,6 @@ export interface Notifier {
 }
 
 export interface DevSessionSettings {
-  /** New supported OpenCode executions collect automatically; accepted starts retain their original mode. */
-  readonly developmentNativeObservationEnabled?: boolean;
-  /** Explicit new-execution validation selection; never a statistics population limit. */
-  readonly developmentNativeObservationAdmissions?: readonly { projectId: string; profileId: string; profileRevision: number }[];
   readonly idleMinutes: number;
   readonly userDomain: string;
   /** 注入 Agent 的平台 MCP 连接（能力说明、操作）。 */

@@ -1,5 +1,4 @@
-import type { DevelopmentNativeProducer } from '@crewstation/agent-drivers';
-import type { DevelopmentRunnerUsageCapture, BusinessMaterialRequest } from '@crewstation/contracts';
+import type { BusinessMaterialRequest } from '@crewstation/contracts';
 import type { AgentEvent, AgentEventType, AgentPermission, KnownAgentProtocol, LaunchSpec, McpConnection } from '@crewstation/contracts';
 import type { ManagedRuntimeContext } from '@crewstation/agent-drivers';
 import type { Logger } from '@crewstation/kernel';
@@ -8,13 +7,8 @@ import type { ProcessLauncher } from '../process/launcher';
 /** 一次 startAgent 命令剥掉协议外壳后的启动规格。 */
 export interface AgentSpec {
   businessSkills?: BusinessMaterialRequest['skills'];
-  /** RFC-027: opt-in usage frames; legacy Agent event ordering is unchanged. */
+  /** RFC-027：业务执行（事件缓冲有上限、usage 事件携带业务用量）。 */
   businessEvents?: boolean;
-  usageObservationsV1?: 1;
-  nativeUsageTreeV1?: 1;
-  developmentNativeSourceV1?: 1;
-  developmentNativePagesV2?: 2;
-  nativeUsageLineageKey?: string;
   agentId: string;
   /** 算力档位名（RFC-001）：平台透传，运行时不解释，只在 started 事件里回显。 */
   compute: string;
@@ -32,9 +26,6 @@ export interface AgentSpec {
 
 /** 由 TaskRunner 提供给驱动的宿主能力：已解析的 cwd、含凭据的完整环境（绝不记录）、降权拉起器与托管上下文。 */
 export interface AgentLaunchContext {
-  /** Direct durable numeric sink; ordinary text and business event mapping remain separate. */
-  usageSink?: (capture: DevelopmentRunnerUsageCapture, occurredAt: string) => void;
-  developmentNativeProducer?: DevelopmentNativeProducer;
   cwd: string;
   env: Record<string, string>;
   launcher: ProcessLauncher;
@@ -55,13 +46,11 @@ export interface AgentProcess {
 /** 驱动接口：把一种已知协议的 CLI 包装为 AgentProcess；二进制来自每次启动的 `launch.binaryPath`（RFC-006 C5）。 */
 export interface AgentDriver {
   readonly protocol: KnownAgentProtocol;
-  readonly developmentNativePagesV2?: 2;
   start(spec: AgentSpec, context: AgentLaunchContext): AgentProcess;
 }
 
 /** 按档位协议取驱动（RFC-006：取代按驱动名注册的表）；测试经同一接缝注入替身。 */
 export interface AgentDriverFactory {
-  readonly developmentNativePagesV2?: 2;
   forProtocol(protocol: KnownAgentProtocol): AgentDriver;
 }
 

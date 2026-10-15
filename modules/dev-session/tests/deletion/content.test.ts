@@ -36,12 +36,12 @@ describe.skipIf(!available)('development content inventory (actual read-only PG;
         VALUES(${f.otherWorkspace},${newResourceId()},1,'{"private":"other-project-layout"}')`);
       const before = await f.database.db.execute('SELECT task_id,user_id,layout FROM dev_session.workspace_layouts ORDER BY task_id,user_id');
       const inspected = await f.inspect();
-      expect(DEVELOPMENT_CONTENT).toHaveLength(15); expect(inspected.inventory.complete).toBe(true); expect(inspected.inventory.resources).toHaveLength(13);
+      expect(DEVELOPMENT_CONTENT).toHaveLength(12); expect(inspected.inventory.complete).toBe(true); expect(inspected.inventory.resources).toHaveLength(11);
       expect(inspected.traversal.counts.workspace_layouts).toBe(207);
       expect(inspected.inventory.resources.find((row) => row.id === 'workspace_layouts')?.count).toBe(206);
-      expect(inspected.contents).toHaveLength(218); expect(inspected.contents.some((row) => row.key.includes(f.otherWorkspace))).toBe(false);
+      expect(inspected.contents).toHaveLength(216); expect(inspected.contents.some((row) => row.key.includes(f.otherWorkspace))).toBe(false);
       expect(inspected.origins.find((row) => row.key === seeded.reserved)).toMatchObject({ kind: 'task', projectId: f.project });
-      for (const privateText of ['prompt', 'terminal-private', 'historical-layout', 'private-comparison', 'activity-private', 'usage-private', 'other-project-layout'])
+      for (const privateText of ['prompt', 'terminal-private', 'historical-layout', 'private-comparison', 'activity-private', 'other-project-layout'])
         expect(JSON.stringify(inspected)).not.toContain(privateText);
       expect(f.requests.filter((value) => value === 'task:' + f.workspace + ':current')).toHaveLength(1);
       expect(await f.database.db.execute('SELECT task_id,user_id,layout FROM dev_session.workspace_layouts ORDER BY task_id,user_id')).toEqual(before);
@@ -90,15 +90,13 @@ describe.skipIf(!available)('development content inventory (actual read-only PG;
     } finally { await f.database.drop(); }
   });
 
-  test('native activity, accepted executions and usage receipts cannot borrow another parent or original identity', async () => {
+  test('native activity and accepted executions cannot borrow another parent or original identity', async () => {
     const f = await developmentContentFixture();
     try {
-      const seeded = await seedDevelopmentContent(f), foreign = await f.native(f.otherWorkspace);
+      await seedDevelopmentContent(f);
+      const foreign = await f.native(f.otherWorkspace);
       await expect(f.database.db.execute(sql`UPDATE dev_session.native_activity_reads SET agent_id=${foreign.agentId} WHERE task_id=${f.workspace}`).then(() => undefined)).rejects.toThrow();
       await expect(f.database.db.execute(sql`UPDATE dev_session.native_activity_sources SET source_task_id=${foreign.id} WHERE task_id=${f.workspace}`).then(() => undefined)).rejects.toThrow();
-      await f.database.db.execute(sql`UPDATE dev_session.development_agent_usage SET prepared=jsonb_set(prepared,'{intent,identity,executionId}',to_jsonb(${foreign.id}::text))`);
-      await expect(f.inspect()).rejects.toThrow('原内容关系');
-      await f.database.db.execute(sql`UPDATE dev_session.development_agent_usage SET prepared=jsonb_set(prepared,'{intent,identity,executionId}',to_jsonb(${seeded.headless.id}::text))`);
       await f.database.db.execute(sql`UPDATE dev_session.agent_starts SET execution=jsonb_set(execution,'{taskId}',to_jsonb(${foreign.id}::text))`);
       await expect(f.inspect()).rejects.toThrow('原内容关系');
     } finally { await f.database.drop(); }

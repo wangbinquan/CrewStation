@@ -1,5 +1,4 @@
 import { jsonHash } from '@crewstation/kernel';
-import { hasDevelopmentParentEnding } from '../../domain/development/parentEnding';
 import { completeStage, failStartup } from '../../domain/podStartup';
 import type { TaskEnvironment } from '../../domain/taskEnvironment';
 import { transition } from '../../domain/taskEnvironment';
@@ -22,7 +21,7 @@ async function applyResult(deps: TaskRuntimeUseCaseDeps, original: TaskEnvironme
       const view = await scope.environments.getMaintenanceView?.(original.id);
       if (view?.status !== 'present') return;
       const current = view.environment;
-      if (identity(current) !== identity(original) || current.kind === 'dev-session' && hasDevelopmentParentEnding(current)) return;
+      if (identity(current) !== identity(original)) return;
       const at = deps.clock.now();
       if (result.kind === 'ack') {
         if (!['creating', 'running'].includes(current.state) || current.podUid !== original.podUid && current.podUid !== result.uid) return;

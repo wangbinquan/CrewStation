@@ -2,7 +2,7 @@
 import type { TaskId, TaskKind, TaskProfileDto } from '@crewstation/contracts';
 import { ProjectIdSchema, ServiceIdSchema } from '@crewstation/contracts';
 import { eventbusMigrations } from '@crewstation/eventbus';
-import { newId, noopLogger } from '@crewstation/kernel';
+import { noopLogger } from '@crewstation/kernel';
 import { createFakeK8sClient, Resources } from '@crewstation/k8s';
 import { createResourcesModule, resourcesMigrations } from '@crewstation/module-resources';
 import { queueMigrations } from '@crewstation/queue';
@@ -77,13 +77,6 @@ export async function initialPodResultFixture() {
     }
     return load(env.id);
   };
-  const seal = async (env: TaskEnvironment) => {
-    const child = await runtime.api.createNativeExecution({ id: newId('tsk') as TaskId, parentTaskId: env.id, purpose: 'agent',
-      agentId: newId('agt'), runnerId: crypto.randomUUID(), fingerprint: 'a'.repeat(64), image: 'task@sha256:' + 'a'.repeat(64),
-      computeProfile: { profileId: profile.id, revision: 3 }, developmentUsageStorage: { version: 1 }, developmentUsageProtection: { version: 1 } });
-    await runtime.api.releaseEnvironment(env.id, 'user');
-    return child;
-  };
   const snapshot = async () => ({
     tasks: Array.from(await tdb.db.execute(sql`SELECT row_to_json(e)::text AS value, e.render IS NOT NULL AS render_present, jsonb_typeof(e.render) AS render_kind, e.render::text AS render_raw, e.native IS NOT NULL AS native_present, jsonb_typeof(e.native) AS native_kind, e.native::text AS native_raw FROM task_runtime.environments e ORDER BY id`)),
     jobs: Array.from(await tdb.db.execute(sql`SELECT row_to_json(j)::text AS value FROM platform_infra.jobs j ORDER BY id`)),
@@ -91,7 +84,7 @@ export async function initialPodResultFixture() {
     used: await resources.api.occupancy(projectId), admissions: await uow.read.admissions.running(projectId),
   });
   let closed = false;
-  return { tdb, k8s, projectId, serviceId, profile, resources, uow, deps, runtime, warnings, start, load, connect, seal, snapshot,
+  return { tdb, k8s, projectId, serviceId, profile, resources, uow, deps, runtime, warnings, start, load, connect, snapshot,
     close: async () => { if (closed) return; closed = true; for (const b of barriers) b.release.resolve(); await Promise.all(pending); await tdb.drop(); } };
 }
 export type InitialPodResultFixture = Awaited<ReturnType<typeof initialPodResultFixture>>;

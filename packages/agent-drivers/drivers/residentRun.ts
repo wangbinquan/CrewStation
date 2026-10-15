@@ -7,7 +7,6 @@ import type { AgentEvent, KnownAgentProtocol } from '@crewstation/contracts';
 import { DriverStateError } from '../contract/agentDriver';
 import type { DriverAgentSpec, DriverLaunchContext } from '../contract/agentDriver';
 import type { DriverChildProcessWithStdin } from '../contract/processHost';
-import type { NativeUsageCapture } from './usage/nativeCapture';
 import type { PreparedRuntime } from './cliRuntimeAdapter';
 import { AgentRunBase, failureMessage } from './agentRunBase';
 import { pumpTurn } from './turnPump';
@@ -15,7 +14,6 @@ import { pumpTurn } from './turnPump';
 export class ResidentAgentRun extends AgentRunBase {
   private stream: DriverChildProcessWithStdin | undefined;
   private lifetime: Promise<void>;
-  private nativeCapture: NativeUsageCapture | undefined;
   private turnError: string | null = null;
 
   constructor(spec: DriverAgentSpec, context: DriverLaunchContext, prepared: PreparedRuntime, protocol: KnownAgentProtocol) {
@@ -49,14 +47,10 @@ export class ResidentAgentRun extends AgentRunBase {
       ...(this.spec.resumeSessionId === undefined ? {} : { resumeSessionId: this.spec.resumeSessionId }),
       resident: true,
     });
-    const captureUsage = this.usageObserver?.beginTurn();
-    if (this.spec.nativeUsageTreeV1 === 1) this.nativeCapture = await this.beginNativeCapture(plan.env, this.sessionId ?? this.spec.resumeSessionId, true);
-    if (this.cancelled || this.events.closed) { await this.finishNativeCapture(this.nativeCapture, ['native-process-not-started']); return; }
     let stream: DriverChildProcessWithStdin;
     try {
       stream = this.context.host.spawnWithStdin({ cmd: plan.cmd, cwd: this.context.cwd, env: plan.env });
     } catch (error) {
-      await this.finishNativeCapture(this.nativeCapture, ['native-process-not-started']);
       this.finishFailed('spawn_failed', error instanceof Error ? error.message : String(error), null);
       return;
     }
@@ -65,29 +59,28 @@ export class ResidentAgentRun extends AgentRunBase {
     if (this.spec.initialPrompt !== undefined && this.spec.initialPrompt.length > 0) {
       this.writeFrame(stream, this.spec.initialPrompt);
     }
-    await this.consume(stream, captureUsage);
+    await this.consume(stream);
   }
 
-  private async consume(stream: DriverChildProcessWithStdin, captureUsage: ReturnType<NonNullable<typeof this.usageObserver>['beginTurn']> | undefined): Promise<void> {
+  private async consume(stream: DriverChildProcessWithStdin): Promise<void> {
     let result: Awaited<ReturnType<typeof pumpTurn>>;
     try {
       result = await pumpTurn(stream, {
-      businessEvents: this.spec.businessEvents,
-      captureUsage: captureUsage ? (event, at) => captureUsage?.(event, at) : undefined,
-      host: this.context.host,
-      logger: this.context.logger,
-      usage: this.usage,
-      emit: (type, fields, at) => this.emit(type, fields, at),
-      push: (event: AgentEvent) => this.push(event),
-      parseEvent: (line) => this.prepared.parseEvent(line),
-      onSessionId: (sessionId) => this.claimSession(sessionId),
-      onTurnFinished: (error) => { this.onTurnFinished(error); captureUsage = this.usageObserver?.beginTurn(); },
-    });
+        businessEvents: this.spec.businessEvents,
+        host: this.context.host,
+        logger: this.context.logger,
+        observeUsage: (source) => this.observeUsage(source),
+        emit: (type, fields, at) => this.emit(type, fields, at),
+        push: (event: AgentEvent) => this.push(event),
+        parseEvent: (line) => this.prepared.parseEvent(line),
+        onSessionId: (sessionId) => this.claimSession(sessionId),
+        onTurnFinished: (error) => this.onTurnFinished(error),
+      });
     } finally {
-      this.retryUsageModels();
-      await this.finishNativeCapture(this.nativeCapture);
-      this.stream = undefined;
-      this.child = undefined;
+      try { this.settleTurnUsage(); } finally {
+        this.stream = undefined;
+        this.child = undefined;
+      }
     }
     if (this.cancelled) return;
     if (result.exitCode !== 0) {
@@ -102,10 +95,11 @@ export class ResidentAgentRun extends AgentRunBase {
     this.finishCompleted(result.exitCode);
   }
 
-  /** 每个 `result` 结束一轮：常驻进程不退出，只回到等待下一条消息的状态。 */
+  /** 每个 `result` 结束一轮：常驻进程不退出，本轮用量立即上报后回到等待下一条消息的状态。 */
   private onTurnFinished(error: string | null): void {
     this.turnError = error;
     if (this.events.closed || this.cancelled) return;
+    this.flushUsage();
     this.push(this.emit('status', { status: 'waiting' }));
   }
 }

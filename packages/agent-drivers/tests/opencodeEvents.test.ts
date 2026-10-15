@@ -1,7 +1,7 @@
 // 样本行取自 agent-workflow `runtime/opencode/events.ts` 的形状注释与其 token 探测顺序
 // （缓存计数的 `cache: {read, write}` 形态实测于 opencode 1.15.5+）。
 import { describe, expect, test } from 'bun:test';
-import { computeTokenDelta, extractErrorText, inferEventKind, observeSystemEvent, parseEvent } from '../drivers/opencode/events';
+import { extractErrorText, inferEventKind, observeSystemEvent, parseEvent } from '../drivers/opencode/events';
 import { detectOpencodeSessionNotFound } from '../drivers/opencode/probe';
 import { createAgentEventFactory, toAgentEvent } from '../drivers/agentEventMapping';
 
@@ -43,11 +43,11 @@ describe('OpenCode --format json 解析', () => {
     expect(event?.tool).toEqual({ callId: 'call_1', name: 'bash', input: { command: 'ls' }, output: 'a.ts' });
   });
 
-  test('token 兼容 cache 对象与旧的扁平键', () => {
-    expect(parseEvent(STEP_FINISH)?.tokens).toEqual({ input: 10, output: 5, cacheRead: 2, cacheCreate: 1 });
-    expect(parseEvent(STEP_FINISH_FLAT)?.tokens).toEqual({ input: 7, output: 3, cacheRead: 4, cacheCreate: 6 });
-    expect(computeTokenDelta({ usage: { input_tokens: 1, output_tokens: 2 } })).toEqual({ input: 1, output: 2, cacheRead: 0, cacheCreate: 0 });
-    expect(computeTokenDelta({ type: 'text' })).toBeNull();
+  // RFC-034 v2：用量不在解析层累计，解析后的整行原样交给计量器（drivers/usage/opencodeMeter.ts）。
+  test('解析结果携带同一行的对象供计量器读取，不再自带 token 增量', () => {
+    expect(parseEvent(STEP_FINISH)?.source).toEqual(JSON.parse(STEP_FINISH));
+    expect(parseEvent(STEP_FINISH_FLAT)?.source).toEqual(JSON.parse(STEP_FINISH_FLAT));
+    expect(parseEvent(STEP_FINISH)).not.toHaveProperty('tokens');
   });
 
   test('step_finish 判为成功终止；其余事件不判定', () => {
@@ -87,11 +87,4 @@ describe('OpenCode 会话不存在判定', () => {
     expect(detectOpencodeSessionNotFound('')).toBe(false);
     expect(detectOpencodeSessionNotFound('provider auth failed')).toBe(false);
   });
-});
-
-// RFC-034 real task regression: old token deltas include only native OpenCode reasoning.
-test('native reasoning is included in the legacy token delta without changing generic totals', () => {
-  expect(computeTokenDelta({ tokens: { input: 9013, output: 53, reasoning: 1 } })?.output).toBe(54);
-  expect(computeTokenDelta({ usage: { output_tokens: 54, reasoning: 1 } })?.output).toBe(54);
-  expect(computeTokenDelta({ usage: { output: null, output_tokens: 54, reasoning: 1 } })?.output).toBe(54);
 });

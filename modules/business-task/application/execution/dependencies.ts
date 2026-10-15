@@ -7,7 +7,8 @@ import type { ExecutionLifecycles } from '../../ports/executionLifecycle';
 import type { BusinessRuntimeImages } from '../../ports/runtimeImages';
 import type { ExecutionCancellations } from '../../ports/executionCancellations';
 import type { ExecutionProjection } from '../../ports/executionProjection';
-import type { ExecutionObservationAdmission, ExecutionSubtasks } from '../../ports/executionSubtasks';
+import type { ExecutionSubtasks } from '../../ports/executionSubtasks';
+import type { BusinessCalls } from '../../ports/runtime';
 import type { ExecutionPayloadCipher } from '../../domain/executionSubtask';
 import type { BusinessTaskUseCaseDeps } from '../dependencies';
 import type { ExecutionOperations } from '../../ports/executionOperations';
@@ -21,7 +22,8 @@ export interface BusinessExecutionDeps extends Pick<BusinessTaskUseCaseDeps, 'uo
   projectWork?: BusinessProjectWork;
   taskInputs?: TaskInputPreparation;
   storageStatus?: (serviceId: ServiceId) => Promise<{ available: boolean; reason: string | null }>;
-  executionObservations?: ExecutionObservationAdmission;
+  /** RFC-034 v2：Agent 子任务执行记录；不给则不记录。 */
+  agentCalls?: BusinessCalls;
   recoveryRequests?: TaskRecoveryRequests;
   agentSecrets?: ExecutionAgentSecrets;
   sessions: ExecutionSessions;

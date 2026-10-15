@@ -9,8 +9,8 @@ import type { AdmissionRepository } from '../../ports/repositories';
 import type { RepositoryScope, TaskQuota, UnitOfWork } from '../../ports/unitOfWork';
 import { drizzleAdmissionRepository, drizzleEnvironmentRepository } from './drizzleRepositories';
 import { drizzleRebuildRepository } from './drizzleRebuildRepository';
-import { authorizeTaskJob, drizzleDevelopmentParentEndingScope } from './developmentParentEndingScope';
-import type { ParentEndingCommitCheck } from './developmentParentEndingScope';
+import { authorizeTaskJob } from './jobLease';
+import type { CommitCheck } from './jobLease';
 import { admitEnvironment, findWorkloadRecord, ledgerEnvironmentRepository, syncEnvironmentLedger } from './ledgerProjection';
 import type { EnvironmentLedger } from '../../ports/ledger';
 import type { TaskEnvironment, WorkloadRender } from '../../domain/taskEnvironment';
@@ -44,14 +44,13 @@ function taskQuota(executor: Executor, admissions: AdmissionRepository, projecti
   };
 }
 
-export function scopeOver(executor: Executor, projection?: LedgerProjection, commitChecks?: ParentEndingCommitCheck[]): RepositoryScope {
+export function scopeOver(executor: Executor, projection?: LedgerProjection, commitChecks?: CommitCheck[]): RepositoryScope {
   const environments = drizzleEnvironmentRepository(executor), admissions = drizzleAdmissionRepository(executor);
   const sync = projection ? (env: TaskEnvironment) => syncEnvironmentLedger(executor, projection.ledger, env, projection.logger ?? noopLogger, projection.preview) : undefined;
   return {
     environments: sync ? ledgerEnvironmentRepository(environments, sync) : environments,
     ...(sync && projection ? { ledger: { sync, workload: (env: TaskEnvironment) => findWorkloadRecord(executor, projection.ledger, env) } } : {}),
     admissions,
-    parentEnding: drizzleDevelopmentParentEndingScope(executor, commitChecks),
     nativeLease: { requireCurrent: (identity, taskId) => authorizeTaskJob(executor, commitChecks, identity, NATIVE_EXECUTION_JOB_KIND, { taskId }, 'execution_lease_lost') },
     quota: taskQuota(executor, admissions, projection),
     rebuilds: drizzleRebuildRepository(executor),
@@ -63,11 +62,11 @@ export function scopeOver(executor: Executor, projection?: LedgerProjection, com
 
 export function drizzleUnitOfWork(db: Database, projection?: LedgerProjection): UnitOfWork {
   return { read: scopeOver(db, projection), run: (fn) => db.transaction(async (tx) => {
-    const checks: ParentEndingCommitCheck[] = [], result = await fn(scopeOver(tx, projection, checks));
+    const checks: CommitCheck[] = [], result = await fn(scopeOver(tx, projection, checks));
     if (checks.length > 0) {
       if (projection) {
         const writer = projection.ledger.within(tx);
-        if (!writer.flushDeferredChanges) throw precondition('父结束或恢复台账提交边界尚未装配', { code: 'development_parent_projection_boundary_missing' });
+        if (!writer.flushDeferredChanges) throw precondition('作业租约的台账提交边界尚未装配', { code: 'job_lease_projection_boundary_missing' });
         await writer.flushDeferredChanges();
       }
       // Nothing after these checks may add a Project/Resource lock or any state write.

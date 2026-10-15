@@ -4,16 +4,16 @@ import type { RuntimeProjectWork } from '../../ports/deletion/work';
 import type { RuntimeWorkInput } from '../../domain/deletion/work';
 import { guardedRuntimePort } from './ports';
 
-type Rule = 'readonly' | 'platform' | 'background' | 'nested' | 'task-0' | 'task-1' | 'project-0' | 'project-1' | 'project-input' | 'service-input' | 'service-0' | 'task-input' | 'parent-input' | 'ending' | 'probe-stop';
+type Rule = 'readonly' | 'platform' | 'background' | 'nested' | 'task-0' | 'task-1' | 'project-0' | 'project-1' | 'project-input' | 'service-input' | 'service-0' | 'task-input' | 'parent-input' | 'probe-stop';
 const origins = {
   deletionOwner: 'nested',
-  originalInfrastructureOwnership: 'readonly', originalProjectTaskIds: 'readonly', inspectDevelopmentRemoval: 'readonly', listClusterTasks: 'readonly',
+  originalInfrastructureOwnership: 'readonly', originalProjectTaskIds: 'readonly', listClusterTasks: 'readonly',
   reconcile: 'background', observeStartup: 'background', runProfileTest: 'platform', archiveExecution: 'nested', storageCleanup: 'nested',
-  resourceWorkload: 'readonly', resourceWorkloads: 'readonly', inspectResourceEnding: 'ending',
+  resourceWorkload: 'readonly', resourceWorkloads: 'readonly',
   freezeBusinessStorage: 'task-input', resolveBusinessStorage: 'task-input', stopBusinessStorage: 'task-input', rebuildBusinessWorkspace: 'task-input',
   restartBusinessWorkspace: 'task-input', inspectBusinessRecovery: 'readonly', imageHistory: 'readonly', blockBusinessAdmission: 'service-0',
   imageReferenceState: 'readonly', runRuntimeImageProbe: 'project-input', stopRuntimeImageProbe: 'probe-stop', reconcileRebuild: 'task-0',
-  lookupDevelopmentUsageLayout: 'readonly', inspectDevelopmentCleanupSelection: 'readonly', resolveDevelopmentObjectSource: 'task-input',
+  resolveDevelopmentObjectSource: 'task-input',
   createEnvironment: 'service-input', createNativeExecution: 'parent-input', releaseEnvironment: 'task-0', pauseEnvironment: 'task-0', resumeEnvironment: 'task-0',
   markFailed: 'task-0', touch: 'task-0', onRunnerConnected: 'task-0', onRunnerDisconnected: 'task-0', onRunnerRejected: 'task-0',
   inspectRebuild: 'project-0', requestRebuild: 'project-0', getRebuild: 'readonly', getEnvironment: 'readonly', describeEnvironment: 'readonly',
@@ -28,7 +28,6 @@ function selection(rule: Rule, args: unknown[]): Pick<RuntimeWorkInput, 'originK
   else if (rule === 'project-input') { originKind = 'project'; key = field(args[0], 'projectId'); }
   else if (rule === 'service-input' || rule === 'service-0') { originKind = 'service'; key = rule === 'service-0' ? args[0] : field(args[0], 'serviceId'); }
   else if (rule === 'task-input' || rule === 'parent-input') key = field(args[0], rule === 'parent-input' ? 'parentTaskId' : 'taskId');
-  else if (rule === 'ending') key = String(field(field(args[1], 'owner'), 'ref') ?? '').split('/')[0];
   else key = args[rule === 'task-1' ? 1 : 0];
   if (typeof key !== 'string' || !key) throw precondition('运行请求缺少原项目、服务或任务身份');
   return { originKind, originKey: key };

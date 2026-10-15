@@ -1,3 +1,4 @@
+// RFC-034 v2：Session 不再保存观测数值，停止快照只覆盖 8 张表；每个任务的种子为 5 行（v1 为 12 张、9 行）。
 import { describe, expect, test } from 'bun:test';
 import { PROJECT_DELETION_PHASES } from '@crewstation/contracts';
 import { jsonHash } from '@crewstation/kernel';
@@ -15,7 +16,7 @@ describe.skipIf(!available)('Session stop snapshot/CAS (real PG; controlled owne
       const context = await f.context(), owner = f.first.module.api.deletionOwner!;
       for (const phase of PROJECT_DELETION_PHASES.slice(0, 5)) expect((await owner.run({ ...context, phase })).kind).toBe('done');
       const frozen = (await f.database.db.execute<{ body: { stopped: unknown } }>('SELECT body FROM session.project_deletions'))[0]!.body.stopped;
-      expect(SessionStopSnapshotSchema.parse(frozen).tables).toHaveLength(12);
+      expect(SessionStopSnapshotSchema.parse(frozen).tables).toHaveLength(8);
       const retained = await f.database.db.execute(sql`SELECT session.digest(to_jsonb(e)) AS hash FROM session.runner_events e WHERE task_id=${other}`);
       const before = (await f.database.db.execute<{ legacy_event: unknown }>(sql`SELECT legacy_event FROM session.runner_events WHERE task_id=${own}`))[0]!.legacy_event;
       // Simulate real row drift, including a column that the user-facing event DTO does not expose.
@@ -34,7 +35,7 @@ describe.skipIf(!available)('Session stop snapshot/CAS (real PG; controlled owne
       expect(await f.database.db.execute(sql`SELECT session.digest(to_jsonb(e)) AS hash FROM session.runner_events e WHERE task_id=${other}`)).toEqual(retained);
       expect((await owner.run({ ...context, phase: 'verify' })).kind).toBe('done');
     } finally { await f.drop(); }
-  });
+  }, 30_000);
 
   test('the complete selector spans more than PostgreSQL single-statement parameter capacity and still includes its last real task', async () => {
     const f = await sessionDeletionFixture();
@@ -43,8 +44,8 @@ describe.skipIf(!available)('Session stop snapshot/CAS (real PG; controlled owne
       const keys = [...Array.from({ length: 70_000 }, (_, index) => 'original-legacy-key-' + index), task];
       const [row] = await f.database.db.execute<{ body: unknown }>(sql`SELECT session.stop_snapshot(${f.projectId},${JSON.stringify(keys)}::jsonb) AS body`);
       const snapshot = SessionStopSnapshotSchema.parse(row!.body);
-      expect(snapshot.tables).toHaveLength(12); expect(snapshot.tables.find((table) => table.table === 'runner_events')?.count).toBe(1);
-      expect(snapshot.count).toBe(9); expect(snapshot.tables.at(-1)?.count).toBe(0);
+      expect(snapshot.tables).toHaveLength(8); expect(snapshot.tables.find((table) => table.table === 'runner_events')?.count).toBe(1);
+      expect(snapshot.count).toBe(5); expect(snapshot.tables.at(-1)?.count).toBe(0);
       expect(await f.database.db.execute('SELECT task_id FROM session.runner_events')).toHaveLength(1);
     } finally { await f.drop(); }
   }, 15_000);

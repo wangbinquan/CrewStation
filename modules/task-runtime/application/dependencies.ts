@@ -1,27 +1,21 @@
-import type { DevelopmentCleanupParticipant } from '../ports/developmentCleanup';
 import type { TaskRecoveryCluster } from '../ports/recoveryCluster';
 import type { RuntimeImageExecutionSnapshot, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
 import type { Clock, Logger } from '@crewstation/kernel';
 import type { TaskCluster } from '../ports/cluster';
 import type { EnvironmentSources, ProfileCatalog, ProjectAuthorizer, QuotaSource, ServiceResolver, SourceCheckoutSource, TaskRuntimeSettings, TestRunner } from '../ports/platform';
 import type { UnitOfWork } from '../ports/unitOfWork';
-import type { DevelopmentParentPhysical } from '../ports/developmentParentPhysical';
 import type { WorkloadSafetyPort, TaskVolumePort } from '../ports/workloadSafety';
 import type { UnprovisionedStorage } from '../ports/unprovisionedStorage';
 import type { RuntimeProjectWork } from '../ports/deletion/work';
 
 export interface TaskRuntimeUseCaseDeps {
   projectWork?: RuntimeProjectWork;
-  developmentParentPhysical?: DevelopmentParentPhysical;
-  developmentCleanup?: DevelopmentCleanupParticipant;
   unprovisionedStorage?: UnprovisionedStorage;
   workloadSafety?: WorkloadSafetyPort;
   taskVolumes?: TaskVolumePort;
   uow: UnitOfWork;
   cluster: TaskCluster;
   businessStorageInspector?: Pick<TaskRecoveryCluster, 'inspect'>;
-  /** Original physical parent identity is read before acquiring Project/Task/Resources locks. */
-  developmentParentInspector?: Pick<TaskRecoveryCluster, 'inspect'>;
   authorizer: ProjectAuthorizer;
   quotas: QuotaSource;
   profiles: ProfileCatalog;

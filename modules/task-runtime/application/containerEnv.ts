@@ -1,7 +1,7 @@
 import type { ProjectId } from '@crewstation/contracts';
-import { DEVELOPMENT_USAGE_BINDING_DIRECTORY, DEVELOPMENT_USAGE_DIRECTORY, DevelopmentUsageRuntimeConfigSchema, PLATFORM_ENV, RuntimeInitializationMaterialSchema } from '@crewstation/contracts';
+import { PLATFORM_ENV, RuntimeInitializationMaterialSchema } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
-import { purposeOf, type TaskEnvironment } from '../domain/taskEnvironment';
+import type { TaskEnvironment } from '../domain/taskEnvironment';
 import type { TaskRuntimeUseCaseDeps } from './dependencies';
 
 /** 任务容器的环境：平台约定变量＋所属环境的配置与数据＋任务级数据绑定＋TaskRunner 自身参数。明文令牌只在这里出现一次。 */
@@ -36,11 +36,6 @@ export async function containerEnv(deps: Pick<TaskRuntimeUseCaseDeps, 'sources' 
     CS_WORKER_UID: String(deps.settings.workerUid),
     ...(env.render?.businessStorage ? { CS_WORKER_UID: String(env.render.workerUid), CS_WORKER_GID: String(env.render.workerUid) } : {}),
   };
-  delete values.CS_RUNNER_DEVELOPMENT_USAGE;
-  if (env.render?.developmentUsageStorage) {
-    if (env.render.developmentUsageStorage.version !== 1 || env.kind !== 'dev-session' || !env.native || !['agent','cli'].includes(purposeOf(env.native))) throw precondition('开发数值日志布局必须绑定独立开发 Agent');
-    values.CS_RUNNER_DEVELOPMENT_USAGE = JSON.stringify(DevelopmentUsageRuntimeConfigSchema.parse({ version: 1, directory: DEVELOPMENT_USAGE_DIRECTORY, bindingDirectory: DEVELOPMENT_USAGE_BINDING_DIRECTORY, projectId: env.projectId, workspaceTaskId: env.native.parentTaskId }));
-  }
   if (env.native) {
     values.CS_RUNNER_NATIVE_ID = env.native.runnerId;
   }

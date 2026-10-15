@@ -1,8 +1,6 @@
-import type { ProfileUsage } from '../ports/profileUsage';
-import {businessProbeTurn} from './profile-testing/businessProbeTurns';
 import { probeBusinessProfile } from './profile-testing/businessProfileProbe';
 import { newResourceId } from '@crewstation/kernel';
-import type { BeforeStartExecution, McpConnection, ProbeTerminalResult, ProfileTestContext, ProfileTestOutcome, ProfileTestStage, RunnerEvent, TaskId } from '@crewstation/contracts';
+import type { BeforeStartExecution, McpConnection, ProbeTerminalResult, ProfileTestContext, ProfileTestOutcome, ProfileTestStage, RunnerEvent, StartAgentCommand, TaskId } from '@crewstation/contracts';
 import { PLATFORM_AGENT_PERMISSION, ProbeTerminalResultSchema, TASKRUNNER_PROTOCOL_VERSION, isKnownProtocol } from '@crewstation/contracts';
 import { isPlatformError } from '@crewstation/kernel';
 import type { ProfileTestRunInput, ProfileTestRunProgress, ProfileTestRunResult } from '../api/moduleApi';
@@ -12,6 +10,7 @@ import type { ProtocolProbe } from '../domain/profileTestStages';
 import { TEST_STAGE, absorbAgentEvent, commandVerdict, containerStagesForTest, launchStage, modelVerdict, stagesFromBeforeStart } from '../domain/profileTestStages';
 import type { TaskEnvironment } from '../domain/taskEnvironment';
 import { awaitingPodCreation } from '../domain/taskEnvironment';
+import type { ProfileTestCalls } from '../ports/agentCalls';
 import type { TestRunner } from '../ports/platform';
 import type { TaskRuntimeUseCaseDeps } from './dependencies';
 import type { TestEnvironmentInput } from './testEnvironment';
@@ -24,7 +23,8 @@ export interface ProfileTestDeps {
   createTestEnvironment(input: TestEnvironmentInput): Promise<TaskEnvironment>;
   release(taskId: TaskId): Promise<unknown>;
   runner?: TestRunner;
-  usage?:ProfileUsage;
+  /** RFC-034 v2：模型执行的平台执行记录；缺省时不记录。 */
+  calls?: ProfileTestCalls;
   timing?: Partial<ProfileTestTiming>;
   /** 平台两个 MCP 的服务域地址；步骤模板引用 `{{mcp.*}}` 时测试才用得上（profileTestMcp）。 */
   mcp?: ReadonlyArray<{ name: string; url: string }>;
@@ -33,7 +33,7 @@ export interface ProfileTestDeps {
 interface Session {
   readonly deps: TaskRuntimeUseCaseDeps; readonly timing: ProfileTestTiming; readonly runner: TestRunner; readonly env: TaskEnvironment;
   readonly input: ProfileTestRunInput; readonly report: ProfileTestReport; readonly heartbeat: () => Promise<boolean>; readonly context: Partial<ProfileTestContext>;
-  readonly mcp: McpConnection[]; readonly usage?:ProfileUsage;
+  readonly mcp: McpConnection[]; readonly calls?: ProfileTestCalls;
 }
 
 const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
@@ -51,11 +51,10 @@ export function runProfileTestUseCase(deps: TaskRuntimeUseCaseDeps, test: Profil
   return async (input: ProfileTestRunInput, report: ProfileTestReport, heartbeat: () => Promise<boolean>): Promise<ProfileTestRunResult> => {
     const runner = test.runner;
     if (!runner) return { state: 'failed', error: '本进程未配置测试执行通道', stages: [] };
-    await test.usage?.accept(input);
     let env: TaskEnvironment;
     try { env = await test.createTestEnvironment({ image: input.image, ...(input.taskProfile ? { taskProfile: input.taskProfile } : {}), labels: { 'crewstation.io/profile-test': input.testId, 'crewstation.io/compute-profile': input.profile, 'crewstation.io/profile-revision': String(input.revision) } }); }
     catch (error) { return { state: 'failed', error: `无法创建测试任务：${messageOf(error)}`, stages: [] }; }
-    const session: Session = { deps, timing, runner, env, input, report, heartbeat,...(test.usage?{usage:test.usage}:{}), context: { kind: 'platform-namespace', taskId: env.id, agentId: newResourceId(), image: input.image, workdir: '/work' }, mcp: profileTestMcp(input.beforeStart.steps, test.mcp ?? []) };
+    const session: Session = { deps, timing, runner, env, input, report, heartbeat, context: { kind: 'platform-namespace', taskId: env.id, agentId: newResourceId(), image: input.image, workdir: '/work' }, mcp: profileTestMcp(input.beforeStart.steps, test.mcp ?? []), ...(test.calls ? { calls: test.calls } : {}) };
     try {
       await report({ context: session.context, stages: containerStagesForTest(env.startup) });
       const waited = await waitForRunner(session);
@@ -63,7 +62,8 @@ export function runProfileTestUseCase(deps: TaskRuntimeUseCaseDeps, test: Profil
       await describeRunner(session);
       const outcome = isKnownProtocol(input.launch.protocol) ? await observeProtocolTurn(session) : await runTerminalProbe(session);
       if (outcome.state === 'passed' && isKnownProtocol(input.launch.protocol)) {
-        session.context.businessExecution = await probeBusinessProfile({ input, runner, taskId: env.id, heartbeat,...(test.usage?{usage:{testId:input.testId,bind:test.usage.bind}}:{}), budgetMs: timing.modelBudgetMs + scriptBudgetOf(input), pollMs: timing.pollMs, report: async (stage) => report({ stages: [stage] }) });
+        session.context.businessExecution = await probeBusinessProfile({ input, runner, taskId: env.id, heartbeat, budgetMs: timing.modelBudgetMs + scriptBudgetOf(input), pollMs: timing.pollMs, report: async (stage) => report({ stages: [stage] }),
+          ...(test.calls ? { accept: (agent: StartAgentCommand) => acceptCall(session, agent.agentId, 'business') } : {}) });
       }
       return { ...outcome, context: session.context };
     } finally {
@@ -123,6 +123,11 @@ async function cliVersion(s: Session): Promise<string | null> {
   } catch { return null; }
 }
 
+/** RFC-034 v2：派发前受理这次模型执行的平台执行记录。 */
+function acceptCall(s: Session, agentId: string, step: 'protocol' | 'business'): Promise<void> {
+  return s.calls?.accept({ testId: s.input.testId, runtimeTaskId: s.env.id, agentId, step, profile: { id: s.input.profile, revision: s.input.revision }, protocol: s.input.launch.protocol }) ?? Promise.resolve();
+}
+
 /**
  * 已知协议：发一次 oneshot 的 nonce 轮次，按事件推进阶段；截止时间 = 脚本预算＋模型预算，到点主动取消。
  * 权限与平台派发给所有 Agent 的一样取 full（D59），也与 agent-workflow 冒烟的系统 persona（`permission: {}`，工具全在）一致；
@@ -131,9 +136,9 @@ async function cliVersion(s: Session): Promise<string | null> {
  */
 async function observeProtocolTurn(s: Session): Promise<ProfileTestRunResult> {
   const { input, runner, env, timing } = s;
-  if(s.usage&&(await runner.connectionStatus(env.id)).capabilities?.businessExecutionV3===1)return observedProfileTurn(s);
   const agentId = s.context.agentId!, sentAt = s.deps.clock.now().toISOString();
   try {
+    await acceptCall(s, agentId, 'protocol');
     await runner.sendCommand(env.id, {
       id: `pft-start-${input.testId}`, type: 'startAgent', agentId, compute: input.profile, profileRevision: input.revision, launch: input.launch, permission: PLATFORM_AGENT_PERMISSION,
       mode: 'oneshot', initialPrompt: input.prompt, mcp: s.mcp, env: {}, beforeStart: input.beforeStart, processAttemptId: `${input.testId}:1`,
@@ -223,14 +228,4 @@ function watchEnvironment(s: Session): () => Promise<string | undefined> {
     disconnectedSince ??= Date.now();
     return Date.now() - disconnectedSince > s.timing.disconnectGraceMs ? 'Runner 在测试中途失联，无法确认启动前脚本与测试结果' : undefined;
   };
-}
-
-async function observedProfileTurn(s:Session):Promise<ProfileTestRunResult>{
- const {input,runner,env,timing}=s,agentId=s.context.agentId!;
- const agent={id:`pft-start-${input.testId}`,type:'startAgent' as const,agentId,compute:input.profile,profileRevision:input.revision,launch:input.launch,permission:PLATFORM_AGENT_PERMISSION,mode:'oneshot' as const,initialPrompt:input.prompt,mcp:s.mcp,env:{},beforeStart:input.beforeStart,processAttemptId:`${input.testId}:1`};
- try{const turn=await businessProbeTurn({runner,taskId:env.id,heartbeat:s.heartbeat,budgetMs:timing.modelBudgetMs+scriptBudgetOf(input),pollMs:timing.pollMs,usage:{testId:input.testId,bind:s.usage!.bind}},agent,input.expectedReply);
-  let probe:ProtocolProbe={started:false,text:'',diagnostics:''};for(const event of turn.events)probe=absorbAgentEvent(probe,event);
-  const verdict=modelVerdict(probe,input.expectedReply,false,!!input.launch.model,Object.values(input.beforeStart.secrets)),stages=[launchStage(probe,true,s.deps.clock.now().toISOString()),verdict.stage];await s.report({stages});
-  return turn.ok?result(s,'passed','passed',undefined,stages):result(s,'failed',verdict.outcome,verdict.error??'模型执行没有完成',stages);
- }catch(error){return result(s,'failed','spawn-failed',messageOf(error),[{id:TEST_STAGE.agent,kind:'agent',name:'Agent 启动中',state:'failed',error:{code:'profile-turn-failed',message:messageOf(error)}}]);}
 }

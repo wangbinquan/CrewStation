@@ -1,6 +1,5 @@
 import type { ProjectDeletionContext, TaskId } from '@crewstation/contracts';
 import type { TaskEnvironment } from '../../domain/taskEnvironment';
-import type { DevelopmentCleanupParticipant } from '../developmentCleanup';
 import type { NativeExecutionJobLease } from '../unitOfWork';
 
 export interface RuntimeOriginalJobs {
@@ -8,7 +7,6 @@ export interface RuntimeOriginalJobs {
 }
 /** Root composition supplies original digital owners and independent container evidence. */
 export interface RuntimeOriginalStopSources {
-  development(context: ProjectDeletionContext): DevelopmentCleanupParticipant;
   digital(context: ProjectDeletionContext, environment: TaskEnvironment): Promise<{ kind: 'ready' } | { kind: 'waiting'; reason: string }>;
   stopped(context: ProjectDeletionContext, environment: TaskEnvironment): Promise<{ digest: string } | undefined>;
   /** Legacy rows may lack a UID. Only the complete confirmed Root inventory,

@@ -1,4 +1,4 @@
-import type { DevelopmentUsageStorage, RuntimeImageExecutionSnapshot, Actor, ProjectId, RunnerCommand, RunnerEvent, ServiceId, StartupRecord, TaskId, TraceId, UserId } from '@crewstation/contracts';
+import type { RuntimeImageExecutionSnapshot, Actor, ProjectId, RunnerCommand, RunnerEvent, ServiceId, StartupRecord, TaskId, TraceId, UserId } from '@crewstation/contracts';
 import type { DevSessionDto, DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest } from '@crewstation/contracts';
 
 export interface EnvironmentView {
@@ -10,7 +10,7 @@ export interface EnvironmentView {
   state: 'creating' | 'running' | 'paused' | 'releasing' | 'released' | 'failed';
   podName: string;
   connected: boolean;
-  native?: { purpose: 'cli' | 'agent' | 'subtask'; parentTaskId: TaskId; agentId: string; terminalId?: string; runnerId: string; podUid?: string; state: 'queued' | 'starting' | 'running' | 'cleaning' | 'finished'; profile: { name: string; cpu: string; memory: string; storage: string }; failureReason?: string };
+  native?: { purpose: 'cli' | 'agent' | 'subtask'; parentTaskId: TaskId; agentId: string; terminalId?: string; runnerId: string; state: 'queued' | 'starting' | 'running' | 'cleaning' | 'finished'; profile: { name: string; cpu: string; memory: string; storage: string }; failureReason?: string };
   branch?: string;
   traceId: string;
   message?: string;
@@ -23,8 +23,6 @@ export interface EnvironmentView {
 
 /** 一个 Agent 的独立执行环境（RFC-006 §5）：「＋ CLI」带 terminalId，headless Agent 没有；image 是档位修订按摘要固定的镜像。 */
 export interface CreateExecutionInput {
-  developmentUsageStorage?: DevelopmentUsageStorage;
-  developmentUsageProtection?: { readonly version: 1 };
   runtimeImage?: RuntimeImageExecutionSnapshot;
   id: TaskId; parentTaskId: TaskId; purpose: 'cli' | 'agent'; createdBy: UserId; agentId: string; terminalId?: string; runnerId: string; fingerprint: string;
   profile?: string; image?: string; computeProfile?: { profileId: string; revision: number };

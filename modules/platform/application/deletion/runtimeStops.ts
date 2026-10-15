@@ -4,9 +4,8 @@ import type { RuntimeStopHistory, RuntimeStopProject, RuntimeStopReceipts, Runti
 import { runtimeHistoricalStop } from './runtimeStopHistory';
 
 /** The Root supplies each owner's stored confirmation; no caller-made Pod identity can authorize cleanup. */
-export function runtimeProjectStops<Selection, Result>(project: RuntimeStopProject,
-  development: (context: ProjectDeletionContext, selection: Selection) => Promise<Result>, receipts: RuntimeStopReceipts,
-  digital: (context: ProjectDeletionContext, environment: RuntimeStoppedEnvironment) => Promise<{ kind: 'ready' } | { kind: 'waiting'; reason: string }>, history?: RuntimeStopHistory, completePrestart?: (context: ProjectDeletionContext, selection: Selection) => Promise<Result>) {
+export function runtimeProjectStops(project: RuntimeStopProject, receipts: RuntimeStopReceipts,
+  digital: (context: ProjectDeletionContext, environment: RuntimeStoppedEnvironment) => Promise<{ kind: 'ready' } | { kind: 'waiting'; reason: string }>, history?: RuntimeStopHistory) {
   const originalPod = async (context: ProjectDeletionContext, environment: RuntimeStoppedEnvironment) => {
     await project.assertProjectDeletionGrant(context);
     const grant = await project.projectDeletionParticipantContext(context, 'resources');
@@ -27,16 +26,6 @@ export function runtimeProjectStops<Selection, Result>(project: RuntimeStopProje
     return { grant, pod, selected, uid };
   };
   return {
-    development: (context: ProjectDeletionContext) => ({ advance: async (selection: Selection) => {
-      const grant = await project.projectDeletionParticipantContext(context, 'dev-session');
-      return development(grant, selection);
-    }, completePrestart: async (selection: Selection) => {
-      await project.assertProjectDeletionGrant(context);
-      const grant = await project.projectDeletionParticipantContext(context, 'dev-session');
-      if (!completePrestart) throw precondition('原 DevSession 未获准启动闭合能力尚未装配');
-      const result = await completePrestart(grant, selection);
-      await project.assertProjectDeletionGrant(context); return result;
-    } }),
     digital,
     originalPodUid: async (context: ProjectDeletionContext, environment: RuntimeStoppedEnvironment) => (await originalPod(context, environment))?.uid,
     stopped: async (context: ProjectDeletionContext, environment: RuntimeStoppedEnvironment) => {

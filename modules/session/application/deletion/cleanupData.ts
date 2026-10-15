@@ -6,31 +6,9 @@ import type { SessionDeletionRepository, SessionDeletionSources } from '../../po
 import type { SessionProjectWork } from '../../ports/projectWork';
 
 async function apply(copies: Copies, taskId: TaskId, operation: ProjectDeletionSessionData): Promise<unknown> {
-  const { business, development, businessSources, developmentSources } = copies;
-  if ('key' in operation && operation.key.executionId !== taskId) throw precondition('私有数字请求的日志不属于原任务');
+  const { business } = copies;
   switch (operation.type) {
     case 'original-transports': throw precondition('原连接必须从封写范围读取');
-    case 'development-lookup': return development.lookup(taskId);
-    case 'development-existing': {
-      const existing = await development.lookup(taskId);
-      if (existing.kind !== 'registered' || operation.registration.runtimeTaskId !== taskId
-        || jsonHash(existing.stored.registration) !== jsonHash(operation.registration)) throw precondition('不能在封写后新增或替换开发数字登记');
-      return existing.stored;
-    }
-    case 'development-read': return development.get(taskId, operation.key);
-    case 'development-drain': return development.requestDrain(taskId, operation.key, operation.reason);
-    case 'development-source': {
-      if (!developmentSources.offer) throw precondition('开发原数字页来源尚未装配');
-      return developmentSources.offer(operation.key);
-    }
-    case 'development-source-ack': return developmentSources.acknowledge(operation.key, operation.through);
-    case 'development-native-page': {
-      if (!developmentSources.nativePage) throw precondition('开发原页读取尚未装配');
-      const page = await developmentSources.nativePage(operation.key, operation.passId, operation.ordinal);
-      if (!page) throw precondition('开发已持久原页不存在，不能伪造停止证明');
-      return page;
-    }
-    case 'development-measurement': return developmentSources.measurement(operation.key, operation.recordId, operation.revision);
     case 'business-read': return business.get(taskId, operation.executionId);
     case 'business-originals': {
       if (!business.originals) throw precondition('原业务执行完整分页来源尚未装配');
@@ -39,17 +17,6 @@ async function apply(copies: Copies, taskId: TaskId, operation: ProjectDeletionS
     case 'business-events': return business.list(taskId, operation.executionId, operation.after, operation.limit);
     case 'business-completion': return business.completionProof(taskId, operation.executionId);
     case 'business-consume': return business.consume(taskId, operation.executionId, operation.through, operation.stopped);
-    case 'business-source-ack': return businessSources.acknowledge(taskId, operation.executionId, operation.through);
-    case 'business-source': {
-      if (!businessSources.offer || !await business.get(taskId, operation.executionId)) throw precondition('业务原数字页来源尚未装配或已经变化');
-      return businessSources.offer(taskId, operation.executionId);
-    }
-    case 'business-measurement': {
-      const stored = await business.get(taskId, operation.executionId);
-      if (!stored) throw precondition('业务原数字执行已经变化');
-      const { executionId, attempt, incarnation, payloadDigest } = stored.receipt;
-      return businessSources.measurement({ runtimeTaskId: taskId, executionId, attempt, incarnation, payloadDigest }, operation.recordId, operation.revision);
-    }
   }
 }
 /** PG effects have their own private finally, including reads that must finish before the stop snapshot. */

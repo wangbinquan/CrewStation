@@ -19,7 +19,6 @@ const terminalChild = (table: string, keys: string[], invalid = 'false'): Conten
   invalid: `p.agent_id IS NULL OR (${invalid})` });
 const executionMismatch = "r.execution->>'taskId' IS DISTINCT FROM r.execution_task_id";
 const duplicateExecution = (other: string) => `EXISTS(SELECT 1 FROM dev_session.${other} c WHERE c.execution_task_id=r.execution_task_id OR c.agent_id=r.agent_id)`;
-const usageMismatch = "r.workspace_task_id IS DISTINCT FROM p.task_id OR r.prepared->'intent'->'identity'->>'taskId' IS DISTINCT FROM p.task_id OR r.prepared->'intent'->'identity'->>'agentId' IS DISTINCT FROM p.agent_id OR r.prepared->'intent'->'identity'->>'projectId' IS DISTINCT FROM r.project_id OR r.prepared->'intent'->'identity'->>'executionId' IS DISTINCT FROM r.execution_task_id OR (r.binding IS NOT NULL AND r.binding->'identity' IS DISTINCT FROM r.prepared->'intent'->'identity')";
 
 export const DEVELOPMENT_CONTENT: readonly ContentTable[] = [
   workspace('idle_reminders'),
@@ -30,7 +29,6 @@ export const DEVELOPMENT_CONTENT: readonly ContentTable[] = [
   workspace('native_activity_progress'),
   { ...terminalChild('native_activity_states', ['task_id', 'agent_id'], "r.projection->'state'->>'agentId' IS DISTINCT FROM r.agent_id"), legacyAgent: "r.legacy_projection->'state'->>'agentId'" },
   { ...terminalChild('native_activity_items', ['task_id', 'seq'], "r.item->>'agentId' IS DISTINCT FROM r.agent_id OR r.item->>'eventId' IS DISTINCT FROM r.event_id"), legacyAgent: "r.legacy_item->>'agentId'" },
-  { ...terminalChild('observation_activity_history',['source_task_id','source_seq'],"r.document->>'agentId' IS DISTINCT FROM r.agent_id OR r.document->>'eventId' IS DISTINCT FROM r.event_id"),runtime:'r.source_task_id' },
   terminalChild('native_activity_reads', ['task_id', 'user_id', 'agent_id', 'turn_id']),
   { ...workspace('native_activity_sources', ['task_id', 'source_task_id']), runtime: 'r.source_task_id',
     invalid: 'r.source_task_id<>r.task_id AND NOT EXISTS(SELECT 1 FROM dev_session.native_terminal_starts p WHERE p.task_id=r.task_id AND p.execution_task_id=r.source_task_id)' },
@@ -41,12 +39,6 @@ export const DEVELOPMENT_CONTENT: readonly ContentTable[] = [
   { table: 'cluster_agent_restarts', keys: ['operation_id'], operation: 'r.operation_id', runtime: 'r.task_id',
     agent: 'r.agent_id',
     invalid: 'EXISTS(SELECT 1 FROM dev_session.agent_starts p WHERE p.agent_id=r.agent_id AND p.execution_task_id<>r.task_id)' },
-  { table: 'development_agent_usage', keys: ['execution_task_id'], workspace: 'p.task_id', runtime: 'r.execution_task_id', project: 'r.project_id',
-    from: 'dev_session.development_agent_usage r LEFT JOIN dev_session.agent_starts p ON p.execution_task_id=r.execution_task_id',
-    invalid: 'p.agent_id IS NULL OR ' + usageMismatch },
-  { table: 'development_agent_endings', keys: ['execution_task_id'], workspace: 'p.task_id', runtime: 'r.execution_task_id', project: 'u.project_id',
-    from: 'dev_session.development_agent_endings r LEFT JOIN dev_session.development_agent_usage u ON u.execution_task_id=r.execution_task_id LEFT JOIN dev_session.agent_starts p ON p.execution_task_id=r.execution_task_id',
-    invalid: "u.execution_task_id IS NULL OR p.agent_id IS NULL OR u.workspace_task_id IS DISTINCT FROM p.task_id OR u.prepared->'intent'->'identity'->>'agentId' IS DISTINCT FROM p.agent_id" },
   { table: 'original_callbacks', keys: ['id'], project: 'r.project_id',
     optionalWorkspace: true,
     from: 'dev_session.original_callbacks r LEFT JOIN dev_session.content_origins p ON p.kind=r.origin_kind AND p.key=r.origin_key',

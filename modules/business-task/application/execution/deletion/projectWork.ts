@@ -21,7 +21,7 @@ export function scopedBusinessPorts<T extends BusinessExecutionDeps>(deps: T, op
     ...(deps.runtimeImages ? { runtimeImages: guardedBusinessPort(deps.runtimeImages, work, optional) } : {}),
     ...(deps.taskInputs ? { taskInputs: guardedBusinessPort(deps.taskInputs, work, optional) } : {}),
     ...(deps.agentSecrets ? { agentSecrets: guardedBusinessPort(deps.agentSecrets, work, optional) } : {}),
-    ...(deps.executionObservations ? { executionObservations: guardedBusinessPort(deps.executionObservations, work, optional) } : {}),
+    ...(deps.agentCalls ? { agentCalls: guardedBusinessPort(deps.agentCalls, work, optional) } : {}),
   };
 }
 export async function businessExecutionWork<T>(deps: BusinessExecutionDeps, input: {

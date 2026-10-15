@@ -20,25 +20,23 @@ describe.skipIf(!available)('durable maintenance keyset and database-time fencin
     h.clock.set(new Date(String(row!.at)));
     return drizzleLedgerUnitOfWork(h.database.db);
   }
-  test('105 waiting records cannot starve the 106th; EOF then revisits old waiting IDs', async () => {
+  test('a durable keyset cursor pages 106 due records across rounds and EOF starts a new scan', async () => {
     await fixture();
     const owner = h.module.api.owner('task-runtime');
     const records = await Promise.all(Array.from({ length: 106 }, (_, n) => owner.declare({ id: newResourceId(), kind: 'volume', ref: `keyset-${n}`, projectId: PROJECT, spec: { children: [] } })));
     records.sort((a, b) => a.id.localeCompare(b.id));
-    const waiting = new Set(records.slice(0, 105).map((r) => r.id));
     await h.database.db.execute(sql`update resources.records set phase='failed', retain_until=clock_timestamp()-interval '1 minute'`);
-    h.module.api.registerMaintenanceEndingHandler('task-runtime', async (_step, snapshot) => waiting.has(snapshot.id) ? { status: 'waiting', reason: 'actual-owner-pending' } : { status: 'unselected' });
     await h.module.maintainOnce();
-    const [cursor] = await h.database.db.execute(sql`select after_id from resources.maintenance_sweeps where step='retention'`);
-    expect(cursor!.after_id).toBe(records[99]!.id);
+    const [cursor] = await h.database.db.execute(sql`select after_id, epoch from resources.maintenance_sweeps where step='retention'`);
+    expect(cursor).toMatchObject({ after_id: records[99]!.id });
+    expect((await h.module.api.get(records[99]!.id))?.desired).toBe('absent');
     expect((await h.module.api.get(records[105]!.id))?.desired).toBe('present');
     await h.module.maintainOnce();
     expect((await h.module.api.get(records[105]!.id))?.desired).toBe('absent');
-    waiting.delete(records[0]!.id);
     await h.module.maintainOnce(); // EOF advances epoch and resets only this scan.
-    await h.module.maintainOnce();
-    expect((await h.module.api.get(records[0]!.id))?.desired).toBe('absent');
-    expect((await h.module.api.get(records[1]!.id))?.desired).toBe('present');
+    const [next] = await h.database.db.execute(sql`select after_id, epoch from resources.maintenance_sweeps where step='retention'`);
+    expect(next).toMatchObject({ after_id: null });
+    expect(Number(next!.epoch)).toBe(Number(cursor!.epoch) + 1);
   }, 15000);
   test('renew cannot revive the same holder after lease expires while waiting for its row lock', async () => {
     const uow = await fixture(), lease = await uow.run((scope) => scope.sweeps.claim('retention', 'first-holder', 300));

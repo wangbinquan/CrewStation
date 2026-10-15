@@ -90,35 +90,3 @@ describe('工作卷记录 → 渲染输入', () => {
     for (const broken of [{ pvc: undefined }, { pvc: { size: '' } }, { pvc: { size: '10Gi', labels: { a: 1 } } }, { children: [{ kind: 'PersistentVolumeClaim', name: 'x' }] }]) expect(volumeRenderOf({ ...spec, ...broken })).toBeUndefined();
   });
 });
-
-// RFC-034: selected numeric layout survives ledger parsing; omission remains an ordinary workspace.
-test('numeric layout parsing keeps both private stores only for an explicit independent development workload', () => {
-  const selected = { ...pod, nodeName: 'original-node', workspace: { pod: 'original-parent', podUid: 'original-pod', pvcUid: 'original-pvc' }, developmentUsageStorage: { version: 1 } };
-  expect(workloadRenderOf('record', { children, pod: selected })?.pod.developmentUsageStorage).toEqual({ version: 1 });
-  expect(workloadRenderOf('record', { children, pod })?.pod.developmentUsageStorage).toBeUndefined();
-  for (const patch of [
-    { developmentUsageStorage: { version: 2 } }, { developmentUsageStorage: { version: 1, directory: '/work' } }, { developmentUsageStorage: null },
-    { workload: 'business-task' }, { workload: 'profile-test' }, { workspace: undefined }, { nodeName: undefined }, { pvc: undefined, emptyDir: true },
-    { checkout: { repoUrl: 'https://fixture.invalid/repo', branch: 'main', credentialSecretName: 'checkout' } }, { businessStorage: { version: 1, ownerTaskId: 'owner' } }, { archive: { ownerTaskId: 'owner' } }, { consumer: {} },
-  ]) expect(workloadRenderOf('record', { children, pod: { ...selected, ...patch } })).toBeUndefined();
-});
-
-// RFC-034: an explicitly protected digital layout must retain the original consumer and PVC instead of being rejected or downgraded.
-test('explicit protected development layouts keep their original agent consumer; incomplete or conflicting selections do not render', () => {
-  const record = '019f0000-0000-7000-8000-000000000003', parent = '019f0000-0000-7000-8000-000000000002';
-  const pvcUid = 'd7aa3cff-94e3-453a-9c04-c6f7a8678438';
-  const selected = { ...pod, nodeName: 'original-node', workspace: { pod: 'parent', podUid: 'd624eb08-2bfa-46f6-812f-29bdecc0d961', pvcUid },
-    labels: { 'crewstation.io/workspace-task': parent }, annotations: { 'crewstation.io/cli-intent': 'a'.repeat(64) },
-    expectedVolumeUid: pvcUid, developmentUsageStorage: { version: 1 }, developmentUsageProtection: { version: 1 },
-    consumer: { id: '019f0000-0000-7000-8000-000000000007', taskId: parent, revision: 1, purpose: 'agent', finalization: null } };
-  expect(workloadRenderOf(record, { children, pod: selected })?.pod).toMatchObject({ developmentUsageProtection: { version: 1 }, consumer: selected.consumer, expectedVolumeUid: pvcUid });
-  expect(workloadRenderOf(record, { children, pod: { ...selected, developmentRemovalProtection: { version: 1 } } })?.pod.developmentRemovalProtection).toEqual({ version: 1 });
-  expect(workloadRenderOf(record, { children, pod: selected })?.pod).not.toHaveProperty('developmentRemovalProtection');
-  for (const patch of [{ developmentRemovalProtection: null }, { developmentRemovalProtection: { version: 2 } }, { developmentRemovalProtection: { version: 1, extra: true } }, { developmentRemovalProtection: { version: 1 }, developmentUsageProtection: undefined }]) expect(workloadRenderOf(record, { children, pod: { ...selected, ...patch } })).toBeUndefined();
-  for (const patch of [
-    { developmentUsageProtection: undefined }, { developmentUsageProtection: null }, { developmentUsageProtection: { version: 2 } }, { developmentUsageProtection: { version: 1, extra: true } },
-    { developmentUsageStorage: undefined }, { consumer: undefined }, { expectedVolumeUid: undefined }, { expectedVolumeUid: crypto.randomUUID() },
-    { consumer: { ...selected.consumer, purpose: 'business' } }, { consumer: { ...selected.consumer, taskId: record } }, { consumer: { ...selected.consumer, revision: 0 } },
-    { labels: {} }, { workspace: undefined }, { nodeName: undefined }, { businessStorage: { version: 1, ownerTaskId: parent } },
-  ]) expect(workloadRenderOf(record, { children, pod: { ...selected, ...patch } })).toBeUndefined();
-});

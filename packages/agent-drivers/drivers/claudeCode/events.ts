@@ -1,4 +1,3 @@
-import { businessUsage } from '../businessUsage';
 // ← agent-workflow `runtime/claudeCode/events.ts`，stream-json 行 → NormalizedEvent。
 //
 // 事件形状按源的注释验证于 claude 2.1.193／2.1.202／2.1.226/227：
@@ -10,16 +9,16 @@ import { businessUsage } from '../businessUsage';
 //  - 删掉 `inventoryFacesFromInitEvent`（清单对账面不复制）；
 //  - `parseResultError` 合并进 NormalizedEvent.terminalError（源为独立函数、把同一行再解析一遍）；
 //  - 新增工具调用展开（`tool_use` / `tool_result` 内容块）：源只判定 kind，CrewStation 的
-//    AgentEvent 契约有 `tool` 字段，工作台直接消费。
+//    AgentEvent 契约有 `tool` 字段，工作台直接消费；
+//  - 用量由 drivers/usage/claudeMeter.ts 从 `source` 计量（RFC-034 v2，与源 RFC-371 v2 同算法）。
 
 import type {
   NormalizedEvent,
   NormalizedEventKind,
   NormalizedToolCall,
-  NormalizedTokenDelta,
   SystemEventObservation,
 } from '../../contract/normalizedEvent';
-import { SAFE_RUNTIME_EVENT_TYPE, numOrZero, parseJsonObjectLine } from '../../contract/normalizedEvent';
+import { SAFE_RUNTIME_EVENT_TYPE, parseJsonObjectLine } from '../../contract/normalizedEvent';
 
 type Block = Record<string, unknown>;
 
@@ -42,15 +41,14 @@ export function parseEvent(line: string): NormalizedEvent | null {
   const tool = extractToolCall(parts);
   const sessionId = rootSessionId(evt, type);
   return {
-    businessUsage: businessUsage('claude-code', evt),
     kind: inferKind(type, parts),
     text: concatText(parts),
     ...(sessionId === undefined ? {} : { sessionId }),
     ...(tool === undefined ? {} : { tool }),
     ...(type === 'result' ? { terminalError: { isError: evt.is_error === true, message: typeof evt.result === 'string' ? evt.result : '' } } : {}),
     timestamp: extractTimestamp(evt),
-    tokens: extractTokenDelta(type, evt) ?? undefined,
     rawLine: line,
+    source: evt,
   };
 }
 
@@ -130,23 +128,6 @@ function inferKind(type: string, parts: Block[]): NormalizedEventKind {
   if (parts.some((p) => p.type === 'tool_use')) return 'tool_use';
   if (parts.some((p) => p.type === 'thinking')) return 'reasoning';
   return 'text';
-}
-
-/**
- * token 只取累计的 `result.usage`，避免逐回合 `assistant.usage` 重复计数；
- * claude 的 snake_case 键映射为归一后的 delta。
- */
-function extractTokenDelta(type: string, evt: Record<string, unknown>): NormalizedTokenDelta | null {
-  if (type !== 'result') return null;
-  const usage = evt.usage;
-  if (!usage || typeof usage !== 'object') return null;
-  const u = usage as Record<string, unknown>;
-  return {
-    input: numOrZero(u.input_tokens),
-    output: numOrZero(u.output_tokens),
-    cacheRead: numOrZero(u.cache_read_input_tokens),
-    cacheCreate: numOrZero(u.cache_creation_input_tokens),
-  };
 }
 
 /**

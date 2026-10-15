@@ -33,7 +33,7 @@ async function fixture(admit = true) {
   let valid = true, invalidateRead = false;
   const ports = runtimeProjectStops({ assertProjectDeletionGrant: async () => { if (!valid) throw precondition('controlled original Root expired'); },
     projectDeletionParticipantContext: async (root) => ProjectDeletionContextSchema.parse({ ...root, confirmed: { ...root.confirmed, participant: 'resources' } }) },
-  async () => undefined, { get: async () => { throw new Error('No live Pod in the complete scope'); } }, async () => ({ kind: 'ready' }),
+  { get: async () => { throw new Error('No live Pod in the complete scope'); } }, async () => ({ kind: 'ready' }),
   { ...safety, get: async (id) => { const state = await safety.get(id); if (invalidateRead) valid = false; return state; } });
   const stopped = () => safety.recordStop({ id: newResourceId(), consumer, ...permit, type: 'kubelet-terminated', podResourceVersion: '42',
     observedAt: new Date().toISOString(), containers: [{ kind: 'container', name: 'runner', state: 'terminated', containerId: 'containerd://controlled-original', exitCode: 0 }] });

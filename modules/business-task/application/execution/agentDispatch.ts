@@ -32,16 +32,15 @@ export async function dispatchBusinessAgent(deps: BusinessExecutionDeps, claimed
       else await fail(deps, claimed, 'secret_version_unavailable');
       return;
     }
-    const info = await observationInfo(deps, env.id);
+    const info = BusinessExecutionInfoSchema.parse(await deps.runner.sendCommand(env.id, { id: newResourceId(), type: 'businessExecutionInfo' }));
     if (incarnation && incarnation !== info.incarnation) { await unknown(deps, claimed, 'execution_incarnation_changed'); return; }
     if (!await deps.subtasks.checkpoint(claimed, info.incarnation)) {
       await deps.subtasks.settle(claimed, { dispatch: 'pending', runtimeAdmitted: true, view: claimed.view }); return;
     }
+    await acceptBusinessCall(deps, claimed, plan, env.id);
     incarnation = info.incarnation;
     const result = BusinessExecutionReceiptSchema.parse(await deps.runner.sendCommand(env.id, { id: newResourceId(), type: 'startBusinessAgent', executionId: claimed.view.executionId,
-      attempt: claimed.view.attempt, incarnation, payloadDigest: claimed.payloadDigest, digestNonce: plan.nonce, agent: command,
-      ...(info.usageObservationsV1 === 1 ? { usageObservationsV1: 1 as const } : {}),
-      ...(info.usageObservationsV1 === 1 && info.nativeUsageTreeV1 === 1 ? { nativeUsageTreeV1: 1 as const, nativeUsageLineageKey: plan.sessionKey } : {}) }));
+      attempt: claimed.view.attempt, incarnation, payloadDigest: claimed.payloadDigest, digestNonce: plan.nonce, agent: command }));
     await acceptReceipt(deps, { ...claimed, incarnation, runtimeAdmitted: true }, result);
   } catch (error) {
     const code = isPlatformError(error) ? String(error.details?.code ?? error.kind) : 'dispatch_unknown';
@@ -90,19 +89,13 @@ export async function cleanupAgentEnvironments(deps: BusinessExecutionDeps): Pro
   return count;
 }
 
-/** Capability omission is the legacy path; transient failures must not silently change an accepted launch. */
-async function observationInfo(deps: BusinessExecutionDeps, taskId: TaskId) {
-  const send = (capabilities: { usageObservationsV1?: 1; nativeUsageTreeV1?: 1 }) => deps.runner.sendCommand(taskId, { id: newResourceId(), type: 'businessExecutionInfo', ...capabilities });
-  try {
-    return BusinessExecutionInfoSchema.parse(await send({ usageObservationsV1: 1, nativeUsageTreeV1: 1 }));
-  } catch (error) {
-    if (!isPlatformError(error) || error.details?.code !== 'unsupported_capability') throw error;
-    if (error.details.capability === 'usageObservationsV1') return BusinessExecutionInfoSchema.parse(await send({}));
-    if (error.details.capability !== 'nativeUsageTreeV1') throw error;
-    try { return BusinessExecutionInfoSchema.parse(await send({ usageObservationsV1: 1 })); }
-    catch (fallback) {
-      if (!isPlatformError(fallback) || fallback.details?.code !== 'unsupported_capability' || fallback.details.capability !== 'usageObservationsV1') throw fallback;
-      return BusinessExecutionInfoSchema.parse(await send({}));
-    }
-  }
+/** 派发前受理这次 Agent 子任务尝试；展示名取任务的 `name` 标签与发布里的 Agent 档案名。未装配记录端口时什么也不做。 */
+export async function acceptBusinessCall(deps: BusinessExecutionDeps, claimed: ExecutionSubtask, plan: ExecutionAgentPlan, runtimeTaskId: TaskId): Promise<void> {
+  if (!deps.agentCalls) return;
+  const parent = await deps.operations.forTask(claimed.serviceId, claimed.taskId);
+  const agentKey = claimed.view.agentProfileId ?? plan.request.agentProfileId;
+  const profile = parent?.intent.tasksSpec.agentProfiles.find((entry) => entry.id === agentKey);
+  await deps.agentCalls.accept({ projectId: plan.projectId, taskId: claimed.taskId, taskLabel: parent?.intent.task.labels['name'] ?? claimed.taskId,
+    subtaskId: claimed.view.id, attempt: claimed.view.attempt, runtimeTaskId, agentId: claimed.view.executionId, agentKey, agentLabel: profile?.name ?? agentKey,
+    profile: { id: plan.compute.id, revision: plan.compute.revision, name: plan.compute.name }, protocol: plan.compute.protocol });
 }

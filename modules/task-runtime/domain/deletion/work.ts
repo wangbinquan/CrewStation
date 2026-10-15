@@ -15,8 +15,8 @@ export const RuntimeWorkGrantSchema = z.strictObject({ operationId: ResourceIdSc
   phase: z.enum(['stop', 'purge', 'prove', 'namespace', 'metadata', 'verify']),
 });
 export const RuntimeWorkCallbackSchema = z.strictObject({ id: ResourceIdSchema, projectId: ProjectIdSchema,
-  originKind: z.enum(['project', 'service', 'task', 'rebuild', 'parent-ending']), originKey: z.string().min(1), originId: ResourceIdSchema,
-  kind: z.enum(['project-api', 'service-api', 'task-api', 'native-job', 'rebuild-job', 'parent-ending', 'reconcile', 'observe-startup', 'archive', 'ledger-resync', 'parent-recovery', 'deletion', 'effect']),
+  originKind: z.enum(['project', 'service', 'task', 'rebuild']), originKey: z.string().min(1), originId: ResourceIdSchema,
+  kind: z.enum(['project-api', 'service-api', 'task-api', 'native-job', 'rebuild-job', 'reconcile', 'observe-startup', 'archive', 'ledger-resync', 'deletion', 'effect']),
   reference: ResourceIdSchema, consumerId: ResourceIdSchema, inputDigest: digest, originRevision: digest,
   backendPid: z.number().int().positive(), process: RuntimeWorkProcessSchema, exitKeyDigest: digest, grant: RuntimeWorkGrantSchema.nullable(),
   exited: z.boolean(), exitDigest: digest.nullable(), recoveryDigest: digest.nullable(),

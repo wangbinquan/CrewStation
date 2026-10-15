@@ -1,29 +1,62 @@
-import type { RuntimeUsageMetrics, RuntimeTaskSummary, RuntimeAttemptFact, RuntimeSourceKind, RuntimeStatistics, RuntimeAgentStatistics } from '@crewstation/contracts';
+import type { AgentCallStatus, ObservationCall, ObservationUsage } from '@crewstation/contracts';
+import { formatObservationCny } from '@crewstation/contracts';
+import type { BadgeTone } from '../../../shared/ui/Badge';
 import type { Translate } from '../../../shared/lib/useT';
-export function runtimeTaskName(task: Pick<RuntimeTaskSummary, 'name' | 'source'> & { sourceKind?: RuntimeSourceKind }, t: Translate): string {
-  if ((task.source?.kind ?? task.sourceKind) !== 'development-agent') return task.name;
-  const agentId = task.source?.kind === 'development-agent' ? task.source.identity.agentId : task.name;
-  return `${t('runtime.developmentExecution')} · ${agentId.slice(-8)}`;
+
+// RFC-034 v2 口径（与 agent-workflow RFC-371 v2 相同）：四桶互斥、推理是输出的子集；未知不是 0——
+// 用量不完整的执行让合计成为已知下界（「≥」），没有快照的执行显示「—」，未定价不显示为 ¥0。
+
+export const TOKEN_BUCKETS = ['input', 'cacheRead', 'cacheWrite', 'output'] as const;
+export type TokenBucket = (typeof TOKEN_BUCKETS)[number];
+export type TokenBuckets = Readonly<Record<TokenBucket, number>>;
+
+export const tokenTotal = (usage: TokenBuckets): number => usage.input + usage.cacheRead + usage.cacheWrite + usage.output;
+export const countText = (value: number): string => value.toLocaleString('en-US');
+export const tokenText = (value: number, lowerBound: boolean): string => `${lowerBound ? '≥ ' : ''}${countText(value)}`;
+
+/** 柱顶的短数字：1.2K / 3.4M。 */
+export function compactCount(value: number): string {
+  if (value < 1000) return String(value);
+  const [unit, size] = value >= 1e9 ? ['B', 1e9] : value >= 1e6 ? ['M', 1e6] : ['K', 1e3];
+  return `${(value / size).toLocaleString('en-US', { maximumFractionDigits: 1 })}${unit}`;
 }
-export function runtimeAttemptName(task: Pick<RuntimeTaskSummary, 'name' | 'source'>, attempt: RuntimeAttemptFact, t: Translate) { return task.source?.kind === 'development-agent' ? runtimeTaskName(task, t) : attempt.name; }
-export function runtimeComputeLabel(profile: { profileName?: string | null; profileRevision: number | null }, t: Translate) { return `${profile.profileName ?? t('runtime.nameUnavailable')} · r${profile.profileRevision ?? '—'}`; }
-export function runtimeAgentName(agent: Pick<RuntimeAgentStatistics, 'name' | 'sourceKind' | 'agentId'>, t: Translate) { return agent.sourceKind === 'development-agent' ? `${t('runtime.developmentExecution')} · ${agent.agentId?.slice(-8) ?? ''}` : agent.name; }
-export function runtimeSourceLabel(kind: RuntimeSourceKind | undefined, t: Translate) { return t(kind === 'development-agent' ? 'runtime.source.development-agent' : kind === 'development-cli' ? 'runtime.source.development-cli' : 'runtime.source.business-task'); }
-export function runtimeObjectLabel(data: RuntimeStatistics, t: Translate) { return t(data.filters.sourceKind === 'business-task' ? 'runtime.tasks' : data.filters.sourceKind === 'development-agent' ? 'runtime.developmentExecutions' : data.sourceScope === 'project-executions' ? 'runtime.objects' : 'runtime.tasks'); }
-export const RUNTIME_TOKEN_BUCKETS = ['input', 'cacheRead', 'cacheWrite', 'output'] as const;
-const grouped = (count: string) => BigInt(count).toLocaleString();
-export function runtimeTokens(m: RuntimeUsageMetrics, bucket?: 'input' | 'cacheRead' | 'cacheWrite' | 'output'): string {
-  const value = bucket ? m.tokens[bucket] : m.tokens.total;
-  const hasKnown = m.tokens.hasKnown && (bucket ? m.tokens.hasKnownBuckets?.[bucket] ?? (m.tokens.complete || BigInt(value) > 0n) : true);
-  if (!hasKnown) return '—';
-  return `${m.tokens.complete ? '' : '≥ '}${grouped(value)}`;
+
+/** 汇总的人民币：不可见为「—」；只有未定价的执行时为「未定价」；含未定价或用量不完整的执行时为下界。 */
+export function usageCostText(usage: Pick<ObservationUsage, 'incompleteCalls' | 'unpricedCalls' | 'costNano'>, t: Translate): string {
+  if (usage.costNano === null) return '—';
+  if (usage.unpricedCalls > 0 && BigInt(usage.costNano) === 0n) return t('runtime.unpriced');
+  return `${usage.unpricedCalls > 0 || usage.incompleteCalls > 0 ? '≥ ' : ''}${formatObservationCny(usage.costNano)}`;
 }
-export function runtimeCny(m: RuntimeUsageMetrics): string {
-  const amount = m.cost.amount; if (amount === null || !m.cost.visible) return '—';
-  const [whole = '0', fraction = ''] = amount.split('.'), picos = BigInt(whole) * 1000000000000n + BigInt(fraction.padEnd(12, '0'));
-  if (picos > 0n && picos < 1000000n) return m.cost.complete ? '< ¥0.000001' : `≥ ¥${whole}.${fraction.replace(/0+$/, '')}`;
-  const micros = (picos + (m.cost.complete ? 500000n : 0n)) / 1000000n, tail = (micros % 1000000n).toString().padStart(6, '0').replace(/0+$/, '');
-  return `${m.cost.complete ? '' : '≥ '}¥${grouped((micros / 1000000n).toString())}${tail ? '.' + tail : ''}`;
+
+type CallUsage = Pick<ObservationCall, 'usageState' | 'costState' | 'costNano'>;
+/** 一次执行的 Token：还没有快照或运行时没有上报为「—」，部分为下界。 */
+export function callTokenText(call: CallUsage, value: number): string {
+  return call.usageState === 'none' || call.usageState === 'pending' ? '—' : tokenText(value, call.usageState === 'partial');
 }
-export function runtimeDuration(ms: number | null): string { if (ms === null) return '—'; return ms < 1000 ? `${ms} ms` : ms < 60000 ? `${(ms / 1000).toFixed(1)} s` : `${(ms / 60000).toFixed(1)} min`; }
-export function runtimeDate(at: string|null, zone?: string): string { if(at===null)return '—';return new Intl.DateTimeFormat(undefined, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', ...(zone ? { timeZone: zone } : {}) }).format(new Date(at)); }
+export function callCostText(call: CallUsage, costVisible: boolean, t: Translate): string {
+  if (!costVisible || call.costNano === null || call.usageState === 'none' || call.usageState === 'pending') return '—';
+  if (call.costState === 'unpriced') return t('runtime.unpriced');
+  return `${call.costState === 'partial' || call.usageState === 'partial' ? '≥ ' : ''}${formatObservationCny(call.costNano)}`;
+}
+/** 按模型拆分的一行：费用不可见为「—」，没有价格为「未定价」。 */
+export function modelCostText(costNano: string | null, costVisible: boolean, t: Translate): string {
+  if (!costVisible) return '—';
+  return costNano === null ? t('runtime.unpriced') : formatObservationCny(costNano);
+}
+
+export const STATUS_TONE: Readonly<Record<AgentCallStatus, BadgeTone>> = { running: 'info', done: 'success', failed: 'danger', canceled: 'neutral', interrupted: 'warning' };
+
+export function callDurationMs(call: Pick<ObservationCall, 'startedAt' | 'endedAt'>, asOf: string): number {
+  return Math.max(0, Date.parse(call.endedAt ?? asOf) - Date.parse(call.startedAt));
+}
+export function durationText(ms: number | null): string {
+  if (ms === null) return '—';
+  if (ms < 1000) return `${ms} ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)} s`;
+  return ms < 3_600_000 ? `${(ms / 60_000).toFixed(1)} min` : `${(ms / 3_600_000).toFixed(1)} h`;
+}
+/** 资源与健康页签沿用的时间格式。 */
+export function runtimeDate(at: string | null, zone?: string): string {
+  if (at === null) return '—';
+  return new Intl.DateTimeFormat(undefined, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', ...(zone ? { timeZone: zone } : {}) }).format(new Date(at));
+}

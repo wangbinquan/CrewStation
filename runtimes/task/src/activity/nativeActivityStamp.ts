@@ -1,3 +1,4 @@
+import type { TerminalUsageMeter } from '@crewstation/agent-drivers';
 import type { NativeActivityEvent, NativeActivitySignal } from '@crewstation/contracts';
 
 export interface NativeActivityOptions {
@@ -9,6 +10,8 @@ export interface NativeActivityOptions {
   leaseMs?: number;
   /** OpenCode 首次插件握手的等待上限；冷启动不能占用已连接后的心跳租约。 */
   startupTimeoutMs?: number;
+  /** RFC-034 v2：终端用量计量器，只收会话身份与模型请求的 Token 数，通道缺口时降级。 */
+  usage?: Pick<TerminalUsageMeter, 'observeSession' | 'observeRequest' | 'degrade'>;
 }
 
 export function createActivityStamp(options: NativeActivityOptions): (signal: NativeActivitySignal) => void {

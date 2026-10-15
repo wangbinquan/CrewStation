@@ -1,17 +1,11 @@
-import { cleanupDevelopmentExecution } from './developmentCleanup';
-import { inspectDevelopmentRemoval } from './developmentRemoval';
-import { DEVELOPMENT_REMOVAL_ANNOTATION } from '@crewstation/contracts';
 import { isDeepStrictEqual } from 'node:util';
 import type { K8sClient, K8sObject, ResourceRef } from '@crewstation/k8s';
 import { LABELS, Resources, resourcesMatch, secretObject } from '@crewstation/k8s';
-import { DEVELOPMENT_USAGE_BINDING_DIRECTORY, DEVELOPMENT_USAGE_DIRECTORY } from '@crewstation/contracts';
 import { isPlatformError, precondition } from '@crewstation/kernel';
 import type { TaskEnvironment } from '../../domain/taskEnvironment';
-import { canonicalNativeIntent, EXECUTION_INTENT_ANNOTATION, nativeIntent, nativeIntentMatches, taskLabelMatches, WORKSPACE_TASK_LABEL } from '../../domain/physicalIdentity';
+import { EXECUTION_INTENT_ANNOTATION, nativeIntent, nativeIntentMatches, taskLabelMatches, WORKSPACE_TASK_LABEL } from '../../domain/physicalIdentity';
 import type { NativeExecutionCluster } from '../../ports/cluster';
 import { taskPodObject } from './taskObjects';
-import type { WorkloadSafetyPort } from '../../ports/workloadSafety';
-import { registerDevelopmentExecution, verifyDevelopmentExecution } from './developmentExecutions';
 
 type Pod = K8sObject & { status?: { phase?: string } };
 type Volume = K8sObject & { status?: { phase?: string } };
@@ -19,7 +13,7 @@ type Secret = K8sObject & { data?: Record<string, string>; stringData?: Record<s
 const intentKey = EXECUTION_INTENT_ANNOTATION;
 const workspaceKey = WORKSPACE_TASK_LABEL;
 const secretName = (env: TaskEnvironment) => `${env.podName}-runner`;
-const intent = (env: TaskEnvironment) => env.render?.developmentUsageProtection !== undefined ? canonicalNativeIntent(env.id, env.native!) : nativeIntent(env.id, env.native!);
+const intent = (env: TaskEnvironment) => nativeIntent(env.id, env.native!);
 
 function owned(object: K8sObject, env: TaskEnvironment, expectedUid?: string): string {
   const uid = object.metadata.uid;
@@ -35,7 +29,7 @@ async function createOrRead<T extends K8sObject>(k8s: K8sClient, ref: ResourceRe
   if (found) return found;
   try {
     const object = await create();
-    object.metadata.annotations = { ...object.metadata.annotations, [intentKey]: intent(env), ...(env.render?.developmentRemovalProtection !== undefined ? { [DEVELOPMENT_REMOVAL_ANNOTATION]: '1' } : {}) };
+    object.metadata.annotations = { ...object.metadata.annotations, [intentKey]: intent(env) };
     return await k8s.create(object);
   }
   catch (error) {
@@ -69,30 +63,14 @@ function verifyPod(pod: K8sObject, env: TaskEnvironment): string {
     || !isDeepStrictEqual(spec.affinity, { nodeAffinity: { requiredDuringSchedulingIgnoredDuringExecution: { nodeSelectorTerms: [{ matchFields: [{ key: 'metadata.name', operator: 'In', values: [n.nodeName] }] }] } } })) {
     throw precondition('CLI 容器与已受理的资源、工作卷或节点不一致');
   }
-  if (env.render?.developmentUsageStorage) verifyDevelopmentStorage(pod, env);
   return uid;
 }
 
-function verifyDevelopmentStorage(pod: K8sObject, env: TaskEnvironment): void {
-  const spec = pod.spec as { volumes?: Array<{ name?: string; emptyDir?: unknown }>; containers: Array<{ env?: Array<{ name: string; valueFrom?: unknown }>; volumeMounts?: Array<{ name?: string; mountPath?: string; readOnly?: boolean }> }> };
-  const container = spec.containers[0]!;
-  const volume = spec.volumes?.filter((v) => v.name === 'development-usage');
-  const mount = container.volumeMounts?.filter((v) => v.name === 'development-usage');
-  const bindingVolume = spec.volumes?.filter((v) => v.name === 'development-usage-binding');
-  const bindingMount = container.volumeMounts?.filter((v) => v.name === 'development-usage-binding');
-  if (env.native?.purpose !== 'agent' || volume?.length !== 1 || !isDeepStrictEqual(volume[0]?.emptyDir, {}) || mount?.length !== 1 || mount[0]?.mountPath !== DEVELOPMENT_USAGE_DIRECTORY || mount[0]?.readOnly === true
-    || bindingVolume?.length !== 1 || !isDeepStrictEqual(bindingVolume[0]?.emptyDir, {}) || bindingMount?.length !== 1 || bindingMount[0]?.mountPath !== DEVELOPMENT_USAGE_BINDING_DIRECTORY || bindingMount[0]?.readOnly === true
-    || !isDeepStrictEqual(container.env?.find((e) => e.name === 'CS_RUNTIME_POD_UID')?.valueFrom, { fieldRef: { fieldPath: 'metadata.uid' } })) throw precondition('开发数值私有日志布局与受理快照不一致');
-}
-
 /** 所有写入只针对本次执行 Pod／Secret；接口没有创建、修改或删除 PVC 的能力。 */
-export function kubernetesNativeExecutions(k8s: K8sClient, workerUid: number, safety?: Pick<WorkloadSafetyPort, 'register'>): NativeExecutionCluster {
+export function kubernetesNativeExecutions(k8s: K8sClient, workerUid: number): NativeExecutionCluster {
   return {
-    cleanupDevelopment: (env, guard) => cleanupDevelopmentExecution(k8s, env, guard),
-    inspectDevelopmentRemoval: (env, target, stopped) => inspectDevelopmentRemoval(k8s, env, target, stopped),
     inspectWorkspace: (parent) => inspectWorkspace(k8s, parent),
     prepare: async (env, values) => {
-      const protection = await registerDevelopmentExecution(env, safety);
       const n = env.native!;
       const secret = await createOrRead<Secret>(k8s, Resources.Secret!, env, secretName(env), async () => ({
         ...secretObject({ name: secretName(env), namespace: env.namespace, stringData: await values(), labels: { [LABELS.task]: env.id, [workspaceKey]: n.parentTaskId } }),
@@ -102,16 +80,13 @@ export function kubernetesNativeExecutions(k8s: K8sClient, workerUid: number, sa
       const token = secret.stringData?.CS_RUNNER_TOKEN ?? (secret.data?.CS_RUNNER_TOKEN ? Buffer.from(secret.data.CS_RUNNER_TOKEN, 'base64').toString('utf8') : undefined);
       if (!secret.immutable || secret.metadata.deletionTimestamp || !token) throw precondition('CLI 环境配置不完整，停止启动');
       const pod = await createOrRead(k8s, Resources.Pod!, env, env.podName, async () => {
-        const object = taskPodObject({ env, image: n.image, envVars: {}, envSecretName: secretName(env), resources: n.profile, nodeName: n.nodeName }, protection ? env.render!.workerUid : workerUid);
-        object.metadata.annotations = { ...object.metadata.annotations, [intentKey]: intent(env) };
+        const object = taskPodObject({ env, image: n.image, envVars: {}, envSecretName: secretName(env), resources: n.profile, nodeName: n.nodeName }, workerUid);
+        object.metadata.annotations = { [intentKey]: intent(env) };
         return object;
       });
-      const podUid = protection ? owned(pod, env, n.podUid) : verifyPod(pod, env);
-      if (protection) verifyDevelopmentExecution(pod, protection);
-      return { secretUid, podUid, token };
+      return { secretUid, podUid: verifyPod(pod, env), token };
     },
     cleanup: async (env) => {
-      if (env.render?.developmentUsageProtection !== undefined) throw precondition('等待开发数字排空与原执行停止屏障');
       for (const [ref, name, expectedUid] of [[Resources.Pod!, env.podName, env.native!.podUid], [Resources.Secret!, secretName(env), env.native!.secretUid]] as const) {
         const object = await k8s.get(ref, name, env.namespace);
         if (!object) continue;

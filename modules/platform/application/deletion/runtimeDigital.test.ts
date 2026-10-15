@@ -18,7 +18,7 @@ function fixture() {
   const state = { receipt, persistedThrough: 0, acknowledgedThrough: 0, complete: false }, calls: RunnerCommand[] = [], selected: string[] = [];
   const flags = { connected: true, ambiguous: false, original: true, granted: true };
   const session: RuntimeSessionCopies = { transports: async () => flags.ambiguous ? [transport, { ...transport, id: newResourceId() }] : flags.connected ? [transport] : [],
-    originalBusiness: async (after) => flags.original && after === null ? [state.receipt] : [], lookupDevelopmentUsage: async () => ({ version: 1, runtimeTaskId: taskId, kind: 'absent' }),
+    originalBusiness: async (after) => flags.original && after === null ? [state.receipt] : [],
     getBusinessExecution: async () => ({ ...state }), send: async (source, command) => {
       expect(source).toEqual(transport); calls.push(command);
       if (command.type === 'cancelBusinessExecution') state.receipt = { ...state.receipt, phase: 'finished', lastSequence: 7, result: { reason: 'cancelled', exitCode: null, durationMs: 0 } };

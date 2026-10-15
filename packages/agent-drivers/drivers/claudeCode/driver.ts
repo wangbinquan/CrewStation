@@ -1,4 +1,4 @@
-import { normalizeClaudeUsage } from '../usage/claude';
+import { createClaudeUsageMeter } from '../usage/claudeMeter';
 import { stageBusinessSkills, nativeSkillRoots } from '../../injection/businessSkills';
 // ← agent-workflow `runtime/claudeCode/driver.ts` 的装配段（`assembleClaudePersonaSpawn` ＋
 // `writeClaudeMcpConfig`）。源里的 business 路径、边界、skill 投影、子代理注入、会话捕获、
@@ -55,6 +55,7 @@ async function prepareClaude(spec: DriverAgentSpec, context: DriverLaunchContext
     ...(settingsFile === undefined ? {} : { settingsFile }),
   };
   return {
+    usageMeter: ({ resumed }) => createClaudeUsageMeter({ resumed }),
     plan: (input) => {
       const plan = buildClaudeSpawn(
         {
@@ -69,7 +70,6 @@ async function prepareClaude(spec: DriverAgentSpec, context: DriverLaunchContext
       return plan;
     },
     parseEvent,
-    normalizeUsage: normalizeClaudeUsage,
     detectSessionNotFound: detectClaudeSessionNotFound,
     encodeStreamFrame: claudeUserMessageFrame,
     dispose: () => { skills?.dispose(); runDir.dispose(); },

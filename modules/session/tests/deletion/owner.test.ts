@@ -41,7 +41,7 @@ describe.skipIf(!available)('session deletion owner (actual PG and two WebSocket
       for (const table of SESSION_CONTENT) expect(await f.database.db.execute(sql`SELECT task_id FROM ${sql.raw('session.' + table)} WHERE task_id=${own}`)).toHaveLength(0);
       expect(await f.database.db.execute(sql`SELECT session.digest(to_jsonb(e)) AS hash FROM session.runner_events e WHERE task_id IN(${other},${platform}) ORDER BY task_id`)).toEqual(retained);
       const stored = (await f.database.db.execute<{ body: unknown; phases: object }>(sql`SELECT body,phases FROM session.project_deletions WHERE project_id=${f.projectId}`))[0]!;
-      expect(stored.body).toMatchObject({ taskKeys: [], births: [], callbacks: [], compacted: true, count: 216 }); expect(Object.keys(stored.phases)).toHaveLength(7);
+      expect(stored.body).toMatchObject({ taskKeys: [], births: [], callbacks: [], compacted: true, count: 212 }); expect(Object.keys(stored.phases)).toHaveLength(7);
       expect(JSON.stringify(stored)).not.toContain('private'); expect(JSON.stringify(stored)).not.toContain(own);
       expect((await owner.inspect(f.target)).resources).toEqual([]);
       expect(await owner.run({ ...context, phase: 'verify', generation: 2 })).toEqual(await owner.run({ ...context, phase: 'verify' }));
@@ -64,7 +64,7 @@ describe.skipIf(!available)('session deletion owner (actual PG and two WebSocket
       expect((await owner.run(renewed)).kind).toBe('done');
       await expect(owner.run({ ...renewed, phase: 'purge' })).rejects.toThrow('前一阶段');
       await expect(owner.run({ ...renewed, phase: 'stop', generation: 1 })).rejects.toThrow('世代');
-      await expect(f.database.db.execute('DELETE FROM session.development_usage_streams').then(() => undefined)).rejects.toMatchObject({ cause: { message: expect.stringContaining('closed') } });
+      await expect(f.database.db.execute(sql`DELETE FROM session.business_executions WHERE task_id=${tasks.at(-1)!}`).then(() => undefined)).rejects.toMatchObject({ cause: { message: expect.stringContaining('closed') } });
       f.permit(false); await expect(owner.run({ ...renewed, phase: 'stop' })).rejects.toThrow('grant'); f.permit(true);
       for (const phase of PROJECT_DELETION_PHASES.slice(1)) expect((await owner.run({ ...renewed, phase })).kind).toBe('done');
       expect((await owner.inspect(f.target)).resources).toEqual([]);
@@ -127,12 +127,12 @@ describe.skipIf(!available)('session deletion owner (actual PG and two WebSocket
       const id = f.task(); await f.seed(id); const context = await f.context(), owner = f.first.module.api.deletionOwner!;
       for (const phase of PROJECT_DELETION_PHASES.slice(0, 5)) expect((await owner.run({ ...context, phase })).kind).toBe('done');
       await f.database.db.execute("CREATE FUNCTION session.test_reject() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'late metadata failure';END $$");
-      await f.database.db.execute('CREATE TRIGGER test_late BEFORE DELETE ON session.development_usage_streams FOR EACH ROW EXECUTE FUNCTION session.test_reject()');
+      await f.database.db.execute('CREATE TRIGGER test_late BEFORE DELETE ON session.business_executions FOR EACH ROW EXECUTE FUNCTION session.test_reject()');
       await expect(owner.run({ ...context, phase: 'metadata' })).rejects.toMatchObject({ cause: { message: expect.stringContaining('late metadata') } });
       expect(await f.database.db.execute('SELECT task_id FROM session.runner_events')).toHaveLength(1);
       const repository = sessionDeletionRepository(f.database.db, f.source), proof = await repository.proof({ ...context, phase: 'stop' });
       await expect(repository.record({ ...context, phase: 'stop' }, { ...proof!, digest: jsonHash('different proof') })).rejects.toThrow('不可替换');
-      await f.database.db.execute('DROP TRIGGER test_late ON session.development_usage_streams');
+      await f.database.db.execute('DROP TRIGGER test_late ON session.business_executions');
       expect((await owner.run({ ...context, phase: 'metadata' })).kind).toBe('done');
       expect((await owner.run({ ...context, phase: 'verify' })).kind).toBe('done');
       const alternate = sessionDeletionOwner(repository, { close: async () => false }, f.source);

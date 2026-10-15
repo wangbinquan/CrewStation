@@ -5,9 +5,12 @@ import type { ApiInvocationCatalog, ComputeCatalog, DevSessionSettings, Manifest
 import type { Environments, ReminderRepository, Runner } from '../ports/runtime';
 import type { ComparisonReferences } from '../ports/comparisons';
 import type { DevelopmentProjectWork } from '../ports/deletion/work';
+import type { DevelopmentCalls } from '../ports/agentCalls';
 
 export interface DevSessionUseCaseDeps {
   projectWork?: DevelopmentProjectWork;
+  /** RFC-034 v2：开发执行记录；不给则不记录。 */
+  calls?: DevelopmentCalls;
   runtimeImages?: DevelopmentRuntimeImages;
   executions?: ExecutionRecords;
   comparisons: ComparisonReferences;

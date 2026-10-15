@@ -1,4 +1,3 @@
-import { Database } from 'bun:sqlite';
 // 运行循环：用假 ProcessHost 回放 stdout，不需要安装任何真实 CLI。
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { rmSync } from 'node:fs';
@@ -67,25 +66,32 @@ const CLAUDE_TURN = (text: string, sessionId = 'sess-1'): ScriptedTurn => ({
   stdout: [
     `{"type":"system","subtype":"init","session_id":"${sessionId}"}`,
     `{"type":"assistant","parent_tool_use_id":null,"session_id":"${sessionId}","message":{"content":[{"type":"text","text":"${text}"}]}}`,
-    `{"type":"result","subtype":"success","is_error":false,"result":"ok","session_id":"${sessionId}","usage":{"input_tokens":10,"output_tokens":5,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}`,
+    `{"type":"result","subtype":"success","is_error":false,"result":"ok","session_id":"${sessionId}","usage":{"input_tokens":10,"output_tokens":5,"cache_read_input_tokens":0,"cache_creation_input_tokens":0},"modelUsage":{"claude-sonnet-4":{"inputTokens":10,"outputTokens":5,"cacheReadInputTokens":0,"cacheCreationInputTokens":0}}}`,
   ],
 });
 
 describe('oneshot 运行', () => {
-  test('business execution opts into usage frames while preserving the final completion boundary', async () => {
+  // RFC-034 v2：业务 usage 事件由执行快照派生（一次执行一个累计范围），终态事件之前给出。
+  test('业务执行的 usage 事件携带按模型快照与合计，完成事件仍是最后一条', async () => {
     const host = createFakeProcessHost([CLAUDE_TURN('好的')]);
     const events = await collect(createClaudeCodeDriver(() => '/bin/claude').start({ ...spec(), businessEvents: true }, context(host)));
     expect(events.map((event) => event.type)).toEqual(['started', 'status', 'session', 'text', 'usage', 'completed']);
-    expect(events.find((event) => event.type === 'usage')?.usage).toMatchObject({ mode: 'cumulative', inputTokens: 10, outputTokens: 5 });
+    const model = { model: 'claude-sonnet-4', input: 10, cacheRead: 0, cacheWrite: 0, output: 5, reasoning: 0 };
+    expect(events[4]?.usage).toMatchObject({ mode: 'cumulative', inputTokens: 10, outputTokens: 5, cacheReadTokens: 0, cacheWriteTokens: 0, complete: true, snapshot: { state: 'complete', models: [model] } });
+    expect(events[4]?.usageSnapshot).toEqual({ state: 'complete', models: [model] });
+    expect(events[5]?.usageSnapshot).toEqual({ state: 'complete', models: [model] });
   });
-  test('started → session → text → completed，用量落在 completed 上', async () => {
+  test('started → session → text → usage → completed，用量合计落在 completed 上', async () => {
     const host = createFakeProcessHost([CLAUDE_TURN('好的')]);
     const events = await collect(createClaudeCodeDriver(() => '/bin/claude').start(spec(), context(host)));
-    expect(events.map((e) => e.type)).toEqual(['started', 'status', 'session', 'text', 'completed']);
+    expect(events.map((e) => e.type)).toEqual(['started', 'status', 'session', 'text', 'usage', 'completed']);
     expect(events[1]).toMatchObject({type:'status'});expect(events[2]?.sessionId).toBe('sess-1');
     expect(events[3]?.text).toBe('好的');
-    expect(events[4]?.result?.usage).toMatchObject({ input: 10, output: 5, total: 15 });
-    expect(events[4]?.result?.exitCode).toBe(0);
+    // 非业务执行只带快照，不带业务用量。
+    expect(events[4]?.usage).toBeUndefined();
+    expect(events[4]?.usageSnapshot?.state).toBe('complete');
+    expect(events[5]?.result?.usage).toMatchObject({ input: 10, output: 5, total: 15 });
+    expect(events[5]?.result?.exitCode).toBe(0);
   });
 
   test('started 事件只记规格摘要，不含任何环境变量或凭据', async () => {
@@ -279,121 +285,3 @@ async function waitFor(predicate: () => boolean, timeoutMs = 2000): Promise<void
     await Bun.sleep(2);
   }
 }
-
-
-test('RFC-034 opt-in root captures travel with legacy usage events while unselected drivers stay unchanged', async () => {
-  recordOpencodeBinaryVersion('/bin/opencode', '1.18.29');
-  const frame = JSON.stringify({ type: 'step_finish', sessionID: 'native-usage', part: { id: 'step-usage', tokens: { input: 9, output: 2, reasoning: 0, cache: { read: 3, write: 0 } } } });
-  for (const enabled of [false, true]) {
-    const host = createFakeProcessHost([{ stdout: [frame] }]);
-    const events = await collect(createOpencodeDriver(() => '/bin/opencode').start(openSpec({ businessEvents: true, ...(enabled ? { usageObservationsV1: 1 as const } : {}) }), context(host)));
-    const usage = events.find((event) => event.type === 'usage')!;
-    expect(usage.usage?.inputTokens).toBe(9);
-    if (enabled) expect(usage.usageCapture?.measurements[0]).toMatchObject({ actualModel: null, usage: { input: '9', output: '2', cacheRead: '3', cacheWrite: '0' } });
-    else expect(usage.usageCapture).toBeUndefined();
-  }
-});
-
-test('RFC-034 resident Claude retains tree identity and advances coverage without including the configured model', async () => {
-  let turns = 0;
-  const host = createFakeProcessHost([{ stdout: [], onFrame: () => {
-    turns++; return [JSON.stringify({ type: 'result', uuid: `result-${turns}`, session_id: 'resident-native', usage: { input_tokens: turns }, modelUsage: { 'actual-model': { inputTokens: turns, outputTokens: 2, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 } } })];
-  } }]);
-  const agent = createClaudeCodeDriver(() => '/bin/claude').start(spec({ mode: 'interactive', businessEvents: true, usageObservationsV1: 1, resumeSessionId: 'resident-native' }), context(host));
-  const events: AgentEvent[] = [];
-  const done = (async () => { for await (const event of agent.events) events.push(event); })();
-  await waitFor(() => events.some((event) => event.type === 'status'));
-  await agent.send('another turn');
-  await waitFor(() => events.filter((event) => event.type === 'status').length === 2);
-  await agent.cancel(); await done;
-  const evidence = events.flatMap((event) => event.usageCapture?.measurements ?? []);
-  expect(evidence).toHaveLength(2); expect(evidence[0]?.recordId).toBe(evidence[1]?.recordId);
-  expect(evidence.map((item) => item.coveredThroughTurn)).toEqual([0, 1]);
-  expect(evidence[1]).toMatchObject({ actualModel: { model: 'actual-model', provider: null }, basis: { kind: 'native-session', baseline: null } });
-});
-
-
-test('RFC-034 native model retry precedes success or failure and never repeats legacy usage', async () => {
-  recordOpencodeBinaryVersion('/bin/opencode', '1.18.29');
-  const frame = JSON.stringify({ type: 'step_finish', sessionID: 'native-usage', part: { id: 'step-usage', messageID: 'message-usage', sessionID: 'native-usage', tokens: { input: 9, output: 2, reasoning: 0, cache: { read: 3, write: 0 } } } });
-  for (const exitCode of [0, 1, 143]) {
-    const host = createFakeProcessHost([{ stdout: [frame], exitCode, ...(exitCode === 143 ? { onFrame: () => [] } : {}) }]), ctx = context(host), file = join(ctx.runDir!, 'opencode.db');
-    ctx.env.OPENCODE_DB = file;
-    const pump = host.pumpLines;
-    host.pumpLines = (stream, onLine) => pump(stream, (line) => {
-      onLine(line);
-      const db = new Database(file);
-      db.exec('CREATE TABLE message(id TEXT PRIMARY KEY, session_id TEXT, data TEXT); CREATE TABLE part(id TEXT PRIMARY KEY, message_id TEXT, session_id TEXT, data TEXT)');
-      db.query('INSERT INTO message VALUES(?,?,?)').run('message-usage', 'native-usage', JSON.stringify({ role: 'assistant', providerID: 'actual-provider', modelID: 'actual-model' }));
-      db.query('INSERT INTO part VALUES(?,?,?,?)').run('step-usage', 'message-usage', 'native-usage', JSON.stringify({ type: 'step-finish' })); db.close();
-    });
-    const agent = createOpencodeDriver(() => '/bin/opencode').start(openSpec({ businessEvents: true, usageObservationsV1: 1 }), ctx);
-    const collecting = collect(agent);
-    if (exitCode === 143) { await waitFor(() => host.spawns.length === 1); await agent.cancel(); }
-    const events = await collecting;
-    const usage = events.filter((e) => e.type === 'usage');
-    expect(usage).toHaveLength(2); expect(usage.filter((e) => e.usage)).toHaveLength(1);
-    expect(usage[0]!.usageCapture!.measurements[0]!.actualModel).toBeNull();
-    expect(usage[1]!.usageCapture!.measurements[0]!.actualModel).toMatchObject({ provider: 'actual-provider', model: 'actual-model' });
-    expect(usage[1]!.usageCapture!.measurements[0]!.recordId).toBe(usage[0]!.usageCapture!.measurements[0]!.recordId);
-    expect(events.at(-1)?.type).toBe(exitCode === 0 ? 'completed' : exitCode === 143 ? 'cancelled' : 'error');
-    expect(events.at(-1)?.result?.usage).toMatchObject({ input: 9, output: 2, total: 14 });
-  }
-});
-
-
-test('RFC-034 output-pump failure still emits the model revision before surfacing the original error', async () => {
-  recordOpencodeBinaryVersion('/bin/opencode', '1.18.29');
-  const frame = JSON.stringify({ type: 'step_finish', sessionID: 'native', part: { id: 'step', messageID: 'message', sessionID: 'native', tokens: { input: 9, output: 2, reasoning: 0, cache: { read: 3, write: 0 } } } });
-  const host = createFakeProcessHost([{ stdout: [frame] }]), ctx = context(host), file = join(ctx.runDir!, 'native.db'); ctx.env.OPENCODE_DB = file;
-  const original = host.pumpLines, failure = new Error('stdout read interrupted');
-  host.pumpLines = (stream, onLine) => original(stream, (line) => {
-    onLine(line);
-    const db = new Database(file);
-    db.exec('CREATE TABLE message(id TEXT PRIMARY KEY, session_id TEXT, data TEXT); CREATE TABLE part(id TEXT PRIMARY KEY, message_id TEXT, session_id TEXT, data TEXT)');
-    db.query('INSERT INTO message VALUES(?,?,?)').run('message', 'native', JSON.stringify({ role: 'assistant', providerID: 'actual', modelID: 'model' }));
-    db.query('INSERT INTO part VALUES(?,?,?,?)').run('step', 'message', 'native', JSON.stringify({ type: 'step-finish' })); db.close();
-    throw failure;
-  });
-  const events: AgentEvent[] = [], agent = createOpencodeDriver(() => '/bin/opencode').start(openSpec({ businessEvents: true, usageObservationsV1: 1 }), ctx);
-  let caught: unknown;
-  try { for await (const event of agent.events) events.push(event); } catch (error) { caught = error; }
-  expect(caught).toBe(failure);
-  const usage = events.filter((event) => event.type === 'usage'); expect(usage).toHaveLength(2);
-  expect(usage.filter((event) => event.usage)).toHaveLength(1);
-  expect(usage[1]!.usageCapture!.measurements[0]!.actualModel).toMatchObject({ provider: 'actual', model: 'model' });
-});
-
-// RFC-034: the actual one-shot driver persists pending before spawn and the subtree proof after final numbers.
-test('native child capture uses final process environment and shares root revisions before completion', async () => {
-  recordOpencodeBinaryVersion('/bin/opencode', '1.18.29');
-  const frame = JSON.stringify({ type: 'step_finish', sessionID: 'root-native', part: { id: 'root-step', sessionID: 'root-native', messageID: 'root-message', tokens: { input: 9, output: 2, reasoning: 0, cache: { read: 3, write: 0 } } } });
-  const host = createFakeProcessHost([{ stdout: [frame] }]), ctx = context(host), file = join(tmpdir(), `cs-native-driver-${crypto.randomUUID()}.db`); roots.push(file); ctx.env.OPENCODE_DB = file;
-  const db = new Database(file);
-  db.exec('CREATE TABLE session(id TEXT PRIMARY KEY,parent_id TEXT,time_created INTEGER); CREATE TABLE message(id TEXT PRIMARY KEY,session_id TEXT,data TEXT); CREATE TABLE part(id TEXT PRIMARY KEY,session_id TEXT,message_id TEXT,time_created INTEGER,data TEXT)');
-  const originalPump=host.pumpLines;let seeded=false;host.pumpLines=(stream,onLine)=>originalPump(stream,line=>{if(!seeded){seeded=true;
-  for (const [session, parent, id, input] of [['root-native', null, 'root', 9], ['child-native', 'root-native', 'child', 13]] as const) {
-    db.query('INSERT INTO session VALUES (?,?,?)').run(session, parent, Date.now());
-    db.query('INSERT INTO message VALUES (?,?,?)').run(id + '-message', session, JSON.stringify({ role: 'assistant', providerID: 'actual-provider', modelID: 'actual-model' }));
-    db.query('INSERT INTO part VALUES (?,?,?,?,?)').run(id + '-step', session, id + '-message', Date.now(), JSON.stringify({ type: 'step-finish', tokens: { input, output: 2, reasoning: 0, cache: { read: 3, write: 0 } } }));
-  }
-  }onLine(line);});
-  const events = await collect(createOpencodeDriver(() => '/bin/opencode').start(openSpec({ businessEvents: true, usageObservationsV1: 1, nativeUsageTreeV1: 1, nativeUsageLineageKey: 'business-session' }), ctx)); db.close();
-  const captures = events.flatMap((event) => event.usageCapture ? [event.usageCapture] : []);
-  expect(captures[0]!.nativeProof).toMatchObject({ state: 'pending', lineageKey: 'business-session' });
-  expect(captures.at(-1)!.nativeProof).toMatchObject({ state: 'complete', emitted: 2, sessions: 2, steps: 2 });
-  const records = captures.flatMap((frame) => frame.measurements), root = records.filter((r) => r.scope?.session === 'root-native');
-  expect(root).toHaveLength(2); expect(root[0]!.recordId).toBe(root[1]!.recordId); expect(root[1]!.revision).toBeGreaterThan(root[0]!.revision);
-  expect(records.find((r) => r.scope?.session === 'child-native')).toMatchObject({ usage: { input: '13' }, scope: { root: 'root-native', ancestors: ['root-native'], parentSession: 'root-native' } });
-  expect(events.at(-1)?.type).toBe('completed'); expect(events.at(-2)?.usageCapture?.nativeProof?.state).toBe('complete');
-});
-
-test('unavailable native store preserves business completion with a partial proof', async () => {
-  recordOpencodeBinaryVersion('/bin/opencode', '1.18.29');
-  const frame = JSON.stringify({ type: 'step_finish', sessionID: 'root', part: { id: 'step', tokens: { input: 9, output: 2, reasoning: 0, cache: { read: 3, write: 0 } } } });
-  const host = createFakeProcessHost([{ stdout: [frame] }]), ctx = context(host); ctx.env.OPENCODE_DB = ':memory:';
-  const events = await collect(createOpencodeDriver(() => '/bin/opencode').start(openSpec({ businessEvents: true, usageObservationsV1: 1, nativeUsageTreeV1: 1, nativeUsageLineageKey: 'lineage' }), ctx));
-  // RFC-034: absent native storage also has no persisted snapshot order; business completion is unchanged.
-  expect(events.at(-1)?.type).toBe('completed'); expect(events.at(-2)?.usageCapture?.nativeProof).toMatchObject({ state: 'partial', issues: ['native-store-unavailable', 'native-order-unavailable', 'native-root-unavailable'] });
-  expect(events.at(-2)?.usageCapture?.nativeProof?.order).toBeUndefined();
-});

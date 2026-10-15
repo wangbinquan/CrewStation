@@ -1,4 +1,4 @@
-import { RunnerUsageCaptureSchema } from './usageObservation';
+import { AgentUsageSnapshotSchema } from './usage';
 import { BusinessUsageSchema } from '../api/business/events';
 import { z } from 'zod';
 import { AgentPermissionSchema } from '../manifest/tasks';
@@ -14,9 +14,10 @@ export const AgentEventSchema = z.object({
   seq: z.number().int().min(0),
   at: z.iso.datetime(),
   type: AgentEventTypeSchema,
+  /** 发给业务应用的同一份用量（RFC-027 业务事件）；由 usageSnapshot 派生，四个总量为各模型合计。 */
   usage: BusinessUsageSchema.optional(),
-  /** RFC-034 opt-in numeric evidence; the legacy BusinessUsage payload stays unchanged. */
-  usageCapture: RunnerUsageCaptureSchema.optional(),
+  /** RFC-034 v2：本次执行到目前为止按实际模型拆分的用量，整份替换上一份。 */
+  usageSnapshot: AgentUsageSnapshotSchema.optional(),
   /** CLI 原生会话 ID，出现后可用于 resume。 */
   sessionId: z.string().optional(),
   /**

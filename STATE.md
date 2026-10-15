@@ -1,3 +1,13 @@
+## 2026-10-14 RFC-034 v2：每次 Agent 执行一行的运行统计（断代重设计，In Progress）
+
+按作者 2026-10-14 裁定（断代、不迁移 v1 已采集数据；原 RFC-034 会话已停，其未提交在制品直接替换），对照 agent-workflow RFC-371 重新设计并实现：业务子任务、开发 Agent、「＋ CLI」、档位测试四类执行都由各自 owner 在派发前受理一行执行记录（受理失败不派发），Runner／agent-drivers 以流与原生会话树计量四桶 Token、≤3 秒节流上报整份快照，Session 只转交快照与终态，组合根订阅 `task-runtime.task-released` 兜底收尾。统计按需聚合（无报告、无水位），价格线按档位 × 模型追加版本、CAS 写入并按执行开始冻结，人民币对项目默认隐藏、由管理员按项目开放。迁移 observability 0045、session 0017、resources 0011、task-runtime 0026、dev-session 0022 退役 v1 全部观测表与附加能力；工作台改为总览／任务／Agent 与模型／项目／平台执行（保留资源与健康），任务详情为独立路由。设计见 [v2 重新设计](proposal/rfc/RFC-034-runtime-observability/redesign-v2-20261014.md)，任务见同目录 `plan.md`「v2 实施」。
+
+实现期自查修正三处真实 PostgreSQL 缺陷：价格行锁键含 `\u0000` 被拒、项目删除 `= ANY(${keys})` 参数形状错误、原生 SQL 的 `Date` 参数；均有真实 PG 用例锁定。
+
+本机在「HEAD＋本批」精确候选树（导出，不含并行在制品）上：`check:static` 通过；分层用例 unit 1517 pass／0 fail，module 2875 pass／50 条件 skip／1 fail，console 1135 pass／0 fail，e2e 20 pass／132 skip（无实机环境）。唯一失败是 data-control 原生删除用例要求 PostgreSQL `max_prepared_transactions`，本机测试库未开（HEAD 既有，与本批无关）；unit 审计另报 Linux 专属的 `packages/filesystem-metrics/consumersNative.test.ts` 在 macOS 不注册用例。新增代码防护按 CI 口径（unit＋module＋console 覆盖）：改动可执行行 2954 行，执行到 2923 行（99.0%），无未被加载的文件。
+
+并行会话的 RFC-039 首次交付在制品（含共享文件中的 hunk）不在本提交内，原样保留在工作树。精确六项 CI、本机部署（七后端＋console＋任务底座镜像）与四类执行逐条对原生存储对账待完成（plan T8）。以下历史与并行内容原样保留。
+
 ## 2026-10-12 RFC-034：6311 修复部署、原 A/B 及临时配额恢复
 
 源码 `6311b8943afab29e9046c98ba13f283a4072cae7` 准确六项 CI 38189279209 全部成功后，七后端于 01:17:38.295 UTC 正常部署，原 261 迁移保持，console 仍为 67b6d445。获准 Docker 容量 200→232 GiB 后，原数据库恢复、27 原 PV UID 保持，原 postgres-0 Ready=true；七后端与 console 镜像及 Ready 再核对通过。

@@ -6,7 +6,6 @@ import type { MigrationSet } from '@crewstation/persistence';
 import type { RuntimeDeletionOrigin } from '../../domain/deletion/content';
 import type { RuntimeDeletionSources } from '../../ports/deletion/sources';
 import { runtimeContentSnapshot } from '../../adapters/persistence/deletion/inspection';
-import { DevelopmentParentEpochSchema, developmentParentEpochHash } from '../../domain/development/parentEnding';
 import { taskRuntimeMigrations } from '../../wiring';
 
 /** Actual owner PostgreSQL, controlled original public identities; this fixture provides no physical stop evidence. */
@@ -52,23 +51,10 @@ export async function corruptRuntimeContent(f: Pick<RuntimeContentFixture, 'data
 }
 
 export async function seedRuntimeContent(f: RuntimeContentFixture) {
-  const db = f.database.db, child = TaskIdSchema.parse(await f.environment({ native: f.native() })), ending = newResourceId(), rebuild = newResourceId();
-  const epoch = DevelopmentParentEpochSchema.parse({ version: 1, parentId: f.parent, projectId: f.project, serviceId: f.service, kind: 'dev-session',
-    volumeMode: 'persistent', namespace: f.project, podName: 'original-pod-' + f.parent, podUid: newResourceId(), pvcName: 'work-' + f.parent, pvcUid: newResourceId(),
-    profile: 'original-profile', labels: {}, runnerTokenHash: '1'.repeat(64), originalRenderStart: null, acceptedRender: null });
-  await db.execute(sql`INSERT INTO task_runtime.development_parent_endings(id,parent_id,project_id,operation,epoch,epoch_hash,selection_hash,intent,phase,status,retry_at,created_at,updated_at)
-    VALUES(${ending},${f.parent},${f.project},'release',${JSON.stringify(epoch)}::jsonb,${developmentParentEpochHash(epoch)},${jsonHash('selection')},
-      '{"private":"original-stop-intent"}'::jsonb,'admission-sealed','pending',now(),now(),now())`);
-  await db.execute(sql`INSERT INTO task_runtime.development_parent_ending_children(ending_id,child_id,original_parent_pod_uid,snapshot,closed,closure)
-    SELECT ${ending},id,native->>'parentPodUid',to_jsonb(r),true,'{"private":"original-numeric-tail"}'::jsonb FROM task_runtime.environments r WHERE id=${child}`);
-  await db.execute(sql`UPDATE task_runtime.development_parent_endings SET phase='children',membership_frozen=true,member_count=1 WHERE id=${ending}`);
-  await db.execute(sql`INSERT INTO task_runtime.development_parent_ending_objects(ending_id,kind,namespace,name,uid,materials_hash)
-    VALUES(${ending},'Pod',${f.project},'original-owned-pod',${newResourceId()},${jsonHash('materials')})`);
+  const db = f.database.db, child = TaskIdSchema.parse(await f.environment({ native: f.native() })), rebuild = newResourceId();
   await db.execute(sql`INSERT INTO task_runtime.environment_rebuilds(id,task_id,project_id,input,namespace,original_pod_name,pod_name,pvc_name,secret_name,image,state,created_at,updated_at)
     VALUES(${rebuild},${f.parent},${f.project},${JSON.stringify({ expectedTaskId: f.parent, private: 'original-rebuild-input' })}::jsonb,
       ${f.project},'original-parent','replacement-parent','original-pvc','original-secret','image','failed',now(),now())`);
-  await db.execute(sql`INSERT INTO task_runtime.development_parent_rebuild_claims(source_ending_id,current_rebuild_id,revision,after_transition_hash,state,retry_at)
-    VALUES(${ending},${rebuild},1,${jsonHash('transition')},'released',now())`);
   const business = await f.environment({ kind: 'business' }), archive = newResourceId(), operation = newResourceId(), reserved = newResourceId();
   const input = { projectId: f.project, serviceId: f.service, taskId: business, operationId: operation, revision: 1, volumeUid: null };
   await db.execute(sql`INSERT INTO task_runtime.archive_executions(id,task_id,state,body) VALUES(${archive},${business},'stopped',
@@ -78,6 +64,5 @@ export async function seedRuntimeContent(f: RuntimeContentFixture) {
     ${JSON.stringify({ input: { ...input, taskId: reserved }, createdAt: '2026-10-01T00:00:00Z', proofId: null, private: 'never-provisioned-private' })}::jsonb)`);
   await db.execute(sql`INSERT INTO task_runtime.blocked_admissions(task_id,service_id) VALUES(${reserved},${f.service})`);
   await db.execute(sql`INSERT INTO task_runtime.admissions(project_id,running) VALUES(${f.project},0)`);
-  await db.execute(sql`INSERT INTO task_runtime.development_parent_recovery_sweep(singleton,kind,scan_cutoff,after_id,epoch) VALUES(true,'ending',now(),${ending},1)`);
-  return { child, ending, rebuild, business, archive, operation, reserved, epoch };
+  return { child, rebuild, business, archive, operation, reserved };
 }

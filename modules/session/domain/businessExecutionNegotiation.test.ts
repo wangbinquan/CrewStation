@@ -22,13 +22,10 @@ test('全部可靠命令都要求显式能力，旧 exec 保留旧协议', () =>
   expect(() => assertLaunchSupported(RunnerCommandSchema.parse({ id: 'legacy', type: 'exec', execId: 'x', command: ['true'] }), capabilities)).not.toThrow();
 });
 
-
-test('RFC-034 observation negotiation preserves old info shape and refuses opt-in to an old Runner before RPC', () => {
+// RFC-034 v2：业务执行不再协商用量能力；旧的扩展字段一律被协议拒绝（usage 事件本身携带执行快照）。
+test('business execution info carries no usage negotiation and rejects the retired v1 fields', () => {
   const caps: RunnerHello['capabilities'] = { protocols: ['opencode'], preview: false, pty: true, businessExecutionV3: 1 };
-  const legacy = RunnerCommandSchema.parse({ id: 'old-info', type: 'businessExecutionInfo' });
-  const requested = RunnerCommandSchema.parse({ id: 'new-info', type: 'businessExecutionInfo', usageObservationsV1: 1 });
-  expect(() => assertLaunchSupported(legacy, caps)).not.toThrow();
-  expect(() => assertLaunchSupported(requested, caps)).toThrow('扩展用量');
-  expect(() => assertLaunchSupported(requested, { ...caps, usageObservationsV1: 1 })).not.toThrow();
-  expect(RunnerCommandSchema.safeParse({ ...requested, usageObservationsV1: 2 }).success).toBe(false);
+  expect(() => assertLaunchSupported(RunnerCommandSchema.parse({ id: 'info', type: 'businessExecutionInfo' }), caps)).not.toThrow();
+  expect(RunnerCommandSchema.safeParse({ id: 'info', type: 'businessExecutionInfo', usageObservationsV1: 1 }).success).toBe(false);
+  expect(RunnerCommandSchema.safeParse({ id: 'info', type: 'businessExecutionInfo', nativeUsageTreeV1: 1 }).success).toBe(false);
 });

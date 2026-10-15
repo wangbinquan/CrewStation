@@ -60,10 +60,5 @@ export async function seedDevelopmentContent(f: DevelopmentContentFixture) {
   await f.database.db.execute(sql`INSERT INTO dev_session.comparison_references(id,task_id,runner_comparison_id,target,deployment,created_at)
     VALUES(${newResourceId()},${f.workspace},'private-comparison','production','private-deployment',now())`);
   await f.database.db.execute(sql`INSERT INTO dev_session.cluster_agent_restarts(operation_id,agent_id,task_id) VALUES(${operation},${newResourceId()},${reserved})`);
-  const identity = { projectId: f.project, taskId: f.workspace, agentId: headless.agentId, executionId: headless.id };
-  await f.database.db.execute(sql`INSERT INTO dev_session.development_agent_usage(execution_task_id,project_id,workspace_task_id,accepted_at,prepared)
-    VALUES(${headless.id},${f.project},${f.workspace},'2026-10-01T00:00:00.000Z',${JSON.stringify({ intent: { identity }, private: 'usage-private' })}::jsonb)`);
-  await f.database.db.execute(sql`INSERT INTO dev_session.development_agent_endings(execution_task_id,first_reason,observed_at,version,fence,last_attempt_at,stage)
-    VALUES(${headless.id},'completed','2026-10-01T00:01:00.000Z',1,0,'2026-10-01T00:01:00.000Z','awaiting-stop')`);
   return { cli, headless, operation, reserved };
 }

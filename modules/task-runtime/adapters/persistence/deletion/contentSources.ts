@@ -30,7 +30,6 @@ export class RuntimeContentSources {
   private readonly publicCache = new Map<string, Promise<RuntimeDeletionOrigin | undefined>>();
   private readonly tasks = new Map<string, Promise<RuntimeDeletionOrigin>>();
   private readonly workOrigins = new Map<string, Promise<RuntimeDeletionOrigin>>();
-  private readonly memberCounts = new Map<string, Promise<number>>();
   private readonly origins = new Map<string, RuntimeContentOrigin>();
   constructor(private readonly db: Executor, private readonly sources: RuntimeDeletionSources, private readonly project: ProjectId) {
     this.rows = new RuntimeContentRows(db);
@@ -127,15 +126,6 @@ export class RuntimeContentSources {
     const protocolIdentity = ['agent', 'runner', 'terminal'].includes(kind) && !ResourceIdSchema.safeParse(id).success;
     if (protocolIdentity ? mapped !== undefined || key !== id : mapped !== ResourceIdSchema.parse(id))
       throw precondition('运行环境当前记录与历史原身份不符');
-  }
-  memberCount(ending: string) {
-    let pending = this.memberCounts.get(ending);
-    if (!pending) {
-      pending = this.db.execute<{ count: number }>(sql`SELECT count(*)::int AS count FROM task_runtime.development_parent_ending_children WHERE ending_id=${ending}`)
-        .then((rows) => rows[0]!.count);
-      this.memberCounts.set(ending, pending);
-    }
-    return pending;
   }
   listOrigins() {
     return [...this.origins.values()].sort((a, b) => Buffer.compare(Buffer.from(JSON.stringify([a.kind, a.key])), Buffer.from(JSON.stringify([b.kind, b.key]))));

@@ -1,6 +1,4 @@
-import { createOpencodeUsageNormalizer, opencodeUsageDatabasePath } from '../usage/opencodeModel';
-import { createDevelopmentNativeUsageCapture } from '../usage/developmentNativeCapture';
-import {createStreamedNativeCapture} from '../usage/streamedNativeCapture';
+import { createOpencodeUsageMeter } from '../usage/opencodeMeter';
 import { stageBusinessSkills, nativeSkillRoots } from '../../injection/businessSkills';
 // ← agent-workflow `runtime/opencode/driver.ts` 的装配段（`assembleOpencodePersonaSpawn`）。
 // 不复制的部分：清单插件物化、skill staging、工作区边界、SQLite 会话捕获、模型列举、
@@ -34,7 +32,6 @@ export function opencodeAdapter(): CliRuntimeAdapter {
     // `opencode run --help`（1.18.29 实测）的 message 是位置参数，没有任何 stdin 流入口：
     // 交互式只能退化为「一轮一进程 ＋ `--session <id>` 续接」。
     supportsResidentStream: false,
-    developmentNativePagesV2: 2,
     prepare: prepareOpencode,
   };
 }
@@ -69,7 +66,8 @@ async function prepareOpencode(spec: DriverAgentSpec, context: DriverLaunchConte
     env.OPENCODE_CONFIG_CONTENT = JSON.stringify(config);
   }
   return {
-    nativePageBootstrap: (finalEnv) => ({ cmd: [...head, 'db', 'SELECT 1', '--format', 'json'], env: finalEnv }),
+    // 计量器只用最终环境定位原生存储（每轮拉起用的就是这一份 env）。
+    usageMeter: ({ resumed, startedAt }) => createOpencodeUsageMeter({ resumed, startedAt, configuredModel: spec.launch.model ?? null, env }),
     plan: (input) => ({
       cmd: buildOpencodeArgv(
         {
@@ -85,8 +83,6 @@ async function prepareOpencode(spec: DriverAgentSpec, context: DriverLaunchConte
       stdin: { mode: 'ignore' },
     }),
     parseEvent,
-    normalizeUsage: createOpencodeUsageNormalizer(env),
-    nativeUsageCapture: (input, finalEnv) => input.developmentNativeSourceV1 === 1 ? createDevelopmentNativeUsageCapture(input, finalEnv) : createStreamedNativeCapture(input,opencodeUsageDatabasePath(finalEnv)),
     detectSessionNotFound: detectOpencodeSessionNotFound,
     dispose: () => { skills?.dispose(); runDir.dispose(); },
   };

@@ -1,6 +1,6 @@
 import type { NativeActivityChannel } from '@crewstation/agent-drivers';
 import { OpencodeNativeActivity } from '@crewstation/agent-drivers';
-import type { NativeActivitySignal, OpencodeActivityInput } from '@crewstation/contracts';
+import type { NativeActivitySignal } from '@crewstation/contracts';
 import { NativeObservationEnvelopeSchema } from '@crewstation/contracts';
 import { createActivityStamp, type NativeActivityOptions } from './nativeActivityStamp';
 
@@ -11,15 +11,14 @@ export interface NativeActivityObserver {
 }
 
 /** 只监听容器环回，每个 CLI 独立令牌和单调源序号。通道失联只降级，不猜测轮次成功。 */
-export function createOpencodeActivityChannel(options: NativeActivityOptions & {numeric?:(event:OpencodeActivityInput)=>Promise<void>}): NativeActivityObserver {
+export function createOpencodeActivityChannel(options: NativeActivityOptions): NativeActivityObserver {
   const token = crypto.randomUUID();
   const stamp = createActivityStamp(options);
   const normalizer = new OpencodeNativeActivity(stamp);
   const startedAt = Date.now();
   const state = { closed: false, sequence: 0, ready: false, degraded: false, lastContact: startedAt };
-  let pending:{sequence:number;body:string;completion:Promise<void>}|undefined;
   const now = () => new Date().toISOString();
-  const gap = (reason: NativeActivitySignal['reason']) => { state.degraded = true; normalizer.gap(now(), crypto.randomUUID(), reason); };
+  const gap = (reason: NativeActivitySignal['reason']) => { state.degraded = true; options.usage?.degrade(); normalizer.gap(now(), crypto.randomUUID(), reason); };
   const leaseMs = options.leaseMs ?? 20000;
   const startupTimeoutMs = options.startupTimeoutMs ?? 120000;
   const server = Bun.serve({
@@ -31,27 +30,23 @@ export function createOpencodeActivityChannel(options: NativeActivityOptions & {
       try { input = await request.json(); } catch { gap('source-error'); return new Response(null, { status: 400 }); }
       const parsed = NativeObservationEnvelopeSchema.safeParse(input);
       if (!parsed.success) { gap('source-error'); return new Response(null, { status: 400 }); }
-      const { sequence, event } = parsed.data,body=JSON.stringify(parsed.data);
-      if(pending){if(pending.sequence===sequence&&pending.body!==body){gap('channel-gap');return new Response(null,{status:409});}await pending.completion;}
-      if(sequence<=state.sequence)return Response.json({});
-      if(sequence!==state.sequence+1)gap('channel-gap');
-      const completion=(async()=>{
-        if(event.type==='ready'){
-          if(sequence!==1)gap('channel-gap');
-          if(!state.ready&&sequence===1&&!state.degraded)stamp({source:'opencode/1.18.29',sourceEventId:'observer-ready',kind:'source-ready',occurredAt:now(),nativeSessionId:null,turnId:null});state.ready=true;
-        }else if(event.type==='gap')gap('channel-gap');
-        else if(event.type!=='heartbeat'){
-          if(!state.ready)gap('channel-gap');
-          // A retried HTTP request cannot acknowledge the model hook before its original baseline is durable.
-          await options.numeric?.(event);normalizer.accept(event);
-        }
-        state.sequence=sequence;state.lastContact=Date.now();
-      })();
-      pending={sequence,body,completion};
-      try{await completion;return Response.json({});}
-      catch{gap('source-error');return new Response(null,{status:503});}
-      finally{if(pending?.completion===completion)pending=undefined;}
-
+      const { sequence, event } = parsed.data;
+      if (sequence <= state.sequence) return Response.json({});
+      if (sequence !== state.sequence + 1) gap('channel-gap');
+      state.sequence = sequence;
+      state.lastContact = Date.now();
+      if (event.type === 'ready') {
+        if (sequence !== 1) gap('channel-gap');
+        if (!state.ready && sequence === 1 && !state.degraded) stamp({ source: 'opencode/1.18.29', sourceEventId: 'observer-ready', kind: 'source-ready', occurredAt: now(), nativeSessionId: null, turnId: null });
+        state.ready = true;
+      } else if (event.type === 'gap') gap('channel-gap');
+      else if (event.type !== 'heartbeat') {
+        if (!state.ready) gap('channel-gap');
+        // 用量只需要会话树的根：终端计量器据此只汇总本 CLI 的原生会话。
+        if (event.type === 'session') options.usage?.observeSession(event.sessionId, event.parentId);
+        normalizer.accept(event);
+      }
+      return Response.json({});
     },
   });
   const timer = setInterval(() => {

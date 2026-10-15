@@ -1,5 +1,4 @@
-import type { ProfileUsage } from './ports/profileUsage';
-import { resourceEndingHandler } from './application/development/parent/retention';
+import type { ProfileTestCalls } from './ports/agentCalls';
 import { originalProjectTaskIds } from './adapters/persistence/infrastructure/origins';
 import { originalRuntimeWorkInfrastructure } from './adapters/persistence/deletion/workOrigin';
 import { runtimeProjectWork } from './adapters/persistence/deletion/projectWork';
@@ -13,10 +12,6 @@ import { scopedRuntimePorts, guardedRuntimePort } from './application/deletion/p
 import { runtimeWorkApi } from './application/deletion/api';
 import { runtimeArchiveWork, runtimeStorageWork } from './application/deletion/storage';
 import type { RuntimeProjectWork, RuntimeWorkSources } from './ports/deletion/work';
-import { developmentRemovalLookup } from './application/development/removalLookup';
-import { developmentCleanupSelection } from './domain/development/cleanupSelection';
-import type { DevelopmentCleanupParticipant } from './ports/developmentCleanup';
-import { developmentUsageLayoutLookup } from './application/development/layoutLookup';
 import { inspectBusinessRecovery } from './application/business/recoveryInspection';
 import { businessStorageFinalization } from './application/business/finalization';
 import { businessStorageCleanup } from './application/business/storageCleanup';
@@ -61,11 +56,6 @@ import { reconcileRebuildUseCase } from './application/reconcileRebuild';
 import { rebuildUseCases } from './application/requestRebuild';
 import { rebuildWorker } from './workers/rebuildWorker';
 import { nativeExecutionWorker } from './workers/nativeExecutionWorker';
-import { developmentParentEndingWorker } from './workers/developmentParentEndingWorker';
-import { developmentParentRecoveryWorker } from './workers/developmentParentRecoveryWorker';
-import { kubernetesDevelopmentParentPhysical } from './adapters/k8s/parentEnding/physical';
-import type { TaskDevelopmentRemovalQuery } from './adapters/k8s/taskRemovalGuard';
-import type { DevelopmentParentPhysical } from './ports/developmentParentPhysical';
 import { createNativeExecutionUseCase } from './application/nativeExecution';
 import { resolveDevelopmentObjectSource } from './application/development/objectStorage';
 import { createTestEnvironmentUseCase } from './application/testEnvironment';
@@ -85,8 +75,6 @@ import type { EnvironmentSources, ProfileCatalog, ProjectAuthorizer, QuotaSource
 export interface TaskRuntimeModuleDeps {
   deletionWorkSources?: RuntimeWorkSources;
   deletionStops?: RuntimeOriginalStopSources;
-  developmentParentPhysical?: DevelopmentParentPhysical;
-  developmentCleanup?: DevelopmentCleanupParticipant;
   archive?: { credentials: ArchiveCredentials; apiUrl: string };
   workloadSafety?: WorkloadSafetyPort;
   taskVolumes?: TaskVolumePort;
@@ -102,7 +90,8 @@ export interface TaskRuntimeModuleDeps {
   checkout?: SourceCheckoutSource;
   /** 档位测试用的 Runner 通道（RFC-006）；不给则测试报“未配置测试执行通道”。 */
   testRunner?: TestRunner;
-  profileUsage?:ProfileUsage;
+  /** RFC-034 v2：档位测试模型执行的平台执行记录（组合根接到 observability）；不给则不记录。 */
+  profileTestCalls?: ProfileTestCalls;
   testTiming?: Partial<ProfileTestTiming>;
   /** 平台两个 MCP 的服务域地址，供档位测试展开步骤里的 `{{mcp.*}}`（RFC-006 C16）。 */
   testMcp?: ReadonlyArray<{ name: string; url: string }>;
@@ -144,14 +133,13 @@ function ledgerProjectionFor(deps: TaskRuntimeModuleDeps): Parameters<typeof dri
     } } : {}) } : undefined;
 }
 
-function taskRuntimeUseCaseDeps(deps: TaskRuntimeModuleDeps, developmentRemoval: TaskDevelopmentRemovalQuery): TaskRuntimeUseCaseDeps {
+function taskRuntimeUseCaseDeps(deps: TaskRuntimeModuleDeps): TaskRuntimeUseCaseDeps {
   return {
-    developmentCleanup: deps.developmentCleanup, workloadSafety: deps.workloadSafety, taskVolumes: deps.taskVolumes,
+    workloadSafety: deps.workloadSafety, taskVolumes: deps.taskVolumes,
     ...(deps.ledger && deps.creation === 'ledger' ? { unprovisionedStorage: unprovisionedStorage(deps.db, deps.ledger) } : {}),
     uow: drizzleUnitOfWork(deps.db, ledgerProjectionFor(deps)),
-    cluster: deps.cluster ?? kubernetesTaskCluster(deps.k8s, deps.settings.workerUid, developmentRemoval),
-    businessStorageInspector: kubernetesTaskRecoveryCluster(deps.k8s, developmentRemoval),
-    developmentParentInspector: kubernetesTaskRecoveryCluster(deps.k8s, developmentRemoval),
+    cluster: deps.cluster ?? kubernetesTaskCluster(deps.k8s, deps.settings.workerUid),
+    businessStorageInspector: kubernetesTaskRecoveryCluster(deps.k8s),
     authorizer: deps.authorizer,
     quotas: deps.quotas,
     profiles: deps.profiles,
@@ -168,13 +156,11 @@ function taskRuntimeUseCaseDeps(deps: TaskRuntimeModuleDeps, developmentRemoval:
 }
 
 function taskRuntimeParticipants(deps: TaskRuntimeModuleDeps) {
-  const forward: TaskDevelopmentRemovalQuery = (target) => query ? query(target) : Promise.resolve({ kind: 'waiting', reason: '原开发删除来源尚未装配' });
   const work = deps.deletionWorkSources ? runtimeProjectWork(deps.db, deps.deletionWorkSources,
     (error) => (deps.logger ?? noopLogger).warn('runtime original lifetime pending', { error: String(error) })) : undefined;
-  const raw = taskRuntimeUseCaseDeps(deps, forward);
-  raw.developmentParentPhysical = deps.developmentParentPhysical ?? kubernetesDevelopmentParentPhysical(deps.k8s, forward);
+  const raw = taskRuntimeUseCaseDeps(deps);
   const useCaseDeps = work ? scopedRuntimePorts(raw, work) : raw;
-  const nativeCluster = kubernetesNativeExecutions(deps.k8s, deps.settings.workerUid, deps.workloadSafety);
+  const nativeCluster = kubernetesNativeExecutions(deps.k8s, deps.settings.workerUid);
   const executionDeps = { ...useCaseDeps, nativeCluster: work ? guardedRuntimePort(nativeCluster, work) : nativeCluster };
   const stopping = work && deps.deletionWorkSources && deps.deletionStops ? runtimeOriginalStop({
     ...scopedRuntimePorts({ ...raw, uow: runtimeStopUnitOfWork(deps.db), cluster: { ...raw.cluster,
@@ -183,10 +169,8 @@ function taskRuntimeParticipants(deps: TaskRuntimeModuleDeps) {
   }, work, guardedRuntimePort(runtimeOriginalJobs(deps.db, deps.deletionWorkSources), work), {
     ...guardedRuntimePort({ digital: deps.deletionStops.digital, stopped: deps.deletionStops.stopped,
       ...(deps.deletionStops.originalPodUid ? { originalPodUid: deps.deletionStops.originalPodUid } : {}) }, work),
-    development: (context) => guardedRuntimePort(deps.deletionStops!.development(context), work),
   }) : undefined;
-  const query = developmentRemovalLookup(executionDeps);
-  const recoveryCluster = kubernetesTaskRecoveryCluster(deps.k8s, forward), provisioner = kubernetesRebuildProvisioner(deps.k8s, deps.settings.workerUid, forward);
+  const recoveryCluster = kubernetesTaskRecoveryCluster(deps.k8s), provisioner = kubernetesRebuildProvisioner(deps.k8s, deps.settings.workerUid);
   const recoveryDeps = { ...useCaseDeps, recoveryCluster: work ? guardedRuntimePort(recoveryCluster, work) : recoveryCluster, provisioner: work ? guardedRuntimePort(provisioner, work) : provisioner };
   return { useCaseDeps, executionDeps, recoveryDeps, work, stopping, readEnvironment: raw.uow.read.environments.getById };
 }
@@ -213,7 +197,6 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     name: 'task-runtime',
     originalInfrastructureOwnership: (kind, key, representation) => originalRuntimeWorkInfrastructure(deps.db, kind, key, representation),
     originalProjectTaskIds: (projectId, after) => originalProjectTaskIds(deps.db, projectId, after),
-    inspectResourceEnding: resourceEndingHandler(useCaseDeps, ledgerProjectionFor(deps)?.preview),
     imageHistory: environmentImageHistory(deps.db),
     blockBusinessAdmission: blockBusinessAdmission(useCaseDeps),
     imageReferenceState: runtimeImageReferenceState(useCaseDeps),
@@ -221,9 +204,6 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     stopRuntimeImageProbe: stopImageProbe(useCaseDeps, deps.imageProbeLeases ? imageProbeCleanup(deps.k8s, deps.imageProbeLeases.port, deps.imageProbeLeases.holder) : undefined),
     reconcileRebuild: reconcileRebuildUseCase(recoveryDeps),
     listClusterTasks: queries.listClusterTasks,
-    lookupDevelopmentUsageLayout: developmentUsageLayoutLookup(useCaseDeps),
-    inspectDevelopmentRemoval: developmentRemovalLookup(executionDeps),
-    inspectDevelopmentCleanupSelection: async (taskId) => { const env = await useCaseDeps.uow.read.environments.getById(taskId); return env ? developmentCleanupSelection(env) : undefined; },
     resourceWorkloads: queries.resourceWorkloads,
     resourceWorkload: queries.resourceWorkload,
     ...rebuild,
@@ -262,7 +242,6 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     api: guardedApi,
     http: [environmentRoutes(guardedApi, deps.isAdmin)],
     workers: [rebuildWorker(deps.db, recoveryDeps), nativeExecutionWorker(deps.db, executionDeps), ...runtimeLifecycleWorkers(useCaseDeps.logger, reconcile, observeStartup), ...(archives ? [archiveExecutionWorker(archives.reconcile, useCaseDeps.logger)] : []),
-      developmentParentEndingWorker(deps.db, useCaseDeps), developmentParentRecoveryWorker(useCaseDeps),
       ...(ledger ? [ledgerResyncWorker(() => resyncLedger(useCaseDeps.uow, ledger, useCaseDeps.logger, useCaseDeps.clock, work), useCaseDeps.logger)] : []),
       ...(work ? [{ start: () => {}, stop: work.drain }] : [])],
     migrations: taskRuntimeMigrations,
@@ -291,15 +270,11 @@ async function captureStartupLog(deps: TaskRuntimeUseCaseDeps, taskId: TaskId) {
   return env ? startupLogTail(deps, env, env.podName) : undefined;
 }
 
-export {readDevelopmentParentObservationContexts} from './adapters/persistence/observability/observationContexts';
-
-export {readRuntimeLifecyclePhases} from './adapters/persistence/observability/observationPhases';
-
 function profileTestRunner(deps:TaskRuntimeModuleDeps,useCaseDeps:TaskRuntimeUseCaseDeps,createTestEnvironment:ReturnType<typeof createTestEnvironmentUseCase>,lifecycle:ReturnType<typeof lifecycleUseCases>,testRunner:TaskRuntimeModuleDeps['testRunner']) {
   return runProfileTestUseCase(useCaseDeps, {
     createTestEnvironment: (input) => createTestEnvironment({ ...input, labels: { [LABELS.project]: PROFILE_TEST_LABELS.project, [LABELS.service]: PROFILE_TEST_LABELS.service, ...input.labels } }),
     release: (taskId) => lifecycle.releaseEnvironment(taskId, 'profile-test'),
-    ...(deps.profileUsage?{usage:deps.profileUsage}:{}),
+    ...(deps.profileTestCalls ? { calls: deps.profileTestCalls } : {}),
     ...(testRunner ? { runner: testRunner } : {}), ...(deps.testTiming ? { timing: deps.testTiming } : {}), ...(deps.testMcp ? { mcp: deps.testMcp } : {}),
   });
 }

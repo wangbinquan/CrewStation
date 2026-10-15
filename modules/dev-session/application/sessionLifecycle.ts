@@ -120,7 +120,7 @@ export function sessionLifecycleUseCases(deps: DevSessionUseCaseDeps) {
       const released = await environments.releaseEnvironment(env.id, mine ? 'user' : 'owner-force');
       const svc = await svcOf(projectId);
       deps.logger.info('dev session released', { taskId: env.id, by: actor.userId, forced: !mine, unpushed: unpushed?.length ?? 'unknown', at: clock.now().toISOString() });
-      return { session: await toDto(released, svc.slug, released.state === 'released' ? 'stopped' : await previewOf(released)), unpushed, workspace };
+      return { session: await toDto(released, svc.slug, 'stopped'), unpushed, workspace };
     },
     touch: (taskId: TaskId) => environments.touch(taskId),
   };

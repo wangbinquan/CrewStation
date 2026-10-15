@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { AgentPermissionSchema } from '../manifest/tasks';
 import { BeforeStartStateSchema } from './beforeStart';
 import { AgentProtocolSchema } from './launch';
+import { AgentUsageSnapshotSchema } from './usage';
 
 export const TerminalSizeSchema = z.object({ cols: z.number().int().min(10).max(300), rows: z.number().int().min(2).max(120) });
 export const NativeTerminalRecordSchema = TerminalSizeSchema.extend({
@@ -23,6 +24,11 @@ export const NativeTerminalRecordSchema = TerminalSizeSchema.extend({
    * 旧 Runner 没有这一项，平台据此按「进程拉起即就绪」处理。`by` 在 ready 时必有：画出界面（screen）或超时放行（timeout）。
    */
   ui: z.object({ state: z.enum(['waiting', 'ready']), readyAt: z.iso.datetime().optional(), by: z.enum(['screen', 'timeout']).optional() }).optional(),
+  /**
+   * RFC-034 v2：本 CLI 到目前为止按实际模型拆分的用量（整份替换），运行中每 10 秒有变化才更新，
+   * 结束记录带最终快照。通用终端协议与旧 Runner 没有这一项（用量未知）。
+   */
+  usage: AgentUsageSnapshotSchema.optional(),
 });
 export const NativeTerminalRosterSchema = z.object({ runnerId: z.uuid(), terminals: z.array(NativeTerminalRecordSchema) });
 /** 输入控制的持有人：cs-session 按浏览器连接的网关身份注入，浏览器自己带来的一律覆盖。 */

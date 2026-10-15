@@ -1,5 +1,0 @@
-import {sql} from 'drizzle-orm';
-import type {Executor} from '@crewstation/persistence';
-import {RuntimeFragmentSchema,type RuntimeTaskHeaderFact} from '@crewstation/contracts';
-/** Safe owner-retained metadata, including the original runtime child selected by the composition root. */
-export async function readOriginalRunnerFragments(db:Executor,task:RuntimeTaskHeaderFact,after:number|undefined,runtimeTaskId=task.id){const rows=await db.execute(sql`SELECT seq,document FROM session.observation_fragment_history WHERE task_id=${runtimeTaskId} AND seq>${after??0} ORDER BY seq LIMIT 201`),selected=rows.slice(0,200);return {items:selected.map(row=>{const d=row['document'] as Record<string,unknown>;return RuntimeFragmentSchema.parse({key:runtimeTaskId+':'+row['seq'],taskId:task.id,agentId:String(d['agentId']),kind:d['type'],source:'agent-driver',occurredAt:d['at'],sessionId:d['sessionId']??null,parentSessionId:null,toolId:d['toolId']??null,toolName:d['toolName']??null,status:d['status']??null,error:d['error']??null,sequence:String(row['seq'])});}),nextCursor:rows.length>200?String(selected.at(-1)!['seq']):null};}

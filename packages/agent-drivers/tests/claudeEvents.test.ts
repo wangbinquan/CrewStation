@@ -56,9 +56,10 @@ describe('Claude stream-json 解析', () => {
     expect(parseEvent(SIDECHAIN)?.sessionId).toBeUndefined();
   });
 
-  test('token 只取累计的 result.usage，逐回合 assistant 不计', () => {
-    expect(parseEvent(TEXT)?.tokens).toBeUndefined();
-    expect(parseEvent(RESULT)?.tokens).toEqual({ input: 10, output: 5, cacheRead: 2, cacheCreate: 1 });
+  // RFC-034 v2：用量由 drivers/usage/claudeMeter.ts 从 `source` 计量，解析层不再给出 token。
+  test('解析结果携带同一行的对象供计量器读取', () => {
+    expect(parseEvent(RESULT)?.source).toEqual(JSON.parse(RESULT));
+    expect(parseEvent(TEXT)).not.toHaveProperty('tokens');
   });
 
   test('result 事件带 terminalError；干净退出但 is_error 时有文案', () => {

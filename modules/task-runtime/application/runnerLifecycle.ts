@@ -1,7 +1,3 @@
-import { precondition } from '@crewstation/kernel';
-import { developmentCleanupSelection } from '../domain/development/cleanupSelection';
-import { requireCurrentParentRebuild } from './development/parent/binding';
-import { assertDevelopmentWriter, wakeRelatedDevelopmentParentEnding } from './development/parent/admission';
 import { withInitializationDeadline } from '../domain/initializationDeadline';
 import { inspectBusinessWorkspace } from './business/workspace';
 import type { TaskId } from '@crewstation/contracts';
@@ -24,37 +20,10 @@ export function runnerLifecycle(deps: TaskRuntimeUseCaseDeps) {
       return deps.uow.run(async (scope) => {
         await scope.admissions.lock(original.projectId);
         const env = await scope.environments.getById(taskId);
-        if (!env || env.businessWorkspace?.phase === 'pausing' || !tokenMatches(token, env.runnerTokenHash)) return false;
-        if (env.state === 'releasing' && env.native?.state === 'cleaning') {
-          if (!developmentCleanupSelection(env)) return false;
-          const parent = await scope.environments.getById(env.native.parentTaskId);
-          if (!parent || parent.native || parent.kind !== 'dev-session' || parent.projectId !== env.projectId
-            || !parent.podUid || parent.podUid !== env.native.parentPodUid)
-            throw precondition('原开发父工作区实例已变化', { code: 'development_parent_changed' });
-          if (!await wakeRelatedDevelopmentParentEnding(scope, env)) await assertDevelopmentWriter(scope, env);
-          // Retain the original cleanup selection and stop fence; the hello only restores diagnostics.
-          const at = deps.clock.now();
-          await scope.environments.update({ ...env, connected: true, lastActivityAt: at, updatedAt: at });
-          return true;
-        }
-        if (!['creating', 'running'].includes(env.state)) return false;
+        if (!env || env.businessWorkspace?.phase === 'pausing' || !['creating', 'running'].includes(env.state) || !tokenMatches(token, env.runnerTokenHash)) return false;
         if (env.native && !['starting', 'running'].includes(env.native.state)) return false;
-        if (await wakeRelatedDevelopmentParentEnding(scope, env)) {
-          // Only the original authenticated connection continues diagnostics; no fresh UID, start, state or rebuild-ready is published.
-          if (env.native && !env.native.podUid) return false;
-          const at = deps.clock.now();
-          await scope.environments.update({ ...env, connected: true, lastActivityAt: at, updatedAt: at });
-          return true;
-        }
-        const writer = await assertDevelopmentWriter(scope, env, undefined, 'existing-legacy-connection');
-        if (writer?.diagnosticConnection) {
-          const at = deps.clock.now();
-          await scope.environments.update({ ...env, connected: true, lastActivityAt: at, updatedAt: at });
-          return true;
-        }
         const record = env.rebuildId ? await scope.rebuilds.get(env.rebuildId) : undefined;
-        if (env.rebuildId && !record || record && !['starting', 'ready'].includes(record.state)) return false;
-        if (await requireCurrentParentRebuild(scope, env, record) && (!record?.podUid || !record.secretUid || record.podUid !== env.podUid)) return false;
+        if (record && !['starting', 'ready'].includes(record.state)) return false;
         const instance = !env.native && !env.podUid ? await deps.cluster.podPhase(env) : undefined;
         const workspace = env.render?.businessStorage && !env.native ? await inspectBusinessWorkspace(deps, env) : undefined;
         const storage = workspace ? { businessWorkspace: { ...workspace, phase: 'ready' as const } } : {};

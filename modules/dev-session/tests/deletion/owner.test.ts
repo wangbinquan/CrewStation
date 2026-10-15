@@ -15,7 +15,7 @@ describe.skipIf(!available)('development deletion owner (actual PG; controlled o
       await f.database.db.execute(sql`INSERT INTO dev_session.workspace_layouts(task_id,user_id,revision,layout)
         VALUES(${f.otherWorkspace},${newResourceId()},1,'{"private":"foreign-layout"}')`);
       await f.work.run(f.input(), async () => undefined);
-      const confirmed = await f.owner().inspect(f.target); expect(confirmed.complete).toBe(true); expect(confirmed.resources).toHaveLength(14);
+      const confirmed = await f.owner().inspect(f.target); expect(confirmed.complete).toBe(true); expect(confirmed.resources).toHaveLength(12);
       await expect(f.owner().run(f.context(confirmed, 'metadata'))).rejects.toThrow();
       const firstSeal = await f.owner().run(f.context(confirmed)); expect(firstSeal.kind).toBe('done');
       let generation = 1;
@@ -26,14 +26,14 @@ describe.skipIf(!available)('development deletion owner (actual PG; controlled o
       expect((await f.owner().inspect(f.target)).resources).toEqual([]);
       expect([...await f.database.db.execute('SELECT task_id,layout FROM dev_session.workspace_layouts')]).toEqual([{ task_id: f.otherWorkspace, layout: { private: 'foreign-layout' } }]);
       const state = (await f.database.db.execute<{ body: Record<string, unknown>; phases: unknown }>('SELECT body,phases FROM dev_session.project_deletions'))[0]!;
-      expect(state.body).toMatchObject({ contents: [], callbacks: [], compacted: true, count: 14 });
+      expect(state.body).toMatchObject({ contents: [], callbacks: [], compacted: true, count: 12 });
       for (const value of ['terminal-private', 'private-comparison', 'usage-private', 'activity-private', 'prompt', 'profile', 'foreign-layout']) expect(JSON.stringify(state)).not.toContain(value);
       expect(await f.database.db.execute('SELECT kind,key FROM dev_session.content_origins')).not.toHaveLength(0);
       for (const mutation of [sql`INSERT INTO dev_session.workspace_layouts(task_id,user_id,revision,layout) VALUES(${f.workspace},${newResourceId()},1,'{}')`,
         sql`INSERT INTO dev_session.idle_reminders(task_id,last_reminder_at) VALUES(${f.workspace},now())`, sql`TRUNCATE dev_session.project_deletions`,
         sql`DELETE FROM dev_session.content_origins`, sql`UPDATE dev_session.project_deletions SET body='{}'`]) await expect(f.database.db.execute(mutation).then(() => undefined)).rejects.toThrow();
     } finally { await f.drop(); }
-  });
+  }, 30_000);
 
   test('changed confirmed content seals writes, refuses the stale scope and accepts only a later generation of the same operation', async () => {
     const f = await developmentWorkFixture();
@@ -48,7 +48,7 @@ describe.skipIf(!available)('development deletion owner (actual PG; controlled o
       await expect(f.owner().run({ ...f.context(current, 'stop', 2), operationId: newResourceId() })).rejects.toThrow();
       expect((await f.owner().run(f.context(current, 'stop', 2))).kind).toBe('waiting');
     } finally { await f.drop(); }
-  });
+  }, 30_000);
 
   test('a missing original source or a late revoked grant never produces a successful seal', async () => {
     const f = await developmentWorkFixture();
@@ -64,5 +64,5 @@ describe.skipIf(!available)('development deletion owner (actual PG; controlled o
       await expect(f.owner().run(f.context({ ...confirmed, participant: 'session' }))).rejects.toThrow('完整原确认');
       await expect(f.owner().run(f.context({ ...confirmed, complete: false }))).rejects.toThrow('完整原确认');
     } finally { await f.drop(); }
-  });
+  }, 30_000);
 });

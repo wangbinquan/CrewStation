@@ -2,8 +2,7 @@ import type { Executor } from '@crewstation/persistence';
 import { precondition } from '@crewstation/kernel';
 import { and, eq, sql } from 'drizzle-orm';
 import { bigint, text, timestamp } from 'drizzle-orm/pg-core';
-import type { MaintenanceStep } from '../../domain/maintenanceEnding';
-import type { MaintenanceSweepLease, MaintenanceSweepRepository } from '../../ports/maintenance';
+import type { MaintenanceStep, MaintenanceSweepLease, MaintenanceSweepRepository } from '../../ports/maintenance';
 import { resourcesSchema } from './schema';
 
 export const maintenanceSweeps = resourcesSchema.table('maintenance_sweeps', {

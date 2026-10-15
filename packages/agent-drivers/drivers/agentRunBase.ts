@@ -1,33 +1,43 @@
-// 两种运行策略（链式 one-shot ／ 常驻流）的公共部分：事件工厂、会话 id 认领、终止事件与清理。
+// 两种运行策略（链式 one-shot ／ 常驻流）的公共部分：事件工厂、会话 id 认领、用量快照、终止事件与清理。
 // ← agent-workflow `execution/agentProcess.ts` 的 outcome 映射思路，但那里的产物是一条汇总记录，
 // 这里的产物是一条 AgentEvent 流。
+//
+// 用量（RFC-034 v2 §4，与 agent-workflow RFC-371 v2 同一计量规则）：每次执行一个计量器，跨轮累计；
+// 快照变化后至多每 USAGE_THROTTLE_MS 发一条 `usage`（整份替换上一份），每轮进程排空后先做一次原生汇总
+// 再立即上报，终态事件之前发最终快照，终态事件本身也带上它。
 
-import { unsupportedDevelopmentNativeUsageCapture } from './usage/developmentNativeCapture';
-import type { DevelopmentRunnerUsageCapture } from '@crewstation/contracts';
-import { unsupportedNativeUsageCapture, type NativeUsageCapture } from './usage/nativeCapture';
-import { createUsageObserver } from './usage/capture';
-import type { AgentEvent, AgentEventType, KnownAgentProtocol } from '@crewstation/contracts';
+import type { AgentEvent, AgentEventType, AgentUsageSnapshot, KnownAgentProtocol } from '@crewstation/contracts';
 import type { DriverAgentProcess, DriverAgentSpec, DriverLaunchContext } from '../contract/agentDriver';
 import { DriverStateError } from '../contract/agentDriver';
 import type { DriverChildProcess } from '../contract/processHost';
 import type { PreparedRuntime } from './cliRuntimeAdapter';
-import type { AgentEventFields, TokenUsage } from './agentEventMapping';
-import { createAgentEventFactory, emptyTokenUsage } from './agentEventMapping';
+import type { AgentEventFields } from './agentEventMapping';
+import { createAgentEventFactory, resultUsageOf } from './agentEventMapping';
 import type { EventStream } from './eventStream';
 import { createEventStream } from './eventStream';
+import { businessUsageOf, hasUsage, sameUsage, type UsageMeter } from './usage/meter';
 
 /** 杀进程树时给 SIGTERM 的宽限；到期升级 SIGKILL（宿主 processTree.ts 实现）。 */
 export const CANCEL_GRACE_MS = 5000;
+/** 两条中间 usage 事件的最小间隔（RFC-034 v2 §4：≤3 秒一次）。 */
+export const USAGE_THROTTLE_MS = 3000;
+
+const NO_USAGE: AgentUsageSnapshot = { state: 'partial', models: [] };
 
 export abstract class AgentRunBase implements DriverAgentProcess {
   readonly events: EventStream<AgentEvent>;
   protected readonly event: ReturnType<typeof createAgentEventFactory>;
-  protected readonly usage: TokenUsage = emptyTokenUsage();
   protected readonly startedAt = Date.now();
   protected sessionId: string | undefined;
   protected cancelled = false;
   protected child: DriverChildProcess | undefined;
-  protected readonly usageObserver: ReturnType<typeof createUsageObserver> | undefined;
+  private readonly meter: UsageMeter;
+  /** 业务 usage 事件的累计范围：一次执行一个，恢复同一 Agent 的下一次执行另起一个。 */
+  private readonly usageScope = crypto.randomUUID();
+  private usageRevision = 0;
+  private reported: AgentUsageSnapshot = NO_USAGE;
+  private usageTimer: ReturnType<typeof setTimeout> | undefined;
+  private lastUsageAt = 0;
 
   constructor(
     protected readonly spec: DriverAgentSpec,
@@ -37,8 +47,7 @@ export abstract class AgentRunBase implements DriverAgentProcess {
   ) {
     this.events = createEventStream<AgentEvent>(spec.businessEvents ? 4 * 1024 * 1024 : undefined);
     this.event = createAgentEventFactory(spec.agentId);
-    this.usageObserver = (spec.businessEvents || context.usageSink !== undefined) && spec.developmentNativePagesV2 !== 2 && spec.usageObservationsV1 === 1 && prepared.normalizeUsage
-      ? createUsageObserver(prepared.normalizeUsage, spec.agentId, spec.resumeSessionId) : undefined;
+    this.meter = prepared.usageMeter({ resumed: spec.resumeSessionId !== undefined, startedAt: this.startedAt });
   }
 
   abstract send(text: string): Promise<void>;
@@ -52,60 +61,57 @@ export abstract class AgentRunBase implements DriverAgentProcess {
     if (child !== undefined) await this.context.host.killTree(child, CANCEL_GRACE_MS);
     await this.settle().catch(() => undefined);
     if (this.events.closed) return;
-    this.push(this.event('cancelled', { result: this.result() }));
-    this.close();
-  }
-
-  protected retryUsageModels(): void {
-    for (const usageCapture of this.usageObserver?.retryModels(Date.now()) ?? []) this.push(this.emit('usage', { usageCapture }));
-  }
-
-  protected async beginNativeCapture(env: Readonly<Record<string, string | undefined>>, resumeSessionId?: string, resident = false): Promise<NativeUsageCapture | undefined> {
-    if (this.spec.developmentNativeSourceV1 === 1 && (!this.context.usageSink || this.spec.businessEvents)) throw new DriverStateError('development_source_requires_sink', '开发实际来源需要独立数字通道');
-    if (this.spec.nativeUsageTreeV1 !== 1 || !this.usageObserver || !this.spec.nativeUsageLineageKey) return undefined;
-    const turn = this.usageObserver.currentTurn();
-    const input = { lineageKey: this.spec.nativeUsageLineageKey, turn: turn.turnId, turnIndex: turn.turnIndex,
-      resumeSessionId, ...(this.spec.developmentNativeSourceV1 === 1 ? { developmentNativeSourceV1: 1 as const } : {}), nextRevision: () => this.usageObserver!.nextRevision() };
-    const capture = !resident && this.prepared.nativeUsageCapture ? this.prepared.nativeUsageCapture(input, env) : this.spec.developmentNativeSourceV1 === 1 ? unsupportedDevelopmentNativeUsageCapture(input) : unsupportedNativeUsageCapture(input);
-    if (capture.normalizeUsage) this.usageObserver.setNormalizer(capture.normalizeUsage);
-    const begin = await capture.begin(Date.now());
-    if (this.persistSource(begin)) return capture;
-    const event = this.emit('usage', { usageCapture: begin });
-    if (!this.persistUsage(event)) await this.events.writeProcessed(event);
-    return capture;
-  }
-
-  protected async finishNativeCapture(capture: NativeUsageCapture | undefined, issues: string[] = []): Promise<void> {
-    for await (const usageCapture of capture?.finish(this.sessionId ?? this.spec.resumeSessionId, Date.now(), issues) ?? []) {
-      if (this.persistSource(usageCapture)) continue;
-      const event = this.emit('usage', { usageCapture });
-      // The final receipt also leaves room for the following business terminal event.
-      if (this.persistUsage(event)) continue;
-      if (usageCapture.nativeProof) await this.events.writeProcessed(event);
-      else await this.events.write(event);
-    }
-  }
-
-  private persistSource(capture: DevelopmentRunnerUsageCapture): boolean {
-    if (!capture.nativeSource) return false;
-    try { this.context.usageSink?.(capture, capture.nativeSource.observedAt); }
-    catch { this.context.logger.warn('numeric usage sink unavailable'); }
-    return true;
+    this.terminate('cancelled', {}, null);
   }
 
   protected push(event: AgentEvent): void {
-    if (!this.persistUsage(event)) this.events.push(event);
-  }
-
-  private persistUsage(event: AgentEvent): boolean {
-    if (event.type !== 'usage' || !event.usageCapture || !this.context.usageSink) return false;
-    try { this.context.usageSink(event.usageCapture, event.at); }
-    catch { this.context.logger.warn('numeric usage sink unavailable'); }
-    return true;
+    this.events.push(event);
   }
 
   protected emit(type: AgentEventType, fields?: AgentEventFields, at?: number): AgentEvent {
     return this.event(type, fields, at);
+  }
+
+  /** 一条解析成功的 stdout 行交给计量器；快照变化后按节流上报。 */
+  protected observeUsage(source: Record<string, unknown>): void {
+    if (this.meter.observe(source)) this.scheduleUsage();
+  }
+
+  /** 一轮的进程排空之后：先做原生汇总（含子 Agent），再立即上报。 */
+  protected settleTurnUsage(): void {
+    this.meter.refresh?.();
+    this.flushUsage();
+  }
+
+  /** 快照有变化就同步发一条 usage，因此总排在随后的终态事件之前。 */
+  protected flushUsage(): void {
+    if (this.usageTimer !== undefined) {
+      clearTimeout(this.usageTimer);
+      this.usageTimer = undefined;
+    }
+    if (this.events.closed) return;
+    const snapshot = this.meter.snapshot();
+    if (!hasUsage(snapshot) || sameUsage(snapshot, this.reported)) return;
+    this.reported = snapshot;
+    this.lastUsageAt = Date.now();
+    this.usageRevision += 1;
+    const usage = this.spec.businessEvents ? { usage: businessUsageOf(this.usageScope, snapshot, this.usageRevision) } : {};
+    this.push(this.emit('usage', { usageSnapshot: snapshot, ...usage }));
+  }
+
+  private scheduleUsage(): void {
+    if (this.usageTimer !== undefined || this.events.closed) return;
+    const wait = this.lastUsageAt + USAGE_THROTTLE_MS - Date.now();
+    if (wait <= 0) {
+      this.flushUsage();
+      return;
+    }
+    this.usageTimer = setTimeout(() => {
+      this.usageTimer = undefined;
+      // 业务事件缓冲已满时 push 会让流以失败结束；这里只记一笔，失败由事件消费方收到。
+      try { this.flushUsage(); } catch { this.context.logger.warn('agent usage event dropped'); }
+    }, wait);
+    this.usageTimer.unref?.();
   }
 
   /** 首个事件：只记录不含凭据的规格摘要（MCP 只记名字，env 一概不记，二进制路径属于管理面也不记）。 */
@@ -132,28 +138,31 @@ export abstract class AgentRunBase implements DriverAgentProcess {
     this.push(this.emit('session', { sessionId }));
   }
 
-  protected result(extra: { summary?: string; exitCode?: number } = {}): AgentEvent['result'] {
-    return {
-      ...(extra.summary === undefined ? {} : { summary: extra.summary }),
-      ...(extra.exitCode === undefined ? {} : { exitCode: extra.exitCode }),
-      usage: { ...this.usage },
-      durationMs: Date.now() - this.startedAt,
-    };
-  }
-
   protected finishCompleted(exitCode: number | null): void {
-    if (this.events.closed) return;
-    this.push(this.emit('completed', { result: this.result({ ...(exitCode === null ? {} : { exitCode }) }) }));
-    this.close();
+    this.terminate('completed', {}, exitCode);
   }
 
   protected finishFailed(code: string, message: string, exitCode: number | null): void {
+    this.terminate('error', { error: { code, message } }, exitCode);
+  }
+
+  /** 最终快照先作为 usage 发出，终态事件再带上同一份（观测侧据此一次写定终态与用量）。 */
+  private terminate(type: 'completed' | 'error' | 'cancelled', fields: AgentEventFields, exitCode: number | null): void {
     if (this.events.closed) return;
-    this.push(this.emit('error', { error: { code, message }, result: this.result({ ...(exitCode === null ? {} : { exitCode }) }) }));
+    this.flushUsage();
+    const snapshot = this.meter.snapshot();
+    const usage = resultUsageOf(snapshot);
+    this.push(this.emit(type, {
+      ...fields,
+      result: { ...(exitCode === null ? {} : { exitCode }), ...(usage ? { usage } : {}), durationMs: Date.now() - this.startedAt },
+      ...(hasUsage(snapshot) ? { usageSnapshot: snapshot } : {}),
+    }));
     this.close();
   }
 
   protected close(): void {
+    if (this.usageTimer !== undefined) clearTimeout(this.usageTimer);
+    this.usageTimer = undefined;
     this.events.close();
     this.prepared.dispose();
   }

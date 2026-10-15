@@ -9,7 +9,9 @@ export function createClaudeActivityChannel(options: NativeActivityOptions): Nat
   const prefix = `/activity/${token}`;
   const stamp = createActivityStamp(options);
   const normalizer = new ClaudeNativeActivity(stamp);
-  const reader = new ClaudeTranscriptReader((node) => normalizer.transcript(node), () => normalizer.gap('source-error'));
+  // 缺口同时意味着遥测里的模型请求可能丢失：终端用量随之降为下界（RFC-034 v2）。
+  const gap = (reason: Parameters<ClaudeNativeActivity['gap']>[0]) => { options.usage?.degrade(); normalizer.gap(reason); };
+  const reader = new ClaudeTranscriptReader((node) => normalizer.transcript(node), () => gap('source-error'));
   const state = { closed: false, heartbeat: Date.now(), pending: 0, serial: Promise.resolve() };
   const receive = async (path: string, body: unknown) => {
     if (state.closed) return;
@@ -25,6 +27,7 @@ export function createClaudeActivityChannel(options: NativeActivityOptions): Nat
     await reader.read();
     if (state.closed) return;
     for (const event of events) {
+      if (event.type === 'api-request') { options.usage?.observeRequest(event); continue; }
       if (event.type === 'heartbeat') state.heartbeat = Date.now();
       normalizer.telemetry(event);
     }
@@ -34,27 +37,27 @@ export function createClaudeActivityChannel(options: NativeActivityOptions): Nat
     if (state.closed || request.method !== 'POST' || !path.startsWith(`${prefix}/`)) return new Response(null, { status: 404 });
     const suffix = path.slice(prefix.length);
     if (!['/hooks', '/v1/logs', '/v1/traces', '/v1/metrics'].includes(suffix)) return new Response(null, { status: 404 });
-    if (state.pending >= 16) { normalizer.gap('capacity'); return new Response(null, { status: 503 }); }
+    if (state.pending >= 16) { gap('capacity'); return new Response(null, { status: 503 }); }
     state.pending++;
     try {
       const body: unknown = await request.json();
       const processing = state.serial.then(() => receive(suffix, body));
-      state.serial = processing.catch(() => { normalizer.gap('source-error'); });
+      state.serial = processing.catch(() => { gap('source-error'); });
       await processing;
       return Response.json({});
-    } catch { normalizer.gap('source-error'); return new Response(null, { status: 400 }); }
+    } catch { gap('source-error'); return new Response(null, { status: 400 }); }
     finally { state.pending--; }
   } });
   const leaseMs = options.leaseMs ?? 20000;
   const timer = setInterval(() => {
-    if (Date.now() - state.heartbeat > leaseMs) normalizer.gap('source-error');
+    if (Date.now() - state.heartbeat > leaseMs) gap('source-error');
     normalizer.check(Date.now());
     void reader.read();
   }, Math.min(1000, leaseMs));
   timer.unref();
   return {
     options: { endpoint: `http://127.0.0.1:${server.port}${prefix}`, token },
-    unavailable: (reason) => normalizer.gap(reason),
+    unavailable: (reason) => gap(reason),
     close() {
       if (state.closed) return;
       state.closed = true; clearInterval(timer); reader.close(); server.stop(true);

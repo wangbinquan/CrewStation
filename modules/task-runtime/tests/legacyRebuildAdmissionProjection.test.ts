@@ -17,7 +17,7 @@ describe.skipIf(!available)('legacy failed workspace rebuild admission with actu
       try {
         const input = await f.request(), before = (await f.uow.read.environments.getById(f.env.id))!;
         const objects = structuredClone([...f.k8s.objects]);
-        expect(before.state).toBe('failed'); expect(before.parentEnding).toBeUndefined(); expect(before.rebuildId).toBeUndefined();
+        expect(before.state).toBe('failed'); expect(before.rebuildId).toBeUndefined();
         expect(await f.resources!.api.occupancy(f.projectId)).toBe(0);
         const record = await f.runtime.api.requestRebuild(f.projectId, input), accepted = (await f.uow.read.environments.getById(f.env.id))!;
         const stored = (await f.uow.read.rebuilds.get(record.id))!;
@@ -44,7 +44,7 @@ describe.skipIf(!available)('legacy failed workspace rebuild admission with actu
       try {
         const input = await f.request(), before = (await f.uow.read.environments.getById(f.env.id))!;
         const resource = await f.resources!.api.get(before.id), originalJobs = await jobs(f), objects = structuredClone([...f.k8s.objects]);
-        expect(before.state).toBe('failed'); expect(before.parentEnding).toBeUndefined(); expect(before.rebuildId).toBeUndefined();
+        expect(before.state).toBe('failed'); expect(before.rebuildId).toBeUndefined();
         expect(await f.resources!.api.occupancy(f.projectId)).toBe(0);
         f.state.quota = 0;
         await expect(f.runtime.api.requestRebuild(f.projectId, input)).rejects.toMatchObject({ kind: 'quota_exceeded' });

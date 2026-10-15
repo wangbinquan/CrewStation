@@ -6,7 +6,6 @@ import { testDatabaseAvailable } from '@crewstation/testkit';
 import { sql } from 'drizzle-orm';
 import { taskRuntimeMigrations } from '../../wiring';
 import { rebuildFixture } from '../rebuildFixture';
-import { developmentParentEndingStorageFixture } from '../developmentParentEndingStorageFixture';
 import { corruptRuntimeContent } from '../deletion/contentFixture';
 
 const available = await testDatabaseAvailable();
@@ -34,26 +33,6 @@ describe.skipIf(!available)('runtime infrastructure ownership (actual PG, not ph
       await expect(read('rebuild', accepted.id)).rejects.toThrow('归属冲突');
     } finally { await f.close(); }
   });
-  test('parent ending uses the immutable original epoch and excludes its cleanup contents', async () => {
-    const f = await developmentParentEndingStorageFixture();
-    try {
-      const [childId] = await f.seed(1);
-      expect(await f.runtime.api.originalInfrastructureOwnership('task', childId!)).toMatchObject({ id: childId, projectIds: [f.projectId] });
-      const ending = await f.admit();
-      const origin = await f.runtime.api.originalInfrastructureOwnership('parent-ending', ending.id);
-      expect(origin).toMatchObject({ id: ending.id, scope: 'project', projectIds: [f.projectId] });
-      expect(await f.runtime.api.originalInfrastructureOwnership('parent-ending', ending.id, 'legacy')).toEqual(origin);
-      expect(await f.runtime.api.originalInfrastructureOwnership('parent-ending', newResourceId())).toBeUndefined();
-      expect(await f.runtime.api.originalInfrastructureOwnership('parent-ending', 'unknown-parent-ending', 'legacy')).toBeUndefined();
-      await f.move(ending.id, 'children');
-      expect(await f.runtime.api.originalInfrastructureOwnership('parent-ending', ending.id)).toEqual(origin);
-      for (const field of ['epoch', 'selectionHash', 'progress', 'acceptedRender', 'completionWitness']) expect(JSON.stringify(origin)).not.toContain(field);
-      // Corrupt only this isolated fixture; a mismatched original epoch must fail closed.
-      await f.db.execute(sql`ALTER TABLE task_runtime.development_parent_endings DISABLE TRIGGER ALL`);
-      await f.db.execute(sql`UPDATE task_runtime.development_parent_endings SET epoch_hash=${'0'.repeat(64)} WHERE id=${ending.id}`);
-      await expect(f.runtime.api.originalInfrastructureOwnership('parent-ending', ending.id)).rejects.toThrow('受理范围冲突');
-    } finally { await f.tdb.drop(); }
-  });
   test('platform tests require their explicit sentinel identity; project image validations keep the actual project', async () => {
     const f = await rebuildFixture();
     try {
@@ -77,21 +56,30 @@ describe.skipIf(!available)('runtime infrastructure ownership (actual PG, not ph
       await expect(read()).rejects.toThrow('原范围冲突');
     } finally { await f.close(); }
   });
-  test('original project task pages traverse every historical native child and return a real EOF after the final page', async () => {
-    const f = await developmentParentEndingStorageFixture();
+  test('original project task pages traverse every historical environment and return a real EOF after the final page', async () => {
+    const f = await rebuildFixture();
     try {
-      const children = await f.seed(205), found = [];
+      const ids = Array.from({ length: 205 }, () => TaskIdSchema.parse(newResourceId()));
+      const columns = await f.tdb.db.execute<{ column_name: string }>(sql`SELECT column_name FROM information_schema.columns
+        WHERE table_schema='task_runtime' AND table_name='environments' AND is_generated='NEVER' ORDER BY ordinal_position`);
+      const names = sql.join(columns.map((c) => sql.identifier(c.column_name)), sql`, `);
+      const values = sql.join(columns.map((c) => sql`copy.${sql.identifier(c.column_name)}`), sql`, `);
+      await f.tdb.db.execute(sql`INSERT INTO task_runtime.environments (${names}) SELECT ${values} FROM task_runtime.environments original
+        CROSS JOIN jsonb_array_elements(${JSON.stringify(ids)}::jsonb) item
+        CROSS JOIN LATERAL jsonb_populate_record(NULL::task_runtime.environments, to_jsonb(original)||jsonb_build_object(
+          'id',item#>>'{}','pod_name','original-copy-'||(item#>>'{}'))) copy WHERE original.id=${f.env.id}`);
+      const found: string[] = [];
       let after: string | null = null;
       for (;;) {
-        const page = await f.runtime.api.originalProjectTaskIds(f.projectId, after);
+        const page: readonly string[] = await f.runtime.api.originalProjectTaskIds(f.projectId, after);
         if (!page.length) break;
         expect(page.length).toBeLessThanOrEqual(200); expect([...page]).toEqual([...page].sort());
         if (after) expect(page[0]! > after).toBe(true);
         found.push(...page); after = page.at(-1)!;
       }
       expect(new Set(found).size).toBe(found.length);
-      for (const child of children) expect(found).toContain(child);
+      for (const id of [f.env.id, ...ids]) expect(found).toContain(id);
       expect(found).toHaveLength(206);
-    } finally { await f.tdb.drop(); }
+    } finally { await f.close(); }
   }, 30_000);
 });

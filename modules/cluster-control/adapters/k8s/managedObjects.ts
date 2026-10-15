@@ -1,7 +1,4 @@
-import { inspectClusterDevelopmentRemoval } from './developmentGuard';
-import type { DevelopmentRemovalQuery } from '../../ports/cluster';
 import { stopMigrationJob } from './stoppedMigrationJob';
-import { developmentAdmissionReceiptBuffer } from './safety/developmentAdmissionReceipts';
 import { inspectTaskClaim, inspectTaskVolume, taskVolumeReclaimed, removeTaskVolume } from './safety/volumeReclaim';
 import type { VolumeProbeOptions } from './safety/volumeReclaim';
 import { assertPinnedVolume } from './pinnedVolume';
@@ -63,8 +60,7 @@ async function ensureNamed(k8s: K8sClient, kind: ObservedKind, target: { readonl
   }
 }
 
-export function kubernetesClusterWriter(k8s: K8sClient, volumeProbe?: VolumeProbeOptions, developmentRemoval?: DevelopmentRemovalQuery): ClusterWriter {
-  const developmentReceipts = developmentAdmissionReceiptBuffer();
+export function kubernetesClusterWriter(k8s: K8sClient, volumeProbe?: VolumeProbeOptions): ClusterWriter {
   const apply = async (desired: K8sObject, current: Parameters<typeof objectCovered>[0]): Promise<'applied' | 'unchanged'> => {
     if (objectCovered(current, desired)) return 'unchanged';
     await k8s.apply(desired);
@@ -74,25 +70,15 @@ export function kubernetesClusterWriter(k8s: K8sClient, volumeProbe?: VolumeProb
     inspectTaskClaim: (namespace, name) => inspectTaskClaim(k8s, namespace, name),
     ...(volumeProbe ? { inspectTaskVolume: (namespace: string, name: string, now: Date) => inspectTaskVolume(k8s, namespace, name, volumeProbe, now), taskVolumeReclaimed: (target: Parameters<typeof taskVolumeReclaimed>[1], now: Date) => taskVolumeReclaimed(k8s, target, volumeProbe, now), removeTaskVolume: (target: Parameters<typeof taskVolumeReclaimed>[1], now: Date) => removeTaskVolume(k8s, target, volumeProbe, now) } : {}),
     inspectWorkloadStart: (pod) => inspectWorkloadStart(k8s, pod),
-    activateWorkload: (pod, permit, state) => activateWorkload(k8s, pod, permit, state, developmentReceipts),
-    pendingDevelopmentAdmissionReceipts: () => developmentReceipts.pending(),
-    acknowledgeDevelopmentAdmissionReceipt: (receipt) => developmentReceipts.acknowledge(receipt),
+    activateWorkload: (pod, permit) => activateWorkload(k8s, pod, permit),
     observeWorkloadStop: (consumer, now) => observeWorkloadStop(k8s, consumer, now),
-    releaseWorkloadStop: (proof, version) => releaseWorkloadStop(k8s, proof, developmentRemoval, version),
+    releaseWorkloadStop: (proof) => releaseWorkloadStop(k8s, proof),
     inspectNamespaceRetirement: async (name, intent, systemNamespace, signal) => { await inspectNamespaceRetirement(k8s, name, intent, systemNamespace, signal); },
     removeRetiredNamespace: (name, intent, systemNamespace, signal) => removeRetiredNamespace(k8s, name, intent, systemNamespace, signal),
-    rebuild: (render, intent, signal) => rebuildObjects(k8s, render, intent, signal, developmentRemoval),
-    remove: async (target) => {
-      const { kind, namespace, name, uid } = target;
-      const result = await inspectClusterDevelopmentRemoval(k8s, developmentRemoval, target, 'delete');
-      if (result.kind === 'waiting') return result;
-      if (result.kind === 'absent') return;
-      const version = result.kind === 'permitted' ? result.resourceVersion : target.resourceVersion;
-      try { await k8s.delete(Resources[kind]!, name, namespace, { preconditions: { uid, ...(version !== undefined ? { resourceVersion: version } : {}) }, ...(kind === 'Pod' ? { gracePeriodSeconds: 30 } : {}) }); }
-      catch (error) {
-        if (!isPlatformError(error) || error.kind !== 'conflict') throw error;
-        if (result.kind === 'permitted' || target.resourceVersion !== undefined) return { kind: 'waiting', reason: 'development-removal-version-changed' };
-      }
+    rebuild: (render, intent, signal) => rebuildObjects(k8s, render, intent, signal),
+    remove: async ({ kind, namespace, name, uid }) => {
+      try { await k8s.delete(Resources[kind]!, name, namespace, { preconditions: { uid }, ...(kind === 'Pod' ? { gracePeriodSeconds: 30 } : {}) }); }
+      catch (error) { if (!isPlatformError(error) || error.kind !== 'conflict') throw error; }
     },
     applyRoute: (route, current) => apply(routeObject(route), current),
     applyMiddleware: (middleware, resourceId, current) => apply(middlewareObject(middleware, resourceId), current),

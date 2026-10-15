@@ -13,13 +13,10 @@ function fixture(unscheduled = false) {
     confirmed: { participant: 'task-runtime', complete: true, resources: [], references: [], blockers: [], revision: jsonHash('runtime') } });
   const resources = ProjectDeletionContextSchema.parse({ ...context, confirmed: { ...context.confirmed, participant: 'resources',
     resources: [{ kind: 'protected:Pod', id: key, identity: JSON.stringify({ uid: environment.podUid, nodeUid, nodeName: unscheduled ? null : 'original-node', specDigest: jsonHash('original-full-spec') }), count: 1 }] } });
-  const dev = ProjectDeletionContextSchema.parse({ ...context, confirmed: { ...context.confirmed, participant: 'dev-session' } });
   let proof: { key: string; uid: string; nodeUid: string | null; digest: string; observedAt: string } | undefined, valid = true, calls = 0;
   const ports = runtimeProjectStops({ projectDeletionParticipantContext: async (actual, participant) => {
-    expect(actual).toEqual(context); return participant === 'resources' ? resources : dev;
-  }, assertProjectDeletionGrant: async () => { if (!valid) throw precondition('controlled Root grant expired'); } }, async (grant, selected: string) => {
-    expect(grant).toEqual(dev); return selected;
-  }, { get: async (grant, actualKey, uid) => { calls++; expect(grant).toEqual(resources); expect(actualKey).toBe(key); expect(uid).toBe(environment.podUid); return proof; } }, async () => ({ kind: 'ready' }),
+    expect(actual).toEqual(context); expect(participant).toBe('resources'); return resources;
+  }, assertProjectDeletionGrant: async () => { if (!valid) throw precondition('controlled Root grant expired'); } }, { get: async (grant, actualKey, uid) => { calls++; expect(grant).toEqual(resources); expect(actualKey).toBe(key); expect(uid).toBe(environment.podUid); return proof; } }, async () => ({ kind: 'ready' }),
   { get: async () => { throw new Error('A live confirmed Pod cannot borrow a historical receipt'); } });
   const receipt = { key, uid: environment.podUid, nodeUid, digest: jsonHash('independent actual complete Pod receipt'), observedAt: new Date().toISOString() };
   return { ports, context, resources, environment, receipt, setProof: (value: typeof proof) => { proof = value; }, expire: () => { valid = false; }, calls: () => calls };
@@ -30,7 +27,6 @@ test('uses the actual protected Pod confirmation and its original resource grant
     expect(await f.ports.stopped(f.context, f.environment)).toBeUndefined();
     f.setProof(f.receipt);
     expect(await f.ports.stopped(f.context, f.environment)).toEqual({ digest: f.receipt.digest });
-    expect(await f.ports.development(f.context).advance('original-selection')).toBe('original-selection');
   }
 });
 test('a replacement environment UID or an unrelated node receipt cannot authorize original STOP', async () => {
@@ -41,18 +37,4 @@ test('a replacement environment UID or an unrelated node receipt cannot authoriz
   await expect(f.ports.stopped(f.context, f.environment)).rejects.toMatchObject({ kind: 'precondition' });
   f.setProof(f.receipt); f.expire();
   await expect(f.ports.stopped(f.context, f.environment)).rejects.toMatchObject({ kind: 'precondition' });
-});
-
-test('project deletion completePrestart requires the actual Dev context and the same live grant before and after transfer', async () => {
-  const f = fixture(); let valid = true, calls = 0;
-  const dev = ProjectDeletionContextSchema.parse({ ...f.context, confirmed: { ...f.context.confirmed, participant: 'dev-session' } });
-  const project = { projectDeletionParticipantContext: async (actual: typeof f.context, participant: string) => {
-    expect(actual).toEqual(f.context); expect(participant).toBe('dev-session'); return dev;
-  }, assertProjectDeletionGrant: async () => { if (!valid) throw precondition('original deletion grant expired'); } };
-  const port = runtimeProjectStops(project, async (_grant, selected: string) => selected,
-    { get: async () => undefined }, async () => ({ kind: 'ready' }), undefined,
-    async (grant, selected: string) => { expect(grant).toEqual(dev); calls++; return selected; });
-  expect(await port.development(f.context).completePrestart('original-selection')).toBe('original-selection'); expect(calls).toBe(1);
-  valid = false; await expect(port.development(f.context).completePrestart('original-selection')).rejects.toThrow('expired'); expect(calls).toBe(1);
-  const old = fixture(); await expect(old.ports.development(old.context).completePrestart('original-selection')).rejects.toThrow('尚未装配');
 });

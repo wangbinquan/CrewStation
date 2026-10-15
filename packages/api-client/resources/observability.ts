@@ -1,40 +1,39 @@
-import type {RuntimeStorage} from '@crewstation/contracts';
-import type { RuntimeMaintenanceRequest, RuntimeMaintenance, RuntimeAnomalyPage } from '@crewstation/contracts';
-import type {RuntimeAggregate} from '@crewstation/contracts';
-import type { PlatformUsagePage } from '@crewstation/contracts';
-import type { OperationalTelemetry, OperationalTelemetryQuery } from '@crewstation/contracts';
-import type { RuntimeCompleteReport,RuntimeReportPage,RuntimeReportPageQuery,RuntimeStatisticsQuery } from '@crewstation/contracts';
-import type { ExecutionCostVisibilityDto, SetExecutionCostVisibility, ExecutionObservationPage, ExecutionObservationQuery, AlertDto, HealthDto, LogEntryDto, SaveTokenPrice, TokenPriceHistory, TokenPriceProfile, TokenPriceVersion } from '@crewstation/contracts';
+import type {
+  AlertDto, HealthDto, LogEntryDto, ObservationAgentPage, ObservationModelPage, ObservationOverview, ObservationPlatformPage, ObservationPlatformQuery,
+  ObservationPrice, ObservationPriceHistory, ObservationPricingDirectory, ObservationProjectPage, ObservationTaskDetail, ObservationTaskPage,
+  ObservationTaskPageQuery, ObservationWindowQuery, OperationalTelemetry, OperationalTelemetryQuery, ProjectCostVisibility, SaveObservationPriceInput,
+  SetProjectCostVisibility,
+} from '@crewstation/contracts';
 import type { Transport } from '../httpTransport';
 import type { ItemsPage } from '../itemsPage';
 import type { LogQueryInput } from '../requestInputs';
 import { segment } from '../requestUrl';
 
-/** observability 模块公开的读取接口。日志来源为 Pod 尾部，不具备全历史分页；调用链在 `traces` 资源里。 */
-export type ExecutionObservationInput = ExecutionObservationQuery extends infer Q ? Q extends ExecutionObservationQuery ? Omit<Q, 'limit'> & { limit?: number } : never : never;
+/** 统计查询的输入：日桶按浏览器时区切，缺省按 UTC。 */
+export type ObservationWindowInput = Omit<ObservationWindowQuery, 'tzOffset'> & { tzOffset?: number };
+export type ObservationTaskPageInput = Omit<ObservationTaskPageQuery, 'tzOffset'> & { tzOffset?: number };
+export type ObservationPlatformInput = Omit<ObservationPlatformQuery, 'tzOffset'> & { tzOffset?: number };
 
+/**
+ * observability 模块公开的读取接口。运行统计（RFC-034 v2）按项目（`projectId`）或系统（省略）两级：
+ * 每次请求即时聚合，没有报告或水位。日志来源为 Pod 尾部，不具备全历史分页；调用链在 `traces` 资源里。
+ */
 export interface ObservabilityResource {
- runtimeStorage():Promise<RuntimeStorage>;
- runtimeMaintenancePreview(input:RuntimeMaintenanceRequest):Promise<RuntimeMaintenance>;
- runtimeMaintenanceStatus(id:string):Promise<RuntimeMaintenance>;
- runtimeMaintenanceConfirm(id:string,digest:string):Promise<RuntimeMaintenance>;
-  runtimeAnomalies(projectId:string|undefined,query:RuntimeStatisticsQuery,after?:string):Promise<RuntimeAnomalyPage>;
-  runtimeAggregate(projectId:string|undefined,query:RuntimeStatisticsQuery):Promise<RuntimeAggregate>;
-  runtimeProjectionStreamUrl(projectId:string|undefined):string;
-  platformUsage(query:RuntimeStatisticsQuery,after?:string):Promise<PlatformUsagePage>;
-  operationalTelemetry(projectId:string|undefined,query:OperationalTelemetryQuery):Promise<OperationalTelemetry>;
-  projectRuntimeStatistics(projectId: string, query: RuntimeStatisticsQuery): Promise<RuntimeCompleteReport>;
-  systemRuntimeStatistics(query: RuntimeStatisticsQuery): Promise<RuntimeCompleteReport>;
-  projectRuntimeTask(projectId: string, taskId: string): Promise<RuntimeCompleteReport>;
-  systemRuntimeTask(taskId: string): Promise<RuntimeCompleteReport>;
-  runtimeReportStatus(projectId:string|undefined,reportId:string):Promise<RuntimeCompleteReport>;
-  runtimeReportPage<T>(projectId:string|undefined,reportId:string,query:RuntimeReportPageQuery):Promise<RuntimeReportPage<T>>;
-  executionObservations(taskId: string, query?: ExecutionObservationInput): Promise<ExecutionObservationPage>;
-  executionCostVisibility(projectId: string): Promise<ExecutionCostVisibilityDto>;
-  setExecutionCostVisibility(projectId: string, input: SetExecutionCostVisibility): Promise<ExecutionCostVisibilityDto>;
-  pricingProfiles(): Promise<{ items: TokenPriceProfile[] }>;
-  priceHistory(profileId: string, query?: { limit?: number; beforeRevision?: number }): Promise<TokenPriceHistory>;
-  savePrice(profileId: string, input: SaveTokenPrice): Promise<TokenPriceVersion>;
+  overview(projectId: string | undefined, query: ObservationWindowInput): Promise<ObservationOverview>;
+  tasks(projectId: string | undefined, query: ObservationTaskPageInput): Promise<ObservationTaskPage>;
+  task(projectId: string | undefined, taskId: string): Promise<ObservationTaskDetail>;
+  agents(projectId: string | undefined, query: ObservationWindowInput): Promise<ObservationAgentPage>;
+  models(projectId: string | undefined, query: ObservationWindowInput): Promise<ObservationModelPage>;
+  /** 仅系统：按项目比较。 */
+  projects(query: ObservationWindowInput): Promise<ObservationProjectPage>;
+  /** 仅系统：不属于项目的平台执行（档位测试等）。 */
+  platform(query: ObservationPlatformInput): Promise<ObservationPlatformPage>;
+  pricing(): Promise<ObservationPricingDirectory>;
+  priceHistory(profileId: string, model: string): Promise<ObservationPriceHistory>;
+  savePrice(profileId: string, input: SaveObservationPriceInput): Promise<ObservationPrice>;
+  costVisibility(projectId: string): Promise<ProjectCostVisibility>;
+  setCostVisibility(projectId: string, input: SetProjectCostVisibility): Promise<ProjectCostVisibility>;
+  operationalTelemetry(projectId: string | undefined, query: OperationalTelemetryQuery): Promise<OperationalTelemetry>;
   /** GET /v1/projects/:projectId/logs?source=&slot=&taskId=&since=&limit=&cursor= */
   logs(projectId: string, query: LogQueryInput): Promise<ItemsPage<LogEntryDto>>;
   /** GET /v1/projects/:projectId/health：两个部署槽的健康态。 */
@@ -44,30 +43,23 @@ export interface ObservabilityResource {
 
 export function observabilityResource(transport: Transport): ObservabilityResource {
   const project = (projectId: string) => `/v1/projects/${segment(projectId)}`;
-  const pricing = '/v1/admin/observability/pricing/profiles';
+  const scope = (projectId: string | undefined) => (projectId ? project(projectId) : '/v1/admin') + '/observability';
+  const pricing = '/v1/admin/observability/pricing';
   const visibility = (id: string) => '/v1/admin/observability/projects/' + segment(id) + '/cost-visibility';
   return {
-    runtimeStorage:()=>transport.request('GET','/v1/admin/observability/storage'),
-runtimeMaintenancePreview:body=>transport.request('POST','/v1/admin/observability/maintenance/preview',{body}),
-    runtimeMaintenanceStatus:id=>transport.request('GET','/v1/admin/observability/maintenance/'+segment(id)),
-    runtimeMaintenanceConfirm:(id,digest)=>transport.request('POST','/v1/admin/observability/maintenance/'+segment(id)+'/confirm',{body:{expectedDigest:digest,confirmation:'APPLY'}}),
-    runtimeAnomalies:(id,query,after)=>transport.request('GET',(id?project(id):'/v1/admin')+'/observability/anomalies',{query:{...query,after}}),
-    runtimeAggregate:(id,query)=>transport.request('GET',(id?project(id):'/v1/admin')+'/observability/aggregate',{query:{...query}}),
-    runtimeProjectionStreamUrl:id=>transport.baseUrl+(id?project(id):'/v1/admin')+'/observability/projection-stream',
-    platformUsage:(query,after)=>transport.request('GET','/v1/admin/observability/platform-usage',{query:{...query,after}}),
-    operationalTelemetry:(id,query)=>transport.request('GET',(id?project(id):'/v1/admin')+'/observability/telemetry',{query:{...query}}),
-    projectRuntimeStatistics: (id, query) => transport.request('GET', project(id) + '/observability/statistics', { query: { ...query } }),
-    systemRuntimeStatistics: (query) => transport.request('GET', '/v1/admin/observability/statistics', { query: { ...query } }),
-    projectRuntimeTask: (id, taskId) => transport.request('GET', project(id) + '/observability/tasks/' + segment(taskId)),
-    systemRuntimeTask: (taskId) => transport.request('GET', '/v1/admin/observability/tasks/' + segment(taskId)),
-    runtimeReportStatus: (id,reportId)=>transport.request('GET',(id?project(id):'/v1/admin')+'/observability/reports/'+segment(reportId)),
-    runtimeReportPage: <T>(id:string|undefined,reportId:string,query:RuntimeReportPageQuery)=>transport.request<RuntimeReportPage<T>>('GET',(id?project(id):'/v1/admin')+'/observability/reports/'+segment(reportId)+'/pages',{query:{...query}}),
-    executionObservations: (id, query = {}) => transport.request('GET', '/v3/business-tasks/' + segment(id) + '/observations', { query }),
-    executionCostVisibility: (id) => transport.request('GET', visibility(id)),
-    setExecutionCostVisibility: (id, body) => transport.request('PUT', visibility(id), { body }),
-    pricingProfiles: () => transport.request('GET', pricing),
-    priceHistory: (id, query = {}) => transport.request('GET', pricing + '/' + segment(id) + '/versions', { query }),
-    savePrice: (id, body) => transport.request('POST', pricing + '/' + segment(id) + '/versions', { body }),
+    overview: (id, query) => transport.request('GET', scope(id) + '/overview', { query: { ...query } }),
+    tasks: (id, query) => transport.request('GET', scope(id) + '/tasks', { query: { ...query } }),
+    task: (id, taskId) => transport.request('GET', scope(id) + '/tasks/' + segment(taskId)),
+    agents: (id, query) => transport.request('GET', scope(id) + '/agents', { query: { ...query } }),
+    models: (id, query) => transport.request('GET', scope(id) + '/models', { query: { ...query } }),
+    projects: (query) => transport.request('GET', '/v1/admin/observability/projects', { query: { ...query } }),
+    platform: (query) => transport.request('GET', '/v1/admin/observability/platform', { query: { ...query } }),
+    pricing: () => transport.request('GET', pricing),
+    priceHistory: (profileId, model) => transport.request('GET', pricing + '/' + segment(profileId) + '/history', { query: { model } }),
+    savePrice: (profileId, body) => transport.request('POST', pricing + '/' + segment(profileId), { body }),
+    costVisibility: (id) => transport.request('GET', visibility(id)),
+    setCostVisibility: (id, body) => transport.request('PUT', visibility(id), { body }),
+    operationalTelemetry: (id, query) => transport.request('GET', scope(id) + '/telemetry', { query: { ...query } }),
     logs: (projectId, query) => transport.request<ItemsPage<LogEntryDto>>('GET', `${project(projectId)}/logs`, { query }),
     health: (projectId) => transport.request<ItemsPage<HealthDto>>('GET', `${project(projectId)}/health`),
     alerts: (projectId) => transport.request('GET', `${project(projectId)}/alerts`),

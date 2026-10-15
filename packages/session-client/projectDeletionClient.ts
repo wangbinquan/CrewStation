@@ -1,23 +1,16 @@
-import { BusinessExecutionReceiptSchema, DevelopmentUsageLookupSchema, DevelopmentUsagePageSchema, ExecutionCompletionProofSchema, ProjectDeletionBusinessSourceSchema,
+import { BusinessExecutionReceiptSchema, ExecutionCompletionProofSchema,
   ProjectDeletionSessionDataRequestSchema, ProjectDeletionSessionTasksRequestSchema, ProjectDeletionSessionTasksSchema, ProjectDeletionSessionTransportSchema, RunnerCommandSchema, RunnerResultPayloads,
-  RunnerUsageMeasurementSchema, StoredBusinessExecutionSchema, StoredDevelopmentUsageSchema } from '@crewstation/contracts';
-import type { DevelopmentUsagePage, ProjectDeletionContext, ProjectDeletionSessionData, ProjectDeletionSessionTransport, RunnerBusinessReceipt, RunnerCommand, RunnerUsageSourcePage, TaskId } from '@crewstation/contracts';
+  StoredBusinessExecutionSchema } from '@crewstation/contracts';
+import type { ProjectDeletionContext, ProjectDeletionSessionData, ProjectDeletionSessionTransport, RunnerBusinessReceipt, RunnerCommand, TaskId } from '@crewstation/contracts';
 import { PlatformError, precondition } from '@crewstation/kernel';
-import type { DevelopmentUsageSessionClient } from './developmentUsageClient';
 import type { SessionClient } from './sessionClient';
 
 type DeletionRequest = (input: string | URL, init?: RequestInit) => Promise<Response>;
 
-export interface ProjectDeletionSessionTask extends Pick<DevelopmentUsageSessionClient,
-  'lookupDevelopmentUsage' | 'registerDevelopmentUsage' | 'getDevelopmentUsage' | 'requestDevelopmentUsageDrain'>,
-  Pick<SessionClient, 'getBusinessExecution' | 'getExecutionCompletionProof' | 'listBusinessExecutionEvents' | 'consumeBusinessExecution'> {
+export interface ProjectDeletionSessionTask extends Pick<SessionClient, 'getBusinessExecution' | 'getExecutionCompletionProof' | 'listBusinessExecutionEvents' | 'consumeBusinessExecution'> {
   transports(): Promise<ProjectDeletionSessionTransport[]>;
   originalBusiness(after?: string | null): Promise<RunnerBusinessReceipt[]>;
   send(transport: ProjectDeletionSessionTransport, command: RunnerCommand): Promise<unknown>;
-  offerDevelopment(key: Parameters<DevelopmentUsageSessionClient['getDevelopmentUsage']>[1]): Promise<DevelopmentUsagePage | null>;
-  acknowledgeDevelopment(key: Parameters<DevelopmentUsageSessionClient['getDevelopmentUsage']>[1], through: number): Promise<void>;
-  offerBusiness(executionId: string): Promise<RunnerUsageSourcePage | null>;
-  acknowledgeBusiness(executionId: string, through: number): Promise<void>;
   data(operation: ProjectDeletionSessionData): Promise<unknown>;
 }
 /** This port is created only by the deletion coordinator. Ordinary callers keep the existing Session client. */
@@ -44,10 +37,6 @@ export function createProjectDeletionSessionClient(baseUrl: string, request: Del
         const transport = ProjectDeletionSessionTransportSchema.parse(raw); sameTask(transport.taskId);
         return post(transport.replica, '/internal/project-deletion/commands/' + transport.id, { context, command: RunnerCommandSchema.parse(command) });
       },
-      lookupDevelopmentUsage: async (id) => { sameTask(id); return DevelopmentUsageLookupSchema.parse(await data({ type: 'development-lookup' })); },
-      registerDevelopmentUsage: async (registration) => StoredDevelopmentUsageSchema.parse(await data({ type: 'development-existing', registration })),
-      getDevelopmentUsage: async (id, key) => { sameTask(id); return StoredDevelopmentUsageSchema.parse(await data({ type: 'development-read', key })); },
-      requestDevelopmentUsageDrain: async (id, key, reason) => { sameTask(id); return StoredDevelopmentUsageSchema.parse(await data({ type: 'development-drain', key, reason })); },
       getBusinessExecution: async (id, executionId) => { sameTask(id); return StoredBusinessExecutionSchema.parse(await data({ type: 'business-read', executionId })); },
       listBusinessExecutionEvents: async (id, executionId, after = 0, limit = 200) => {
         sameTask(id); return RunnerResultPayloads.businessExecutionEvents.parse(await data({ type: 'business-events', executionId, after, limit }));
@@ -57,13 +46,8 @@ export function createProjectDeletionSessionClient(baseUrl: string, request: Del
         sameTask(id); if (stopped) throw precondition('数字消费不能代替原容器停止证明');
         await data({ type: 'business-consume', executionId, through, stopped: false });
       },
-      offerDevelopment: async (key) => DevelopmentUsagePageSchema.nullable().parse(await data({ type: 'development-source', key })),
-      acknowledgeDevelopment: async (key, through) => { await data({ type: 'development-source-ack', key, through }); },
-      offerBusiness: async (executionId) => ProjectDeletionBusinessSourceSchema.nullable().parse(await data({ type: 'business-source', executionId })),
-      acknowledgeBusiness: async (executionId, through) => { await data({ type: 'business-source-ack', executionId, through }); },
     };
   };
   return Object.assign(task, { tasks: async (context: ProjectDeletionContext, after: TaskId | null = null): Promise<TaskId[]> =>
     ProjectDeletionSessionTasksSchema.parse(await post(baseUrl, '/internal/project-deletion/tasks', ProjectDeletionSessionTasksRequestSchema.parse({ context, after }))) });
 }
-export const projectDeletionMeasurement = (value: unknown) => RunnerUsageMeasurementSchema.nullable().parse(value);

@@ -9,8 +9,6 @@ export interface LedgerReconcilerOptions {
   readonly pollMs?: number;
   readonly resyncMs?: number;
   readonly concurrency?: number;
-  /** Finite original creator receipts, including records no longer in listLive. */
-  readonly pendingRecordIds?: () => readonly string[];
   /** 路由等中间件时的复核间隔（用例调短）。 */
   readonly retryMs?: number;
   /** 多副本分工（设计 §6.3）：处理一条记录前抢它的租约；不给就不分工（单副本、用例）。 */
@@ -58,7 +56,6 @@ export function ledgerReconciler(ledger: LedgerObservations, feed: ManagedObject
 
   const releaseSignals=registerRuntimeSignals('controller.reconcile',()=>[{kind:'controller.reconcile.queue',unit:'records',value:String(queue.size())},{kind:'controller.reconcile.running',unit:'boolean',value:running?'1':'0'},{kind:'controller.reconcile.synced',unit:'boolean',value:synced?'1':'0'}]);
   const resync = async () => {
-    try { for (const id of options.pendingRecordIds?.() ?? []) queue.add(id); } catch (error) { logger.warn('original admission receipt resync failed', { error: String(error) }); }
     try { for (const record of await ledger.listLive()) queue.add(record.id); } catch (error) { logger.warn('resource reconcile resync failed', { error: String(error) }); }
   };
   const tail = async () => {

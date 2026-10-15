@@ -1,66 +1,39 @@
-import type {RuntimeStorage} from '@crewstation/contracts';
-import type { ResourceId } from '@crewstation/contracts';
-import type { RuntimeAnomalyPage } from '@crewstation/contracts';
-import type {RuntimeAggregate,RuntimeProjectionState} from '@crewstation/contracts';
-import type { RunnerUsageSourceIdentity } from '@crewstation/contracts';
-export interface PlatformUsageAcceptance {testId:ResourceId;profileId:ResourceId;profileRevision:number;protocol:'opencode'|'claude-code'|'terminal'}
-export interface PlatformUsageBinding extends RunnerUsageSourceIdentity {testId:ResourceId}
-import type {PlatformUsageAdmission,PlatformUsagePage} from '@crewstation/contracts';
-import type { OperationalTelemetry, OperationalTelemetryQuery } from '@crewstation/contracts';
-import type {RuntimeCompleteReport,RuntimeReportPage,RuntimeReportPageQuery} from '@crewstation/contracts';
-import type { RuntimeStatisticsQuery, ExecutionCostVisibilityDto, ExecutionObservationV2Page, ExecutionObservationPage, ExecutionObservationQuery, SetExecutionCostVisibility, UsageValuation, UsageExecutionIdentity, UsageRecord, Actor, AlertDto, HealthDto, LogEntryDto, LogQuery, ProjectId, TaskId, TraceChainDto, TraceEventDto, TraceEventsQuery, TraceId, TraceListQuery, TraceSummaryDto, SaveTokenPrice, TokenPriceHistory, TokenPricePageQuery, TokenPriceProfile, TokenPriceVersion } from "@crewstation/contracts";
-import type { ProjectDeletionOwner } from '@crewstation/contracts';
+import type {
+  Actor, AlertDto, HealthDto, LogEntryDto, LogQuery, ObservationAgentPage, ObservationModelPage, ObservationOverview, ObservationPlatformPage,
+  ObservationPlatformQuery, ObservationPrice, ObservationPriceHistory, ObservationPricingDirectory, ObservationProjectPage, ObservationTaskDetail,
+  ObservationTaskPage, ObservationTaskPageQuery, ObservationWindowQuery, OperationalTelemetry, OperationalTelemetryQuery, ProjectCostVisibility,
+  ProjectDeletionOwner, ProjectId, SaveObservationPriceInput, SetProjectCostVisibility, TaskId, TraceChainDto, TraceEventDto, TraceEventsQuery, TraceId,
+  TraceListQuery, TraceSummaryDto,
+} from '@crewstation/contracts';
+import type { AgentCallRecorder } from './agentCalls';
 
-/** Public input/output values are independent of persistence ports. Wiring checks their structural compatibility. */
-export interface ExecutionPriceInput {
-  identity: UsageExecutionIdentity;
-  profile: { id: string; revision: number; protocol: 'opencode' | 'claude-code' | 'terminal' } | null;
-}
-export interface AcceptedExecutionPrice extends ExecutionPriceInput { acceptedAt: string; priceBookRevision: number }
-export interface UsageSourcePage {
-  projectId: ProjectId; taskId: TaskId; sourceId: string; expectedCursor: string | null; nextCursor: string;
-  events: Array<{ eventId: string; measurement: Omit<UsageRecord, 'projection'> }>;
-}
-export interface ExecutionValuationRequest {
-  measurement: Pick<UsageRecord, 'identity' | 'sourceId' | 'recordId'>;
-  usageRevision: number; requestKey: string; model: { provider: string; model: string; condition: string | null } | null;
-}
-export interface ExecutionObservationCaller { identity: string; token?: string }
+export type { AgentCallOutcome, AgentCallRecorder, AgentCallStart, AgentCallTarget } from './agentCalls';
 
-import type { RuntimeMaintenance, RuntimeMaintenanceRequest } from '@crewstation/contracts';
-export interface ObservabilityModuleApi extends TokenPricingApi {
-  runtimeStorage?(actor:Actor):Promise<RuntimeStorage>;
-  runtimeMaintenancePreview(actor:Actor,input:RuntimeMaintenanceRequest):Promise<RuntimeMaintenance>;
-  runtimeMaintenanceStatus(actor:Actor,id:string):Promise<RuntimeMaintenance>;
-  runtimeMaintenanceConfirm(actor:Actor,id:string,digest:string):Promise<RuntimeMaintenance>;
+/** RFC-034 v2 §5：项目（projectId）与系统（null）两级共用的运行统计；价格与费用可见性仅系统。 */
+export interface RuntimeStatisticsApi {
+  overview(actor: Actor, projectId: ProjectId | null, query: ObservationWindowQuery): Promise<ObservationOverview>;
+  tasks(actor: Actor, projectId: ProjectId | null, query: ObservationTaskPageQuery): Promise<ObservationTaskPage>;
+  task(actor: Actor, projectId: ProjectId | null, taskId: string): Promise<ObservationTaskDetail>;
+  agents(actor: Actor, projectId: ProjectId | null, query: ObservationWindowQuery): Promise<ObservationAgentPage>;
+  models(actor: Actor, projectId: ProjectId | null, query: ObservationWindowQuery): Promise<ObservationModelPage>;
+  projects(actor: Actor, query: ObservationWindowQuery): Promise<ObservationProjectPage>;
+  platform(actor: Actor, query: ObservationPlatformQuery): Promise<ObservationPlatformPage>;
+  pricing(actor: Actor): Promise<ObservationPricingDirectory>;
+  priceHistory(actor: Actor, profileId: string, model: string): Promise<ObservationPriceHistory>;
+  savePrice(actor: Actor, profileId: string, input: SaveObservationPriceInput): Promise<ObservationPrice>;
+  costVisibility(actor: Actor, projectId: ProjectId): Promise<ProjectCostVisibility>;
+  setCostVisibility(actor: Actor, projectId: ProjectId, input: SetProjectCostVisibility): Promise<ProjectCostVisibility>;
+}
+
+export interface ObservabilityModuleApi extends RuntimeStatisticsApi {
   readonly name: 'observability';
-  runtimeAnomalies(actor:Actor,projectId:ProjectId|null,query:RuntimeStatisticsQuery,after?:string):Promise<RuntimeAnomalyPage>;
-  runtimeAggregate(actor:Actor,projectId:ProjectId|null,query:RuntimeStatisticsQuery):Promise<RuntimeAggregate>;
-  runtimeProjectionState(actor:Actor,projectId:ProjectId|null):Promise<RuntimeProjectionState>;
-  acceptPlatformUsage(input:PlatformUsageAcceptance):Promise<PlatformUsageAdmission>;
-  bindPlatformUsage(input:PlatformUsageBinding):Promise<void>;
-  platformUsage(actor:Actor,query:RuntimeStatisticsQuery,after?:string):Promise<PlatformUsagePage>;
-  operationalTelemetry?(actor:Actor,projectId:ProjectId|null,query:OperationalTelemetryQuery):Promise<OperationalTelemetry>;
-  runtimeCompleteTaskReport(actor:Actor,projectId:ProjectId|null,taskId:TaskId):Promise<RuntimeCompleteReport>;
-  runtimeCompleteReport(actor:Actor,projectId:ProjectId|null,query:RuntimeStatisticsQuery):Promise<RuntimeCompleteReport>;
-  runtimeCompleteReportStatus(actor:Actor,projectId:ProjectId|null,reportId:string):Promise<RuntimeCompleteReport>;
-  runtimeCompleteReportPage(actor:Actor,projectId:ProjectId|null,reportId:string,query:RuntimeReportPageQuery):Promise<RuntimeReportPage<unknown>>;
+  /**
+   * RFC-034 v2 §4：Agent 执行记录的写入口。owner（business-task / dev-session / task-runtime）在派发前受理、
+   * 在 owner 判定的结束时补写终态；session 把 Runner 上报的快照与终态转交。组合根装配到各自声明的端口。
+   */
+  readonly agentCalls: AgentCallRecorder;
   readonly deletionOwner?: ProjectDeletionOwner;
-  projectRuntimeStatistics(actor: Actor, projectId: ProjectId, query: RuntimeStatisticsQuery): Promise<RuntimeCompleteReport>;
-  systemRuntimeStatistics(actor: Actor, query: RuntimeStatisticsQuery): Promise<RuntimeCompleteReport>;
-  projectRuntimeTask(actor: Actor, projectId: ProjectId, taskId: TaskId): Promise<RuntimeCompleteReport>;
-  systemRuntimeTask(actor: Actor, taskId: TaskId): Promise<RuntimeCompleteReport>;
-  reconcileExecutionUsage(): Promise<number>;
-  /** Internal owner admission participant; call before starting this execution. */
-  acceptExecutionPrice(input: ExecutionPriceInput): Promise<AcceptedExecutionPrice>;
-  /** Internal durable source ingestion; never an HTTP write endpoint. */
-  ingestExecutionUsage(input: UsageSourcePage): Promise<{ cursor: string | null; applied: number; duplicate: number }>;
-  /** Separate durable valuation; references one committed usage projection revision. */
-  valueExecutionUsage(input: ExecutionValuationRequest): Promise<UsageValuation>;
-  executionObservationsV2(caller: ExecutionObservationCaller, taskId: TaskId, query: ExecutionObservationQuery): Promise<ExecutionObservationV2Page>;
-  executionObservations(caller: ExecutionObservationCaller, taskId: TaskId, query: ExecutionObservationQuery): Promise<ExecutionObservationPage>;
-  executionCostVisibility(actor: Actor, projectId: ProjectId): Promise<ExecutionCostVisibilityDto>;
-  setExecutionCostVisibility(actor: Actor, projectId: ProjectId, input: SetExecutionCostVisibility): Promise<ExecutionCostVisibilityDto>;
+  operationalTelemetry(actor: Actor, projectId: ProjectId | null, query: OperationalTelemetryQuery): Promise<OperationalTelemetry>;
   queryLogs(actor: Actor, projectId: ProjectId, query: LogQuery): Promise<LogEntryDto[]>;
   health(actor: Actor, projectId: ProjectId): Promise<HealthDto[]>;
   listAlerts(actor: Actor, projectId: ProjectId): Promise<AlertDto[]>;
@@ -73,11 +46,3 @@ export interface ObservabilityModuleApi extends TokenPricingApi {
   /** 巡检一个项目的两槽健康态并触发／恢复告警。 */
   sweepProject(projectId: ProjectId): Promise<number>;
 }
-
-export interface TokenPricingApi {
-  pricingProfiles(actor: Actor): Promise<{ items: TokenPriceProfile[] }>;
-  priceHistory(actor: Actor, profileId: string, query: TokenPricePageQuery): Promise<TokenPriceHistory>;
-  savePrice(actor: Actor, profileId: string, input: SaveTokenPrice): Promise<TokenPriceVersion>;
-}
-
-export type {CompleteRuntimeFactSources,CompleteRuntimeFactSourceFactory} from "./completeRuntimeSources";

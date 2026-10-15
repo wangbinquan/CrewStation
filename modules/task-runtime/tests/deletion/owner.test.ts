@@ -5,7 +5,7 @@ import { testDatabaseAvailable } from '@crewstation/testkit';
 import { sql } from 'drizzle-orm';
 import { runtimeOwnerFixture } from './ownerFixture';
 import { corruptRuntimeContent } from './contentFixture';
-import { expectParentStorageRejection } from '../developmentParentEndingStorageFixture';
+import { expectRejectionChain } from './rejection';
 
 const available = await testDatabaseAvailable();
 describe.skipIf(!available)('TaskRuntime persistent content owner (actual PG; controlled original stopping)', () => {
@@ -19,15 +19,14 @@ describe.skipIf(!available)('TaskRuntime persistent content owner (actual PG; co
       expect(f.stopCalls()).toBe(1); expect((await f.repository.inspect(f.target)).scope.count).toBe(0);
       expect(await f.work.history(f.project)).toEqual([]);
       expect((await f.database.db.execute<{ body: unknown }>(sql`SELECT to_jsonb(r) AS body FROM task_runtime.environments r WHERE id=${f.otherParent}`))[0]!.body).toEqual(other);
-      expect((await f.database.db.execute(sql`SELECT epoch FROM task_runtime.development_parent_recovery_sweep`))).toHaveLength(1);
       const [journal] = await f.database.db.execute<{ body: { contents: unknown[]; callbacks: unknown[]; stopped: unknown; compacted: boolean; count: number }; phases: Record<string, unknown> }>(sql`
         SELECT body,phases FROM task_runtime.project_deletions WHERE project_id=${f.project}`);
       expect(journal!.body).toMatchObject({ contents: [], callbacks: [], stopped: null, compacted: true, count: before.scope.count });
       expect(Object.keys(journal!.phases).sort()).toEqual([...PROJECT_DELETION_PHASES].sort());
       expect(JSON.stringify(journal)).not.toContain('archive-private-DSN');
       expect((await f.database.db.execute(sql`SELECT key FROM task_runtime.work_origins WHERE project_id=${f.project}`)).length).toBeGreaterThan(5);
-      await expectParentStorageRejection(f.environment({ id: f.parent }), 'permanently sealed');
-      await expectParentStorageRejection(f.environment({ id: f.parent, projectId: f.otherProject, serviceId: f.otherService }), 'original content project links conflict');
+      await expectRejectionChain(f.environment({ id: f.parent }), 'permanently sealed');
+      await expectRejectionChain(f.environment({ id: f.parent, projectId: f.otherProject, serviceId: f.otherService }), 'original content project links conflict');
       f.origins.delete('project:' + f.project); f.origins.delete('service:' + f.service);
       expect((await f.owner.inspect(f.target)).complete).toBe(true);
       expect((await f.owner.inspect(f.target)).resources).toEqual([]);
@@ -61,7 +60,7 @@ describe.skipIf(!available)('TaskRuntime persistent content owner (actual PG; co
     try {
       await f.environment();
       expect((await f.run('seal')).kind).toBe('blocked');
-      await expectParentStorageRejection(f.environment(), 'permanently sealed');
+      await expectRejectionChain(f.environment(), 'permanently sealed');
       expect((await f.owner.inspect(f.target)).complete).toBe(true);
       const current = (await f.repository.inspect(f.target)).inventory;
       await expect(f.owner.run({ ...f.context(), confirmed: current })).rejects.toMatchObject({ kind: 'precondition' });
@@ -97,7 +96,7 @@ describe.skipIf(!available)('TaskRuntime persistent content owner (actual PG; co
       await f.database.handle.client.unsafe(`CREATE FUNCTION task_runtime.fail_test_original_metadata() RETURNS trigger LANGUAGE plpgsql AS $$
         BEGIN IF OLD.id='${f.parent}' THEN RAISE EXCEPTION 'controlled original metadata late failure';END IF;RETURN OLD;END $$;
         CREATE TRIGGER fail_test_original_metadata BEFORE DELETE ON task_runtime.environments FOR EACH ROW EXECUTE FUNCTION task_runtime.fail_test_original_metadata()`);
-      await expectParentStorageRejection(f.run('metadata'), 'original metadata late failure');
+      await expectRejectionChain(f.run('metadata'), 'original metadata late failure');
       expect((await f.repository.inspect(f.target)).scope.contents).toEqual(before.scope.contents);
       expect((await f.database.db.execute<{ recorded: unknown }>(sql`SELECT phases->'metadata' AS recorded FROM task_runtime.project_deletions WHERE project_id=${f.project}`))[0]!.recorded).toBeNull();
       await f.database.db.execute(sql`DROP TRIGGER fail_test_original_metadata ON task_runtime.environments`);

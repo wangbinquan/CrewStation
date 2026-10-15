@@ -17,5 +17,6 @@ export function scopedDevelopmentPorts(deps: DevSessionUseCaseDeps, work: Develo
     services: guardedDevelopmentPort(deps.services, work), notifier: guardedDevelopmentPort(deps.notifier, work), credentials: guardedDevelopmentPort(deps.credentials, work),
     compute: guardedDevelopmentPort(deps.compute, work), reminders: guardedDevelopmentPort(deps.reminders, work), comparisons: guardedDevelopmentPort(deps.comparisons, work),
     apiCatalog: guardedDevelopmentPort(deps.apiCatalog, work), ...(deps.executions ? { executions: guardedDevelopmentPort(deps.executions, work) } : {}),
-    ...(deps.runtimeImages ? { runtimeImages: guardedDevelopmentPort(deps.runtimeImages, work) } : {}) };
+    ...(deps.runtimeImages ? { runtimeImages: guardedDevelopmentPort(deps.runtimeImages, work) } : {}),
+    ...(deps.calls ? { calls: guardedDevelopmentPort(deps.calls, work) } : {}) };
 }

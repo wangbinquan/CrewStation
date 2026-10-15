@@ -1,16 +1,15 @@
-import { businessUsage } from '../businessUsage';
 // ← agent-workflow `runtime/opencode/events.ts`，`--format json` 行 → NormalizedEvent。
 // 与源的差异：新增 `tool` 的尽力提取（源只判定 kind）；`error` 行取厂商的错误文案作 text（源留空，下游只能拿到「运行时报告错误」，
-// 2026-09-18 实机：业务子任务把 OpenCode Zen 的 403 报成这一句）；其余（文本提取、kind 推断、token 累计）原样。
+// 2026-09-18 实机：业务子任务把 OpenCode Zen 的 403 报成这一句）；其余（文本提取、kind 推断）原样。
+// 用量由 drivers/usage/opencodeMeter.ts 从 `source` 计量（RFC-034 v2，与源 RFC-371 v2 同算法）。
 
 import type {
   NormalizedEvent,
   NormalizedEventKind,
   NormalizedToolCall,
-  NormalizedTokenDelta,
   SystemEventObservation,
 } from '../../contract/normalizedEvent';
-import { SAFE_RUNTIME_EVENT_TYPE, numOrZero, parseJsonObjectLine } from '../../contract/normalizedEvent';
+import { SAFE_RUNTIME_EVENT_TYPE, parseJsonObjectLine } from '../../contract/normalizedEvent';
 
 export function observeSystemEvent(line: string): SystemEventObservation {
   const event = parseJsonObjectLine(line);
@@ -26,15 +25,14 @@ export function parseEvent(line: string): NormalizedEvent | null {
   if (evt === null) return null;
   const tool = extractToolCall(evt);
   return {
-    businessUsage: businessUsage('opencode', evt),
     kind: inferEventKind(evt),
     text: evt.type === 'error' ? extractErrorText(evt) : extractTextFromEvent(evt),
     // 与 Claude 不同：opencode 每个事件的顶层 `sessionID` 就是会话 id，没有根／侧链之分。
     ...(typeof evt.sessionID === 'string' ? { sessionId: evt.sessionID } : {}),
     ...(tool === undefined ? {} : { tool }),
     ...(typeof evt.timestamp === 'number' ? { timestamp: evt.timestamp } : {}),
-    tokens: computeTokenDelta(evt) ?? undefined,
     rawLine: line,
+    source: evt,
   };
 }
 
@@ -100,52 +98,4 @@ function firstString(candidates: readonly unknown[]): string | undefined {
     if (typeof candidate === 'string' && candidate.length > 0) return candidate;
   }
   return undefined;
-}
-
-/**
- * 逐事件的 token 增量。opencode 把用量放在好几处，按优先级探：
- * `evt.tokens` → `evt.part.tokens` → `evt.usage` → `evt.step.tokens` → `evt.message.usage`；
- * 每处同时接受 snake_case 与 camelCase。没有 token 字段时返回 null。
- */
-export function computeTokenDelta(evt: Record<string, unknown>): NormalizedTokenDelta | null {
-  const tokens = pickTokens([
-    evt,
-    evt.part as Record<string, unknown> | undefined,
-    evt.usage as Record<string, unknown> | undefined,
-    evt.step as Record<string, unknown> | undefined,
-    evt.message as Record<string, unknown> | undefined,
-  ]);
-  if (!tokens) return null;
-  const input = numOrZero(tokens.input ?? tokens.input_tokens ?? tokens.prompt_tokens);
-  // Native output excludes reasoning; generic completion totals already include it.
-  const output = numOrZero(tokens.output ?? tokens.output_tokens ?? tokens.completion_tokens) + (tokens.output != null ? numOrZero(tokens.reasoning) : 0);
-  // opencode 1.15.5+ 把缓存计数嵌在 `cache: { read, write }` 下；旧的扁平 `cache_read`／`cache_creation`
-  // 作为回退保留 —— 只读扁平键会静默丢掉缓存 token（源实测约 15 倍低估）。
-  const cache = tokens.cache as Record<string, unknown> | undefined;
-  return {
-    input,
-    output,
-    cacheCreate: numOrZero(tokens.cache_creation ?? tokens.cacheCreation ?? cache?.write),
-    cacheRead: numOrZero(tokens.cache_read ?? tokens.cacheRead ?? cache?.read),
-  };
-}
-
-function pickTokens(candidates: Array<Record<string, unknown> | undefined>): Record<string, unknown> | null {
-  for (const candidate of candidates) {
-    if (!candidate || typeof candidate !== 'object') continue;
-    const tokens = candidate.tokens;
-    if (tokens && typeof tokens === 'object') return tokens as Record<string, unknown>;
-    if (hasInlineCounts(candidate)) return candidate;
-    const usage = candidate.usage;
-    if (usage && typeof usage === 'object') {
-      const u = usage as Record<string, unknown>;
-      if (typeof u.input === 'number' || typeof u.output === 'number' || hasInlineCounts(u)) return u;
-    }
-  }
-  return null;
-}
-
-function hasInlineCounts(value: Record<string, unknown>): boolean {
-  return typeof value.input_tokens === 'number' || typeof value.output_tokens === 'number'
-    || typeof value.prompt_tokens === 'number' || typeof value.completion_tokens === 'number';
 }

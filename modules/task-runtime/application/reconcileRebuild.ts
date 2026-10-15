@@ -1,4 +1,3 @@
-import { executeDevelopmentParentRebuild } from './development/parent/rebuildExecution';
 import type { TaskId } from '@crewstation/contracts';
 import { isPlatformError } from '@crewstation/kernel';
 import type { RebuildRendering } from '../ports/rebuildRendering';
@@ -14,7 +13,6 @@ export function reconcileRebuildUseCase(deps: RebuildExecutionDeps) {
       prepareSecret: (record, values) => operations.prepareSecret(values, record.secretUid),
       ensurePod: (record) => operations.ensurePod(record.podUid), ensurePreview: () => operations.ensurePreview(), cleanup: (record) => operations.cleanup(record),
     } };
-    if (Object.hasOwn(original, 'developmentParentBinding')) { await executeDevelopmentParentRebuild(bound, id, heartbeat); return; }
     try {
       await deps.uow.run(async (scope) => {
         await scope.admissions.lock(original.projectId);

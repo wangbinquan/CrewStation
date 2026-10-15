@@ -1,6 +1,6 @@
 import type { ServiceId } from '@crewstation/contracts';
 import { completeFinalizationPorts } from './application/storage/storageCapabilities';
-import type { ExecutionObservationAdmission } from './ports/executionSubtasks';
+import type { BusinessCalls } from './ports/runtime';
 import type { StorageControlSink } from './ports/storage/control';
 import type { TaskInputPreparation } from './ports/storage/taskInputs';
 import { finalizationRevisions, archiveRevisionIntake } from './application/finalization/revisions';
@@ -101,7 +101,8 @@ export interface BusinessTaskModuleDeps {
   taskInputs?: TaskInputPreparation;
   taskStorageStatus?: (serviceId: ServiceId) => Promise<{ available: boolean; reason: string | null }>;
   finalizationPreparation?: FinalizationPreparation;
-  executionObservations?: ExecutionObservationAdmission;
+  /** RFC-034 v2：Agent 子任务执行记录（组合根接到 observability）；不给则不记录。 */
+  agentCalls?: BusinessCalls;
   storageControl?: StorageControlSink;
   legacyRecoveryProof?: LegacyRecoveryProof;
   agentSecrets?: ExecutionAgentSecrets;
@@ -162,7 +163,7 @@ export function createBusinessTaskModule(deps: BusinessTaskModuleDeps): Business
   const cleanupStorage = finalizationPorts ? cleanupFinalizations(finalizations, finalizationPorts, useCaseDeps.projectWork) : async () => 0;
   const storedControls = drizzleExecutionControls(deps.db, !!deps.storageControl);
   const synchronizedControls = deps.storageControl ? storageSynchronizedControls(storedControls, storageControlOutbox(deps.db), deps.storageControl, logger, useCaseDeps.projectWork) : undefined;
-  const executionDeps = scopedBusinessPorts({ ...useCaseDeps, storageStatus: completeFinalizationPorts(finalizationPorts) && deps.runner.getExecutionCompletionProof ? deps.taskStorageStatus : undefined, taskInputs: deps.taskInputs, executionObservations: deps.executionObservations, recoveryRequests, sessions: drizzleExecutionSessions(deps.db), messages: drizzleExecutionMessages(deps.db), agentSecrets: deps.agentSecrets, materials: drizzleExecutionMaterials(deps.db), lifecycles: drizzleExecutionLifecycles(deps.db), runtimeImages: deps.runtimeImages, cancellations: drizzleExecutionCancellations(deps.db), projection: drizzleExecutionProjection(deps.db), subtasks: drizzleExecutionSubtasks(deps.db), cipher: executionCipher(deps.settings.secretKeyBase64), operations: drizzleExecutionOperations(deps.db), controls: synchronizedControls ?? storedControls, sources: deps.executionSources ?? { resolve: async () => undefined } }, true);
+  const executionDeps = scopedBusinessPorts({ ...useCaseDeps, storageStatus: completeFinalizationPorts(finalizationPorts) && deps.runner.getExecutionCompletionProof ? deps.taskStorageStatus : undefined, taskInputs: deps.taskInputs, ...(deps.agentCalls ? { agentCalls: deps.agentCalls } : {}), recoveryRequests, sessions: drizzleExecutionSessions(deps.db), messages: drizzleExecutionMessages(deps.db), agentSecrets: deps.agentSecrets, materials: drizzleExecutionMaterials(deps.db), lifecycles: drizzleExecutionLifecycles(deps.db), runtimeImages: deps.runtimeImages, cancellations: drizzleExecutionCancellations(deps.db), projection: drizzleExecutionProjection(deps.db), subtasks: drizzleExecutionSubtasks(deps.db), cipher: executionCipher(deps.settings.secretKeyBase64), operations: drizzleExecutionOperations(deps.db), controls: synchronizedControls ?? storedControls, sources: deps.executionSources ?? { resolve: async () => undefined } }, true);
   const tasksV3 = executionTaskUseCases(executionDeps), { progressSubtask, ...subtasksV3 } = executionSubtaskUseCases(executionDeps);
   const { progressProjection, ...projectionV3 } = executionProjectionUseCases(executionDeps);
   const { progressCancellation, ...cancellationV3 } = executionCancellationUseCases(executionDeps);
@@ -214,9 +215,3 @@ export function createBusinessTaskModule(deps: BusinessTaskModuleDeps): Business
   };
 }
 
-/** Read-only owner source; the composition root supplies its transaction snapshot. */
-export { readBusinessObservationFacts } from './adapters/persistence/task-list/repository';
-
-export { readBusinessObservationTaskPage, readBusinessObservationAttemptPage } from './adapters/persistence/task-list/observationPages';
-
-export {readBusinessObservationRuntimeOrigins} from './adapters/persistence/task-list/observationRuntimeOrigins';

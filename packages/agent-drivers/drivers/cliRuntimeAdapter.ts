@@ -2,12 +2,11 @@
 // 因此对具体 CLI 一无所知。源里没有这层抽象（agent-workflow 的 RuntimeDriver 把装配、解析、
 // 会话捕获、清单读取全挂在一个对象上）；这里只留 CrewStation 实际要的四件事。
 
-import type { NativeCaptureInput, NativeUsageCapture } from './usage/nativeCapture';
-import type { UsageNormalizer } from './usage/capture';
 import type { KnownAgentProtocol } from '@crewstation/contracts';
 import type { NormalizedEvent } from '../contract/normalizedEvent';
 import type { DriverAgentSpec, DriverLaunchContext } from '../contract/agentDriver';
 import type { SpawnPlan } from '../contract/spawnPlan';
+import type { UsageMeter } from './usage/meter';
 
 export interface TurnInput {
   prompt: string;
@@ -18,10 +17,8 @@ export interface TurnInput {
 }
 
 export interface PreparedRuntime {
-  /** Native bootstrap uses the actual upstream binary and this turn's final environment. */
-  nativePageBootstrap?(env: Record<string, string>): { cmd: string[]; env: Record<string, string> };
-  normalizeUsage?: UsageNormalizer;
-  nativeUsageCapture?(input: NativeCaptureInput, env: Readonly<Record<string, string | undefined>>): NativeUsageCapture;
+  /** RFC-034 v2：本次执行的计量器（一次执行一个，跨轮累计；与 agent-workflow RFC-371 v2 同算法）。 */
+  usageMeter(execution: { resumed: boolean; startedAt: number }): UsageMeter;
   /** 组装一次拉起的 argv／env／stdin 约定。 */
   plan(input: TurnInput): SpawnPlan;
   parseEvent(line: string): NormalizedEvent | null;
@@ -37,6 +34,5 @@ export interface CliRuntimeAdapter {
   readonly protocol: KnownAgentProtocol;
   /** CLI 是否真的支持「进程常驻、持续读 stdin」；false 时交互式退化为链式 one-shot。 */
   readonly supportsResidentStream: boolean;
-  readonly developmentNativePagesV2?: 2;
   prepare(spec: DriverAgentSpec, context: DriverLaunchContext): Promise<PreparedRuntime>;
 }

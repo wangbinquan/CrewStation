@@ -2,7 +2,6 @@ import type { ClusterPurpose, ProjectId, ResourceChild, ResourceCondition, Resou
 import { conflict } from '@crewstation/kernel';
 import type { Executor } from '@crewstation/persistence';
 import { and, asc, eq, gt, inArray, isNull, lt, notInArray, or, sql } from 'drizzle-orm';
-import { selectedDevelopmentRecord } from '../../domain/maintenanceEnding';
 import { currentMaintenanceLease } from './maintenanceSweeps';
 import { STABLE_KINDS } from '../../domain/kinds';
 import type { LedgerRecord, RecordFilter, ResourceAlias, ResourceSpec } from '../../domain/record';
@@ -125,7 +124,7 @@ function childLookups(db: Executor): Pick<RecordRepository, 'findByChild' | 'cla
   };
 }
 
-function maintenanceRecords(db: Executor, hydrate: (rows: readonly RecordRow[]) => Promise<LedgerRecord[]>, one: (where: ReturnType<typeof eq>, forUpdate?: boolean) => Promise<LedgerRecord | undefined>): Pick<RecordRepository, 'maintenancePage' | 'maintenanceOwnerRequired' | 'updateForMaintenance' | 'compactForMaintenance'> {
+function maintenanceRecords(db: Executor, hydrate: (rows: readonly RecordRow[]) => Promise<LedgerRecord[]>): Pick<RecordRepository, 'maintenancePage' | 'updateForMaintenance' | 'compactForMaintenance'> {
   return {
     maintenancePage: async (lease, compactAfterMs, limit) => hydrate(await db.select().from(records).where(and(
       lease.afterId ? gt(records.id, lease.afterId) : undefined,
@@ -133,14 +132,6 @@ function maintenanceRecords(db: Executor, hydrate: (rows: readonly RecordRow[]) 
         sql`NOT (${records.kind} = 'volume' AND ${records.spec} ? 'taskStorage')`)
         : and(eq(records.desired, 'absent'), eq(records.phase, 'stopped'), lt(records.phaseSince, new Date(lease.scanCutoff.getTime() - compactAfterMs)), isNull(records.compactedAt)),
     )).orderBy(asc(records.id)).limit(Math.max(1, Math.min(100, limit)))),
-    maintenanceOwnerRequired: async (id) => {
-      const record = await one(eq(records.id, id));
-      if (!record || record.owner.module !== 'task-runtime') return false;
-      if (selectedDevelopmentRecord(record)) return true;
-      const rows = await db.select({ id: records.id }).from(records).where(and(eq(records.parentId, id), eq(records.ownerModule, 'task-runtime'),
-        sql`(${records.spec}->'pod' ? 'developmentUsageProtection' OR ${records.spec}->'pod' ? 'developmentRemovalProtection' OR ${records.spec} ? 'developmentParentEnding')`)).limit(1);
-      return rows.length > 0;
-    },
     updateForMaintenance: async (record, lease) => (await db.update(records).set(toRow(record))
       .where(and(eq(records.id, record.id), currentMaintenanceLease(lease))).returning({ id: records.id })).length > 0,
     compactForMaintenance: async (record, at, lease) => {
@@ -218,7 +209,7 @@ export function drizzleRecordRepository(db: Executor): RecordRepository {
       }
     },
     resolveAlias: async (alias) => (await db.select({ id: aliases.resourceId }).from(aliases).where(and(eq(aliases.source, alias.source), eq(aliases.alias, alias.alias))))[0]?.id,
-    ...maintenanceRecords(db, hydrate, one),
+    ...maintenanceRecords(db, hydrate),
     retentionDue: async (limit) => hydrate(await db.select().from(records)
       .where(and(lt(records.retainUntil, sql`now()`), eq(records.desired, 'present'), eq(records.phase, 'failed'),
         sql`NOT (${records.kind} = 'volume' AND ${records.spec} ? 'taskStorage')`)).orderBy(asc(records.retainUntil)).limit(limit)),

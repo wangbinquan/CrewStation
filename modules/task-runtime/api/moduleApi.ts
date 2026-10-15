@@ -1,11 +1,9 @@
-import type { ResourceEndingDecision, ResourceEndingSnapshot, ResourceEndingStep } from './resourceEnding';
 import type { ProjectDeletionOwner } from '@crewstation/contracts';
 import type { RuntimeImageHistoryRead, RuntimeImageHistoryItem } from '@crewstation/contracts';
 import type { ResourceWorkload, ResourceWorkloadPage } from '@crewstation/contracts';
 import type { BusinessStorageFinalization, DevelopmentSourceBinding, WorkloadStopBarrier } from '@crewstation/contracts';
-import type { DevelopmentCleanupSelection, DevelopmentRemovalDecision, DevelopmentRemovalTarget } from './developmentCleanup';
 import type { BusinessRecoveryScope, BusinessWorkspaceProof, RebuildBusinessWorkspaceInput, RestartBusinessWorkspaceInput } from './businessRecovery';
-import type { BusinessSessionStorage, DevelopmentUsageStorage, DevelopmentUsageLayoutLookup } from '@crewstation/contracts';
+import type { BusinessSessionStorage } from '@crewstation/contracts';
 import type { RuntimeImageProbeInput, RuntimeImageProbeResult, RuntimeInitializationStatus, RuntimeImageExecutionSnapshot, Actor, ProjectId, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
 import type { DevSessionDto, DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest, StartupRecord } from '@crewstation/contracts';
 import type { BeforeStartMaterial, LaunchSpec, ProfileTestContext, ProfileTestOutcome, ProfileTestStage, TerminalTest } from '@crewstation/contracts';
@@ -86,11 +84,6 @@ export interface CreateEnvironmentInput {
  * image 是档位修订按摘要固定的镜像；省略时用平台任务镜像（RFC-006 之前受理的 CLI）。
  */
 export interface CreateNativeExecutionInput {
-  /** Opt-in only for a new independent development Agent; frozen for every retry. */
-  developmentUsageStorage?: DevelopmentUsageStorage;
-  /** Explicit private opt-in; no production caller until the complete digital cleanup barrier is ready. */
-  developmentUsageProtection?: { readonly version: 1 };
-  developmentRemovalProtection?: { readonly version: 1 };
   businessSession?: BusinessSessionStorage;
   runtimeImage?: RuntimeImageExecutionSnapshot;
   id: TaskId;
@@ -118,12 +111,8 @@ export interface RebuildRendering {
 
 export interface TaskRuntimeModuleApi {
   readonly deletionOwner?: ProjectDeletionOwner;
-  originalInfrastructureOwnership(kind: 'task' | 'rebuild' | 'parent-ending', key: string, representation?: 'current' | 'legacy'): Promise<{ complete: true; id: string; scope: 'project' | 'platform'; projectIds: readonly ProjectId[]; revision: string } | undefined>;
+  originalInfrastructureOwnership(kind: 'task' | 'rebuild', key: string, representation?: 'current' | 'legacy'): Promise<{ complete: true; id: string; scope: 'project' | 'platform'; projectIds: readonly ProjectId[]; revision: string } | undefined>;
   originalProjectTaskIds(projectId: ProjectId, after: string | null): Promise<readonly TaskId[]>;
-  /** Internal neutral maintenance owner callback; never exposed by an HTTP route. */
-  inspectResourceEnding?(step: ResourceEndingStep, snapshot: ResourceEndingSnapshot): Promise<ResourceEndingDecision>;
-  /** Internal L6 cleanup composition only, never exposed by HTTP. */
-  inspectDevelopmentCleanupSelection?(taskId: TaskId): Promise<DevelopmentCleanupSelection | undefined>;
   resourceWorkload(actor: Actor, taskId: TaskId): Promise<ResourceWorkload>;
   resourceWorkloads(actor: Actor, projectId: ProjectId, page: { after?: string; limit: number }): Promise<ResourceWorkloadPage>;
   readonly storageCleanup?: StorageCleanupApi;
@@ -142,9 +131,6 @@ export interface TaskRuntimeModuleApi {
   reconcileRebuild(taskId: TaskId, rebuildId: string, operations: RebuildRendering, heartbeat: () => Promise<boolean>): Promise<void>;
   readonly name: 'task-runtime';
   listClusterTasks(): Promise<Array<{ taskId: string; projectId: string; namespace: string; podName: string; podUid?: string; pvcName: string; pvcUid?: string; kind: string; state: string; purpose?: string; parentTaskId?: string; agentId?: string; terminalId?: string; profile: string; profileRevision?: number; profileTestId?: string; revision: string; volumeMode: string }>>;
-  /** Read-only actual persisted child layout; no physical-stop or cleanup permission. */
-  lookupDevelopmentUsageLayout(taskId: TaskId): Promise<DevelopmentUsageLayoutLookup>;
-  inspectDevelopmentRemoval(target: DevelopmentRemovalTarget): Promise<DevelopmentRemovalDecision>;
   resolveDevelopmentObjectSource(source: DevelopmentSourceBinding): Promise<{ projectId: ProjectId; serviceId: ServiceId; planId: string } | undefined>;
   createEnvironment(input: CreateEnvironmentInput): Promise<EnvironmentDto>;
   createNativeExecution(input: CreateNativeExecutionInput): Promise<EnvironmentDto>;

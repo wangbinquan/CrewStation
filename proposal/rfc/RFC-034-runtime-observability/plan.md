@@ -1,5 +1,18 @@
 # RFC-034 设计交付与分阶段实施计划
 
+> 2026-10-14：v1 计划与其剩余工作随 [v2 重设计](./redesign-v2-20261014.md) 关闭；v2 的任务分解见该文与下方「v2 实施」一节，下文为 v1 历史记录。
+
+## v2 实施（2026-10-14）
+
+- [x] T1 契约：`api/observability/runtime.ts`（两级统计、价格线、费用可见性）与 `taskrunner/usage.ts`（执行快照）；业务 `usage` 事件携带可选快照（契约金样仅新增）。
+- [x] T2 Runner / agent-drivers：OpenCode 与 Claude 计量器（流＋原生会话树、assistant 去重、`result.modelUsage`），≤3 秒节流上报与最终快照；「＋ CLI」终端每 10 秒及退出采样。
+- [x] T3 observability：迁移 0045 断代；Agent 执行记录器、按需聚合统计、价格线（CAS、按开始冻结）、项目费用可见性、项目删除内容。
+- [x] T4 owner 受理：business-task / dev-session / task-runtime 派发前受理（失败不派发）；Session 转交快照与终态；组合根装配并订阅 `task-runtime.task-released` 兜底。
+- [x] T5 退役 v1 附加能力：resources 0011、task-runtime 0026、dev-session 0022、session 0017 与对应代码、报告快照卷、规模作业。
+- [x] T6 工作台：两级统计页（总览 / 任务 / Agent 与模型 / 项目 / 平台执行，保留资源与健康）、任务详情独立路由、价格配置与项目费用可见性。
+- [x] T7 用例：领域、计量器、真实 PostgreSQL 模块、owner 受理、Session 转交、组合根端口与兜底、终端采样、工作台、实机。
+- [ ] T8 精确提交的六项 CI、本机部署，并以业务子任务 / 开发 Agent / ＋CLI / 档位测试逐条与原生存储对账。
+
 保留期接续修复已完成独立 SOURCE10 与真实 PG 逆序回归，官方锁仅追加 0021 至 220 项；唯一共同完整检查、发布部署待完成，见 [保留期接续](./retention-continuation.md)。全量统计的正式页面仍在实施中。
 
 ## 完整统计硬要求（2026-10-03）

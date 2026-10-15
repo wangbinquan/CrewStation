@@ -1,12 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import { BUILTIN_RESOURCES } from '@crewstation/contracts';
-import { jsonHash, newResourceId } from '@crewstation/kernel';
+import { newResourceId } from '@crewstation/kernel';
 import { resourceIdentityDirectory } from '@crewstation/persistence';
 import { testDatabaseAvailable } from '@crewstation/testkit';
 import { sql } from 'drizzle-orm';
 import { RUNTIME_CONTENT } from '../../adapters/persistence/deletion/contentTables';
 import { taskRuntimeMigrations } from '../../wiring';
-import { developmentParentEpochHash } from '../../domain/development/parentEnding';
 import { corruptRuntimeContent, runtimeContentFixture, seedRuntimeContent } from './contentFixture';
 
 const available = await testDatabaseAvailable();
@@ -40,14 +39,11 @@ describe.skipIf(!available)('TaskRuntime content inventory (actual read-only PG;
         CROSS JOIN LATERAL jsonb_populate_record(NULL::task_runtime.environments,to_jsonb(original)||jsonb_build_object('id',item#>>'{}','pod_name',item#>>'{}')) copy WHERE original.id=${f.parent}`);
       const before = await f.database.db.execute('SELECT id,runner_token_hash,render,message FROM task_runtime.environments ORDER BY id');
       const result = await f.inspect();
-      expect(RUNTIME_CONTENT).toHaveLength(12); expect(result.inventory.complete).toBe(true); expect(result.inventory.resources).toHaveLength(11);
+      expect(RUNTIME_CONTENT).toHaveLength(7); expect(result.inventory.complete).toBe(true); expect(result.inventory.resources).toHaveLength(6);
       expect(result.traversal.counts.environments).toBe(209); expect(result.inventory.resources.find((row) => row.id === 'environments')?.count).toBe(208);
-      const [history] = await f.database.db.execute<{count:string}>(sql`SELECT count(*)::text AS count FROM task_runtime.observation_lifecycle WHERE project_id=${f.project}`);
-      expect(Number(history!.count)).toBe(208);
-      expect(result.contents.filter(row=>row.table!=='observation_lifecycle')).toHaveLength(217);
-      expect(result.contents).toHaveLength(217+Number(history!.count)); expect(result.contents.some((row) => row.key.includes(f.otherParent))).toBe(false);
+      expect(result.contents).toHaveLength(213); expect(result.contents.some((row) => row.key.includes(f.otherParent))).toBe(false);
       expect(result.origins.find((row) => row.kind === 'task' && row.key === seeded.reserved)?.projectId).toBe(f.project);
-      for (const secret of ['runner_token_hash', '111111111111', 'original-rebuild-input', 'original-stop-intent', 'original-numeric-tail', 'archive-private-DSN', 'never-provisioned-private'])
+      for (const secret of ['runner_token_hash', '111111111111', 'original-rebuild-input', 'archive-private-DSN', 'never-provisioned-private'])
         expect(JSON.stringify(result)).not.toContain(secret);
       expect(f.requests.filter((row) => row === 'service:' + f.service + ':current')).toHaveLength(1);
       expect(await f.database.db.execute('SELECT id,runner_token_hash,render,message FROM task_runtime.environments ORDER BY id')).toEqual(before);
@@ -99,7 +95,7 @@ describe.skipIf(!available)('TaskRuntime content inventory (actual read-only PG;
     } finally { await f.database.drop(); }
   });
 
-  test('native children and frozen parent members require their original workspace and all original identity links', async () => {
+  test('native children require their original workspace and all original identity links', async () => {
     const f = await runtimeContentFixture();
     try {
       const seeded = await seedRuntimeContent(f);
@@ -107,8 +103,7 @@ describe.skipIf(!available)('TaskRuntime content inventory (actual read-only PG;
       await corruptRuntimeContent(f, 'environments', () => f.database.db.execute(sql`UPDATE task_runtime.environments SET service_id=${f.service},native=jsonb_set(native,'{parentTaskId}',to_jsonb(${f.otherParent}::text)) WHERE id=${seeded.child}`));
       await expect(f.inspect()).rejects.toThrow('父关系冲突');
       await corruptRuntimeContent(f, 'environments', () => f.database.db.execute(sql`UPDATE task_runtime.environments SET native=jsonb_set(native,'{parentTaskId}',to_jsonb(${f.parent}::text)) WHERE id=${seeded.child}`));
-      await f.database.db.execute(sql`UPDATE task_runtime.environments SET native=jsonb_set(native,'{runnerId}',to_jsonb(${newResourceId()}::text)) WHERE id=${seeded.child}`);
-      await expect(f.inspect()).rejects.toThrow('原父记录关系不符');
+      expect((await f.inspect()).inventory.complete).toBe(true);
     } finally { await f.database.drop(); }
   });
 
@@ -139,25 +134,6 @@ describe.skipIf(!available)('TaskRuntime content inventory (actual read-only PG;
     } finally { await f.database.drop(); }
   });
 
-  test('current parent pointers and pending/completed rebuild bindings require the original epoch and completion hash', async () => {
-    const f = await runtimeContentFixture();
-    try {
-      const seeded = await seedRuntimeContent(f), epochHash = developmentParentEpochHash(seeded.epoch);
-      const pointer = { version: 1, endingId: seeded.ending, epochHash, phase: 'children' };
-      const pending = { version: 1, endingId: seeded.ending, epochHash, kind: 'pending-ending' };
-      await f.database.db.execute(sql`UPDATE task_runtime.environments SET parent_ending=${JSON.stringify(pointer)}::jsonb WHERE id=${f.parent}`);
-      await f.database.db.execute(sql`UPDATE task_runtime.environment_rebuilds SET development_parent_binding=${JSON.stringify(pending)}::jsonb WHERE id=${seeded.rebuild}`);
-      expect((await f.inspect()).inventory.complete).toBe(true);
-      const witness = { private: 'completed-original-tail' };
-      await f.database.db.execute(sql`UPDATE task_runtime.development_parent_endings SET phase='complete',status='complete',completion_witness=${JSON.stringify(witness)}::jsonb WHERE id=${seeded.ending}`);
-      const completed = { ...pending, kind: 'completed-ending', completionWitnessHash: jsonHash(witness), afterTransitionHash: jsonHash('original-transition'), pvcUid: seeded.epoch.pvcUid, claimRevision: 1 };
-      await f.database.db.execute(sql`UPDATE task_runtime.environment_rebuilds SET development_parent_binding=${JSON.stringify(completed)}::jsonb WHERE id=${seeded.rebuild}`);
-      const inventory = await f.inspect(); expect(inventory.inventory.complete).toBe(true); expect(JSON.stringify(inventory)).not.toContain(witness.private);
-      await f.database.db.execute(sql`UPDATE task_runtime.environment_rebuilds SET development_parent_binding=jsonb_set(development_parent_binding,'{completionWitnessHash}',to_jsonb(${'0'.repeat(64)}::text)) WHERE id=${seeded.rebuild}`);
-      await expect(f.inspect()).rejects.toThrow('原完成证明不符');
-    } finally { await f.database.drop(); }
-  });
-
   test('legacy rebuild input and cluster identities must map to the same original task and request', async () => {
     const f = await runtimeContentFixture();
     try {
@@ -172,19 +148,14 @@ describe.skipIf(!available)('TaskRuntime content inventory (actual read-only PG;
     } finally { await f.database.drop(); }
   });
 
-  test('archive bodies, frozen membership counts and immutable epochs cannot borrow unrelated original records', async () => {
+  test('archive bodies cannot borrow unrelated original records', async () => {
     const f = await runtimeContentFixture();
     try {
       const seeded = await seedRuntimeContent(f);
       await corruptRuntimeContent(f, 'archive_executions', () => f.database.db.execute(sql`UPDATE task_runtime.archive_executions SET body=jsonb_set(body,'{taskId}',to_jsonb(${f.otherParent}::text)) WHERE id=${seeded.archive}`));
       await expect(f.inspect()).rejects.toThrow('原父记录关系不符');
       await corruptRuntimeContent(f, 'archive_executions', () => f.database.db.execute(sql`UPDATE task_runtime.archive_executions SET body=jsonb_set(body,'{taskId}',to_jsonb(${seeded.business}::text)) WHERE id=${seeded.archive}`));
-      // Only this isolated fixture is corrupted. Inspection must reject missing members even if the original table guard was lost.
-      await f.database.db.execute('ALTER TABLE task_runtime.development_parent_endings DISABLE TRIGGER ALL');
-      await f.database.db.execute(sql`UPDATE task_runtime.development_parent_endings SET member_count=2 WHERE id=${seeded.ending}`);
-      await expect(f.inspect()).rejects.toThrow('冻结成员数');
-      await f.database.db.execute(sql`UPDATE task_runtime.development_parent_endings SET member_count=1,epoch_hash=${'0'.repeat(64)} WHERE id=${seeded.ending}`);
-      await expect(f.inspect()).rejects.toThrow('受理范围冲突');
+      expect((await f.inspect()).inventory.complete).toBe(true);
     } finally { await f.database.drop(); }
   });
 

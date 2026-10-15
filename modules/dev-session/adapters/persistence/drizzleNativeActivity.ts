@@ -1,9 +1,8 @@
-import {observationActivityHistory} from './observability/observationActivityTable';
 import type { AgentActivityItem, AgentActivityQuery, ReadAgentActivityRequest, TaskId, UserId } from '@crewstation/contracts';
 import { precondition, validation } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
 import { and, asc, desc, eq, gt, inArray, lt, lte, max, sql } from 'drizzle-orm';
-import { activityNotifies, initialNativeActivity, projectNativeActivity, projectNativeLifecycle, type NativeActivityProjection } from '../../domain/nativeActivityProjection';
+import { activityNotifies, initialNativeActivity, projectNativeActivity, projectNativeLifecycle } from '../../domain/nativeActivityProjection';
 import type { NativeActivityRepository, NativeActivityRead, StoredNativeEvent } from '../../ports/nativeActivity';
 import { activityItems as items, activityProgress as progress, activityReads as reads, activityStates as states, activitySources as sources } from './nativeActivityTables';
 import { nativeTerminalStarts as starts } from './nativeTerminalTable';
@@ -65,9 +64,8 @@ export function drizzleNativeActivity(db: Database): NativeActivityRepository {
 }
 
 async function applyEvents(db: Executor, taskId: TaskId, events: StoredNativeEvent[], sourceTaskId: TaskId): Promise<void> {
-  const ids=[...new Set(events.flatMap(({event})=>event.kind==='nativeActivity'?[event.activity.agentId]:event.kind==='nativeTerminal'?[event.terminal.agentId]:[]))],known=new Map<string,{agentId:string;record:typeof starts.$inferSelect['record'];executionTaskId:string|null}>();
-  for(let at=0;at<ids.length;at+=200)for(const row of await db.select({agentId:starts.agentId,record:starts.record,executionTaskId:starts.executionTaskId}).from(starts).where(and(eq(starts.taskId,taskId),inArray(starts.agentId,ids.slice(at,at+200)))))known.set(row.agentId,row);
-  const projections=new Map<string,NativeActivityProjection>();for(let at=0;at<ids.length;at+=200)for(const row of await db.select().from(states).where(and(eq(states.taskId,taskId),inArray(states.agentId,ids.slice(at,at+200)))))projections.set(row.agentId,row.projection);
+  const known = new Map((await db.select({ agentId: starts.agentId, record: starts.record, executionTaskId: starts.executionTaskId }).from(starts).where(eq(starts.taskId, taskId)).limit(256)).map((row) => [row.agentId, row]));
+  const projections = new Map((await db.select().from(states).where(eq(states.taskId, taskId)).limit(256)).map((row) => [row.agentId, row.projection]));
   const changed = new Set<string>(), additions: Array<typeof items.$inferInsert> = [];
   for (const { event, seq, at } of events) {
     if (event.kind !== 'nativeActivity' && event.kind !== 'nativeTerminal') continue;
@@ -76,7 +74,6 @@ async function applyEvents(db: Executor, taskId: TaskId, events: StoredNativeEve
     if (!start || (start.executionTaskId ?? taskId) !== sourceTaskId || start.record.runnerId !== record.runnerId || start.record.terminalId !== record.terminalId) continue;
     const previous = projections.get(record.agentId) ?? initialNativeActivity(start.record);
     const activity = event.kind === 'nativeActivity' ? { ...event.activity, eventId: await nativeActivityIdentity(db, sourceTaskId, event.activity.eventId) } : undefined;
-    if(activity)await db.insert(observationActivityHistory).values({taskId,sourceTaskId,sourceSeq:seq,agentId:record.agentId,eventId:activity.eventId,document:activity}).onConflictDoNothing();
     const result = activity ? projectNativeActivity(previous, activity, seq) : projectNativeLifecycle(previous, record as typeof start.record, seq, at);
     projections.set(record.agentId, result.projection); changed.add(record.agentId);
     if (result.item) additions.push({ taskId, seq, eventId: result.item.eventId, agentId: record.agentId, turnId: result.item.turnId, kind: result.item.kind, item: result.item });

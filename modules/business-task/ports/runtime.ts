@@ -98,3 +98,29 @@ export interface BusinessTaskSettings {
   readonly outputLimitBytes: number;
   readonly secretKeyBase64?: string;
 }
+
+/** 业务任务里的一次 Agent 子任务尝试。 */
+export interface BusinessCall {
+  readonly projectId: ProjectId;
+  readonly taskId: TaskId;
+  readonly taskLabel: string;
+  readonly subtaskId: string;
+  readonly attempt: number;
+  /** Runner 寻址：子任务的执行环境与其中的 Agent（即执行 ID）。 */
+  readonly runtimeTaskId: TaskId;
+  readonly agentId: string;
+  /** 稳定逻辑 Agent：发布里的 Agent 档案。 */
+  readonly agentKey: string;
+  readonly agentLabel: string;
+  readonly profile: { readonly id: string; readonly revision: number; readonly name: string | null };
+  readonly protocol: string;
+}
+
+/**
+ * RFC-034 v2 §4：Agent 子任务在派发 `startBusinessAgent` 前受理一条执行记录（组合根接到 observability）；用量与
+ * 终态由 Session 按业务事件转交，执行环境释放后仍在运行的由 observability 记为中断。
+ */
+export interface BusinessCalls {
+  /** 失败时不派发；同一执行重复受理是幂等的。 */
+  accept(call: BusinessCall): Promise<void>;
+}

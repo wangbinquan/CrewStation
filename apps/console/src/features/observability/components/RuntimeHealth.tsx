@@ -1,5 +1,3 @@
-import {RuntimeStorage} from './runtime/RuntimeStorage';
-import {RuntimeAnomalies} from './RuntimeAnomalies';
 import {RuntimeOperationalTelemetry} from './runtime/RuntimeOperationalTelemetry';
 import type {OperationalTelemetryQuery} from '@crewstation/contracts';
 import { useState } from 'react';
@@ -38,4 +36,7 @@ function PlatformHealth() {
     </> : null}</Card>
   </Stack>;
 }
-export function RuntimeHealth({ projectId, window }: { projectId?: string; window?:OperationalTelemetryQuery }) {const [initialRange]=useState(()=>{const now=Date.now();return {from:new Date(now-86400000).toISOString(),to:new Date(now).toISOString()};}),range=window??initialRange;return <Stack>{projectId?<ProjectHealth key={projectId} projectId={projectId}/>:<><RuntimeStorage/><PlatformHealth/></>}<RuntimeOperationalTelemetry projectId={projectId} window={range}/><RuntimeAnomalies key={projectId??'system'} projectId={projectId} window={{...range,timezone:'Asia/Shanghai'}}/></Stack>;}
+/** 服务健康、平台组件与运行遥测；RFC-034 v2 退役了统计存储维护与异常页签（服务告警仍在这里）。 */
+export function RuntimeHealth({ projectId, window }: { projectId?: string; window: OperationalTelemetryQuery }) {
+  return <Stack>{projectId ? <ProjectHealth key={projectId} projectId={projectId} /> : <PlatformHealth />}<RuntimeOperationalTelemetry projectId={projectId} window={window} /></Stack>;
+}
