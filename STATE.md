@@ -1,3 +1,11 @@
+## 2026-10-15 RFC-034 v2：精确 CI 全绿、本机部署与四类执行实机对账（Done）
+
+`4d8cc2d9`（时间范围移到页头，修 `3d7a680a` 在 e2e 暴露的 390px 英文溢出）精确 CI 38699494497 与 `4990a699`（日柱图当天明细不再把全未定价显示成 ¥0）精确 CI 38707202733 均九项全绿。两版都经 `git archive` → 官方 `install-platform.sh` 部署到本机：迁移 287 → 292，四个镜像与精确归档预构建一致，新任务底座已发布并写入 `CS_TASK_IMAGE`；09:21 UTC 并行会话又部署了包含这些提交的 `e3559f0d`。
+
+实机对账：把 RFC-034 自己的两个验收档位（obs-native-development-20261007、rfc027-live-agent）保存到新底座 r5，两次档位测试通过并记下 12 次 `platform/profile-test` 执行；rfc027-live 的业务子任务（oneshot 与 interactive，经应用自身工作负载身份调用 `/v3`）、开发 Agent 与「＋ CLI」（经工作台同一终端 WebSocket 真实键入）逐会话与 OpenCode 原生库完全一致，取消 / 停止后为 canceled + partial 下界；系统 / 项目统计页的数字与数据库逐项一致。详见 [v2 实机对账](proposal/rfc/RFC-034-runtime-observability/v2-acceptance-20261015.md)。
+
+注意：档位修订按摘要钉住镜像，仍钉在旧底座的档位（含平台默认档位）不产生 v2 用量，需管理员保存到新底座；本机 PostgreSQL `max_connections=100` 在验收期间被控制面与各项目连接池占满，并发生过一次 Docker 虚拟机全局 OOM（均为环境问题，已如实记录）；Claude Code 本机无凭据未实机，未向共享环境追加价格线。rfc027-live 的开发会话已还原为重建前的 failed（只删了验收重建的 Pod，工作卷保留）。以下历史与并行内容原样保留。
+
 ## 2026-10-14 RFC-034 v2：每次 Agent 执行一行的运行统计（断代重设计，In Progress）
 
 按作者 2026-10-14 裁定（断代、不迁移 v1 已采集数据；原 RFC-034 会话已停，其未提交在制品直接替换），对照 agent-workflow RFC-371 重新设计并实现：业务子任务、开发 Agent、「＋ CLI」、档位测试四类执行都由各自 owner 在派发前受理一行执行记录（受理失败不派发），Runner／agent-drivers 以流与原生会话树计量四桶 Token、≤3 秒节流上报整份快照，Session 只转交快照与终态，组合根订阅 `task-runtime.task-released` 兜底收尾。统计按需聚合（无报告、无水位），价格线按档位 × 模型追加版本、CAS 写入并按执行开始冻结，人民币对项目默认隐藏、由管理员按项目开放。迁移 observability 0045、session 0017、resources 0011、task-runtime 0026、dev-session 0022 退役 v1 全部观测表与附加能力；工作台改为总览／任务／Agent 与模型／项目／平台执行（保留资源与健康），任务详情为独立路由。设计见 [v2 重新设计](proposal/rfc/RFC-034-runtime-observability/redesign-v2-20261014.md)，任务见同目录 `plan.md`「v2 实施」。
