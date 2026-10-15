@@ -10,6 +10,22 @@ import { loadReadyBinding } from './queryRepository';
 export function sessionCredentialUseCases(deps: ScmUseCaseDeps) {
   const { uow, gitlab, settings, clock } = deps;
   return {
+    /** 发布已授权后才调用；持有同一 SCM 写入准入直到推送、撤销结束，崩溃时由到期台账兜底。 */
+    withPublishCredential: <T>(serviceId: ServiceId, publish: (credential: SessionCredentialDto) => Promise<T>): Promise<T> => withScmServiceWrite(deps, serviceId, 'push-branch', async () => {
+      const binding = await loadReadyBinding(uow, serviceId), now = clock.now(), expiresAt = credentialExpiry(now, 10), id = newId('cred');
+      const remote = await scmExternalEffect(deps, { kind: 'credential', remoteProjectId: binding.remoteProjectId, credentialId: id },
+        () => gitlab.createAccessToken(binding.remoteProjectId, { name: `cs-publish-${id}`, expiresOn: remoteExpiryDate(expiresAt), publish: true }),
+        (created) => ({ remoteTokenId: created.id, ...(created.createdAt ? { createdAt: created.createdAt } : {}), ...(created.userId ? { userId: created.userId } : {}) }));
+      let recorded = false;
+      try {
+        await uow.run((scope) => scope.credentials.insert({ id, serviceId, remoteTokenId: remote.id, tokenHash: hashToken(remote.token), expiresAt, createdAt: now }));
+        recorded = true;
+        return await publish({ token: remote.token, expiresAt: expiresAt.toISOString(), httpUrlWithCredentialTemplate: credentialTemplate(binding.httpUrl, settings.credentialUsername ?? DEFAULT_CREDENTIAL_USERNAME) });
+      } finally {
+        await gitlab.revokeAccessToken(binding.remoteProjectId, remote.id);
+        if (recorded) await uow.run((scope) => scope.credentials.markRevoked(id, clock.now()));
+      }
+    }),
     /** 构建只读凭据与开发读写凭据共用准入、原生副作用沿革和撤销台账。 */
     issueBuildCredential: (serviceId: ServiceId, ttlMinutes: number) => withScmServiceWrite(deps, serviceId, 'build-credential', async () => {
       const binding = await loadReadyBinding(uow, serviceId), now = clock.now();

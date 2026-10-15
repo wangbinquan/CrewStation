@@ -69,7 +69,7 @@ export function scmCurrentRepositoryOrigins(projectId: ProjectId, history: ScmWr
     const known = history.credentials.filter((value) => value.remoteTokenId === native.id && history.origins.some((origin) => origin.serviceId === value.serviceId && origin.remoteProjectId === row.remoteProjectId));
     if (known.length > 1) reject('当前令牌存在多个平台归属');
     const binding = known[0], effect = effects.find((value) => value.remoteProjectId === row.remoteProjectId && value.remoteTokenId === native.id);
-    if (binding && !['cs-session-' + binding.id, 'cs-build-' + binding.id].includes(native.name)) reject('当前旧凭据缺少精确原 ID／名称关联');
+    if (binding && !['cs-session-' + binding.id, 'cs-build-' + binding.id, 'cs-publish-' + binding.id].includes(native.name)) reject('当前旧凭据缺少精确原 ID／名称关联');
     if (effect && (effect.createdAt && effect.createdAt !== native.createdAt || effect.userId && effect.userId !== native.userId || binding && effect.credentialId !== binding.id)) reject('当前令牌身份与已知原回调结果冲突');
     const user = row.users.find((value) => value.id === native.userId)!, member = row.memberships.find((value) => value.userId === native.userId)!;
     return { platformCredentialId: binding?.id ?? effect?.credentialId ?? null, remoteProjectId: row.remoteProjectId, remoteTokenId: native.id, createdAt: native.createdAt,

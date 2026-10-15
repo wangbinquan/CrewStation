@@ -169,3 +169,13 @@ Chrome 打开实际页面组件的独立验收壳，最初标示“实现验收 
 真实 Bot 完成游戏时发现 minimal-sample 的 chat 测试硬编码模板 Agent UUID；新建项目分配独立 UUID 后断言失败并使请求返回 502。模板测试现与业务调用共用 `CHAT_AGENT_PROFILE`，新项目身份重映射后不会使用旧 UUID。CLI 启动 / 附着 / 执行窗口、资源状态防护与模板主入口共 38 pass / 0 fail / 194 断言，控制台类型检查通过。模板被仓库 eslint 明确排除，精确 lint 的其余候选无错误。
 
 游戏第二轮 Bot 已完成布局收尾并报告 32 pass / 0 fail、类型检查通过；浏览器已实测计分、碰撞、重新开始、暂停、WASD 与刷新保留最高分。发布和最终修复部署仍待后续实机步骤，不据此提前宣称完成。
+
+### 正式 Git 提交与受保护分支发布断点
+
+游戏布局经真实 Chrome 二次复测：1728×817 文档与 main 高度为 817、标题完整；390×844 文档尺寸为 390×844，棋盘 356×356，方向按钮高 60px，实际点击方向键启动并暂停。游戏测试真实工具回执为 32 pass / 0 fail / 139 断言，类型检查退出 0。模板另外通过正式 materialize 分配独立 ID，再运行生成项目测试：13 pass / 0 fail / 63 断言。
+
+经正式发布确认弹窗核对六项文件并提交，得到游戏 SHA `12450292b0e8438a066391a08f53bcfa511559ed`。GitLab 随后拒绝推送受保护 main；未创建标签，页面保留该 SHA 供重试。只读检查证实 main 的 push / merge access 均为 40、force push=false。根因是 platform 的 developmentSourceControl 把普通 developer 会话凭据接到了发布代推。修复采用上述 SCM 临时发布回调并即时撤销，未修改远端保护规则。
+
+修复相邻 7 文件 48 pass / 0 fail / 324 断言，包含真实 PostgreSQL 写入沿革与封闭准入；发布授权 / 真实 Git 3 pass / 0 fail / 26 断言。真实 GitLab 六项全部通过：先验证普通令牌推 main 拒绝，再验证发布令牌推确认 SHA 成功，读取 GitLab 令牌为 revoked=true / active=false，实际 ls-remote 认证失败。第一轮末项只因 Git 返回 terminal prompts disabled 而非 Authentication failed 文本导致断言失败，补充实际认证拒绝形式并增加 API 撤销状态后第二轮 6 pass / 0 fail / 49 断言。专用 GitLab 测试项目已按测试清理，不影响游戏项目。
+
+`58faaf11dec5fcf6cb29a7adfd1a31fcf1cde94b` 的 [CI 38719381453](https://github.com/wangbinquan/CrewStation/actions/runs/38719381453) 全部成功，但新发布身份修复尚待自己的准确 SHA CI 与部署，贪吃蛇尚未切流。

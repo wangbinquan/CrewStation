@@ -230,4 +230,23 @@ describe.skipIf(!available)('scm × 本机 GitLab', () => {
       expect((error as Error).message).not.toContain(issued.token);
     }
   }, TIMEOUT);
+  test('受保护 main：普通会话推送被拒；发布回调可推确认提交且结束后凭据立即失效', async () => {
+    const id = remoteProjectId ?? '', workdir = join(workRoot, 'publish');
+    const ordinary = await scm.api.issueSessionCredential(serviceId, 30);
+    await git(workRoot, ['clone', '-q', httpUrl, workdir], ordinary.token);
+    await writeFile(join(workdir, 'PUBLISHED.md'), 'confirmed protected-branch release\n');
+    await git(workdir, ['add', 'PUBLISHED.md']); await git(workdir, ['commit', '-qm', 'feat: protected branch publication']);
+    const confirmed = await git(workdir, ['rev-parse', 'HEAD']);
+    await expect(git(workdir, ['push', '-q', httpUrl, 'HEAD:refs/heads/main'], ordinary.token)).rejects.toThrow(/protected/i);
+    expect((await client.getBranch(id, 'main')).commit.id).not.toBe(confirmed);
+    let revokedToken = '';
+    await scm.api.withPublishCredential(serviceId, async credential => {
+      revokedToken = credential.token;
+      await git(workdir, ['push', '-q', httpUrl, `${confirmed}:refs/heads/main`], credential.token);
+    });
+    expect((await client.getBranch(id, 'main')).commit.id).toBe(confirmed);
+    expect((await client.listProjectAccessTokens(id)).find(token => token.name.startsWith('cs-publish-'))).toMatchObject({ revoked: true, active: false, accessLevel: 40 });
+    await expect(git(workdir, ['ls-remote', httpUrl, 'refs/heads/main'], revokedToken)).rejects.toThrow(/Authentication failed|Access denied|terminal prompts disabled/i);
+  }, TIMEOUT);
+
 });

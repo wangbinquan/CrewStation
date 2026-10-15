@@ -9,6 +9,16 @@ import { scmRepositoryWrites } from '../adapters/persistence/repositoryAdmission
 import type { ScmCurrentRepositoryOriginsSource } from '../ports/currentRepositoryOrigins';
 
 describe('当前原仓库归属与旧回调缺失分别核对', () => {
+  test('发布凭据仍按项目、原令牌和完整平台 ID 核对，不接受同前缀的其他凭据', () => {
+    const f = currentOriginsHistory(), raw = currentOriginsMaterial(f.history);
+    const named = (id: string) => ({ ...raw, repositories: raw.repositories.map(row => ({ ...row,
+      nativeTokens: row.nativeTokens.map(token => ({ ...token, name: 'cs-publish-' + id })),
+      apiTokens: row.apiTokens.map(token => ({ ...token, name: 'cs-publish-' + id })),
+      relatedTokens: row.relatedTokens.map(token => ({ ...token, name: 'cs-publish-' + id })),
+    })) });
+    expect(scmCurrentRepositoryOrigins(f.projectId, f.history, named(f.credentialId)).credentials[0]?.platformCredentialId).toBe(f.credentialId);
+    expect(() => scmCurrentRepositoryOrigins(f.projectId, f.history, named(newResourceId()))).toThrow('精确原 ID');
+  });
   test('当前身份不补造原创建回执；顺序变化不改变固定摘要', () => {
     const f = currentOriginsHistory();
     const secondId = newResourceId(), history = { ...f.history,

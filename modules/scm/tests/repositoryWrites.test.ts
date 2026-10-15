@@ -16,17 +16,20 @@ describe.skipIf(!available)('SCM 原回调和逐请求副作用沿革（真实 P
       const original = await f.ensure(), session = await f.scm.api.issueSessionCredential(f.serviceId, 15), build = await f.scm.api.issueBuildCredential(f.serviceId, 15);
       await f.scm.api.createReleaseTag(f.serviceId, { branch: 'main', bump: 'minor' });
       await f.scm.api.pushBranch(f.serviceId, '/scratch/private-workdir', 'main');
+      let publishToken = '';
+      await f.scm.api.withPublishCredential(f.serviceId, async credential => { publishToken = credential.token; });
       await f.scm.api.revokeBuildCredential(f.serviceId, build.id);
       const history = await f.writes().history(f.projectId);
       expect(history.metadataComplete).toBe(true);
       expect(history.bindings).toHaveLength(1);
-      expect(history.credentials).toHaveLength(2);
-      expect(history.records.map((r) => r.kind).sort()).toEqual(['build-credential', 'credential-revoke', 'ensure-repository', 'push-branch', 'release-tag', 'session-credential']);
+      expect(history.credentials).toHaveLength(3);
+      expect(history.records.map((r) => r.kind).sort()).toEqual(['build-credential', 'credential-revoke', 'ensure-repository', 'push-branch', 'push-branch', 'release-tag', 'session-credential']);
       expect(history.records.every((r) => r.state === 'exited' && r.process?.podUid === f.process.podUid && /^[a-f0-9]{64}$/.test(r.exitDigest ?? '') && r.backendPid > 0)).toBe(true);
       expect(history.unresolvedEffects).toHaveLength(0);
       expect(history.records.flatMap((r) => r.effects).some((e) => e.stage === 'returned' && e.remoteProjectId === original.remoteProjectId)).toBe(true);
       const body = JSON.stringify(history);
       expect(body).not.toContain(session.token); expect(body).not.toContain(build.token);
+      expect(body).not.toContain(publishToken);
       expect(body).not.toContain(TEST_SECRET); expect(body).not.toContain('tokenHash'); expect(body).not.toContain('/scratch/private-workdir');
       expect(await f.writes().history(f.projectId)).toEqual(history);
     } finally { await f.database.drop(); }
@@ -51,6 +54,7 @@ describe.skipIf(!available)('SCM 原回调和逐请求副作用沿革（真实 P
       release.resolve(); await pending; await sealing;
       const count = f.gitlab.calls.length;
       for (const write of [() => f.ensure(), () => f.scm.api.issueSessionCredential(f.serviceId, 15), () => f.scm.api.issueBuildCredential(f.serviceId, 15),
+        () => f.scm.api.withPublishCredential(f.serviceId, async () => {}),
         () => f.scm.api.createReleaseTag(f.serviceId, { branch: 'main', bump: 'patch' }), () => f.scm.api.pushBranch(f.serviceId, '/scratch/closed', 'main'),
         () => f.scm.api.revokeBuildCredential(f.serviceId, build.id), () => f.scm.api.getBinding({ userId: newResourceId() as UserId, isAdmin: true }, f.serviceId)]) {
         await expect(write()).rejects.toMatchObject({ kind: 'precondition' });

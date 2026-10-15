@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { ProjectIdSchema, ServiceIdSchema, UserIdSchema } from '@crewstation/contracts';
+import { ProjectIdSchema, ServiceIdSchema, UserIdSchema, type SessionCredentialDto } from '@crewstation/contracts';
 import { jsonHash, newResourceId } from '@crewstation/kernel';
 import { developmentDeletionSources, developmentSourceControl } from './developmentSources';
 
@@ -32,10 +32,17 @@ test('development source-control Root preserves the original receiver and issues
   const scm = { sentinel, async listBranches(who: typeof actor, id: typeof service, compare: unknown) { expect(this.sentinel).toBe(sentinel); calls.push([who, id, compare]); return []; },
     async issueSessionCredential(id: typeof service, minutes: number) { expect(this.sentinel).toBe(sentinel); calls.push([id, minutes]);
       return { token: 'test credential/?', httpUrlWithCredentialTemplate: 'https://oauth2:{token}@git.example.test/original.git', expiresAt: '2026-10-03T15:00:00Z' }; },
+    async withPublishCredential<T>(id: typeof service, publish: (credential: SessionCredentialDto) => Promise<T>) { expect(this.sentinel).toBe(sentinel); calls.push([id, 'publish']);
+      try { return await publish({ token: 'publish/?', httpUrlWithCredentialTemplate: 'https://oauth2:{token}@git.example.test/original.git', expiresAt: '2026-10-03T15:00:00Z' }); }
+      finally { calls.push('revoked'); } },
     async readFile(id: typeof service, ref: string, path: string) { expect(this.sentinel).toBe(sentinel); calls.push([id, ref, path]); return 'original-file'; } };
   const port = developmentSourceControl(scm, actor), compare = { previewSha: 'original-preview' };
   expect(await port.listBranches(service, compare)).toEqual([]);
   expect(await port.pushUrl(service)).toEqual({ url: 'https://oauth2:test%20credential%2F%3F@git.example.test/original.git', expiresAt: '2026-10-03T15:00:00Z' });
   expect(await port.readFile(service, 'main', 'crewstation.yaml')).toBe('original-file');
   expect(calls).toEqual([[actor, service, compare], [service, 60], [service, 'main', 'crewstation.yaml']]);
+  expect(await port.withPublishUrl(service, async url => { expect(url).toBe('https://oauth2:publish%2F%3F@git.example.test/original.git'); return 'pushed'; })).toBe('pushed');
+  expect(calls.slice(-2)).toEqual([[service, 'publish'], 'revoked']);
+  await expect(port.withPublishUrl(service, async () => { throw new Error('push refused'); })).rejects.toThrow('push refused');
+  expect(calls.slice(-2)).toEqual([[service, 'publish'], 'revoked']);
 });

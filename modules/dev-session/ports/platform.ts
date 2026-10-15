@@ -17,8 +17,10 @@ export interface ServiceResolver {
 /** 由 scm 模块提供。 */
 export interface SourceControl {
   listBranches(serviceId: ServiceId, compare: { previewSha?: string; prodSha?: string }): Promise<BranchDto[]>;
-  /** 供容器内 git push 使用的短期凭据，已拼进 URL；只在命令执行时传入容器，不落库。 */
+  /** 普通会话凭据，供补齐比较历史；不能用于发布受保护分支。 */
   pushUrl(serviceId: ServiceId): Promise<{ url: string; expiresAt: string }>;
+  /** 仅发布动作使用：项目级短期凭据只供当前命令，回调成功或失败后均撤销。 */
+  withPublishUrl<T>(serviceId: ServiceId, publish: (url: string) => Promise<T>): Promise<T>;
   readFile(serviceId: ServiceId, ref: string, path: string): Promise<string | undefined>;
 }
 

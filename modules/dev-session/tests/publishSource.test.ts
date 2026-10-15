@@ -17,6 +17,19 @@ test('确认后会话或 HEAD 已变化：不推送、不打标签，旧来源�
   expect(state.published).toBe(false);
 });
 
+test('发布凭据只在授权与工作树检查后取得，撤销失败不能继续打标签', async () => {
+  const { deps, state, commands } = workspaceFixture();
+  let issued = 0;
+  deps.scm.withPublishUrl = async (_id, publish) => { issued++; await publish('https://git.example/demo.git'); throw new Error('revoke unavailable'); };
+  deps.authorizer.authorize = async () => { throw new Error('publish forbidden'); };
+  const publish = publishFromSessionUseCase(deps), input = { branch: 'main', version: 'patch' as const };
+  await expect(publish(workspaceActor, workspaceProject, input)).rejects.toThrow('publish forbidden');
+  expect(issued).toBe(0); expect(commands).toHaveLength(0);
+  deps.authorizer.authorize = async () => {};
+  await expect(publish(workspaceActor, workspaceProject, input)).rejects.toThrow('revoke unavailable');
+  expect(issued).toBe(1); expect(state.published).toBe(false);
+});
+
 test('真实代推只发送确认的 SHA，成功同步推送记录；拒绝不改记录且不打标签', async () => {
   const root = await mkdtemp(join(tmpdir(), 'cs-publish-source-'));
   const work = join(root, 'work'), remote = join(root, 'remote.git');
@@ -32,6 +45,7 @@ test('真实代推只发送确认的 SHA，成功同步推送记录；拒绝不�
     const confirmed = await git(['rev-parse', 'HEAD']);
     await git(['remote', 'add', 'origin', 'https://example.invalid/read-only.git']);
     await git(['update-ref', 'refs/remotes/origin/main', confirmed]);
+    await writeFile(join(work, '.git/hooks/pre-push'), '#!/bin/sh\ntouch hook-ran\nexit 1\n', { mode: 0o755 });
     const configBefore = await Bun.file(join(work, '.git/config')).text();
     const { deps, state } = workspaceFixture(); let published: PublishRequest | undefined;
     state.result = { ...readyWorkspace(), headSha: confirmed };
@@ -51,6 +65,7 @@ test('真实代推只发送确认的 SHA，成功同步推送记录；拒绝不�
     await publishFromSessionUseCase(deps)(workspaceActor, workspaceProject, { branch: 'main', version: 'patch', expectedTaskId: workspaceTask });
     // 执行真实 git push；原实现使用 HEAD，会把后来 Agent 的提交一起推上去。
     expect(await git(['rev-parse', 'refs/heads/main'], remote)).toBe(confirmed);
+    expect(await Bun.file(join(work, 'hook-ran')).exists()).toBe(false);
     expect(await git(['rev-parse', 'HEAD'])).not.toBe(confirmed);
     expect(published).toMatchObject({ branch: 'main', expectedCommitSha: confirmed });
     expect(published).not.toHaveProperty('expectedTaskId');

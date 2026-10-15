@@ -176,6 +176,49 @@ describe('session credentials', () => {
   });
 });
 
+describe('withPublishCredential', () => {
+  test('发布凭据仅在回调中存活，成功与失败均撤销；只存哈希，过期预算十分钟', async () => {
+    const h = harness(); await h.ensure(serviceId, projectId, input);
+    const create = h.gitlab.gateway.createAccessToken;
+    const scopes: unknown[] = [];
+    h.gitlab.gateway.createAccessToken = async (id, spec) => { scopes.push(spec); return create(id, spec); };
+    const publish = async (fail: boolean) => h.credentials.withPublishCredential(serviceId, async credential => {
+      expect(credential.expiresAt).toBe('2026-09-11T10:10:00.000Z');
+      const row = [...h.memory.credentials.values()].at(-1)!;
+      expect(h.gitlab.get('100').tokens.get(row.remoteTokenId)?.revoked).toBe(false);
+      expect(row.tokenHash).toBe(hashToken(credential.token));
+      expect(JSON.stringify(row)).not.toContain(credential.token);
+      if (fail) throw new Error('push refused');
+      return 'published';
+    });
+    expect(await publish(false)).toBe('published');
+    await expect(publish(true)).rejects.toThrow('push refused');
+    expect(scopes).toHaveLength(2);
+    expect(scopes.every(spec => (spec as { publish?: boolean }).publish === true)).toBe(true);
+    expect([...h.memory.credentials.values()].every(row => row.revokedAt?.getTime() === h.clock.now().getTime())).toBe(true);
+    expect([...h.gitlab.get('100').tokens.values()].every(row => row.revoked)).toBe(true);
+  });
+
+  test('台账写入失败不执行推送并撤销；撤销失败保留台账供到期补偿', async () => {
+    const h = harness(); await h.ensure(serviceId, projectId, input);
+    const revoke = h.gitlab.gateway.revokeAccessToken;
+    h.gitlab.gateway.revokeAccessToken = async () => { throw new Error('revoke unavailable'); };
+    await expect(h.credentials.withPublishCredential(serviceId, async () => 'pushed')).rejects.toThrow('revoke unavailable');
+    const row = [...h.memory.credentials.values()][0]!;
+    expect(row.revokedAt).toBeUndefined();
+    h.gitlab.gateway.revokeAccessToken = revoke; h.clock.advanceMinutes(11);
+    expect(await h.credentials.revokeExpiredCredentials()).toBe(1);
+    expect(h.gitlab.get('100').tokens.get(row.remoteTokenId)?.revoked).toBe(true);
+    const insert = h.memory.uow.run;
+    h.memory.uow.run = async () => { throw new Error('ledger unavailable'); };
+    let called = false;
+    await expect(h.credentials.withPublishCredential(serviceId, async () => { called = true; })).rejects.toThrow('ledger unavailable');
+    expect(called).toBe(false);
+    expect([...h.gitlab.get('100').tokens.values()].every(item => item.revoked)).toBe(true);
+    h.memory.uow.run = insert;
+  });
+});
+
 describe('queries', () => {
   test('listBranches：落后数来自 compare，未给出槽提交或引用未知为 null；授权 view', async () => {
     const h = harness();

@@ -63,8 +63,8 @@ export interface GitLabGateway {
   ensureTagProtection(remoteProjectId: string, pattern: string): Promise<void>;
   /** `to` 可达而 `from` 不可达的提交数；任一引用不存在时返回 undefined。 */
   countCommitsBehind(remoteProjectId: string, refs: { from: string; to: string }): Promise<number | undefined>;
-  /** 只读写仓库、开发者级别的项目访问令牌；`expiresOn` 为 `YYYY-MM-DD`。 */
-  createAccessToken(remoteProjectId: string, input: { name: string; expiresOn: string; readOnly?: boolean }): Promise<RemoteAccessToken>;
+  /** 默认开发者、构建只读；publish 仅供平台发布回调使用维护者级 Git 权限。`expiresOn` 为 `YYYY-MM-DD`。 */
+  createAccessToken(remoteProjectId: string, input: { name: string; expiresOn: string; readOnly?: boolean; publish?: boolean }): Promise<RemoteAccessToken>;
   /** 幂等：远端已不存在视为成功。 */
   revokeAccessToken(remoteProjectId: string, tokenId: string): Promise<void>;
 }

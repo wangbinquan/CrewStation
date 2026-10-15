@@ -58,7 +58,8 @@ export function workspaceFixture() {
         return { id: '01a0bf5d-8f4b-7fe7-81b4-3ca489d1f621' as ReleaseId, serviceId: workspaceService, branch: input.branch, commitSha: workspaceSha, tag: 'v0.1.1', status: 'pending', createdBy: workspaceActor.userId, createdAt: checkedAt, updatedAt: checkedAt };
       },
     },
-    scm: { readFile: async () => undefined, listBranches: async () => [], pushUrl: async () => ({ url: 'https://git.example/demo.git', expiresAt: checkedAt }) },
+    scm: { readFile: async () => undefined, listBranches: async () => [], pushUrl: async () => ({ url: 'https://git.example/demo.git', expiresAt: checkedAt }),
+      withPublishUrl: async (id, publish) => publish((await deps.scm.pushUrl(id)).url) },
     compute: fakeComputeCatalog(() => []), manifests: { parse: () => { throw new Error('unused'); } },
     credentials: { issueDevSessionToken: async () => ({ token: 'test', expiresAt: checkedAt }) }, notifier: { notify: async () => {} },
     reminders: { lastReminder: async () => undefined, recordReminder: async () => {} },

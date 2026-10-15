@@ -44,6 +44,8 @@ export interface ScmModuleApi {
   createReleaseTag(serviceId: ServiceId, input: CreateReleaseTagRequest): Promise<ReleaseTagDto>;
   /** 签发会话级短期 Git 凭据；明文只返回这一次，平台只存哈希。 */
   issueSessionCredential(serviceId: ServiceId, ttlMinutes: number): Promise<SessionCredentialDto>;
+  /** 内部发布动作专用的项目 Git 凭据：回调结束即撤销，不交给开发 Agent 或普通会话。 */
+  withPublishCredential<T>(serviceId: ServiceId, publish: (credential: SessionCredentialDto) => Promise<T>): Promise<T>;
   /** 撤销平台侧已到期的凭据，返回撤销数量。 */
   revokeExpiredCredentials(): Promise<number>;
   /** 发布流程：把开发容器工作目录里的分支以平台身份推到远端。 */

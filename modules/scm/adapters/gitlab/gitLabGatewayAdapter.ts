@@ -1,6 +1,6 @@
 import type { GitLabBranch, GitLabClient, GitLabProject, GitLabTag } from '@crewstation/gitlab-client';
 import { GITLAB_ACCESS_LEVEL } from '@crewstation/gitlab-client';
-import { conflict, isPlatformError } from '@crewstation/kernel';
+import { conflict, isPlatformError, validation } from '@crewstation/kernel';
 import type { GitLabGateway, RemoteBranch, RemoteProject, RemoteRepositoryRemoval, RemoteTag } from '../../ports/gitLabGateway';
 
 /** 会话凭据只读写仓库；开发者级别，受保护的 `v*` 标签与默认分支保护都对它生效。 */
@@ -68,8 +68,10 @@ export function gitLabGatewayAdapter(client: GitLabClient): GitLabGateway {
       }
     },
     countCommitsBehind: async (id, { from, to }) => (await orUndefined(client.compare(id, from, to)))?.commitCount,
-    createAccessToken: async (id, { name, expiresOn, readOnly }) => {
-      const created = await client.createProjectAccessToken(id, { name, scopes: readOnly ? ['read_repository'] : SESSION_TOKEN_SCOPES, expiresAt: expiresOn, accessLevel: readOnly ? GITLAB_ACCESS_LEVEL.reporter : GITLAB_ACCESS_LEVEL.developer });
+    createAccessToken: async (id, { name, expiresOn, readOnly, publish }) => {
+      if (readOnly && publish) throw validation('只读凭据不能用于发布');
+      const created = await client.createProjectAccessToken(id, { name, scopes: readOnly ? ['read_repository'] : SESSION_TOKEN_SCOPES, expiresAt: expiresOn,
+        accessLevel: readOnly ? GITLAB_ACCESS_LEVEL.reporter : publish ? GITLAB_ACCESS_LEVEL.maintainer : GITLAB_ACCESS_LEVEL.developer });
       return { id: String(created.id), token: created.token, ...(typeof created.createdAt === 'string' ? { createdAt: created.createdAt } : {}), ...(Number.isSafeInteger(created.userId) && created.userId > 0 ? { userId: String(created.userId) } : {}) };
     },
     revokeAccessToken: async (id, tokenId) => { await orUndefined(client.revokeProjectAccessToken(id, Number(tokenId))); },

@@ -49,6 +49,10 @@ test('构建令牌只有 read_repository 与 reporter 权限，开发会话原�
   expect(bodies[0]).toMatchObject({ scopes: ['read_repository'], access_level: GITLAB_ACCESS_LEVEL.reporter });
   await gateway.createAccessToken('42', { name: 'session', expiresOn: '2026-09-28' });
   expect(bodies[1]).toMatchObject({ scopes: ['read_repository', 'write_repository'], access_level: GITLAB_ACCESS_LEVEL.developer });
+  await gateway.createAccessToken('42', { name: 'publish', expiresOn: '2026-09-28', publish: true });
+  expect(bodies[2]).toMatchObject({ scopes: ['read_repository', 'write_repository'], access_level: GITLAB_ACCESS_LEVEL.maintainer });
+  await expect(gateway.createAccessToken('42', { name: 'invalid', expiresOn: '2026-09-28', readOnly: true, publish: true })).rejects.toMatchObject({ kind: 'validation' });
+  expect(bodies).toHaveLength(3);
 });
 
 test('源码引用与 Git tree 请求固定同一 SHA，不存在的提交返回 undefined', async () => {

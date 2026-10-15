@@ -1,4 +1,4 @@
-import type { Actor, BranchDto, ServiceId } from '@crewstation/contracts';
+import type { Actor, BranchDto, ServiceId, SessionCredentialDto } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
 import type { InfrastructureSourceModules } from '../../ports/infrastructureOrigins';
 import type { SessionProcessObservers, SessionProjectAdmission } from '../../ports/sessionDeletion';
@@ -20,6 +20,7 @@ export function developmentDeletionSources(project: InfrastructureSourceModules[
 interface DevelopmentSourceControl {
   listBranches(actor: Actor, id: ServiceId, compare: { previewSha?: string; prodSha?: string }): Promise<BranchDto[]>;
   issueSessionCredential(id: ServiceId, minutes: number): Promise<{ token: string; httpUrlWithCredentialTemplate: string; expiresAt: string }>;
+  withPublishCredential<T>(id: ServiceId, publish: (credential: SessionCredentialDto) => Promise<T>): Promise<T>;
   readFile(id: ServiceId, ref: string, path: string): Promise<string | undefined>;
 }
 /** Session-scoped source-control credentials exist only in the immediate command response. */
@@ -27,5 +28,7 @@ export function developmentSourceControl(scm: DevelopmentSourceControl, actor: A
   return { listBranches: (id: ServiceId, compare: { previewSha?: string; prodSha?: string }) => scm.listBranches(actor, id, compare),
     pushUrl: async (id: ServiceId) => { const original = await scm.issueSessionCredential(id, 60); return {
       url: original.httpUrlWithCredentialTemplate.replace('{token}', encodeURIComponent(original.token)), expiresAt: original.expiresAt }; },
+    withPublishUrl: <T>(id: ServiceId, publish: (url: string) => Promise<T>) => scm.withPublishCredential(id,
+      original => publish(original.httpUrlWithCredentialTemplate.replace('{token}', encodeURIComponent(original.token)))),
     readFile: (id: ServiceId, ref: string, path: string) => scm.readFile(id, ref, path) };
 }
