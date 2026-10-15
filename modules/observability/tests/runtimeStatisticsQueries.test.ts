@@ -43,7 +43,8 @@ describe.skipIf(!available)('RFC-034 v2 runtime statistics queries', () => {
     expect([overview.bySource.business.calls, overview.bySource.development.calls, overview.bySource.platform.calls]).toEqual([4, 1, 1]);
     expect(overview.statuses).toEqual({ running: 1, done: 4, failed: 1, canceled: 0, interrupted: 0 });
     expect(overview.durations).toEqual({ samples: 5, p50: 300_000, p95: 600_000, max: 600_000 });
-    expect(overview.daily.map((day) => [day.day, day.calls])).toEqual([['2026-10-14', 6]]);
+    // 日桶带上不完整与未定价的执行数（实机 2026-10-15：全未定价的一天曾显示成 ¥0.00）。
+    expect(overview.daily.map((day) => [day.day, day.calls, day.incompleteCalls, day.unpricedCalls, day.costNano])).toEqual([['2026-10-14', 6, 2, 1, '3045000']]);
     expect(overview.topTasks.map((row) => row.taskId)).toEqual(['task-b1', 'task-a1', 'session-1', 'test-1', 'task-a2']);
     expect(overview.topProjects.map((row) => [row.projectName, row.tasks])).toEqual([['Project B', 1], ['Project A', 3]]);
     const shifted = await f.api.overview(ADMIN, null, windowOf(0, 24 * 60, 480));
@@ -55,6 +56,7 @@ describe.skipIf(!available)('RFC-034 v2 runtime statistics queries', () => {
     const hidden = await f.api.overview(MEMBER, PROJECT_A, DAY);
     expect(f.authorized).toContainEqual([MEMBER.userId, PROJECT_A, 'view']);
     expect(hidden).toMatchObject({ costVisible: false, topProjects: [], usage: { calls: 4, costNano: null }, bySource: { platform: { calls: 0 } } });
+    expect(hidden.daily.map((day) => [day.calls, day.incompleteCalls, day.costNano])).toEqual([[4, 2, null]]);
     expect((await f.api.tasks(MEMBER, PROJECT_A, DAY)).items.every((row) => row.usage.costNano === null)).toBe(true);
     await expect(f.api.overview(STRANGER, PROJECT_A, DAY)).rejects.toMatchObject({ kind: 'forbidden' });
     await expect(f.api.overview(MEMBER, null, DAY)).rejects.toMatchObject({ kind: 'forbidden' });

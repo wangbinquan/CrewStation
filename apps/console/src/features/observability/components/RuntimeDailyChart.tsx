@@ -1,9 +1,8 @@
 import type { ObservationOverview } from '@crewstation/contracts';
-import { formatObservationCny } from '@crewstation/contracts';
 import { useState } from 'react';
 import { useT } from '../../../shared/lib/useT';
 import { Card } from '../../../shared/ui/Card';
-import { TOKEN_BUCKETS, compactCount, countText, tokenTotal } from '../model/runtimeFormat';
+import { TOKEN_BUCKETS, compactCount, countText, tokenText, tokenTotal, usageCostText } from '../model/runtimeFormat';
 import styles from './RuntimeStatistics.module.css';
 
 type Day = ObservationOverview['daily'][number];
@@ -21,15 +20,16 @@ export function RuntimeDailyChart({ daily, costVisible }: { daily: readonly Day[
       {daily.map((row) => <DayColumn key={row.day} row={row} max={max} active={row.day === active?.day} select={() => setSelected(row.day)} />)}
     </div></div>
     {active ? <div className={styles.trendDetail} data-runtime-day={active.day}>
-      <p className={styles.hint}>{active.day} · {t('runtime.callCount', { count: countText(active.calls) })}{costVisible && active.costNano !== null ? ` · ${formatObservationCny(active.costNano)}` : ''}</p>
-      <dl className={styles.tokenBuckets}>{TOKEN_BUCKETS.map((bucket) => <div key={bucket}><dt>{t('runtime.bucket.' + bucket)}</dt><dd>{countText(active[bucket])}</dd></div>)}</dl>
+      {/* 与总览卡同一口径：有不完整的执行时是下界，只有未定价的执行时写「未定价」而不是 ¥0（未知不是 0）。 */}
+      <p className={styles.hint}>{active.day} · {t('runtime.callCount', { count: countText(active.calls) })}{costVisible && active.costNano !== null ? ` · ${usageCostText(active, t)}` : ''}</p>
+      <dl className={styles.tokenBuckets}>{TOKEN_BUCKETS.map((bucket) => <div key={bucket}><dt>{t('runtime.bucket.' + bucket)}</dt><dd>{tokenText(active[bucket], active.incompleteCalls > 0)}</dd></div>)}</dl>
     </div> : null}
   </Card>;
 }
 
 function DayColumn({ row, max, active, select }: { row: Day; max: number; active: boolean; select: () => void }) {
   const t = useT(), total = tokenTotal(row);
-  const label = `${row.day} · ${countText(total)} Token · ${t('runtime.callCount', { count: countText(row.calls) })}`;
+  const label = `${row.day} · ${tokenText(total, row.incompleteCalls > 0)} Token · ${t('runtime.callCount', { count: countText(row.calls) })}`;
   return <button type="button" className={styles.chartColumn} aria-pressed={active} aria-label={label} title={label} onClick={select}>
     <span className={styles.chartValue} aria-hidden="true">{compactCount(total)}</span>
     <span className={styles.chartTrack} aria-hidden="true">

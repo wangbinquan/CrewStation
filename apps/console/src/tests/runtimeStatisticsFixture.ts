@@ -58,8 +58,10 @@ export function runtimeStatisticsFixture() {
     bySource: { business: usageOf({ calls: 40 }), development: usageOf({ calls: 18, incompleteCalls: 2 }), platform: usageOf({ calls: 2, unpricedCalls: 2, costNano: '0' }) },
     statuses: { running: 1, done: 56, failed: 2, canceled: 0, interrupted: 1 },
     durations: { samples: 59, p50: 42_000, p95: 610_000, max: 1_800_000 },
-    daily: Array.from({ length: 8 }, (_, i) => ({ day: `2026-10-${String(7 + i).padStart(2, '0')}`, calls: i === 7 ? 60 : 0, input: i === 7 ? 60_000 : 0,
-      cacheRead: i === 7 ? 12_000 : 0, cacheWrite: i === 7 ? 3_000 : 0, output: i === 7 ? 18_000 : 0, costNano: i === 7 ? '150000000000' : '0' })),
+    // 10-13 只有未定价的执行（人民币为「未定价」不是 ¥0）；10-14 含不完整与未定价的执行（下界）。
+    daily: Array.from({ length: 8 }, (_, i) => ({ day: `2026-10-${String(7 + i).padStart(2, '0')}`, calls: i === 7 ? 60 : i === 6 ? 2 : 0,
+      incompleteCalls: i === 7 ? 2 : 0, unpricedCalls: i === 7 ? 1 : i === 6 ? 2 : 0, input: i === 7 ? 60_000 : i === 6 ? 1_000 : 0,
+      cacheRead: i === 7 ? 12_000 : 0, cacheWrite: i === 7 ? 3_000 : 0, output: i === 7 ? 18_000 : i === 6 ? 200 : 0, costNano: i === 7 ? '150000000000' : '0' })),
     topTasks: tasks.slice(0, 3).map((row) => ({ taskId: row.taskId, source: row.source, label: row.label, projectId, usage: row.usage })),
     topAgents: [{ agentKey: 'coder', agentLabel: 'Coder', tasks: 20, durationMs: 3_600_000, usage: usageOf({ calls: 40 }) }],
     topProjects: [{ projectId, projectName: '管理项目 12', tasks: 30, usage: usageOf({ calls: 60 }) }],

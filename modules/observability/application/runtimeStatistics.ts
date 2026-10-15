@@ -125,8 +125,8 @@ async function overview(ctx: Context, actor: Actor, projectId: ProjectId | null,
     durations,
     daily: dayIndexes(range.from, range.to, query.tzOffset).map((index) => {
       const row = days.get(String(index));
-      return { day: dayLabel(index), calls: row?.calls ?? 0, input: row?.input ?? 0, cacheRead: row?.cacheRead ?? 0, cacheWrite: row?.cacheWrite ?? 0, output: row?.output ?? 0,
-        costNano: costVisible ? row?.costNano ?? '0' : null };
+      return { day: dayLabel(index), calls: row?.calls ?? 0, incompleteCalls: row?.incompleteCalls ?? 0, unpricedCalls: row?.unpricedCalls ?? 0,
+        input: row?.input ?? 0, cacheRead: row?.cacheRead ?? 0, cacheWrite: row?.cacheWrite ?? 0, output: row?.output ?? 0, costNano: costVisible ? row?.costNano ?? '0' : null };
     }),
     topTasks: byTask.map((row) => taskRef(row, costVisible)).sort(byConsumption).slice(0, TOP),
     topAgents: byAgent.map((row) => agentRow(row, costVisible)).sort(byConsumption).slice(0, TOP),
