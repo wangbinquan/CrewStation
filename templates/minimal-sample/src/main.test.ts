@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { EventStore } from './events/gitlabHandler';
 import { createApp } from './main';
 import type { FetchLike } from './platform/agentClient';
+import { CHAT_AGENT_PROFILE } from './platform/agentClient';
 
 const quiet = (): void => {};
 const baseEnv = { CS_SLOT: 'preview', CS_ENVIRONMENT: 'production', GREETING: '早上好' };
@@ -132,7 +133,7 @@ describe('POST /chat', () => {
           expect(JSON.parse(String(init?.body))).toEqual({});
           return Response.json({ id: '01a0bf5d-8f4b-75a7-80d4-bd6f2b68d4bb', state: 'creating' });
         case 'POST /v2/business-tasks/01a0bf5d-8f4b-75a7-80d4-bd6f2b68d4bb/subtasks':
-          expect(JSON.parse(String(init?.body))).toEqual({ kind: 'agent', name: 'chat', agentProfileId: '01a0bf5d-8f4b-7101-8000-000000000001', mode: 'oneshot', prompt: '你好' });
+          expect(JSON.parse(String(init?.body))).toEqual({ kind: 'agent', name: 'chat', agentProfileId: CHAT_AGENT_PROFILE, mode: 'oneshot', prompt: '你好' });
           return Response.json({ id: '01a0bf5d-8f4b-713a-8076-fce7d175418c', state: 'pending' });
         case 'GET /v2/business-tasks/01a0bf5d-8f4b-75a7-80d4-bd6f2b68d4bb/subtasks/01a0bf5d-8f4b-713a-8076-fce7d175418c':
           polls += 1;

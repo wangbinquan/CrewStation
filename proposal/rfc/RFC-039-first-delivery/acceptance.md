@@ -161,3 +161,11 @@ Chrome 打开实际页面组件的独立验收壳，最初标示“实现验收 
 在同一项目通过正式 CLI 页面创建原生会话 `CLI 536db6`，使用修订 14、400m CPU / 2Gi 和 Runner `sha256:6e5bfa4581bf…`。OpenCode 1.18.29 的真实 PTY 输入 `Do not edit files. Reply exactly CLI_BOT_SWITCH_OK.` 后，模型约 9 秒回显 `CLI_BOT_SWITCH_OK`；切回 Bot 后原游戏开发继续，未重复启动 Bot 或中断 CLI。原生更新提示通过 Esc 跳过，没有变更容器内 CLI 版本。
 
 首次附着先于 Runner 内终端创建，曾收到 `terminal … 不存在`，而启动流程就绪后页面不自动重试；点击“重新附着”立即恢复。现补充生命周期 / 启动阶段转变时，对已有附着错误重新请求一次屏幕，不重放输入、不重建终端。启动恢复回归先红后绿；启动、独立执行窗口、附着与模式切换共 28 pass / 0 fail / 160 断言，精确 lint 和控制台类型通过。此修复待准确 SHA CI 与 console 部署后再新建 CLI 验证自动恢复。
+
+### CI 防护修正与新项目模板自测
+
+`99fdda809b48fac296d4212e3dd28e43c9724752` 的 CI 38717264266 全部成功。随后 CLI 修复 `79ecba2ad1f40fdcc6a8be3dccc5fde838fbd93c` 的 console 作业被既有资源状态防护正确拦截：组件内 lifecycle 判断从 4 处增加到 5 处。现统一派生 `processRunning`，启动恢复、可交互性与控制状态共享同一判断，计数降至 2；防护基线同时从 4 收紧为 2，没有放宽规则。失败候选未部署。
+
+真实 Bot 完成游戏时发现 minimal-sample 的 chat 测试硬编码模板 Agent UUID；新建项目分配独立 UUID 后断言失败并使请求返回 502。模板测试现与业务调用共用 `CHAT_AGENT_PROFILE`，新项目身份重映射后不会使用旧 UUID。CLI 启动 / 附着 / 执行窗口、资源状态防护与模板主入口共 38 pass / 0 fail / 194 断言，控制台类型检查通过。模板被仓库 eslint 明确排除，精确 lint 的其余候选无错误。
+
+游戏第二轮 Bot 已完成布局收尾并报告 32 pass / 0 fail、类型检查通过；浏览器已实测计分、碰撞、重新开始、暂停、WASD 与刷新保留最高分。发布和最终修复部署仍待后续实机步骤，不据此提前宣称完成。

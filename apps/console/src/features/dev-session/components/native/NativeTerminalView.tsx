@@ -78,8 +78,9 @@ function LiveNativeTerminalView({ terminal, channel, stream, onActivity, canDeve
     return { surface, attachment: new NativeTerminalAttachment(channel, terminal.terminalId, terminal.runnerId, surface) };
   }, [channel, terminal.terminalId, terminal.runnerId, terminal.protocol]);
   const state = useSyncExternalStore(attachment.subscribe, attachment.getState);
+  const processRunning = terminal.lifecycle === 'running';
   // 进程拉起前 Runner 只接受「取得」：输入与改尺寸先不发（RFC-022）。要在挂载 xterm 之前设好，挂载时的第一次改尺寸才会被记下。
-  useEffect(() => attachment.setProcessRunning(terminal.lifecycle === 'running'), [attachment, terminal.lifecycle]);
+  useEffect(() => attachment.setProcessRunning(processRunning), [attachment, processRunning]);
   useEffect(() => {
     if (!host.current) return;
     surface.mount(host.current, (data) => { attachment.input(data); activity.current(); }, (cols, rows) => attachment.resize(cols, rows));
@@ -92,11 +93,11 @@ function LiveNativeTerminalView({ terminal, channel, stream, onActivity, canDeve
   }, [attachment, stream.runnerConnected, stream.generation, terminal.connection]);
   useEffect(() => {
     // Runner 连上时终端可能还未创建；进程／界面就绪后补一次失败的附着，不重发输入。
-    if (terminal.lifecycle === 'running' && attachment.getState().phase === 'error') void attachment.refresh();
-  }, [attachment, terminal.lifecycle, terminal.startup?.state]);
+    if (processRunning && attachment.getState().phase === 'error') void attachment.refresh();
+  }, [attachment, processRunning, terminal.startup?.state]);
   useEffect(() => surface.setControlled(state.controlled && state.phase === 'ready'), [surface, state.controlled, state.phase]);
   // 操作终端（点进、Tab 进、按键、切回来）即自动取得输入（2026-09-23 裁定）；被别人占着时取得会被拒，状态条显示是谁。
-  const interactive = canDevelop && state.phase === 'ready' && terminal.lifecycle === 'running';
+  const interactive = canDevelop && state.phase === 'ready' && processRunning;
   const take = useCallback(() => {
     if (interactive) void attachment.ensureControl().then((ok) => { if (ok) { surface.setControlled(true); surface.focus(); } });
   }, [interactive, attachment, surface]);
@@ -105,7 +106,7 @@ function LiveNativeTerminalView({ terminal, channel, stream, onActivity, canDeve
   const onFocusChange = useCallback((value: boolean) => { active.current = value; attachment.setActive(value || hold.current); }, [attachment]);
   useEffect(() => { hold.current = holding; attachment.setActive(active.current || holding); }, [attachment, holding]);
   useTerminalFocus(host, onFocusChange, take);
-  const view = terminal.lifecycle === 'running' ? terminalControlView(state, viewerId, canDevelop) : undefined;
+  const view = processRunning ? terminalControlView(state, viewerId, canDevelop) : undefined;
   // 启动中（RFC-022 D3）：终端区域中间是步骤条，状态条显示当前段；xterm 照常挂载、照常附着，只是被盖住。
   const startup = terminal.startup?.state === 'running' ? terminal.startup : undefined;
   return <>

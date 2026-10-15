@@ -17,7 +17,7 @@ const LIFECYCLE_BACKLOG: Readonly<Record<string, number>> = {
   'app/layout/activity/AgentActivityMenu.tsx': 1,
   'features/dev-session/components/native/CliDock.tsx': 1,
   'features/dev-session/components/native/NativeTerminalCard.tsx': 5,
-  'features/dev-session/components/native/NativeTerminalView.tsx': 4,
+  'features/dev-session/components/native/NativeTerminalView.tsx': 2,
   'features/dev-session/hooks/native/useCreatorClaim.ts': 4,
   'features/dev-session/model/native/terminalPhase.ts': 1,
   'shared/activity/agentActivityStore.ts': 1,
