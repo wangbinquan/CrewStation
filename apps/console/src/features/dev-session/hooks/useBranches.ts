@@ -8,13 +8,14 @@ export interface BranchesHandle {
   readonly branches: readonly BranchDto[];
   readonly isPending: boolean;
   readonly loadError: ApiClientError | null;
+  readonly retry?: () => void;
 }
 
 /**
  * 分支列表带各分支落后两槽的提交数：开会话与发布都从这里选分支。每 30 秒在原位重读，读取失败自动重试；
- * 不再有「重新读取分支」（2026-09-23 裁定）。
+ * 常态自动刷新；首次交付在读取失败时提供原位重试。
  */
 export function useBranches(projectId: string): BranchesHandle {
   const query = useApiQuery(queryKeys.branches(projectId), () => api.devSession.listBranches(projectId), AUTO_REFRESH);
-  return { branches: query.data?.items ?? [], isPending: query.isPending, loadError: query.error };
+  return { branches: query.data?.items ?? [], isPending: query.isPending, loadError: query.error, retry: () => { void query.refetch(); } };
 }

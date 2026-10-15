@@ -41,6 +41,7 @@ import styles from './DevSessionWorkbench.module.css';
 import { ButtonLink, ExternalButtonLink } from '../../../shared/ui/navigation/ButtonLink';
 
 export interface DevSessionWorkbenchProps {
+  readonly active?: boolean;
   readonly projectId: string;
   readonly session: DevSessionDto;
   readonly access: SessionAccess;
@@ -64,7 +65,7 @@ export interface DevSessionWorkbenchProps {
  * 有会话时的工作区：一条任务流供所有面板共用，外加发布与数据绑定。
  * 所有面板都只拿 channel，不各自开连接。
  */
-export function DevSessionWorkbench({ projectId, session, access, canDevelop, serviceId, userId, release, activityTarget, isAdmin, recovery, reference, sessionLogs, onRestart, enteredAt }: DevSessionWorkbenchProps): ReactElement {
+export function DevSessionWorkbench({ projectId, session, access, canDevelop, serviceId, userId, release, activityTarget, isAdmin, recovery, reference, sessionLogs, onRestart, enteredAt, active = true }: DevSessionWorkbenchProps): ReactElement {
   const t = useT();
   const { space } = useProjectScope();
   const taskId = session.taskId;
@@ -76,7 +77,7 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
   const touch = useActivityTouch(taskId);
   const tree = useWorkspaceTree(channel, state.generation, state.runnerConnected);
   const editor = useFileEditor(channel);
-  const location = useDevelopmentLocation(taskId, editor, state.runnerConnected);
+  const location = useDevelopmentLocation(taskId, editor, state.runnerConnected, active);
   const preview = usePreviewStatus(channel, projectId, state.generation, state.runnerConnected);
   const data = useDataBindings(projectId, taskId, serviceId, { canDevelop: access.isOwner && !isAdmin, canManage: isAdmin });
   const [dataDirty, setDataDirty] = useState(false);
@@ -101,7 +102,7 @@ export function DevSessionWorkbench({ projectId, session, access, canDevelop, se
         confirmationForNavigation={(next) => { const file = location.fileChange(next); return file ? { question: t('devSession.editor.openQuestion', { from: editor.file?.path ?? '', to: file }), confirmLabel: t('devSession.editor.discardOpen', { path: file }) } : undefined; }} onDiscard={location.approveFile} />
       <NativeWorkspace header={(newCli) => <>
         <header className={styles.context}>
-          <div className={styles.titleRow}><h1 className={styles.title}>{t('devSession.title')}</h1>
+          <div className={styles.titleRow}>
             {/* 连接状态芯片可点：直接打开会话面板（RFC-020 §4.3）。 */}
             <button type="button" className={styles.chip} onClick={() => location.selectTool({ name: 'session', mode: 'side' })} title={t('devSession.connection.details')}>
               {session.startup?.state === 'running' ? <Badge tone="info"><StageSummary progress={session.startup} compact /></Badge> : <StreamStatus state={state} sessionState={session.state} compact />}</button>

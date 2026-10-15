@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { onlineManager } from '@tanstack/react-query';
-import { ReleaseDtoSchema, ReleaseJourneyDetailSchema, ReleaseJourneyPageSchema, WorkspaceStatusDtoSchema } from '@crewstation/contracts';
+import { CommitWorkspaceDtoSchema, ReleaseDtoSchema, ReleaseJourneyDetailSchema, ReleaseJourneyPageSchema, WorkspaceStatusDtoSchema } from '@crewstation/contracts';
+import type { WorkspaceStatusDto } from '@crewstation/contracts';
 import type { PublishDevSessionInput } from '@crewstation/api-client';
 import { api } from '../../../../shared/api/client';
 import { queryKeys } from '../../../../shared/api/queryKeys';
@@ -8,6 +9,7 @@ import { errorMessage, isApiClientError, useApiQuery } from '../../../../shared/
 import { useT } from '../../../../shared/lib/useT';
 import type { PublishSource } from '../../../../shared/project/releaseSearch';
 import { repositoryPublishSnapshot, sessionPublishSnapshot } from '../publishSource';
+import type { PublishSnapshot } from '../publishSource';
 import { candidateReleaseTag } from '../releaseVersion';
 import { acceptedIntentMatches } from './preparation';
 import { readWizardStorage, removeWizardStorage, saveWizardStorage, WizardDraftSchema, wizardStorageKey } from './storage';
@@ -37,11 +39,12 @@ export function useWizardPreparation(input: Input) {
     if (!acceptedIntentMatches(detail, intent, input.serviceId, input.projectId)) throw new Error(t('release.wizard.receiptMismatch'));
     if (mounted.current) { removeWizardStorage(key); input.onAccepted(id); }
   };
-  const submit = async () => {
-    if (locked.current || !input.canPublish || draft.intent || !snapshot || !candidate || versionError || messageError || pending || queryError) return;
+  const submit = async (confirmedSnapshot?: PublishSnapshot) => {
+    const publishSnapshot = confirmedSnapshot ?? snapshot;
+    if (locked.current || !input.canPublish || draft.intent || !publishSnapshot || !candidate || versionError || messageError || pending || queryError) return;
     if (!onlineManager.isOnline()) { setError(t('ui.connection.notSent')); return; }
     if (tags.data?.items.some(tag => tag.name === candidate)) { setError(t('release.prepare.tagExists')); return; }
-    const intent: PublishIntent = { tag: candidate, branch: snapshot.branch, commitSha: snapshot.commitSha, source: draft.source, actorId: input.userId, message: draft.message, ...(snapshot.taskId ? { taskId: snapshot.taskId } : {}) };
+    const intent: PublishIntent = { tag: candidate, branch: publishSnapshot.branch, commitSha: publishSnapshot.commitSha, source: draft.source, actorId: input.userId, message: draft.message, ...(publishSnapshot.taskId ? { taskId: publishSnapshot.taskId } : {}) };
     const stored = saveWizardStorage(key, { ...draft, intent }); setSaved(stored);
     if (!stored) { setError(t('release.wizard.publishStorageRequired')); return; }
     locked.current = true; setBusy(true); setError(undefined); setDraft({ ...draft, intent });
@@ -73,6 +76,22 @@ export function useWizardPreparation(input: Input) {
     } catch (cause) { setError(errorMessage(cause)); }
     finally { locked.current = false; setBusy(false); }
   };
-  return { draft, set, saved, busy, error, branches, workspace, selected, snapshot, candidate, versionError, messageError, queryError, pending,
+  const commitAndBuild = async (confirmed: Extract<WorkspaceStatusDto, { status: 'ready' }>, message: string) => {
+    if (locked.current || !input.canPublish || draft.intent || draft.source !== 'session' || !confirmed.headSha || !confirmed.branch || !candidate || versionError || messageError || pending || queryError) return;
+    locked.current = true; setBusy(true); setError(undefined);
+    let next: PublishSnapshot | undefined;
+    try {
+      const receipt = CommitWorkspaceDtoSchema.parse(await api.devSession.commitWorkspace(input.projectId, { expectedTaskId: confirmed.taskId, expectedHead: confirmed.headSha,
+        expectedBranch: confirmed.branch, expectedFingerprint: confirmed.fingerprint, message }));
+      if (receipt.taskId !== confirmed.taskId || receipt.branch !== confirmed.branch) throw new Error(t('release.commit.unknown'));
+      const read = await workspace.refetch(), actual = read.data;
+      if (read.error || actual?.status !== 'ready' || actual.taskId !== receipt.taskId || actual.headSha !== receipt.commitSha || actual.branch !== receipt.branch) throw new Error(t('release.commit.unknown'));
+      next = sessionPublishSnapshot(actual).snapshot;
+      if (!next) throw new Error(t('release.commit.changedAfter'));
+    } catch (cause) { setError(errorMessage(cause)); await workspace.refetch(); }
+    finally { locked.current = false; setBusy(false); }
+    if (next) await submit(next);
+  };
+  return { draft, set, saved, busy, error, branches, workspace, selected, snapshot, candidate, versionError, messageError, queryError, pending, commitAndBuild,
     problem: checked?.problem, submit, recover, clear: () => { if (!busy && !draft.intent) { removeWizardStorage(key); set({ tag: '', message: '', branch: '' }); } } };
 }

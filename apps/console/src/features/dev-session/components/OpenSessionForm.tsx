@@ -23,13 +23,14 @@ export interface OpenSessionFormProps {
   readonly previousTaskId?: string;
   /** 放在「从远端另建工作树」弹窗里：不画面板外框与标题，弹窗标题已经说明。 */
   readonly embedded?: boolean;
+  readonly guided?: boolean;
 }
 
 /**
  * 还没有会话时的入口：选分支开一个开发容器。一个项目同时只能有一个。
  * 会话失败后从远端另建时先确认离开失败会话（确认弹窗，2026-09-23 起），默认聚焦「保留当前工作区」。
  */
-export function OpenSessionForm({ branches, open, previousTaskId, embedded = false }: OpenSessionFormProps): ReactElement {
+export function OpenSessionForm({ branches, open, previousTaskId, embedded = false, guided = false }: OpenSessionFormProps): ReactElement {
   const t = useT(), { projectId } = useProjectScope();
   const [runtimeImageVersionId, setRuntimeImageVersionId] = useState('');
   const launch = (branch: string) => open.mutate({ branch, ...(runtimeImageVersionId ? { runtimeImageVersionId } : {}) });
@@ -49,12 +50,12 @@ export function OpenSessionForm({ branches, open, previousTaskId, embedded = fal
           {open.isPending ? t('devSession.open.pending') : t(previousTaskId ? 'devSession.failed.open' : 'devSession.open.submit')}
         </Button>
       </div>
-      <RuntimeImagePicker projectId={projectId} usage="task" value={runtimeImageVersionId} onChange={setRuntimeImageVersionId} disabled={open.isPending || confirmedBranch !== undefined} />
+      {guided ? <details><summary>{t('devSession.guided.environmentOptions')}</summary><RuntimeImagePicker projectId={projectId} usage="task" value={runtimeImageVersionId} onChange={setRuntimeImageVersionId} disabled={open.isPending || confirmedBranch !== undefined} /></details> : <RuntimeImagePicker projectId={projectId} usage="task" value={runtimeImageVersionId} onChange={setRuntimeImageVersionId} disabled={open.isPending || confirmedBranch !== undefined} />}
       {confirmedBranch !== undefined ? <ConfirmationDialog question={t('devSession.failed.question', { taskId: previousTaskId ?? '', branch: confirmedBranch })}
         hint={t('devSession.failed.newWorkspace')} confirmLabel={t('devSession.failed.confirm')} cancelLabel={t('devSession.failed.cancel')} focus="cancel"
         busy={open.isPending} confirmDisabled={branches.loadError !== null || branches.isPending}
         onConfirm={() => { launch(confirmedBranch); setConfirmedBranch(undefined); }} onCancel={() => setConfirmedBranch(undefined)} /> : null}
-      {branches.loadError !== null ? <PaneNotice tone="warning">{errorMessage(branches.loadError)}{retryableReadError(branches.loadError) ? ` ${t('ui.status.autoRetry')}` : ''}</PaneNotice> : null}
+      {branches.loadError !== null ? <PaneNotice tone="warning">{errorMessage(branches.loadError)}{retryableReadError(branches.loadError) ? ` ${t('ui.status.autoRetry')}` : ''} {branches.retry ? <Button onClick={branches.retry}>{t('release.wizard.recheck')}</Button> : null}</PaneNotice> : null}
       {!branches.isPending && !branches.loadError && branches.branches.length === 0 ? <PaneNotice tone="info">{t('devSession.open.noBranches')}</PaneNotice> : null}
       {open.error !== null ? <PaneNotice tone="warning">{errorMessage(open.error)}</PaneNotice> : null}
     </>

@@ -52,7 +52,7 @@ test('运行中收到失败状态不卸载编辑器草稿，明确新建失败�
   f.sessionState.state = 'failed'; f.sessionState.message = '容器运行失败：OOMKilled（退出码 137）';
   await act(async () => { focusManager.setFocused(false); focusManager.setFocused(true); }); await page.settle();
   await act(async () => { f.receive({ type: 'runnerReconnected' }); }); await page.settle();
-  const status = [...document.querySelectorAll('header')].find((node) => node.querySelector('h1')?.textContent === '开发会话')!.querySelector('span')!;
+  const status = document.querySelector<HTMLButtonElement>('button[title="查看会话与环境"]')!;
   expect(status.textContent).toBe('失败');
   expect(document.querySelector('.cm-content')).toBe(editor); expect(editor.textContent).toBe('OOM 前尚未保存的内容');
   expect(document.activeElement).toBe(editor);
@@ -67,7 +67,7 @@ test('运行中收到失败状态不卸载编辑器草稿，明确新建失败�
 
 test('浏览器通道保持打开时，容器断连和恢复在原工作区显示且不重新创建会话', async () => {
   const { f, starts } = setup(); page = await renderApp(path);
-  const status = [...document.querySelectorAll('header')].find((node) => node.querySelector('h1')?.textContent === '开发会话')!.querySelector('span')!;
+  const status = document.querySelector<HTMLButtonElement>('button[title="查看会话与环境"]')!;
   expect(status.textContent).toBe('已连接');
   await page.click('代码'); await page.click('a.ts');
   const editor = document.querySelector<HTMLElement>('.cm-content')!, view = EditorView.findFromDOM(editor)!;

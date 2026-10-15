@@ -1,6 +1,7 @@
 import type { AgentSupervisor } from './agents/agentSupervisor';
 import type { TerminalProbes } from './agents/terminalProbe';
-import type { CommandHandlers } from './commandDispatcher';
+import type { CommandHandlers, CommandOf } from './commandDispatcher';
+import type { CommitWorkspaceResult } from '@crewstation/contracts';
 import type { ContractVerifier } from './contract/verifyContract';
 import type { ExecSupervisor } from './exec/execSupervisor';
 import type { BusinessCommands } from './exec/businessCommands';
@@ -25,6 +26,7 @@ export interface CommandTargets {
   preview: PreviewSupervisor;
   verifyContract: ContractVerifier;
   workspaceStatus: () => Promise<RunnerWorkspaceStatus>;
+  commitWorkspace: (input: CommandOf<'commitWorkspace'>) => Promise<CommitWorkspaceResult>;
   comparisons: WorkspaceComparisons;
   fetchComparisonHistory: (url: string, targetSha?: string) => Promise<void>;
   /** 先回 ack，再异步进入排空；由 runner 实现。 */
@@ -70,6 +72,7 @@ export function buildCommandHandlers(targets: CommandTargets): CommandHandlers {
     readFile: (c) => targets.files.read(c),
     writeFile: (c) => targets.files.write(c),
     workspaceStatus: () => targets.workspaceStatus(),
+    commitWorkspace: c => targets.commitWorkspace(c),
     compareWorkspace: (c) => targets.comparisons.compare(c.targetSha),
     workspaceComparisonDetails: (c) => targets.comparisons.details(c.comparisonId, c),
     fetchComparisonHistory: (c) => targets.fetchComparisonHistory(c.url, c.targetSha).then(ack),

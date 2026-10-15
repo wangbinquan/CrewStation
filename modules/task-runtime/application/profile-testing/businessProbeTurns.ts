@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import type { AgentEvent, RunnerCommand, StartAgentCommand, TaskId } from '@crewstation/contracts';
-import { BusinessExecutionEventSchema, BusinessExecutionInfoSchema, StoredBusinessExecutionSchema, businessAgentDigestInput } from '@crewstation/contracts';
+import { BusinessExecutionEventSchema, BusinessExecutionInfoSchema, StoredBusinessExecutionSchema, StartAgentCommandSchema, businessAgentDigestInput } from '@crewstation/contracts';
 import { isPlatformError, newResourceId } from '@crewstation/kernel';
 import type { TestRunner } from '../../ports/platform';
 
@@ -10,7 +10,9 @@ export interface BusinessProbeTurnDeps {
   accept?(agent: StartAgentCommand): Promise<void>;
 }
 export interface BusinessProbeTurn { ok: boolean; sessionId?: string; events: AgentEvent[]; text: string }
-export async function businessProbeTurn(deps: BusinessProbeTurnDeps, agent: StartAgentCommand, expected: string): Promise<BusinessProbeTurn> {
+export async function businessProbeTurn(deps: BusinessProbeTurnDeps, rawAgent: StartAgentCommand, expected: string): Promise<BusinessProbeTurn> {
+  // 摘要绑定 Runner 实际解析后的字节；可选字段的默认值也必须在派发前固定。
+  const agent = StartAgentCommandSchema.parse(rawAgent);
   const info = BusinessExecutionInfoSchema.parse(await deps.runner.sendCommand(deps.taskId, { id: newResourceId(), type: 'businessExecutionInfo' }));
   const digestNonce = randomBytes(32).toString('hex'), executionId = agent.agentId;
   const payloadDigest = new Bun.CryptoHasher('sha256').update(businessAgentDigestInput(agent, digestNonce)).digest('hex');

@@ -20,6 +20,7 @@ const MAX_MERGED_BODY = 16_000;
 
 function bodyOf(event: AgentEvent): string {
   switch (event.type) {
+    case 'user-message':
     case 'text':
     case 'thinking':
     case 'permission':

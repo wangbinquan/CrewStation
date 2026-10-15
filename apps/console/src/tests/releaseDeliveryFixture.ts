@@ -1,3 +1,4 @@
+import { AppVisibilityDtoSchema } from '@crewstation/contracts';
 import type { ReleaseDto, ResourceRecord, SlotDto, TrafficSwitchDto } from '@crewstation/contracts';
 import { testerSummaryFixture, trialMarketFixture } from './projectSummaryFixture';
 import { resourceView } from './resourceRecordFixture';
@@ -11,13 +12,16 @@ export function releaseDeliveryFixture() {
   const prod = makeRelease(prodId, 'v1.0.0', sha, time), candidate = makeRelease(targetId, 'v1.1.0', 'b'.repeat(40), '2026-09-13T02:00:00.000Z');
   const releases = [prod, candidate, makeRelease(historyId, 'v0.9.0', 'c'.repeat(40), '2026-09-12T01:00:00.000Z')];
   const slot = (name: 'prod' | 'preview', release: ReleaseDto): SlotDto => ({ name, active: name === 'prod', releaseId: release.id, tag: release.tag, commitSha: release.commitSha, replicas: 1, readyReplicas: 1, state: 'ready', host: name === 'prod' ? 'demo.cs.localhost' : 'preview.demo.cs.localhost' });
-  const state = { handoff: null as TrafficSwitchDto | null, controlled: false, role: 'owner', admin: false, failSlots: false, failSwitch: false, mismatch: false, badRelease: false, hold: undefined as Promise<void> | undefined, slots: [slot('prod', prod), slot('preview', candidate)], records: [] as ResourceRecord[] };
+  const state = { visibility: AppVisibilityDtoSchema.parse({ mode: 'members', allowRequests: true, revision: 0, updatedAt: null, canConfigure: true }), handoff: null as TrafficSwitchDto | null, controlled: false, role: 'owner', admin: false, failSlots: false, failSwitch: false, mismatch: false, badRelease: false, hold: undefined as Promise<void> | undefined, slots: [slot('prod', prod), slot('preview', candidate)], records: [] as ResourceRecord[] };
   const writes: Array<{ path: string; body: Record<string, unknown> }> = [], reads: string[] = [];
   globalThis.fetch = (async (raw, init) => {
     const path = new URL(String(raw), 'http://localhost').pathname, method = init?.method ?? 'GET'; let body: unknown = { items: [] }, status = 200;
     if (method !== 'GET') {
       const input = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>; writes.push({ path, body: input }); await state.hold;
-      if (path.endsWith('/traffic-switch')) {
+      if (path.endsWith('/app-visibility')) {
+        if (input.expectedRevision !== state.visibility.revision) return Response.json({ error: 'conflict', message: '访问范围已变化' }, { status: 409 });
+        state.visibility = AppVisibilityDtoSchema.parse({ ...state.visibility, mode: input.mode, allowRequests: input.allowRequests, revision: state.visibility.revision + 1, updatedAt: new Date().toISOString() }); body = state.visibility;
+      } else if (path.endsWith('/traffic-switch')) {
         if (state.failSwitch) { status = 412; body = { error: 'precondition', message: '当前版本含破坏性迁移，不能切回旧版本' }; }
         else {
           body = { id: 'tsw_example', serviceId, fromSlot: 'preview', toSlot: 'prod', releaseId: state.mismatch ? historyId : input.expectedTargetRelease, ...(input.expectedActiveRelease ? { previousReleaseId: input.expectedActiveRelease } : {}), actorUserId: userId, createdAt: time };
@@ -28,6 +32,7 @@ export function releaseDeliveryFixture() {
     } else {
       reads.push(path);
       if (path === '/v1/me') body = { id: userId, name: '负责人', email: 'owner@test.invalid', platformRole: (state.admin) ? 'admin' : 'developer', isAdmin: state.admin, memberships: [{ projectId, role: state.role }] };
+      else if (path.endsWith('/app-visibility')) body = { ...state.visibility, canConfigure: state.role === 'owner' || state.admin };
       else if (path === '/v1/market/apps') body = { items: [trialMarketFixture(projectId)] };
       else if (path === `/v1/market/apps/${projectId}`) body = trialMarketFixture(projectId);
       else if (path === `/v1/workbench/project-summaries/${projectId}`) body = testerSummaryFixture(projectId, serviceId);

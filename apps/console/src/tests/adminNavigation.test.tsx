@@ -83,8 +83,9 @@ describe('管理空间的分组树（2026-09-21 修订 RFC-003 §4）', () => {
     asAdmin(); page = await renderApp(`/admin/integrations/${projectId}`);
     // 项目侧栏曾重复整棵平台菜单，折叠后仍与项目导航混在一起。
     const nav = document.querySelector('nav[aria-label="主导航"]')!;
-    expect(nav.querySelector('details') === null).toBe(true);
-    expect(nav.querySelectorAll('ul')).toHaveLength(1);
+    expect([...nav.querySelectorAll('details > summary')].map(node => node.textContent)).toEqual(['运行与管理']);
+    expect(nav.querySelectorAll('[aria-label="项目页面"] > li')).toHaveLength(4);
+    expect(nav.querySelectorAll('[aria-label="项目页面"] details a')).toHaveLength(4);
     expect(nav.querySelector('[aria-label="项目页面"]')).not.toBeNull();
     // 2026-09-24 起项目管理只列数字人：接入项目的侧栏回能力接入的接入容器页签。
     expect(nav.querySelector('a[href="/admin/capabilities?tab=integrations"]')?.textContent).toContain('返回接入容器');

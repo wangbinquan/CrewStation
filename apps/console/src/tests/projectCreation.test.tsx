@@ -23,7 +23,7 @@ async function cancelWithEscape() {
   await act(async () => { openDialog().dispatchEvent(new Event('cancel', { cancelable: true })); }); await page!.settle();
 }
 async function resources() {
-  await act(async () => { openDialog().querySelector('summary')!.click(); }); await page!.settle();
+  await act(async () => { openDialog().querySelector('[name="plan"]')!.closest('details')!.querySelector('summary')!.click(); }); await page!.settle();
 }
 async function ready() { await field('name', '新数字人'); await field('slug', 'billing'); }
 const inputValue = (name: string) => openDialog().querySelector<HTMLInputElement>(`[name="${name}"]`)?.value;
@@ -39,7 +39,12 @@ test('开发列表打开共享弹窗，无独立创建页；关闭、重开、Es
   expect(templateSection.querySelector('option[value="01a0bf5d-8f4b-7002-9560-94caf593fb19"]')?.textContent).toBe('基础应用（有界面）');
   expect(templateSection.querySelector('option[value="01a0e222-de8b-7000-8cd8-207c8673b62e"]')?.textContent).toBe('业务执行示例（仅接口，无界面）');
   expect(templateSection.querySelector('strong + p')?.textContent).toContain('可在浏览器中打开的应用界面');
-  await ready(); await field('template', '01a0e222-de8b-7000-8cd8-207c8673b62e');
+  await ready();
+  const advanced = templateSection.querySelector('details')!;
+  expect(advanced.open).toBe(false);
+  await act(async () => { advanced.querySelector('summary')!.click(); }); await page.settle();
+  expect(advanced.open).toBe(true);
+  await field('template', '01a0e222-de8b-7000-8cd8-207c8673b62e');
   expect(templateSection.querySelector('strong')?.textContent).toBe('业务执行示例（仅接口，无界面）');
   expect(templateSection.querySelector('strong + p')?.textContent).toContain('仅提供 API 接口，没有应用界面');
   expect(openDialog().textContent).toContain('后台业务任务'); expect(openDialog().textContent).toContain('billing.installed.apps.test');
@@ -76,13 +81,13 @@ test('管理员在接入列表同一弹窗选择真实类型、模板、套餐�
   await cancelWithEscape(); expect(page.search()).toEqual(search);
 });
 
-test('自建负责人只读、默认资源不作为覆盖提交；成功在原列表显示真实开通结果', async () => {
+test('自建负责人只读、默认资源不作为覆盖提交；成功进入可恢复的首次交付路由', async () => {
   const f = projectCreationFixture('developer'); page = await renderApp('/projects'); await page.click('新建项目');
   expect(openDialog().querySelectorAll('[name="ownerUserId"], [name="plan"], [name="maxConcurrentTasks"]')).toHaveLength(0);
   expect(openDialog().textContent).toContain('管理者'); expect(openDialog().textContent).toContain('最多 3 个并发任务');
   await ready(); await page.click('创建项目');
   expect(f.writes()).toHaveLength(1); expect(f.writes()[0]?.body).toEqual({ name: '新数字人', slug: 'billing', kind: 'DigitalWorker', template: '01a0bf5d-8f4b-7002-9560-94caf593fb19' });
-  expect(page.path()).toBe('/projects'); expect(openDialog().textContent).toContain('开通'); expect(f.requests.some((r) => r.path === '/v1/users' || r.path === '/v1/catalog/project-templates' || r.path === '/v1/catalog/service-plans')).toBe(false);
+  expect(page.path()).toBe(`/projects/${f.state.project!.id}/provisioning`); expect(document.querySelectorAll('dialog[open]')).toHaveLength(0); expect(page.text()).toContain('首次交付'); expect(f.requests.some((r) => r.path === '/v1/users' || r.path === '/v1/catalog/project-templates' || r.path === '/v1/catalog/service-plans')).toBe(false);
 });
 
 test('本地必填与服务端字段错误聚焦原字段，不清除已填写内容或默认资源语义', async () => {

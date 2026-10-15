@@ -6,7 +6,7 @@ import { KnownAgentProtocolSchema } from './launch';
 
 /** 驱动层把两个 CLI 的输出归一为这一种事件；工作台流式面板与 execution_events 都消费它。 */
 export const AgentEventTypeSchema = z.enum([
-  'usage', 'started', 'session', 'text', 'thinking', 'tool-start', 'tool-end', 'permission', 'status', 'error', 'completed', 'cancelled',
+  'usage', 'started', 'session', 'user-message', 'text', 'thinking', 'tool-start', 'tool-end', 'permission', 'status', 'error', 'completed', 'cancelled',
 ]);
 
 export const AgentEventSchema = z.object({

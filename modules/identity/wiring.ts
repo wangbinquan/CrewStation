@@ -36,6 +36,9 @@ import { oidcLoginUseCases } from './application/oidc/login';
 import { providerAdminUseCases } from './application/oidc/providerAdmin';
 import { passwordLoginUseCases } from './application/passwordLogin';
 import { queryUsersUseCases } from './application/queryUsers';
+import { developerAccessUseCases } from './application/roles/developerAccess';
+import { developerAccessUnitOfWork } from './adapters/persistence/developerAccess/repository';
+import { developerAccessRoutes } from './http/developerAccessRoutes';
 import { platformRoleUseCases } from './application/roles/platformRoles';
 import { sessionTokenUseCases } from './application/sessionTokens';
 import { resolveHostByPattern } from './domain/hosts';
@@ -172,6 +175,7 @@ export function createIdentityModule(deps: IdentityModuleDeps): IdentityModule {
   const forwarding = forwardingUseCases(useCaseDeps);
   const api: IdentityModuleApi = {
     name: 'identity',
+    ...developerAccessUseCases(developerAccessUnitOfWork(deps.db), clock),
     projectDeletionOwner: (assertGrant) => identityDeletionOwner(identityDeletionRepository(deps.db, assertGrant), assertGrant),
     ensureUser: ensureUserUseCase(useCaseDeps),
     ...queryUsersUseCases(useCaseDeps.users),
@@ -213,7 +217,7 @@ export function createIdentityModule(deps: IdentityModuleDeps): IdentityModule {
   };
   return {
     api,
-    http: { auth: [authRoutes(api)], forwardAuth: [forwardAuthRoutes(api)], users: [userRoutes(api), adminAuthRoutes(api)], devSessionGate: [devSessionGate(api)] },
+    http: { auth: [authRoutes(api)], forwardAuth: [forwardAuthRoutes(api)], users: [developerAccessRoutes(api), userRoutes(api), adminAuthRoutes(api)], devSessionGate: [devSessionGate(api)] },
     migrations: identityMigrations,
   };
 }

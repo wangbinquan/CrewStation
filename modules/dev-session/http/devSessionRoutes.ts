@@ -1,4 +1,4 @@
-import { OpenDevSessionV2RequestSchema, StartDevAgentV2RequestSchema } from '@crewstation/contracts';
+import { CommitWorkspaceRequestSchema, OpenDevSessionV2RequestSchema, StartDevAgentV2RequestSchema } from '@crewstation/contracts';
 import type { ProjectId, TaskId, UserId } from '@crewstation/contracts';
 import { OpenDevSessionRequestSchema, ProjectIdSchema, PublishDevSessionRequestSchema, SendAgentMessageRequestSchema, StartDevAgentRequestSchema, TaskIdSchema } from '@crewstation/contracts';
 import { ComparisonDetailQuerySchema, ComparisonTargetSchema } from '@crewstation/contracts';
@@ -24,6 +24,7 @@ export function devSessionRoutes(api: DevSessionModuleApi, isAdmin: (userId: Use
   r.post('/v2/projects/:projectId/dev-session', async (c) => c.json(await api.openSession(await actor(c), parseParams(c, projectParams).projectId as ProjectId, await parseBody(c, OpenDevSessionV2RequestSchema)), 201));
   r.get('/v1/projects/:projectId/dev-session/rebuild', async (c) => { c.header('cache-control', 'no-store'); return c.json(await api.inspectSessionRebuild(await actor(c), parseParams(c, projectParams).projectId)); });
   r.post('/v1/projects/:projectId/dev-session/rebuild', async (c) => c.json(await api.rebuildSession(await actor(c), parseParams(c, projectParams).projectId, await parseBody(c, RebuildDevSessionRequestSchema)), 202));
+  r.post('/v1/projects/:projectId/dev-session/workspace-commits', async c => c.json(await api.commitWorkspace(await actor(c), parseParams(c, projectParams).projectId, await parseBody(c, CommitWorkspaceRequestSchema)), 201));
   r.get('/v1/projects/:projectId/dev-session/workspace-status', async (c) => c.json(await api.workspaceStatus(await actor(c), parseParams(c, projectParams).projectId as ProjectId)));
   // RFC-016 预览进程：工作台、CLI 与操作 MCP 共用这一条入口，授权判定只有用例层一处。
   r.get('/v1/projects/:projectId/dev-session/preview', async (c) => { c.header('cache-control', 'no-store'); return c.json(await api.previewStatus(await actor(c), parseParams(c, projectParams).projectId as ProjectId)); });

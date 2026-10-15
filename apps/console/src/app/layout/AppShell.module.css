@@ -29,7 +29,7 @@
 /* 开发页：收紧内边距，终端成为主体；内容区是纵向弹性列、长满到窗口底边，工作区在其中长满剩余高度（2026-09-23）。
    左栏宽度与其他页面一致，不在这里改写 --cs-nav-width。 */
 .compact { padding: 8px 12px; display: flex; flex-direction: column; --cs-main-sticky-top: -8px; }
-.compact > .content { flex: 1 0 auto; display: flex; flex-direction: column; }
+.compact > .content { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
 /* 窄屏左栏变成内容上方的横条：外壳随内容长高、整页滚动，顶栏与横条一起滚走（2026-09-23 作者裁定）。 */
 @media (max-width: 800px) {
@@ -54,4 +54,7 @@
     --cs-main-sticky-top: 0px;
   }
   .compact { padding: 8px; }
+  /* 开发页保持一屏工作台：导航占实际高度，剩余高度给对话／终端，输入区不落到首屏外。 */
+  .compactShell { height: 100dvh; min-height: 0; }
+  .compactShell .compact { min-height: 0; }
 }

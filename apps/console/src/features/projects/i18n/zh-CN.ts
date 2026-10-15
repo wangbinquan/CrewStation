@@ -1,6 +1,11 @@
+import { deliveryMessages } from './delivery/zh-CN';
 import type { Messages } from '../../../shared/lib/i18n';
 
 export const messages = {
+  ...deliveryMessages,
+
+
+
   "projects.repair.title": "确认旧资源归属",
   "projects.repair.explanation": "旧历史未恢复，此处确认的是现在的资源。请逐条核对完整记录、当前引用和实际身份，再选择本项目如何处理。没有选择的条目继续阻止删除。",
   "projects.repair.afterSave": "保存只记录你的确权决定，不会删除资源。保存后会重新生成删除预检；永久删除仍需两次确认并输入 delete。",
@@ -353,7 +358,7 @@ export const messages = {
   "projects.wizard.catalogLoading": "读取模板与套餐目录…",
   "projects.wizard.catalogError": "目录暂不可用：{message}。输入已保留，请重新读取目录。",
   "projects.wizard.nameHint": "用于项目列表展示，可填写中文，1–80 个字符。",
-  "projects.wizard.slugHint": "决定下方访问域名；创建后不能修改。",
+  "projects.wizard.slugHint": "根据名称自动建议，可自行修改；决定下方访问域名，创建后不能修改。",
   "projects.wizard.kindHint": "API 代理接入公司接口；事件生产者把外部事件送入平台。",
   "projects.wizard.templateHint": "用于生成初始代码与发布配置，创建后可以继续开发修改。",
   "projects.wizard.noTemplates": "当前类型暂无可用模板；请确认控制面的模板目录后重新读取。",

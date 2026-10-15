@@ -1,6 +1,7 @@
 import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { CatalogRequestsPage } from '../../features/catalog';
+import { DeveloperAccessReview } from '../../features/admin';
 import { AccessRequestReview } from '../../features/projects';
 import type { RequestSearch } from '../../shared/admin/managementSearch';
 import { keepRequestDrafts } from '../../shared/admin/requestPageState';
@@ -13,6 +14,7 @@ export function AdminRequestPanels({ search }: { readonly search: RequestSearch 
   const t = useT(), navigate = useNavigate(), [dirty, setDirty] = useState(false);
   return <Stack>
     <UnsavedChangesGuard dirty={dirty} scope={t('ui.requestDraft.scope')} allowNavigate={keepRequestDrafts} />
+    {!search.projectId ? <DeveloperAccessReview /> : null}
     <div><CatalogRequestsPage projectId={search.projectId} state={search.state} cursor={search.apiCursor} active onDirtyChange={setDirty}
       onPage={(apiCursor) => void navigate({ to: '/admin/requests', search: { ...search, apiCursor } })} /></div>
     <div><AccessRequestReview scope={{ ...(search.projectId ? { projectId: search.projectId } : {}), state: search.state, ...(search.accessCursor ? { cursor: search.accessCursor } : {}) }}

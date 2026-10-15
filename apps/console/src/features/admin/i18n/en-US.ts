@@ -9,6 +9,18 @@ import { settingsMessages } from './settings.en-US';
 import { rateLimitMessages } from './rateLimits.en-US';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
+  "admin.developer.title": "Developer access requests",
+  "admin.developer.status": "Request status",
+  "admin.developer.applicant": "Applicant",
+  "admin.developer.empty": "No matching developer access requests",
+  "admin.developer.review": "Review developer access",
+  "admin.developer.submit": "Confirm decision",
+  "admin.developer.decision": "Decision",
+  "admin.developer.approve": "Approve developer access",
+  "admin.developer.reject": "Reject request",
+  "admin.developer.effect": "Approval grants the developer role and project creation access. It does not grant administrator privileges.",
+  "admin.developer.note": "Review note",
+
   ...tokenPricingMessages,
   ...projectComputeMessages,
   ...settingsMessages,

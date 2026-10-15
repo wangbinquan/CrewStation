@@ -17,6 +17,8 @@ test('headless Agent：受理即登记独立执行环境（档位镜像、固定
   const catalog = fakeComputeCatalog(() => profiles);
   f.deps.compute = catalog;
   const dto = await f.api.startAgent(actor, taskId, { compute: computeSelector('gw'), prompt: 'hi' });
+  expect(dto.initialPrompt).toBe('hi');
+  expect((await f.api.listAgents(actor, taskId)).find(agent => agent.agentId === dto.agentId)?.initialPrompt).toBe('hi');
   expect(dto).toMatchObject({ state: 'preparing', compute: computeId('gw'), profileRevision: 5, execution: { state: 'queued' } });
   expect(f.inputs[0]).toMatchObject({ purpose: 'agent', parentTaskId: taskId, agentId: dto.agentId, profile: '01a0bf5d-8f4b-7dd6-8102-2aa5cc3255b1', computeProfile: { profileId: computeId('gw'), revision: 5 } });
   expect(f.inputs[0]!.image).toContain('registry.test/runtime/gw@sha256:');

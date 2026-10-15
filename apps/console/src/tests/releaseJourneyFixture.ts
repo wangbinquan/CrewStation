@@ -19,6 +19,7 @@ export function releaseJourneyFixture() {
   const summary = () => ({ recordKind: detail.recordKind, id: detail.id, snapshot: detail.snapshot, status: detail.status, revision: detail.revision, updatedAt: detail.updatedAt });
   globalThis.fetch = (async (raw, init) => {
     const url = new URL(String(raw), 'http://localhost'), path = url.pathname, method = init?.method ?? 'GET';
+    if (path.endsWith('/app-visibility')) return base(raw, init);
     if (method === 'GET') {
       if (path.includes('/release-journeys') || path.endsWith('/journey-history') || path.endsWith('/workspace-status')) f.reads.push(path + url.search);
       if (path === `/v1/release-journeys/${journeyId}`) return state.readError ? Response.json({ error: 'unavailable', message: '流程读取失败' }, { status: 503 }) : Response.json({ ...detail, slots: f.state.slots });

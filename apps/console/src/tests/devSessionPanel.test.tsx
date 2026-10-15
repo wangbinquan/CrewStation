@@ -116,6 +116,7 @@ test('开着面板从左栏去别的页：离开途中的地址不算「无参�
   expect(page.path()).toBe(`/projects/${activityProjectId}/release`);
   // 从左栏回开发页仍按设计恢复在旁；重新挂载后再离开，同样不被拽回。
   await page.navigate(path); expect(page.path()).toBe(path); expect(page.search()).toEqual({ view: 'reference' });
+  await act(async () => document.querySelector<HTMLElement>('nav details > summary')!.click()); await page.settle();
   await page.click('运行与诊断'); expect(page.path()).toBe(`/projects/${activityProjectId}/operations`);
 });
 

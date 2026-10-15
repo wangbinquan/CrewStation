@@ -27,7 +27,7 @@ test('历史确认步骤分开显示当次目标、原确认人与前一版本�
   for (const text of ['当前正式版本', 'v9.9.9', '本次目标版本', 'v1.1.0', '当次上线前的版本 ID', prodId, '上线确认人', '当次上线说明', '这次发布已确认正式生效']) expect(page.text()).toContain(text);
   expect(f.writes).toHaveLength(0); expect(button('确认将 v1.1.0 上线')).toBeUndefined();
 });
-async function verify() { await page!.click('验证通过，继续'); }
+async function verify() { await act(async () => document.querySelector<HTMLInputElement>('input[type=checkbox]')?.click()); await page!.settle(); await page!.click('验证通过，继续'); }
 
 test('就绪自动进入验证，验证后同页显示双版本和明确上线确认；受理和实际完成分开', async () => {
   const f = releaseJourneyFixture(); page = await renderApp(path);

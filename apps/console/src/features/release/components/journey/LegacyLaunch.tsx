@@ -11,6 +11,8 @@ import { Button } from '../../../../shared/ui/Button';
 import { ExternalButtonLink } from '../../../../shared/ui/navigation/ButtonLink';
 import { slotCanOpen } from '../../model/deployedVersions';
 import { LaunchIntentSchema, readWizardStorage, removeWizardStorage, saveWizardStorage, wizardStorageKey } from '../../model/journey/storage';
+import { useLaunchAudience } from '../../model/journey/useLaunchAudience';
+import { LaunchAudience } from './LaunchAudience';
 
 const LegacyIntentSchema = LaunchIntentSchema.omit({ journeyId: true });
 export function LegacyLaunch({ release, slots, userId, space, projectId, canSwitch, refresh, onAccepted }: {
@@ -18,6 +20,7 @@ export function LegacyLaunch({ release, slots, userId, space, projectId, canSwit
   readonly canSwitch: boolean; readonly refresh: () => Promise<unknown>; readonly onAccepted: (id: string) => void;
 }) {
   const t = useT(), mounted = useRef(true), lock = useRef(false), key = wizardStorageKey(userId, space, projectId, `legacy-launch:${release.id}`);
+  const audience = useLaunchAudience(projectId, userId, space === 'workbench');
   const preview = slots.find(slot => slot.name === 'preview' && slot.releaseId === release.id), prod = slots.find(slot => slot.name === 'prod');
   const [intent, setIntent] = useState(() => readWizardStorage(key, LegacyIntentSchema));
   const [review, setReview] = useState({ active: prod?.releaseId ?? null, revision: preview?.targetRevision });
@@ -45,10 +48,11 @@ export function LegacyLaunch({ release, slots, userId, space, projectId, canSwit
     <p>{t('release.wizard.legacyLaunchHint')}</p>
     {slotCanOpen(preview) ? <ExternalButtonLink href={`//${preview!.host}`}>{t('release.wizard.openPreview')}</ExternalButtonLink> : null}
     {!intent ? <>
+      <LaunchAudience audience={audience} disabled={busy || !canSwitch} />
       <FormField label={t('release.traffic.reason')}><textarea maxLength={500} rows={2} value={reason} onChange={event => setReason(event.target.value)} disabled={busy || !canSwitch} /></FormField>
       <label><input type="checkbox" checked={checked} disabled={busy || !canSwitch} onChange={event => setChecked(event.target.checked)} />{t('release.wizard.legacyChecked')}</label>
       {stale ? <ActionNote tone="neutral">{t('release.wizard.targetChanged')} <Button onClick={() => { setReview({ active: prod?.releaseId ?? null, revision: preview?.targetRevision }); setChecked(false); }}>{t('release.wizard.recheck')}</Button></ActionNote> : null}
-      <Button variant="primary" disabled={!canSwitch || busy || !checked || stale || !slotCanOpen(preview) || !preview?.targetRevision} onClick={() => void confirm()}>{t('release.wizard.launch', { tag: release.tag })}</Button>
+      <Button variant="primary" disabled={audience.blocked || audience.busy || !canSwitch || busy || !checked || stale || !slotCanOpen(preview) || !preview?.targetRevision} onClick={() => void audience.launch(confirm)}>{t('release.wizard.launch', { tag: release.tag })}</Button>
     </> : <ActionNote tone="neutral">{t('release.wizard.launchUnknown')} <Button onClick={() => void refresh()}>{t('release.wizard.readLaunch')}</Button></ActionNote>}
     {!canSwitch ? <p>{t('release.wizard.ownerHandoff')}</p> : null}
     {error ? <ActionNote tone="error">{error}</ActionNote> : null}

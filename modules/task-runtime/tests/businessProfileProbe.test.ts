@@ -3,6 +3,7 @@ import type { AgentEvent, RunnerBusinessEvent, RunnerBusinessReceipt, RunnerComm
 import { LaunchSpecSchema, RunnerCommandSchema, businessAgentDigestInput } from '@crewstation/contracts';
 import { newResourceId, precondition } from '@crewstation/kernel';
 import { probeBusinessProfile } from '../application/profile-testing/businessProfileProbe';
+import { businessProbeTurn } from '../application/profile-testing/businessProbeTurns';
 import type { TestRunner } from '../ports/platform';
 
 function fixture() {
@@ -29,6 +30,7 @@ function fixture() {
         const wire = RunnerCommandSchema.parse(command);
         if (wire.type !== 'startBusinessAgent') throw new Error('wrong command');
         const digest = new Bun.CryptoHasher('sha256').update(businessAgentDigestInput(wire.agent, wire.digestNonce)).digest('hex');
+        if (digest !== command.payloadDigest) throw precondition('Agent 执行参数摘要不匹配', { code: 'execution_conflict' });
         expect(digest).toBe(command.payloadDigest);
         const agent = command.agent, step = agent.resumeSessionId ? 'resume' : agent.systemPrompt ? 'systemPrompt' : agent.businessSkills?.length ? 'skills' : agent.mcp.length ? 'mcp' : 'events';
         const token = step === 'resume' ? state.sessionToken : step === 'mcp' ? state.mcpToken : JSON.stringify(agent).match(/cs-proof-[a-f0-9]+/)![0];
@@ -47,7 +49,7 @@ function fixture() {
     },
   };
   const input = { testId: newResourceId(), profile: newResourceId(), revision: 1, launch: LaunchSpecSchema.parse({ protocol: 'opencode', binaryPath: '/usr/bin/opencode' }), image: `image@sha256:${'a'.repeat(64)}`, beforeStart: { profile: newResourceId(), revision: 1, contentHash: 'hash', vars: {}, secrets: {}, steps: [], configFile: { kind: 'none' as const }, captureOutput: false }, prompt: 'ordinary smoke', expectedReply: 'ordinary smoke' };
-  return { state, commands, run: () => probeBusinessProfile({ runner, taskId: newResourceId() as TaskId, input, budgetMs: 100, pollMs: 1, heartbeat: async () => true, report: async () => {} }) };
+  return { state, commands, runner, input, run: () => probeBusinessProfile({ runner, taskId: newResourceId() as TaskId, input, budgetMs: 100, pollMs: 1, heartbeat: async () => true, report: async () => {} }) };
 }
 test('ordinary/old Runner smoke never grants business capability; exact per-feature observations grant proof', async () => {
   const f = fixture(); f.state.supported = false; expect(await f.run()).toBeUndefined(); expect(f.commands).toHaveLength(0);
@@ -78,4 +80,20 @@ test('explicit Runner rejection is preserved; a lost response reconciles the ori
   const uncertain = fixture(); uncertain.state.lostReply = true;
   expect((await uncertain.run())?.capabilities.events).toBe(true);
   expect(uncertain.commands.filter((command) => command.type === 'startBusinessAgent')).toHaveLength(5);
+});
+
+test('档位首轮未带可选技能时，摘要仍与真正 Runner 解析后的默认值一致', async () => {
+  const f = fixture(), agentId = newResourceId(), token = 'cs-proof-0123456789abcdef';
+  const agent = { id: 'pft-start-first', type: 'startAgent' as const, agentId, compute: f.input.profile, profileRevision: f.input.revision,
+    launch: f.input.launch, permission: 'full' as const, mode: 'oneshot' as const, initialPrompt: token, mcp: [], env: {},
+    beforeStart: f.input.beforeStart, processAttemptId: 'first:1' };
+  // 实机首轮在解析前计算摘要，Runner 补入 businessSkills=[] 后误拒绝；不能只验证已 parse 的能力探针。
+  expect(agent).not.toHaveProperty('businessSkills');
+  const accepted: RunnerCommand[] = [];
+  const turn = await businessProbeTurn({ runner: f.runner, taskId: newResourceId() as TaskId, budgetMs: 100, pollMs: 1,
+    heartbeat: async () => true, accept: async command => { accepted.push(command); } }, agent, token);
+  expect(turn.ok).toBe(true);
+  expect(accepted).toHaveLength(1);
+  expect(accepted[0]).toMatchObject({ agentId, businessSkills: [] });
+  expect(f.commands.filter(command => command.type === 'startBusinessAgent')).toHaveLength(1);
 });

@@ -14,6 +14,7 @@ import { useServiceOfProject } from '../model/useServiceOfProject';
 import { useReleasePermissions } from '../model/journey/useReleasePermissions';
 import { useWizardPreparation } from '../model/journey/useWizardPreparation';
 import { WizardFrame } from '../components/journey/WizardFrame';
+import { CommitReview } from '../components/journey/CommitReview';
 import styles from '../components/journey/WizardFrame.module.css';
 
 export function PublishWizardPage() {
@@ -57,6 +58,8 @@ function Preparation({ serviceId, userId, canPublish }: { readonly serviceId: st
     {!fixed ? <QueryStatus isPending={p.pending} error={p.queryError} /> : null}
     {p.problem && !fixed ? <ActionNote tone="neutral">{p.problem.startsWith('release.') ? t(p.problem) : p.problem}</ActionNote> : null}
     {source === 'session' && !fixed && p.workspace.data?.status === 'ready' && p.workspace.data.uncommittedCount > 0 ? <ul>{p.workspace.data.uncommitted.map(file => <li key={file.path}>{file.status.includes('D') ? <code>{file.path}</code> : <Link to={PROJECT_PATHS[space].development} params={{ projectId }} search={{ view: 'code', file: file.path, task: p.workspace.data!.taskId }}>{file.path}</Link>}</li>)}</ul> : null}
+    {source === 'session' && !fixed && p.workspace.data?.status === 'ready' && p.workspace.data.uncommittedCount > 0 ? <CommitReview workspace={p.workspace.data} busy={p.busy} error={p.error}
+      disabled={!canPublish || p.pending || !!p.queryError || !p.candidate || !!p.versionError || !!p.messageError} onCommit={p.commitAndBuild} /> : null}
     {source === 'session' ? <ButtonLink to={PROJECT_PATHS[space].development} params={{ projectId }} search={{ view: 'diff' }}>{t('release.prepare.openDevelopment')}</ButtonLink> : null}
     {p.error ? <ActionNote tone="error">{p.error}</ActionNote> : null}
     <ActionNote tone="neutral">{t('release.prepare.productionWarning')}</ActionNote>

@@ -1,3 +1,4 @@
+import type { CommitWorkspaceDto, CommitWorkspaceRequest } from '@crewstation/contracts';
 import type { AgentInstanceDto, BranchDto, DevSessionDto, OpenDevSessionV2Request, ReleaseDto, SendAgentMessageRequest, StartDevAgentV2Request, WorkspaceStatusDto } from '@crewstation/contracts';
 import type { ComparisonDetailQuery, ComparisonDetails, ComparisonTarget, VersionComparisonDto } from '@crewstation/contracts';
 import type { NativeTerminalDto, NativeTerminalList, NativeTerminalSnapshotDto, StartNativeTerminalV2Request } from '@crewstation/contracts';
@@ -53,6 +54,7 @@ export interface DevSessionResource {
   /** 预览进程自己的最近输出；跨重启保留，按 `attempt` 区分是哪一次运行。 */
   previewLogs(projectId: string, query?: Partial<PreviewLogsQuery>): Promise<PreviewLogsDto>;
   /** 只读、无副作用的释放／发布前检查；无会话 404，断线或 Git 失败返回 unavailable。 */
+  commitWorkspace(projectId: string, input: CommitWorkspaceRequest): Promise<CommitWorkspaceDto>;
   workspaceStatus(projectId: string): Promise<WorkspaceStatusDto>;
   versionComparison(projectId: string, target?: ComparisonTarget): Promise<VersionComparisonDto>;
   versionComparisonDetails(projectId: string, comparisonId: string, query: ComparisonDetailQuery): Promise<ComparisonDetails>;
@@ -98,6 +100,7 @@ export function devSessionResource(transport: Transport): DevSessionResource {
     previewStatus: (projectId) => transport.request<PreviewStatusDto>('GET', `${preview(projectId)}`),
     controlPreview: (projectId, action) => transport.request<PreviewStatusDto>('POST', `${preview(projectId)}/${action}`),
     previewLogs: (projectId, query) => transport.request<PreviewLogsDto>('GET', `${preview(projectId)}/logs`, { query }),
+    commitWorkspace: (projectId, input) => transport.request('POST', `${project(projectId)}/dev-session/workspace-commits`, { body: input, signal: AbortSignal.timeout(90_000) }),
     workspaceStatus: (projectId) => transport.request<WorkspaceStatusDto>('GET', `${project(projectId)}/dev-session/workspace-status`),
     versionComparison: (projectId, target) => transport.request<VersionComparisonDto>('GET', `${project(projectId)}/dev-session/version-comparison`, { query: { target } }),
     versionComparisonDetails: (projectId, comparisonId, query) => transport.request<ComparisonDetails>('GET', `${project(projectId)}/dev-session/version-comparisons/${segment(comparisonId)}`, { query }),

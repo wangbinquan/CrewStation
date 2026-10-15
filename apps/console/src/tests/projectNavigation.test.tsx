@@ -95,19 +95,19 @@ describe('六个项目入口与旧链接兼容', () => {
     expect(document.querySelector('header.bar')?.textContent).not.toContain(projectId);
     // 页头的仓库链接跟着摘要走：这份夹具没有摘要，就不该去读仓库或成员。
     expect(f.calls.some((call) => call.url.pathname.endsWith('/members') || call.url.pathname.endsWith('/repository'))).toBe(false);
+    await act(async () => document.querySelector<HTMLElement>('nav details > summary')!.click()); await page.settle();
     await page.click('项目设置'); expect(page.search()).toMatchObject({ tab: 'config', env: 'development' });
   });
 
   test('开发会话及其子页的左栏与其他项目页同宽，只有正文收紧密度', async () => {
     fixture(); page = await renderApp(`/projects/${projectId}`);
-    const shell = (): string => document.querySelector('.shell')!.className;
-    const other = shell();
+    const shell = (): Element => document.querySelector('.shell')!;
     // 开发页曾把 --cs-nav-width 改写成 156px，左栏因此比其他页签窄一截，进出开发会话时整条左栏跳一下。
     await page.navigate(`/projects/${projectId}/dev-session`);
-    expect(shell()).toBe(other);
+    expect(shell().classList.contains('compactShell')).toBe(true);
     expect(document.querySelector('main')!.className).toContain('compact');
     await page.navigate(`/projects/${projectId}/dev-session/conversations`);
-    expect(shell()).toBe(other);
+    expect(shell().classList.contains('compactShell')).toBe(false);
     // 宽度只能有一个来源：任何页面级改写都会让这条红，而不是等实机看出来。
     expect(consoleStyles().filter((file) => /--cs-nav-width\s*:/.test(file.code)).map((file) => file.path)).toEqual(['app/theme/tokens.css']);
   });

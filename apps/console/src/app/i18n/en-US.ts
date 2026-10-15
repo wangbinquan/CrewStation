@@ -2,6 +2,8 @@ import type { MessagesShapedLike } from '../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
+  "nav.projectManagement": "Operations and management",
+
   "catalog.resources": "Resources",
   "catalog.search": "Search",
   "catalog.clear": "Clear search",

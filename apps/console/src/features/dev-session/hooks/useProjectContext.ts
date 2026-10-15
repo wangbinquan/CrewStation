@@ -19,6 +19,6 @@ export function useProjectContext(projectId: string, session: DevSessionDto | un
   const me = useApiQuery(queryKeys.me(), () => api.me.get());
   const project = useApiQuery(queryKeys.project(projectId), () => api.projects.get(projectId));
   const membership = me.data?.memberships?.find((item) => item.projectId === projectId);
-  const canDevelop = me.data !== undefined && (me.data.isAdmin || project.data?.ownerUserId === me.data.id || membership?.role === 'owner' || membership?.role === 'developer');
+  const canDevelop = !me.error && !project.error && me.data !== undefined && (me.data.isAdmin || project.data?.ownerUserId === me.data.id || membership?.role === 'owner' || membership?.role === 'developer');
   return { access: sessionAccess(me.data, project.data, session), serviceId: project.data?.serviceId, canDevelop, userId: me.data?.id, isAdmin: me.data?.isAdmin ?? false };
 }

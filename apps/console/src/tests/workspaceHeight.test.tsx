@@ -26,14 +26,18 @@ test('开发页撑到窗口底边：外壳、内容区、工作区一路是纵�
   const shell = 'app/layout/AppShell.module.css', workspace = 'features/dev-session/components/native/NativeWorkspace.module.css';
   expect(column(declarations(shell, '.compact'))).toBe(true);
   expect(column(declarations(shell, '.compact > .content'))).toBe(true);
-  expect(declarations(shell, '.compact > .content')).toMatch(/flex:\s*1 0 auto/);
+  expect(declarations(shell, '.compact > .content')).toMatch(/flex:\s*1;/);
+  expect(declarations(shell, '.compact > .content')).toMatch(/min-height:\s*0/);
   expect(column(declarations(workspace, '.workspace'))).toBe(true);
-  expect(declarations(workspace, '.workspace')).toMatch(/flex:\s*1 0 auto/);
+  expect(declarations(workspace, '.workspace')).toMatch(/flex:\s*1;/);
+  expect(declarations(workspace, '.workspace')).toMatch(/min-height:\s*0/);
   expect(declarations(workspace, '.stage')).toMatch(/flex:\s*1 1 0/);
-  // 不再有「视口减外壳」的定高；手机上只留下限：外壳太高时主区不被压扁（390×844 实量只剩 360px），页面照旧滚动。
+  // 一屏工作台由外壳分配剩余高度；窄屏不能再用 70dvh 下限把输入区推到首屏外。
   const code = sourceAt(consoleStyles(), workspace).code;
   expect(code).not.toMatch(/(?:^|[;{\s])height\s*:[^;}]*dvh/);
-  expect(code).toMatch(/\.stage\s*\{\s*min-height:\s*max\(360px,\s*70dvh\)/);
+  expect(declarations(workspace, '.stage')).toMatch(/min-height:\s*0/);
+  expect(code).not.toMatch(/min-height\s*:[^;}]*dvh/);
+  expect(declarations(shell, '.compactShell')).toMatch(/height:\s*100dvh/);
   // 没有会话时，开会话表单与参考面板这一层同样长满。
   expect(declarations('features/dev-session/components/panel/ToolPanel.module.css', '.noSession')).toMatch(/flex:\s*1 0 auto/);
 });

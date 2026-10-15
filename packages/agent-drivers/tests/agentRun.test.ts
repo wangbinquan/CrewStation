@@ -184,6 +184,9 @@ describe('OpenCode 交互式：链式 one-shot ＋ --session 续接', () => {
     expect(host.spawns).toHaveLength(2);
     expect(host.spawns[0]?.cmd).not.toContain('--session');
     expect(host.spawns[1]?.cmd.slice(-4)).toEqual(['--session', 'ses_1', '--', '第二轮']);
+    // Bot 刷新后必须能从同一持久事件流恢复问题，不能只有模型输出。
+    expect(events.filter(e => e.type === 'user-message').map(e => e.text)).toEqual(['写个 hello', '第二轮']);
+    expect(new Set(events.map(e => e.seq)).size).toBe(events.length);
     expect(events.at(-1)?.type).toBe('cancelled');
   });
 
@@ -218,6 +221,8 @@ describe('Claude 交互式：常驻进程 ＋ stream-json 输入帧', () => {
     expect(host.spawns[0]?.cmd).toContain('--input-format');
     expect(host.spawns[0]?.cmd).not.toContain('--resume');
     expect(host.spawns[0]?.stdinWrites).toHaveLength(2);
+    expect(events.filter(e => e.type === 'user-message').map(e => e.text)).toEqual(['写个 hello', '第二轮']);
+    expect(new Set(events.map(e => e.seq)).size).toBe(events.length);
     expect(JSON.parse(host.spawns[0]?.stdinWrites[1] ?? '{}')).toMatchObject({ type: 'user', message: { role: 'user', content: '第二轮' } });
     expect(events.filter((e) => e.type === 'text').map((e) => e.text)).toEqual(['写个 hello', '第二轮']);
     await agent.cancel();

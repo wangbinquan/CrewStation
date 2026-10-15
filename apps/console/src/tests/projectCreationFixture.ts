@@ -55,6 +55,8 @@ export function projectCreationFixture(role: PlatformRole = 'admin') {
       const offset = url.searchParams.has('cursor') ? 20 : 0, limit = Number(url.searchParams.get('limit') ?? 20);
       const items = rows.slice(offset, offset + limit).map((project, index) => path.includes('summaries') ? { ...summaryFixtureItem(index + 1), project, role: role === 'admin' ? 'admin' : 'owner' } : { project, role: role === 'admin' ? 'admin' : 'owner', ownerName: me.name });
       result = { items, ...(rows.length > offset + limit ? { nextCursor: 'page-2' } : {}) };
+    } else if (path === `/v1/workbench/project-summaries/${creationProjectId}`) {
+      result = { ...summaryFixtureItem(), project: { ...state.project, state: state.status }, role: 'owner' };
     } else if (path === `/v1/projects/${creationProjectId}`) {
       if (state.projectFailure) { status = 503; result = { error: 'unavailable', message: '状态暂时无法读取' }; }
       else result = { ...(state.project ?? creationFixtureProject(99, 'APIProxy')), id: creationProjectId, state: state.status, message: state.status === 'failed' ? 'ensureFirstRelease 失败：缺少 GITLAB_TOKEN' : undefined };

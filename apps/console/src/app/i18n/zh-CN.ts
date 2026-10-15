@@ -2,6 +2,8 @@ import type { Messages } from '../../shared/lib/i18n';
 
 /** app 级文案：导航、顶栏、语言、404，以及 shared/ui 里通用组件的缺省文案。页面文案在各 feature 的 i18n/ 中。 */
 export const messages = {
+  "nav.projectManagement": "运行与管理",
+
   "catalog.resources": "资源配置",
   "catalog.search": "搜索",
   "catalog.clear": "清除搜索",

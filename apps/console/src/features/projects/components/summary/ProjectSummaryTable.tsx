@@ -10,6 +10,7 @@ import { DataTable } from '../../../../shared/ui/DataTable';
 import { ProjectStateBadge } from '../ProjectStateBadge';
 import { DeploymentFact, DevelopmentFact } from './SummaryFacts';
 import { summaryIsFresh } from '../../model/projectSummaryState';
+import { firstDeliveryPending } from '../../model/delivery/firstDelivery';
 import styles from './ProjectSummary.module.css';
 import { ButtonLink } from '../../../../shared/ui/navigation/ButtonLink';
 
@@ -27,7 +28,7 @@ export function ProjectSummaryTable({ items, available, onOwner }: { readonly it
       <CatalogCell label={t('projects.summary.owner')}><span className={catalog.owner}>{item.ownerName ? <Button size="small" onClick={() => onOwner?.(item)}>{item.ownerName}</Button> : t('catalog.ownerUnknown')}</span></CatalogCell>
       <CatalogCell label={t('projects.summary.development')}><DevelopmentFact item={item} compact /></CatalogCell><CatalogCell label={t('projects.summary.preview')}><DeploymentFact item={item} name="preview" compact canOpen={available && summaryIsFresh(item)} /></CatalogCell>
       <CatalogCell label={t('projects.summary.prod')}><DeploymentFact item={item} name="prod" compact canOpen={available && summaryIsFresh(item)} /></CatalogCell>
-      <td><div className={catalog.rowActions}>{canDevelop ? <ButtonLink size="small" to="/projects/$projectId/dev-session" params={{ projectId: p.id }}>{t(item.development.status === 'ready' && item.development.value ? 'projects.summary.continue' : 'projects.summary.openDevelopment')}</ButtonLink> : null}
+      <td><div className={catalog.rowActions}>{canDevelop ? <ButtonLink size="small" to={firstDeliveryPending(item) ? '/projects/$projectId/provisioning' : '/projects/$projectId/dev-session'} params={{ projectId: p.id }}>{t(firstDeliveryPending(item) ? 'projects.delivery.continue' : item.development.status === 'ready' && item.development.value ? 'projects.summary.continue' : 'projects.summary.openDevelopment')}</ButtonLink> : null}
         {available && (item.role === 'admin' || item.role === 'owner') && (p.state === 'failed' || p.state === 'provisioning') ? <ButtonLink size="small" to={item.role === 'admin' ? '/admin/projects/$projectId/provisioning' : '/projects/$projectId/provisioning'} params={{ projectId: p.id }}>{t('projects.provision.title')}</ButtonLink> : null}<Button size="small" onClick={() => setSelected(p.id)}>{t('catalog.details')}</Button></div></td>
     </tr>;
   })}</DataTable>{detail ? <ProjectSummaryDetails item={detail} onClose={() => setSelected(undefined)} /> : null}</>;

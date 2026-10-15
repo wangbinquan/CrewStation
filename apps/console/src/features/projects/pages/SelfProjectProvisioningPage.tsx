@@ -1,7 +1,5 @@
-import { useParams } from '@tanstack/react-router';
-import { ProjectProvisioningPage } from './ProjectProvisioningPage';
+import { FirstDeliveryPage } from './FirstDeliveryPage';
 
 export function SelfProjectProvisioningPage() {
-  const { projectId = '' } = useParams({ strict: false });
-  return <ProjectProvisioningPage key={projectId} projectId={projectId} />;
+  return <FirstDeliveryPage />;
 }

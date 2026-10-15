@@ -1,3 +1,4 @@
+import type { CommitWorkspaceDto, CommitWorkspaceRequest } from '@crewstation/contracts';
 import type { Actor, AgentInstanceDto, BranchDto, DevSessionDto, OpenDevSessionV2Request, ProjectId, PublishDevSessionRequest, ReleaseDto, SendAgentMessageRequest, StartDevAgentV2Request, TaskId, WorkspaceStatusDto } from '@crewstation/contracts';
 import type { ComparisonDetailQuery, ComparisonDetails, ComparisonTarget, VersionComparisonDto } from '@crewstation/contracts';
 import type { NativeTerminalDto, NativeTerminalList, NativeTerminalSnapshotDto, StartNativeTerminalV2Request } from '@crewstation/contracts';
@@ -39,6 +40,7 @@ export interface DevSessionModuleApi extends NativeTerminalApi {
   openSession(actor: Actor, projectId: ProjectId, input: OpenDevSessionV2Request): Promise<DevSessionDto>;
   getSession(actor: Actor, projectId: ProjectId): Promise<DevSessionDto | undefined>;
   listBranches(actor: Actor, projectId: ProjectId): Promise<BranchDto[]>;
+  commitWorkspace(actor: Actor, projectId: ProjectId, input: CommitWorkspaceRequest): Promise<CommitWorkspaceDto>;
   workspaceStatus(actor: Actor, projectId: ProjectId): Promise<WorkspaceStatusDto>;
   versionComparison(actor: Actor, projectId: ProjectId, target?: ComparisonTarget): Promise<VersionComparisonDto>;
   versionComparisonDetails(actor: Actor, projectId: ProjectId, comparisonId: string, query: ComparisonDetailQuery): Promise<ComparisonDetails>;

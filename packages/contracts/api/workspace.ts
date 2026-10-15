@@ -3,6 +3,12 @@ import { TaskIdSchema } from '../ids';
 import { WorkspaceReadySchema, WorkspaceUnavailableSchema } from '../taskrunner/workspace';
 import { ReleaseIdSchema } from '../ids';
 import { RunnerComparisonSchema } from '../taskrunner/workspaceComparison';
+import { CommitWorkspaceInputSchema, CommitWorkspaceResultSchema } from '../taskrunner/workspaceCommit';
+
+export const CommitWorkspaceRequestSchema = CommitWorkspaceInputSchema.extend({ expectedTaskId: TaskIdSchema }).strict();
+export const CommitWorkspaceDtoSchema = CommitWorkspaceResultSchema.extend({ taskId: TaskIdSchema }).strict();
+export type CommitWorkspaceRequest = z.infer<typeof CommitWorkspaceRequestSchema>;
+export type CommitWorkspaceDto = z.infer<typeof CommitWorkspaceDtoSchema>;
 
 /** 只读预检；无会话为 404，断线／Git 失败必须保留 unavailable。 */
 export const WorkspaceStatusDtoSchema = z.discriminatedUnion('status', [

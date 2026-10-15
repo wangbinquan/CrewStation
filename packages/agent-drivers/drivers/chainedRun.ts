@@ -21,6 +21,7 @@ export class ChainedAgentRun extends AgentRunBase {
 
   async send(text: string): Promise<void> {
     this.assertCanSend();
+    this.recordInput(text);
     this.turn = this.turn.then(() => this.runTurn(text)).catch((error) => { this.events.fail(error); throw error; });
     // Reply after admission; model completion and failure still travel through events.
     // Observe a later rejection without changing the original turn or cancellation barrier.
@@ -42,6 +43,7 @@ export class ChainedAgentRun extends AgentRunBase {
       this.push(this.emit('status', { status: 'waiting' }));
       return;
     }
+    this.recordInput(prompt);
     await this.runTurn(prompt);
   }
 

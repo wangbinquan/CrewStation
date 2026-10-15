@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/react-router';
+import { Link, useLocation } from '@tanstack/react-router';
 import type { ReactElement, ReactNode } from 'react';
 import { useT } from '../../shared/lib/useT';
 import { useProjectIdentity } from '../../shared/project/useProjectIdentity';
@@ -29,6 +29,7 @@ const PROJECT_PAGES: readonly ProjectPageItem[] = [
 export function ProjectNavSection({ projectId, space = 'workbench', backTo }: { readonly projectId: string; readonly space?: ProjectSpace; readonly backTo?: ReactNode }): ReactElement {
   const t = useT();
   const identity = useProjectIdentity(projectId);
+  const pathname = useLocation({ select: location => location.pathname });
   const pages = identity.previewOnly ? [{ page: 'overview' as const, labelKey: 'nav.preview', exact: false }] : PROJECT_PAGES;
   // 项目不存在或当前身份不是成员：项目入口都会落到同一个说明页，只保留返回与对象 ID。
   const missing = !identity.data && [403, 404].includes(identity.error?.status ?? 0);
@@ -39,12 +40,14 @@ export function ProjectNavSection({ projectId, space = 'workbench', backTo }: { 
         <span className={styles.projectName} title={identity.data?.name}>{identity.data?.name ?? t('nav.currentProject')}</span>
         {identity.data?.slug ? <code className={styles.projectId} title={identity.data.slug}>{identity.data.slug}{identity.data.kind ? ` · ${t(`projects.kind.${identity.data.kind}`)}` : ''}</code> : missing ? <code className={styles.projectId} title={projectId}>{projectId}</code> : null}
       </div>
-      {missing ? null : <ul className={styles.list} aria-label={t('nav.projectPages')}>
-        {pages.map((item) => (
+      {missing ? null :
+      <ul className={styles.list} aria-label={t('nav.projectPages')}>
+        {pages.slice(0, 3).map((item) => (
           <li key={item.page}>
             <Link
               to={PROJECT_PATHS[space][item.page]}
               params={{ projectId }}
+              search={space === 'workbench' && item.page === 'development' ? { view: 'cli' } : undefined}
               className={styles.link}
               activeProps={{ className: styles.linkActive }}
               activeOptions={{ exact: item.exact ?? false, includeSearch: false }}
@@ -53,6 +56,22 @@ export function ProjectNavSection({ projectId, space = 'workbench', backTo }: { 
             </Link>
           </li>
         ))}
+        {pages.length > 3 ? (
+          <li className={styles.navGroup}>
+            <details open={pages.slice(3).some(item => pathname.startsWith(PROJECT_PATHS[space][item.page].replace('$projectId', encodeURIComponent(projectId))))}>
+              <summary className={styles.groupToggle}>{t('nav.projectManagement')}</summary>
+              <ul className={styles.nestedList}>
+                {pages.slice(3).map(item => (
+                  <li key={item.page}>
+                    <Link to={PROJECT_PATHS[space][item.page]} params={{ projectId }} className={styles.link} activeProps={{ className: styles.linkActive }} activeOptions={{ includeSearch: false }}>
+                      {t(item.labelKey)}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          </li>
+        ) : null}
       </ul>}
     </div>
   );

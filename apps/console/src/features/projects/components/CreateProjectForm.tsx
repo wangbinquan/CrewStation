@@ -24,7 +24,7 @@ export function CreateProjectForm({ scope, open, self = false, returnFocusTo, on
   const fields = { draft, errors, catalog, scope, self, defaultTasks: state.settings?.maxConcurrentTasks, disabled: create.isPending || state.unknown || state.reconciling, setField: state.setField };
   return <>
     <UnsavedChangesGuard dirty={state.dirty} scope={t(`projects.wizard.title.${scope}`)}
-      allowNavigate={(current, next) => current.pathname === next.pathname} isNavigationBusy={() => create.isPending || state.reconciling} onDiscard={state.clear} />
+      allowNavigate={(current, next) => state.hasAccepted() || current.pathname === next.pathname} isNavigationBusy={() => create.isPending || state.reconciling} onDiscard={state.clear} />
     {open ? <FormDialog title={t(`projects.wizard.title.${scope}`)} size="large" returnFocusTo={returnFocusTo} onClose={onClose} onSubmit={() => void state.submit()} onClear={state.unknown ? undefined : state.clear}
       submitLabel={t('projects.create.submit')} busyLabel={t('projects.create.submitting')} busy={create.isPending || state.reconciling} submitDisabled={!state.available || state.unknown} dirty={state.dirty}
       error={create.error ? t('projects.create.error', { message: errorMessage(create.error) }) : state.resultError}>

@@ -45,6 +45,6 @@ export function createSessionClient(baseUrl: string, fetchImpl: typeof fetch = f
 function commandBudget(command: RunnerCommand): number {
   if (command.type === 'invokeApi') return API_INVOCATION_TIMEOUT_MS;
   if (command.type === 'fetchComparisonHistory') return COMPARISON_HISTORY_TIMEOUT_MS;
-  if (command.type === 'compareWorkspace' || command.type === 'workspaceComparisonDetails') return COMPARISON_COMMAND_TIMEOUT_MS;
+  if (command.type === 'commitWorkspace' || command.type === 'compareWorkspace' || command.type === 'workspaceComparisonDetails') return COMPARISON_COMMAND_TIMEOUT_MS;
   return WORKSPACE_COMMAND_TIMEOUT_MS;
 }

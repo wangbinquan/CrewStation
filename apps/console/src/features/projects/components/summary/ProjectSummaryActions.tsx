@@ -3,11 +3,13 @@ import { PROJECT_PATHS, RELEASE_PATHS } from '../../../../shared/project/project
 import type { ProjectSpace } from '../../../../shared/project/projectPaths';
 import { useT } from '../../../../shared/lib/useT';
 import { projectNextAction } from '../../model/projectSummaryState';
+import { firstDeliveryPending } from '../../model/delivery/firstDelivery';
 import styles from './ProjectSummary.module.css';
 import { ButtonLink } from '../../../../shared/ui/navigation/ButtonLink';
 
 export function ProjectSummaryActions({ item, space, available }: { readonly item: ProjectSummaryDetail; readonly space: ProjectSpace; readonly available: boolean }) {
   const t = useT(), action = available ? projectNextAction(item) : undefined, params = { projectId: item.project.id };
+  if (action?.type === 'develop' && space === 'workbench' && firstDeliveryPending(item)) return <ButtonLink data-primary-project-action variant="primary" to="/projects/$projectId/provisioning" params={params}>{t('projects.delivery.continue')}</ButtonLink>;
   return <div className={styles.actions}>
     {action?.type === 'provision' ? <ButtonLink data-primary-project-action variant="primary" to={item.role === 'admin' ? '/admin/projects/$projectId/provisioning' : '/projects/$projectId/provisioning'} params={params}>{t(action.label)}</ButtonLink> : null}
     {action?.type === 'release' ? <><ButtonLink data-primary-project-action variant="primary" to={RELEASE_PATHS[space].version} params={{ ...params, releaseId: action.release.id }}>{t(action.label, { tag: action.release.tag })}</ButtonLink>

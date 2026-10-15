@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from '@tanstack/react-router';
 import type { NavigationLocation } from '../../../../shared/navigation/UnsavedChangesGuard';
-import { parseDevelopmentSearch } from '../../../../shared/project/developmentSearch';
+import { isGuidedDevelopment, parseDevelopmentSearch } from '../../../../shared/project/developmentSearch';
 import type { DevelopmentSearch, DevelopmentView } from '../../../../shared/project/developmentSearch';
 import { PROJECT_PATHS, projectPageFromPath } from '../../../../shared/project/projectPaths';
 import type { ProjectSpace } from '../../../../shared/project/projectPaths';
@@ -14,16 +14,17 @@ import type { FileEditorHandle } from '../useFileEditor';
  * 本页自己的地址。TanStack Router 在跳转一开始就发布新地址，新页面提交前开发页仍挂着：离开途中的地址（如 /release，没有 view）
  * 会被当成「无参数进入」，把跳转 replace 回开发页——2026-09-23 实机左栏点什么都被拽回来。离开途中沿用本页最后一次的地址。
  */
-function usePageLocation(projectId: string, space: ProjectSpace) {
-  const location = useLocation(), own = projectPageFromPath(location.pathname, projectId, space) === 'development';
+function usePageLocation(projectId: string, space: ProjectSpace, active: boolean) {
+  // 地址在路由提交前先变化，此时父页的 active 仍可能为 true；直接识别 Bot 地址，避免布局恢复把切换拉回 CLI。
+  const location = useLocation(), own = active && !isGuidedDevelopment(parseDevelopmentSearch(location.search)) && projectPageFromPath(location.pathname, projectId, space) === 'development';
   const [last, setLast] = useState(location);
   if (own && last !== location) setLast(location);
   return { location: own ? location : last, leaving: !own };
 }
 
 /** 显式地址优先；只读指定文件，不触发写入、CLI 启停或取得终端控制。 */
-export function useDevelopmentLocation(taskId: string, editor: FileEditorHandle, connected: boolean) {
-  const { projectId, space } = useProjectScope(), { location, leaving } = usePageLocation(projectId, space);
+export function useDevelopmentLocation(taskId: string, editor: FileEditorHandle, connected: boolean, active = true) {
+  const { projectId, space } = useProjectScope(), { location, leaving } = usePageLocation(projectId, space, active);
   const search = parseDevelopmentSearch(location.search), navigate = useNavigate();
   const key = `${location.href}:${location.state.__TSR_key}`, handled = useRef<string | undefined>(undefined);
   const approved = useRef<{ file: string; draft: string; source: string | undefined; revision: number | undefined } | undefined>(undefined);

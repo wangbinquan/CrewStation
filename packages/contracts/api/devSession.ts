@@ -95,6 +95,8 @@ export const BranchDtoSchema = z.object({
 export const AgentInstanceStateSchema = z.enum(['starting', 'preparing', 'running', 'awaiting-input', 'completed', 'failed', 'cancelled']);
 
 export const AgentInstanceDtoSchema = z.object({
+  /** 受理时已保存的首条需求：执行环境准备或启动失败时，Bot 刷新后仍能恢复这条输入。 */
+  initialPrompt: z.string().optional(),
   image: z.string().optional(),
   runtimeImage: RuntimeImageExecutionSnapshotSchema.optional(),
   agentId: z.string(),

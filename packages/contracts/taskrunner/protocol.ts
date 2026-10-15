@@ -8,6 +8,8 @@ import { AgentEventSchema } from './agentEvents';
 import { NativeActivityEventSchema } from './nativeActivity';
 import { RunnerApiInvocationSchema, ApiInvocationResultSchema } from './apiInvocation';
 import { RunnerWorkspaceStatusSchema } from './workspace';
+import { CommitWorkspaceInputSchema, CommitWorkspaceResultSchema } from './workspaceCommit';
+import { UserIdSchema } from '../ids';
 import { ComparisonDetailQuerySchema, ComparisonDetailsSchema, GitObjectIdSchema, RunnerComparisonSchema } from './workspaceComparison';
 import { NativeTerminalRecordSchema, NativeTerminalRosterSchema, TerminalControlSchema, TerminalControlStateSchema, TerminalHolderSchema, TerminalSizeSchema, TerminalSnapshotSchema } from './nativeTerminal';
 import { BeforeStartErrorSchema, BeforeStartExecutionSchema, BeforeStartMaterialSchema, RunnerInterpreterSchema } from './beforeStart';
@@ -48,6 +50,7 @@ export const RunnerHelloSchema = z.object({
      * 开发会话是长活对象，升版会让集群里正跑的旧镜像容器握手即被拒，等于强制所有人释放会话。
      */
     previewControl: z.literal(1).optional(),
+    workspaceCommit: z.literal(1).optional(),
     /** RFC-027: reliable business execution, materials and replay; omitted by older runners. */
     businessExecutionV3: z.literal(1).optional(),
     /** RFC-028：逐容器初始化、工具检查、持久去重和命令门控。 */
@@ -177,6 +180,7 @@ export const RunnerCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...cmd('readFile'), path: z.string().min(1) }),
   z.object({ ...cmd('writeFile'), path: z.string().min(1), content: z.string(), expectedVersion: z.string().optional() }),
   z.object({ ...cmd('workspaceStatus') }),
+  CommitWorkspaceInputSchema.extend({ ...cmd('commitWorkspace'), actorUserId: UserIdSchema }),
   z.object({ ...cmd('compareWorkspace'), targetSha: GitObjectIdSchema.optional() }),
   ComparisonDetailQuerySchema.extend({ ...cmd('workspaceComparisonDetails'), comparisonId: z.string().min(1) }),
   z.object({ ...cmd('fetchComparisonHistory'), url: z.string().min(1), targetSha: GitObjectIdSchema.optional() }),
@@ -217,6 +221,7 @@ export const RunnerResultPayloads = {
   attachTerminal: TerminalSnapshotSchema,
   claimTerminalControl: TerminalControlSchema,
   workspaceStatus: RunnerWorkspaceStatusSchema,
+  commitWorkspace: CommitWorkspaceResultSchema,
   compareWorkspace: RunnerComparisonSchema,
   workspaceComparisonDetails: ComparisonDetailsSchema,
   listFiles: z.object({ path: z.string(), entries: z.array(FileEntrySchema) }),

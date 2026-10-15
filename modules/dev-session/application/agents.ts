@@ -46,7 +46,7 @@ export function agentUseCases(deps: DevSessionUseCaseDeps, starts: AgentStartRep
       const execution = await executions.admit(start);
       void executions.dispatch(start.agentId);
       await environments.touch(taskId);
-      return { image: start.execution.image, ...(start.execution.runtimeImage ? { runtimeImage: start.execution.runtimeImage } : {}), agentId: start.agentId, taskId: env.id, compute: start.compute, computeName: start.computeName, permission: start.permission, state: 'preparing', profileRevision: start.profile.revision,
+      return { initialPrompt: start.request.prompt, image: start.execution.image, ...(start.execution.runtimeImage ? { runtimeImage: start.execution.runtimeImage } : {}), agentId: start.agentId, taskId: env.id, compute: start.compute, computeName: start.computeName, permission: start.permission, state: 'preparing', profileRevision: start.profile.revision,
         execution: { taskId: execution.id, state: execution.native?.state ?? 'queued', ...(execution.message ? { message: execution.message } : {}) }, startedAt: start.createdAt };
     },
     sendMessage: async (actor: Actor, taskId: TaskId, agentId: string, input: SendAgentMessageRequest): Promise<void> => {
@@ -100,7 +100,7 @@ async function withExecution(deps: DevSessionUseCaseDeps, start: AgentStart, obs
   const state: AgentInstanceState = start.state === 'ended' && !['completed', 'failed', 'cancelled'].includes(base.state) ? (start.cancelled ? 'cancelled' : start.failure ? 'failed' : 'completed') : base.state;
   const executionState = env?.native?.state ?? (start.finalized || start.state === 'ended' ? 'finished' : 'queued');
   const message = start.failure ?? (['queued', 'starting'].includes(executionState) ? env?.message : undefined);
-  return { ...base, image: start.execution.image, computeName: start.computeName, compute: base.compute || start.compute, profileRevision: base.profileRevision ?? start.profile.revision, state,
+  return { ...base, initialPrompt: start.request.prompt, image: start.execution.image, computeName: start.computeName, compute: base.compute || start.compute, profileRevision: base.profileRevision ?? start.profile.revision, state,
     ...(start.execution.runtimeImage ? { runtimeImage: start.execution.runtimeImage } : {}),
     ...(state !== base.state && start.endedAt ? { endedAt: start.endedAt } : {}), execution: { taskId: start.execution.taskId, state: executionState, ...(message ? { message } : {}) } };
 }

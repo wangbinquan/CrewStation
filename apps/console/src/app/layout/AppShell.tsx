@@ -43,7 +43,7 @@ export function AppShell({ nav, children }: AppShellProps): ReactElement {
   const main = useRef<HTMLElement>(null);
   useFocusMainOnPageChange(main);
   return (
-    <div className={[styles.shell, !nav && styles.noNav].filter(Boolean).join(' ')}>
+    <div className={[styles.shell, !nav && styles.noNav, compact && styles.compactShell].filter(Boolean).join(' ')}>
       {nav}
       <TopBar />
       <main ref={main} tabIndex={-1} data-scroll-restoration-id={MAIN_SCROLL_ID} className={[styles.main, compact && styles.compact].filter(Boolean).join(' ')}>

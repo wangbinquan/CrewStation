@@ -16,7 +16,7 @@ export function locationView(search: DevelopmentSearch) {
  */
 export function locationTool(search: DevelopmentSearch): { name: WorkspaceToolName; mode: 'side' | 'full' } | null | undefined {
   const view = locationView(search);
-  if (view === undefined || view === 'conversation') return undefined;
+  if (view === undefined || view === 'conversation' || view === 'guided') return undefined;
   if (view === 'cli') return null;
   if (view === 'split') return { name: 'preview', mode: 'side' };
   const name: WorkspaceToolName = view === 'diff' ? 'changes' : view;

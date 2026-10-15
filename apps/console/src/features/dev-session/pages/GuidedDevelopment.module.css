@@ -1,0 +1,15 @@
+.page { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; gap: 6px; }
+.context { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 30px; flex-shrink: 0; }
+.context > div { display: flex; align-items: center; gap: 12px; font-size: 12px; }
+.context code { color: var(--cs-color-text-muted); max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+.workspace { display: grid; grid-template-columns: minmax(340px, 38%) minmax(0, 1fr); flex: 1; min-height: 0; min-width: 0; border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-md); overflow: hidden; }
+.conversation, .preview { min-width: 0; min-height: 0; }
+.conversation { border-right: 1px solid var(--cs-color-border); }
+.preview { background: var(--cs-color-surface-muted); }
+.mobileSwitch { display: none; }
+@media (max-width: 1100px) {
+  .workspace { grid-template-columns: minmax(0, 1fr); }
+  .mobileSwitch { display: block; }
+  .workspace[data-pane="conversation"] .preview, .workspace[data-pane="preview"] .conversation { display: none; }
+  .conversation { border-right: 0; }
+}

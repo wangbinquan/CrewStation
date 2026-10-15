@@ -8,6 +8,18 @@ import { settingsMessages } from './settings.zh-CN';
 import { rateLimitMessages } from './rateLimits.zh-CN';
 
 export const messages = {
+  "admin.developer.title": "开发者权限申请",
+  "admin.developer.status": "申请状态",
+  "admin.developer.applicant": "申请人",
+  "admin.developer.empty": "没有符合条件的开发权限申请",
+  "admin.developer.review": "审批开发者权限",
+  "admin.developer.submit": "确认审批结果",
+  "admin.developer.decision": "审批结果",
+  "admin.developer.approve": "批准为开发者",
+  "admin.developer.reject": "拒绝申请",
+  "admin.developer.effect": "批准只授予开发者角色，允许创建项目；不会授予管理员权限。",
+  "admin.developer.note": "审批意见",
+
   ...tokenPricingMessages,
   ...projectComputeMessages,
   ...settingsMessages,

@@ -9,7 +9,7 @@ import { previewUrl } from '../../model/previewSnapshot';
 import styles from './DevelopmentPreview.module.css';
 import { ExternalButtonLink } from '../../../../shared/ui/navigation/ButtonLink';
 
-export function DevelopmentPreview({ preview, previewHost, connected, logs }: { readonly preview: PreviewHandle; readonly previewHost: string; readonly connected: boolean; readonly logs?: ReactNode }): ReactElement {
+export function DevelopmentPreview({ preview, previewHost, connected, logs, readOnly = false }: { readonly preview: PreviewHandle; readonly previewHost: string; readonly connected: boolean; readonly logs?: ReactNode; readonly readOnly?: boolean }): ReactElement {
   const t = useT();
   const [generation, setGeneration] = useState(0);
   const url = connected && preview.confirmed ? previewUrl(previewHost, preview.status.state) : undefined;
@@ -22,10 +22,10 @@ export function DevelopmentPreview({ preview, previewHost, connected, logs }: { 
     <header className={styles.toolbar}>
       <span title={t('devSession.native.previewHint')}><Badge tone={stateTone(known ? preview.status.state : undefined)}>{t(known ? `devSession.previewState.${preview.status.state}` : 'devSession.native.lifecycle.unknown')}</Badge></span>
       <Button size="small" disabled={blocked} onClick={() => { setGeneration((value) => value + 1); preview.refresh(); }}>{t('devSession.preview.reload')}</Button>
-      <Button size="small" disabled={blocked} onClick={() => preview.run('restart')}>{t('devSession.preview.restart')}</Button>
+      <Button size="small" disabled={blocked || readOnly} onClick={() => preview.run('restart')}>{t('devSession.preview.restart')}</Button>
       {running
-        ? <Button size="small" disabled={blocked} onClick={() => preview.run('stop')}>{t('devSession.preview.stop')}</Button>
-        : <Button size="small" disabled={blocked || preview.status.state === 'disabled'} onClick={() => preview.run('start')}>{t('devSession.preview.start')}</Button>}
+        ? <Button size="small" disabled={blocked || readOnly} onClick={() => preview.run('stop')}>{t('devSession.preview.stop')}</Button>
+        : <Button size="small" disabled={blocked || readOnly || preview.status.state === 'disabled'} onClick={() => preview.run('start')}>{t('devSession.preview.start')}</Button>}
       {logs}
       {url ? <ExternalButtonLink size="small" href={url}>{t('devSession.native.openPreview')}</ExternalButtonLink> : null}
     </header>

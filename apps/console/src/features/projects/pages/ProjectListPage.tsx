@@ -14,6 +14,7 @@ import { parseProjectListSearch } from '../model/projectListSearch';
 import { useProjectSummaries } from '../model/useProjectSummaries';
 import { Button } from '../../../shared/ui/Button';
 import { SelfCreateProject } from '../components/creation/SelfCreateProject';
+import { DeveloperAccessRequest } from '../components/creation/DeveloperAccessRequest';
 
 /**
  * 首页：管理员看全部项目并可代建，成员只看自己参与的项目。
@@ -27,23 +28,25 @@ export function ProjectListPage(): ReactElement {
   const error = me.error ?? query.error, pending = !error && (me.isPending || query.isPending);
   const items = [401, 403, 404].includes(error?.status ?? 0) ? [] : query.data?.items ?? [];
   const settled = !pending && !error, filtered = !!(search.q || search.state || search.ownerUserId || search.cursor);
+  const needsAccess = me.data?.platformRole === 'user';
 
   return (
     <>
       <PageHeader title={t('projects.list.title')}
-        actions={<Button ref={trigger} variant="primary" onClick={() => setCreating(true)}>{t('projects.self.title')}</Button>} />
+        actions={<Button ref={trigger} variant="primary" disabled={!me.data || !!me.error} onClick={() => setCreating(true)}>{t(needsAccess ? 'projects.developer.title' : 'projects.self.title')}</Button>} />
+      {needsAccess && me.data ? <DeveloperAccessRequest userId={me.data.id} open={creating || !!search.create} onClose={closeCreation} /> : null}
       <Card compact>
         <ProjectListFilters key={JSON.stringify(search)} search={search} items={items} userId={me.data?.id}
           apply={(next) => { void navigate({ to: '/projects', search: next }); }} />
         <QueryStatus isPending={pending} error={error} loadingKey="projects.list.loading" errorKey="projects.list.error" />
         {error && items.length > 0 ? <ActionNote tone="neutral">{t('projects.summary.lastRead')}</ActionNote> : null}
         {settled && items.length === 0 ? <EmptyState title={t(filtered ? 'projects.summary.noMatches' : 'projects.list.emptyTitle')} description={t(filtered ? 'projects.summary.noMatchesHint' : 'projects.list.emptyDescription')}
-          action={filtered ? undefined : <Button onClick={() => { trigger.current?.focus(); setCreating(true); }}>{t('projects.self.title')}</Button>} /> : null}
+          action={filtered ? undefined : <Button onClick={() => { trigger.current?.focus(); setCreating(true); }}>{t(needsAccess ? 'projects.developer.title' : 'projects.self.title')}</Button>} /> : null}
         {items.length > 0 ? <ProjectSummaryTable items={items} available={!error && !pending} onOwner={(item) => void navigate({ to: '/projects', search: { ...search, cursor: undefined, ownerUserId: item.project.ownerUserId, ownerName: item.ownerName } })} /> : null}
         <CatalogPagination scope="projects" userId={me.data?.id} filter={[search.q, search.state, search.ownerUserId, 20]} cursor={search.cursor} next={query.data?.nextCursor} count={settled ? items.length : undefined} disabled={!settled}
           onChange={(cursor) => void navigate({ to: '/projects', search: { ...search, cursor } })} />
       </Card>
-      <SelfCreateProject open={creating || !!search.create} onClose={closeCreation} returnFocusTo={trigger} />
+      {!needsAccess ? <SelfCreateProject open={creating || !!search.create} onClose={closeCreation} returnFocusTo={trigger} /> : null}
     </>
   );
 }

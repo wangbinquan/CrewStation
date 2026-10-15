@@ -1,4 +1,4 @@
-export type DevelopmentView = 'cli' | 'preview' | 'split' | 'code' | 'diff' | 'changes' | 'conversation' | 'data' | 'reference' | 'session';
+export type DevelopmentView = 'guided' | 'cli' | 'preview' | 'split' | 'code' | 'diff' | 'changes' | 'conversation' | 'data' | 'reference' | 'session';
 /**
  * 「可使用资源」面板的四类（RFC-020 D2；2026-09-23 作者裁定按代码怎么用它分类）：调用接口、接收事件、
  * 运行环境（地址里仍叫 `guide`，旧链接不失效）、Agent 工具。
@@ -17,7 +17,12 @@ export interface DevelopmentSearch {
   guide?: GuideSection;
 }
 
-const VIEWS: readonly DevelopmentView[] = ['cli', 'preview', 'split', 'code', 'diff', 'changes', 'conversation', 'data', 'reference', 'session'];
+/** 新手入口明确进入引导；保留既有裸地址、文件、版本及 Agent 书签的高级工作区语义。 */
+export function isGuidedDevelopment(search: DevelopmentSearch): boolean {
+  return search.view === 'guided';
+}
+
+const VIEWS: readonly DevelopmentView[] = ['guided', 'cli', 'preview', 'split', 'code', 'diff', 'changes', 'conversation', 'data', 'reference', 'session'];
 const text = (value: unknown, max: number) => typeof value === 'string' && value.length > 0 && value.length <= max && !/[\u0000-\u001f\u007f]/u.test(value) ? value : undefined;
 
 /** 两空间共用活动定位协议；历史对话仍由各自路由接续。 */

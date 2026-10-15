@@ -10,7 +10,7 @@ let page: Awaited<ReturnType<typeof renderApp>> | undefined;
 afterEach(() => { page?.unmount(); page = undefined; globalThis.fetch = originalFetch; });
 const visible = <T extends HTMLElement>(selector: string) => [...document.querySelectorAll<T>(selector)].filter((n) => !n.closest('[hidden]'));
 async function click(label: string) {
-  const target = visible<HTMLButtonElement>('button').find((b) => b.textContent === label)!;
+  const target = visible<HTMLButtonElement>('button').find((b) => b.textContent === label || b.getAttribute('aria-label') === label)!;
   expect(Boolean(target)).toBe(true); await act(async () => target.click()); await page!.settle();
 }
 async function type(node: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string) {
@@ -25,7 +25,7 @@ test('审批只读取 20 项分页，游标随翻页进 URL，历史返回保留
   expect(apiCalls()).toHaveLength(1); expect(apiCalls()[0]!.url.searchParams.get('limit')).toBe('20');
   expect(f.calls.some((c) => ['/v1/projects', '/v1/api-requests'].includes(c.url.pathname))).toBe(false);
   expect(page.text()).toContain('申请项目 0'); expect(page.text()).toContain('tenant-0'); expect(page.text()).toContain('本页 20 项');
-  await click('下一页'); expect(page.search().apiCursor).toBe('api:20'); expect(page.text()).toContain(f.apiRequests[20]!.operationId); expect(page.text()).not.toContain('账单申请 0');
+  await click('API 申请：下一页'); expect(page.search().apiCursor).toBe('api:20'); expect(page.text()).toContain(f.apiRequests[20]!.operationId); expect(page.text()).not.toContain('账单申请 0');
   await page.back(); expect(page.search().apiCursor).toBeUndefined(); expect(f.writes()).toHaveLength(0);
 });
 
@@ -48,7 +48,7 @@ test('/admin/egress 旧地址重定向到管理总览', async () => {
 test('改变筛选先确认，取消保留输入，确认后按新范围读取', async () => {
   const f = adminRequestPagesFixture(); page = await renderApp('/admin/requests');
   await type(visible<HTMLTextAreaElement>('textarea')[0]!, 'API 草稿');
-  await click('下一页'); expect(page.search().apiCursor).toBeUndefined(); expect(page.text()).toContain('审批意见有未保存的输入');
+  await click('API 申请：下一页'); expect(page.search().apiCursor).toBeUndefined(); expect(page.text()).toContain('审批意见有未保存的输入');
   await page.click('继续编辑'); expect(visible<HTMLTextAreaElement>('textarea')[0]!.value).toBe('API 草稿');
   await type(visible<HTMLSelectElement>('select[aria-label="申请状态"]')[0]!, 'approved'); expect(page.search().state ?? 'pending').toBe('pending');
   await page.click('放弃输入并离开'); expect(page.search().state).toBe('approved'); expect(page.search().apiCursor).toBeUndefined();

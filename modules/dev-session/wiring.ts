@@ -28,6 +28,7 @@ import { publishFromSessionUseCase } from './application/publishFromSession';
 import { previewControlUseCases } from './application/previewControl';
 import { rebuildSessionUseCases, sessionLifecycleUseCases } from './application/sessionLifecycle';
 import { workspaceStatusUseCase } from './application/workspaceStatus';
+import { commitWorkspaceUseCase } from './application/workspace/commitWorkspace';
 import { versionComparisonUseCases } from './application/versionComparison';
 import { apiInvocationUseCase } from './application/apiInvocation';
 import { devSessionRoutes } from './http/devSessionRoutes';
@@ -130,7 +131,7 @@ function developmentApi(deps: DevSessionModuleDeps, useCaseDeps: DevSessionUseCa
     dispatchPendingNativeExecution: async (executionTaskId) => { if (!(await agentExecutions.dispatchExecution(executionTaskId))) await native.dispatchPendingNativeExecution(executionTaskId); },
     reconcileNativeExecutions: async () => { await Promise.all([native.reconcileNativeExecutions(), agentExecutions.sweep()]); },
     ...rebuildSessionUseCases(useCaseDeps), ...previewControlUseCases(useCaseDeps),
-    ...versionComparisonUseCases(useCaseDeps), workspaceStatus: workspaceStatusUseCase(useCaseDeps), publish: publishFromSessionUseCase(useCaseDeps), sendIdleReminders: remind,
+    ...versionComparisonUseCases(useCaseDeps), workspaceStatus: workspaceStatusUseCase(useCaseDeps), commitWorkspace: commitWorkspaceUseCase(useCaseDeps), publish: publishFromSessionUseCase(useCaseDeps), sendIdleReminders: remind,
     async listNativeTerminals(actor, taskId) {
       const pageQuery = activityPage(actor, taskId);
       const phasesQuery = deps.executions?.phases(taskId).catch(() => new Map()) ?? Promise.resolve(new Map());

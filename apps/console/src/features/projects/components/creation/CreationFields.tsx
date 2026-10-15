@@ -47,12 +47,12 @@ export function CreationResources(props: CreationFieldsProps): ReactElement {
     <section className={[styles.section, styles.templates].join(' ')}>
       <div className={styles.heading}><h3>{t('projects.creation.code')}</h3><span>{t('projects.creation.codeHint')}</span></div>
       <div className={styles.templateGrid}>
-        <FormField label={t('projects.create.template')} hint={t(options.length ? 'projects.wizard.templateHint' : 'projects.wizard.noTemplates')} hintId="creation-template-hint" error={errors.template} errorId="creation-template-error">
+        <details open={!props.self || !!errors.template}><summary>{t('projects.creation.templateOptions')}</summary><FormField label={t('projects.create.template')} hint={t(options.length ? 'projects.wizard.templateHint' : 'projects.wizard.noTemplates')} hintId="creation-template-hint" error={errors.template} errorId="creation-template-error">
           <select {...attributes('template', errors.template)} value={draft.template} disabled={disabled} onChange={(event) => setField('template', event.target.value)}>
             <option value="">{t('projects.wizard.chooseTemplate')}</option>
             {options.map((item) => <option value={item.id} key={item.id}>{templateDescription(item, t).name}</option>)}
           </select>
-        </FormField>
+        </FormField></details>
         {description ? <div className={styles.templateDetail}><strong>{description.name}</strong><p>{description.description}</p>{description.contents ? <small>{description.contents}</small> : null}</div> : null}
       </div>
       {template?.requiredConfig.length ? <ActionNote tone="neutral">{t('projects.wizard.requiredConfig', { keys: template.requiredConfig.map((item) => `${item.name}（${t(`projects.wizard.config.${item.from}`)}）`).join('、') })}</ActionNote> : null}

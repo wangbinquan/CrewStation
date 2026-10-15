@@ -1,5 +1,6 @@
 import './domSetup';
 import { afterEach, describe, expect, test } from 'bun:test';
+import { act } from 'react';
 import { rememberWorkbenchPath } from '../app/layout/spaceMemory';
 import { renderApp } from './renderApp';
 
@@ -41,8 +42,12 @@ describe('管理接入容器复用业务页面', () => {
     await page.click('公司接口接入'); expect(page.path()).toBe(`/admin/integrations/${projectId}`);
     expect(document.querySelector('[aria-label="项目页面"]')?.textContent).toContain('发布与上线');
     expect(page.text()).toContain('返回接入容器'); expect(page.text()).not.toContain('返回项目管理');
-    expect(document.querySelector('nav details')).toBeNull();
+    expect([...document.querySelectorAll('nav details > summary')].map(node => node.textContent)).toEqual(['运行与管理']);
     await page.click('发布与上线'); expect(page.path()).toBe(`/admin/integrations/${projectId}/release`);
+    const management = document.querySelector<HTMLDetailsElement>('nav details')!;
+    expect(management.open).toBe(false);
+    await act(async () => management.querySelector<HTMLElement>('summary')!.click()); await page.settle();
+    expect(management.open).toBe(true);
     await page.click('项目设置'); expect(page.path()).toBe(`/admin/integrations/${projectId}/settings`);
     expect(page.text()).not.toContain('应用可见性');
     await page.click('环境变量'); await page.click('生产');

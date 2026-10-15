@@ -38,6 +38,7 @@ export class ResidentAgentRun extends AgentRunBase {
     // encodeStreamFrame 在构造器里已经确认存在。
     stream.stdin.write((this.prepared.encodeStreamFrame as (t: string) => string)(text));
     stream.stdin.flush?.();
+    this.recordInput(text);
   }
 
   private async begin(): Promise<void> {

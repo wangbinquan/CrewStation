@@ -8,20 +8,23 @@ import { useT } from '../../../shared/lib/useT';
 import type { CreationErrors, CreationField, CreationScope } from '../model/creationDraft';
 import { confirmedCreationResult, creationErrors, creationInput, creationServerErrors } from '../model/creationDraft';
 import { useCreationCatalog, useCreationDraft } from './useCreationCatalog';
+import { suggestProjectSlug } from '../model/creation/suggestProjectSlug';
 
 export function useProjectCreation(scope: CreationScope, onCreated: (project: ProjectDto) => void, open: boolean, self: boolean) {
-  const t = useT(), busy = useRef(false);
+  const t = useT(), busy = useRef(false), accepted = useRef(false);
   const data = useCreationCatalog(scope, self, open);
   const { draft, setEdits, resetDraft } = useCreationDraft(data.defaults);
+  const slugEdited = useRef(false), slugSuffix = useRef(crypto.randomUUID().slice(0, 8));
+  const reset = () => { resetDraft(); slugEdited.current = false; slugSuffix.current = crypto.randomUUID().slice(0, 8); };
   const [errors, setErrors] = useState<CreationErrors>({});
   const [unknown, setUnknown] = useState(false), [reconciling, setReconciling] = useState(false), [resultError, setResultError] = useState<string>();
   const epoch = useRef(0);
   useEffect(() => { const value = ++epoch.current; return () => { epoch.current = value + 1; }; }, []);
   const create = useApiMutation((input: ReturnType<typeof creationInput>) => api.projects.create(input), { invalidate: [queryKeys.projects(), queryKeys.me()] });
-  const clear = () => { if (busy.current || unknown) return; resetDraft(); setErrors({}); create.reset(); setResultError(undefined); };
+  const clear = () => { if (busy.current || unknown) return; accepted.current = false; reset(); setErrors({}); create.reset(); setResultError(undefined); };
   const dirty = !!draft.name || !!draft.slug || draft.ownerUserId !== data.defaults(draft.kind).ownerUserId ||
     draft.kind !== data.defaults().kind || draft.template !== data.defaults(draft.kind).template || draft.plan !== data.defaults().plan || !!draft.maxConcurrentTasks;
-  const accept = (project: ProjectDto) => { resetDraft(); setErrors({}); create.reset(); setUnknown(false); setResultError(undefined); onCreated(project); };
+  const accept = (project: ProjectDto) => { accepted.current = true; reset(); setErrors({}); create.reset(); setUnknown(false); setResultError(undefined); onCreated(project); };
   const expected = () => ({ ...creationInput(draft, data.catalog, self), ownerUserId: UserIdSchema.parse(draft.ownerUserId) });
   const reconcile = async () => {
     if (busy.current || !unknown) return;
@@ -58,11 +61,14 @@ export function useProjectCreation(scope: CreationScope, onCreated: (project: Pr
   };
   const setField = (field: CreationField, value: string) => {
     if (busy.current || unknown) return;
+    accepted.current = false;
+    if (field === 'slug') slugEdited.current = true;
+    const suggestion = field === 'name' && !slugEdited.current ? suggestProjectSlug(value, slugSuffix.current) : undefined;
     setEdits((current) => {
       if (field === 'kind') { const { template: _template, ...rest } = current; return { ...rest, kind: value as typeof draft.kind }; }
-      return { ...current, [field]: value };
+      return { ...current, [field]: value, ...(suggestion !== undefined ? { slug: suggestion } : {}) };
     });
     setErrors((current) => ({ ...current, [field]: undefined })); create.reset(); setResultError(undefined);
   };
-  return { ...data, draft, errors, dirty, unknown, reconciling, resultError, create, clear, setField, submit, reconcile };
+  return { ...data, draft, errors, dirty, unknown, reconciling, resultError, create, clear, setField, submit, reconcile, hasAccepted: () => accepted.current };
 }

@@ -4,7 +4,7 @@ import type { DevelopmentProjectWork } from '../../ports/deletion/work';
 
 const origins = {
   inspectSessionRebuild: 'project', rebuildSession: 'project', invokeApi: 'project', previewStatus: 'project', controlPreview: 'project', previewLogs: 'project',
-  openSession: 'project', getSession: 'project', listBranches: 'project', workspaceStatus: 'project', versionComparison: 'project', versionComparisonDetails: 'project',
+  openSession: 'project', getSession: 'project', listBranches: 'project', workspaceStatus: 'project', commitWorkspace: 'project', versionComparison: 'project', versionComparisonDetails: 'project',
   refreshComparisonHistory: 'project', releaseSession: 'project', publish: 'project', inspectClusterNative: 'task', inspectClusterAgent: 'task',
   manageClusterNative: 'task', manageClusterAgent: 'task', getAgentActivity: 'task', readAgentActivity: 'task', getWorkspaceLayout: 'task', saveWorkspaceLayout: 'task',
   startAgent: 'task', sendMessage: 'task', cancelAgent: 'task', listAgents: 'task', startNativeTerminal: 'task', listNativeTerminals: 'task',

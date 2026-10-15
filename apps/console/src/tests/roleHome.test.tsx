@@ -117,7 +117,7 @@ test('开发者表单初始约束可见，逐字段错误与焦点正确，冲�
   expect(document.activeElement?.getAttribute('name')).toBe('name');
   await change('[name="name"]', '团队助理'); await change('[name="slug"]', 'team-helper'); await change('[name="template"]', '01a0bf5d-8f4b-7002-9560-94caf593fb19');
   f.state.failCreate = true; await page.click('创建项目'); expect(page.text()).toContain('该标识已存在'); expect(document.querySelector<HTMLInputElement>('[name="name"]')?.value).toBe('团队助理');
-  f.state.failCreate = false; await page.click('创建项目'); await page!.settle(); expect(page.path()).toBe('/projects'); expect(document.querySelector('[role="dialog"]')?.textContent).toContain('开通');
+  f.state.failCreate = false; await page.click('创建项目'); await page!.settle(); expect(page.path()).toBe(`/projects/${projectId}/provisioning`); expect(document.querySelector('[role="dialog"]')).toBeNull();
   const request = f.calls.find((c) => c.method === 'POST')!;
   expect(request.body).toEqual({ name: '团队助理', slug: 'team-helper', template: '01a0bf5d-8f4b-7002-9560-94caf593fb19', kind: 'DigitalWorker' });
   expect(f.calls.some((c) => c.path === '/v1/users')).toBe(false);
@@ -179,6 +179,6 @@ test('自建回执丢失先核对本人同标识项目，不重复提交已创�
   page = await renderApp('/projects/new');
   await change('[name="name"]', '团队助理'); await change('[name="slug"]', 'team-helper'); await change('[name="template"]', '01a0bf5d-8f4b-7002-9560-94caf593fb19');
   await page.click('创建项目'); expect(page.text()).toContain('回执'); expect(document.querySelector<HTMLInputElement>('[name="slug"]')?.disabled).toBe(true);
-  await page.click('核对创建结果'); expect(page.path()).toBe('/projects'); expect(document.querySelector('[role="dialog"]')?.textContent).toContain('开通');
+  await page.click('核对创建结果'); expect(page.path()).toBe(`/projects/${projectId}/provisioning`); expect(document.querySelector('[role="dialog"]')).toBeNull();
   expect(f.calls.filter((call) => call.method === 'POST')).toHaveLength(1); expect(sessionStorage.getItem(`cs-project-draft:${userId}`)).toBeNull();
 });

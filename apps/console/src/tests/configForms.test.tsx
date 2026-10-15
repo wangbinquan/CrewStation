@@ -198,7 +198,7 @@ test('设置默认只显示开发变量列表；新增、取消和保存的焦�
   fixture(); page = await renderApp(`/projects/${projectId}/settings`);
   expect(page.search()).toEqual({ tab: 'config', env: 'development' });
   expect(visible('input[placeholder="DATABASE_URL"]')).toBeUndefined();
-  expect([...document.querySelectorAll('details')].every((node) => !node.open)).toBe(true);
+  expect([...document.querySelectorAll<HTMLDetailsElement>('main details')].every((node) => !node.open)).toBe(true);
   const add = [...document.querySelectorAll<HTMLButtonElement>('button')].find((node) => !node.closest('[hidden]') && node.textContent === '新增变量')!;
   await act(async () => { add.focus(); add.click(); }); await page.settle();
   expect(document.activeElement === visible('input[placeholder="DATABASE_URL"]')).toBe(true);

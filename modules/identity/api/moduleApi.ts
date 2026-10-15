@@ -1,3 +1,4 @@
+import type { DeveloperAccessPage, DeveloperAccessQuery, DeveloperAccessRequestDto, RequestDeveloperAccess, ResourceId, ReviewDeveloperAccess } from '@crewstation/contracts';
 import type {
   SetPlatformRoleRequest, AuthMethod, CurrentUserDto, EffectiveForwardingDto, IdentityForwardingDto, JwksDocument, LoginDiscoveryDto, LoginPolicyDto,
   OfflineReason, OidcLoginFailureCode, OidcProbeResult, OidcProviderDto, OidcProviderId, ProjectDeletionContext, ProjectDeletionOwner, ProjectId, ProjectServiceActor, ServiceId, TaskId, UserDto, UserId, WorkloadIdentity,
@@ -163,6 +164,10 @@ export type OidcCallbackOutcome =
  * 运行面（登录、引导、OIDC、会话、ForwardAuth、JWKS）供 cs-auth。其他模块经 ports 注入其中的子集。
  */
 export interface IdentityModuleApi {
+  myDeveloperAccess(userId: UserId): Promise<{ request: DeveloperAccessRequestDto | null }>;
+  requestDeveloperAccess(userId: UserId, input: RequestDeveloperAccess): Promise<DeveloperAccessRequestDto>;
+  listDeveloperAccess(actor: UserId, query: DeveloperAccessQuery): Promise<DeveloperAccessPage>;
+  reviewDeveloperAccess(actor: UserId, id: ResourceId, input: ReviewDeveloperAccess): Promise<DeveloperAccessRequestDto>;
   readonly name: 'identity';
   projectDeletionOwner(assertGrant: (context: ProjectDeletionContext) => Promise<void>): ProjectDeletionOwner;
   /** 按外部标识幂等建档；供测试与其他模块播种用户，OIDC 建档走自己的事务路径。 */

@@ -72,6 +72,11 @@ export abstract class AgentRunBase implements DriverAgentProcess {
     return this.event(type, fields, at);
   }
 
+  /** 开发 Bot 的已接收输入与回答共用持久事件序列；业务执行沿用原有消息契约。 */
+  protected recordInput(text: string): void {
+    if (this.spec.mode === 'interactive' && !this.spec.businessEvents) this.push(this.emit('user-message', { text }));
+  }
+
   /** 一条解析成功的 stdout 行交给计量器；快照变化后按节流上报。 */
   protected observeUsage(source: Record<string, unknown>): void {
     if (this.meter.observe(source)) this.scheduleUsage();

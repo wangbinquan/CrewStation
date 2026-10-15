@@ -34,6 +34,7 @@ import { createTerminalSupervisor } from './terminal/terminalSupervisor';
 import { NativeTerminalSupervisor } from './terminal/nativeSupervisor';
 import { createGitCommand } from './workspace/gitCommand';
 import { readWorkspaceStatus } from './workspace/workspaceStatus';
+import { commitWorkspace } from './workspace/commitWorkspace';
 import { createWorkspaceComparisons } from './workspace/workspaceComparison';
 import { fetchComparisonHistory } from './workspace/fetchComparisonHistory';
 import { createApiInvoker } from './http/apiInvocation';
@@ -120,14 +121,14 @@ class TaskRunner implements RunnerHandle {
     const comparisons = createWorkspaceComparisons({ git, paths, launcher });
     const apiInvoker = createApiInvoker(config.internalApiBase);
     const runnerRef: { current?: TaskRunner } = {};
-    const handlers = buildCommandHandlers({ initialization, agents, probes, execs, business, terminals, nativeTerminals, files, preview, verifyContract, invokeApi: apiInvoker.invoke, workspaceStatus: () => readWorkspaceStatus(git, paths), comparisons, fetchComparisonHistory: (url, sha) => fetchComparisonHistory(git, url, sha), requestShutdown: (grace) => void runnerRef.current?.shutdown(grace) });
+    const handlers = buildCommandHandlers({ initialization, agents, probes, execs, business, terminals, nativeTerminals, files, preview, verifyContract, invokeApi: apiInvoker.invoke, workspaceStatus: () => readWorkspaceStatus(git, paths), commitWorkspace: input => commitWorkspace({ git, paths, launcher }, input), comparisons, fetchComparisonHistory: (url, sha) => fetchComparisonHistory(git, url, sha), requestShutdown: (grace) => void runnerRef.current?.shutdown(grace) });
     const hello = (): RunnerHello => ({
       type: 'hello',
       protocolVersion: TASKRUNNER_PROTOCOL_VERSION,
       taskId: config.taskId,
       runnerToken: config.runnerToken,
       workdir: paths.root,
-      capabilities: { ...(config.businessJournalDir && process.platform === 'linux' ? { businessExecutionV3: 1 as const } : {}), protocols: [...RUNNER_PROTOCOLS], pty: terminals.backend !== undefined, preview: preview.enabled, ...(apiInvoker.enabled ? { apiInvocations: 1 as const } : {}), previewControl: 1 as const, terminalControl: 1 as const, runtimeInitialization: 1 as const, interpreters: interpreters.list },
+      capabilities: { ...(config.businessJournalDir && process.platform === 'linux' ? { businessExecutionV3: 1 as const } : {}), protocols: [...RUNNER_PROTOCOLS], pty: terminals.backend !== undefined, preview: preview.enabled, ...(apiInvoker.enabled ? { apiInvocations: 1 as const } : {}), previewControl: 1 as const, workspaceCommit: 1 as const, terminalControl: 1 as const, runtimeInitialization: 1 as const, interpreters: interpreters.list },
     });
     const dispatcherRef: { current?: CommandDispatcher } = {};
     const link = createSessionLink({

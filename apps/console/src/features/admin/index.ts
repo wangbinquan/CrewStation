@@ -7,3 +7,4 @@ export { AdminOverviewPage } from './pages/AdminOverviewPage';
 export { ProjectResourcePoliciesDialog } from './pages/ProjectResourcePoliciesDialog';
 
 export { AdminSection } from './pages/AdminSection';
+export { DeveloperAccessReview } from './components/DeveloperAccessReview';

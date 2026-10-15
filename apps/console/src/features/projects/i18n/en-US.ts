@@ -1,7 +1,12 @@
+import { deliveryMessages } from './delivery/en-US';
 import type { MessagesShapedLike } from '../../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
+  ...deliveryMessages,
+
+
+
   "projects.repair.title": "Confirm legacy resource ownership",
   "projects.repair.explanation": "The original history has not been recovered. You are confirming current resources. Review each full record, current references and actual identity before choosing how this project handles it. Unreviewed items continue to block deletion.",
   "projects.repair.afterSave": "Saving records your decision and deletes no resources. It regenerates the deletion inventory; permanent deletion still requires two confirmations and typing delete.",
@@ -354,7 +359,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'projects.wizard.catalogLoading': 'Loading templates and plans…',
   'projects.wizard.catalogError': 'Catalog unavailable: {message}. Your input is retained; reload to continue.',
   "projects.wizard.nameHint": "Shown in project lists. Use 1–80 characters, including non-English names.",
-  "projects.wizard.slugHint": "Determines the addresses below. It cannot be changed after creation.",
+  "projects.wizard.slugHint": "Suggested from the name and editable. Determines the addresses below and cannot be changed after creation.",
   'projects.wizard.kindHint': 'API proxies integrate company APIs; event producers forward external events to the platform.',
   "projects.wizard.templateHint": "Generates the initial code and release configuration. You can edit the code after creation.",
   'projects.wizard.noTemplates': 'No template is available for this kind. Check the control-plane template catalog and reload.',
