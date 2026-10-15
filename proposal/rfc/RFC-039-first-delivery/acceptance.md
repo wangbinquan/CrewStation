@@ -217,3 +217,15 @@ Chrome 打开实际页面组件的独立验收壳，最初标示“实现验收 
 本次 Git 推送后，开发入口仍包住整个发布调用；Release 在开发 shared admission 内取得自己完整的三把锁，被 `Cannot expand an active shared admission` 正确拒绝。现把开发检查／推送与 Release 受理顺序交接，开发方实际回调与锁全部退出后才调用 Release 公共 API；不放宽 persistence 守卫。真实开发模块 + PostgreSQL 回归原实现两项红，修复后 3 pass / 0 fail / 21 断言，证明推送期间原开发锁有效、Release 开始时全部开发回调已退出、发布持有自己的三把锁、封闭来源零命令／零发布，以及发布拒绝如实返回。后续准确 CI、后台部署与实际切流继续验收。
 
 该交接修复与开发删除生命周期、Git 发布、工作区预检、SCM 回调上下文相邻 11 文件合计 38 pass / 0 fail / 915 断言；类型、结构和精确 lint 通过。真实失败尝试的两枚临时发布令牌 683、684 均已 revoked=true / active=false。正式 Bot 手机视口 390×844 时文档同为 390×844，输入框 top 684.5 / bottom 764.5；聊天／预览往返保留真实 MCP 消息，截图 `bot-production-mobile.png`。
+
+### 发布受理成功与本机磁盘恢复
+
+`dd85c40c324fa4a576524c794af75e7c3cc4fcf3` 的 [CI 38730803101](https://github.com/wangbinquan/CrewStation/actions/runs/38730803101) 全部九项成功，七个后台部署到 manifest `sha256:533923ac94a3b763959bca0707b20d285113c807d2bdfee41392513b754e8709`，均 Ready=1。控制台保持 507d832d、任务底座保持 946658e7。实际 v0.1.1 原意图恢复后受理为流程 `01a13f7d-52ea-7000-a386-008b0aba56ba`；等待构建约 3 秒、镜像构建约 11 秒，无迁移命令而明确跳过，候选部署正常就绪。
+
+Chrome 打开实际候选地址 `http://preview.snake-bot-20261014.cs.localhost`，显示贪吃蛇；操作开始、计分到 10、暂停、重开及方向控制通过，最高分保持 10。正式 UI 的人工验证勾选与说明提交成功，流程进入“待确认上线”，确认 SHA 始终为 `12450292b0e8438a066391a08f53bcfa511559ed`。实际发布令牌 685 与此前 683、684 均 revoked=true / active=false。工作区未提交数 0、未推送数 0；本地 origin/main 追踪引用仍为旧模板 SHA，`upstream.ahead=1` 是该缓存引用的比较，不能写成已刷新远端追踪引用。实际发布目标及推送判断均使用确认 SHA 与真实远端。
+
+期间 Docker 虚拟机磁盘耗尽（229G 总量、可用 0），PostgreSQL 因 No space left on device 退出。按准确清单清理本会话五个已停止验收容器、五个无其他引用的测试卷、十一项未部署候选标签、九个自有验证缓存，以及二十三个 8–14 天未用且 unshared/reclaimable 的依赖构建缓存。保留日志与对象元数据；未删除业务卷、活跃容器、正式平台 Pod，未请求重启 Docker 或数据库。可用恢复为约 5.1G，PostgreSQL 自动 Ready，存储合同为 1，随后七后台正常滚动。剩余容量仍低，不能据此宣称容量问题永久解决。证据 `platform-disk-recovery.json`、`post-recovery-platform-ready.json` 及各精确清理清单。
+
+数据库恢复后 Bot 仍 awaiting-input，真实 MCP 历史保留。1728×817 下文档同尺寸，main 1520×765、输入框底边 737.5，正式截图 `bot-production-final.png`。旧预览在恢复后需点击原有“重新加载”才能重新显示，此局限保留。候选截图 `snake-candidate-verified.png`。
+
+上线确认时，自动审批拒绝把“项目成员”扩大到“全部登录用户”并切流，认为此前授权未具体覆盖受众范围。已向作者明确呈现目标版本、访问范围和未登录者仍被阻止的后果，并请求选择；没有通过 API 或其他方式绕过。此段记录时尚未正式切流，页面和原流程保留，后续结果另记。
