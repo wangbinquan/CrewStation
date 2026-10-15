@@ -266,3 +266,13 @@ RFC-039 的 T1–T10 与 FD-01–FD-09 在上述实现、相应层级回归和�
 转录投影在合并正文前，仅识别这种旧长度、缺失原生 `raw`、带完整 OpenCode 工具身份头的记录，归入折叠执行记录并保留原文；不改写持久事件，不对普通 JSON、讨论 `tool_use` 的正文或有效原生文本帧做关键词过滤。回答正文、列表和代码统一放入气泡，采用既有浅绿 `--cs-tone-success-bg`；执行记录独立呈现。实现仍属于 RFC-039 已批准的正式 Bot 对话界面修复。
 
 新增回归先红（旧工具污染正文、回答未包入气泡），修复后 Bot、原生 OpenCode 与长行协议三文件 21 pass / 0 fail / 80 断言；相邻历史、执行订阅、开发面板三文件 17 pass / 0 fail / 147 断言。精确 lint、console 类型和结构检查通过。实际旧事件回放得到两条正常回答，四条工具原文完整保留在执行记录。此处记录源码验收，准确 SHA CI、部署及 Chrome 最终结果在后续条目补记。原始证据位于 `.local/cli-bot-acceptance/bot-protocol-*`。
+
+### Bot 修复的准确 CI、本机部署与 Chrome 验收
+
+源码 `dfe67386bc8b5c19d4dff4b639b0e84fa4b54cc3` 的 [CI 38752016566](https://github.com/wangbinquan/CrewStation/actions/runs/38752016566) 九项全部成功，包含 gate 与真实部署 e2e。由准确提交归档构建并核对存储合同 1 后，仅更新 console：generation 309、Ready 1，镜像 manifest `sha256:cac1ed3ad5ba7874c36344d000a62f8baf5ba6fd8da9792aea83f2c32260c1a3`。其余 11 个系统 Deployment 的 UID、generation、镜像保持一致；正式贪吃蛇 Pod 仍为 UID `c46b9412-3f4b-4b7e-bc42-439b03f372a5`，Running / Ready。
+
+正式 Chrome 刷新后，旧 Bot 只显示两条自然语言回答，四条 8192 字符工具原文位于关闭的执行记录内；成功开发 Bot 的八条回答全部使用 `rgb(234, 246, 239)` 气泡，无原始工具信封混入回答。1728×817 下文档宽 1728，聊天容器 clientWidth/scrollWidth 均为 567；390×844 下文档同尺寸，聊天容器 clientWidth/scrollWidth 均为 372，气泡最大宽 340，输入框 bottom 764.5，长回复和 90 处行内代码不撑宽页面。手机检查后已恢复桌面视口，浏览器保留现有 MCP 验收对话；截图中的回复是该历史回合当时的状态，不是重新查询发布状态。
+
+代码围栏包入气泡、普通 JSON 与原生正文不被误分类由本轮渲染回归覆盖。原计划补发一条只读 Bot 测试消息被自动审批拒绝，理由是启动新一轮 Agent 执行需要更具体的发送授权；未发送、未留草稿、未重试或改通道。实际验收改用已存在的三段真实历史，未创建新 Agent。刷新后预览曾空白，点击既有“重新加载”恢复；此前已记录的预览重载边界未在本次扩大修复。
+
+最终证据：`.local/cli-bot-acceptance/ci-bot-bubbles-deployment-gate.json`、`bot-bubbles-deployment-proof.json`、`bot-bubbles-desktop-proof.json`、`bot-bubbles-mobile-proof.json`、`bot-protocol-legacy-after.png`、`bot-bubbles-final.png`、`bot-bubbles-mobile-after.png`。本轮局部回归合计 38 pass / 0 fail / 227 断言；未重跑此前失败的本机整库测试，沿用作者批准的准确 GitHub gate/e2e 门槛。并行 RFC-040 文档在制品保持原样。本条与 STATE 是纯验收收尾，文档提交的准确 CI 另在最终交付记录。

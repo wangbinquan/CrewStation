@@ -1,3 +1,9 @@
+## 2026-10-15 RFC-039 Bot 历史工具记录与浅绿色回答气泡修复
+
+作者反馈贪吃蛇旧 Bot 将 `tool_use` 当回答，另明确要求浅绿色气泡。已复现旧 Runner 的四条 8192 字符截断工具信封被保存为 text；新长行处理此前已修复，本轮补齐历史投影，在合并文本前归回执行记录且保留原文。普通 JSON、讨论工具的正文与有效原生文本不受影响。回答正文、列表及代码完整包入浅绿色气泡。
+
+源码 `dfe67386bc8b5c19d4dff4b639b0e84fa4b54cc3` 的 [九项 CI 38752016566](https://github.com/wangbinquan/CrewStation/actions/runs/38752016566) 全绿后部署到本机 console，generation 309 / Ready 1，manifest `sha256:cac1ed3ad5ba7874c36344d000a62f8baf5ba6fd8da9792aea83f2c32260c1a3`。其余 11 个系统部署未改变，贪吃蛇正式 Pod UID 保持。实际 Chrome 旧对话四条工具收起、两条回答保留，后续开发对话八条回答全部入气泡；桌面和 390px 均无横向溢出。局部回归 38 pass / 0 fail / 227 断言，类型、lint、结构通过；本机全量失败记录与 GitHub gate/e2e 授权口径延续。额外发送测试消息被自动审批拒绝，因此未发送，改以已有真实历史验收；代码围栏与 JSON 误判由渲染用例覆盖。证据见 [RFC-039 验收](proposal/rfc/RFC-039-first-delivery/acceptance.md#bot-修复的准确-ci本机部署与-chrome-验收)。本次收尾文档准确 CI 在最终交付记录。RFC-040 并行文档原样保留，以下历史不变。
+
 ## 2026-10-15 RFC-036 部署架构资源视图（Done）
 
 源码 `c02ca7a29a872f9e7bfc505cb1c2b414445e6d35` 已精确推送，准确 SHA [CI 38742516344](https://github.com/wangbinquan/CrewStation/actions/runs/38742516344) 九项全绿。共用运行事实、四视角、稳定身份聚合、对象权限／实例／关系统一弹窗、来源不完整提示和有界分页已实现；原型及并行历史完整保留。本地完整分层共 5650 pass／159 环境 skip／0 fail，1176 文件人口审计通过，改动行 374／374；原单进程 18 GiB OOM 和 Node 2 GiB 堆不足原件保留，未改变测试预算，不能表述为原单进程 check 全绿。
