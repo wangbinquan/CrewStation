@@ -54,25 +54,34 @@ export function runnerHub(deps: SessionUseCaseDeps) {
     });
   };
 
-  const onMessage = (connection: RunnerConnection, raw: unknown): Promise<void> => connection.process(async () => {
-    if (connections.get(connection.hello.taskId) !== connection) return;
-    const candidate = await normalizeIncoming(deps, connection, raw);
-    const parsed = RunnerMessageSchema.safeParse(candidate);
-    if (connections.get(connection.hello.taskId) !== connection) return;
-    if (!parsed.success) { logger.warn('invalid runner frame', { taskId: connection.hello.taskId }); return; }
-    const message: RunnerMessage = parsed.data;
-    const now = deps.clock.now();
-    connection.lastSeenAt = now.getTime();
-    switch (message.type) {
-      case 'result': connection.pending.settle(message.id, { ok: true, payload: message.payload }); return;
-      case 'error': connection.pending.settle(message.id, { ok: false, code: message.code, message: message.message }); return;
-      case 'pong': return;
-      case 'hello': return;
-      case 'event': {
-        await persistRunnerMessage(deps, connection, message, raw, now); return;
+  const onMessage = (connection: RunnerConnection, raw: unknown): Promise<void> => {
+    if (connection.closed || connections.get(connection.hello.taskId) !== connection) return Promise.resolve();
+    // A command holds its original admission until its reply is checked. An
+    // earlier event can be waiting for that same bounded pool. Replies must
+    // release commands independently; only events need sequential persistence.
+    const type = raw && typeof raw === 'object' ? Reflect.get(raw, 'type') as unknown : undefined;
+    const reply = type === 'result' || type === 'error' || type === 'pong';
+    const handle = async () => {
+      if (connections.get(connection.hello.taskId) !== connection) return;
+      const candidate = await normalizeIncoming(deps, connection, raw);
+      const parsed = RunnerMessageSchema.safeParse(candidate);
+      if (connections.get(connection.hello.taskId) !== connection) return;
+      if (!parsed.success) { logger.warn('invalid runner frame', { taskId: connection.hello.taskId }); return; }
+      const message: RunnerMessage = parsed.data;
+      const now = deps.clock.now();
+      connection.lastSeenAt = now.getTime();
+      switch (message.type) {
+        case 'result': connection.pending.settle(message.id, { ok: true, payload: message.payload }); return;
+        case 'error': connection.pending.settle(message.id, { ok: false, code: message.code, message: message.message }); return;
+        case 'pong': return;
+        case 'hello': return;
+        case 'event': {
+          await persistRunnerMessage(deps, connection, message, raw, now); return;
+        }
       }
-    }
-  });
+    };
+    return reply ? connection.command(handle) : connection.process(handle);
+  };
 
   const subscribe = (taskId: TaskId, sink: EventSink) => {
     const set = subscribers.get(taskId) ?? new Set<EventSink>();

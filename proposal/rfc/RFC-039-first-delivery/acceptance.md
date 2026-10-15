@@ -179,3 +179,11 @@ Chrome 打开实际页面组件的独立验收壳，最初标示“实现验收 
 修复相邻 7 文件 48 pass / 0 fail / 324 断言，包含真实 PostgreSQL 写入沿革与封闭准入；发布授权 / 真实 Git 3 pass / 0 fail / 26 断言。真实 GitLab 六项全部通过：先验证普通令牌推 main 拒绝，再验证发布令牌推确认 SHA 成功，读取 GitLab 令牌为 revoked=true / active=false，实际 ls-remote 认证失败。第一轮末项只因 Git 返回 terminal prompts disabled 而非 Authentication failed 文本导致断言失败，补充实际认证拒绝形式并增加 API 撤销状态后第二轮 6 pass / 0 fail / 49 断言。专用 GitLab 测试项目已按测试清理，不影响游戏项目。
 
 `58faaf11dec5fcf6cb29a7adfd1a31fcf1cde94b` 的 [CI 38719381453](https://github.com/wangbinquan/CrewStation/actions/runs/38719381453) 全部成功，但新发布身份修复尚待自己的准确 SHA CI 与部署，贪吃蛇尚未切流。
+
+### 并发 Runner 回复导致开发接口停滞
+
+`946658e7d58f1de9090b9f854adbafad1c13d88b` 的 [CI 38721282235](https://github.com/wangbinquan/CrewStation/actions/runs/38721282235) 全部九项成功，八服务已按不可变镜像部署。新 CLI `01a13f29-1659-7000-a99e-f34788f24773` 的容器实际就绪，但页面仍停留启动阶段，工作区接口出现 502；默认档位修订 15 自测真实模型阶段成功，后续 resume 因环境超时失败，不能宣称档位可用。
+
+实机 PostgreSQL 未重启、没有查询锁阻塞；cs-session 的四条准入连接全部持有未完成命令，Runner 已发出回复。入口把全部帧串行处理，前面的事件等待同一准入池，后面的结果无法完成命令并释放连接；最终触发既有 60 秒事务内空闲超时。修复保持握手屏障和事件顺序，将已校验的命令回复单独处理，并仍纳入原连接关闭时的回调等待。没有扩大连接池、放宽事务超时或绕开项目封闭保护。
+
+真实 PostgreSQL + WebSocket 回归覆盖四个命令并发、事件先到、重复事件去重、成功 / 错误回复及原回调全部退出：修复前超时，修复后 2 pass / 0 fail / 8 断言。整个 session 模块 37 文件 108 pass / 0 fail / 795 断言，包含旧 Runner 身份转换、重连、关闭与删除保护；类型、精确 lint 和结构检查通过。准确 SHA CI、修复部署、CLI 自动连接复验和游戏切流仍待完成。
