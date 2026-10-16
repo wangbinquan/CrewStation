@@ -1,5 +1,7 @@
 ## 2026-10-15 RFC-041：正式部署与停止续接通过，修复实机并发断点
 
+继续验收前补齐父环境重建时的 `botVolume` 绑定保留：先红复现，重建/准入/台账 25 项、177 断言通过，防止后续续接与原卷回收丢失身份。准入修复的全量本机检查仍有 Runner/PTY 沙箱与 prepared transactions 配置失败；正常权限和独立 CI 同配置 PG 的定向对照通过，原失败不改写，待准确 SHA CI 与实机收口。
+
 `3fb767e61c1e6878af01ae81efadbb6ab6e1bc6c` 的 CI 38855659848 九项全绿，八组件已部署本机。隔离项目实际三轮、同键去重、停止运行中的 sleep 后新 Pod 保持原生 session 与随机标记均通过；CLI 独立真实回答、文件 API 隔离、旧 Agent 兼容已验证。验收发现同时读取 Bot/CLI 会耗尽四连接准入池，外层持连接等内层导致 HTTP 502；真实 PG 屏障先红，现修复同 backend 的嵌套锁与授权生命周期，原失败记录保留。新修复准确 CI/部署、第三个 Pod 冷续接、窄屏及最终回收仍待完成，RFC 保持 In Progress。证据与身份见 [验收记录](proposal/rfc/RFC-041-continuous-bot-session/acceptance.md)。并行 RFC-040 内容与在制品保持。
 
 ## 2026-10-15 RFC-041：已批准，正式实现进行中

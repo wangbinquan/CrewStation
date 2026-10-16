@@ -42,6 +42,7 @@ export function rebuildUseCases(deps: RebuildDependencies) {
         image: record.image, start: (env.render?.start ?? 0) + 1,
         ...(env.render?.runtimeImage ? { runtimeImage: env.render.runtimeImage } : {}),
         ...(env.render?.developmentObjectPlanId ? { developmentObjectPlanId: env.render.developmentObjectPlanId } : {}),
+        ...(env.render?.botVolume ? { botVolume: env.render.botVolume } : {}),
         rebuild: { id: record.id, volumeUid: input.expectedVolumeUid, intent: rebuildIntent(record), ...(nodeName ? { nodeName } : {}) } } : undefined;
       const patch = { ...(render ? { render } : {}), rebuildId: record.id, podName, profile: input.profile.id,
         runtimeInitialization: undefined, connected: false, message: '已受理保留工作树重建，等待后台准备', runnerTokenHash: hashRunnerToken(newRunnerToken()),

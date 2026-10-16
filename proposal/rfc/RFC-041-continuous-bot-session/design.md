@@ -95,3 +95,7 @@ RFC-039 design.md §5 的 CLI/Bot 独立语义继续有效。本 RFC 取代其�
 正式 Chrome 同时读取 Bot 历史、状态与 CLI 名册时，四个 dev-session 外层 shared 准入占满专用四连接池，后续 task-runtime shared 准入再次申请该池连接，形成应用层相互等待；普通数据库连接仍空闲，就绪探针不能发现此故障，HTTP 返回 502。真实 PG 四请求屏障用例稳定复现。
 
 修复落在既有 `packages/persistence/transactionContext.ts`：同一数据库的嵌套单 key shared 准入复用原 backend，实际取得新 key 的 shared advisory lock，子 scope 只在其回调内授权；实际锁保留至原事务退出。所有嵌套 scope 跟随原 backend 失效，普通 UOW 仍独立提交。记录整条事务实际持有的 key，防止子 scope 返回后外层尝试对自己仍持有的锁执行排他封闭。既有显式多 key 准入不允许隐式扩展的规则保持。回归必须覆盖四请求无饥饿、真实锁排他等待、授权边界与原 backend 断线后拒绝迟到调用。
+
+### 父工作区重建保留上下文卷
+
+`task-runtime/application/requestRebuild.ts` 替换父环境 render 时必须保留 `botVolume` 的 conversationId、PVC 名称与原 UID。否则工作卷虽保留，私有上下文绑定及后续回收投影会丢失。`ledgerRebuild.test.ts` 先复现字段丢失，再验证完整重建后绑定不变、父 Pod 不挂私有卷、台账保持 present，完成 Runner 握手后释放父环境仍将同一上下文卷置为 absent。实际物理保留与回收另行实机验证。

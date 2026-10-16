@@ -27,6 +27,33 @@ async function controller(f: Awaited<ReturnType<typeof rebuildFixture>>) {
 }
 
 describe.skipIf(!available)('保卷重建交给资源调和器（RFC-025 T6）', () => {
+  test('重建保留 Bot 原卷身份和台账，父工作区不挂私有上下文；随后释放仍回收原卷', async () => {
+    const f = await rebuildFixture({ ledger: true });
+    try {
+      const original = (await f.uow.read.environments.getById(f.env.id))!;
+      const botVolume = { conversationId: crypto.randomUUID(), pvcName: `bot-${f.env.id}`, size: '1Gi' as const, volumeUid: crypto.randomUUID() };
+      await f.k8s.create({ apiVersion: 'v1', kind: 'PersistentVolumeClaim', metadata: { name: botVolume.pvcName, namespace: original.namespace, uid: botVolume.volumeUid, labels: { 'crewstation.io/task': original.id, 'crewstation.io/storage': 'bot-context' } }, status: { phase: 'Bound' } });
+      await f.uow.run(scope => scope.environments.update({ ...original, render: { image: 'task:current', workerUid: 10001, resources: f.state.profiles[0]!, start: 1, botVolume } }));
+      await f.runtime.api.requestRebuild(f.projectId, await f.request());
+      // Replacing render used to drop the private-volume binding, losing both resume identity and later cleanup.
+      expect((await f.uow.read.environments.getById(f.env.id))!.render?.botVolume).toEqual(botVolume);
+      await controller(f);
+      const rebuilt = (await f.uow.read.environments.getById(f.env.id))!;
+      expect(rebuilt.render?.botVolume).toEqual(botVolume);
+      const pod = (await f.k8s.get(Resources.Pod!, rebuilt.podName, rebuilt.namespace))!;
+      expect(JSON.stringify(pod.spec)).not.toContain(botVolume.pvcName);
+      expect((await f.k8s.get(Resources.PersistentVolumeClaim!, botVolume.pvcName, rebuilt.namespace))?.metadata.uid).toBe(botVolume.volumeUid);
+      const volumes = await f.resources!.api.list({ parentId: f.env.id, kind: 'volume' });
+      const record = volumes.find(row => row.display.purpose === 'bot-context')!;
+      expect(record.desired).toBe('present');
+      expect(record.children).toContainEqual(expect.objectContaining({ name: botVolume.pvcName }));
+      const secret = await f.k8s.get<K8sObject & { stringData: Record<string, string> }>(Resources.Secret!, `${rebuilt.podName}-runner`, rebuilt.namespace);
+      expect(await f.runtime.api.onRunnerConnected(f.env.id, secret!.stringData.CS_RUNNER_TOKEN!)).toBe(true);
+      await f.runtime.api.releaseEnvironment(f.env.id, 'user');
+      expect((await f.resources!.api.get(record.id))?.desired).toBe('absent');
+    } finally { await f.close(); }
+  });
+
   test('受理不建对象也不走旧队列；调和器复用原卷，无检出，绑定令牌并等新 Runner', async () => {
     const f = await rebuildFixture({ ledger: true });
     try {
