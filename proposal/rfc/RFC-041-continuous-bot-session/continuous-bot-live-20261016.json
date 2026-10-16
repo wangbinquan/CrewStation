@@ -1,0 +1,2864 @@
+{
+  "scope": "RFC-041 continuous Bot, CLI independent",
+  "projectId": "01a1432d-f9d3-7000-8fc6-c5abd3b64781",
+  "parentTaskId": "01a1433e-acbc-7000-a4b8-3dd5484dd297",
+  "marker": "BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf",
+  "checkpoints": [
+    {
+      "conversationId": "01a14340-df08-7000-81c0-e4fba486bbed",
+      "revision": 1,
+      "epoch": 1,
+      "state": "awaiting-input",
+      "nativeSessionId": "ses_ebcbec57fffecKX95xBPqYqrZR",
+      "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+      "continuity": "available",
+      "reason": null,
+      "label": "turn-one",
+      "at": "2026-10-16T05:49:20.537Z",
+      "agentId": "01a14340-ef15-7000-9b74-113d12b79b70",
+      "executionTaskId": "01a14340-deda-7000-aee1-9ced5d7d000f",
+      "pods": [
+        {
+          "name": "agt-01a14340deda7000aee19ced5d7d000f",
+          "uid": "c992ed8e-fc65-4922-9520-a45334fe3a49",
+          "phase": "Running"
+        },
+        {
+          "name": "build-01a1432e99f17000bfe7c304f6cb4891-9slnl",
+          "uid": "6da57fff-bf3f-4d55-8f06-2c6fab72cbcf",
+          "phase": "Succeeded"
+        },
+        {
+          "name": "task-01a1433eacbc7000a4b83dd5484dd297",
+          "uid": "c8d8d5a1-22fb-44ae-820c-d1dd5bdd6b9c",
+          "phase": "Running"
+        }
+      ],
+      "volumes": [
+        {
+          "name": "bot-01a1433eacbc7000a4b83dd5484dd297",
+          "uid": "897430a0-a723-4295-be96-a52b9a25f28d",
+          "phase": "Bound"
+        },
+        {
+          "name": "task-01a1433eacbc7000a4b83dd5484dd297-work",
+          "uid": "13b9dd76-eeab-428b-90d5-7a6c66b8c6ff",
+          "phase": "Bound"
+        }
+      ],
+      "historyExecutions": 1
+    },
+    {
+      "conversationId": "01a14340-df08-7000-81c0-e4fba486bbed",
+      "revision": 2,
+      "epoch": 1,
+      "state": "awaiting-input",
+      "nativeSessionId": "ses_ebcbec57fffecKX95xBPqYqrZR",
+      "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+      "continuity": "available",
+      "reason": null,
+      "label": "turn-two",
+      "at": "2026-10-16T05:50:10.482Z",
+      "agentId": "01a14340-ef15-7000-9b74-113d12b79b70",
+      "executionTaskId": "01a14340-deda-7000-aee1-9ced5d7d000f",
+      "pods": [
+        {
+          "name": "agt-01a14340deda7000aee19ced5d7d000f",
+          "uid": "c992ed8e-fc65-4922-9520-a45334fe3a49",
+          "phase": "Running"
+        },
+        {
+          "name": "build-01a1432e99f17000bfe7c304f6cb4891-9slnl",
+          "uid": "6da57fff-bf3f-4d55-8f06-2c6fab72cbcf",
+          "phase": "Succeeded"
+        },
+        {
+          "name": "task-01a1433eacbc7000a4b83dd5484dd297",
+          "uid": "c8d8d5a1-22fb-44ae-820c-d1dd5bdd6b9c",
+          "phase": "Running"
+        }
+      ],
+      "volumes": [
+        {
+          "name": "bot-01a1433eacbc7000a4b83dd5484dd297",
+          "uid": "897430a0-a723-4295-be96-a52b9a25f28d",
+          "phase": "Bound"
+        },
+        {
+          "name": "task-01a1433eacbc7000a4b83dd5484dd297-work",
+          "uid": "13b9dd76-eeab-428b-90d5-7a6c66b8c6ff",
+          "phase": "Bound"
+        }
+      ],
+      "historyExecutions": 1
+    },
+    {
+      "conversationId": "01a14340-df08-7000-81c0-e4fba486bbed",
+      "revision": 3,
+      "epoch": 1,
+      "state": "awaiting-input",
+      "nativeSessionId": "ses_ebcbec57fffecKX95xBPqYqrZR",
+      "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+      "continuity": "available",
+      "reason": null,
+      "label": "turn-three",
+      "at": "2026-10-16T05:50:41.121Z",
+      "agentId": "01a14340-ef15-7000-9b74-113d12b79b70",
+      "executionTaskId": "01a14340-deda-7000-aee1-9ced5d7d000f",
+      "pods": [
+        {
+          "name": "agt-01a14340deda7000aee19ced5d7d000f",
+          "uid": "c992ed8e-fc65-4922-9520-a45334fe3a49",
+          "phase": "Running"
+        },
+        {
+          "name": "build-01a1432e99f17000bfe7c304f6cb4891-9slnl",
+          "uid": "6da57fff-bf3f-4d55-8f06-2c6fab72cbcf",
+          "phase": "Succeeded"
+        },
+        {
+          "name": "task-01a1433eacbc7000a4b83dd5484dd297",
+          "uid": "c8d8d5a1-22fb-44ae-820c-d1dd5bdd6b9c",
+          "phase": "Running"
+        }
+      ],
+      "volumes": [
+        {
+          "name": "bot-01a1433eacbc7000a4b83dd5484dd297",
+          "uid": "897430a0-a723-4295-be96-a52b9a25f28d",
+          "phase": "Bound"
+        },
+        {
+          "name": "task-01a1433eacbc7000a4b83dd5484dd297-work",
+          "uid": "13b9dd76-eeab-428b-90d5-7a6c66b8c6ff",
+          "phase": "Bound"
+        }
+      ],
+      "historyExecutions": 1
+    },
+    {
+      "conversationId": "01a14340-df08-7000-81c0-e4fba486bbed",
+      "revision": 5,
+      "epoch": 1,
+      "state": "paused",
+      "nativeSessionId": "ses_ebcbec57fffecKX95xBPqYqrZR",
+      "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+      "continuity": "available",
+      "reason": null,
+      "label": "stopped",
+      "at": "2026-10-16T05:51:41.061Z",
+      "agentId": "01a14340-ef15-7000-9b74-113d12b79b70",
+      "executionTaskId": "01a14340-deda-7000-aee1-9ced5d7d000f",
+      "pods": [
+        {
+          "name": "build-01a1432e99f17000bfe7c304f6cb4891-9slnl",
+          "uid": "6da57fff-bf3f-4d55-8f06-2c6fab72cbcf",
+          "phase": "Succeeded"
+        },
+        {
+          "name": "task-01a1433eacbc7000a4b83dd5484dd297",
+          "uid": "c8d8d5a1-22fb-44ae-820c-d1dd5bdd6b9c",
+          "phase": "Running"
+        }
+      ],
+      "volumes": [
+        {
+          "name": "bot-01a1433eacbc7000a4b83dd5484dd297",
+          "uid": "897430a0-a723-4295-be96-a52b9a25f28d",
+          "phase": "Bound"
+        },
+        {
+          "name": "task-01a1433eacbc7000a4b83dd5484dd297-work",
+          "uid": "13b9dd76-eeab-428b-90d5-7a6c66b8c6ff",
+          "phase": "Bound"
+        }
+      ],
+      "historyExecutions": 1
+    },
+    {
+      "conversationId": "01a14340-df08-7000-81c0-e4fba486bbed",
+      "revision": 6,
+      "epoch": 1,
+      "state": "awaiting-input",
+      "nativeSessionId": "ses_ebcbec57fffecKX95xBPqYqrZR",
+      "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+      "continuity": "available",
+      "reason": null,
+      "label": "resumed",
+      "at": "2026-10-16T05:53:13.422Z",
+      "agentId": "01a14344-bc59-7000-847b-45e2fca008f2",
+      "executionTaskId": "01a14344-bc59-7001-ab1d-abdff1b92a0a",
+      "pods": [
+        {
+          "name": "agt-01a14344bc597001ab1dabdff1b92a0a",
+          "uid": "7a302124-72ba-4211-bf29-496d8e0ddf7e",
+          "phase": "Running"
+        },
+        {
+          "name": "build-01a1432e99f17000bfe7c304f6cb4891-9slnl",
+          "uid": "6da57fff-bf3f-4d55-8f06-2c6fab72cbcf",
+          "phase": "Succeeded"
+        },
+        {
+          "name": "task-01a1433eacbc7000a4b83dd5484dd297",
+          "uid": "c8d8d5a1-22fb-44ae-820c-d1dd5bdd6b9c",
+          "phase": "Running"
+        }
+      ],
+      "volumes": [
+        {
+          "name": "bot-01a1433eacbc7000a4b83dd5484dd297",
+          "uid": "897430a0-a723-4295-be96-a52b9a25f28d",
+          "phase": "Bound"
+        },
+        {
+          "name": "task-01a1433eacbc7000a4b83dd5484dd297-work",
+          "uid": "13b9dd76-eeab-428b-90d5-7a6c66b8c6ff",
+          "phase": "Bound"
+        }
+      ],
+      "historyExecutions": 2
+    },
+    {
+      "conversationId": "01a14340-df08-7000-81c0-e4fba486bbed",
+      "revision": 6,
+      "epoch": 1,
+      "state": "paused",
+      "nativeSessionId": "ses_ebcbec57fffecKX95xBPqYqrZR",
+      "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+      "continuity": "available",
+      "reason": null,
+      "label": "cold-stopped",
+      "at": "2026-10-16T05:53:56.029Z",
+      "agentId": "01a14344-bc59-7000-847b-45e2fca008f2",
+      "executionTaskId": "01a14344-bc59-7001-ab1d-abdff1b92a0a",
+      "pods": [
+        {
+          "name": "build-01a1432e99f17000bfe7c304f6cb4891-9slnl",
+          "uid": "6da57fff-bf3f-4d55-8f06-2c6fab72cbcf",
+          "phase": "Succeeded"
+        },
+        {
+          "name": "task-01a1433eacbc7000a4b83dd5484dd297",
+          "uid": "c8d8d5a1-22fb-44ae-820c-d1dd5bdd6b9c",
+          "phase": "Running"
+        }
+      ],
+      "volumes": [
+        {
+          "name": "bot-01a1433eacbc7000a4b83dd5484dd297",
+          "uid": "897430a0-a723-4295-be96-a52b9a25f28d",
+          "phase": "Bound"
+        },
+        {
+          "name": "task-01a1433eacbc7000a4b83dd5484dd297-work",
+          "uid": "13b9dd76-eeab-428b-90d5-7a6c66b8c6ff",
+          "phase": "Bound"
+        }
+      ],
+      "historyExecutions": 2
+    },
+    {
+      "conversationId": "01a14340-df08-7000-81c0-e4fba486bbed",
+      "revision": 7,
+      "epoch": 1,
+      "state": "awaiting-input",
+      "nativeSessionId": "ses_ebcbec57fffecKX95xBPqYqrZR",
+      "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+      "continuity": "available",
+      "reason": null,
+      "label": "cold-attempt",
+      "at": "2026-10-16T07:17:19.233Z",
+      "agentId": "01a14391-e764-7000-b78a-0517f3faa96d",
+      "executionTaskId": "01a14391-e764-7001-bf99-8ebf29e6e5ba",
+      "pods": [
+        {
+          "name": "agt-01a14391e7647001bf998ebf29e6e5ba",
+          "uid": "ef809070-0cee-40f0-9ed1-16c172615783",
+          "phase": "Running"
+        },
+        {
+          "name": "task-01a1433eacbc7000a4b83dd5484dd297",
+          "uid": "c8d8d5a1-22fb-44ae-820c-d1dd5bdd6b9c",
+          "phase": "Running"
+        }
+      ],
+      "volumes": [
+        {
+          "name": "bot-01a1433eacbc7000a4b83dd5484dd297",
+          "uid": "897430a0-a723-4295-be96-a52b9a25f28d",
+          "phase": "Bound"
+        },
+        {
+          "name": "task-01a1433eacbc7000a4b83dd5484dd297-work",
+          "uid": "13b9dd76-eeab-428b-90d5-7a6c66b8c6ff",
+          "phase": "Bound"
+        }
+      ],
+      "historyExecutions": 3
+    },
+    {
+      "conversationId": "01a14340-df08-7000-81c0-e4fba486bbed",
+      "revision": 7,
+      "epoch": 1,
+      "state": "stopping",
+      "nativeSessionId": "ses_ebcbec57fffecKX95xBPqYqrZR",
+      "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+      "continuity": "available",
+      "reason": null,
+      "label": "parent-rebuilt",
+      "at": "2026-10-16T07:21:25.041Z",
+      "agentId": "01a14391-e764-7000-b78a-0517f3faa96d",
+      "executionTaskId": "01a14391-e764-7001-bf99-8ebf29e6e5ba",
+      "pods": [
+        {
+          "name": "task-r-01a14393c1df7000ad909ee670ade01b",
+          "uid": "7b34037f-fa67-4a06-8565-3bdd51f55d79",
+          "phase": "Running"
+        }
+      ],
+      "volumes": [
+        {
+          "name": "bot-01a1433eacbc7000a4b83dd5484dd297",
+          "uid": "897430a0-a723-4295-be96-a52b9a25f28d",
+          "phase": "Bound"
+        },
+        {
+          "name": "task-01a1433eacbc7000a4b83dd5484dd297-work",
+          "uid": "13b9dd76-eeab-428b-90d5-7a6c66b8c6ff",
+          "phase": "Bound"
+        }
+      ],
+      "historyExecutions": 3
+    },
+    {
+      "conversationId": "01a14340-df08-7000-81c0-e4fba486bbed",
+      "revision": 7,
+      "epoch": 1,
+      "state": "paused",
+      "nativeSessionId": "ses_ebcbec57fffecKX95xBPqYqrZR",
+      "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+      "continuity": "available",
+      "reason": null,
+      "label": "parent-recovered",
+      "at": "2026-10-16T07:51:04.930Z",
+      "agentId": "01a14391-e764-7000-b78a-0517f3faa96d",
+      "executionTaskId": "01a14391-e764-7001-bf99-8ebf29e6e5ba",
+      "pods": [
+        {
+          "name": "task-r-01a14393c1df7000ad909ee670ade01b",
+          "uid": "7b34037f-fa67-4a06-8565-3bdd51f55d79",
+          "phase": "Running"
+        }
+      ],
+      "volumes": [
+        {
+          "name": "bot-01a1433eacbc7000a4b83dd5484dd297",
+          "uid": "897430a0-a723-4295-be96-a52b9a25f28d",
+          "phase": "Bound"
+        },
+        {
+          "name": "task-01a1433eacbc7000a4b83dd5484dd297-work",
+          "uid": "13b9dd76-eeab-428b-90d5-7a6c66b8c6ff",
+          "phase": "Bound"
+        }
+      ],
+      "historyExecutions": 3
+    },
+    {
+      "conversationId": "01a14340-df08-7000-81c0-e4fba486bbed",
+      "revision": 8,
+      "epoch": 1,
+      "state": "awaiting-input",
+      "nativeSessionId": "ses_ebcbec57fffecKX95xBPqYqrZR",
+      "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+      "continuity": "available",
+      "reason": null,
+      "label": "parent-resumed",
+      "at": "2026-10-16T07:52:27.698Z",
+      "agentId": "01a143b1-d8d7-7000-85be-74be66dc70a4",
+      "executionTaskId": "01a143b1-d8d7-7001-a972-dfba9a314a4f",
+      "pods": [
+        {
+          "name": "agt-01a143b1d8d77001a972dfba9a314a4f",
+          "uid": "b64685e8-fca4-42d7-b5db-e13f44bb6b3e",
+          "phase": "Running"
+        },
+        {
+          "name": "task-r-01a14393c1df7000ad909ee670ade01b",
+          "uid": "7b34037f-fa67-4a06-8565-3bdd51f55d79",
+          "phase": "Running"
+        }
+      ],
+      "volumes": [
+        {
+          "name": "bot-01a1433eacbc7000a4b83dd5484dd297",
+          "uid": "897430a0-a723-4295-be96-a52b9a25f28d",
+          "phase": "Bound"
+        },
+        {
+          "name": "task-01a1433eacbc7000a4b83dd5484dd297-work",
+          "uid": "13b9dd76-eeab-428b-90d5-7a6c66b8c6ff",
+          "phase": "Bound"
+        }
+      ],
+      "historyExecutions": 4
+    },
+    {
+      "conversationId": "01a14340-df08-7000-81c0-e4fba486bbed",
+      "revision": 9,
+      "epoch": 1,
+      "state": "awaiting-input",
+      "nativeSessionId": "ses_ebcbec57fffecKX95xBPqYqrZR",
+      "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+      "continuity": "available",
+      "reason": null,
+      "label": "tool-complete",
+      "at": "2026-10-16T07:55:27.597Z",
+      "agentId": "01a143b1-d8d7-7000-85be-74be66dc70a4",
+      "executionTaskId": "01a143b1-d8d7-7001-a972-dfba9a314a4f",
+      "pods": [
+        {
+          "name": "agt-01a143b1d8d77001a972dfba9a314a4f",
+          "uid": "b64685e8-fca4-42d7-b5db-e13f44bb6b3e",
+          "phase": "Running"
+        },
+        {
+          "name": "task-r-01a14393c1df7000ad909ee670ade01b",
+          "uid": "7b34037f-fa67-4a06-8565-3bdd51f55d79",
+          "phase": "Running"
+        }
+      ],
+      "volumes": [
+        {
+          "name": "bot-01a1433eacbc7000a4b83dd5484dd297",
+          "uid": "897430a0-a723-4295-be96-a52b9a25f28d",
+          "phase": "Bound"
+        },
+        {
+          "name": "task-01a1433eacbc7000a4b83dd5484dd297-work",
+          "uid": "13b9dd76-eeab-428b-90d5-7a6c66b8c6ff",
+          "phase": "Bound"
+        }
+      ],
+      "historyExecutions": 4
+    },
+    {
+      "conversationId": "01a14340-df08-7000-81c0-e4fba486bbed",
+      "revision": 10,
+      "epoch": 2,
+      "state": "empty",
+      "nativeSessionId": null,
+      "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+      "continuity": "unknown",
+      "reason": null,
+      "label": "fresh-context",
+      "at": "2026-10-16T07:59:17.509Z",
+      "agentId": null,
+      "executionTaskId": null,
+      "pods": [
+        {
+          "name": "task-r-01a14393c1df7000ad909ee670ade01b",
+          "uid": "7b34037f-fa67-4a06-8565-3bdd51f55d79",
+          "phase": "Running"
+        }
+      ],
+      "volumes": [
+        {
+          "name": "bot-01a1433eacbc7000a4b83dd5484dd297",
+          "uid": "897430a0-a723-4295-be96-a52b9a25f28d",
+          "phase": "Bound"
+        },
+        {
+          "name": "task-01a1433eacbc7000a4b83dd5484dd297-work",
+          "uid": "13b9dd76-eeab-428b-90d5-7a6c66b8c6ff",
+          "phase": "Bound"
+        }
+      ],
+      "historyExecutions": 4
+    },
+    {
+      "conversationId": "01a14340-df08-7000-81c0-e4fba486bbed",
+      "revision": 11,
+      "epoch": 2,
+      "state": "awaiting-input",
+      "nativeSessionId": "ses_ebc465800ffe5MLqCuqxKu96pF",
+      "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+      "continuity": "available",
+      "reason": null,
+      "label": "fresh-replied",
+      "at": "2026-10-16T08:02:20.657Z",
+      "agentId": "01a143b9-6382-7000-9c3b-e961f3bc0117",
+      "executionTaskId": "01a143b9-6382-7001-9a62-09a6ec18d7f2",
+      "pods": [
+        {
+          "name": "agt-01a143b9638270019a6209a6ec18d7f2",
+          "uid": "69f5fe6a-8518-4714-b623-7ad942281767",
+          "phase": "Running"
+        },
+        {
+          "name": "task-r-01a14393c1df7000ad909ee670ade01b",
+          "uid": "7b34037f-fa67-4a06-8565-3bdd51f55d79",
+          "phase": "Running"
+        }
+      ],
+      "volumes": [
+        {
+          "name": "bot-01a1433eacbc7000a4b83dd5484dd297",
+          "uid": "897430a0-a723-4295-be96-a52b9a25f28d",
+          "phase": "Bound"
+        },
+        {
+          "name": "task-01a1433eacbc7000a4b83dd5484dd297-work",
+          "uid": "13b9dd76-eeab-428b-90d5-7a6c66b8c6ff",
+          "phase": "Bound"
+        }
+      ],
+      "historyExecutions": 5
+    }
+  ],
+  "originalStops": [
+    {
+      "consumerId": "01a14340-f1b7-7000-afe5-04941b927d8a",
+      "resourceId": "01a14340-deda-7000-aee1-9ced5d7d000f",
+      "admissionClosed": true,
+      "permit": {
+        "podUid": "c992ed8e-fc65-4922-9520-a45334fe3a49",
+        "nodeUid": "1d907504-da49-4ad5-bcf1-05bf3de4139d",
+        "nodeName": "desktop-control-plane",
+        "grantedAt": "2026-10-16T05:48:16.972Z"
+      },
+      "proof": {
+        "id": "01a14343-fac1-7000-aace-093a3cfe1211",
+        "type": "kubelet-terminated",
+        "podUid": "c992ed8e-fc65-4922-9520-a45334fe3a49",
+        "nodeUid": "1d907504-da49-4ad5-bcf1-05bf3de4139d",
+        "consumer": {
+          "id": "01a14340-f1b7-7000-afe5-04941b927d8a",
+          "taskId": "01a1433e-acbc-7000-a4b8-3dd5484dd297",
+          "podName": "agt-01a14340deda7000aee19ced5d7d000f",
+          "purpose": "agent",
+          "revision": 1,
+          "namespace": "cs-rfc041-bot-continuity-20261015",
+          "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+          "resourceId": "01a14340-deda-7000-aee1-9ced5d7d000f",
+          "finalization": null
+        },
+        "nodeName": "desktop-control-plane",
+        "containers": [
+          {
+            "kind": "init",
+            "name": "workload-admission",
+            "state": "terminated",
+            "exitCode": 0,
+            "containerId": "containerd://5dbac8b818fa5819ad5bc745d85eb005a6f04929ebca11d08bffcec5b928c2f1"
+          },
+          {
+            "kind": "init",
+            "name": "prepare-bot-context",
+            "state": "terminated",
+            "exitCode": 0,
+            "containerId": "containerd://f8021b726de3432c7335d4f0facb9cc207f7f153b5715f7a5ad1776195a21efd"
+          },
+          {
+            "kind": "container",
+            "name": "agt-01a14340deda7000aee19ced5d7d000f",
+            "state": "terminated",
+            "exitCode": 0,
+            "containerId": "containerd://f3f3d81fa3d9dc3fac998becc37a89f93f574dcc36127c6e18efd8e9ff249685"
+          }
+        ],
+        "observedAt": "2026-10-16T05:51:31.004Z",
+        "podResourceVersion": "5234214"
+      }
+    },
+    {
+      "consumerId": "01a14344-c09b-7000-b4a7-15e09867ddee",
+      "resourceId": "01a14344-bc59-7001-ab1d-abdff1b92a0a",
+      "admissionClosed": true,
+      "permit": {
+        "podUid": "7a302124-72ba-4211-bf29-496d8e0ddf7e",
+        "nodeUid": "1d907504-da49-4ad5-bcf1-05bf3de4139d",
+        "nodeName": "desktop-control-plane",
+        "grantedAt": "2026-10-16T05:52:23.858Z"
+      },
+      "proof": {
+        "id": "01a14345-ef0e-7000-8d64-960cca5b8400",
+        "type": "kubelet-terminated",
+        "podUid": "7a302124-72ba-4211-bf29-496d8e0ddf7e",
+        "nodeUid": "1d907504-da49-4ad5-bcf1-05bf3de4139d",
+        "consumer": {
+          "id": "01a14344-c09b-7000-b4a7-15e09867ddee",
+          "taskId": "01a1433e-acbc-7000-a4b8-3dd5484dd297",
+          "podName": "agt-01a14344bc597001ab1dabdff1b92a0a",
+          "purpose": "agent",
+          "revision": 1,
+          "namespace": "cs-rfc041-bot-continuity-20261015",
+          "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+          "resourceId": "01a14344-bc59-7001-ab1d-abdff1b92a0a",
+          "finalization": null
+        },
+        "nodeName": "desktop-control-plane",
+        "containers": [
+          {
+            "kind": "init",
+            "name": "workload-admission",
+            "state": "terminated",
+            "exitCode": 0,
+            "containerId": "containerd://819e0a806a1b5fb3ec85d89daf8e8aa21a4b41526dd1756ed984d21ca2b6cb6e"
+          },
+          {
+            "kind": "init",
+            "name": "prepare-bot-context",
+            "state": "terminated",
+            "exitCode": 0,
+            "containerId": "containerd://45dd401296fcc07f4ab39bd159a0263c4d3f2f7ddd5a3eda887bebec14753659"
+          },
+          {
+            "kind": "container",
+            "name": "agt-01a14344bc597001ab1dabdff1b92a0a",
+            "state": "terminated",
+            "exitCode": 0,
+            "containerId": "containerd://7143fe5e23ebd709a41e91ce7985c99db1c0aa0af3259e45fa761da19bb08c45"
+          }
+        ],
+        "observedAt": "2026-10-16T05:53:39.081Z",
+        "podResourceVersion": "5234459"
+      }
+    }
+  ],
+  "independentCLI": [
+    {
+      "path": "/tmp/crewstation-agents/01a14346-d183-7000-98a2-c6bcb8b7829b/home/.local/share/opencode/opencode.db",
+      "sessions": [
+        [
+          "ses_ebcb7c27affe6UTi7lUPNAtLW4",
+          "CLI_INDEPENDENT_OK reply instruction"
+        ]
+      ]
+    }
+  ],
+  "responsiveLayout": {
+    "bodyWidth": 390,
+    "bubbles": [
+      {
+        "children": [
+          {
+            "color": "rgba(0, 0, 0, 0)",
+            "tag": "DIV",
+            "width": 340
+          },
+          {
+            "color": "rgb(234, 246, 239)",
+            "tag": "DIV",
+            "width": 74
+          }
+        ],
+        "text": "Crew Bot已记住"
+      },
+      {
+        "children": [
+          {
+            "color": "rgba(0, 0, 0, 0)",
+            "tag": "DIV",
+            "width": 340
+          },
+          {
+            "color": "rgb(234, 246, 239)",
+            "tag": "DIV",
+            "width": 340
+          }
+        ],
+        "text": "Crew BotBOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+      },
+      {
+        "children": [
+          {
+            "color": "rgba(0, 0, 0, 0)",
+            "tag": "DIV",
+            "width": 340
+          },
+          {
+            "color": "rgb(234, 246, 239)",
+            "tag": "DIV",
+            "width": 340
+          }
+        ],
+        "text": "Crew Bot上下文仍在：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+      },
+      {
+        "children": [
+          {
+            "color": "rgba(0, 0, 0, 0)",
+            "tag": "DIV",
+            "width": 340
+          },
+          {
+            "color": "rgb(234, 246, 239)",
+            "tag": "DIV",
+            "width": 340
+          }
+        ],
+        "text": "Crew BotBOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+      }
+    ],
+    "main": [
+      {
+        "height": 583.8203125,
+        "width": 390,
+        "x": 0,
+        "y": 260.1796875
+      }
+    ],
+    "messages": [
+      {
+        "height": 220,
+        "scrollHeight": 1604,
+        "scrollWidth": 372,
+        "width": 372
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 390
+    }
+  },
+  "localFullGate": {
+    "command": "bun run check",
+    "sourceProductionCandidate": "2bf5bd9e56a728a1d2fc66be83a79e45c9a0afa2",
+    "pass": 5720,
+    "skip": 176,
+    "fail": 3,
+    "errors": 3,
+    "assertions": 41279,
+    "files": 1201,
+    "durationSeconds": 2019.06,
+    "failures": [
+      "deploy/local/installPlatform.test.ts: 5s timeout",
+      "modules/provisioning/tests/deletionWorker.test.ts: 5s timeout",
+      "modules/resource-access/tests/projectDeletion.test.ts: 5s timeout"
+    ],
+    "focusedComparison": {
+      "pass": 24,
+      "fail": 0,
+      "assertions": 365,
+      "files": 3,
+      "doesNotReplaceFullFailure": true
+    }
+  },
+  "recordedAt": "2026-10-16T08:20:28.939686+00:00",
+  "provenance": "Curated live API, PostgreSQL, Kubernetes, native Agent events, and Chrome observations. Raw local receipts remain ignored; digests below are provenance, not independently hosted evidence.",
+  "idempotentMessage": {
+    "input": {
+      "requestId": "ec31c2ee-cc6c-4106-a47c-2a91c8547117",
+      "expectedRevision": 2,
+      "content": "第三轮：仍然不要调用工具或读取文件，请再次给出最初的随机标记，并在前面写“上下文仍在：”。"
+    },
+    "firstReceipt": {
+      "requestId": "ec31c2ee-cc6c-4106-a47c-2a91c8547117",
+      "conversationId": "01a14340-df08-7000-81c0-e4fba486bbed",
+      "revision": 3,
+      "epoch": 1,
+      "state": "accepted"
+    },
+    "duplicateReceipt": {
+      "epoch": 1,
+      "state": "dispatched",
+      "revision": 3,
+      "requestId": "ec31c2ee-cc6c-4106-a47c-2a91c8547117",
+      "conversationId": "01a14340-df08-7000-81c0-e4fba486bbed"
+    },
+    "databaseMessageCount": 3,
+    "databaseExecutionCount": 1,
+    "matchingRequestRows": 1
+  },
+  "nativeEvents": {
+    "cold-resumed": {
+      "executionTaskId": "01a14391-e764-7001-bf99-8ebf29e6e5ba",
+      "events": [
+        {
+          "seq": 8,
+          "at": "2026-10-16T07:16:50.291Z",
+          "event": {
+            "at": "2026-10-16T07:16:50.289Z",
+            "seq": 2,
+            "text": "执行容器已经从集群侧退出并重新接入。不要调用工具，不要读写文件，请仅回复“冷续接成功：”加上第一轮约定的随机标记。",
+            "type": "user-message",
+            "agentId": "01a14391-e764-7000-b78a-0517f3faa96d"
+          }
+        },
+        {
+          "seq": 9,
+          "at": "2026-10-16T07:16:50.291Z",
+          "event": {
+            "at": "2026-10-16T07:16:50.290Z",
+            "seq": 3,
+            "type": "status",
+            "status": "running",
+            "agentId": "01a14391-e764-7000-b78a-0517f3faa96d"
+          }
+        },
+        {
+          "seq": 10,
+          "at": "2026-10-16T07:17:06.089Z",
+          "event": {
+            "at": "2026-10-16T07:17:06.089Z",
+            "seq": 4,
+            "type": "session",
+            "agentId": "01a14391-e764-7000-b78a-0517f3faa96d",
+            "sessionId": "ses_ebcbec57fffecKX95xBPqYqrZR"
+          }
+        },
+        {
+          "seq": 11,
+          "at": "2026-10-16T07:17:06.092Z",
+          "event": {
+            "at": "2026-10-16T07:17:06.089Z",
+            "raw": "{\"type\":\"text\",\"timestamp\":1792135026089,\"sessionID\":\"ses_ebcbec57fffecKX95xBPqYqrZR\",\"part\":{\"id\":\"prt_143925423001z6ahfulWg5gdmH\",\"messageID\":\"msg_143923ca9001vfKQJxwMhu9fWL\",\"sessionID\":\"ses_ebcbec57fffecKX95xBPqYqrZR\",\"type\":\"text\",\"text\":\"冷续接成功：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf\",\"time\":{\"start\":1792135025699,\"end\":1792135026005}}}",
+            "seq": 5,
+            "text": "冷续接成功：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf",
+            "type": "text",
+            "agentId": "01a14391-e764-7000-b78a-0517f3faa96d"
+          }
+        },
+        {
+          "seq": 13,
+          "at": "2026-10-16T07:17:07.007Z",
+          "event": {
+            "at": "2026-10-16T07:17:07.007Z",
+            "seq": 7,
+            "type": "status",
+            "status": "waiting",
+            "agentId": "01a14391-e764-7000-b78a-0517f3faa96d"
+          }
+        }
+      ]
+    },
+    "parent-resumed": {
+      "executionTaskId": "01a143b1-d8d7-7001-a972-dfba9a314a4f",
+      "events": [
+        {
+          "seq": 8,
+          "at": "2026-10-16T07:51:49.178Z",
+          "event": {
+            "at": "2026-10-16T07:51:49.176Z",
+            "seq": 2,
+            "text": "父开发环境已经重建。不要调用工具，不要读写文件，请只回复“重建续接成功：”加上第一轮约定的随机标记。",
+            "type": "user-message",
+            "agentId": "01a143b1-d8d7-7000-85be-74be66dc70a4"
+          }
+        },
+        {
+          "seq": 9,
+          "at": "2026-10-16T07:51:49.178Z",
+          "event": {
+            "at": "2026-10-16T07:51:49.177Z",
+            "seq": 3,
+            "type": "status",
+            "status": "running",
+            "agentId": "01a143b1-d8d7-7000-85be-74be66dc70a4"
+          }
+        },
+        {
+          "seq": 10,
+          "at": "2026-10-16T07:52:03.676Z",
+          "event": {
+            "at": "2026-10-16T07:52:03.676Z",
+            "seq": 4,
+            "type": "session",
+            "agentId": "01a143b1-d8d7-7000-85be-74be66dc70a4",
+            "sessionId": "ses_ebcbec57fffecKX95xBPqYqrZR"
+          }
+        },
+        {
+          "seq": 11,
+          "at": "2026-10-16T07:52:03.679Z",
+          "event": {
+            "at": "2026-10-16T07:52:03.676Z",
+            "raw": "{\"type\":\"text\",\"timestamp\":1792137123676,\"sessionID\":\"ses_ebcbec57fffecKX95xBPqYqrZR\",\"part\":{\"id\":\"prt_143b254d1001C6wtXuaaUZ8rCi\",\"messageID\":\"msg_143b23ff4001D1ADe4t9524L01\",\"sessionID\":\"ses_ebcbec57fffecKX95xBPqYqrZR\",\"type\":\"text\",\"text\":\"重建续接成功：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf\",\"time\":{\"start\":1792137123025,\"end\":1792137123089}}}",
+            "seq": 5,
+            "text": "重建续接成功：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf",
+            "type": "text",
+            "agentId": "01a143b1-d8d7-7000-85be-74be66dc70a4"
+          }
+        },
+        {
+          "seq": 13,
+          "at": "2026-10-16T07:52:04.577Z",
+          "event": {
+            "at": "2026-10-16T07:52:04.577Z",
+            "seq": 7,
+            "type": "status",
+            "status": "waiting",
+            "agentId": "01a143b1-d8d7-7000-85be-74be66dc70a4"
+          }
+        }
+      ]
+    },
+    "tool-complete": {
+      "executionTaskId": "01a143b1-d8d7-7001-a972-dfba9a314a4f",
+      "events": [
+        {
+          "seq": 8,
+          "at": "2026-10-16T07:51:49.178Z",
+          "event": {
+            "at": "2026-10-16T07:51:49.176Z",
+            "seq": 2,
+            "text": "父开发环境已经重建。不要调用工具，不要读写文件，请只回复“重建续接成功：”加上第一轮约定的随机标记。",
+            "type": "user-message",
+            "agentId": "01a143b1-d8d7-7000-85be-74be66dc70a4"
+          }
+        },
+        {
+          "seq": 9,
+          "at": "2026-10-16T07:51:49.178Z",
+          "event": {
+            "at": "2026-10-16T07:51:49.177Z",
+            "seq": 3,
+            "type": "status",
+            "status": "running",
+            "agentId": "01a143b1-d8d7-7000-85be-74be66dc70a4"
+          }
+        },
+        {
+          "seq": 10,
+          "at": "2026-10-16T07:52:03.676Z",
+          "event": {
+            "at": "2026-10-16T07:52:03.676Z",
+            "seq": 4,
+            "type": "session",
+            "agentId": "01a143b1-d8d7-7000-85be-74be66dc70a4",
+            "sessionId": "ses_ebcbec57fffecKX95xBPqYqrZR"
+          }
+        },
+        {
+          "seq": 11,
+          "at": "2026-10-16T07:52:03.679Z",
+          "event": {
+            "at": "2026-10-16T07:52:03.676Z",
+            "raw": "{\"type\":\"text\",\"timestamp\":1792137123676,\"sessionID\":\"ses_ebcbec57fffecKX95xBPqYqrZR\",\"part\":{\"id\":\"prt_143b254d1001C6wtXuaaUZ8rCi\",\"messageID\":\"msg_143b23ff4001D1ADe4t9524L01\",\"sessionID\":\"ses_ebcbec57fffecKX95xBPqYqrZR\",\"type\":\"text\",\"text\":\"重建续接成功：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf\",\"time\":{\"start\":1792137123025,\"end\":1792137123089}}}",
+            "seq": 5,
+            "text": "重建续接成功：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf",
+            "type": "text",
+            "agentId": "01a143b1-d8d7-7000-85be-74be66dc70a4"
+          }
+        },
+        {
+          "seq": 13,
+          "at": "2026-10-16T07:52:04.577Z",
+          "event": {
+            "at": "2026-10-16T07:52:04.577Z",
+            "seq": 7,
+            "type": "status",
+            "status": "waiting",
+            "agentId": "01a143b1-d8d7-7000-85be-74be66dc70a4"
+          }
+        },
+        {
+          "seq": 14,
+          "at": "2026-10-16T07:52:55.109Z",
+          "event": {
+            "at": "2026-10-16T07:52:55.107Z",
+            "seq": 8,
+            "text": "请只调用一次 bash，执行 printf RFC041_TOOL_ARGS_OK，不要读写文件。执行完成后只回复“命令验证完成”。",
+            "type": "user-message",
+            "agentId": "01a143b1-d8d7-7000-85be-74be66dc70a4"
+          }
+        },
+        {
+          "seq": 15,
+          "at": "2026-10-16T07:52:55.109Z",
+          "event": {
+            "at": "2026-10-16T07:52:55.108Z",
+            "seq": 9,
+            "type": "status",
+            "status": "running",
+            "agentId": "01a143b1-d8d7-7000-85be-74be66dc70a4"
+          }
+        },
+        {
+          "seq": 16,
+          "at": "2026-10-16T07:53:09.003Z",
+          "event": {
+            "at": "2026-10-16T07:53:09.002Z",
+            "raw": "{\"type\":\"tool_use\",\"timestamp\":1792137189002,\"sessionID\":\"ses_ebcbec57fffecKX95xBPqYqrZR\",\"part\":{\"type\":\"tool\",\"tool\":\"bash\",\"callID\":\"call_00_xqys3K7tg06fUpvOAn6Q3891\",\"state\":{\"status\":\"completed\",\"input\":{\"command\":\"printf RFC041_TOOL_ARGS_OK\"},\"output\":\"RFC041_TOOL_ARGS_OK\",\"metadata\":{\"output\":\"RFC041_TOOL_ARGS_OK\",\"exit\":0,\"truncated\":false},\"title\":\"printf RFC041_TOOL_ARGS_OK\",\"time\":{\"start\":1792137188588,\"end\":1792137188973}},\"id\":\"prt_143b35456001CVFj2z3NPJXKJO\",\"sessionID\":\"ses_ebcbec57fffecKX95xBPqYqrZR\",\"messageID\":\"msg_143b3392a001s9JzUx8vxAXMk1\"}}",
+            "seq": 10,
+            "tool": {
+              "name": "bash",
+              "input": {
+                "command": "printf RFC041_TOOL_ARGS_OK"
+              },
+              "callId": "call_00_xqys3K7tg06fUpvOAn6Q3891",
+              "output": "RFC041_TOOL_ARGS_OK"
+            },
+            "type": "tool-start",
+            "agentId": "01a143b1-d8d7-7000-85be-74be66dc70a4"
+          }
+        },
+        {
+          "seq": 18,
+          "at": "2026-10-16T07:53:11.777Z",
+          "event": {
+            "at": "2026-10-16T07:53:11.777Z",
+            "raw": "{\"type\":\"text\",\"timestamp\":1792137191777,\"sessionID\":\"ses_ebcbec57fffecKX95xBPqYqrZR\",\"part\":{\"id\":\"prt_143b36104001rPcUfUdnu2pOXD\",\"messageID\":\"msg_143b3580a001zXoAbo2A8Y6VY4\",\"sessionID\":\"ses_ebcbec57fffecKX95xBPqYqrZR\",\"type\":\"text\",\"text\":\"命令验证完成\",\"time\":{\"start\":1792137191684,\"end\":1792137191773}}}",
+            "seq": 12,
+            "text": "命令验证完成",
+            "type": "text",
+            "agentId": "01a143b1-d8d7-7000-85be-74be66dc70a4"
+          }
+        },
+        {
+          "seq": 20,
+          "at": "2026-10-16T07:53:12.275Z",
+          "event": {
+            "at": "2026-10-16T07:53:12.275Z",
+            "seq": 14,
+            "type": "status",
+            "status": "waiting",
+            "agentId": "01a143b1-d8d7-7000-85be-74be66dc70a4"
+          }
+        }
+      ]
+    },
+    "fresh-replied": {
+      "executionTaskId": "01a143b9-6382-7001-9a62-09a6ec18d7f2",
+      "events": [
+        {
+          "seq": 8,
+          "at": "2026-10-16T07:59:58.056Z",
+          "event": {
+            "at": "2026-10-16T07:59:58.054Z",
+            "seq": 2,
+            "text": "这是刚明确开启的新上下文。不要调用工具，不要读写文件，请只回复“新上下文已就绪”。",
+            "type": "user-message",
+            "agentId": "01a143b9-6382-7000-9c3b-e961f3bc0117"
+          }
+        },
+        {
+          "seq": 9,
+          "at": "2026-10-16T07:59:58.056Z",
+          "event": {
+            "at": "2026-10-16T07:59:58.055Z",
+            "seq": 3,
+            "type": "status",
+            "status": "running",
+            "agentId": "01a143b9-6382-7000-9c3b-e961f3bc0117"
+          }
+        },
+        {
+          "seq": 10,
+          "at": "2026-10-16T08:00:13.948Z",
+          "event": {
+            "at": "2026-10-16T08:00:13.947Z",
+            "seq": 4,
+            "type": "session",
+            "agentId": "01a143b9-6382-7000-9c3b-e961f3bc0117",
+            "sessionId": "ses_ebc465800ffe5MLqCuqxKu96pF"
+          }
+        },
+        {
+          "seq": 11,
+          "at": "2026-10-16T08:00:13.948Z",
+          "event": {
+            "at": "2026-10-16T08:00:13.947Z",
+            "raw": "{\"type\":\"text\",\"timestamp\":1792137613947,\"sessionID\":\"ses_ebc465800ffe5MLqCuqxKu96pF\",\"part\":{\"id\":\"prt_143b9d2180016qtHcznoApCMNx\",\"messageID\":\"msg_143b9b0db0010Z0zJ4ePKyduHI\",\"sessionID\":\"ses_ebc465800ffe5MLqCuqxKu96pF\",\"type\":\"text\",\"text\":\"新上下文已就绪\",\"time\":{\"start\":1792137613848,\"end\":1792137613858}}}",
+            "seq": 5,
+            "text": "新上下文已就绪",
+            "type": "text",
+            "agentId": "01a143b9-6382-7000-9c3b-e961f3bc0117"
+          }
+        },
+        {
+          "seq": 13,
+          "at": "2026-10-16T08:00:14.454Z",
+          "event": {
+            "at": "2026-10-16T08:00:14.454Z",
+            "seq": 7,
+            "type": "status",
+            "status": "waiting",
+            "agentId": "01a143b9-6382-7000-9c3b-e961f3bc0117"
+          }
+        }
+      ]
+    }
+  },
+  "stoppedConsumers": [
+    {
+      "id": "01a14340-f1b7-7000-afe5-04941b927d8a",
+      "resourceId": "01a14340-deda-7000-aee1-9ced5d7d000f",
+      "podName": "agt-01a14340deda7000aee19ced5d7d000f",
+      "admissionClosed": true,
+      "consumer": {
+        "id": "01a14340-f1b7-7000-afe5-04941b927d8a",
+        "taskId": "01a1433e-acbc-7000-a4b8-3dd5484dd297",
+        "podName": "agt-01a14340deda7000aee19ced5d7d000f",
+        "purpose": "agent",
+        "revision": 1,
+        "namespace": "cs-rfc041-bot-continuity-20261015",
+        "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+        "resourceId": "01a14340-deda-7000-aee1-9ced5d7d000f",
+        "finalization": null
+      },
+      "startPermit": {
+        "podUid": "c992ed8e-fc65-4922-9520-a45334fe3a49",
+        "nodeUid": "1d907504-da49-4ad5-bcf1-05bf3de4139d",
+        "nodeName": "desktop-control-plane",
+        "grantedAt": "2026-10-16T05:48:16.972Z"
+      },
+      "stopProof": {
+        "id": "01a14343-fac1-7000-aace-093a3cfe1211",
+        "type": "kubelet-terminated",
+        "podUid": "c992ed8e-fc65-4922-9520-a45334fe3a49",
+        "nodeUid": "1d907504-da49-4ad5-bcf1-05bf3de4139d",
+        "consumer": {
+          "id": "01a14340-f1b7-7000-afe5-04941b927d8a",
+          "taskId": "01a1433e-acbc-7000-a4b8-3dd5484dd297",
+          "podName": "agt-01a14340deda7000aee19ced5d7d000f",
+          "purpose": "agent",
+          "revision": 1,
+          "namespace": "cs-rfc041-bot-continuity-20261015",
+          "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+          "resourceId": "01a14340-deda-7000-aee1-9ced5d7d000f",
+          "finalization": null
+        },
+        "nodeName": "desktop-control-plane",
+        "containers": [
+          {
+            "kind": "init",
+            "name": "workload-admission",
+            "state": "terminated",
+            "exitCode": 0,
+            "containerId": "containerd://5dbac8b818fa5819ad5bc745d85eb005a6f04929ebca11d08bffcec5b928c2f1"
+          },
+          {
+            "kind": "init",
+            "name": "prepare-bot-context",
+            "state": "terminated",
+            "exitCode": 0,
+            "containerId": "containerd://f8021b726de3432c7335d4f0facb9cc207f7f153b5715f7a5ad1776195a21efd"
+          },
+          {
+            "kind": "container",
+            "name": "agt-01a14340deda7000aee19ced5d7d000f",
+            "state": "terminated",
+            "exitCode": 0,
+            "containerId": "containerd://f3f3d81fa3d9dc3fac998becc37a89f93f574dcc36127c6e18efd8e9ff249685"
+          }
+        ],
+        "observedAt": "2026-10-16T05:51:31.004Z",
+        "podResourceVersion": "5234214"
+      }
+    },
+    {
+      "id": "01a14344-c09b-7000-b4a7-15e09867ddee",
+      "resourceId": "01a14344-bc59-7001-ab1d-abdff1b92a0a",
+      "podName": "agt-01a14344bc597001ab1dabdff1b92a0a",
+      "admissionClosed": true,
+      "consumer": {
+        "id": "01a14344-c09b-7000-b4a7-15e09867ddee",
+        "taskId": "01a1433e-acbc-7000-a4b8-3dd5484dd297",
+        "podName": "agt-01a14344bc597001ab1dabdff1b92a0a",
+        "purpose": "agent",
+        "revision": 1,
+        "namespace": "cs-rfc041-bot-continuity-20261015",
+        "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+        "resourceId": "01a14344-bc59-7001-ab1d-abdff1b92a0a",
+        "finalization": null
+      },
+      "startPermit": {
+        "podUid": "7a302124-72ba-4211-bf29-496d8e0ddf7e",
+        "nodeUid": "1d907504-da49-4ad5-bcf1-05bf3de4139d",
+        "nodeName": "desktop-control-plane",
+        "grantedAt": "2026-10-16T05:52:23.858Z"
+      },
+      "stopProof": {
+        "id": "01a14345-ef0e-7000-8d64-960cca5b8400",
+        "type": "kubelet-terminated",
+        "podUid": "7a302124-72ba-4211-bf29-496d8e0ddf7e",
+        "nodeUid": "1d907504-da49-4ad5-bcf1-05bf3de4139d",
+        "consumer": {
+          "id": "01a14344-c09b-7000-b4a7-15e09867ddee",
+          "taskId": "01a1433e-acbc-7000-a4b8-3dd5484dd297",
+          "podName": "agt-01a14344bc597001ab1dabdff1b92a0a",
+          "purpose": "agent",
+          "revision": 1,
+          "namespace": "cs-rfc041-bot-continuity-20261015",
+          "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+          "resourceId": "01a14344-bc59-7001-ab1d-abdff1b92a0a",
+          "finalization": null
+        },
+        "nodeName": "desktop-control-plane",
+        "containers": [
+          {
+            "kind": "init",
+            "name": "workload-admission",
+            "state": "terminated",
+            "exitCode": 0,
+            "containerId": "containerd://819e0a806a1b5fb3ec85d89daf8e8aa21a4b41526dd1756ed984d21ca2b6cb6e"
+          },
+          {
+            "kind": "init",
+            "name": "prepare-bot-context",
+            "state": "terminated",
+            "exitCode": 0,
+            "containerId": "containerd://45dd401296fcc07f4ab39bd159a0263c4d3f2f7ddd5a3eda887bebec14753659"
+          },
+          {
+            "kind": "container",
+            "name": "agt-01a14344bc597001ab1dabdff1b92a0a",
+            "state": "terminated",
+            "exitCode": 0,
+            "containerId": "containerd://7143fe5e23ebd709a41e91ce7985c99db1c0aa0af3259e45fa761da19bb08c45"
+          }
+        ],
+        "observedAt": "2026-10-16T05:53:39.081Z",
+        "podResourceVersion": "5234459"
+      }
+    },
+    {
+      "id": "01a14391-ebb8-7000-af52-d785c91659f0",
+      "resourceId": "01a14391-e764-7001-bf99-8ebf29e6e5ba",
+      "podName": "agt-01a14391e7647001bf998ebf29e6e5ba",
+      "admissionClosed": true,
+      "consumer": {
+        "id": "01a14391-ebb8-7000-af52-d785c91659f0",
+        "taskId": "01a1433e-acbc-7000-a4b8-3dd5484dd297",
+        "podName": "agt-01a14391e7647001bf998ebf29e6e5ba",
+        "purpose": "agent",
+        "revision": 1,
+        "namespace": "cs-rfc041-bot-continuity-20261015",
+        "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+        "resourceId": "01a14391-e764-7001-bf99-8ebf29e6e5ba",
+        "finalization": null
+      },
+      "startPermit": {
+        "podUid": "ef809070-0cee-40f0-9ed1-16c172615783",
+        "nodeUid": "1d907504-da49-4ad5-bcf1-05bf3de4139d",
+        "nodeName": "desktop-control-plane",
+        "grantedAt": "2026-10-16T07:16:40.927Z"
+      },
+      "stopProof": {
+        "id": "01a14393-ca50-7000-8733-987531402985",
+        "type": "kubelet-terminated",
+        "podUid": "ef809070-0cee-40f0-9ed1-16c172615783",
+        "nodeUid": "1d907504-da49-4ad5-bcf1-05bf3de4139d",
+        "consumer": {
+          "id": "01a14391-ebb8-7000-af52-d785c91659f0",
+          "taskId": "01a1433e-acbc-7000-a4b8-3dd5484dd297",
+          "podName": "agt-01a14391e7647001bf998ebf29e6e5ba",
+          "purpose": "agent",
+          "revision": 1,
+          "namespace": "cs-rfc041-bot-continuity-20261015",
+          "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+          "resourceId": "01a14391-e764-7001-bf99-8ebf29e6e5ba",
+          "finalization": null
+        },
+        "nodeName": "desktop-control-plane",
+        "containers": [
+          {
+            "kind": "init",
+            "name": "workload-admission",
+            "state": "terminated",
+            "exitCode": 0,
+            "containerId": "containerd://5104f527c34e3079f4857b19fd8a1a079ee6c7aa0b50225bca9867b2f8abc158"
+          },
+          {
+            "kind": "init",
+            "name": "prepare-bot-context",
+            "state": "terminated",
+            "exitCode": 0,
+            "containerId": "containerd://8c48da7c81e0023afb723d5c3f95c23f8c4e28082ddcb3266d812f4ac6ab02a7"
+          },
+          {
+            "kind": "container",
+            "name": "agt-01a14391e7647001bf998ebf29e6e5ba",
+            "state": "terminated",
+            "exitCode": 0,
+            "containerId": "containerd://bec9c84494c1eefec022fbf7b155a383a74d920ebde5f80c2cc28cf2a2301d48"
+          }
+        ],
+        "observedAt": "2026-10-16T07:18:41.482Z",
+        "podResourceVersion": "5244726"
+      }
+    },
+    {
+      "id": "01a143b1-e523-7000-b4b5-cc583725ff16",
+      "resourceId": "01a143b1-d8d7-7001-a972-dfba9a314a4f",
+      "podName": "agt-01a143b1d8d77001a972dfba9a314a4f",
+      "admissionClosed": true,
+      "consumer": {
+        "id": "01a143b1-e523-7000-b4b5-cc583725ff16",
+        "taskId": "01a1433e-acbc-7000-a4b8-3dd5484dd297",
+        "podName": "agt-01a143b1d8d77001a972dfba9a314a4f",
+        "purpose": "agent",
+        "revision": 1,
+        "namespace": "cs-rfc041-bot-continuity-20261015",
+        "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+        "resourceId": "01a143b1-d8d7-7001-a972-dfba9a314a4f",
+        "finalization": null
+      },
+      "startPermit": {
+        "podUid": "b64685e8-fca4-42d7-b5db-e13f44bb6b3e",
+        "nodeUid": "1d907504-da49-4ad5-bcf1-05bf3de4139d",
+        "nodeName": "desktop-control-plane",
+        "grantedAt": "2026-10-16T07:51:36.563Z"
+      },
+      "stopProof": {
+        "id": "01a143b8-71ee-7000-b4c2-31cac97991e2",
+        "type": "kubelet-terminated",
+        "podUid": "b64685e8-fca4-42d7-b5db-e13f44bb6b3e",
+        "nodeUid": "1d907504-da49-4ad5-bcf1-05bf3de4139d",
+        "consumer": {
+          "id": "01a143b1-e523-7000-b4b5-cc583725ff16",
+          "taskId": "01a1433e-acbc-7000-a4b8-3dd5484dd297",
+          "podName": "agt-01a143b1d8d77001a972dfba9a314a4f",
+          "purpose": "agent",
+          "revision": 1,
+          "namespace": "cs-rfc041-bot-continuity-20261015",
+          "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+          "resourceId": "01a143b1-d8d7-7001-a972-dfba9a314a4f",
+          "finalization": null
+        },
+        "nodeName": "desktop-control-plane",
+        "containers": [
+          {
+            "kind": "init",
+            "name": "workload-admission",
+            "state": "terminated",
+            "exitCode": 0,
+            "containerId": "containerd://26c38cc41d504e5e9b84dc17282755aa4b5378e6c2f754d4b98a14edd2413f08"
+          },
+          {
+            "kind": "init",
+            "name": "prepare-bot-context",
+            "state": "terminated",
+            "exitCode": 0,
+            "containerId": "containerd://6a0e193fc6b789c3251d3ffbe3f453b6a5ffd376277671188f25dd8558b40178"
+          },
+          {
+            "kind": "container",
+            "name": "agt-01a143b1d8d77001a972dfba9a314a4f",
+            "state": "terminated",
+            "exitCode": 0,
+            "containerId": "containerd://25326ca88fb70e4ab8712ec9949eec98e7a926379b91ac5879986f403655cccf"
+          }
+        ],
+        "observedAt": "2026-10-16T07:58:43.688Z",
+        "podResourceVersion": "5249389"
+      }
+    },
+    {
+      "id": "01a143b9-6c1f-7000-bddf-e48044a65b14",
+      "resourceId": "01a143b9-6382-7001-9a62-09a6ec18d7f2",
+      "podName": "agt-01a143b9638270019a6209a6ec18d7f2",
+      "admissionClosed": true,
+      "consumer": {
+        "id": "01a143b9-6c1f-7000-bddf-e48044a65b14",
+        "taskId": "01a1433e-acbc-7000-a4b8-3dd5484dd297",
+        "podName": "agt-01a143b9638270019a6209a6ec18d7f2",
+        "purpose": "agent",
+        "revision": 1,
+        "namespace": "cs-rfc041-bot-continuity-20261015",
+        "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+        "resourceId": "01a143b9-6382-7001-9a62-09a6ec18d7f2",
+        "finalization": null
+      },
+      "startPermit": {
+        "podUid": "69f5fe6a-8518-4714-b623-7ad942281767",
+        "nodeUid": "1d907504-da49-4ad5-bcf1-05bf3de4139d",
+        "nodeName": "desktop-control-plane",
+        "grantedAt": "2026-10-16T07:59:48.572Z"
+      },
+      "stopProof": {
+        "id": "01a143cb-4bb0-7000-bdb6-c9a7316d9d21",
+        "type": "kubelet-terminated",
+        "podUid": "69f5fe6a-8518-4714-b623-7ad942281767",
+        "nodeUid": "1d907504-da49-4ad5-bcf1-05bf3de4139d",
+        "consumer": {
+          "id": "01a143b9-6c1f-7000-bddf-e48044a65b14",
+          "taskId": "01a1433e-acbc-7000-a4b8-3dd5484dd297",
+          "podName": "agt-01a143b9638270019a6209a6ec18d7f2",
+          "purpose": "agent",
+          "revision": 1,
+          "namespace": "cs-rfc041-bot-continuity-20261015",
+          "volumeUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+          "resourceId": "01a143b9-6382-7001-9a62-09a6ec18d7f2",
+          "finalization": null
+        },
+        "nodeName": "desktop-control-plane",
+        "containers": [
+          {
+            "kind": "init",
+            "name": "workload-admission",
+            "state": "terminated",
+            "exitCode": 0,
+            "containerId": "containerd://30d142ce2a66ff5a44e722cf81ed6f1fa9e34fc72d0fcc1e77537dbfbe180c4f"
+          },
+          {
+            "kind": "init",
+            "name": "prepare-bot-context",
+            "state": "terminated",
+            "exitCode": 0,
+            "containerId": "containerd://e23510b0ed30c2e77aad55b4b02bf18279f92149f2d2e42c4f352a1b151830e1"
+          },
+          {
+            "kind": "container",
+            "name": "agt-01a143b9638270019a6209a6ec18d7f2",
+            "state": "terminated",
+            "exitCode": 0,
+            "containerId": "containerd://7cbcf225acbdb606f11bd7cd1a284c724388c251749675254728ca4110a848d0"
+          }
+        ],
+        "observedAt": "2026-10-16T08:19:19.071Z",
+        "podResourceVersion": "5251964"
+      }
+    }
+  ],
+  "parentRebuild": {
+    "operationId": "01a14393-b6fd-7001-ad38-e72250ba3803",
+    "inspectionId": "01a14393-b329-7000-977b-c51f2cf0de96",
+    "idempotencyKey": "d57eaebb-6f86-4d11-bbdc-ea9de70b7088",
+    "actorId": "01a0c12a-de09-7005-b0f9-d55a8676540b",
+    "action": "restart",
+    "target": {
+      "resourceId": "01a1433e-e7c1-716f-9e1c-3fa32fed88b9",
+      "apiVersion": "v1",
+      "kind": "Pod",
+      "namespace": "cs-rfc041-bot-continuity-20261015",
+      "name": "task-01a1433eacbc7000a4b83dd5484dd297",
+      "uid": "c8d8d5a1-22fb-44ae-820c-d1dd5bdd6b9c",
+      "resourceVersion": "5243743",
+      "revision": "79c07a504c95ce4d07c8270a2273036bfadcefca3c8694ed489a2882c3ce2fbe",
+      "observedAt": "2026-10-16T07:18:34.684Z",
+      "createdAt": "2026-10-16T05:45:45Z",
+      "generation": 1,
+      "observedGeneration": 1,
+      "view": "pods",
+      "ownership": {
+        "scope": "project",
+        "projectId": "01a1432d-f9d3-7000-8fc6-c5abd3b64781",
+        "projectName": "RFC041 Bot 持续会话验收",
+        "slug": "rfc041-bot-continuity-20261015",
+        "projectKind": "DigitalWorker",
+        "archived": false
+      },
+      "purpose": "development-workspace",
+      "phase": "Running",
+      "ready": true,
+      "abnormal": false,
+      "reason": "checkout: Completed (exit 0)",
+      "topLevel": true,
+      "standalone": true,
+      "restarts": 0,
+      "node": "desktop-control-plane",
+      "labels": {
+        "crewstation.io/task": "01a1433e-acbc-7000-a4b8-3dd5484dd297",
+        "crewstation.io/project": "rfc041-bot-continuity-20261015",
+        "crewstation.io/service": "rfc041-bot-continuity-20261015",
+        "crewstation.io/workload": "dev-session",
+        "app.kubernetes.io/managed-by": "crewstation"
+      },
+      "owners": [],
+      "references": [
+        "cs-rfc041-bot-continuity-20261015/PersistentVolumeClaim/task-01a1433eacbc7000a4b83dd5484dd297-work",
+        "cs-rfc041-bot-continuity-20261015/Secret/task-01a1433eacbc7000a4b83dd5484dd297-runner-1",
+        "cs-rfc041-bot-continuity-20261015/Secret/task-01a1433eacbc7000a4b83dd5484dd297-checkout-1",
+        "cs-rfc041-bot-continuity-20261015/ServiceAccount/default"
+      ],
+      "containers": [
+        {
+          "name": "task-01a1433eacbc7000a4b83dd5484dd297",
+          "init": false,
+          "type": "application",
+          "image": "registry.crewstation-system.svc.cluster.local:5000/crewstation/task-runtime@sha256:0f87aceb9eb8c51ac3dd97bc4460e4d5b101aa6482b1d7f0bd41c590a3254e79",
+          "ready": true,
+          "restarts": 0,
+          "state": "running",
+          "requests": {
+            "cpu": "100m",
+            "memory": "2Gi",
+            "ephemeral-storage": "2Gi"
+          },
+          "limits": {
+            "cpu": "100m",
+            "memory": "2Gi",
+            "ephemeral-storage": "2Gi"
+          },
+          "ports": []
+        },
+        {
+          "name": "checkout",
+          "init": true,
+          "type": "init",
+          "image": "registry.crewstation-system.svc.cluster.local:5000/crewstation/task-runtime@sha256:0f87aceb9eb8c51ac3dd97bc4460e4d5b101aa6482b1d7f0bd41c590a3254e79",
+          "ready": true,
+          "restarts": 0,
+          "state": "terminated",
+          "reason": "Completed",
+          "exitCode": 0,
+          "requests": {
+            "cpu": "200m",
+            "memory": "256Mi"
+          },
+          "limits": {
+            "cpu": "200m",
+            "memory": "256Mi"
+          },
+          "ports": []
+        }
+      ],
+      "facts": {
+        "qos": "Guaranteed"
+      },
+      "mounts": [
+        {
+          "claimName": "task-01a1433eacbc7000a4b83dd5484dd297-work",
+          "container": "task-01a1433eacbc7000a4b83dd5484dd297",
+          "mountPath": "/work",
+          "readOnly": false,
+          "init": false
+        },
+        {
+          "claimName": "task-01a1433eacbc7000a4b83dd5484dd297-work",
+          "container": "checkout",
+          "mountPath": "/work",
+          "readOnly": false,
+          "init": true
+        }
+      ],
+      "taskId": "01a1433e-acbc-7000-a4b8-3dd5484dd297",
+      "profile": "01a0c12a-de0c-7001-a7d7-a0212edcc3dc",
+      "domainRevision": "2026-10-16T07:16:06.074Z",
+      "availableActions": [
+        {
+          "action": "restart",
+          "enabled": true,
+          "reason": "",
+          "executionRoute": "task",
+          "impactSummary": [
+            "受控重建或单次重开；确认前检查子执行、未推送变更与工作卷"
+          ]
+        },
+        {
+          "action": "scale",
+          "enabled": false,
+          "reason": "该资源不支持此操作",
+          "executionRoute": "none",
+          "impactSummary": []
+        },
+        {
+          "action": "restore-replicas",
+          "enabled": false,
+          "reason": "该资源不支持此操作",
+          "executionRoute": "none",
+          "impactSummary": []
+        },
+        {
+          "action": "delete",
+          "enabled": true,
+          "reason": "",
+          "executionRoute": "task",
+          "impactSummary": [
+            "通过任务所属生命周期结束执行；工作卷影响会在确认前检查"
+          ]
+        }
+      ],
+      "ledger": {
+        "id": "01a1433e-acbc-7000-a4b8-3dd5484dd297",
+        "kind": "dev-workspace",
+        "phase": "ready",
+        "phaseSince": "2026-10-16T05:45:55.438Z",
+        "actions": [
+          {
+            "id": "release",
+            "enabled": false,
+            "disabledReason": "这类资源暂不支持在这里操作"
+          },
+          {
+            "id": "retry",
+            "enabled": false,
+            "disabledReason": "只有失败的才可以重试"
+          }
+        ],
+        "version": 17,
+        "maintained": false
+      }
+    },
+    "params": {
+      "action": "restart"
+    },
+    "phase": "succeeded",
+    "observationStartedAt": "2026-10-16T07:18:39.545Z",
+    "createdAt": "2026-10-16T07:18:36.541Z",
+    "updatedAt": "2026-10-16T07:19:06.001Z",
+    "finishedAt": "2026-10-16T07:19:06.001Z",
+    "durationMs": 29460,
+    "traceId": "79c5efa7-e719-438a-8038-11c19376d56c",
+    "httpStatus": 200,
+    "reason": "原工作树已恢复；需要的 CLI 请逐个手动启动",
+    "domainOperationId": "01a14393-b6fd-7001-ad38-e72250ba3803"
+  },
+  "physicalVolumeRelease": [
+    {
+      "kind": "pvc",
+      "namespace": "cs-rfc041-bot-continuity-20261015",
+      "name": "bot-01a1433eacbc7000a4b83dd5484dd297",
+      "originalUid": "897430a0-a723-4295-be96-a52b9a25f28d",
+      "absent": true,
+      "observedAt": "2026-10-16T08:19:37.072931+00:00"
+    },
+    {
+      "kind": "pv",
+      "namespace": null,
+      "name": "pvc-897430a0-a723-4295-be96-a52b9a25f28d",
+      "originalUid": "325ec9a4-ad5f-4c04-8fa8-c7d67ea2ad52",
+      "absent": true,
+      "observedAt": "2026-10-16T08:19:37.184622+00:00"
+    },
+    {
+      "kind": "pvc",
+      "namespace": "cs-rfc041-bot-continuity-20261015",
+      "name": "task-01a1433eacbc7000a4b83dd5484dd297-work",
+      "originalUid": "13b9dd76-eeab-428b-90d5-7a6c66b8c6ff",
+      "absent": true,
+      "observedAt": "2026-10-16T08:19:37.282784+00:00"
+    },
+    {
+      "kind": "pv",
+      "namespace": null,
+      "name": "pvc-13b9dd76-eeab-428b-90d5-7a6c66b8c6ff",
+      "originalUid": "ef8a176a-7039-4ed6-8b7f-b27146a12efa",
+      "absent": true,
+      "observedAt": "2026-10-16T08:19:37.377131+00:00"
+    }
+  ],
+  "releaseResourceLedger": {
+    "at": "2026-10-16T08:19:53.477180+00:00",
+    "records": [
+      {
+        "id": "01a1433e-acbc-7000-a4b8-3dd5484dd297",
+        "kind": "dev-workspace",
+        "ownerRef": "01a1433e-acbc-7000-a4b8-3dd5484dd297",
+        "desired": "absent",
+        "phase": "stopped",
+        "phaseSince": "2026-10-16T08:19:18.842+00:00",
+        "generation": 3,
+        "status": {
+          "reason": {
+            "code": "user",
+            "message": "用户释放"
+          },
+          "display": {
+            "branch": "main",
+            "profile": "01a0c12a-de0c-7001-a7d7-a0212edcc3dc"
+          },
+          "startup": {
+            "state": "ready",
+            "stages": [
+              {
+                "kind": "queue",
+                "state": "succeeded",
+                "endedAt": "2026-10-16T07:18:56.468Z",
+                "startedAt": "2026-10-16T07:18:39.327Z",
+                "durationMs": 17141
+              },
+              {
+                "kind": "replace",
+                "state": "succeeded",
+                "endedAt": "2026-10-16T07:18:59.173Z",
+                "startedAt": "2026-10-16T07:18:56.468Z",
+                "durationMs": 2705
+              },
+              {
+                "kind": "container",
+                "state": "succeeded",
+                "detail": "已调度到节点 desktop-control-plane",
+                "endedAt": "2026-10-16T07:18:59.173Z",
+                "startedAt": "2026-10-16T07:18:59.173Z",
+                "durationMs": 0
+              },
+              {
+                "kind": "connect",
+                "state": "succeeded",
+                "endedAt": "2026-10-16T07:19:05.274Z",
+                "startedAt": "2026-10-16T07:18:59.173Z",
+                "durationMs": 6101
+              },
+              {
+                "kind": "ready",
+                "state": "succeeded",
+                "endedAt": "2026-10-16T07:19:05.274Z",
+                "startedAt": "2026-10-16T07:19:05.274Z",
+                "durationMs": 0
+              }
+            ],
+            "endedAt": "2026-10-16T07:19:05.274Z",
+            "startedAt": "2026-10-16T07:18:39.327Z"
+          },
+          "conditions": [
+            {
+              "type": "Failed",
+              "since": "2026-10-16T05:45:43.452Z",
+              "status": "false"
+            },
+            {
+              "type": "Paused",
+              "since": "2026-10-16T05:45:43.452Z",
+              "status": "false"
+            },
+            {
+              "type": "Rebuilding",
+              "since": "2026-10-16T07:19:05.284Z",
+              "status": "false"
+            },
+            {
+              "type": "Provisioning",
+              "since": "2026-10-16T05:45:45.538Z",
+              "status": "false"
+            },
+            {
+              "type": "CrashLooping",
+              "since": "2026-10-16T05:45:45.303Z",
+              "status": "false"
+            },
+            {
+              "type": "Created",
+              "since": "2026-10-16T05:45:45.592Z",
+              "status": "true"
+            },
+            {
+              "type": "RunnerConnected",
+              "since": "2026-10-16T08:19:17.048Z",
+              "status": "false",
+              "message": "Runner 已断开"
+            }
+          ]
+        }
+      },
+      {
+        "id": "01a1433e-ad4f-7000-b17f-9e2a52ed8bd3",
+        "kind": "volume",
+        "ownerRef": "01a1433e-acbc-7000-a4b8-3dd5484dd297/work",
+        "desired": "absent",
+        "phase": "stopped",
+        "phaseSince": "2026-10-16T08:19:19.159+00:00",
+        "generation": 3,
+        "status": {
+          "reason": {
+            "code": "user",
+            "message": "用户释放"
+          },
+          "display": {
+            "mode": "follow-container"
+          },
+          "conditions": [
+            {
+              "type": "Provisioning",
+              "since": "2026-10-16T05:45:45.566Z",
+              "status": "false"
+            }
+          ]
+        }
+      },
+      {
+        "id": "01a14340-e814-7000-aa93-67277c96b05f",
+        "kind": "volume",
+        "ownerRef": "01a1433e-acbc-7000-a4b8-3dd5484dd297/bot-context",
+        "desired": "absent",
+        "phase": "stopped",
+        "phaseSince": "2026-10-16T08:19:19.148+00:00",
+        "generation": 2,
+        "status": {
+          "reason": {
+            "code": "user",
+            "message": "用户释放"
+          },
+          "display": {
+            "mode": "follow-container",
+            "purpose": "bot-context",
+            "capacity": "1Gi",
+            "conversation": "01a14340-df08-7000-81c0-e4fba486bbed"
+          },
+          "conditions": [
+            {
+              "type": "Provisioning",
+              "since": "2026-10-16T05:48:11.309Z",
+              "status": "false"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "release": {
+    "session": {
+      "taskId": "01a1433e-acbc-7000-a4b8-3dd5484dd297",
+      "projectId": "01a1432d-f9d3-7000-8fc6-c5abd3b64781",
+      "state": "releasing",
+      "branch": "main",
+      "podName": "task-r-01a14393c1df7000ad909ee670ade01b",
+      "previewHost": "dev.rfc041-bot-continuity-20261015.cs.localhost",
+      "preview": "stopped",
+      "createdBy": "01a0c12a-de09-7005-b0f9-d55a8676540b",
+      "createdAt": "2026-10-16T05:45:43.356Z",
+      "lastActivityAt": "2026-10-16T08:18:24.956Z",
+      "message": "正在结束执行并释放工作区",
+      "rebuild": {
+        "id": "01a14393-c1df-7000-ad90-9ee670ade01b",
+        "requestId": "01a14393-b6fd-7001-ad38-e72250ba3803",
+        "taskId": "01a1433e-acbc-7000-a4b8-3dd5484dd297",
+        "state": "ready",
+        "profile": {
+          "id": "01a0c12a-de0c-7001-a7d7-a0212edcc3dc",
+          "name": "rfc003-integration-qa",
+          "cpu": "100m",
+          "memory": "2Gi",
+          "storage": "2Gi"
+        },
+        "createdAt": "2026-10-16T07:18:39.327Z",
+        "updatedAt": "2026-10-16T07:19:05.274Z",
+        "message": "原工作树已恢复；需要的 CLI 请逐个手动启动"
+      },
+      "image": "registry.crewstation-system.svc.cluster.local:5000/crewstation/task-runtime@sha256:0f87aceb9eb8c51ac3dd97bc4460e4d5b101aa6482b1d7f0bd41c590a3254e79",
+      "startup": {
+        "state": "ready",
+        "stages": [
+          {
+            "kind": "queue",
+            "state": "succeeded",
+            "endedAt": "2026-10-16T07:18:56.468Z",
+            "startedAt": "2026-10-16T07:18:39.327Z",
+            "durationMs": 17141
+          },
+          {
+            "kind": "replace",
+            "state": "succeeded",
+            "endedAt": "2026-10-16T07:18:59.173Z",
+            "startedAt": "2026-10-16T07:18:56.468Z",
+            "durationMs": 2705
+          },
+          {
+            "kind": "container",
+            "state": "succeeded",
+            "detail": "已调度到节点 desktop-control-plane",
+            "endedAt": "2026-10-16T07:18:59.173Z",
+            "startedAt": "2026-10-16T07:18:59.173Z",
+            "durationMs": 0
+          },
+          {
+            "kind": "connect",
+            "state": "succeeded",
+            "endedAt": "2026-10-16T07:19:05.274Z",
+            "startedAt": "2026-10-16T07:18:59.173Z",
+            "durationMs": 6101
+          },
+          {
+            "kind": "ready",
+            "state": "succeeded",
+            "endedAt": "2026-10-16T07:19:05.274Z",
+            "startedAt": "2026-10-16T07:19:05.274Z",
+            "durationMs": 0
+          }
+        ],
+        "endedAt": "2026-10-16T07:19:05.274Z",
+        "startedAt": "2026-10-16T07:18:39.327Z",
+        "observedAt": "2026-10-16T08:19:17.398Z"
+      }
+    },
+    "unpushed": [],
+    "workspace": {
+      "status": "ready",
+      "branch": "main",
+      "headSha": "1e57b57aa800a6840c1951a72855639eceeb68a2",
+      "shallow": false,
+      "fingerprint": "c522de0c547df3e23bd8dd3d82fd8c6614a8228e3a1897956a0eb3b2adeeee47",
+      "uncommitted": [],
+      "uncommittedCount": 0,
+      "uncommittedTruncated": false,
+      "unpushed": {
+        "status": "ready",
+        "commits": [],
+        "count": 0,
+        "truncated": false
+      },
+      "upstream": {
+        "status": "ready",
+        "name": "origin/main",
+        "headSha": "1e57b57aa800a6840c1951a72855639eceeb68a2",
+        "ahead": 0,
+        "behind": 0
+      },
+      "checkedAt": "2026-10-16T08:19:16.693Z",
+      "taskId": "01a1433e-acbc-7000-a4b8-3dd5484dd297"
+    }
+  },
+  "releasedParentPod": {
+    "name": "task-r-01a14393c1df7000ad909ee670ade01b",
+    "originalUid": "7b34037f-fa67-4a06-8565-3bdd51f55d79",
+    "absent": true,
+    "observedAt": "2026-10-16T08:20:28.794370+00:00"
+  },
+  "workspaceIsolation": [
+    {
+      "input": {
+        "type": "listFiles",
+        "path": ".",
+        "id": "rfc041-isolation-0"
+      },
+      "frame": {
+        "type": "result",
+        "id": "rfc041-isolation-0",
+        "payload": {
+          "path": ".",
+          "entries": [
+            {
+              "name": ".bun",
+              "kind": "dir",
+              "size": 4096,
+              "modifiedAt": "2026-10-16T05:45:54.662Z"
+            },
+            {
+              "name": ".dockerignore",
+              "kind": "file",
+              "size": 46,
+              "modifiedAt": "2026-10-16T05:45:50.321Z"
+            },
+            {
+              "name": ".git",
+              "kind": "dir",
+              "size": 4096,
+              "modifiedAt": "2026-10-16T05:48:29.020Z"
+            },
+            {
+              "name": ".gitignore",
+              "kind": "file",
+              "size": 384,
+              "modifiedAt": "2026-10-16T05:45:50.321Z"
+            },
+            {
+              "name": "CONTRIBUTING.md",
+              "kind": "file",
+              "size": 1332,
+              "modifiedAt": "2026-10-16T05:45:50.321Z"
+            },
+            {
+              "name": "Dockerfile",
+              "kind": "file",
+              "size": 341,
+              "modifiedAt": "2026-10-16T05:45:50.321Z"
+            },
+            {
+              "name": "README.md",
+              "kind": "file",
+              "size": 5140,
+              "modifiedAt": "2026-10-16T05:45:50.321Z"
+            },
+            {
+              "name": "bun.lock",
+              "kind": "file",
+              "size": 1132,
+              "modifiedAt": "2026-10-16T05:45:50.321Z"
+            },
+            {
+              "name": "crewstation.yaml",
+              "kind": "file",
+              "size": 847,
+              "modifiedAt": "2026-10-16T05:45:50.321Z"
+            },
+            {
+              "name": "openapi.yaml",
+              "kind": "file",
+              "size": 1288,
+              "modifiedAt": "2026-10-16T05:45:50.321Z"
+            },
+            {
+              "name": "package.json",
+              "kind": "file",
+              "size": 515,
+              "modifiedAt": "2026-10-16T05:45:50.321Z"
+            },
+            {
+              "name": "src",
+              "kind": "dir",
+              "size": 4096,
+              "modifiedAt": "2026-10-16T05:45:50.321Z"
+            },
+            {
+              "name": "tsconfig.json",
+              "kind": "file",
+              "size": 466,
+              "modifiedAt": "2026-10-16T05:45:50.322Z"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "type": "workspaceStatus",
+        "id": "rfc041-isolation-1"
+      },
+      "frame": {
+        "type": "result",
+        "id": "rfc041-isolation-1",
+        "payload": {
+          "status": "ready",
+          "headSha": "1e57b57aa800a6840c1951a72855639eceeb68a2",
+          "branch": "main",
+          "shallow": false,
+          "fingerprint": "c522de0c547df3e23bd8dd3d82fd8c6614a8228e3a1897956a0eb3b2adeeee47",
+          "uncommitted": [],
+          "uncommittedCount": 0,
+          "uncommittedTruncated": false,
+          "unpushed": {
+            "status": "ready",
+            "count": 0,
+            "commits": [],
+            "truncated": false
+          },
+          "upstream": {
+            "status": "ready",
+            "name": "origin/main",
+            "headSha": "1e57b57aa800a6840c1951a72855639eceeb68a2",
+            "ahead": 0,
+            "behind": 0
+          },
+          "checkedAt": "2026-10-16T07:28:49.067Z"
+        }
+      }
+    },
+    {
+      "input": {
+        "type": "listFiles",
+        "path": "/var/lib/crewstation/bot-context",
+        "id": "rfc041-isolation-2"
+      },
+      "frame": {
+        "type": "error",
+        "id": "rfc041-isolation-2",
+        "code": "precondition",
+        "message": "路径 /var/lib/crewstation/bot-context 不在工作目录内或形式不合法"
+      }
+    },
+    {
+      "input": {
+        "type": "readFile",
+        "path": "../../var/lib/crewstation/bot-context/opencode.db",
+        "id": "rfc041-isolation-3"
+      },
+      "frame": {
+        "type": "error",
+        "id": "rfc041-isolation-3",
+        "code": "precondition",
+        "message": "路径 ../../var/lib/crewstation/bot-context/opencode.db 不在工作目录内或形式不合法"
+      }
+    }
+  ],
+  "browserRefresh": {
+    "at": "2026-10-16T07:13:30.280Z",
+    "before": [
+      {
+        "role": "你",
+        "text": "这是持续会话验收。请只在当前对话上下文记住随机标记 BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf。不要写文件，不要调用工具，不要保存到项目或外部服务。仅回复“已记住”。"
+      },
+      {
+        "role": "Crew Bot",
+        "text": "Crew Bot已记住"
+      },
+      {
+        "role": "你",
+        "text": "请直接复述第一轮约定的随机标记，不要调用工具或查询文件。"
+      },
+      {
+        "role": "Crew Bot",
+        "text": "Crew BotBOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+      },
+      {
+        "role": "你",
+        "text": "第三轮：仍然不要调用工具或读取文件，请再次给出最初的随机标记，并在前面写“上下文仍在：”。"
+      },
+      {
+        "role": "Crew Bot",
+        "text": "Crew Bot上下文仍在：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+      },
+      {
+        "role": "你",
+        "text": "请只使用 bash 执行 sleep 120。执行结束后再复述我们第一轮约定的随机标记，不要查询文件，不要写文件，不要主动提前结束命令。"
+      },
+      {
+        "role": "你",
+        "text": "刚才主动停止了执行。现在不要再执行 sleep，不要调用工具，不要读取文件，请直接复述第一轮约定的随机标记。"
+      },
+      {
+        "role": "Crew Bot",
+        "text": "Crew BotBOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+      }
+    ],
+    "after": [
+      {
+        "role": "你",
+        "text": "这是持续会话验收。请只在当前对话上下文记住随机标记 BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf。不要写文件，不要调用工具，不要保存到项目或外部服务。仅回复“已记住”。"
+      },
+      {
+        "role": "Crew Bot",
+        "text": "Crew Bot已记住"
+      },
+      {
+        "role": "你",
+        "text": "请直接复述第一轮约定的随机标记，不要调用工具或查询文件。"
+      },
+      {
+        "role": "Crew Bot",
+        "text": "Crew BotBOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+      },
+      {
+        "role": "你",
+        "text": "第三轮：仍然不要调用工具或读取文件，请再次给出最初的随机标记，并在前面写“上下文仍在：”。"
+      },
+      {
+        "role": "Crew Bot",
+        "text": "Crew Bot上下文仍在：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+      },
+      {
+        "role": "你",
+        "text": "请只使用 bash 执行 sleep 120。执行结束后再复述我们第一轮约定的随机标记，不要查询文件，不要写文件，不要主动提前结束命令。"
+      },
+      {
+        "role": "你",
+        "text": "刚才主动停止了执行。现在不要再执行 sleep，不要调用工具，不要读取文件，请直接复述第一轮约定的随机标记。"
+      },
+      {
+        "role": "Crew Bot",
+        "text": "Crew BotBOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+      }
+    ],
+    "draft": "执行容器已经从集群侧退出并重新接入。不要调用工具，不要读写文件，请仅回复“冷续接成功：”加上第一轮约定的随机标记。",
+    "sameMessages": true,
+    "sameDraft": true
+  },
+  "browserNavigation": {
+    "at": "2026-10-16T07:56:21.269Z",
+    "overview": {
+      "url": "http://console.cs.localhost/projects/01a1432d-f9d3-7000-8fc6-c5abd3b64781",
+      "dialogs": 0
+    },
+    "before": [
+      {
+        "role": "你",
+        "text": "这是持续会话验收。请只在当前对话上下文记住随机标记 BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf。不要写文件，不要调用工具，不要保存到项目或外部服务。仅回复“已记住”。"
+      },
+      {
+        "role": "Crew Bot",
+        "text": "Crew Bot已记住"
+      },
+      {
+        "role": "你",
+        "text": "请直接复述第一轮约定的随机标记，不要调用工具或查询文件。"
+      },
+      {
+        "role": "Crew Bot",
+        "text": "Crew BotBOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+      },
+      {
+        "role": "你",
+        "text": "第三轮：仍然不要调用工具或读取文件，请再次给出最初的随机标记，并在前面写“上下文仍在：”。"
+      },
+      {
+        "role": "Crew Bot",
+        "text": "Crew Bot上下文仍在：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+      },
+      {
+        "role": "你",
+        "text": "请只使用 bash 执行 sleep 120。执行结束后再复述我们第一轮约定的随机标记，不要查询文件，不要写文件，不要主动提前结束命令。"
+      },
+      {
+        "role": "你",
+        "text": "刚才主动停止了执行。现在不要再执行 sleep，不要调用工具，不要读取文件，请直接复述第一轮约定的随机标记。"
+      },
+      {
+        "role": "Crew Bot",
+        "text": "Crew BotBOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+      },
+      {
+        "role": "你",
+        "text": "执行容器已经从集群侧退出并重新接入。不要调用工具，不要读写文件，请仅回复“冷续接成功：”加上第一轮约定的随机标记。"
+      },
+      {
+        "role": "Crew Bot",
+        "text": "Crew Bot冷续接成功：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+      },
+      {
+        "role": "你",
+        "text": "父开发环境已经重建。不要调用工具，不要读写文件，请只回复“重建续接成功：”加上第一轮约定的随机标记。"
+      },
+      {
+        "role": "Crew Bot",
+        "text": "Crew Bot重建续接成功：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+      },
+      {
+        "role": "你",
+        "text": "请只调用一次 bash，执行 printf RFC041_TOOL_ARGS_OK，不要读写文件。执行完成后只回复“命令验证完成”。"
+      },
+      {
+        "role": "Crew Bot",
+        "text": "Crew Bot命令验证完成"
+      }
+    ],
+    "after": {
+      "dialogs": 0,
+      "draft": "这是离开后应保留的验收草稿，暂不发送。",
+      "messages": [
+        {
+          "role": "你",
+          "text": "这是持续会话验收。请只在当前对话上下文记住随机标记 BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf。不要写文件，不要调用工具，不要保存到项目或外部服务。仅回复“已记住”。"
+        },
+        {
+          "role": "Crew Bot",
+          "text": "Crew Bot已记住"
+        },
+        {
+          "role": "你",
+          "text": "请直接复述第一轮约定的随机标记，不要调用工具或查询文件。"
+        },
+        {
+          "role": "Crew Bot",
+          "text": "Crew BotBOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+        },
+        {
+          "role": "你",
+          "text": "第三轮：仍然不要调用工具或读取文件，请再次给出最初的随机标记，并在前面写“上下文仍在：”。"
+        },
+        {
+          "role": "Crew Bot",
+          "text": "Crew Bot上下文仍在：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+        },
+        {
+          "role": "你",
+          "text": "请只使用 bash 执行 sleep 120。执行结束后再复述我们第一轮约定的随机标记，不要查询文件，不要写文件，不要主动提前结束命令。"
+        },
+        {
+          "role": "你",
+          "text": "刚才主动停止了执行。现在不要再执行 sleep，不要调用工具，不要读取文件，请直接复述第一轮约定的随机标记。"
+        },
+        {
+          "role": "Crew Bot",
+          "text": "Crew BotBOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+        },
+        {
+          "role": "你",
+          "text": "执行容器已经从集群侧退出并重新接入。不要调用工具，不要读写文件，请仅回复“冷续接成功：”加上第一轮约定的随机标记。"
+        },
+        {
+          "role": "Crew Bot",
+          "text": "Crew Bot冷续接成功：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+        },
+        {
+          "role": "你",
+          "text": "父开发环境已经重建。不要调用工具，不要读写文件，请只回复“重建续接成功：”加上第一轮约定的随机标记。"
+        },
+        {
+          "role": "Crew Bot",
+          "text": "Crew Bot重建续接成功：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+        },
+        {
+          "role": "你",
+          "text": "请只调用一次 bash，执行 printf RFC041_TOOL_ARGS_OK，不要读写文件。执行完成后只回复“命令验证完成”。"
+        },
+        {
+          "role": "Crew Bot",
+          "text": "Crew Bot命令验证完成"
+        }
+      ]
+    },
+    "draftAfterLeave": "这是离开后应保留的验收草稿，暂不发送。",
+    "cli": "已连接\nmain\n原工作树已恢复\n创建开发Agent会话\n选择算力档位\n新窗口打开预览\n准备发布\n释放会话\nCLI b7829b\nCLI 运行失败\n×\nCLI 运行失败\nopencode-go-deepseek-v4.1-flash\nsha256:0f87aceb9eb8\n档位修订 16\nCPU 400m · 2Gi\n运行环境退出前未能保存末屏\n\n容器不存在\n\n重新启动一窗\n \n预览\n代码\n变更\n数据访问\n可使用资源\n会话与环境\n当前工作树: main @ 1e57b57aa8\n生产部署: 尚未部署\n尚无生产版本\n未提交文件 0\n未推送提交 0\n查看变更\n所有 CLI 共用当前工作树 · 标签与排列仅属于你\n个人布局已保存",
+    "sameMessages": true
+  },
+  "browserToolDetail": {
+    "at": "2026-10-16T07:54:06.889Z",
+    "dialog": {
+      "rect": {
+        "height": 468.171875,
+        "width": 880,
+        "x": 424,
+        "y": 174.4140625
+      },
+      "sharedDialog": true,
+      "text": "bash · 执行详情✕调用 ID call_00_xqys3K7tg06fUpvOAn6Q3891实际命令复制printf RFC041_TOOL_ARGS_OK输入参数复制{\n  \"command\": \"printf RFC041_TOOL_ARGS_OK\"\n}返回结果复制RFC041_TOOL_ARGS_OK"
+    },
+    "before": {
+      "answers": [
+        "Crew Bot已记住",
+        "Crew BotBOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf",
+        "Crew Bot上下文仍在：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf",
+        "Crew BotBOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf",
+        "Crew Bot冷续接成功：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf",
+        "Crew Bot重建续接成功：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf",
+        "Crew Bot命令验证完成"
+      ],
+      "scroll": 1830.5
+    },
+    "after": {
+      "answers": [
+        "Crew Bot已记住",
+        "Crew BotBOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf",
+        "Crew Bot上下文仍在：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf",
+        "Crew BotBOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf",
+        "Crew Bot冷续接成功：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf",
+        "Crew Bot重建续接成功：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf",
+        "Crew Bot命令验证完成"
+      ],
+      "focus": "查看 bash 执行详情",
+      "scroll": 1933.5
+    }
+  },
+  "browserFreshContext": {
+    "at": "2026-10-16T08:07:37.476Z",
+    "confirmedDialogBefore": "历史与设置\n✕\n\nBot 与 CLI 各自保留上下文，共享项目文件。切换页面不会开启新对话。\n\n返回当前 Bot\n开启全新上下文\n\nopencode-go-deepseek-v4.1-flash · 上下文 2 · 尚未开始\n\n上下文 1 · 正在停止\nses_ebcbec57fffecKX95xBPqYqrZR\n上下文 1 · 准备中\nses_ebcbec57fffecKX95xBPqYqrZR\n上下文 1 · 已暂停 · 可以续聊\nses_ebcbec57fffecKX95xBPqYqrZR\n上下文 1 · 已暂停 · 可以续聊\nses_ebcbec57fffecKX95xBPqYqrZR",
+    "after": {
+      "messages": [
+        {
+          "role": "你",
+          "text": "这是持续会话验收。请只在当前对话上下文记住随机标记 BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf。不要写文件，不要调用工具，不要保存到项目或外部服务。仅回复“已记住”。"
+        },
+        {
+          "role": "Crew Bot",
+          "text": "Crew Bot已记住"
+        },
+        {
+          "role": "你",
+          "text": "请直接复述第一轮约定的随机标记，不要调用工具或查询文件。"
+        },
+        {
+          "role": "Crew Bot",
+          "text": "Crew BotBOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+        },
+        {
+          "role": "你",
+          "text": "第三轮：仍然不要调用工具或读取文件，请再次给出最初的随机标记，并在前面写“上下文仍在：”。"
+        },
+        {
+          "role": "Crew Bot",
+          "text": "Crew Bot上下文仍在：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+        },
+        {
+          "role": "你",
+          "text": "请只使用 bash 执行 sleep 120。执行结束后再复述我们第一轮约定的随机标记，不要查询文件，不要写文件，不要主动提前结束命令。"
+        },
+        {
+          "role": "你",
+          "text": "刚才主动停止了执行。现在不要再执行 sleep，不要调用工具，不要读取文件，请直接复述第一轮约定的随机标记。"
+        },
+        {
+          "role": "Crew Bot",
+          "text": "Crew BotBOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+        },
+        {
+          "role": "你",
+          "text": "执行容器已经从集群侧退出并重新接入。不要调用工具，不要读写文件，请仅回复“冷续接成功：”加上第一轮约定的随机标记。"
+        },
+        {
+          "role": "Crew Bot",
+          "text": "Crew Bot冷续接成功：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+        },
+        {
+          "role": "你",
+          "text": "父开发环境已经重建。不要调用工具，不要读写文件，请只回复“重建续接成功：”加上第一轮约定的随机标记。"
+        },
+        {
+          "role": "Crew Bot",
+          "text": "Crew Bot重建续接成功：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+        },
+        {
+          "role": "你",
+          "text": "请只调用一次 bash，执行 printf RFC041_TOOL_ARGS_OK，不要读写文件。执行完成后只回复“命令验证完成”。"
+        },
+        {
+          "role": "Crew Bot",
+          "text": "Crew Bot命令验证完成"
+        },
+        {
+          "role": "你",
+          "text": "这是刚明确开启的新上下文。不要调用工具，不要读写文件，请只回复“新上下文已就绪”。"
+        },
+        {
+          "role": "Crew Bot",
+          "text": "Crew Bot新上下文已就绪"
+        }
+      ],
+      "timeline": "上下文 1这是持续会话验收。请只在当前对话上下文记住随机标记 BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf。不要写文件，不要调用工具，不要保存到项目或外部服务。仅回复“已记住”。执行记录 1状态runningCrew Bot已记住执行记录 1状态waiting请直接复述第一轮约定的随机标记，不要调用工具或查询文件。执行记录 1状态runningCrew BotBOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf执行记录 1状态waiting第三轮：仍然不要调用工具或读取文件，请再次给出最初的随机标记，并在前面写“上下文仍在：”。执行记录 1状态runningCrew Bot上下文仍在：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf执行记录 1状态waiting请只使用 bash 执行 sleep 120。执行结束后再复述我们第一轮约定的随机标记，不要查询文件，不要写文件，不要主动提前结束命令。执行记录 1状态running刚才主动停止了执行。现在不要再执行 sleep，不要调用工具，不要读取文件，请直接复述第一轮约定的随机标记。执行记录 1状态runningCrew BotBOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf执行记录 1状态waiting执行容器已经从集群侧退出并重新接入。不要调用工具，不要读写文件，请仅回复“冷续接成功：”加上第一轮约定的随机标记。执行记录 1状态runningCrew Bot冷续接成功：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf执行记录 1状态waiting父开发环境已经重建。不要调用工具，不要读写文件，请只回复“重建续接成功：”加上第一轮约定的随机标记。执行记录 1状态runningCrew Bot重建续接成功：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf执行记录 1状态waiting请只调用一次 bash，执行 printf RFC041_TOOL_ARGS_OK，不要读写文件。执行完成后只回复“命令验证完成”。执行记录 2状态running调用bash查看详情printf RFC041_TOOL_ARGS_OKCrew Bot命令验证完成执行记录 1状态waiting上下文 2这是刚明确开启的新上下文。不要调用工具，不要读写文件，请只回复“新上下文已就绪”。执行记录 1状态runningCrew Bot新上下文已就绪执行记录 1状态waiting",
+      "width": 1728
+    },
+    "originalMessagesRetained": true
+  },
+  "finalResponsiveLayout": {
+    "bodyWidth": 390,
+    "bubbles": [
+      {
+        "colors": [
+          "rgba(0, 0, 0, 0)",
+          "rgb(234, 246, 239)"
+        ],
+        "text": "Crew Bot已记住"
+      },
+      {
+        "colors": [
+          "rgba(0, 0, 0, 0)",
+          "rgb(234, 246, 239)"
+        ],
+        "text": "Crew BotBOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+      },
+      {
+        "colors": [
+          "rgba(0, 0, 0, 0)",
+          "rgb(234, 246, 239)"
+        ],
+        "text": "Crew Bot上下文仍在：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+      },
+      {
+        "colors": [
+          "rgba(0, 0, 0, 0)",
+          "rgb(234, 246, 239)"
+        ],
+        "text": "Crew BotBOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+      },
+      {
+        "colors": [
+          "rgba(0, 0, 0, 0)",
+          "rgb(234, 246, 239)"
+        ],
+        "text": "Crew Bot冷续接成功：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+      },
+      {
+        "colors": [
+          "rgba(0, 0, 0, 0)",
+          "rgb(234, 246, 239)"
+        ],
+        "text": "Crew Bot重建续接成功：BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf"
+      },
+      {
+        "colors": [
+          "rgba(0, 0, 0, 0)",
+          "rgb(234, 246, 239)"
+        ],
+        "text": "Crew Bot命令验证完成"
+      },
+      {
+        "colors": [
+          "rgba(0, 0, 0, 0)",
+          "rgb(234, 246, 239)"
+        ],
+        "text": "Crew Bot新上下文已就绪"
+      }
+    ],
+    "log": {
+      "scrollWidth": 372,
+      "width": 372
+    },
+    "viewport": {
+      "height": 844,
+      "width": 390
+    }
+  },
+  "existingSnakePage": {
+    "at": "2026-10-16T07:39:32.513Z",
+    "url": "http://snake-bot-20261014.cs.localhost/",
+    "snapshot": "- main:\n  - heading \"贪吃蛇\" [level=1]\n  - paragraph: 方向键或 WASD 转向 · 吃到光点变长加分 · 别撞墙也别咬到自己\n  - generic: 分数\n  - generic: \"0\"\n  - generic: 最高分\n  - generic: \"10\"\n  - img \"贪吃蛇棋盘\"\n  - paragraph: 准备好了吗？\n  - paragraph: 点击「开始」，或按方向键／WASD 出发\n  - button \"开始\"\n  - button \"暂停\" [disabled]\n  - button \"重新开始\"\n  - region \"方向控制\":\n    - button \"上\": ▲\n    - button \"左\": ◀\n    - button \"下\": ▼\n    - button \"右\": ▶\n  - status: 等待开始\n  - generic: 最高分保存在本机浏览器。\n- document"
+  },
+  "deployment": {
+    "sourceSha": "9b4aa5a3d1a2e04663d2547db7690c0b392ff717",
+    "ciSha": "ff948919109062e3355d569699c71b53c779f7a7",
+    "at": "2026-10-16T07:50:47.210229+00:00",
+    "deployments": {
+      "cs-api": {
+        "generation": 310,
+        "image": "docker.io/library/cs-control-plane@sha256:cdc7569fbdd4549c344ccbf2b66cde1ae0f4d7a0a930ed90019a16a78b77d0eb",
+        "replicas": 1,
+        "readyReplicas": 1,
+        "observedGeneration": 310
+      },
+      "cs-auth": {
+        "generation": 205,
+        "image": "docker.io/library/cs-control-plane@sha256:cdc7569fbdd4549c344ccbf2b66cde1ae0f4d7a0a930ed90019a16a78b77d0eb",
+        "replicas": 1,
+        "readyReplicas": 1,
+        "observedGeneration": 205
+      },
+      "cs-controller": {
+        "generation": 276,
+        "image": "docker.io/library/cs-control-plane@sha256:cdc7569fbdd4549c344ccbf2b66cde1ae0f4d7a0a930ed90019a16a78b77d0eb",
+        "replicas": 1,
+        "readyReplicas": 1,
+        "observedGeneration": 276
+      },
+      "cs-events": {
+        "generation": 175,
+        "image": "docker.io/library/cs-control-plane@sha256:cdc7569fbdd4549c344ccbf2b66cde1ae0f4d7a0a930ed90019a16a78b77d0eb",
+        "replicas": 1,
+        "readyReplicas": 1,
+        "observedGeneration": 175
+      },
+      "cs-session": {
+        "generation": 226,
+        "image": "docker.io/library/cs-control-plane@sha256:cdc7569fbdd4549c344ccbf2b66cde1ae0f4d7a0a930ed90019a16a78b77d0eb",
+        "replicas": 1,
+        "readyReplicas": 1,
+        "observedGeneration": 226
+      },
+      "mcp-capabilities": {
+        "generation": 170,
+        "image": "docker.io/library/cs-control-plane@sha256:cdc7569fbdd4549c344ccbf2b66cde1ae0f4d7a0a930ed90019a16a78b77d0eb",
+        "replicas": 1,
+        "readyReplicas": 1,
+        "observedGeneration": 170
+      },
+      "mcp-operations": {
+        "generation": 170,
+        "image": "docker.io/library/cs-control-plane@sha256:cdc7569fbdd4549c344ccbf2b66cde1ae0f4d7a0a930ed90019a16a78b77d0eb",
+        "replicas": 1,
+        "readyReplicas": 1,
+        "observedGeneration": 170
+      },
+      "console": {
+        "generation": 313,
+        "image": "docker.io/library/cs-console@sha256:a4276724b5ed47e4f2696bf6e5f85e9106d277378c808542f8560f3489f0bc27",
+        "replicas": 1,
+        "readyReplicas": 1,
+        "observedGeneration": 313
+      }
+    }
+  },
+  "sourceEquivalence": {
+    "imageSourceSha": "9b4aa5a3d1a2e04663d2547db7690c0b392ff717",
+    "ciSourceSha": "ff948919109062e3355d569699c71b53c779f7a7",
+    "changedPaths": [
+      "apps/console/src/tests/developmentModes.test.tsx"
+    ],
+    "productionFilesIdentical": true
+  },
+  "consoleCi": {
+    "headSha": "ff948919109062e3355d569699c71b53c779f7a7",
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/wangbinquan/CrewStation/actions/runs/38868457866",
+    "jobs": [
+      {
+        "name": "unit（方法级 UT）",
+        "conclusion": "success",
+        "startedAt": "2026-10-16T07:38:07Z",
+        "completedAt": "2026-10-16T07:38:41Z"
+      },
+      {
+        "name": "module（模块级 UT 4/4）",
+        "conclusion": "success",
+        "startedAt": "2026-10-16T07:41:29Z",
+        "completedAt": "2026-10-16T07:46:59Z"
+      },
+      {
+        "name": "module（模块级 UT 1/4）",
+        "conclusion": "success",
+        "startedAt": "2026-10-16T07:38:08Z",
+        "completedAt": "2026-10-16T07:41:07Z"
+      },
+      {
+        "name": "e2e（实机端到端）",
+        "conclusion": "success",
+        "startedAt": "2026-10-16T07:38:08Z",
+        "completedAt": "2026-10-16T07:47:15Z"
+      },
+      {
+        "name": "module（模块级 UT 3/4）",
+        "conclusion": "success",
+        "startedAt": "2026-10-16T07:41:09Z",
+        "completedAt": "2026-10-16T07:45:27Z"
+      },
+      {
+        "name": "static（结构规则 · lint · 类型）",
+        "conclusion": "success",
+        "startedAt": "2026-10-16T07:38:07Z",
+        "completedAt": "2026-10-16T07:39:39Z"
+      },
+      {
+        "name": "console（工作台）",
+        "conclusion": "success",
+        "startedAt": "2026-10-16T07:38:07Z",
+        "completedAt": "2026-10-16T07:40:51Z"
+      },
+      {
+        "name": "module（模块级 UT 2/4）",
+        "conclusion": "success",
+        "startedAt": "2026-10-16T07:38:08Z",
+        "completedAt": "2026-10-16T07:41:27Z"
+      },
+      {
+        "name": "gate（汇总 · 新增代码防护）",
+        "conclusion": "success",
+        "startedAt": "2026-10-16T07:47:01Z",
+        "completedAt": "2026-10-16T07:47:13Z"
+      }
+    ]
+  },
+  "finalBackendDeployment": {
+    "sourceSha": "32cf2d7e154744412bcc11c951597049ec7b9463",
+    "at": "2026-10-16T08:15:24.209978+00:00",
+    "deployments": {
+      "cs-api": {
+        "image": "docker.io/library/cs-control-plane@sha256:d6c6a0b95bdc14dcdbbbdac0f6950edb670ca3d6857dc19a0272880c83437851",
+        "generation": 311,
+        "replicas": 1,
+        "readyReplicas": 1,
+        "observedGeneration": 311
+      },
+      "cs-auth": {
+        "image": "docker.io/library/cs-control-plane@sha256:d6c6a0b95bdc14dcdbbbdac0f6950edb670ca3d6857dc19a0272880c83437851",
+        "generation": 206,
+        "replicas": 1,
+        "readyReplicas": 1,
+        "observedGeneration": 206
+      },
+      "cs-controller": {
+        "image": "docker.io/library/cs-control-plane@sha256:d6c6a0b95bdc14dcdbbbdac0f6950edb670ca3d6857dc19a0272880c83437851",
+        "generation": 277,
+        "replicas": 1,
+        "readyReplicas": 1,
+        "observedGeneration": 277
+      },
+      "cs-events": {
+        "image": "docker.io/library/cs-control-plane@sha256:d6c6a0b95bdc14dcdbbbdac0f6950edb670ca3d6857dc19a0272880c83437851",
+        "generation": 176,
+        "replicas": 1,
+        "readyReplicas": 1,
+        "observedGeneration": 176
+      },
+      "cs-session": {
+        "image": "docker.io/library/cs-control-plane@sha256:d6c6a0b95bdc14dcdbbbdac0f6950edb670ca3d6857dc19a0272880c83437851",
+        "generation": 227,
+        "replicas": 1,
+        "readyReplicas": 1,
+        "observedGeneration": 227
+      },
+      "mcp-capabilities": {
+        "image": "docker.io/library/cs-control-plane@sha256:d6c6a0b95bdc14dcdbbbdac0f6950edb670ca3d6857dc19a0272880c83437851",
+        "generation": 171,
+        "replicas": 1,
+        "readyReplicas": 1,
+        "observedGeneration": 171
+      },
+      "mcp-operations": {
+        "image": "docker.io/library/cs-control-plane@sha256:d6c6a0b95bdc14dcdbbbdac0f6950edb670ca3d6857dc19a0272880c83437851",
+        "generation": 171,
+        "replicas": 1,
+        "readyReplicas": 1,
+        "observedGeneration": 171
+      },
+      "console": {
+        "image": "docker.io/library/cs-console@sha256:a4276724b5ed47e4f2696bf6e5f85e9106d277378c808542f8560f3489f0bc27",
+        "generation": 313,
+        "replicas": 1,
+        "readyReplicas": 1,
+        "observedGeneration": 313
+      }
+    }
+  },
+  "finalHistoryProjection": {
+    "items": [
+      {
+        "initialPrompt": "这是刚明确开启的新上下文。不要调用工具，不要读写文件，请只回复“新上下文已就绪”。",
+        "agentId": "01a143b9-6382-7000-9c3b-e961f3bc0117",
+        "executionTaskId": "01a143b9-6382-7001-9a62-09a6ec18d7f2",
+        "epoch": 2,
+        "state": "awaiting-input",
+        "createdAt": "2026-10-16T07:59:45.538Z",
+        "nativeSessionId": "ses_ebc465800ffe5MLqCuqxKu96pF"
+      },
+      {
+        "initialPrompt": "父开发环境已经重建。不要调用工具，不要读写文件，请只回复“重建续接成功：”加上第一轮约定的随机标记。",
+        "agentId": "01a143b1-d8d7-7000-85be-74be66dc70a4",
+        "executionTaskId": "01a143b1-d8d7-7001-a972-dfba9a314a4f",
+        "epoch": 1,
+        "state": "paused",
+        "createdAt": "2026-10-16T07:51:31.287Z",
+        "nativeSessionId": "ses_ebcbec57fffecKX95xBPqYqrZR"
+      },
+      {
+        "initialPrompt": "执行容器已经从集群侧退出并重新接入。不要调用工具，不要读写文件，请仅回复“冷续接成功：”加上第一轮约定的随机标记。",
+        "agentId": "01a14391-e764-7000-b78a-0517f3faa96d",
+        "executionTaskId": "01a14391-e764-7001-bf99-8ebf29e6e5ba",
+        "epoch": 1,
+        "state": "paused",
+        "createdAt": "2026-10-16T07:16:37.860Z",
+        "nativeSessionId": "ses_ebcbec57fffecKX95xBPqYqrZR"
+      },
+      {
+        "initialPrompt": "刚才主动停止了执行。现在不要再执行 sleep，不要调用工具，不要读取文件，请直接复述第一轮约定的随机标记。",
+        "agentId": "01a14344-bc59-7000-847b-45e2fca008f2",
+        "executionTaskId": "01a14344-bc59-7001-ab1d-abdff1b92a0a",
+        "epoch": 1,
+        "state": "paused",
+        "createdAt": "2026-10-16T05:52:20.569Z",
+        "nativeSessionId": "ses_ebcbec57fffecKX95xBPqYqrZR"
+      },
+      {
+        "initialPrompt": "这是持续会话验收。请只在当前对话上下文记住随机标记 BOT-MEMORY-9c6470d5-d3ea-4f91-9feb-753b68a38dbf。不要写文件，不要调用工具，不要保存到项目或外部服务。仅回复“已记住”。",
+        "agentId": "01a14340-ef15-7000-9b74-113d12b79b70",
+        "executionTaskId": "01a14340-deda-7000-aee1-9ced5d7d000f",
+        "epoch": 1,
+        "state": "paused",
+        "createdAt": "2026-10-16T05:48:11.413Z",
+        "nativeSessionId": "ses_ebcbec57fffecKX95xBPqYqrZR"
+      }
+    ]
+  },
+  "finalHistoryBrowser": {
+    "at": "2026-10-16T08:18:24.437Z",
+    "text": "历史与设置\n✕\n\nBot 与 CLI 各自保留上下文，共享项目文件。切换页面不会开启新对话。\n\n返回当前 Bot\n开启全新上下文\n\nopencode-go-deepseek-v4.1-flash · 上下文 2 · 等待你的消息\n\n上下文 2 · 等待你的消息\nses_ebc465800ffe5MLqCuqxKu96pF\n上下文 1 · 已暂停 · 可以续聊\nses_ebcbec57fffecKX95xBPqYqrZR\n上下文 1 · 已暂停 · 可以续聊\nses_ebcbec57fffecKX95xBPqYqrZR\n上下文 1 · 已暂停 · 可以续聊\nses_ebcbec57fffecKX95xBPqYqrZR\n上下文 1 · 已暂停 · 可以续聊\nses_ebcbec57fffecKX95xBPqYqrZR"
+  },
+  "ci": {
+    "headSha": "32cf2d7e154744412bcc11c951597049ec7b9463",
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/wangbinquan/CrewStation/actions/runs/38870965711",
+    "jobs": [
+      {
+        "name": "e2e（实机端到端）",
+        "conclusion": "success",
+        "startedAt": "2026-10-16T08:01:49Z",
+        "completedAt": "2026-10-16T08:10:52Z"
+      },
+      {
+        "name": "unit（方法级 UT）",
+        "conclusion": "success",
+        "startedAt": "2026-10-16T08:01:49Z",
+        "completedAt": "2026-10-16T08:02:18Z"
+      },
+      {
+        "name": "module（模块级 UT 3/4）",
+        "conclusion": "success",
+        "startedAt": "2026-10-16T08:04:14Z",
+        "completedAt": "2026-10-16T08:08:46Z"
+      },
+      {
+        "name": "console（工作台）",
+        "conclusion": "success",
+        "startedAt": "2026-10-16T08:01:49Z",
+        "completedAt": "2026-10-16T08:04:47Z"
+      },
+      {
+        "name": "module（模块级 UT 4/4）",
+        "conclusion": "success",
+        "startedAt": "2026-10-16T08:04:54Z",
+        "completedAt": "2026-10-16T08:10:19Z"
+      },
+      {
+        "name": "static（结构规则 · lint · 类型）",
+        "conclusion": "success",
+        "startedAt": "2026-10-16T08:01:49Z",
+        "completedAt": "2026-10-16T08:04:06Z"
+      },
+      {
+        "name": "module（模块级 UT 1/4）",
+        "conclusion": "success",
+        "startedAt": "2026-10-16T08:01:49Z",
+        "completedAt": "2026-10-16T08:04:52Z"
+      },
+      {
+        "name": "module（模块级 UT 2/4）",
+        "conclusion": "success",
+        "startedAt": "2026-10-16T08:01:49Z",
+        "completedAt": "2026-10-16T08:04:12Z"
+      },
+      {
+        "name": "gate（汇总 · 新增代码防护）",
+        "conclusion": "success",
+        "startedAt": "2026-10-16T08:10:21Z",
+        "completedAt": "2026-10-16T08:10:35Z"
+      }
+    ]
+  },
+  "finalConcurrentReads": {
+    "count": 24,
+    "httpStatus": 200,
+    "maxDurationMs": 3792
+  },
+  "knownLimits": [
+    "CLI and Bot remain independent model contexts; only the project worktree is shared.",
+    "Native recovery is limited to admitted OpenCode 1.18.29/1.19.0 capability contracts; missing legacy HOME cannot be recovered from chat rendering.",
+    "Explicit fresh advances the epoch and preserves displayed history, while deliberately starting a different native context.",
+    "Releasing a follow-container parent recycles its private context volume; this is not the Stop current turn action.",
+    "The real sleep interruption used observed live process evidence; the native JSON protocol did not emit tool-start before command completion.",
+    "The full local gate was not green. Focused environment comparisons do not replace its failure; hosted CI is recorded separately."
+  ],
+  "rawReceiptSha256": {
+    "rfc041-portable-evidence-draft.json": "d14049f1b6ffc5716a84912053b63395524efcc8c9a95e3e9b28e4952bb6c349",
+    "rfc041-checkpoint-turn-one.json": "0e4ee37f7896b6a7118e0d1935a4a5d921c82cb3ca223edc1b7051c18f5a13d2",
+    "rfc041-checkpoint-turn-two.json": "d6288936493bb6a3f1b731c320f8c46c60ec4ed96c0ca0d6fbacafb52b618809",
+    "rfc041-checkpoint-turn-three.json": "b216c21c2b672b1dd5c9e8fdbd72451a70807509b6d84eb6e2ef79382cc757cf",
+    "rfc041-checkpoint-stopped.json": "1263a8daeebd929c323bd3c1a9c2f4132fe05478cd476fe03cf4ca64bcbafbc9",
+    "rfc041-checkpoint-resumed.json": "aac3e8d49eaeb751a2abd181985aab352e0162190cb32adfc4989eaee5abe3d9",
+    "rfc041-checkpoint-cold-stopped.json": "b6b97d1b5d4beb493aa464630e585d2c01b1c5fe7ec36bbeb746be23c3cfcd80",
+    "rfc041-checkpoint-cold-attempt.json": "7f6a404469e941f9209ebee5f1724dc3dc49549e66b009d27ecd8d59e45c7b5a",
+    "rfc041-checkpoint-parent-rebuilt.json": "09cb3961b137760ec48c7fbdc8bf2c9562edca6e401f3326178c5cde72954c90",
+    "rfc041-checkpoint-parent-recovered.json": "c303563752fafaa5871dbee5166eedf8748bc2d8f7e0ccba9a06c21faaa59fbe",
+    "rfc041-checkpoint-parent-resumed.json": "8d9da842d2476a671a4cf4eae9c033e84daba7550c12a3bde8d9dfb6cd87f278",
+    "rfc041-checkpoint-tool-complete.json": "b1c5aedeac952710a17a72d70839374065a72bb2c0244d05e5c90fd7f3b0d851",
+    "rfc041-checkpoint-fresh-context.json": "4e263c7530bb7c219b84def267557367223bfd67ae3e58c68814d18822f515ec",
+    "rfc041-checkpoint-fresh-replied.json": "78c71ca9bcfa3f7b3e6ea0c28b70ed4dc0cb4be781bdbe0e569a28ac8d7d8837",
+    "rfc041-third-turn-receipt.json": "a5446f44f36c15b01037300ebe28e1b4feb13773df8a347fd6206f609ecfaa2d",
+    "rfc041-third-turn-duplicate.json": "e99088ba9e8e63d1aa2931a0d4f996c4296f7d08979207c34ec8d27fde713a1c",
+    "rfc041-database-turn-three.json": "0a23b6613baee668ffb17f97f31096e73e892e1749e8fe877ccf344ef2abc525",
+    "rfc041-third-turn-input.json": "45f29fc08126d06b370206d155741fd79121c0c084403700d6eb0bf54f1b7358",
+    "rfc041-replay-cold-resumed.json": "a45261cd4fb2d55e36018a01dcf8942c622e33132f55b96ab202775c826ae5bf",
+    "rfc041-replay-parent-resumed.json": "ec075feadb18a80d3481a35278eeeb6dd8d949093281cee6a9736cbece240675",
+    "rfc041-replay-tool-complete.json": "889e5db7d8ee90705976d3eceb17691e6221aea6277636d5df1daab7d5ba39a6",
+    "rfc041-replay-fresh-replied.json": "aff142599fd73e34c6f7d1ca4c65ad0e6f65690569d6dc7c7787f27fc4fdee24",
+    "rfc041-database-parent-released.json": "8c848ab6a27646b3e9bd106f69948b48d7957d471827e2f9407fba6f1e082052",
+    "rfc041-parent-retained-context-terminal.json": "9f3003b026228d3dab1463ee76b7bd1a69f6737ceee8d4034f7bfdd71394bb93",
+    "rfc041-volume-physical-release-receipt.json": "5502df53b4b9d23a85512de4107d070acb33df0495c45483f80bcf71d9088625",
+    "rfc041-released-resource-ledger.json": "633e455b74c21114908bee41a636476cd27183ccc8cffa2b017ba2e52a865934",
+    "rfc041-parent-final-release.json": "c7cb059d3c2c5562457b9fb4ea7f1aedb143be45ecd0bb7b0edf676e6babb34a",
+    "rfc041-parent-pod-release-proof.json": "bf2a12345c5650be9339e3fde99fad2eb0c6eb3011bab4f673dcd685cd962857",
+    "rfc041-workspace-isolation-parent-rebuilt.json": "5c70d01f4a9cd91f29d99f221a85f8ee8a90159593d17c71fad9411fb783a0c1",
+    "rfc041-browser-refresh-stability.json": "787e9f4f162867513e7633587ce4e2c6d2d5f8744e2be83ec99c51820aa399d3",
+    "rfc041-browser-final-navigation.json": "72d1b0bc7dd928a1d364bb318098784b5f69cb08d868a017f48084283bcf4eb3",
+    "rfc041-browser-tool-detail.json": "ec9c0b9607ecad67b1cbcfb08ed4425edbd29029bd99c521967ed48cd07790fa",
+    "rfc041-browser-fresh-context-verified.json": "a2357e3eb0eef530209ce778c641d2381a4feffea3266093f9a173d5a1ff7638",
+    "rfc041-mobile-fresh-verified.json": "84d1605a5f7cf1de97acc78c996343e5afb1d4f183afbec2e966ad0da23da293",
+    "rfc041-existing-snake-page.json": "4d155dd77d9c61e36d4694beb5f180f0c2671e1a56e5364651fea9a03659c37e",
+    "rfc041-final-eight-deployment-receipt.json": "6bfa8b150d533b6fe4757a40729f3b9ab2f289ea9cd600d82862c0b276fb0aa0",
+    "rfc041-final-source-equivalence.json": "ef9d5ec9de3f5b92af9663414fad76ece52a03e1279ec0977b544b1c8a92d63c",
+    "rfc041-final-ui-state-ci-deployment-gate.json": "aa92fbd463c5811193d231778183fdf03c994d017d1b5a76aefbe5ab961f678a",
+    "rfc041-history-deployment-receipt.json": "5a89dde861c94e399941eb4bea44bdd7dd4fa11c0a08fa75d33fbb62e09ff0f3",
+    "rfc041-checkpoint-after-history-fix.json": "5e9a73641b3f68a63b75702ec0b4f1a6701af5df237f7cb421117198157579a8",
+    "rfc041-browser-history-final.json": "d3ff98b697160d53ba4c369971ac7c32f0c83517b036aa6c5b41ef2036f98064",
+    "rfc041-history-ci-deployment-gate.json": "c8cddf758aa2c4ce8d1675a3c669741693eaa34a3f3a9e46dfcfd4164a832a1f",
+    "rfc041-parallel-read-final-receipt.json": "7c4c03ce30a9d4fec286dbf40d39a9240b6f6096d0bd1b478388927044f88170",
+    "rfc041-review-parent.json": "b9a062c8d17ceb47a32eb4c9a708a02b96ba79ac590dae2cb310483b421c2b0e",
+    "rfc041-review-bot.json": "9802e2688c868ef8b43c888003d24c263ad625ee6d38ca0274e4bccd30fd6a81",
+    "rfc041-review-environment.png": "346b6618c51654a2baba9270606ba9be1c9b95a5300e655064125ed9b4c738a9"
+  },
+  "reviewEnvironment": {
+    "purpose": "Separate newly opened environment kept for UI review; not a restoration of the released acceptance context",
+    "projectId": "01a1432d-f9d3-7000-8fc6-c5abd3b64781",
+    "parentTaskId": "01a143cd-35e6-7000-baa6-c960f6012fcb",
+    "parentPodName": "task-01a143cd35e67000baa6c960f6012fcb",
+    "createdAt": "2026-10-16T08:21:24.582Z",
+    "url": "http://console.cs.localhost/projects/01a1432d-f9d3-7000-8fc6-c5abd3b64781/dev-session?view=guided",
+    "bot": {
+      "conversationId": "01a143d4-c48d-7000-a770-c94cd9090884",
+      "epoch": 1,
+      "state": "awaiting-input",
+      "nativeSessionId": "ses_ebc2ab9f0ffebnm7LZ42pMJBW4",
+      "volumeUid": "da39d9fd-9a7f-44a1-a98d-c663dc910c37"
+    },
+    "execution": {
+      "initialPrompt": "用简短中文说明你可以怎样帮助我开发项目，并给出三步开始的方法。不要调用工具，不要读写文件。",
+      "agentId": "01a143d4-e395-7000-a64d-521450312aaa",
+      "executionTaskId": "01a143d4-c403-7000-a6e1-7a4417b66bf0",
+      "epoch": 1,
+      "state": "awaiting-input",
+      "createdAt": "2026-10-16T08:29:47.797Z",
+      "nativeSessionId": "ses_ebc2ab9f0ffebnm7LZ42pMJBW4"
+    },
+    "browserResponse": "One fresh Chinese reply observed in the formal Chrome Bot page after the final deployment; no tools or file operations requested"
+  }
+}

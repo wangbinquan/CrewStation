@@ -1,6 +1,52 @@
 # RFC-041｜实施与验收记录
 
-状态：In Progress。用户在 2026-10-15 明确批准正式实现、本机部署与真实模型验收。本文区分源码检查、带替身的分层回归、准确提交 CI 与真实部署；未完成的层级不视为通过。
+状态：Done · 2026-10-16。作者批准范围内的正式实现、本机部署、真实模型/Chrome 以及物理资源回收验收完成；完整本机检查的历史失败保留，准确 GitHub CI 与实机证据单独列明。
+
+## 最终交付事实
+
+CLI 与 Bot 保持独立。默认 Bot 按父开发 task 保持一个 conversationId；执行 Pod 更换与父环境保留工作区重建不创建新的聊天上下文。只有用户确认“开启全新上下文”才增加 epoch。回答继续位于浅绿色气泡内，工具记录独立展示完整参数并通过统一 Dialog 查看。
+
+最终七后端源码为 `32cf2d7e154744412bcc11c951597049ec7b9463`，对应 [CI 38870965711](https://github.com/wangbinquan/CrewStation/actions/runs/38870965711)。Console 保持 `9b4aa5a3d1a2e04663d2547db7690c0b392ff717` 镜像，已由仅测试修正后的 `ff948919109062e3355d569699c71b53c779f7a7` 的 [CI 38868457866](https://github.com/wangbinquan/CrewStation/actions/runs/38868457866) 验证。9b→ff 的唯一差异为 `apps/console/src/tests/developmentModes.test.tsx`，生产文件逐项相同；32cf 补正旧执行被新一轮意图覆盖的历史状态，并依据真实 finished 环境只读修正已有错误标签。最后修正的真实 PG/HTTP 七项、65 断言及 lint/类型通过。全部镜像从准确提交的 `git archive` 构建，不包含共享目录内 RFC-040/042 在制品。
+
+| 验收 | 实际证据与层级 |
+|---|---|
+| CB-01 | 隔离项目真实模型前三轮保持 conversation `01a14340-df08-7000-81c0-e4fba486bbed`、Agent `01a14340-ef15-7000-9b74-113d12b79b70`、OpenCode `ses_ebcbec57fffecKX95xBPqYqrZR`；后两轮没有再次提供随机标记，模型准确复述 |
+| CB-02 | 正式 Chrome 刷新前后历史消息逐条一致，草稿一致；离开返回和 CLI/Bot 切换保留当前 Bot。独立 CLI 使用 `ses_ebcb7c27affe6UTi7lUPNAtLW4`，真实回答 `CLI_INDEPENDENT_OK`，未绑定 Bot session |
+| CB-03 | Pod 内实际 `sleep 120` 运行时点击“停止本轮”；旧 Pod 全部容器终止并关闭准入，随后新 Pod 以同 session 回忆随机标记。原生 JSON 在命令完成前未输出 tool-start，停止时机由实际进程列表证明 |
+| CB-04 | 集群侧退出第二个 Bot Pod 后，第三个 Pod UID `ef809070-0cee-40f0-9ed1-16c172615783` 从同一私有 PVC 冷续接；真实返回“冷续接成功：”及原标记。父环境重建后的新执行也以同 session 回忆原标记，旧执行均有精确停止证明 |
+| CB-05 | 实机第三轮相同 requestId 重试，数据库只有三条用户消息与一项执行，重复回执仍指向同一 revision。丢回执、刷新保留请求身份、并发 revision 拒绝由真实 PG 和 Console 回归覆盖；不将这些夹具写成实机网络断流注入 |
+| CB-06 | 实机确认新上下文后 epoch 从 1 变为 2，首次新消息取得不同 native session；旧回答仍在同一时间线。缺失/损坏原生数据及不同 session 回报以 Runner/驱动和模块故障用例验证，未破坏用户现有卷做模拟 |
+| CB-07 | 正式 Chrome 核对贪吃蛇旧 ended 与 live-only 历史提示；不自动合并旧 Agent，不向既有活跃 Agent 发消息。旧版本 HOME 已删除的执行不宣称可恢复。既有贪吃蛇正式游戏页面仍可正常访问 |
+| CB-08 | 正式桌面与 390px 无横向溢出；窄屏消息区 372px，回答背景 RGB(234,246,239)。统一历史/工具 Dialog，嵌套 Esc 只关顶层、关闭回到触发按钮；长历史末行由组件回归补充。实际 bash 命令、输入与结果在工具详情内，未混入回答正文 |
+| CB-09 | Bot 私有 PVC UID `897430a0-a723-4295-be96-a52b9a25f28d` 独立于工作 PVC；父 Pod 不挂载它，文件 API 拒绝绝对路径与 `../`，工作树未提交/未推送均 0。父重建保留 task 与两卷 UID；释放 follow-container 父会话后按平台流程回收原两 PVC 及各自 PV，资源台账为 absent/stopped |
+| CB-10 | 最终 CI、镜像来源/摘要、八组件实际 Ready、原生模型事件、PostgreSQL 回执、停止证明、物理卷回收与 Chrome 事实分别留证；详见机器可读记录，不以局部测试或原型代替部署验收 |
+
+## 验证边界及过程失败
+
+完整本机 `bun run check` 并非绿色。最后一次完整结果为 5720 pass / 176 skip / 3 fail / 3 errors，41279 断言、1201 文件、2019.06 秒；三个默认 5 秒超时分别在安装脚本、provisioning 删除工作器和 resource-access 多页删除。结束后正常权限仅对三文件对照为 24 pass / 0 fail / 365 断言，不替代原全量失败。完整运行使用当时 `2bf5bd9e` 生产候选，后续修复按内容范围验证及准确 SHA GitHub CI 验收；一次性测试 PG 已清除。
+
+实机发现并补回归的断点包括：嵌套准入占满连接池造成 HTTP 502、嵌套授权不得借用父 scope、异步 WebSocket 权限回调提前失去 backend、父重建遗漏 botVolume、准备中被旧 paused 覆盖、父清理结束后卡在 stopping，以及已保存草稿离页误提示。对应失败原件保留，修复后通过真实 PG/组件回归；没有手动修改业务数据库状态来通过验收。
+
+`b11fd663` 的 CI 38860984110 捕获嵌套授权错误，`9b4aa5a3` 的 CI 38867288941 捕获旧草稿断言；这两次失败均保留，不用重跑同一失败提交掩盖。`9b4aa5a3` 的其余模块、静态、e2e 成功，随后测试修正提交重新跑完整 CI。原 Docker 空间耗尽、PTY 沙箱、prepared transactions 与旧升级审计失败也保留在下方历史记录。
+
+原生恢复只对已协商通过的 OpenCode 1.18.29/1.19.0 合同成立；不承诺无限上下文，不从显示的聊天记录伪造原生 session。`停止本轮` 与 `释放整个开发环境` 的生命周期不同：后者在 follow-container 模式下会回收原生上下文卷。默认档位真实探针的核心模型/resume/MCP/nativeConfig 成功，可选 materialObjects 失败仍保持不可用。
+
+
+## 已验证部署与可携带证据
+
+最终后端 manifest `sha256:d6c6a0b95bdc14dcdbbbdac0f6950edb670ca3d6857dc19a0272880c83437851`，Console manifest `sha256:a4276724b5ed47e4f2696bf6e5f85e9106d277378c808542f8560f3489f0bc27`，Runner 保持 `sha256:0f87aceb9eb8c51ac3dd97bc4460e4d5b101aa6482b1d7f0bd41c590a3254e79`。后端与 Console 对应两条准确 CI 均九项成功，八个 Deployment 实际 Ready。最终 24 次并发读取全部 200，最长 3792ms；会话服务观察日志没有原准入 warning。
+
+原 epoch 1 四次执行保持 `ses_ebcbec57fffecKX95xBPqYqrZR`；父重建后的第四 Pod UID `b64685e8-fca4-42d7-b5db-e13f44bb6b3e` 正确回忆标记。显式确认后的 epoch 2 使用 `ses_ebc465800ffe5MLqCuqxKu96pF`、第五 Pod UID `69f5fe6a-8518-4714-b623-7ad942281767`。新一轮没有自动合并 CLI 或旧独立 Agent。
+
+2026-10-16 08:19 UTC，通过正常平台 API 释放本次验收父 task；其 Pod `7b34037f-fa67-4a06-8565-3bdd51f55d79`、两张原 PVC 及其 PV 均已消失，资源台账 absent/stopped，五个私有卷消费者均关闭准入并有精确 kubelet 停止证明。工作树未提交和未推送均 0。随后同项目重新打开独立开发环境 `01a143cd-35e6-7000-baa6-c960f6012fcb` 供界面查看，正式 Chrome 中新 Bot 已真实回复并处于等待输入状态；它不是对已回收原上下文的恢复。[打开正式页面](http://console.cs.localhost/projects/01a1432d-f9d3-7000-8fc6-c5abd3b64781/dev-session?view=guided)。
+
+完整身份、回执、筛选后的原生事件、停止证明、卷回收、浏览器事实及原始本地验收记录的摘要见 [可携带实机记录](continuous-bot-live-20261016.json)。该附件不含认证 Cookie、Secret 或模型密钥。本机完整原日志仍位于 ignored 的 `.local/cli-bot-acceptance/`，文件存在和摘要不冒充可独立下载的 CI 日志。十二项本次构建产生的闲置、非共享缓存按精确 ID 回收；原型服务器已停止，所有项目卷的回收均通过平台生命周期完成。
+
+正式页面截图：[实际工具详情](continuous-bot-tools.png)、[390px Bot 页面](continuous-bot-mobile.png)。原生接口模板的空预览不作为游戏截图；既有贪吃蛇正式页另经登录态打开确认可访问。
+
+## 阶段记录（历史原件）
+
+以下保留实施各阶段的失败与当时待办；其中“待完成”“尚未收口”描述当时状态，当前结论以上方最终验收为准。
 
 2026-10-16 补充：`2bf5bd9e56a728a1d2fc66be83a79e45c9a0afa2` 的 [CI 38861981825](https://github.com/wangbinquan/CrewStation/actions/runs/38861981825) 九项全绿，后端 manifest `2d98fd65094cafb37b0225b6a097056aa49f48acfc1605387d263978dc741108` 已部署七组件，Console/Runner 未变；24 次并发读取均 200（最大 3961ms）。正式页面 390px 无横向溢出，消息区 372px，浅绿色回答气泡 RGB(234,246,239)；嵌套确认 Esc 只关上层、历史关闭焦点返回入口。实机继续发现广播异步权限检查晚于外层返回，导致复用 backend 提前退出、回调出生被 SQL 拒绝。`asyncAdmissionLifetime.test.ts` 真实 PG 先红复现，然后修复为已发出的子回调保留 backend，外层返回后自身授权仍立即失效；两批共九文件 36 项/287 断言通过，精确 lint 和后端类型通过。新候选准确 CI/部署和换 Pod 冷续接仍需完成，原失败不覆盖。
 

@@ -1,3 +1,11 @@
+## 2026-10-16 RFC-041：正式持续 Bot 与物理回收验收完成（Done）
+
+CLI/Bot 保持独立。默认 Bot 以父 task 保持 conversation；真实 epoch 1 跨四个执行 Pod，停止、集群侧退出、父环境保留重建后仍使用原 native session 并准确回忆首轮随机标记。明确 fresh 后 epoch 2 / 新 session，旧消息逐条保留。正式 Chrome 的草稿刷新/离页/CLI 切换、浅绿气泡、完整工具参数与统一 Dialog、390px 无溢出通过。父重建及停止状态、异步广播准入 backend 生命周期和旧历史状态错标均已补真实 PG 回归并修复。
+
+最终七后端源码 `32cf2d7e154744412bcc11c951597049ec7b9463`，[CI 38870965711](https://github.com/wangbinquan/CrewStation/actions/runs/38870965711) 九项全绿，manifest `d6c6a0b9…`；Console `9b4aa5a3` / manifest `a4276724…`，生产文件与仅测试修正的 `ff948919` 完全相同，后者 [CI 38868457866](https://github.com/wangbinquan/CrewStation/actions/runs/38868457866) 九项全绿；Runner 保持 3fb767e6 / `0f87aceb…`。八组件 Ready，最终 24 次并发读取全 200。9b 的旧断言 CI 失败和本机完整 5720/176/3（3 errors）原失败保留，定向对照不替代全量。
+
+08:19 UTC 正常释放专用验收父 task `01a1433e-acbc-7000-a4b8-3dd5484dd297`：五次 Bot 执行均有关闭准入和整 Pod 停止证明，父 Pod、工作/私有两 PVC 及两 PV 物理消失，三项台账 absent/stopped。原工作树未提交/未推送均 0；既有贪吃蛇上线页仍可访问，未修改它的旧 Agent。验收项目另开独立环境供查看，不能把它说成恢复了已回收的原会话。RFC 三件套/索引 Done，详见 [验收记录](proposal/rfc/RFC-041-continuous-bot-session/acceptance.md) 与 [可携带证据](proposal/rfc/RFC-041-continuous-bot-session/continuous-bot-live-20261016.json)。并行 RFC-040/042 实现在制品保持；共享索引保留原有 RFC-042 条目。以下阶段历史原样保留。
+
 ## 2026-10-16 RFC-041：异步广播准入生命周期修复
 
 `651a1310` 的 CI 38864682444 九项全绿并已部署七后端，连接恢复稳定。第三个真实执行 Pod `ef809070-0cee-40f0-9ed1-16c172615783` 保持原 session/PVC，准确回忆首轮随机标记；完整回放 14 事件已留证。父环境重建操作 `01a14393-b6fd-7001-ad38-e72250ba3803` 成功，新父 Pod UID `7b34037f-fa67-4a06-8565-3bdd51f55d79`、两卷 UID 不变。实机继续发现新执行准备被旧暂停状态覆盖，以及外部结束误当用户停止意图而卡住 stopping；两处真实 PG 先红后绿，并修正已保存 Bot 草稿离开页面仍误报丢失的问题（存储失败仍保护）。后端七项/60 断言、Console 13 项通过，前后端类型/lint 通过；待该批准确 CI/部署后验证原 stuck 状态自然恢复及父重建后续聊。
