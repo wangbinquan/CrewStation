@@ -9,13 +9,16 @@ import { developmentContentFixture, seedDevelopmentContent } from './contentFixt
 const available = await testDatabaseAvailable();
 /** RFC-034 v2（0022 断代）有意退役的旧列；其余旧列的每一行在升级后逐字保留。 */
 const RETIRED_BY_V2: Record<string, string[]> = { agent_starts: ['logical_ending'] };
+const ADDED_BY_BOT = ['bot_conversations', 'bot_messages', 'bot_executions'];
 const kept = (table: string, columns: readonly string[]) => columns.filter((column) => !(RETIRED_BY_V2[table] ?? []).includes(column));
 describe.skipIf(!available)('development original content upgrade (actual old PG; controlled public identity witnesses)', () => {
   test('appending work and content guards preserves every original row and then inventories all legacy families', async () => {
     const f = await developmentContentFixture({ legacyOnly: true });
     try {
       await seedDevelopmentContent(f);
-      const tables = DEVELOPMENT_CONTENT.filter((entry) => entry.table !== 'original_callbacks');
+      // RFC-041 tables do not exist in the historical schema; audit their creation separately from preservation of old rows.
+      for (const table of ADDED_BY_BOT) expect((await f.database.db.execute<{ name: string | null }>(sql`SELECT to_regclass(${'dev_session.' + table})::text AS name`))[0]?.name).toBeNull();
+      const tables = DEVELOPMENT_CONTENT.filter((entry) => entry.table !== 'original_callbacks' && !ADDED_BY_BOT.includes(entry.table));
       const oldColumns = new Map<string, string[]>();
       for (const entry of tables) {
         const columns = await f.database.db.execute<{column_name: string}>(sql`SELECT column_name FROM information_schema.columns WHERE table_schema='dev_session' AND table_name=${entry.table} ORDER BY ordinal_position`);
@@ -32,6 +35,10 @@ describe.skipIf(!available)('development original content upgrade (actual old PG
       const before = await fingerprint();
       await runMigrations(f.database.db, [devSessionMigrations]);
       expect(await fingerprint()).toEqual(before);
+      for (const table of ADDED_BY_BOT) {
+        expect((await f.database.db.execute<{ name: string | null }>(sql`SELECT to_regclass(${'dev_session.' + table})::text AS name`))[0]?.name).toBe('dev_session.' + table);
+        expect(await f.database.db.execute(sql`SELECT * FROM ${sql.raw('dev_session.' + table)}`)).toHaveLength(0);
+      }
       const retired: Record<string, string[]> = {};
       for (const entry of tables) {
         const columns = new Set((await f.database.db.execute<{column_name: string}>(sql`SELECT column_name FROM information_schema.columns WHERE table_schema='dev_session' AND table_name=${entry.table}`)).map((column) => column.column_name));

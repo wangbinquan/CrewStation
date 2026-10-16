@@ -23,9 +23,10 @@
 | 真实 PG 卷消费者与停止证明 | `rfc041-bot-consumer-uuid-fixed.log`：1 pass / 0 fail / 13 断言；finished 状态及关闭准入不能代替精确 Pod/节点停止证明，UID 替换拒绝；物理 Pod 停止为显式证明夹具 |
 | 现有资源保护与 Runner 协商 | `rfc041-bot-consumer-fixed.log` 对应 11 项通过；其中 Bot 存储夹具最初不是合法 UUID，修正后的结果在上一行，不抹掉原失败 |
 | 固定运行镜像目录探针 | `rfc041-image-layout-probe.log`：镜像内 OpenCode 1.18.29 将 SQLite 建到指定 `OPENCODE_DB`；无模型调用，不构成冷续接证明 |
-| 全量本地检查 | `rfc041-full-local-gate.log` 运行中；已见 `runnerLifecycle.test.ts:177` 真实 shell `echo output` 15 秒超时，尚未通过；不取消检查，不将重试成功当成原检查成功 |
+| 全量本地检查 | `rfc041-full-local-gate.log` 完整运行 1499.92 秒，5712 pass / 177 skip / 3 fail / 41220 断言，跨 1199 文件。失败为沙箱 PTY 回显超时、本机测试库关闭 prepared transactions、旧升级审计误将新增 Bot 表纳入旧表指纹而生成 `IN ()`。本次全量未通过，原日志不覆盖；前两项环境对照如下，第三项补充明确新表前后断言后定向验证通过。全量开始后只新增了监督器/设置草稿用例及修改升级审计，生产候选内容保持一致，没有重复启动全量门禁 |
 | 失败的本机环境对照 | 正常本机权限下 PTY 定向检查 1 pass / 0 fail / 6 断言（`rfc041-terminal-outside-sandbox.log`）；独立 PostgreSQL 17.11 设置 `max_prepared_transactions=10` 后对应文件 18 pass / 0 fail / 135 断言（`rfc041-prepared-transactions-isolated.log`），不修改现有测试库配置、不覆盖全量原失败 |
 | Runner 重启与设置草稿补充 | `rfc041-supervisor-options-final.log`：7 pass / 0 fail / 41 断言；真实 SQLite 回执跨监督器重建不重复派发、未挂载/错误 epoch 拒绝、设置关闭和刷新保留并在首条发送固定 |
+| 历史升级审计修正 | `rfc041-upgrade-regression-fixed.log`：2 pass / 0 fail / 27 断言；升级前逐表证明三个 Bot 表不存在，升级后证明新表创建且为空，同时保留逐行旧数据指纹检查；原封闭回归一并通过，精确 lint 通过 |
 | 准确 SHA GitHub gate/e2e | 待提交并等待终态；部署前必须确认同一来源提交 |
 
 ## 实机验收清单
