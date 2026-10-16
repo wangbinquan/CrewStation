@@ -2,6 +2,8 @@
 
 状态：In Progress。用户在 2026-10-15 明确批准正式实现、本机部署与真实模型验收。本文区分源码检查、带替身的分层回归、准确提交 CI 与真实部署；未完成的层级不视为通过。
 
+2026-10-16 补充：`2bf5bd9e56a728a1d2fc66be83a79e45c9a0afa2` 的 [CI 38861981825](https://github.com/wangbinquan/CrewStation/actions/runs/38861981825) 九项全绿，后端 manifest `2d98fd65094cafb37b0225b6a097056aa49f48acfc1605387d263978dc741108` 已部署七组件，Console/Runner 未变；24 次并发读取均 200（最大 3961ms）。正式页面 390px 无横向溢出，消息区 372px，浅绿色回答气泡 RGB(234,246,239)；嵌套确认 Esc 只关上层、历史关闭焦点返回入口。实机继续发现广播异步权限检查晚于外层返回，导致复用 backend 提前退出、回调出生被 SQL 拒绝。`asyncAdmissionLifetime.test.ts` 真实 PG 先红复现，然后修复为已发出的子回调保留 backend，外层返回后自身授权仍立即失效；两批共九文件 36 项/287 断言通过，精确 lint 和后端类型通过。新候选准确 CI/部署和换 Pod 冷续接仍需完成，原失败不覆盖。
+
 ## 候选实现
 
 基线 `a3cc357829faafd668a0881a2a176d8b8fb44828`。默认 Bot 按父开发 task 保持一个 conversationId；正常多轮沿用 Agent 与原生 session，停止后使用原生私有卷和原 sessionId 创建新的执行。CLI 与高级独立 Agent 保持独立。OpenCode 1.18.29 / 1.19.0 的会话数据库与会话数据可持久化，HOME、启动配置与凭据仍为执行临时数据；其他协议/版本不宣称支持这条恢复路径。
