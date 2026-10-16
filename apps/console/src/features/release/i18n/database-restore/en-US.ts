@@ -21,7 +21,7 @@ export const databaseRestoreMessages = {
   "release.restore.autoResume": "Automatic recovery",
   "release.restore.suspended": "Paused for business review",
   "release.restore.retry": "Continue this restore",
-  "release.restore.generations": "Database generations",
+  "release.restore.generations": "Production database generations",
   "release.restore.generation": "Generation",
   "release.restore.state": "State",
   "release.restore.filter": "Filter by state",

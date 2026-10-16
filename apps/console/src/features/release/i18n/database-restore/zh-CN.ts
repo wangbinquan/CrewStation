@@ -21,7 +21,7 @@ export const databaseRestoreMessages = {
   "release.restore.autoResume": "业务自动恢复",
   "release.restore.suspended": "已暂停，等待业务核对",
   "release.restore.retry": "继续原恢复",
-  "release.restore.generations": "数据库世代",
+  "release.restore.generations": "生产数据库世代",
   "release.restore.generation": "世代",
   "release.restore.state": "状态",
   "release.restore.filter": "筛选状态",

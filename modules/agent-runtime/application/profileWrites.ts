@@ -6,7 +6,7 @@ import { conflict, newId, newResourceId, notFound, validation } from '@crewstati
 import type { ComputeProfile, ProfileCredential, ProfileRevision } from '../domain/computeProfile';
 import { contentHashOf, credentialStampOf } from '../domain/computeProfile';
 import { planCredentialWrites } from '../domain/credentialWrites';
-import { parseProfileImage, pullReference } from '../domain/imageReference';
+import { completeStoredImageReference, parseProfileImage, pullReference } from '../domain/imageReference';
 import type { ProfileTest } from '../domain/profileTest';
 import { initialStages } from '../domain/profileTest';
 import { validateProfileContent } from '../domain/profileValidation';
@@ -83,7 +83,11 @@ export function profileWriteUseCases(deps: AgentRuntimeUseCaseDeps) {
     adminOnly(actor);
     const existing = await uow.read.profiles.get(name);
     if (!existing) throw notFound('算力档位', name);
-    const prepared = await prepare(deps, existing.protocol, input.content, input.credentials, await uow.read.credentials.list(name));
+    const stored = await uow.read.revisions.get(name, existing.currentRevision);
+    const content = stored && input.content.image === stored.content.image
+      ? { ...input.content, image: completeStoredImageReference(input.content.image, stored.imageDigest, deps.registry.layout) }
+      : input.content;
+    const prepared = await prepare(deps, existing.protocol, content, input.credentials, await uow.read.credentials.list(name));
     const now = clock.now();
     await uow.run(async (scope) => {
       const profile = await scope.profiles.lock(name);
@@ -124,7 +128,7 @@ export function profileWriteUseCases(deps: AgentRuntimeUseCaseDeps) {
       if (!from) throw notFound('算力档位', source);
       const revision = await uow.read.revisions.get(source, from.currentRevision);
       if (!revision) throw notFound('档位修订', `${source}@${from.currentRevision}`);
-      const copied = copyProfileContent(revision.content, await uow.read.credentials.list(source));
+      const copied = copyProfileContent({ ...revision.content, image: completeStoredImageReference(revision.content.image, revision.imageDigest, deps.registry.layout) }, await uow.read.credentials.list(source));
       const id = await insertProfile(deps, actor, { name: input.name, description: input.description ?? from.description, protocol: from.protocol, defaultVisible: from.defaultVisible }, await prepare(deps, from.protocol, copied.content, {}, copied.credentials));
       return getProfile(actor, id);
     },

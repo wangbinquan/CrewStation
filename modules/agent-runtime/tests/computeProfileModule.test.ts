@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { sql } from 'drizzle-orm';
 import type { Actor, CreateComputeProfileRequest, ProfileTestId, UserId } from '@crewstation/contracts';
 import { CreateComputeProfileRequestSchema, IDENTITY_HEADERS } from '@crewstation/contracts';
 import { newResourceId } from '@crewstation/kernel';
@@ -7,6 +8,7 @@ import { generateSecretKey } from '@crewstation/secretbox';
 import { queueMigrations } from '@crewstation/queue';
 import type { TestDatabase } from '@crewstation/testkit';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
+import { contentHashOf, credentialStampOf } from '../domain/computeProfile';
 import type { ProfileTestInput, ProfileTestResult } from '../ports/testExecutor';
 import type { AgentRuntimeModule } from '../wiring';
 import { agentRuntimeMigrations, createAgentRuntimeModule } from '../wiring';
@@ -59,7 +61,7 @@ beforeAll(async () => {
   mod = createAgentRuntimeModule({
     db: tdb.db, isAdmin: async (id) => id === admin.userId,
     settings: { secretKeyBase64: generateSecretKey(), registry: { ...layout, scheme: 'http', baseTag: 'dev' } },
-    registry: { layout, resolveDigest: async (repository, ref) => { const d = digests.get(`${repository}:${ref.tag}`); if (!d) throw Object.assign(new Error('missing'), { kind: 'validation' }); return d; } },
+    registry: { layout, resolveDigest: async (repository, ref) => { const d = ref.digest ?? digests.get(`${repository}:${ref.tag}`); if (!d) throw Object.assign(new Error('missing'), { kind: 'validation' }); return d; } },
     executor: { run: async (input, report) => { executions.push(input); await report({ context: { imageDigest: input.image.split('@')[1], runnerProtocol: 2 } }); return result(input); } },
     references: { listReferencingProjects: async () => references },
     taskProfiles: { exists: async (name) => name === 'cli-small' },
@@ -68,6 +70,29 @@ beforeAll(async () => {
 afterAll(async () => { await tdb?.drop(); });
 
 describe.skipIf(!available)('算力档位模块（RFC-006）', () => {
+  test('digest profiles remain editable and copyable, including legacy bare stored references', async () => {
+    const digest = digests.get('crewstation/task-runtime:dev')!;
+    const reference = `registry.cs.svc:5000/crewstation/task-runtime@${digest}`;
+    const created = await createProfile(admin, CreateComputeProfileRequestSchema.parse({ name: 'digest-copy-source', content: { image: reference, launch: { protocol: 'opencode', binaryPath: '/usr/local/bin/opencode' } } }));
+    expect(created.content.image).toBe(reference);
+    expect((await copyProfile(admin, created.id, { name: 'digest-copy-new' })).content.image).toBe(reference);
+    // Reproduce persisted pre-fix rows, without changing their frozen image digest.
+    const bare = 'registry.cs.svc:5000/crewstation/task-runtime';
+    const legacyHash = contentHashOf({ ...created.content, image: bare }, digest, credentialStampOf([], []));
+    await tdb.db.execute(sql`UPDATE agent_runtime.profile_revisions SET content_hash = ${legacyHash}, content = jsonb_set(content, '{image}', to_jsonb(${bare}::text)), normalized_content = CASE WHEN normalized_content IS NULL THEN NULL ELSE jsonb_set(normalized_content, '{image}', to_jsonb(${bare}::text)) END WHERE profile = ${created.id} AND revision = 1`);
+    const legacy = await mod.api.getProfile(admin, created.id);
+    expect(legacy.content.image).toBe(bare);
+    const copied = await copyProfile(admin, created.id, { name: 'digest-copy-legacy' });
+    expect(copied.content.image).toBe(reference);
+    expect(copied.imageDigest).toBe(digest);
+    expect((await mod.api.getProfile(admin, created.id)).revision).toBe(1);
+    const saved = await mod.api.saveProfile(admin, created.id, { expectedRevision: 1, content: legacy.content, credentials: {} });
+    expect(saved.content.image).toBe(reference);
+    expect(saved.imageDigest).toBe(digest);
+    expect(saved.revision).toBe(2);
+    await expect(mod.api.saveProfile(admin, created.id, { expectedRevision: 2, content: { ...saved.content, image: 'runtime/missing-tag' }, credentials: {} })).rejects.toMatchObject({ kind: 'validation' });
+  });
+
   test('historical observation names include hidden and disabled profiles without changing their visibility', async () => {
     const profile = await createProfile(admin, claude({ name: 'historical-name' }));
     try {

@@ -48,9 +48,15 @@ export function parseProfileImage(input: string, layout: RegistryLayout): { ok: 
   return { ok: true, image: { repository, ...(tag === undefined ? {} : { tag }), ...(digest === undefined ? {} : { digest }) } };
 }
 
-/** 存进修订内容的拉取引用（不含摘要；摘要单独固定）。 */
+/** 保存管理员给出的标签或摘要；纯摘要引用也必须能够再次保存、复制。 */
 export function pullReference(image: ImageReference, layout: RegistryLayout): string {
-  return `${layout.pullBase}/${image.repository}${image.tag ? `:${image.tag}` : ''}`;
+  return `${layout.pullBase}/${image.repository}${image.tag ? `:${image.tag}` : ''}${image.digest ? `@${image.digest}` : ''}`;
+}
+
+/** 旧版曾丢掉纯摘要引用的后缀；只补全同一平台仓库的裸路径，不改变标签语义。 */
+export function completeStoredImageReference(reference: string, digest: string, layout: RegistryLayout): string {
+  const repository = repositoryOf(reference, layout);
+  return reference === `${layout.pullBase}/${repository}` ? `${reference}@${digest}` : reference;
 }
 
 /** Pod 里用的固定引用：永远按摘要拉，重推同一标签不会悄悄换掉已测试的镜像。 */

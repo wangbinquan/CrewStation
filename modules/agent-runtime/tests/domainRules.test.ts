@@ -5,7 +5,7 @@ import { LaunchSpecSchema } from '@crewstation/contracts';
 import { availabilityOf, contentHashOf, credentialStampOf } from '../domain/computeProfile';
 import { planCredentialWrites } from '../domain/credentialWrites';
 import type { RegistryLayout } from '../domain/imageReference';
-import { parseProfileImage, pinnedReference, pullReference, repositoryOf } from '../domain/imageReference';
+import { completeStoredImageReference, parseProfileImage, pinnedReference, pullReference, repositoryOf } from '../domain/imageReference';
 import type { ProfileTest } from '../domain/profileTest';
 import { completeContainerStages, initialStages, mergeStages, outcomeSentence, skipUnreachedStages, testPrompt } from '../domain/profileTest';
 import { validateProfileContent } from '../domain/profileValidation';
@@ -106,6 +106,24 @@ describe('镜像只来自平台仓库（C15）', () => {
     const digest = `sha256:${'a'.repeat(64)}`;
     expect(parseProfileImage(`runtime/glm@${digest}`, layout)).toMatchObject({ ok: true, image: { repository: 'runtime/glm', digest } });
     expect(pinnedReference(repositoryOf('registry.cs.svc:5000/runtime/glm:1.2', layout), digest, layout)).toBe(`registry.cs.svc:5000/runtime/glm@${digest}`);
+  });
+});
+
+describe('已存镜像引用的摘要补全', () => {
+  test('纯摘要和标签加摘要均可往返；旧裸路径只使用已固定的摘要', () => {
+    const digest = `sha256:${'a'.repeat(64)}`;
+    for (const suffix of [`@${digest}`, `:1.2@${digest}`]) {
+      const parsed = parseProfileImage(`runtime/glm${suffix}`, layout);
+      expect(parsed.ok).toBe(true);
+      if (!parsed.ok) throw new Error('valid digest rejected');
+      const reference = pullReference(parsed.image, layout);
+      expect(reference).toBe(`registry.cs.svc:5000/runtime/glm${suffix}`);
+      expect(parseProfileImage(reference, layout)).toEqual(parsed);
+    }
+    expect(completeStoredImageReference('registry.cs.svc:5000/runtime/glm', digest, layout)).toBe(`registry.cs.svc:5000/runtime/glm@${digest}`);
+    for (const reference of ['registry.cs.svc:5000/runtime/glm:1.2', `registry.cs.svc:5000/runtime/glm@${digest}`, 'elsewhere.invalid/runtime/glm', 'runtime/glm']) {
+      expect(completeStoredImageReference(reference, digest, layout)).toBe(reference);
+    }
   });
 });
 

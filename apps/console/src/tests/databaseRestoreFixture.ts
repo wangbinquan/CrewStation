@@ -10,7 +10,7 @@ export function databaseRestoreFixture(){
   if(path.includes('/database-restores')||path.endsWith('/database-generations')){
    if(method!=='GET'){const body=JSON.parse(String(init?.body??'{}')) as Record<string,unknown>;writes.push({path,body});if(state.loseResponse)throw new TypeError('response lost');if(path.endsWith('/switch'))return Response.json({...op,stage:'freezing',revision:op.revision+1,actions:[],confirmationDigest:null});return Response.json({...op,id:state.wrongResponse?Bun.randomUUIDv7():body.requestId??op.id,stage:'requested',confirmationDigest:null,actions:['retry']});}
    if(state.readError)return Response.json({error:'unavailable',message:'原恢复读取失败'},{status:503});
-   if(path.endsWith('/database-generations'))return Response.json({active:{generationId,revision:1,restoreOperationId:null},items:[{id:generationId,resourceId:generationId,projectId,serviceId,env:'production',state:'active',origin:'existing',restoreOperationId:null,identity:null,createdAt:op.createdAt}]});
+   if(path.endsWith('/database-generations'))return Response.json({active:{generationId,revision:1,restoreOperationId:null},items:[{id:generationId,resourceId:generationId,projectId,serviceId,env:'production',state:'active',origin:'existing',restoreOperationId:null,identity:null,createdAt:op.createdAt},{id:'01a1428f-eabe-7000-af4c-887037988564',resourceId:'01a1428f-eabe-7000-af4c-887037988564',projectId,serviceId,env:'development',state:'active',origin:'existing',restoreOperationId:null,identity:null,createdAt:op.createdAt}]});
    return Response.json(path.endsWith('/database-restores')?{items:state.items}:op);
   }
   return base(raw,init);

@@ -48,3 +48,10 @@ test('project viewers can read restore history while all administrative mutation
  expect(page.text()).toContain('backup-original');expect(button('切换到恢复数据库')).toBeUndefined();expect(button('继续原恢复')).toBeUndefined();
  await page.click('返回恢复列表');expect(button('新建恢复')).toBeUndefined();expect(f.writes).toHaveLength(0);
 });
+
+test('production restore list never labels the active development database as current production',async()=>{
+ const f=databaseRestoreFixture();page=await renderApp(list);
+ expect(page.text()).toContain('生产数据库世代');expect(page.text()).toContain(generationId);
+ expect(page.text()).not.toContain('01a1428f-eabe-7000-af4c-887037988564');
+ expect(page.text().match(/当前生产/g)).toHaveLength(1);expect(f.writes).toHaveLength(0);
+});
