@@ -1,3 +1,11 @@
+## 2026-10-15 RFC-041：Bot 持续对话设计与原型（Draft）
+
+作者反馈一个 session 被拆成多个对话，并明确“cli 和 bot 先保持独立”。实机原事件表明贪吃蛇成功开发三次输入本来沿用同一 OpenCode session，另外两项是先前失败与另开的验收 Agent；实际断点是停止结束 Agent、清理临时 HOME 后不能续接。新 [RFC-041](proposal/rfc/RFC-041-continuous-bot-session/proposal.md) 提议默认 Bot 对话身份稳定、停止本轮、独立原生上下文持久化与执行交接，旧历史不自动合并，无法恢复时明确告知。CLI 保持独立；业务模块不改。
+
+三件套及复用正式组件的交互原型已完成，Chrome 桌面/390px、停止继续、切换/刷新草稿、嵌套弹窗焦点与缺失上下文提示通过；详见 [原型检查](proposal/rfc/RFC-041-continuous-bot-session/prototype-review.md)。原型 `http://127.0.0.1:51441/` 仅本地模拟、未接模型。按开发规则 §5.3，RFC 尚待批准，生产生命周期、私有原生上下文卷及冷续接均未实施。首次 Bot 使用按父开发会话惰性分配 1 GiB 上下文存储作为明确设计批准项。旧版本已清理的 HOME 不可凭聊天日志冒充恢复。
+
+上一批工具详情已部署来源 8e8bc072 / CI 38844486779 全绿继续有效；纯验收文档 22d916e8 的 CI 38846674085 在原 `modules/session/tests/sessionAdmissionProgress.test.ts:123` 期望事件序号 [1]、实际 []，module 4 和 gate 失败，其余七项成功。保留原日志，不将重试作为通过依据；这批没有修改该源文件，也没有以文档提交重新部署。当前 RFC 草稿提交及 CI 在交付单独记录。下面并行 RFC-040 与全部历史保留。
+
 ## 2026-10-15 RFC-040：准确 CI、七后端部署与 OpenCode 实机验收完成，AW 联合接线继续
 
 源码 `92889e87a7be3db1cbc4f2aad8c63a85f1f577c9` 的 [CI 38838520891](https://github.com/wangbinquan/CrewStation/actions/runs/38838520891) 九项全部成功。控制面 manifest `004edc4e…`、Runner `b27a7fb8…` 已导入；仅新增 `business_task/0038_material_objects.sql`，七后端 Ready 1，console 保留其他会话已发布版本。原本地 425 项范围验证及 ignored 文件 lint 的历史失败不改写。

@@ -316,3 +316,5 @@ GitHub 拒绝以历史 SHA 直接 workflow_dispatch（HTTP 422 No ref found）�
 独立验收页签用 Enter 打开指定末段工具行，Esc 关闭后焦点回原“查看 bash 执行详情”按钮，聊天 scrollTop 前后均为 2145。390×844 下文档宽 390，弹窗 left=16 / right=374 / top=16 / bottom=828，正文 clientWidth 与 scrollWidth 均为 356，2161 字符命令完整保留；恢复桌面后保存短命令、参数、结果及游戏预览的最终截图。预览仍按既有按钮手动重新加载；未把这个既有边界记为已修复。全程未发送新的模型消息、创建 Agent 或执行历史命令，原用户页签和草稿未被覆盖。
 
 证据在 `.local/cli-bot-acceptance/`：`ci-bot-tools-release-deployment-gate.json`、`bot-tools-deployment-proof.json`、`bot-tools-running-pod-proof.json`、`bot-tools-replay-proof.json`、`bot-tools-browser-equality.json`、`bot-tools-focus-proof.json`、`bot-tools-mobile-proof.json`、`bot-tools-final.png` 与 `bot-tools-detail-mobile.png`。本次纯文档收尾不再次部署；后续文档 SHA 的 CI 与以上已部署来源的 CI 分开记录。
+
+纯验收文档提交 `22d916e855d36168efcf3c78f8d1089e9383dc62` 的 [CI 38846674085](https://github.com/wangbinquan/CrewStation/actions/runs/38846674085) 七项成功，module 4 与 gate 失败。失败为既有 `modules/session/tests/sessionAdmissionProgress.test.ts:123:88` 的握手后事件读取期望 `[1]`，实际 `[]`；原日志保存在 `bot-tools-docs-ci-failed.log`。该文档提交未修改 Session 源码/用例，未重试此 run 或改断言，未把文档 CI 写成绿色，也没有据此部署新代码。已部署来源 8e8bc072 的独立九项成功回执保持单独可追溯。
