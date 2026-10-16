@@ -56,7 +56,8 @@ async function nestedSharedAdmission<T>(parent: Scope, key: string, work: (trans
   if (!parent.heldKeys.has(key)) await parent.transaction.execute(sql`SELECT pg_advisory_xact_lock_shared(hashtextextended(${key},0))`);
   if (!scopeActive(parent)) throw new Error('Original database admission has exited');
   parent.heldKeys.add(key);
-  const scope: Scope = { ...parent, key, keys: [...new Set([...parent.keys, key])].sort(), parent, active: true };
+  // Reusing a backend must not let another owner borrow the outer callback's authority.
+  const scope: Scope = { ...parent, key, keys: [key], parent, active: true };
   try { return await scopes.run(scope, () => work(parent.transaction)); }
   finally { scope.active = false; }
 }

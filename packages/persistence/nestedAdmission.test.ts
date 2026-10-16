@@ -34,9 +34,10 @@ describe.skipIf(!available)('cross-module admission lifetime (real PG)', () => {
       await withSharedDatabaseAdmission(handle.db, inner, async nested => {
         innerBackend = Number((await nested.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`))[0]!.pid);
         expect(innerBackend).toBe(backend);
-        for (const key of [outer, inner]) expect(() => assertSharedDatabaseAdmissionActive(handle.db, key)).not.toThrow();
+        expect(() => assertSharedDatabaseAdmissionActive(handle.db, inner)).not.toThrow();
+        expect(() => assertSharedDatabaseAdmissionActive(handle.db, outer)).toThrow('has exited');
         const rows = await handle.db.transaction(tx => tx.execute<{ keys: string; pid: string }>(sql`SELECT current_setting('crewstation.shared_admission_keys') AS keys,current_setting('crewstation.shared_admission_pid') AS pid`));
-        expect(JSON.parse(rows[0]!.keys)).toEqual([outer, inner].sort()); expect(rows[0]!.pid).toBe(String(backend));
+        expect(JSON.parse(rows[0]!.keys)).toEqual([inner]); expect(rows[0]!.pid).toBe(String(backend));
       });
       expect(() => assertSharedDatabaseAdmissionActive(handle.db, inner)).toThrow('has exited');
       expect(() => assertSharedDatabaseAdmissionActive(handle.db, outer)).not.toThrow();
