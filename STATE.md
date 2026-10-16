@@ -1,3 +1,11 @@
+## 2026-10-15 RFC-039：Bot 重开时丢失对话选择已修复并部署
+
+真实 Chrome 复现选中贪吃蛇只读验收对话后刷新，自动跳回首条失败对话；手动切回原对象的全文一致，根因是选择只存在 React state。正式 Bot 现在按用户、项目、开发任务保留同一浏览器页签内的选择（包含新对话），默认选择锁定身份，名册重排不切对象；正文继续从原事件流回放。
+
+源码 `ab26394a78de75e3550ca852fdcaaca253b9716d` 的 [CI 38839403851](https://github.com/wangbinquan/CrewStation/actions/runs/38839403851) 九项全绿，精确源码镜像已部署本机 console：generation 310、Ready 1，manifest `sha256:cde5e9c51e1bcfcdcd10a2919992fb2c0fd042b0bb91eb5ec0b1b4084a3abbfb`。三个回归先红，修复后七文件 46 pass / 0 fail / 293 断言，类型、lint、结构通过。正式 Chrome 刷新、离开再进入、CLI/Bot 切换均保留成功开发 Agent，八条回复全文及顺序与部署前逐条一致；空新对话刷新仍为空，三条原 Agent 未增加，浅绿色气泡保持。只复用已有历史，未发送新请求；预览一次手动重载恢复的既有边界保留。
+
+本操作仅 CAS 修改 console 镜像；验收时间窗另观察到七个后台镜像发生变化，不把它们归为本任务，也不声称整套服务未变。RFC-040 的实现与部署由原会话负责，以下内容完整保留。详见 [本次验收](proposal/rfc/RFC-039-first-delivery/acceptance.md#bot-选择恢复的准确-ci部署与实机复验)。收尾文档的准确 CI 在最终交付记录。
+
 ## 2026-10-15 RFC-040：实现及范围验证完成，部署与联合验收进行中
 
 用户在当前会话明确“那这个RFC040你接手”。本会话负责原生材料、对象固定引用与物化、命令 Secret、启动清单合同及双协议实现，与 AW RFC-370 接续。开发基线 `2274ae0473efd8fcd5cf26af5f329a212220bca6` 与 `origin/main` 同步，共享 index 为空；原在制品仅 RFC-040 文档。完整实现与测试用例编写结束后，集中验证与修复复验合并为 82 文件／425 项通过、无失败和跳过；架构、97 个改动 TS 文件 lint、前后端类型通过。整仓 lint 被既有 `.local/cli-bot-acceptance/` 的 8 处问题阻断，未改其内容。控制面和 Runner 独立镜像已构建，未部署；节点磁盘 99%／约 2.9 GiB 余量，导入前先处理空间条件。准确证据与未完成项见 [RFC-040 验证记录](proposal/rfc/RFC-040-business-native-materials/acceptance.md)。保留本机 AW 正式服务及两个现存槽，不停用或删除。

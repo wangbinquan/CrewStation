@@ -284,3 +284,11 @@ Chrome 在真实贪吃蛇项目复现：手动选择只读验收 Agent `01a13f4b
 正式 Bot 用 `useBotSelection` 按用户、项目及开发任务在 sessionStorage 记住所选 Agent 身份，空串表示明确选择新对话；默认第一项也锁定身份，轮询重排不换对象。只存身份，不缓存回答或执行事实；刷新仍读取原持久事件。浏览器禁止存储时仍可正常在当前页面切换；已记住的对象不可用时不擅自跳到另一条历史。CLI/Bot 常驻切换及在隐藏 Bot 中完成的启动继续沿用原行为。记忆范围是同一浏览器页签的会话，不承诺跨设备同步。
 
 三个故障回归先红，修复后七文件 46 pass / 0 fail / 293 断言，覆盖刷新、离开再进入、CLI/Bot 切换、新对话、默认名册重排、名册延迟与已结束执行流重放、用户/项目/任务隔离、存储失败和无效值，以及已有工具记录与气泡行为。console 类型、精确 lint、结构检查通过；未重复原本机整库失败轮次，沿用作者批准的准确 GitHub gate/e2e 门槛。准确源码 CI、本机部署和修复后 Chrome 结果在后续条目补记。
+
+### Bot 选择恢复的准确 CI、部署与实机复验
+
+源码 `ab26394a78de75e3550ca852fdcaaca253b9716d` 的 [CI 38839403851](https://github.com/wangbinquan/CrewStation/actions/runs/38839403851) 九项全部成功。由准确提交归档构建 console 镜像，核对存储合同 1 后，使用 resourceVersion CAS 仅替换 console 容器 image；generation 310、Ready 1，运行 Pod `console-6bfcc59db-9qrrr`，UID `8afdf80c-9fbc-42ef-9d1f-0fcbd20375c9`，实际镜像 manifest 为 `sha256:cde5e9c51e1bcfcdcd10a2919992fb2c0fd042b0bb91eb5ec0b1b4084a3abbfb`。同一验收时间窗还观察到七个后台 Deployment 镜像改变；本脚本的前后容器 spec 比对证明自身只修改 console，不将并行变化归入本修复或声称其他系统均未变。
+
+Chrome 正式项目中选中成功开发 Agent `01a13efc-55c0-7000-86c8-545583181bb5`，完整八条回答与部署前逐条对比全文相等。刷新、CLI → Bot、项目概览 → 开发 → Bot 三条实际路径均恢复同一 Agent，八条正文及顺序保持一致；选择新对话后刷新，选择仍为空且没有 Bot 回答。再次选回成功开发对话后，八条浅绿气泡均为 `rgb(234, 246, 239)`，名册仍为原三条 Agent，没有发送或创建新请求。刷新前独立确认输入草稿为空；预览空白时点既有“重新加载”恢复，原预览重载边界未纳入这次修复。
+
+证据保存在 `.local/cli-bot-acceptance/bot-history-before-proof.json`、`bot-history-development-before.json`、`bot-history-after-proof.json`、`ci-bot-history-deployment-gate.json`、`bot-history-deployment-proof.json` 与 `bot-history-fixed.png`。浏览器保留成功开发对话和贪吃蛇预览。本条与 STATE 为纯验收文档提交，准确 CI 在最终交付记录。
