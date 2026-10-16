@@ -2,13 +2,13 @@ import { expect, test } from 'bun:test';
 import type { AgentEvent, RunnerBusinessEvent, RunnerBusinessReceipt, RunnerCommand, TaskId } from '@crewstation/contracts';
 import { LaunchSpecSchema, RunnerCommandSchema, businessAgentDigestInput } from '@crewstation/contracts';
 import { newResourceId, precondition } from '@crewstation/kernel';
-import { probeBusinessProfile } from '../application/profile-testing/businessProfileProbe';
+import { PROBE_ATTEMPTS, probeBusinessProfile } from '../application/profile-testing/businessProfileProbe';
 import { businessProbeTurn } from '../application/profile-testing/businessProbeTurns';
 import type { TestRunner } from '../ports/platform';
 
 function fixture() {
   const commands: RunnerCommand[] = [], receipts = new Map<string, RunnerBusinessReceipt>(), events = new Map<string, RunnerBusinessEvent[]>(), steps: string[] = [];
-  const state = { supported: true, modern: false, legacyMapping: false, materialToken: '', inventory: true, mismatch: undefined as string | undefined, noTool: undefined as string | undefined, unknown: false, gap: false, rejectStart: false, lostReply: false, sessionToken: '', mcpToken: '' };
+  const state = { supported: true, modern: false, legacyMapping: false, materialToken: '', inventory: true, mismatch: undefined as string | undefined, flakyOnce: undefined as string | undefined, noTool: undefined as string | undefined, unknown: false, gap: false, rejectStart: false, lostReply: false, sessionToken: '', mcpToken: '' };
   const runner: TestRunner = {
     connectionStatus: async () => ({ connected: true, capabilities: { protocols: ['opencode'], pty: false, preview: false, ...(state.supported ? { businessExecutionV3: 1 as const } : {}), ...(state.modern ? { ...(state.legacyMapping ? { nativeModelMappingVersion: 1 as const } : { nativeModelMaterialVersion: 1 as const }), nativeConfigVersion: 1 as const, materialObjectsVersion: 1 as const, startupInventoryVersion: 1 as const } : {}) } }),
     listEvents: async () => [],
@@ -38,8 +38,9 @@ function fixture() {
         const step = agent.platformOpencodeModels ? 'nativeModelMapping' : native ? nativeStep : agent.businessMaterialDownloads?.length ? 'materialObjects' : agent.resumeSessionId ? 'resume' : agent.systemPrompt ? 'systemPrompt' : agent.businessSkills?.length ? 'skills' : agent.mcp.length ? 'mcp' : 'events';
         const token = step === 'materialObjects' ? state.materialToken : step === 'resume' ? state.sessionToken : step === 'mcp' || step === 'nativeRemoteMcp' ? state.mcpToken : JSON.stringify(agent).match(/cs-proof-[a-f0-9]+/)![0];
         steps.push(step);
+        if (state.flakyOnce === step) queueMicrotask(() => { state.flakyOnce = undefined; });
         if (step === 'events') state.sessionToken = token;
-        const fields: Array<Partial<AgentEvent> & Pick<AgentEvent, 'type'>> = [{ type: 'session', sessionId: 'native-session' }, { type: 'text', text: state.mismatch === step ? 'unsupported' : token }, { type: 'usage', usage: { measurementId: 'turn', scope: 'session', mode: 'delta', inputTokens: 3, outputTokens: 1, cacheReadTokens: null, cacheWriteTokens: null, complete: true } }];
+        const fields: Array<Partial<AgentEvent> & Pick<AgentEvent, 'type'>> = [{ type: 'session', sessionId: 'native-session' }, { type: 'text', text: state.mismatch === step || state.flakyOnce === step ? 'unsupported' : token }, { type: 'usage', usage: { measurementId: 'turn', scope: 'session', mode: 'delta', inputTokens: 3, outputTokens: 1, cacheReadTokens: null, cacheWriteTokens: null, complete: true } }];
         if (agent.startupInventoryVersion === 1) fields.push({ type: 'startup-inventory', inventory: state.inventory ? { version: 1, state: 'verified', source: 'opencode-inventory', mcpServers: [{ name: 'crewstation-probe', status: 'connected' }] } : { version: 1, state: 'unavailable', reason: 'inventory-not-reported' } });
         if ((step === 'nativeModelMapping' || step === 'nativeConfig') && state.noTool !== step) fields.push({ type: 'tool-start', tool: { name: 'task' } });
         if (['mcp', 'nativeRemoteMcp', 'nativeLocalMcp'].includes(step) && state.noTool !== step) fields.push({ type: 'tool-start', tool: { name: 'crewstation_probe_nonce' } });
@@ -69,7 +70,17 @@ test('ordinary/old Runner smoke never grants business capability; exact per-feat
 test('optional feature failure remains false; event baseline failure grants no effective business execution', async () => {
   const f = fixture(); f.state.mismatch = 'skills'; expect((await f.run())?.capabilities).toMatchObject({ events: true, skills: false, mcp: true });
   const bad = fixture(); bad.state.mismatch = 'events'; expect((await bad.run())?.capabilities).toMatchObject({ events: false, usage: 'none', resume: false });
-  expect(bad.commands.filter((command) => command.type === 'startBusinessAgent')).toHaveLength(1);
+  // Every capability is retried before it is recorded as unsupported.
+  expect(bad.commands.filter((command) => command.type === 'startBusinessAgent')).toHaveLength(PROBE_ATTEMPTS);
+});
+test('a capability the model misses once is proven by a fresh retry with the same expectation', async () => {
+  const f = fixture(); f.state.flakyOnce = 'systemPrompt';
+  expect((await f.run())?.capabilities).toMatchObject({ events: true, systemPrompt: true, skills: true });
+  const prompts = f.commands.filter((command) => command.type === 'startBusinessAgent' && command.agent.systemPrompt);
+  expect(prompts).toHaveLength(2);
+  const [first, second] = prompts.map((command) => (command.type === 'startBusinessAgent' ? command.agent : undefined));
+  expect(first?.agentId).not.toBe(second?.agentId);
+  expect(first?.systemPrompt).toBe(second?.systemPrompt);
 });
 test('unknown execution and noncontiguous source events abort proof batch and cancel without a fresh retry', async () => {
   for (const problem of ['unknown', 'gap'] as const) {

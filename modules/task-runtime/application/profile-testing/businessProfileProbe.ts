@@ -9,6 +9,8 @@ import type { BusinessProbeTurnDeps } from './businessProbeTurns';
 import { businessProbeTurn } from './businessProbeTurns';
 
 interface Input extends BusinessProbeTurnDeps { input: ProfileTestRunInput; report(stage: ProfileTestStage): Promise<void> }
+/** Attempts per capability before it is recorded as unsupported. */
+export const PROBE_ATTEMPTS = 3;
 /** Capabilities come from actual CLI behavior in the fixed image/revision, never from the driver name or version alone. */
 export async function probeBusinessProfile(deps: Input): Promise<BusinessExecutionProof | undefined> {
   const connected = await deps.runner.connectionStatus(deps.taskId);
@@ -20,9 +22,12 @@ export async function probeBusinessProfile(deps: Input): Promise<BusinessExecuti
       permission: PLATFORM_AGENT_PERMISSION, mode: 'oneshot', env: {}, mcp: [], ...patch });
   };
   const nonce = () => `cs-proof-${randomBytes(12).toString('hex')}`;
+  const again = (agent: StartAgentCommand): StartAgentCommand => { const id = newResourceId(); return StartAgentCommandSchema.parse({ ...agent, id, agentId: id, processAttemptId: id }); };
   const probe = async (name: string, agent: StartAgentCommand, expected: string) => {
     await deps.report({ id: `business:${name}`, kind: 'model', name: `业务能力：${name}`, state: 'running' });
-    const turn = await businessProbeTurn(deps, agent, expected);
+    // A model can miss an exact-token instruction once; any completed attempt proves the CLI capability. A failed turn (unknown/gap) still aborts the batch.
+    let turn = await businessProbeTurn(deps, agent, expected);
+    for (let attempt = 2; !turn.ok && attempt <= PROBE_ATTEMPTS; attempt += 1) turn = await businessProbeTurn(deps, again(agent), expected);
     await deps.report({ id: `business:${name}`, kind: 'model', name: `业务能力：${name}`, state: turn.ok ? 'succeeded' : 'failed', ...(turn.ok ? {} : { detail: 'CLI 未通过此能力实测，业务 API 将明确拒绝依赖该能力的调用' }) });
     return turn;
   };
