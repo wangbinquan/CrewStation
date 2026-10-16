@@ -87,4 +87,4 @@ Claude 从该次根会话 init 读取实际清单；OpenCode 在该次私有运�
 - 对象未 ready／跨服务／摘要或大小不符／下载过期／途中断线／超预算／取消：不启动 CLI；固定引用与同一材料受理可恢复。
 - Secret 版本轮换后重试仍用原版本；原版本不可用则具名拒绝。旧 Runner／未授权键／跨项目 Secret 均在派发前拒绝，不把密钥塞进 argv。
 
-按 `docs/engineering/testing.md`：schema 正反例、领域授权矩阵、双协议真实 argv/env/配置文件断言、FakeProcessHost 失败与取消、模块持久 requestKey/摘要/重连测试、旧材料回归；发布后两种 CLI 实机验收。每个拒绝分支都有测试。完整实现和测试编写结束后集中执行检查；精确 SHA CI 与本机部署证据分别记录。
+按 `docs/engineering/testing.md`：schema 正反例、领域授权矩阵、双协议真实 argv/env/配置文件断言、FakeProcessHost 失败与取消、模块持久 requestKey/摘要/重连测试、旧材料回归；发布后 CLI 实机验收遵循用户最新裁定：2026-10-15 明确只验证 OpenCode，Claude Code 不作为本轮实机收口条件。每个拒绝分支都有测试。完整实现和测试编写结束后集中执行检查；精确 SHA CI 与本机部署证据分别记录。

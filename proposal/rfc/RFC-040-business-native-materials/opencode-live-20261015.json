@@ -1,0 +1,365 @@
+{
+  "scope": "OpenCode only, explicitly directed by the user on 2026-10-15",
+  "sourceSha": "92889e87a7be3db1cbc4f2aad8c63a85f1f577c9",
+  "ci": {
+    "runId": 38838520891,
+    "jobs": 9,
+    "allSucceeded": true
+  },
+  "images": {
+    "control": "sha256:004edc4ee8e73ae03254c9d8d172e54fec601229d1481fc27798871eddccedb0",
+    "runner": "sha256:b27a7fb8ebf7134c2e53585cb55248eb4d054aa5da122af6c0b6989d76da88b7"
+  },
+  "profile": {
+    "id": "01a14282-7979-7000-b517-f3d4a3207d56",
+    "revision": 2,
+    "testId": "01a14282-7a4e-7000-bfe5-90b409d97680",
+    "cliVersion": "1.18.29",
+    "capabilities": {
+      "mcp": true,
+      "usage": "final",
+      "events": true,
+      "resume": true,
+      "skills": true,
+      "systemPrompt": false,
+      "platformDelegation": false,
+      "nativeConfigVersion": 1,
+      "materialObjectsVersion": 1,
+      "startupInventoryVersion": 1,
+      "opaqueInternalDelegation": true
+    }
+  },
+  "project": {
+    "id": "01a1428b-7693-7000-9695-28881ae3aebc",
+    "serviceId": "01a1428b-7693-7001-8b43-6e28c4c4eff5",
+    "manifestCommit": "3619524d7fa429fa2a3f82080582ea2a62ab8698",
+    "tag": "v0.1.2",
+    "releaseId": "01a1428f-eabe-7000-af4c-887037988560"
+  },
+  "taskId": "01a14294-79d0-7000-b7d6-f0db13390656",
+  "native": {
+    "receipt": {
+      "id": "01a14295-6f22-7000-8837-c05d8396f4d9",
+      "executionId": "01a14295-6f22-7001-aeb7-098e057aa607",
+      "attempt": 1,
+      "state": "succeeded",
+      "process": "exited",
+      "sessionId": "ses_ebd69b3cdffeLzWJvzdTPtlXeb",
+      "materialDigest": "b83e90c6c8e4eff23c1c52331bf5674e873a5ac83da7de1cb5e6d80fb79b2b32",
+      "computeProfileId": "01a14282-7979-7000-b517-f3d4a3207d56",
+      "profileRevision": 2
+    },
+    "object": {
+      "id": "01a14294-f3d1-7000-aaa3-68c15021d2b6",
+      "sha256": "8761406ccd0f5438e1c106d8e1381af1fb560bd78dfe37d90de0f62dcd1e605c",
+      "size": 2097169
+    },
+    "checks": [
+      {
+        "name": "new-capability-bits",
+        "ok": true
+      },
+      {
+        "name": "object-upload",
+        "ok": true,
+        "detail": {
+          "status": 202
+        }
+      },
+      {
+        "name": "material-idempotent",
+        "ok": true
+      },
+      {
+        "name": "rejection-/v3/business-tasks/01a14294-79d0-7000-b7d6-f0db13390656/materials",
+        "ok": true,
+        "detail": {
+          "status": 409,
+          "code": "idempotency_conflict"
+        }
+      },
+      {
+        "name": "object-fixed-reference",
+        "ok": true,
+        "detail": {
+          "referenceCount": 1
+        }
+      },
+      {
+        "name": "native-exit",
+        "ok": true,
+        "detail": {
+          "state": "succeeded"
+        }
+      },
+      {
+        "name": "plugin-binary-tree-mode",
+        "ok": true
+      },
+      {
+        "name": "native-local-mcp",
+        "ok": false
+      }
+    ],
+    "firstHarnessFailure": "The original local-MCP check expected plaintext from an env value. The platform correctly redacted it. Subsequent local and remote MCP checks verify SHA256 instead; the failed harness assertion is retained."
+  },
+  "mcpAndResume": {
+    "checks": [
+      {
+        "name": "rejection-/v3/business-tasks/01a14294-79d0-7000-b7d6-f0db13390656/materials",
+        "ok": true,
+        "detail": {
+          "status": 400,
+          "code": "invalid_configuration"
+        }
+      },
+      {
+        "name": "rejection-/v3/business-tasks/01a14294-79d0-7000-b7d6-f0db13390656/materials",
+        "ok": true,
+        "detail": {
+          "status": 400,
+          "code": "invalid_configuration"
+        }
+      },
+      {
+        "name": "rejection-/v3/business-tasks/01a14294-79d0-7000-b7d6-f0db13390656/materials",
+        "ok": true,
+        "detail": {
+          "status": 412,
+          "code": "material_object_mismatch"
+        }
+      },
+      {
+        "name": "MCP-success",
+        "ok": true
+      },
+      {
+        "name": "local-env-digest",
+        "ok": true
+      },
+      {
+        "name": "remote-header-digest",
+        "ok": true
+      },
+      {
+        "name": "MCP-secrets-redacted",
+        "ok": true
+      },
+      {
+        "name": "both-MCP-runtime-connected",
+        "ok": true,
+        "detail": {
+          "state": "verified",
+          "agents": [
+            "build",
+            "compaction",
+            "explore",
+            "general",
+            "plan",
+            "rfc040-mcp-root",
+            "summary",
+            "title"
+          ],
+          "source": "opencode-inventory",
+          "version": 1,
+          "mcpServers": [
+            {
+              "name": "capabilities",
+              "status": "connected"
+            },
+            {
+              "name": "operations",
+              "status": "connected"
+            },
+            {
+              "name": "rfc040-local-hash",
+              "status": "connected"
+            },
+            {
+              "name": "rfc040-remote-hash",
+              "status": "connected"
+            }
+          ]
+        }
+      },
+      {
+        "name": "native-session-id-preserved",
+        "ok": true
+      },
+      {
+        "name": "native-session-memory-preserved",
+        "ok": true
+      },
+      {
+        "name": "resume-snapshot-preserved",
+        "ok": true
+      },
+      {
+        "name": "original-durable-events-replayed",
+        "ok": true
+      }
+    ],
+    "receipt": {
+      "id": "01a1429a-6033-7000-8cbe-a701b72f3d41",
+      "executionId": "01a1429a-6033-7001-b386-6ceab92712cc",
+      "attempt": 1,
+      "state": "succeeded",
+      "process": "exited",
+      "sessionId": "ses_ebd640b20ffeqluMy4V7ZM3yEQ",
+      "materialDigest": "bca5cde7f90818a28be6d56e12c725ccaa9977e5f38df7f8b8b1f3b0bf19d310",
+      "computeProfileId": "01a14282-7979-7000-b517-f3d4a3207d56",
+      "profileRevision": 2
+    },
+    "permissions": {
+      "bashPermission": "deny",
+      "forbiddenFileExists": false,
+      "topP": 0.7,
+      "temperature": 0.15
+    },
+    "resumed": {
+      "id": "01a1429c-5721-7000-a987-71630441dfb8",
+      "executionId": "01a1429c-5721-7001-ab4c-2f1655a2e1e2",
+      "attempt": 1,
+      "state": "succeeded",
+      "process": "exited",
+      "sessionId": "ses_ebd69b3cdffeLzWJvzdTPtlXeb",
+      "materialDigest": "b83e90c6c8e4eff23c1c52331bf5674e873a5ac83da7de1cb5e6d80fb79b2b32",
+      "computeProfileId": "01a14282-7979-7000-b517-f3d4a3207d56",
+      "profileRevision": 2
+    }
+  },
+  "commandSecrets": {
+    "checks": [
+      {
+        "name": "first-command-exit-7",
+        "ok": true
+      },
+      {
+        "name": "first-secret-digest",
+        "ok": true
+      },
+      {
+        "name": "command-idempotency-after-rotation",
+        "ok": true
+      },
+      {
+        "name": "retry-completed",
+        "ok": true
+      },
+      {
+        "name": "retry-frozen-old-secret",
+        "ok": true
+      },
+      {
+        "name": "new-command-rotated-secret",
+        "ok": true
+      },
+      {
+        "name": "rejection-/v3/business-tasks/01a14294-79d0-7000-b7d6-f0db13390656/subtasks",
+        "ok": true,
+        "detail": {
+          "status": 400,
+          "code": "invalid_configuration"
+        }
+      }
+    ],
+    "first": {
+      "id": "01a14297-feeb-7000-9330-308b1b456d3a",
+      "executionId": "01a14297-feeb-7001-b57b-f7744babbbff",
+      "attempt": 1,
+      "state": "failed",
+      "process": "exited"
+    },
+    "retry": {
+      "id": "01a14298-f2a1-7000-97a9-0b3b34206b93",
+      "executionId": "01a14298-f2a1-7001-b3dd-1d8aa8765908",
+      "attempt": 2,
+      "previousId": "01a14297-feeb-7000-9330-308b1b456d3a",
+      "state": "succeeded",
+      "process": "exited"
+    },
+    "newCommand": {
+      "id": "01a14298-f984-7000-bd9b-f4d08a4b5ebc",
+      "executionId": "01a14298-f984-7001-a6f4-d497e31e7a53",
+      "attempt": 1,
+      "state": "succeeded",
+      "process": "exited"
+    },
+    "persistence": {
+      "rows": 3,
+      "plaintextSecretPersisted": false,
+      "retryPayloadDigestUnchanged": true,
+      "newCommandPayloadDigestDifferent": true
+    }
+  },
+  "cancelAndFreshRetry": {
+    "checks": [
+      {
+        "name": "cancel-after-native-session",
+        "ok": true
+      },
+      {
+        "name": "native-cancelled-physical-exit",
+        "ok": true,
+        "detail": {
+          "state": "cancelled",
+          "process": "exited"
+        }
+      },
+      {
+        "name": "cancel-inventory-before-result",
+        "ok": true,
+        "detail": {
+          "state": "unavailable",
+          "reason": "inventory-cancelled",
+          "version": 1
+        }
+      },
+      {
+        "name": "fresh-retry-completed",
+        "ok": true
+      },
+      {
+        "name": "fresh-retry-new-native-session",
+        "ok": true
+      },
+      {
+        "name": "fresh-retry-snapshot-preserved",
+        "ok": true
+      },
+      {
+        "name": "fresh-retry-plugin-objects-loaded",
+        "ok": true
+      }
+    ],
+    "cancelled": {
+      "id": "01a1429f-2011-7000-a46a-c56f43f8ca5a",
+      "executionId": "01a1429f-2011-7001-838c-6f337178e1c5",
+      "attempt": 1,
+      "state": "cancelled",
+      "process": "exited",
+      "sessionId": "ses_ebd6022e9ffehnEOmay9M0kO5h",
+      "materialDigest": "b83e90c6c8e4eff23c1c52331bf5674e873a5ac83da7de1cb5e6d80fb79b2b32",
+      "computeProfileId": "01a14282-7979-7000-b517-f3d4a3207d56",
+      "profileRevision": 2
+    },
+    "retried": {
+      "id": "01a142a0-27e5-7000-8b04-e5ad4097b0f6",
+      "executionId": "01a142a0-27e5-7001-bdfb-47dc1ffe54fe",
+      "attempt": 2,
+      "previousId": "01a1429f-2011-7000-a46a-c56f43f8ca5a",
+      "state": "succeeded",
+      "process": "exited",
+      "sessionId": "ses_ebd5f0fceffeI3j2n2C9woPbwH",
+      "materialDigest": "b83e90c6c8e4eff23c1c52331bf5674e873a5ac83da7de1cb5e6d80fb79b2b32",
+      "computeProfileId": "01a14282-7979-7000-b517-f3d4a3207d56",
+      "profileRevision": 2
+    }
+  },
+  "limits": [
+    "systemPrompt capability probe failed for this GLM profile; bit remains false",
+    "No Claude Code live validation after user scope change",
+    "AW native-material compiler and joint acceptance remain unfinished",
+    "This evidence does not prove full AW RFC370 completion"
+  ]
+}
