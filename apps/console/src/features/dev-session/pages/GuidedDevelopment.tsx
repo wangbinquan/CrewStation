@@ -10,7 +10,8 @@ import { ActionNote } from '../../../shared/ui/ActionNote';
 import { ButtonLink } from '../../../shared/ui/navigation/ButtonLink';
 import { useTaskStream } from '../hooks/useTaskStream';
 import { usePreviewStatus } from '../hooks/usePreviewStatus';
-import { useDevAgents, useAgentSelection } from '../hooks/useDevAgents';
+import { useDevAgents } from '../hooks/useDevAgents';
+import { useBotSelection } from '../hooks/useBotSelection';
 import { useAgentTranscripts } from '../hooks/useAgentTranscripts';
 import { useActivityTouch } from '../hooks/useActivityTouch';
 import { executionStreamTaskIds } from '../model/agentTranscript';
@@ -23,14 +24,14 @@ import { SessionCover } from '../components/session/SessionCover';
 import { sessionConnection } from '../model/connection/sessionConnection';
 import styles from './GuidedDevelopment.module.css';
 
-export function GuidedDevelopment({ session, canDevelop, onRestart, recovery }: { readonly session: DevSessionDto; readonly canDevelop: boolean; readonly onRestart?: () => void; readonly recovery: ReactNode }) {
+export function GuidedDevelopment({ session, userId, canDevelop, onRestart, recovery }: { readonly session: DevSessionDto; readonly userId: string; readonly canDevelop: boolean; readonly onRestart?: () => void; readonly recovery: ReactNode }) {
   const t = useT(), { projectId, space } = useProjectScope(), { state, channel, reconnect } = useTaskStream(session.taskId);
   const health = sessionConnection(session, state), ready = health === 'ready' && !sessionStartupShown(session);
   const [enteredAt] = useState(() => Date.now()), [opened, setOpened] = useState(false);
   const [mobilePane, setMobilePane] = useState('conversation');
   if (ready && !opened) setOpened(true);
   const preview = usePreviewStatus(channel, projectId, state.generation, ready), agents = useDevAgents(session.taskId);
-  const selection = useAgentSelection(agents.agents, undefined), { transcripts, ingest } = useAgentTranscripts(channel, session.taskId, agents.refresh), touch = useActivityTouch(session.taskId);
+  const selection = useBotSelection(agents.agents, userId, projectId, session.taskId), { transcripts, ingest } = useAgentTranscripts(channel, session.taskId, agents.refresh), touch = useActivityTouch(session.taskId);
   const params = { projectId }, logs = <ButtonLink to={PROJECT_PATHS[space].operations} params={params} search={{ tab: 'logs', source: 'dev-session', taskId: session.taskId }}>{t('devSession.preview.logs')}</ButtonLink>;
   return <div className={styles.page}>
     <header className={styles.context}><div><StreamStatus state={state} sessionState={session.state} compact /><code>{session.branch}</code></div>

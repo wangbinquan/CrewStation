@@ -60,7 +60,7 @@ export function DevSessionPage({ reference, sessionLogs }: DevSessionPageProps =
       {!session.session && session.release.data !== undefined ? <ReleaseOutcome result={session.release.data} /> : null}
       {/* 开会话时 Manifest 有问题：会话照样开，但要把原因摆在这儿。轮询回来的会话对象不带它，所以取开会话那次的返回值。 */}
       {session.open.data?.message !== undefined ? <PaneNotice tone="warning">{session.open.data.message}</PaneNotice> : null}
-      {session.session === undefined || !context.userId ? null : <DevelopmentModes key={session.session.taskId} bot={<GuidedDevelopment session={session.session} canDevelop={context.canDevelop} recovery={recovery}
+      {session.session === undefined || !context.userId ? null : <DevelopmentModes key={session.session.taskId} bot={<GuidedDevelopment session={session.session} userId={context.userId} canDevelop={context.canDevelop} recovery={recovery}
         onRestart={context.canDevelop ? () => session.open.mutate({ branch: session.session!.branch, restartOf: session.session!.taskId }) : undefined} />} cli={
         <DevSessionWorkbench
           active={!guided}

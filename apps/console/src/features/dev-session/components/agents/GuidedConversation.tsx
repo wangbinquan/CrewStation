@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useT } from '../../../../shared/lib/useT';
 import { Button } from '../../../../shared/ui/Button';
 import { ActionNote } from '../../../../shared/ui/ActionNote';
@@ -19,9 +18,9 @@ export function GuidedConversation({ projectId, agents, selection, transcripts, 
   readonly projectId: string; readonly agents: DevAgentsHandle; readonly selection: AgentSelection;
   readonly transcripts: TranscriptsByAgent; readonly ready: boolean; readonly onActivity: () => void;
 }) {
-  const t = useT(), [newRequest, setNewRequest] = useState(false), messages = useHistoricalMessages(agents.sendMessage);
-  const creation = useHistoricalStart(agents.start, id => { selection.select(id); setNewRequest(false); onActivity(); });
-  const selected = newRequest ? undefined : selection.selected, draft = selected ? messages.drafts[selected.agentId] : undefined;
+  const t = useT(), messages = useHistoricalMessages(agents.sendMessage);
+  const creation = useHistoricalStart(agents.start, id => { selection.select(id); onActivity(); });
+  const selected = selection.selected, draft = selected ? messages.drafts[selected.agentId] : undefined;
   const busy = creation.busy || messages.busy, allowed = ready && !agents.loadError && !agents.isPending;
   const send = () => { if (!allowed) return; if (selected) { if (messages.send(selected.agentId)) onActivity(); } else creation.start(); };
   const running = !!selected && ['preparing', 'starting', 'running'].includes(selected.state);
@@ -33,11 +32,11 @@ export function GuidedConversation({ projectId, agents, selection, transcripts, 
     <UnsavedChangesGuard dirty={creation.dirty || messages.dirty || busy} scope={t('devSession.agents.draftScope')} isNavigationBusy={() => busy}
       allowNavigate={(current, next) => current.pathname === next.pathname} />
     <header className={styles.toolbar}><GlyphIcon name="assistant" plain />
-      <select aria-label={t('devSession.bot.chooseConversation')} value={selected?.agentId ?? ''} onChange={event => { if (event.target.value) { selection.select(event.target.value); setNewRequest(false); } else setNewRequest(true); }}>
+      <select aria-label={t('devSession.bot.chooseConversation')} value={selected?.agentId ?? ''} onChange={event => selection.select(event.target.value)}>
         <option value="">{t('devSession.guided.newRequest')}</option>
         {agents.agents.map((agent, index) => <option key={agent.agentId} value={agent.agentId}>{(agent.initialPrompt || transcripts[agent.agentId]?.find(line => line.type === 'user-message')?.body)?.slice(0, 36) || t('devSession.bot.conversationName', { number: index + 1 })}</option>)}
       </select>
-      <Button variant="ghost" size="small" disabled={!allowed || busy} onClick={() => setNewRequest(true)}>{t('devSession.guided.newRequest')}</Button>
+      <Button variant="ghost" size="small" disabled={!allowed || busy} onClick={() => selection.select('')}>{t('devSession.guided.newRequest')}</Button>
     </header>
     {agents.loadError ? <ActionNote tone="error">{errorMessage(agents.loadError)}</ActionNote> : null}
     {selected?.execution?.message ? <ActionNote tone={selected.state === 'failed' ? 'error' : 'neutral'}>{selected.execution.message}</ActionNote> : null}

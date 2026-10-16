@@ -276,3 +276,11 @@ RFC-039 的 T1–T10 与 FD-01–FD-09 在上述实现、相应层级回归和�
 代码围栏包入气泡、普通 JSON 与原生正文不被误分类由本轮渲染回归覆盖。原计划补发一条只读 Bot 测试消息被自动审批拒绝，理由是启动新一轮 Agent 执行需要更具体的发送授权；未发送、未留草稿、未重试或改通道。实际验收改用已存在的三段真实历史，未创建新 Agent。刷新后预览曾空白，点击既有“重新加载”恢复；此前已记录的预览重载边界未在本次扩大修复。
 
 最终证据：`.local/cli-bot-acceptance/ci-bot-bubbles-deployment-gate.json`、`bot-bubbles-deployment-proof.json`、`bot-bubbles-desktop-proof.json`、`bot-bubbles-mobile-proof.json`、`bot-protocol-legacy-after.png`、`bot-bubbles-final.png`、`bot-bubbles-mobile-after.png`。本轮局部回归合计 38 pass / 0 fail / 227 断言；未重跑此前失败的本机整库测试，沿用作者批准的准确 GitHub gate/e2e 门槛。并行 RFC-040 文档在制品保持原样。本条与 STATE 是纯验收收尾，文档提交的准确 CI 另在最终交付记录。
+
+### Bot 重开后回复变化：对话选择恢复修复（2026-10-15）
+
+Chrome 在真实贪吃蛇项目复现：手动选择只读验收 Agent `01a13f4b-a087-7000-937a-b7dd1e34370d` 后，刷新页面自动回到最初失败的 `01a13ee2-6441-7000-a6e3-bea464a298bd`；重新选回验收 Agent，其回复全文与刷新前一致。`GuidedDevelopment` 原先把 `undefined` 传给 `useAgentSelection`，当前身份只有 React state，重挂载或未手动选择时名册重排都会回到第一项。这次证据支持选择丢失，不是模型重新作答或同一条回答被随机改写。
+
+正式 Bot 用 `useBotSelection` 按用户、项目及开发任务在 sessionStorage 记住所选 Agent 身份，空串表示明确选择新对话；默认第一项也锁定身份，轮询重排不换对象。只存身份，不缓存回答或执行事实；刷新仍读取原持久事件。浏览器禁止存储时仍可正常在当前页面切换；已记住的对象不可用时不擅自跳到另一条历史。CLI/Bot 常驻切换及在隐藏 Bot 中完成的启动继续沿用原行为。记忆范围是同一浏览器页签的会话，不承诺跨设备同步。
+
+三个故障回归先红，修复后七文件 46 pass / 0 fail / 293 断言，覆盖刷新、离开再进入、CLI/Bot 切换、新对话、默认名册重排、名册延迟与已结束执行流重放、用户/项目/任务隔离、存储失败和无效值，以及已有工具记录与气泡行为。console 类型、精确 lint、结构检查通过；未重复原本机整库失败轮次，沿用作者批准的准确 GitHub gate/e2e 门槛。准确源码 CI、本机部署和修复后 Chrome 结果在后续条目补记。
