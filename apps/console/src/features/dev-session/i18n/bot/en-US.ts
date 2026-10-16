@@ -17,6 +17,7 @@ export const botMessages = {
   'devSession.continuous.reconcile': "Check original request",
   'devSession.continuous.stop': "Stop this turn",
   'devSession.continuous.continueHint': "Your next message continues the current context.",
+  'devSession.continuous.draftScope': "Bot conversation input",
   'devSession.continuous.options': "Bot startup settings",
   'devSession.continuous.applyOptions': "Save settings",
   'devSession.continuous.optionsHint': "The compute profile and runtime are fixed after your first message to keep later turns in the same context.",

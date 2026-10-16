@@ -73,3 +73,30 @@ test('startup options keep the user draft on close and refresh, then freeze the 
   expect([...document.querySelectorAll('[data-bot-composer] button')].some(button => button.textContent === 'fast')).toBe(false);
   expect([...document.querySelectorAll('[data-bot-composer] span')].some(span => span.textContent === 'fast')).toBe(true);
 });
+
+test('a saved Bot draft leaves and returns without claiming that the input will be discarded', async () => {
+  f = continuousBotFixture(); page = await renderDeliveryHarness(path); await draft('返回后继续这个需求');
+  // RFC-041 Chrome acceptance: the persisted default Bot incorrectly used the legacy unsaved-input warning.
+  await page.go('/projects'); expect(page.path()).toBe('/projects'); expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+  await page.go(path); expect(document.querySelector<HTMLTextAreaElement>('textarea')?.value).toBe('返回后继续这个需求');
+  expect(f.botMessages).toHaveLength(0);
+});
+
+test('unavailable browser storage still protects the actual unsaved Bot input', async () => {
+  f = continuousBotFixture(); page = await renderDeliveryHarness(path);
+  const storage = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage')!, original = sessionStorage;
+  let writes = 0;
+  Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: new Proxy(original, { get(target, key) {
+    if (key === 'setItem') return () => { writes++; throw new Error('storage unavailable'); };
+    const value = Reflect.get(target, key, target); return typeof value === 'function' ? value.bind(target) : value;
+  } }) });
+  try {
+    await draft('仅在页面里的草稿'); expect(writes).toBeGreaterThan(0); await page.go('/projects');
+    expect(page.path()).toBe(`/projects/${activityProjectId}/dev-session`);
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('Bot 对话输入');
+    await page.click('继续编辑'); expect(document.querySelector<HTMLTextAreaElement>('textarea')?.value).toBe('仅在页面里的草稿');
+    await page.go(path.replace('guided', 'cli'));
+    expect(document.querySelector('[role="alertdialog"]')).not.toBeNull();
+    await page.click('继续编辑'); expect(document.querySelector<HTMLTextAreaElement>('textarea')?.value).toBe('仅在页面里的草稿');
+  } finally { Object.defineProperty(globalThis, 'sessionStorage', storage); }
+});

@@ -34,8 +34,8 @@ export class BotConversationLifecycle {
     if (!current) return;
     const parent = await this.deps.environments.getEnvironment(taskId);
     if (!parent || ['released', 'releasing', 'failed'].includes(parent.state)) return;
-    current = await observeBot(this.deps, this.repo, this.starts, current);
     const operations = await this.repo.pending(taskId), control = operations.find((op) => op.kind !== 'message');
+    current = await observeBot(this.deps, this.repo, this.starts, current, operations);
     if (control) { await this.control(current, control, operations); return; }
     const operation = operations.find((op) => op.kind === 'message');
     if (!operation || current.continuity === 'unavailable') return;

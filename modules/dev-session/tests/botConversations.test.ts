@@ -35,7 +35,12 @@ describe.skipIf(!available)('durable default Bot conversation', () => {
     await f.tick(); expect((await f.current()).state).toBe('stopping');
     await expect(f.message('too early')).rejects.toMatchObject({ kind: 'precondition' });
     await f.stopped(); expect((await f.current()).state).toBe('paused');
-    await f.message('recall random marker'); await f.tick(); await f.connectBot();
+    await f.message('recall random marker'); f.botState.volume = false; await f.tick();
+    // RFC-041 live cold resume: observing the ended old Agent must not mark its replacement paused.
+    expect((await f.current()).state).toBe('preparing');
+    await expect(f.message('another page while the replacement starts')).rejects.toMatchObject({ kind: 'precondition' });
+    f.botState.volume = true; await f.tick(); expect((await f.current()).state).toBe('preparing');
+    await f.connectBot();
     const resumed = await f.current(), command = f.startCommands().at(-1)!.command;
     expect(resumed.conversationId).toBe(original.conversationId); expect(resumed.epoch).toBe(1);
     expect(resumed.execution?.agentId).not.toBe(original.execution?.agentId);
@@ -53,6 +58,19 @@ describe.skipIf(!available)('durable default Bot conversation', () => {
     f.botState.loseReply = false; await f.tick();
     expect((await f.repo.operation(task, receipt.requestId))?.receipt.state).toBe('dispatched');
     expect(f.routed.filter((row) => row.command.type === 'sendBotMessage')).toHaveLength(1);
+  });
+  test('parent-driven cleanup becomes resumable after actual finish without a user stop operation', async () => {
+    f = await botConversationFixture(); await f.message('original context'); await f.tick(); await f.connectBot();
+    await f.emitBot({ type: 'session', sessionId: 'ses_original' }); await f.emitBot({ type: 'status', status: 'waiting' });
+    const current = await f.current(), execution = current.execution!, start = f.starts.rows.get(execution.agentId)!;
+    await f.lifecycle.end(start, { cancelled: true }); await f.tick();
+    expect((await f.current()).state).toBe('stopping');
+    expect((await f.repo.pending(task)).some(op => op.kind !== 'message')).toBe(false);
+    // The real parent-rebuild cleanup finished, but the observed stopping state was mistaken for a permanent user intent.
+    await f.stopped(); expect((await f.current()).state).toBe('paused');
+    expect((await f.current()).nativeSessionId).toBe('ses_original');
+    await f.message('resume after parent rebuild'); await f.tick(); await f.connectBot();
+    expect(f.startCommands().at(-1)!.command.resumeSessionId).toBe('ses_original');
   });
   test('fresh context is explicit and keeps history; missing context or different native ID does not silently resume', async () => {
     f = await botConversationFixture(); await f.message('first'); await f.tick(); await f.connectBot();

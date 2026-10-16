@@ -17,6 +17,7 @@ export const botMessages = {
   'devSession.continuous.reconcile': "确认原请求",
   'devSession.continuous.stop': "停止本轮",
   'devSession.continuous.continueHint': "继续发送消息会沿用当前上下文。",
+  'devSession.continuous.draftScope': "Bot 对话输入",
   'devSession.continuous.options': "Bot 启动设置",
   'devSession.continuous.applyOptions': "保存设置",
   'devSession.continuous.optionsHint': "首次发送后档位与运行环境固定，后续续聊保持相同上下文。",

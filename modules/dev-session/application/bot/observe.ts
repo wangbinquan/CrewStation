@@ -1,10 +1,10 @@
 import type { AgentEvent } from '@crewstation/contracts';
-import type { BotConversation, BotConversationRepository, BotExecution } from '../../ports/botConversations';
+import type { BotConversation, BotConversationRepository, BotExecution, BotOperation } from '../../ports/botConversations';
 import type { AgentStartRepository } from '../../ports/agentStarts';
 import type { DevSessionUseCaseDeps } from '../dependencies';
 
 /** Persistent event cursor: a refresh cannot replay earlier status over the current turn. */
-export async function observeBot(deps: DevSessionUseCaseDeps, repo: BotConversationRepository, starts: AgentStartRepository, current: BotConversation): Promise<BotConversation> {
+export async function observeBot(deps: DevSessionUseCaseDeps, repo: BotConversationRepository, starts: AgentStartRepository, current: BotConversation, pending: readonly BotOperation[] = []): Promise<BotConversation> {
   if (!current.currentAgentId) return current;
   const execution = await repo.execution(current.currentAgentId);
   if (!execution || execution.epoch !== current.epoch) return current;
@@ -23,7 +23,9 @@ export async function observeBot(deps: DevSessionUseCaseDeps, repo: BotConversat
     } else next.state = 'stopping';
   }
   // User stop/fresh intent wins over late running/waiting events.
-  if (current.state === 'stopping') next.state = 'stopping';
+  if (current.state === 'stopping' && pending.some(op => op.kind !== 'message')) next.state = 'stopping';
+  // The previous execution cannot reopen input while the accepted next turn is still being prepared.
+  if (current.state === 'preparing' && pending.some(op => op.kind === 'message' && op.receipt.state === 'accepted') && next.continuity !== 'unavailable') next.state = 'preparing';
   observed.state = next.state;
   await repo.putExecution(observed); await repo.save(next);
   return next;

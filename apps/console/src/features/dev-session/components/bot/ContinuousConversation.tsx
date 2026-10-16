@@ -30,7 +30,7 @@ export function ContinuousConversation({ bot, projectId, draftScope, transcripts
   if (pending && !lines.some(line => line.type === 'user-message' && line.body === pending.content && line.at >= pending.createdAt)) lines.push({ id: pending.id, type: 'user-message', body: pending.content, at: pending.createdAt, failed: false });
   const allowed = ready && !bot.pending && !bot.error && ['empty', 'awaiting-input', 'paused'].includes(status) && current?.continuity !== 'unavailable';
   return <div className={styles.conversation}>
-    <UnsavedChangesGuard dirty={!!draft.text || draft.sending} scope={t('devSession.agents.draftScope')} isNavigationBusy={() => draft.sending} allowNavigate={(a, b) => a.pathname === b.pathname} />
+    <UnsavedChangesGuard dirty={draft.unsaved} scope={t('devSession.continuous.draftScope')} isNavigationBusy={() => draft.sending} />
     <header className={styles.toolbar}><GlyphIcon name="assistant" plain /><strong className={styles.botTitle}>Crew Bot</strong><span className={styles.botState}>{t(`devSession.continuous.state.${status}`)}</span><Button size="small" variant="ghost" onClick={onHistory}>{t('devSession.continuous.history')}</Button></header>
     {bot.error ? <ActionNote tone="error">{errorMessage(bot.error)}</ActionNote> : null}
     {current?.reason ? <ActionNote tone={current.continuity === 'unavailable' ? 'error' : 'neutral'}>{current.reason}</ActionNote> : null}

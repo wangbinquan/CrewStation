@@ -15,7 +15,12 @@ function read(key: string): Draft {
 /** One default Bot per parent task; the request and original revision survive a browser refresh too. */
 export function useBotDraft(scope: string, bot: ContinuousBotHandle, onActivity: () => void) {
   const [draft, setDraft] = useState(() => read(scope)), current = useRef(draft), busy = useRef(false);
-  const update = (next: Draft) => { current.current = next; setDraft(next); try { sessionStorage.setItem(scope, JSON.stringify(next)); } catch { /* Current page remains usable. */ } };
+  const [persisted, setPersisted] = useState(true);
+  const update = (next: Draft) => {
+    current.current = next; setDraft(next);
+    try { sessionStorage.setItem(scope, JSON.stringify(next)); setPersisted(true); }
+    catch { setPersisted(false); }
+  };
   const edit = (text: string) => { if (!busy.current && !current.current.pending) update({ text, options: current.current.options }); };
   const send = () => {
     if (busy.current || !current.current.text.trim()) return;
@@ -27,5 +32,6 @@ export function useBotDraft(scope: string, bot: ContinuousBotHandle, onActivity:
     }).finally(() => { busy.current = false; });
   };
   const options = (value: BotOptions) => { if (!busy.current && !current.current.pending) update({ ...current.current, options: value }); };
-  return { ...draft, edit, setOptions: options, send, sending: bot.send.isPending, uncertain: !!draft.pending && !bot.send.isPending };
+  return { ...draft, edit, setOptions: options, send, sending: bot.send.isPending, uncertain: !!draft.pending && !bot.send.isPending,
+    unsaved: !persisted && (!!draft.text || !!draft.pending || !!draft.options) };
 }
