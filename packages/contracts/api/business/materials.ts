@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { BusinessNativeConfigSchema } from './nativeConfig';
-import { BusinessMaterialFileSchema, BUSINESS_NATIVE_MATERIAL_LIMITS, materialTreeIssue, type BusinessMaterialObject } from './materialFiles';
+import { BusinessMaterialFileSchema, BUSINESS_NATIVE_MATERIAL_LIMITS, businessMaterialAccounting, materialTreeIssue, type BusinessMaterialObject } from './materialFiles';
 import { ResourceIdSchema } from '../../ids';
 import { BusinessExecutionFenceSchema } from './control';
 import { BUSINESS_EXECUTION_LIMITS, BusinessDigestSchema, BusinessEnvironmentNameSchema, BusinessRequestKeySchema } from './executionValues';
@@ -26,8 +26,9 @@ export const BusinessMaterialRequestSchema = z.strictObject({
   if (files.length > BUSINESS_NATIVE_MATERIAL_LIMITS.files || bytes > BUSINESS_NATIVE_MATERIAL_LIMITS.bytes) ctx.addIssue({ code: 'custom', message: '材料文件超过数量或字节预算' });
   const issue = materialTreeIssue(value.skills.map((file) => ({ ...file, kind: 'file' as const })));
   if (issue) ctx.addIssue({ code: 'custom', message: issue, path: ['skills'] });
-  const { fence: _fence, requestKey: _key, ...material } = value;
-  if (new TextEncoder().encode(JSON.stringify(material)).byteLength > BUSINESS_EXECUTION_LIMITS.materialBytes) ctx.addIssue({ code: 'custom', message: '执行材料超过字节上限' });
+  const { fence: _fence, requestKey: _key, ...material } = value, size = businessMaterialAccounting(material);
+  if (size.inlineBytes > BUSINESS_EXECUTION_LIMITS.materialBytes) ctx.addIssue({ code: 'custom', message: '执行材料超过字节上限' });
+  if (size.descriptorBytes > BUSINESS_NATIVE_MATERIAL_LIMITS.descriptorBytes) ctx.addIssue({ code: 'custom', message: '对象文件描述超过预算' });
   if (new Set(value.skills.map((file) => file.path)).size !== value.skills.length) ctx.addIssue({ code: 'custom', path: ['skills'], message: 'skills 路径重复' });
   if (new Set(value.mcp.map((mcp) => mcp.connectionId)).size !== value.mcp.length) ctx.addIssue({ code: 'custom', path: ['mcp'], message: 'MCP 引用重复' });
   if (new Set(value.subagents.map((agent) => agent.name)).size !== value.subagents.length) ctx.addIssue({ code: 'custom', path: ['subagents'], message: '子代理名称重复' });

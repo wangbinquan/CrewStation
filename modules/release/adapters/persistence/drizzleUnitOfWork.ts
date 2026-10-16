@@ -1,4 +1,4 @@
-import { databaseRestoreRepository, bindRestoreTransaction } from './database/restores';
+import { databaseRestoreRepository } from './databaseRestores';
 import { drizzleHandoffs } from './handoff/repository';
 import { drizzleJourneys } from './journey/repository';
 import { drizzleMaintenance } from './drizzleMaintenance';
@@ -45,7 +45,7 @@ export function scopeOver(executor: Executor, lockSlots = false, projection?: Sl
 }
 
 export function drizzleUnitOfWork(db: Database, projection?: SlotProjectionDeps): UnitOfWork {
-  const run: UnitOfWork['run'] = (fn) => db.transaction(async (tx) => { await bindRestoreTransaction(db,tx); return fn(scopeOver(tx, true, projection)); }), read = scopeOver(db, false, projection);
+  const run: UnitOfWork['run'] = (fn) => db.transaction(async (tx) => fn(scopeOver(tx, true, projection))), read = scopeOver(db, false, projection);
   // These historical "read" repositories also expose writes. Route every write through a real UOW so admission identity reaches SQL.
   return { run, read: { ...read,
     databaseRestores: { ...read.databaseRestores!, insert: op => run(s => s.databaseRestores!.insert(op)), save: (op,next) => run(s => s.databaseRestores!.save(op,next)) },

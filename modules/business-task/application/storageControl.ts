@@ -27,6 +27,7 @@ export function storageSynchronizedControls(controls: ExecutionControls, outbox:
     freeze: async (...args) => synchronize(await controls.freeze(...args)), handoffReady: async (...args) => synchronize(await controls.handoffReady(...args)),
     routeObserved: async (...args) => synchronize(await controls.routeObserved(...args)),
     freezeMigration: async (...args) => synchronize(await controls.freezeMigration(...args)), migrationReady: async (...args) => synchronize(await controls.migrationReady(...args)),
+    withdrawMigration: async (...args) => synchronize(await controls.withdrawMigration(...args)),
     syncPending: async () => {
       let count = 0;
       for (const update of await outbox.pending(100)) {

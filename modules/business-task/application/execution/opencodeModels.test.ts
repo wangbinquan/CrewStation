@@ -1,20 +1,19 @@
-import {prepareAgentFreshRetry,prepareAgentResume} from '../execution/agentResume';
+import {prepareAgentFreshRetry,prepareAgentResume} from './agentResume';
 import type {BusinessSubtaskV3Dto,ServiceId} from '@crewstation/contracts';
 import type {ExecutionSubtask} from '../../domain/executionSubtask';
 import { expect, test } from 'bun:test';
 import { TaskIdSchema, ProjectIdSchema, AgentProfileSchema, BusinessNativeConfigSchema, LaunchSpecSchema, StartAgentCommandSchema } from '@crewstation/contracts';
-import type { BusinessExecutionDeps } from '../execution/dependencies';
+import type { BusinessExecutionDeps } from './dependencies';
 import type { ComputeLaunch } from '../../ports/runtime';
 import { BUSINESS_AGENT_CAPABILITIES } from '../../domain/executionAgent';
 import type { ExecutionAgentPlan } from '../../domain/executionAgent';
-import { pinOpencodeModels, renderPinnedOpencodeModels } from './opencodeModels';
-import { agentCommand, agentPayloadDigest } from '../execution/agentMaterial';
+import { agentCommand, agentPayloadDigest, pinOpencodeModels, pinnedOpencodeModelMaterial } from './agentMaterial';
 import { validateBusinessMaterial } from '../../domain/businessMaterials';
 
 function fixture() {
   const rootId = Bun.randomUUIDv7(), childId = Bun.randomUUIDv7(), secret = new Map<string, string>();
   const image = `registry.example/runner@sha256:${'a'.repeat(64)}`;
-  const compute = (id: string, revision = 1) => ({ id, name: id, image, revision, protocol: 'opencode' as const, businessExecution: { protocolVersion: 3 as const, capabilities: { ...BUSINESS_AGENT_CAPABILITIES } } });
+  const compute = (id: string, revision = 1) => ({ id, name: id, image, revision, protocol: 'opencode' as const, businessExecution: { protocolVersion: 3 as const, capabilities: { ...BUSINESS_AGENT_CAPABILITIES }, nativeProbeVersion: 2 as const } });
   const root = compute(rootId), child = compute(childId);
   const launch = (id: string, revision: number, token: string): ComputeLaunch => ({ ...compute(id, revision), launch: LaunchSpecSchema.parse({ protocol: 'opencode', binaryPath: '/usr/bin/opencode', model: `same/${id === rootId ? 'root' : 'child'}`, opencodeProvider: { id: 'same', npm: '@ai-sdk/openai-compatible', models: { [id === rootId ? 'root' : 'child']: { name: id } }, options: { baseURL: `https://${id === rootId ? 'root' : 'child'}.example/v1` }, credentials: { apiKey: 'MODEL_KEY' } } }), beforeStart: { profile: id, revision, contentHash: 'fixed', vars: {}, secrets: { MODEL_KEY: token }, steps: [], configFile: { kind: 'none' }, captureOutput: false } });
   const state = { resolves: 0, pins: 0, revision: 1, token: 'initial-child-secret', revoked: false, changeImage: false, changeBinary: false, missingMaterial: false, unsupported: false, wrongProtocol: false, unauthorized: false };
@@ -40,19 +39,21 @@ test('different models and equal provider names keep independent gateways/secret
   const f = fixture(), models = (await pinOpencodeModels(f.deps, f.input))!;
   expect(f.state.resolves).toBe(1); expect(f.state.pins).toBe(1);
   expect(JSON.stringify(models)).not.toContain('initial-child-secret');
-  const rendered = await renderPinnedOpencodeModels(f.deps, models);
+  const rendered = await pinnedOpencodeModelMaterial(f.deps, models);
   expect(Object.keys(rendered.providers)).toHaveLength(2);
   expect(rendered.subagents.child).toBe(rendered.subagents.second);
   expect(rendered.subagents).not.toHaveProperty('inherit');
   expect(rendered.root).not.toBe(rendered.subagents.child);
   const values = Object.values(rendered.providers);
-  expect(values.map((entry) => entry.options.baseURL).sort()).toEqual(['https://child.example/v1', 'https://root.example/v1']);
-  expect(values.map((entry) => entry.options.apiKey).sort()).toEqual(['initial-child-secret', 'initial-root-secret']);
+  expect(values.map((entry) => entry.provider.options.baseURL).sort()).toEqual(['https://child.example/v1', 'https://root.example/v1']);
+  expect(values.map((entry) => entry.secrets.MODEL_KEY).sort()).toEqual(['initial-child-secret', 'initial-root-secret']);
+  // RFC-040 V12: business-task forwards structured material; only agent-drivers renders OpenCode provider options.
+  expect(values.every((entry) => !('apiKey' in entry.provider.options) && Object.keys(entry.secrets).join() === 'MODEL_KEY')).toBe(true);
   expect(Object.values(rendered.identities).map((entry) => entry.model).sort()).toEqual(['same/child', 'same/root']);
   f.state.revision = 8; f.state.token = 'rotated-current';
-  expect(await renderPinnedOpencodeModels(f.deps, JSON.parse(JSON.stringify(models)))).toEqual(rendered);
+  expect(await pinnedOpencodeModelMaterial(f.deps, JSON.parse(JSON.stringify(models)))).toEqual(rendered);
   expect(f.state.resolves).toBe(1); expect(f.state.pins).toBe(1);
-  f.state.revoked = true; await expect(renderPinnedOpencodeModels(f.deps, models)).rejects.toThrow('secret_version_unavailable');
+  f.state.revoked = true; await expect(pinnedOpencodeModelMaterial(f.deps, models)).rejects.toThrow('secret_version_unavailable');
 });
 test('authorization, original release roster, protocol, installed capability and image are checked before dispatch', async () => {
   const absent = fixture(); absent.input.profiles = [];

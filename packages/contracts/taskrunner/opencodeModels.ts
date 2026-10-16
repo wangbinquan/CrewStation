@@ -37,12 +37,20 @@ export const OpencodeProviderSchema = providerInput.pipe(z.strictObject({
   credentials: z.strictObject({ apiKey: EnvNameSchema.optional(), headers: z.record(key, EnvNameSchema).optional() }).default({}),
 }));
 export type OpencodeProvider = z.infer<typeof OpencodeProviderSchema>;
-/** Runner-only; business material APIs never accept this compiled field. */
+/**
+ * Runner-only; business material APIs never accept this field. Version 2 carries, per stable internal alias, the
+ * administrator's structured provider material and only the secret values that material declares; agent-drivers is the
+ * single place that renders OpenCode provider config (RFC-040 V12). Runners advertise it as `nativeModelMaterialVersion`.
+ */
 export const PlatformOpencodeModelsSchema = z.strictObject({
-  version: z.literal(1),
+  version: z.literal(2),
   root: z.string().min(1).max(300),
   subagents: z.record(key, z.string().min(1).max(300)),
-  providers: z.record(providerId, z.strictObject({ npm: z.string().min(1), name: z.string().optional(), models: z.record(key, z.record(key, z.json())), options: z.record(key, z.json()), whitelist: z.array(key).min(1) })),
+  providers: z.record(providerId, z.strictObject({ provider: OpencodeProviderSchema, secrets: z.record(EnvNameSchema, z.string().max(65536)) })),
   identities: z.record(z.string().min(1).max(300), z.strictObject({ model: z.string().min(1).max(200), computeProfileId: ResourceIdSchema, revision: z.number().int().positive() })),
 });
 export type PlatformOpencodeModels = z.infer<typeof PlatformOpencodeModelsSchema>;
+/** Declared credential variable names of a structured provider: the only secret values platform code forwards for it. */
+export function opencodeProviderSecretNames(provider: Pick<OpencodeProvider, 'credentials'>): string[] {
+  return [...new Set([...(provider.credentials.apiKey ? [provider.credentials.apiKey] : []), ...Object.values(provider.credentials.headers ?? {})])].sort();
+}

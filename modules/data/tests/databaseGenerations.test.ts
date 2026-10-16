@@ -3,11 +3,11 @@ import type {ProjectId,ServiceId} from '@crewstation/contracts';
 import {createTestDatabase,testDatabaseAvailable} from '@crewstation/testkit';
 import {sql} from 'drizzle-orm';
 import {dataMigrations} from '../wiring';
-import {databaseGenerationRepository} from '../adapters/persistence/database/generations';
-import {databaseGenerationUseCases} from '../application/database/generations';
+import {databaseGenerationRepository} from '../adapters/persistence/databaseGenerations';
+import {databaseGenerationUseCases} from '../application/serviceData';
 import type {DataUseCaseDeps} from '../application/dependencies';
 import type {DataResource} from '../domain/dataResource';
-import type {DatabaseGenerationPlane} from '../ports/database/generations';
+import type {DatabaseGenerationPlane} from '../ports/repositories';
 const available=await testDatabaseAvailable();
 let close:(()=>Promise<void>)|undefined;
 afterEach(async()=>{await close?.();close=undefined;});
@@ -34,7 +34,9 @@ describe.skipIf(!available)('RFC-042 physical database generations',()=>{
   expect(await f.api.prepare(f.serviceId,f.request.operationId,f.request.id)).toEqual({ready:false,identity:null});
   await f.mark();expect(await f.api.envFor(f.serviceId,f.request.id,f.request.operationId)).toMatchObject({CS_DATABASE_GENERATION_ID:f.request.id,CS_DATABASE_GENERATION_OPERATION:f.request.operationId});
   await expect(f.store.assertUnreserved(f.serviceId)).rejects.toThrow('恢复操作');
-  await expect(Promise.resolve(f.database.db.execute(sql`INSERT INTO data.task_bindings(id,project_id,service_id,task_id,mode,state,requested_by,ttl_minutes,created_at,updated_at) VALUES(${Bun.randomUUIDv7()},${f.projectId},${f.serviceId},${Bun.randomUUIDv7()},'diagnostic-readonly','requested',${Bun.randomUUIDv7()},30,now(),now())`))).rejects.toBeDefined();
+  // RFC-042 review: the reservation is enforced by documented application prechecks, not a trigger raising HTTP 500.
+  await expect(f.store.assertUnreserved(f.serviceId)).rejects.toMatchObject({kind:'conflict',details:{code:'database_restore_active'}});
+  await expect(f.store.withUnreserved(f.serviceId,async()=>'rotated')).rejects.toMatchObject({details:{code:'database_restore_active'}});
   const commit={operationId:f.request.operationId,serviceId:f.serviceId,sourceGenerationId:f.id,targetGenerationId:f.request.id,expectedRevision:1};
   const switched=await f.api.commit(commit);expect(switched).toMatchObject({generationId:f.request.id,revision:2,restoreOperationId:f.request.operationId});expect(await f.api.commit(commit)).toEqual(switched);
   expect(await f.store.get(f.id)).toMatchObject({objectName:original!.objectName,credentialResourceId:original!.credentialResourceId,state:'retained'});
@@ -67,4 +69,18 @@ test.skipIf(!available)('RFC-042 original supply must settle before a source ide
  const f=await fixture(),original=f.physical.get('cs_original')!;f.physical.set('cs_original',{...original,provisioning:true});
  await expect(f.api.reserve(f.request)).rejects.toThrow('供给仍在结算');expect(await f.target()).toBeUndefined();expect(f.declarations).toHaveLength(0);
  f.physical.set('cs_original',original);await f.api.reserve(f.request);expect(f.declarations[0]).toMatchObject({spec:{independentDatabase:true}});expect((f.declarations[0] as {spec:{provision?:string}}).spec.provision).toBeUndefined();
+});
+
+// RFC-042 review: an unfinished restore could never be ended, so its reservation blocked production
+// access, credential rotation and new restores forever.
+test.skipIf(!available)('RFC-042 abandon releases an uncommitted reservation, retains the target and refuses after the commit',async()=>{
+ const f=await fixture();await f.api.reserve(f.request);await f.mark();const reserved=(await f.target())!;
+ await f.api.abandon(f.serviceId,f.request.operationId);await f.api.abandon(f.serviceId,f.request.operationId);
+ expect(await f.api.active(f.serviceId,'production')).toMatchObject({generationId:f.id,restoreOperationId:null});
+ expect(await f.target()).toMatchObject({state:'retained',identity:reserved.identity,objectName:reserved.objectName});
+ expect(await f.store.withUnreserved(f.serviceId,async()=>'rotated')).toBe('rotated');
+ f.request.id=Bun.randomUUIDv7();f.request.operationId=Bun.randomUUIDv7();await f.api.reserve(f.request);await f.mark();
+ await f.api.commit({operationId:f.request.operationId,serviceId:f.serviceId,sourceGenerationId:f.id,targetGenerationId:f.request.id,expectedRevision:1});
+ await expect(f.api.abandon(f.serviceId,f.request.operationId)).rejects.toMatchObject({details:{code:'database_restore_switched'}});
+ expect((await f.api.active(f.serviceId,'production')).generationId).toBe(f.request.id);
 });

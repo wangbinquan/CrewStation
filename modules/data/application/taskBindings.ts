@@ -42,7 +42,9 @@ export function taskBindingUseCases(deps: DataUseCaseDeps) {
       }
       if (requiresApproval(input.mode)) await deps.generations?.store.assertUnreserved(ids.serviceId);
       const now = clock.now();
-      let binding: TaskDataBinding = { id: newId('tdb'), taskId: ids.taskId, serviceId: ids.serviceId, projectId: svc.projectId, mode: input.mode, state: 'requested', ...(input.reason ? { reason: input.reason } : {}), requestedBy: actor.userId, ttlMinutes: input.ttlMinutes, createdAt: now, updatedAt: now };
+      // A production request is pinned to the active generation at request time (RFC-042); approval after a switch is refused.
+      const production = requiresApproval(input.mode) ? await data.productionDatabase(ids.serviceId) : undefined;
+      let binding: TaskDataBinding = { id: newId('tdb'), taskId: ids.taskId, serviceId: ids.serviceId, projectId: svc.projectId, mode: input.mode, state: 'requested', ...(input.reason ? { reason: input.reason } : {}), ...(production ? { databaseName: production.databaseName } : {}), requestedBy: actor.userId, ttlMinutes: input.ttlMinutes, createdAt: now, updatedAt: now };
       if (!requiresApproval(input.mode)) {
         const dsn = (await data.envFor(ids.serviceId, 'development')).CS_DATABASE_URL;
         if (!dsn) throw precondition('开发库尚未供给');

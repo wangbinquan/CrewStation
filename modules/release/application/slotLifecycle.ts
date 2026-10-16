@@ -12,6 +12,7 @@ import {
   offlineDeadline, postponeRetention, retentionForExisting, retentionStep, takeSlotOffline,
 } from '../domain/slotLifecycle';
 import { slotSpecOf } from '../domain/ledgerProjection';
+import { restoreEnded } from '../domain/databaseRestore';
 import type { PhysicalSlot, ServiceSlots, SlotWorkload } from '../domain/slots';
 import { nextWorkload, standbyOf, withSlot } from '../domain/slots';
 import type { SlotDeploySpec } from '../ports/delivery';
@@ -247,7 +248,7 @@ interface RedeployTarget { readonly physical: PhysicalSlot; readonly prepared: S
  */
 async function checkRedeploy(deps: Deps, release: Release, svc: ResolvedService): Promise<RedeployTarget | { readonly reason: PrecheckReason; readonly extra?: Readonly<Record<string, unknown>> }> {
   const restores=await deps.uow.read.databaseRestores?.list(release.serviceId)??[];
-  if(restores.some(op=>op.stage!=='completed'))return {reason:precheckReason('release-in-progress','服务数据库恢复尚未结束')};
+  if(restores.some(op=>!restoreEnded(op)))return {reason:precheckReason('database_restore_active','服务数据库恢复尚未结束','请先完成或放弃原恢复操作')};
   const latest=restores.find(op=>op.stage==='completed');
   if(latest&&release.id!==latest.candidateReleaseId&&release.createdAt.getTime()<=Date.parse(latest.createdAt))return {reason:precheckReason('not-redeployable','数据库恢复前的发布必须通过新的明确恢复操作切回')};
   const seen = await deps.uow.read.slots.get(release.serviceId);
@@ -346,7 +347,7 @@ function sweepUseCase(deps: Deps, removeWorkload: (serviceId: ServiceId, svc: Re
     const slots = await scope.slots.get(serviceId);
     const slot = slots?.[physical];
     if (!slots || !slot || slots.active === physical || slot.releaseId !== releaseId || !hasWorkload(slot)) return { kind: 'none' };
-    if (await scope.handoffs.active(serviceId) || await scope.releases.findInProgress(serviceId) || await scope.maintenance.active(serviceId)) return { kind: 'none' };
+    if (await scope.handoffs.active(serviceId) || await scope.releases.findInProgress(serviceId) || await scope.maintenance.active(serviceId) || await scope.databaseRestores?.active(serviceId)) return { kind: 'none' };
     if (!slot.retention) {
       // 升级前就在跑的待命槽从这一刻起算（M26）；这一轮只补计时，不提醒也不下线。
       const lastSwitch = (await scope.switches.listByService(serviceId, 1))[0];
@@ -378,7 +379,8 @@ function sweepUseCase(deps: Deps, removeWorkload: (serviceId: ServiceId, svc: Re
       try {
         await releaseProjectWork(deps, slots.serviceId, 'sweep', newResourceId(), { serviceId: slots.serviceId, physical, releaseId: slot.releaseId ?? slot.offline?.releaseId ?? null }, async () => {
           const svc = await deps.services.resolveServiceById(slots.serviceId);
-          if (!svc) return;
+          // RFC-042: an unfinished database restore reserves the standby slot for its candidate.
+          if (!svc || await uow.read.databaseRestores?.active(slots.serviceId)) return;
           if (slot.offline && !slot.offline.workloadRemoved) {
             if (await removeWorkload(slots.serviceId, svc, physical, slot.offline.releaseId)) outcome.repaired += 1;
             return;

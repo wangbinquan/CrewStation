@@ -1,4 +1,4 @@
-import type { ExecutionMaterialObjects } from '../../ports/materials/objects';
+import type { ExecutionMaterialObjects } from '../../ports/executionMaterials';
 import type { ServiceId } from '@crewstation/contracts';
 import type { ExecutionAgentSecrets } from '../../ports/executionAgentSecrets';
 import type { ExecutionSessions } from '../../ports/executionSessions';

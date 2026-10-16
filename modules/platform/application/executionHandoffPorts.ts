@@ -6,6 +6,7 @@ export function executionHandoffPorts(business: () => BusinessHandoffBinding, ga
   const authority = () => business().releaseHandoff;
   return {
     migrationBarrier: (...args: Parameters<BusinessHandoffBinding['releaseHandoff']['migrationBarrier']>) => authority().migrationBarrier(...args),
+    withdrawMigrationBarrier: (...args: Parameters<BusinessHandoffBinding['releaseHandoff']['withdrawMigrationBarrier']>) => authority().withdrawMigrationBarrier(...args),
     precheck: (...args: Parameters<BusinessHandoffBinding['releaseHandoff']['precheck']>) => authority().precheck(...args),
     freeze: (...args: Parameters<BusinessHandoffBinding['releaseHandoff']['freeze']>) => authority().freeze(...args),
     inspect: (...args: Parameters<BusinessHandoffBinding['releaseHandoff']['inspect']>) => authority().inspect(...args),

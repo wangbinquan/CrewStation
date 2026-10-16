@@ -128,7 +128,7 @@ class TaskRunner implements RunnerHandle {
       taskId: config.taskId,
       runnerToken: config.runnerToken,
       workdir: paths.root,
-      capabilities: { ...(config.botContext ? { botContextVersion: 1 as const } : {}), ...(config.businessJournalDir && process.platform === 'linux' ? { businessExecutionV3: 1 as const, nativeModelMappingVersion: 1 as const, nativeConfigVersion: 1 as const, materialObjectsVersion: 1 as const, startupInventoryVersion: 1 as const, commandSecretEnvVersion: 1 as const } : {}), protocols: [...RUNNER_PROTOCOLS], pty: terminals.backend !== undefined, preview: preview.enabled, ...(apiInvoker.enabled ? { apiInvocations: 1 as const } : {}), previewControl: 1 as const, workspaceCommit: 1 as const, terminalControl: 1 as const, runtimeInitialization: 1 as const, interpreters: interpreters.list },
+      capabilities: { ...(config.botContext ? { botContextVersion: 1 as const } : {}), ...(config.businessJournalDir && process.platform === 'linux' ? { businessExecutionV3: 1 as const, nativeModelMaterialVersion: 1 as const, nativeConfigVersion: 1 as const, materialObjectsVersion: 1 as const, startupInventoryVersion: 1 as const, commandSecretEnvVersion: 1 as const } : {}), protocols: [...RUNNER_PROTOCOLS], pty: terminals.backend !== undefined, preview: preview.enabled, ...(apiInvoker.enabled ? { apiInvocations: 1 as const } : {}), previewControl: 1 as const, workspaceCommit: 1 as const, terminalControl: 1 as const, runtimeInitialization: 1 as const, interpreters: interpreters.list },
     });
     const dispatcherRef: { current?: CommandDispatcher } = {};
     const link = createSessionLink({

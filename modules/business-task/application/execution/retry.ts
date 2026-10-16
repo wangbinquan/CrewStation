@@ -1,4 +1,3 @@
-import { readCommandPlan } from './command/material';
 import { dispatchBusinessAgent } from './agentDispatch';
 import { prepareAgentPlan } from './agentPlan';
 import { prepareAgentFreshRetry } from './agentResume';
@@ -12,7 +11,7 @@ import type { BusinessExecutionApi } from '../../api/executionApi';
 import type { BusinessExecutionDeps } from './dependencies';
 import { executionSource } from './source';
 import { assertExecutionFence } from '../../domain/executionControl';
-import { dispatchBusinessCommand } from './commandDispatch';
+import { dispatchBusinessCommand, readCommandPlan } from './commandDispatch';
 
 /** A fresh retry has its own immutable identity; old attempts and their event history remain unchanged. */
 export function executionRetryUseCases(deps: BusinessExecutionDeps): Pick<BusinessExecutionApi, 'retrySubtask'> {
@@ -60,7 +59,7 @@ export function executionRetryUseCases(deps: BusinessExecutionDeps): Pick<Busine
         ...(agent ? { runtimeTaskId, sessionKey: agent.plan.sessionKey, sessionVolumeUid: agent.plan.volumeUid } : {}),
         sealedPayload: await deps.cipher.seal(JSON.stringify(agent?.plan ?? (command?.kind === 'command-plan' ? { ...command, request: { ...command.request, requestKey } } : { ...payload, requestKey }))), payloadDigest: agent?.payloadDigest ?? previous.payloadDigest, fenced: previous.fenced, epoch: fence?.epoch ?? null,
         view: agent?.view ?? view,
-        }, authorization);
+        }, authorization, agent?.plan.materialIdentity ? { materialId: agent.plan.materialIdentity.materialId } : undefined);
       }, (result) => result.subtask.runtimeTaskId);
       const claim = await deps.subtasks.claim(newResourceId(), saved.subtask.view.id);
       if (claim) { if (claim.view.kind === 'agent') await dispatchBusinessAgent(deps, claim); else await dispatchBusinessCommand(deps, claim); }

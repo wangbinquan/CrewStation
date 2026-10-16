@@ -38,8 +38,8 @@ import { createHmac } from 'node:crypto';
 import { encryptString, decryptString } from '@crewstation/secretbox';
 import { databaseRestoreCommands } from './application/database-restore/commands';
 import { databaseRestoreProgress } from './application/database-restore/progress';
-import { restoreObjectSource } from './application/database-restore/owner';
-import { databaseRestoreCoordination } from './adapters/persistence/database/restores';
+import { restoreGuardedReleaseApi, restoreObjectSource } from './application/database-restore/owner';
+import { databaseRestoreCoordination } from './adapters/persistence/databaseRestores';
 import { kubernetesRestoreJobObserver } from './adapters/k8s/databaseRestoreJobs';
 import { databaseRestoreRoutes } from './http/databaseRestoreRoutes';
 import { pipelineStepUseCase } from './application/pipeline';
@@ -188,7 +188,7 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
     ...slotLifecycleUseCases({ ...useCaseDeps, isAdmin: deps.isAdmin }),
     ...slotOwnerUseCases(useCaseDeps),
   };
-  const api = admittedReleaseApi(useCaseDeps, implementation);
+  const api = admittedReleaseApi(useCaseDeps, restoreGuardedReleaseApi(useCaseDeps, implementation));
   let timer: ReturnType<typeof setInterval> | undefined;
   const sweep: ReleaseTimer = {
     start: () => { timer ??= setInterval(() => void api.sweepSlotLifecycle().catch((error: unknown) => logger.error('slot lifecycle sweep failed', { error: String(error) })), SLOT_SWEEP_INTERVAL_MS); },

@@ -2,7 +2,8 @@ import { expect, test } from 'bun:test';
 import { BusinessConfigSchema } from '../../manifest/businessConfig';
 import { BusinessNativeConfigSchema } from './nativeConfig';
 import { BusinessMaterialRequestSchema, businessMaterialObjects } from './materials';
-import { BusinessPluginFileSchema, materialTreeIssue } from './materialFiles';
+import { BUSINESS_NATIVE_MATERIAL_LIMITS, BusinessPluginFileSchema, businessMaterialAccounting, materialTreeIssue } from './materialFiles';
+import { BUSINESS_EXECUTION_LIMITS } from './executionValues';
 import { SubmitBusinessSubtaskV3Schema } from './requests';
 import { BusinessCommandSecretEnvironmentSchema } from './commandSecrets';
 
@@ -90,4 +91,22 @@ test('OpenCode native names retain AW identifiers through 128 characters', () =>
   expect(BusinessNativeConfigSchema.parse({ ...native(), agent: { name, body: '', options: {} }, mcp: [{ name, type: 'local', command: ['tool'] }], plugins: [{ name, entry: 'index.js', files: [file('index.js')] }] }).agent.name).toBe(name);
   expect(BusinessNativeConfigSchema.safeParse({ ...native(), agent: { name: name + 'a', body: '', options: {} } }).success).toBe(false);
   for (const name of ['crewstation-agent', 'cs-platform-task', '__proto__', '../escape']) expect(BusinessNativeConfigSchema.safeParse({ ...native(), agent: { name, body: '', options: {} } }).success).toBe(false);
+});
+
+// RFC-040: object-file descriptors used to count toward the 1 MiB inline envelope, capping plugin
+// trees around 4–5k files although the stated native limit is 10,000 files.
+test('a 10,000-file object plugin tree fits its descriptor budget while inline content keeps the 1 MiB envelope', () => {
+  const files = Array.from({ length: 10_000 }, (_, i) => ({ kind: 'file' as const, path: `node_modules/package-${i}/lib/index.js`, object: { objectId: Bun.randomUUIDv7(), sha256: i.toString(16).padStart(64, '0'), size: 1 } }));
+  const tree = { version: 1, protocol: 'opencode', agent: { name: 'root', body: '' }, plugins: [{ name: 'tree', entry: files[0]!.path, files }] };
+  const material = { requestKey: 'tree', nativeConfig: tree }, accounting = businessMaterialAccounting(material);
+  expect(accounting.descriptorBytes).toBeGreaterThan(BUSINESS_EXECUTION_LIMITS.materialBytes);
+  expect(accounting.descriptorBytes).toBeLessThanOrEqual(BUSINESS_NATIVE_MATERIAL_LIMITS.descriptorBytes);
+  expect(accounting.inlineBytes).toBeLessThan(4096);
+  expect(BusinessMaterialRequestSchema.safeParse(material).success).toBe(true);
+  expect(BusinessMaterialRequestSchema.safeParse({ ...material, systemPrompt: 'x'.repeat(BUSINESS_EXECUTION_LIMITS.materialBytes - 10) }).success).toBe(false);
+  const long = files.map((file) => ({ ...file, path: `${file.path}/${'x'.repeat(400)}` }));
+  expect(businessMaterialAccounting({ nativeConfig: { ...tree, plugins: [{ ...tree.plugins[0]!, files: long }] } }).descriptorBytes).toBeGreaterThan(BUSINESS_NATIVE_MATERIAL_LIMITS.descriptorBytes);
+  expect(BusinessMaterialRequestSchema.safeParse({ ...material, nativeConfig: { ...tree, plugins: [{ name: 'tree', entry: long[0]!.path, files: long }] } }).success).toBe(false);
+  // Unparsed bodies are measured the same way; malformed shapes count entirely as inline bytes.
+  expect(businessMaterialAccounting({ skills: 'not-a-list', nativeConfig: { plugins: [null] } })).toEqual({ inlineBytes: Buffer.byteLength(JSON.stringify({ skills: 'not-a-list', nativeConfig: { plugins: [null] } })), descriptorBytes: 0 });
 });

@@ -13,7 +13,7 @@ export function temporaryRoleUseCases(deps: DataUseCaseDeps) {
       await deps.generations?.store.assertUnreserved(binding.serviceId as ServiceId);
       const prod = await data.productionDatabase(binding.serviceId as ServiceId);
       if (!prod) throw precondition('生产库尚未供给，不能授予访问');
-      if (binding.databaseName && binding.databaseName !== prod.databaseName) throw precondition('生产数据库世代已变化，原申请不能重新授予');
+      if (binding.databaseName && binding.databaseName !== prod.databaseName) throw precondition('生产数据库世代已变化，原申请不能重新授予，请重新申请', { code: 'database_generation_changed' });
       binding = { ...binding, databaseName: prod.databaseName };
       const roleName = binding.roleName ?? (binding.legacyResourceId ? `${prod.roleName}_t_${binding.legacyResourceId.slice(-8)}` : `cs_t_${binding.id.replaceAll('-', '')}`);
       // 由 data-control 建（RFC-025 I28 第二步）：这里只记下角色名、置为生效，投影把期望（到期、只读与否、所在的库）写进台账。

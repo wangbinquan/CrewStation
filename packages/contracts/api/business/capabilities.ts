@@ -15,7 +15,7 @@ export const BusinessCapabilitiesDtoSchema = z.strictObject({
     retentionDays: z.number().int().positive(), leaseSeconds: z.number().int().positive(), renewSeconds: z.number().int().positive(),
   }),
   commandSecretEnvVersion: z.literal(1).optional(),
-  nativeMaterialLimits: z.strictObject({ files: z.number().int().positive(), bytes: z.number().int().positive() }).optional(),
+  nativeMaterialLimits: z.strictObject({ files: z.number().int().positive(), bytes: z.number().int().positive(), descriptorBytes: z.number().int().positive().optional() }).optional(),
   storage: z.strictObject({ version: z.literal(1), objects: z.boolean(), taskInputs: z.boolean(), finalization: z.boolean(), unavailableReason: z.string().nullable() }).optional(),
   agentProfiles: z.array(z.strictObject({ agentProfileId: ResourceIdSchema, computeProfileId: ResourceIdSchema, profileRevision: BusinessGenerationSchema, capabilities: BusinessAgentCapabilitiesSchema })),
 });
@@ -23,6 +23,10 @@ export const BusinessCapabilitiesDtoSchema = z.strictObject({
 export type BusinessAgentCapabilities = z.infer<typeof BusinessAgentCapabilitiesSchema>;
 export type BusinessCapabilitiesDto = z.infer<typeof BusinessCapabilitiesDtoSchema>;
 
-/** Written only by the profile compatibility test, bound to that test revision and image. */
-export const BusinessExecutionProofSchema = z.strictObject({ protocolVersion: z.literal(3), capabilities: BusinessAgentCapabilitiesSchema });
+/**
+ * Written only by the profile compatibility test, bound to that test revision and image. `nativeProbeVersion: 2` marks a
+ * proof whose native material probes exercised a sub-agent, inline remote and local MCP and a plugin, and the structured
+ * model-material wire (RFC-040 V12); native capabilities of older proofs are not claimed.
+ */
+export const BusinessExecutionProofSchema = z.strictObject({ protocolVersion: z.literal(3), capabilities: BusinessAgentCapabilitiesSchema, nativeProbeVersion: z.literal(2).optional() });
 export type BusinessExecutionProof = z.infer<typeof BusinessExecutionProofSchema>;

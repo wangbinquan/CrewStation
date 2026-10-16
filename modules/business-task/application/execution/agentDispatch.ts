@@ -44,7 +44,7 @@ export async function dispatchBusinessAgent(deps: BusinessExecutionDeps, claimed
     await acceptReceipt(deps, { ...claimed, incarnation, runtimeAdmitted: true }, result);
   } catch (error) {
     const code = isPlatformError(error) ? String(error.details?.code ?? error.kind) : 'dispatch_unknown';
-    if (!incarnation && ['unsupported_capability', 'profile_revision_missing', 'secret_version_unavailable', 'protocol_unsupported', 'interpreter_unavailable'].includes(code)) await fail(deps, claimed, code);
+    if (!incarnation && ['unsupported_capability', 'profile_revision_missing', 'secret_version_unavailable', 'protocol_unsupported', 'interpreter_unavailable', 'material_objects_released', 'material_objects_unpinned'].includes(code)) await fail(deps, claimed, code);
     else if (incarnation) await unknown(deps, claimed, code);
     else await deps.subtasks.settle(claimed, { dispatch: 'pending', view: claimed.view });
   }

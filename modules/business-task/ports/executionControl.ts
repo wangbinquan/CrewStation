@@ -10,6 +10,7 @@ export interface FreezeExecutionInput {
 export interface ExecutionControls {
   freezeMigration(serviceId: string, input: Omit<MigrationFreeze, 'preparationDigest' | 'receiptPodUid'> & { supersedesOperationId?: string }): Promise<ControlSnapshot>;
   migrationReady(serviceId: string, source: ExecutionAuthority, input: BusinessMigrationReady): Promise<ControlSnapshot>;
+  withdrawMigration(serviceId: string, operationId: string): Promise<ControlSnapshot>;
   writerRuntimes(serviceId: string): Promise<string[]>;
   activeTaskContracts(serviceId: string): Promise<Array<{ taskId: string; taskContractVersion: string }>>;
   quiescent(serviceId: string): Promise<boolean>;

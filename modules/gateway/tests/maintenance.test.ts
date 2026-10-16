@@ -173,7 +173,9 @@ describe.skipIf(!available)('RFC-042 original restore maintenance hold',()=>{
   const held=await gateway.api.enterDatabaseRestoreMaintenance(admin,serviceId,operationId);expect(held).toEqual({revision:before.revision+1,wasOpen:true});
   const restarted=newGateway();expect(await restarted.api.enterDatabaseRestoreMaintenance(admin,serviceId,operationId)).toEqual(held);
   expect(await restarted.api.userEntry(admin.userId,'restore','prod')).toMatchObject({kind:'maintenance'});
-  await expect(restarted.api.exitMaintenance(admin,serviceId,{expectedRevision:held.revision})).rejects.toBeDefined();
+  // RFC-042 review: owner edits during the hold used to surface as HTTP 500 from a trigger; they now get a documented code.
+  await expect(restarted.api.exitMaintenance(admin,serviceId,{expectedRevision:held.revision})).rejects.toMatchObject({kind:'precondition',details:{code:'database_restore_maintenance_held'}});
+  await expect(restarted.api.setMaintenance(admin,serviceId,{switches:{users:true,services:true,events:true},allowUserIds:[],reason:'owner edit',expectedRevision:held.revision})).rejects.toMatchObject({details:{code:'database_restore_maintenance_held'}});
   await expect(restarted.api.exitDatabaseRestoreMaintenance(admin,serviceId,Bun.randomUUIDv7(),held.revision)).rejects.toBeDefined();
   await expect(Promise.resolve(tdb.db.execute(sql`DELETE FROM gateway.database_restore_maintenance WHERE operation_id=${operationId}`))).rejects.toBeDefined();
   await restarted.api.exitDatabaseRestoreMaintenance(admin,serviceId,operationId,held.revision);await restarted.api.exitDatabaseRestoreMaintenance(admin,serviceId,operationId,held.revision);

@@ -5,7 +5,7 @@ import type { EntryVerdict } from '../api/moduleApi';
 import type { Maintenance } from '../domain/maintenance';
 import { applyMaintenance, assertExitRevision, blocksServiceCall, fullWindow, holdsEvents, retryAfterSeconds } from '../domain/maintenance';
 import type { DirectoryService } from '../ports/directories';
-import type { MaintenanceEventRecord } from '../ports/repositories';
+import type { MaintenanceEventRecord, MaintenanceRepository } from '../ports/repositories';
 import type { GatewayUseCaseDeps } from './dependencies';
 
 /** 放行判定每个请求都用：进程内缓存「当前所有维护中的服务」3 秒，改动后最多 3 秒生效（design §5）。 */
@@ -64,6 +64,11 @@ function maintenanceCache(deps: GatewayUseCaseDeps) {
 
 type Cache = ReturnType<typeof maintenanceCache>;
 
+/** RFC-042: a database restore holds the window until it completes or is abandoned; the revision fence still guards races. */
+async function assertNoRestoreHold(repository: Pick<MaintenanceRepository, 'restoreHeld'>, serviceId: ServiceId): Promise<void> {
+  if (await repository.restoreHeld?.(serviceId)) throw precondition('维护窗口由数据库恢复保留，请在原恢复操作中完成或放弃后再调整', { code: 'database_restore_maintenance_held' });
+}
+
 /** 进入、调整、退出与读取（负责人与管理员可写，`view` 可读；M8、M9）。 */
 function maintenanceCommands(deps: GatewayUseCaseDeps, cache: Cache) {
   const uow = deps.maintenanceUow;
@@ -104,6 +109,7 @@ function maintenanceCommands(deps: GatewayUseCaseDeps, cache: Cache) {
       if (missing.length > 0) throw validation(`临时指定的人不存在：${missing.join('、')}`, { missing });
       const now = deps.clock.now();
       const next = await uow.run(async (scope) => {
+        await assertNoRestoreHold(scope.maintenance, serviceId);
         const current = await scope.maintenance.get(serviceId);
         const next = applyMaintenance(current, { serviceId, projectId: svc.projectId }, { ...input, expectedEndAt: input.expectedEndAt ? new Date(input.expectedEndAt) : null }, actor.userId, now);
         if (!(await scope.maintenance.save(next, input.expectedRevision))) throw conflict('维护状态已被他人修改，请刷新后重新确认');
@@ -120,6 +126,7 @@ function maintenanceCommands(deps: GatewayUseCaseDeps, cache: Cache) {
       await deps.access.authorize(actor, svc.projectId, 'manage-maintenance');
       const now = deps.clock.now();
       await uow.run(async (scope) => {
+        await assertNoRestoreHold(scope.maintenance, serviceId);
         const current = assertExitRevision(await scope.maintenance.get(serviceId), input.expectedRevision);
         if (!(await scope.maintenance.remove(serviceId, input.expectedRevision))) throw conflict('维护状态已被他人修改，请刷新后重新确认');
         await scope.maintenance.insertEvent({ id: newId('mev'), serviceId, kind: 'exited', actorUserId: actor.userId, at: now, ...snapshotOf(current) });

@@ -14,6 +14,8 @@ export function validateBusinessMaterial(profile: AgentProfile, material: Materi
     if (capabilities.nativeConfigVersion !== 1) unsupported('nativeConfigVersion');
     if (native.protocol !== platform.protocol) denied('nativeConfig.protocol');
     if (!policy?.nativeConfig?.agentDefinitions) denied('nativeConfig.agentDefinitions');
+    // OpenCode delivers native agent bodies through the same prompt field as systemPrompt (RFC-040 V12).
+    if ([native.agent, ...native.subagents].some((agent) => agent.body.trim()) && !capabilities.systemPrompt) unsupported('systemPrompt');
     if (native.subagents.length && !capabilities.opaqueInternalDelegation) unsupported('opaqueInternalDelegation');
     for (const agent of native.subagents) if (agent.agentProfileId) {
       if (capabilities.nativeModelMappingVersion !== 1) unsupported('nativeModelMappingVersion');

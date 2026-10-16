@@ -5,6 +5,7 @@ interface Snapshot { operationId?: string; epoch: number; stage: 'inactive' | 'f
 export interface BusinessHandoffBinding {
   releaseHandoff: {
     migrationBarrier(serviceId: ServiceId, request: { operationId: string; targetReleaseId: ReleaseId; expectedActiveReleaseId: ReleaseId; supersedesOperationId?: string }): Promise<{ ready: boolean; epoch: number; blocked: string[]; preparationDigest?: string }>;
+    withdrawMigrationBarrier(serviceId: ServiceId, operationId: string): Promise<void>;
     precheck(serviceId: ServiceId, targetReleaseId: ReleaseId): Promise<{ supported: boolean; blocked: Array<{ taskId: string; taskContractVersion: string }> }>;
     freeze(serviceId: ServiceId, request: Request): Promise<Snapshot>;
     inspect(serviceId: ServiceId): Promise<Snapshot>;

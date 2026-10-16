@@ -34,7 +34,7 @@
         "databaseGenerationOperation": "CS_DATABASE_GENERATION_OPERATION",
         "databaseRestoreOperation": "CS_DATABASE_RESTORE_OPERATION",
         "databaseRestoreReference": "CS_DATABASE_RESTORE_REFERENCE",
-        "databaseRestoreObjectsToken": "CS_DATABASE_RESTORE_OBJECTS_TOKEN",
+        "databaseRestoreObjectsToken": "CS_OBJECTS_TOKEN",
         "objectSpaceId": "CS_OBJECT_SPACE_ID",
         "objectsUrl": "CS_OBJECTS_URL",
         "port": "PORT",
@@ -4167,6 +4167,11 @@
                   "maximum": 9007199254740991,
                   "type": "integer"
                 },
+                "descriptorBytes": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer"
+                },
                 "files": {
                   "exclusiveMinimum": 0,
                   "maximum": 9007199254740991,
@@ -7996,6 +8001,13 @@
         "～ schemas/BusinessMaterialRequest/properties/nativeConfig/properties/mcp/items/oneOf[1]/properties/name/maxLength：80 → 128",
         "～ schemas/BusinessMaterialRequest/properties/nativeConfig/properties/plugins/items/properties/name/maxLength：80 → 128",
         "～ schemas/BusinessMaterialRequest/properties/nativeConfig/properties/subagents/items/properties/name/maxLength：80 → 128"
+      ]
+    },
+    {
+      "date": "2026-10-16",
+      "basis": "RFC-042 review finding 7 (author instruction 2026-10-16, AW RFC-370 §9.2 V13 follow-up): PLATFORM_ENV.databaseRestoreObjectsToken declared CS_DATABASE_RESTORE_OBJECTS_TOKEN, which no Job ever injected; the restore/verify Job injects CS_OBJECTS_TOKEN (read by AW), so the constant now names the injected variable",
+      "changes": [
+        "～ constants/PLATFORM_ENV/databaseRestoreObjectsToken：\"CS_DATABASE_RESTORE_OBJECTS_TOKEN\" → \"CS_OBJECTS_TOKEN\""
       ]
     }
   ]

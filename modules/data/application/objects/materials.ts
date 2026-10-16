@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { BusinessMaterialObjectSchema, ProjectIdSchema, ServiceIdSchema, ResourceIdSchema } from '@crewstation/contracts';
 import { forbidden } from '@crewstation/kernel';
 import type { MaterialObjectApi } from '../../api/materialObjectApi';
-import type { MaterialObjectRepository } from '../../ports/objects/materials';
+import type { MaterialObjectRepository } from '../../ports/objectContent';
 import type { ObjectSourceResolver } from '../../ports/objectSources';
 import { downloadStoredObject, type ObjectDownloadDeps } from '../objectDownload';
 
@@ -18,6 +18,7 @@ export function materialObjectUseCases(deps: ObjectDownloadDeps & { materials: M
       await deps.materials.pin(input, { source, ...(input.fence ? { fence: input.fence } : {}) });
     },
     check: deps.materials.check,
+    release: deps.materials.release,
     grants: async (input) => {
       await deps.materials.check(input);
       const expires = now() + 30 * 60_000;

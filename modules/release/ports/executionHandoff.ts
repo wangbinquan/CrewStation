@@ -9,6 +9,8 @@ export interface HandoffAuthority {
 /** Supplied by platform: release does not import business-task or gateway. */
 export interface ExecutionHandoff {
   migrationBarrier?(serviceId: ServiceId, request: { operationId: string; targetReleaseId: ReleaseId; expectedActiveReleaseId: ReleaseId; supersedesOperationId?: string }): Promise<{ ready: boolean; epoch: number; blocked: string[]; preparationDigest?: string }>;
+  /** RFC-042: withdraw the barrier of an abandoned restore that never switched. */
+  withdrawMigrationBarrier?(serviceId: ServiceId, operationId: string): Promise<void>;
   observeMigrationStopped?(serviceId: ServiceId, releaseId: ReleaseId, requireSuspendedJob?: boolean): Promise<boolean>;
   observeWritersStopped?(serviceId: ServiceId, includeServices?: boolean): Promise<boolean>;
   precheck(serviceId: ServiceId, targetReleaseId: ReleaseId): Promise<{ supported: boolean; blocked: Array<{ taskId: string; taskContractVersion: string }> }>;

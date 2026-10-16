@@ -1,4 +1,3 @@
-import { prepareCommandPlan } from './command/material';
 import { prepareAgentPlan } from './agentPlan';
 import { admitWithRuntimeImage } from '../taskRuntimeImage';
 import { dispatchBusinessAgent, cleanupAgentEnvironments } from './agentDispatch';
@@ -10,7 +9,7 @@ import type { BusinessExecutionDeps } from './dependencies';
 import type { ExecutionSubtask } from '../../domain/executionSubtask';
 import { assertExecutionFence } from '../../domain/executionControl';
 import { executionSource } from './source';
-import { dispatchBusinessCommand } from './commandDispatch';
+import { dispatchBusinessCommand, prepareCommandPlan } from './commandDispatch';
 import { businessExecutionWork } from './deletion/projectWork';
 
 export function executionSubtaskUseCases(deps: BusinessExecutionDeps): Pick<BusinessExecutionApi, 'submitSubtask' | 'getSubtask' | 'listSubtasks'> & { progressSubtask(): Promise<number> } {
@@ -56,7 +55,7 @@ export function executionSubtaskUseCases(deps: BusinessExecutionDeps): Pick<Busi
         sealedPayload: await deps.cipher.seal(JSON.stringify(agent?.plan ?? command?.plan ?? { ...payload, requestKey: input.requestKey })),
         payloadDigest: agent?.payloadDigest ?? command!.payloadDigest,
         fenced: context.parent.intent.tasksSpec.executionControl === 'fenced', epoch: input.fence?.epoch ?? null, view: agent?.view ?? view,
-      }, authority), (result) => result.subtask.runtimeTaskId);
+      }, authority, agent?.plan.materialIdentity ? { materialId: agent.plan.materialIdentity.materialId } : undefined), (result) => result.subtask.runtimeTaskId);
       await progress(saved.subtask.view.id);
       return subtaskResponse((await deps.subtasks.get(context.serviceId, taskId, saved.subtask.view.id))!, saved.created);
     },

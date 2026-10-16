@@ -1,6 +1,7 @@
 import { businessAdmissionOpen } from '../deletion/admission';
 import { reserveSessionHome, releaseSessionHome } from '../sessions/repository';
 import { assertTaskAcceptsExecution } from './lifecycleAdmission';
+import { assertMaterialUsable } from '../materials/repository';
 import { and, asc, eq, lt, or, sql } from 'drizzle-orm';
 import { conflict, notFound } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
@@ -32,7 +33,7 @@ export function drizzleExecutionSubtasks(db: Database): ExecutionSubtasks {
     find: async (serviceId, taskId, key, kind = 'submit', parent = '') => { const row = (await db.select().from(tasks).where(and(scope(serviceId, taskId), eq(tasks.requestKey, key), eq(tasks.requestKind, kind), eq(tasks.requestParent, parent))))[0]; return row && rowView(row); },
     get: async (serviceId, taskId, id) => { const row = (await db.select().from(tasks).where(and(scope(serviceId, taskId), eq(tasks.id, id))))[0]; return row && rowView(row); },
     list: async (serviceId, taskId) => (await db.select().from(tasks).where(scope(serviceId, taskId)).orderBy(asc(tasks.id))).map(rowView),
-    reserve: (candidate, authorization) => executionTransaction(db, candidate.serviceId, async (tx, now) => {
+    reserve: (candidate, authorization, material) => executionTransaction(db, candidate.serviceId, async (tx, now) => {
       const recovery = await recoveryForRetry(tx, now, candidate, authorization);
       const old = (await tx.select().from(tasks).where(and(scope(candidate.serviceId, candidate.taskId), eq(tasks.requestKey, candidate.requestKey), eq(tasks.requestKind, candidate.requestKind), eq(tasks.requestParent, candidate.requestParent))))[0];
       if (old) {
@@ -41,6 +42,7 @@ export function drizzleExecutionSubtasks(db: Database): ExecutionSubtasks {
         return { subtask: rowView(old), created: false };
       }
       await assertTaskAcceptsExecution(tx, candidate.taskId);
+      if (material) await assertMaterialUsable(tx, material.materialId);
       if (candidate.requestKind === 'retry') await assertRetry(tx, candidate);
       const epoch = await authorizeExecution(tx, candidate.serviceId, candidate.fenced, authorization, now);
       await reserveSessionHome(tx, candidate);

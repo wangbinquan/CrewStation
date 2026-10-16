@@ -1,6 +1,6 @@
-import { databaseGenerationRepository } from './adapters/persistence/database/generations';
-import { databaseGenerationUseCases, projectGeneration } from './application/database/generations';
-import type { DatabaseGenerationPlane } from './ports/database/generations';
+import { databaseGenerationRepository } from './adapters/persistence/databaseGenerations';
+import { databaseGenerationUseCases, projectGeneration } from './application/serviceData';
+import type { DatabaseGenerationPlane } from './ports/repositories';
 import { taskStorageStatus } from './application/objects/taskStorageStatus';
 import type { ObjectTransferOwners } from './ports/objectTransferOwners';
 import { recoverStoppedReads } from './adapters/persistence/objects/readRecovery';

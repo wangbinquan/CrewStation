@@ -30,7 +30,7 @@ export async function agentRuntimeImageFixture(db: Database) {
     },
     confirmAgent: async (_image, id) => { order.push(`confirm:${id}`); },
   };
-  const resolved = { businessExecution: { protocolVersion: 3 as const, capabilities: BUSINESS_AGENT_CAPABILITIES }, id: computeId, name: 'compute', revision: 3, protocol: 'opencode' as const, image: `registry.test/platform@${digest}` };
+  const resolved = { businessExecution: { protocolVersion: 3 as const, capabilities: BUSINESS_AGENT_CAPABILITIES, nativeProbeVersion: 2 as const }, id: computeId, name: 'compute', revision: 3, protocol: 'opencode' as const, image: `registry.test/platform@${digest}` };
   const compute: ComputeCatalog = { resolve: async () => resolved, launchMaterial: async () => ({ ...resolved, launch: LaunchSpecSchema.parse({ protocol: 'opencode', binaryPath: '/usr/local/bin/opencode', model: 'opencode/one' }), beforeStart: { profile: computeId, revision: 3, contentHash: 'h', steps: [], vars: {}, secrets: {}, configFile: { kind: 'none' }, captureOutput: false } }) };
   const f = await executionHttpFixture(db, { port, selection: { runtimeImageVersionId: parentVersion } }, { agentProfiles: profiles, compute });
   const instanceId = newResourceId(), control = '/v3/business-execution/control';

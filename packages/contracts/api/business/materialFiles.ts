@@ -4,7 +4,11 @@ import type { ProjectId, ServiceId } from '../../ids';
 import { ObjectDigestSchema, StorageBytesSchema, OBJECT_STORAGE_LIMITS } from '../object-storage/values';
 import { BusinessRelativePathSchema, BUSINESS_EXECUTION_LIMITS } from './executionValues';
 
-export const BUSINESS_NATIVE_MATERIAL_LIMITS = { files: 10_000, bytes: OBJECT_STORAGE_LIMITS.objectBytes } as const;
+/**
+ * `files` and `bytes` bound the whole file tree. Object-file descriptors are not part of the 1 MiB inline envelope
+ * (`BUSINESS_EXECUTION_LIMITS.materialBytes`); they have their own budget so a 10,000-file tree stays admissible (RFC-040).
+ */
+export const BUSINESS_NATIVE_MATERIAL_LIMITS = { files: 10_000, bytes: OBJECT_STORAGE_LIMITS.objectBytes, descriptorBytes: 4 * 1024 * 1024 } as const;
 export const BusinessMaterialObjectSchema = z.strictObject({ objectId: ResourceIdSchema, sha256: ObjectDigestSchema, size: StorageBytesSchema.max(OBJECT_STORAGE_LIMITS.objectBytes) });
 export const BusinessMaterialFileSchema = z.strictObject({
   path: BusinessRelativePathSchema, mode: z.number().int().min(0).max(0o777).optional(),
@@ -54,3 +58,21 @@ export function materialTreeIssue(files: readonly BusinessPluginFile[], entry?: 
 
 /** Immutable ownership and descriptors shared by internal material capabilities. */
 export interface BusinessMaterialObjectScope { projectId: ProjectId; serviceId: ServiceId; materialId: string; objects: readonly BusinessMaterialObject[] }
+
+/**
+ * Splits a material's serialized size into the inline envelope and the object-file descriptor budget. A descriptor is the
+ * JSON of a file entry that references an immutable object, plus its separator; everything else counts as inline.
+ * Accepts unparsed request bodies so HTTP admission can apply the same accounting before schema parsing.
+ */
+export function businessMaterialAccounting(material: unknown): { inlineBytes: number; descriptorBytes: number } {
+  const encoder = new TextEncoder(), record = (value: unknown) => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+  let descriptorBytes = 0;
+  const keep = (files: unknown) => Array.isArray(files) ? files.filter((file) => {
+    if (record(file)?.['object'] === undefined) return true;
+    descriptorBytes += encoder.encode(JSON.stringify(file)).byteLength + 1; return false;
+  }) : files;
+  const value = record(material) ?? {}, native = record(value['nativeConfig']);
+  const plugins = native && Array.isArray(native['plugins']) ? native['plugins'].map((plugin) => record(plugin) ? { ...record(plugin), files: keep(record(plugin)!['files']) } : plugin) : native?.['plugins'];
+  const inline = { ...value, ...('skills' in value ? { skills: keep(value['skills']) } : {}), ...(native ? { nativeConfig: { ...native, ...(plugins !== undefined ? { plugins } : {}) } } : {}) };
+  return { inlineBytes: encoder.encode(JSON.stringify(inline)).byteLength, descriptorBytes };
+}

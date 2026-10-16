@@ -1,4 +1,4 @@
-import { MATERIAL_REFERENCE_PREFIX } from '../ports/objects/materials';
+import { MATERIAL_REFERENCE_PREFIX } from '../ports/objectContent';
 import { forbidden, newResourceId, notFound, precondition, validation } from '@crewstation/kernel';
 import type { ObjectServiceApi, ObjectServiceCaller } from '../api/objectServiceApi';
 import { spaceDto, storedObjectDto, uploadDto } from '../domain/objectStorage';

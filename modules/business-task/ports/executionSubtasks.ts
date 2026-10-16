@@ -12,7 +12,8 @@ export interface ExecutionSubtasks {
   markRuntimeReleased(subtask: ExecutionSubtask): Promise<void>;
   cleanupCandidates(limit: number): Promise<ExecutionSubtask[]>;
   list(serviceId: string, taskId: TaskId): Promise<ExecutionSubtask[]>;
-  reserve(candidate: SubtaskCandidate, authorization: ExecutionAuthorization): Promise<{ subtask: ExecutionSubtask; created: boolean }>;
+  /** `material` must still be ready under the same service lock that releases material pins (RFC-040). */
+  reserve(candidate: SubtaskCandidate, authorization: ExecutionAuthorization, material?: { materialId: string }): Promise<{ subtask: ExecutionSubtask; created: boolean }>;
   adoptPending(subtask: ExecutionSubtask, authorization: ExecutionAuthorization): Promise<ExecutionSubtask>;
   claim(owner: string, id?: string): Promise<ExecutionSubtask | undefined>;
   checkpoint(claim: ExecutionSubtask, incarnation: string): Promise<boolean>;

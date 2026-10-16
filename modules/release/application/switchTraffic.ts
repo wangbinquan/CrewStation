@@ -1,7 +1,7 @@
 import { handoffSwitchDto } from '../domain/executionHandoff';
 import type { Actor, ServiceId, TrafficSwitchDto, TrafficSwitchRequest } from '@crewstation/contracts';
 import { DomainTopic } from '@crewstation/contracts';
-import { conflict, newId, notFound, precondition } from '@crewstation/kernel';
+import { conflict, isPlatformError, newId, notFound, precondition } from '@crewstation/kernel';
 import { assertSwitchAllowed, rollbackBlockedBy } from '../domain/migrationPolicy';
 import { precheckFailed, precheckReason } from '../domain/precheck';
 import { physicalOf, roleOf, switchTraffic } from '../domain/slots';
@@ -10,7 +10,7 @@ import { switchToDto } from './toDto';
 import { journeyForLaunch, recordJourneyLaunch, replayJourneyLaunch } from './journey/launch';
 
 /** 晋级与回退都是负责人的一次切流（G15）；破坏性迁移之后禁止切回旧版本。 */
-export function switchTrafficUseCase(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'authorizer' | 'services' | 'clock' | 'maintenance' | 'executionHandoff'>) {
+export function switchTrafficUseCase(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'authorizer' | 'services' | 'clock' | 'maintenance' | 'executionHandoff'> & Partial<Pick<ReleaseUseCaseDeps, 'data' | 'databaseRestore'>>) {
   const { uow, authorizer, services, clock, maintenance } = deps;
   return async (actor: Actor, serviceId: ServiceId, input: TrafficSwitchRequest): Promise<TrafficSwitchDto> => {
     const svc = await services.resolveServiceById(serviceId);
@@ -18,6 +18,9 @@ export function switchTrafficUseCase(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'aut
     await authorizer.authorize(actor, svc.projectId, 'switch-traffic');
     // 维护窗口在事务外读（跨模块查询）；目标版本在事务内锁槽之后再核对一次是否就是它。
     const windowOpen = await maintenance.open(serviceId);
+    // RFC-042: the data binding is the only record of the active generation (no trigger on slots).
+    await deps.databaseRestore?.coordination.assertAvailable(serviceId);
+    const generation = await deps.data?.databaseGenerations?.active(serviceId, 'production').catch((error: unknown) => { if (isPlatformError(error) && error.kind === 'precondition') return undefined; throw error; });
     const now = clock.now();
     return uow.run(async (scope) => {
       const slots = await scope.slots.get(serviceId);
@@ -47,6 +50,9 @@ export function switchTrafficUseCase(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'aut
       // 切流到含破坏性迁移的版本同样要求维护窗口（Design §6.5「部署与切流」，RFC-021 M27）。
       if (targetRelease) assertSwitchAllowed(targetRelease.manifest?.spec.release.migration, targetRelease.tag, windowOpen);
       if (!targetRelease) throw precondition('目标发布不存在');
+      // A slot bound to another generation (e.g. the release retained by a completed restore) cannot take traffic.
+      const bound = slots[target].workload?.databaseGenerationId ?? (generation?.revision === 1 ? generation.generationId : undefined);
+      if (generation && bound !== generation.generationId) throw precheckFailed(precheckReason('database_generation_retained', `目标版本 ${targetRelease.tag} 连接的不是当前生产数据库世代`, '如需使用该数据库请发起新的数据库恢复，否则部署一个新版本后再上线'));
       const journey = await journeyForLaunch(scope, actor, input, targetRelease, currentRelease, slots, now);
       const controlled = currentRelease?.manifest?.kind === 'DigitalWorker' && currentRelease.manifest.spec.tasks?.executionControl === 'fenced' || targetRelease?.manifest?.kind === 'DigitalWorker' && targetRelease.manifest.spec.tasks?.executionControl === 'fenced';
       if (controlled) {

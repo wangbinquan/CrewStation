@@ -18,6 +18,15 @@ export function freezeMigration(current: ExecutionControl, request: Omit<Migrati
   const migration = { ...next, ...(current.migration?.preparationDigest ? { preparationDigest: current.migration.preparationDigest, receiptPodUid: current.migration.receiptPodUid } : {}) };
   return { ...current, migration, epoch: nextEpoch(current.epoch), phase: 'frozen', leaseId: null, leaseOwner: null, leasePodUid: null, leaseExpiresAt: null, preparationDigest: null };
 }
+/**
+ * RFC-042 abandon: a database restore that never switched withdraws its own barrier. Nothing was migrated, so the
+ * original release re-claims execution under a new epoch; a started handoff can only be completed, never withdrawn.
+ */
+export function withdrawMigration(current: ExecutionControl, operationId: string): ExecutionControl {
+  if (current.migration?.operationId !== operationId) return current;
+  if (current.handoff && current.handoff.stage !== 'complete') throw precondition('执行交接已开始，迁移停写屏障只能随交接完成', { code: 'handoff_in_progress' });
+  return { ...current, migration: undefined, epoch: nextEpoch(current.epoch), phase: 'inactive', leaseId: null, leaseOwner: null, leasePodUid: null, leaseExpiresAt: null, preparationDigest: null };
+}
 /** Receipt attests an application database write barrier; browser claims cannot substitute for it. */
 export function migrationReady(current: ExecutionControl, source: ExecutionAuthority, input: BusinessMigrationReady): ExecutionControl {
   const migration = current.migration;

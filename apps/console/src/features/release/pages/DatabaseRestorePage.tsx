@@ -21,11 +21,12 @@ import {EmptyState} from '../../../shared/ui/EmptyState';
 import {FormField} from '../../../shared/ui/FormField';
 import {FormDialog} from '../../../shared/ui/dialog/FormDialog';
 import {ConfirmationDialog} from '../../../shared/ui/dialog/ConfirmationDialog';
+import {ConfirmDialog} from '../../../shared/ui/dialog/ConfirmDialog';
 import {StageProgress} from '../../../shared/ui/progress/StageProgress';
 import {UnsavedChangesGuard} from '../../../shared/navigation/UnsavedChangesGuard';
 import {useReleasePermissions} from '../model/journey/useReleasePermissions';
 import {useServiceOfProject} from '../model/useServiceOfProject';
-import {parseRestoreSearch,restoreProgress,sameRestoreConfirmation} from '../model/databaseRestore';
+import {parseRestoreSearch,restoreFinished,restoreProgress,sameRestoreConfirmation} from '../model/databaseRestore';
 import styles from './ReleasePage.module.css';
 export function DatabaseRestorePage(){
  const {projectId}=useProjectScope(),permissions=useReleasePermissions(projectId),service=useServiceOfProject(projectId);
@@ -39,19 +40,20 @@ function RestoreWorkspace({serviceId,userId,canManage}:{serviceId:string;userId:
  const t=useT(),{projectId,space}=useProjectScope(),navigate=useNavigate(),{restoreId}=useParams({strict:false}),search=parseRestoreSearch(useSearch({strict:false}));
  const list=useApiQuery(['database-restores',serviceId],()=>api.services.listDatabaseRestores(serviceId),{refetchIntervalMs:5000});
  const generations=useApiQuery(['database-generations',serviceId],async()=>DatabaseGenerationListSchema.parse(await api.services.databaseGenerations(serviceId)),{refetchIntervalMs:5000});
- const detail=useApiQuery(['database-restore',serviceId,restoreId],async()=>DatabaseRestoreDtoSchema.parse(await api.services.getDatabaseRestore(serviceId,restoreId!)),{enabled:!!restoreId,refetchIntervalMs:data=>data?.stage==='completed'?undefined:3000});
+ const detail=useApiQuery(['database-restore',serviceId,restoreId],async()=>DatabaseRestoreDtoSchema.parse(await api.services.getDatabaseRestore(serviceId,restoreId!)),{enabled:!!restoreId,refetchIntervalMs:data=>restoreFinished(data)?undefined:3000});
  const releases=useApiQuery(['database-restore-releases',serviceId],()=>api.services.listReleases(serviceId));
  const slots=useApiQuery(['database-restore-slots',serviceId],()=>api.services.listSlots(serviceId),{refetchIntervalMs:5000});
  const intentKey=restoreIntentKey(serviceId,userId),[saved]=useState(()=>readRestoreIntent(sessionStorage,intentKey));
  const [intentError,setIntentError]=useState(saved.error),acceptedPath=useRef<string|null>(null);
- const [open,setOpen]=useState(canManage&&!!saved.intent),[reference,setReference]=useState(saved.intent?.backupReference??''),[releaseId,setReleaseId]=useState(saved.intent?.restoreReleaseId??''),[intent,setIntent]=useState<CreateDatabaseRestore|null>(saved.intent),[review,setReview]=useState<DatabaseRestoreDto|null>(null);
+ const [open,setOpen]=useState(canManage&&!!saved.intent),[reference,setReference]=useState(saved.intent?.backupReference??''),[releaseId,setReleaseId]=useState(saved.intent?.restoreReleaseId??''),[intent,setIntent]=useState<CreateDatabaseRestore|null>(saved.intent),[review,setReview]=useState<DatabaseRestoreDto|null>(null),[abandoning,setAbandoning]=useState<DatabaseRestoreDto|null>(null);
  const invalidations=[['database-restores',serviceId],['database-restore',serviceId],['database-generations',serviceId]];
  const create=useApiMutation(async(input:CreateDatabaseRestore)=>{const op=DatabaseRestoreDtoSchema.parse(await api.services.createDatabaseRestore(serviceId,input));if(op.id!==input.requestId||op.serviceId!==serviceId||op.createdBy!==userId||op.sourceGenerationId!==input.expectedActiveGenerationId||op.sourceReleaseId!==input.expectedActiveReleaseId||op.restoreReleaseId!==input.restoreReleaseId||op.backupReference!==input.backupReference)throw new Error(t('release.restore.responseMismatch'));return op;},{invalidate:invalidations,onSuccess:op=>{try{clearRestoreIntent(sessionStorage,intentKey,op.id);}catch{setIntentError('release.restore.intentUnavailable');}acceptedPath.current=RELEASE_PATHS[space].database.replace('$projectId',projectId).replace('$restoreId',op.id);setOpen(false);setIntent(null);setReference('');setReleaseId('');void navigate({to:RELEASE_PATHS[space].database,params:{projectId,restoreId:op.id},search});}});
  const retry=useApiMutation((op:DatabaseRestoreDto)=>api.services.retryDatabaseRestore(serviceId,op.id,{expectedRevision:op.revision}),{invalidate:invalidations});
  const activate=useApiMutation((op:DatabaseRestoreDto)=>api.services.switchDatabaseRestore(serviceId,op.id,{expectedRevision:op.revision,confirmationDigest:op.confirmationDigest!}),{invalidate:invalidations,onSuccess:()=>setReview(null)});
+ const abandon=useApiMutation((op:DatabaseRestoreDto)=>api.services.abandonDatabaseRestore(serviceId,op.id,{expectedRevision:op.revision}),{invalidate:invalidations,onSuccess:()=>setAbandoning(null)});
  const active=slots.data?.items.find(s=>s.name==='prod')?.releaseId;
  const rows=list.error?[]:list.data?.items??[],current=detail.error?undefined:detail.data;
- const busy=create.isPending||activate.isPending||retry.isPending;
+ const busy=create.isPending||activate.isPending||retry.isPending||abandon.isPending;
  const submit=()=>{if(!generations.data||!active)return;const input=intent??{requestId:resourceRequestId(),expectedActiveGenerationId:generations.data.active.generationId,expectedActiveReleaseId:ReleaseIdSchema.parse(active),restoreReleaseId:ReleaseIdSchema.parse(releaseId),backupReference:reference.trim()};try{saveRestoreIntent(sessionStorage,intentKey,input);setIntentError(null);setIntent(input);create.mutate(input);}catch{setIntentError('release.restore.intentUnavailable');}};
  const listBack=<ButtonLink to={RELEASE_PATHS[space].databases} params={{projectId}} search={search}>{t('release.restore.back')}</ButtonLink>;
  return <div className={styles.stack}>
@@ -63,11 +65,14 @@ function RestoreWorkspace({serviceId,userId,canManage}:{serviceId:string;userId:
   {restoreId&&current?<>
    <Card title={t(`release.restore.stage.${current.stage}`)}><StageProgress progress={restoreProgress(current)} label={stage=>t(`release.restore.stage.${stage.kind}`)}/><RestoreFacts op={current}/></Card>
    {current.error?<ActionNote tone="error">{current.error}</ActionNote>:null}
-   <ActionNote tone="neutral">{t(current.stage==='completed'?'release.restore.retained':'release.restore.separate')}</ActionNote>
+   {current.observation?<ActionNote tone="neutral">{t('release.restore.observation')}{current.observation.message}</ActionNote>:null}
+   {current.abandonedAt&&current.stage!=='abandoned'?<ActionNote tone="error">{t('release.restore.abandoning')}</ActionNote>:null}
+   <ActionNote tone="neutral">{t(current.stage==='completed'?'release.restore.retained':current.stage==='abandoned'?'release.restore.abandoned':'release.restore.separate')}</ActionNote>
    <Card title={t('release.restore.verification')}><DefinitionList items={[{label:t('release.restore.restoreJob'),value:current.restoreJob?`${current.restoreJob.state} · ${current.restoreJob.uid}`:'—'},{label:t('release.restore.verifyJob'),value:current.verifyJob?`${current.verifyJob.state} · ${current.verifyJob.uid}`:'—'},{label:t('release.restore.schema'),value:current.verification?.schemaDigest??'—'},{label:t('release.restore.autoResume'),value:current.verification?.autoResumeSuspended?t('release.restore.suspended'):'—'}]}/></Card>
    {current.previousAttempts.length?<Card title={t('release.restore.attempts')}><DataTable columns={[t('release.restore.operation'),t('release.restore.state')]}>{current.previousAttempts.map(attempt=><tr key={attempt.jobId}><td><code>{attempt.jobId}</code></td><td>{attempt.receipt.state} · {attempt.receipt.uid}</td></tr>)}</DataTable></Card>:null}
    {canManage&&current.actions.includes('switch')?<Button variant="primary" disabled={busy||!!detail.error} onClick={()=>setReview(current)}>{t('release.restore.switch')}</Button>:null}
    {canManage&&current.actions.includes('retry')&&current.error?<Button disabled={busy} onClick={()=>retry.mutate(current)}>{t('release.restore.retry')}</Button>:null}
+   {canManage&&current.actions.includes('abandon')?<Button variant="danger" disabled={busy||!!detail.error} onClick={()=>setAbandoning(current)}>{t('release.restore.abandon')}</Button>:null}
    <QueryStatus isPending={false} error={retry.error??activate.error}/>
   </>:!restoreId?<>
    <Card title={t('release.restore.generations')}><DataTable columns={[t('release.restore.generation'),t('release.restore.state')]}>{generations.data?.items.filter(g=>g.env==='production').map(g=><tr key={g.id}><td><code>{g.id}</code></td><td>{t(`release.restore.generation.${g.state}`)}</td></tr>)}</DataTable></Card>
@@ -82,6 +87,9 @@ function RestoreWorkspace({serviceId,userId,canManage}:{serviceId:string;userId:
    {intent?<ActionNote tone="neutral">{t('release.restore.sameRequest')} <code>{intent.requestId}</code></ActionNote>:null}
    <QueryStatus isPending={releases.isPending} error={releases.error??slots.error}/>
   </FormDialog>:null}
+  {canManage&&abandoning?<ConfirmDialog title={t('release.restore.abandon')} question={t('release.restore.abandonQuestion')} confirmWord="abandon" confirmLabel={t('release.restore.abandonConfirm')} busy={abandon.isPending} confirmDisabled={!current||current.id!==abandoning.id||!current.actions.includes('abandon')||!!detail.error} onCancel={()=>{setAbandoning(null);abandon.reset();}} onConfirm={()=>abandon.mutate(current??abandoning)}>
+   <ActionNote tone="neutral">{t('release.restore.abandonImpact')}</ActionNote><RestoreFacts op={abandoning}/><QueryStatus isPending={false} error={abandon.error}/>
+  </ConfirmDialog>:null}
   {canManage&&review?<ConfirmationDialog title={t('release.restore.switch')} question={t('release.restore.confirm')} hint={t('release.restore.impact')} confirmLabel={t('release.restore.confirmAction')} busy={activate.isPending} confirmDisabled={!current||!sameRestoreConfirmation(current,review)||!!detail.error} onCancel={()=>setReview(null)} onConfirm={()=>activate.mutate(review)} actions={current&&!sameRestoreConfirmation(current,review)?<Button onClick={()=>setReview(current)}>{t('release.restore.recheck')}</Button>:undefined}>
    <RestoreFacts op={review}/>{current&&!sameRestoreConfirmation(current,review)?<ActionNote tone="error">{t('release.restore.stale')}</ActionNote>:null}<QueryStatus isPending={false} error={activate.error}/>
   </ConfirmationDialog>:null}

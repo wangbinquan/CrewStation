@@ -1,4 +1,4 @@
-import type { CreateDatabaseRestore, RetryDatabaseRestore, SwitchDatabaseRestore, DatabaseRestoreDto, DatabaseGenerationList } from '@crewstation/contracts';
+import type { AbandonDatabaseRestore, CreateDatabaseRestore, RetryDatabaseRestore, SwitchDatabaseRestore, DatabaseRestoreDto, DatabaseGenerationList } from '@crewstation/contracts';
 import type { RuntimeImageHistoryRead, RuntimeImageHistoryItem } from '@crewstation/contracts';
 import type { ReleaseJourneySource } from '@crewstation/contracts';
 import type { ReleaseJourneyDetail, ReleaseJourneyHistory, ReleaseJourneyPage, ReleaseJourneyPageRequest, VerifyReleaseJourneyRequest } from '@crewstation/contracts';
@@ -54,6 +54,8 @@ export interface ReleaseModuleApi {
   createDatabaseRestore(actor:Actor,serviceId:ServiceId,input:CreateDatabaseRestore):Promise<DatabaseRestoreDto>;
   retryDatabaseRestore(actor:Actor,serviceId:ServiceId,id:string,input:RetryDatabaseRestore):Promise<DatabaseRestoreDto>;
   switchDatabaseRestore(actor:Actor,serviceId:ServiceId,id:string,input:SwitchDatabaseRestore):Promise<DatabaseRestoreDto>;
+  /** RFC-042: ends a never-switched restore, releases its reservations and holds, retains the target database. */
+  abandonDatabaseRestore(actor:Actor,serviceId:ServiceId,id:string,input:AbandonDatabaseRestore):Promise<DatabaseRestoreDto>;
   progressDatabaseRestores():Promise<number>;
   restoreObjectSource(jobId:string,token:string):Promise<RestoreObjectSource|undefined>;
   /** Composition acquires the complete callback graph before entering another owner's original work. */

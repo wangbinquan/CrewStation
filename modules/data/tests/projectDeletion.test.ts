@@ -109,7 +109,7 @@ describe.skipIf(!available)('actual data project deletion owner', () => {
     const id = Bun.randomUUIDv7(); await resource(db,id);
     const original = await db.db.execute(sql`SELECT to_jsonb(r) AS body FROM data.resources r`);
     const checksums = await db.db.execute(sql`SELECT name,checksum FROM platform_infra.migrations WHERE module='data' ORDER BY name`);
-    expect(await runMigrations(db.db,[dataMigrations])).toEqual(['data/0007_project_deletion.sql','data/0008_project_object_work.sql','data/0009_database_generations.sql']);
+    expect(await runMigrations(db.db,[dataMigrations])).toEqual(['data/0007_project_deletion.sql','data/0008_project_object_work.sql','data/0009_database_generations.sql','data/0010_database_restore_prechecks.sql']);
     expect(await db.db.execute(sql`SELECT to_jsonb(r) AS body FROM data.resources r`)).toEqual(original);
     expect(await db.db.execute(sql`SELECT name,checksum FROM platform_infra.migrations WHERE module='data' AND name<'0007_project_deletion.sql' ORDER BY name`)).toEqual(checksums);
     await expect(originalSqlError(db.db.execute(sql`INSERT INTO data.project_deletions VALUES(${project},${Bun.randomUUIDv7()},1,${'a'.repeat(64)},'{}','{}',true,NULL)`))).rejects.toMatchObject({ message: 'data deletion requires the original exclusive grant' });

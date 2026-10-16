@@ -11,7 +11,7 @@ export async function executionAgentFixture(db: Database, materials?: { prompt?:
   const profileId = newResourceId(), computeId = newResourceId(), image = `registry.test/agent@sha256:${'1'.repeat(64)}`;
   const behavior = { businessSupported: true, revision: 1, providerKey: 'provider-secret-one', resolveCount: 0, quota: false, createLost: false, startLost: false, starts: 0, createGate: undefined as Promise<void> | undefined };
   const compute: ComputeCatalog = {
-    resolve: async () => { behavior.resolveCount++; return { id: computeId, name: 'compute', revision: behavior.revision, image, protocol: 'opencode', businessExecution: behavior.businessSupported ? { protocolVersion: 3, capabilities: BUSINESS_AGENT_CAPABILITIES } : undefined }; },
+    resolve: async () => { behavior.resolveCount++; return { id: computeId, name: 'compute', revision: behavior.revision, image, protocol: 'opencode', businessExecution: behavior.businessSupported ? { protocolVersion: 3, capabilities: BUSINESS_AGENT_CAPABILITIES, nativeProbeVersion: 2 } : undefined }; },
     launchMaterial: async (ref) => ({ id: ref.profileId, name: 'compute', revision: ref.revision, image, protocol: 'opencode', launch: LaunchSpecSchema.parse({ protocol: 'opencode', binaryPath: '/usr/bin/opencode' }),
       beforeStart: { profile: ref.profileId, revision: ref.revision, contentHash: 'fixed', vars: {}, secrets: { PROVIDER_KEY: behavior.providerKey }, steps: [], configFile: { kind: 'none' }, captureOutput: false } }),
   };

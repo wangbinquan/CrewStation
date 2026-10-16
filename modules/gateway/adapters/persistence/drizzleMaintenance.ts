@@ -44,7 +44,6 @@ export function drizzleMaintenanceRepository(db: Executor): MaintenanceRepositor
       const [original]=await db.execute<Record<string,unknown>>(sql`SELECT * FROM gateway.service_maintenance WHERE service_id=${input.serviceId} FOR UPDATE`);
       const revision=Number(original?.revision??0)+1;
       await db.execute(sql`INSERT INTO gateway.database_restore_maintenance(operation_id,service_id,project_id,original,maintenance_revision) VALUES(${input.operationId},${input.serviceId},${input.projectId},${original?JSON.stringify(original):null}::jsonb,${revision})`);
-      await db.execute(sql`SELECT set_config('crewstation.restore_maintenance',${input.operationId},true)`);
       const body={switches:{users:true,services:true,events:true},allowUserIds:[],reason:'数据库恢复切换 '+input.operationId,startedBy:input.actor,startedAt:input.now.toISOString(),updatedBy:input.actor};
       await db.execute(sql`INSERT INTO gateway.service_maintenance(service_id,project_id,body,revision,updated_at) VALUES(${input.serviceId},${input.projectId},${JSON.stringify(body)}::jsonb,${revision},${input.now.toISOString()}) ON CONFLICT(service_id) DO UPDATE SET body=excluded.body,revision=excluded.revision,updated_at=excluded.updated_at`);
       await db.insert(maintenanceEvents).values({id:newResourceId(),serviceId:input.serviceId,kind:original?'updated':'entered',actorUserId:input.actor,at:input.now,body:{switches:body.switches,allowUserIds:[],reason:body.reason}});
@@ -57,7 +56,6 @@ export function drizzleMaintenanceRepository(db: Executor): MaintenanceRepositor
       if(hold.completed)return;
       const [actual]=await db.execute<{revision:number}>(sql`SELECT revision FROM gateway.service_maintenance WHERE service_id=${input.serviceId} FOR UPDATE`);
       if(actual?.revision!==input.revision)throw conflict('恢复维护窗口已变化');
-      await db.execute(sql`SELECT set_config('crewstation.restore_maintenance',${input.operationId},true)`);
       if(hold.original)await db.execute(sql`UPDATE gateway.service_maintenance SET body=${JSON.stringify(hold.original.body)}::jsonb,revision=revision+1,updated_at=now() WHERE service_id=${input.serviceId}`);
       else await db.execute(sql`DELETE FROM gateway.service_maintenance WHERE service_id=${input.serviceId}`);
       const restored=hold.original?.body as MaintenanceBody|undefined;

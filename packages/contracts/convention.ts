@@ -53,8 +53,10 @@ export const PLATFORM_ENV = {
   databaseGenerationId: 'CS_DATABASE_GENERATION_ID',
   databaseGenerationOperation: 'CS_DATABASE_GENERATION_OPERATION',
   databaseRestoreOperation: 'CS_DATABASE_RESTORE_OPERATION',
+  /** RFC-042 restore／verify Job: the operator's backup reference verbatim; its digest is SHA-256 of these exact bytes (no trimming). */
   databaseRestoreReference: 'CS_DATABASE_RESTORE_REFERENCE',
-  databaseRestoreObjectsToken: 'CS_DATABASE_RESTORE_OBJECTS_TOKEN',
+  /** RFC-042 restore／verify Job: read-only object token paired with `CS_OBJECTS_URL`; the name the Job actually injects. */
+  databaseRestoreObjectsToken: 'CS_OBJECTS_TOKEN',
   /** 服务对象空间的稳定标识与平台代理地址；不含后端凭据或物理 key。 */
   objectSpaceId: 'CS_OBJECT_SPACE_ID',
   objectsUrl: 'CS_OBJECTS_URL',

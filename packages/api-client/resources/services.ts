@@ -1,4 +1,4 @@
-import type { CreateDatabaseRestore, RetryDatabaseRestore, SwitchDatabaseRestore, DatabaseRestoreDto, DatabaseGenerationList } from '@crewstation/contracts';
+import type { AbandonDatabaseRestore, CreateDatabaseRestore, RetryDatabaseRestore, SwitchDatabaseRestore, DatabaseRestoreDto, DatabaseGenerationList } from '@crewstation/contracts';
 import type {
   BranchDto, ExitMaintenanceRequest, ListBranchesQuery, MaintenanceDto, ManifestUpgradePreview, PostponeOfflineRequest, RedeployPrecheckDto, RedeployRequest, ReleaseDto, RepositoryBindingDto,
   ServiceDto, ServiceMaintenanceView, SetMaintenanceRequest, SlotDto, SlotEventDto, TagDto, TakeOfflineRequest, TrafficSwitchDto, TrafficSwitchRequest,
@@ -17,6 +17,7 @@ export interface ServicesResource {
   createDatabaseRestore(serviceId:string,input:CreateDatabaseRestore):Promise<DatabaseRestoreDto>;
   retryDatabaseRestore(serviceId:string,id:string,input:RetryDatabaseRestore):Promise<DatabaseRestoreDto>;
   switchDatabaseRestore(serviceId:string,id:string,input:SwitchDatabaseRestore):Promise<DatabaseRestoreDto>;
+  abandonDatabaseRestore(serviceId:string,id:string,input:AbandonDatabaseRestore):Promise<DatabaseRestoreDto>;
   listReleaseJourneys(serviceId: string, query?: Partial<ReleaseJourneyPageRequest>): Promise<ReleaseJourneyPage>;
   getReleaseJourney(journeyId: string): Promise<ReleaseJourneyDetail>;
   getReleaseJourneyHistory(releaseId: string): Promise<ReleaseJourneyHistory>;
@@ -71,6 +72,7 @@ export function servicesResource(transport: Transport): ServicesResource {
     createDatabaseRestore:(id,input)=>transport.request('POST',`${base(id)}/database-restores`,{body:input}),
     retryDatabaseRestore:(id,op,input)=>transport.request('POST',`${base(id)}/database-restores/${segment(op)}/retry`,{body:input}),
     switchDatabaseRestore:(id,op,input)=>transport.request('POST',`${base(id)}/database-restores/${segment(op)}/switch`,{body:input}),
+    abandonDatabaseRestore:(id,op,input)=>transport.request('POST',`${base(id)}/database-restores/${segment(op)}/abandon`,{body:input}),
     listReleaseJourneys: (serviceId, query) => transport.request<ReleaseJourneyPage>('GET', `${base(serviceId)}/release-journeys`, { query }),
     getReleaseJourney: (id) => transport.request<ReleaseJourneyDetail>('GET', `/v1/release-journeys/${segment(id)}`),
     getReleaseJourneyHistory: (id) => transport.request<ReleaseJourneyHistory>('GET', `/v1/releases/${segment(id)}/journey-history`),

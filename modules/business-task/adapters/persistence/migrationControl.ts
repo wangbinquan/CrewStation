@@ -3,19 +3,24 @@ import { and, eq, sql } from 'drizzle-orm';
 import { precondition } from '@crewstation/kernel';
 import type { Database } from '@crewstation/persistence';
 import type { ExecutionControls } from '../../ports/executionControl';
-import { freezeMigration, migrationReady } from '../../domain/migrationControl';
+import { freezeMigration, migrationReady, withdrawMigration } from '../../domain/migrationControl';
 import { executionOperations as ops } from './executionTables';
 import { executionTaskStates } from './execution/lifecycleTables';
 import { executionTransaction, readExecutionControl } from './executionTransaction';
 import { tasks, subtasks } from './tables';
 import { executionSubtasks } from './execution/subtaskTables';
 
-export function migrationControlRepository(db: Database, projectStorage = false): Pick<ExecutionControls, 'freezeMigration' | 'migrationReady' | 'writerRuntimes'> {
+export function migrationControlRepository(db: Database, projectStorage = false): Pick<ExecutionControls, 'freezeMigration' | 'migrationReady' | 'withdrawMigration' | 'writerRuntimes'> {
   return {
     freezeMigration: (id, request) => executionTransaction(db, id, async (tx, now) => {
       const current = await readExecutionControl(tx, id); if (!current) throw precondition('迁移前必须先由应用启用执行屏障');
       const control = await persistExecutionControl(tx, freezeMigration(current, request), current, projectStorage);
       return { control, now };
+    }),
+    withdrawMigration: (id, operationId) => executionTransaction(db, id, async (tx, now) => {
+      const current = await readExecutionControl(tx, id);
+      if (!current || current.migration?.operationId !== operationId) return { control: current, now };
+      return { control: await persistExecutionControl(tx, withdrawMigration(current, operationId), current, projectStorage), now };
     }),
     migrationReady: (id, source, input) => executionTransaction(db, id, async (tx, now) => {
       const current = await readExecutionControl(tx, id); if (!current) throw precondition('服务尚无执行控制记录');

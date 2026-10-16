@@ -48,3 +48,45 @@ Manifest 增加可选 `spec.service.databaseRestore`，包含 `command: string[]
 ## 测试与上线
 
 domain 边界／幂等／revision；真实 PG 多请求竞争、原操作冷恢复、旧资源迁移；resource owner 删除和授权互斥；release 故障注入覆盖每个外部调用前后；错误、秘密与权限用例；UI 深链／撤权／过期确认／返回列表；真实独立服务恢复与切换。先完成全量实现和用例，再集中验证。新增迁移及合同锁留基线；只使用 OpenCode 验证涉及 Agent 的真实流程。现有正式 AW 不作为数据库恢复试验目标。
+
+## 2026-10-16 审查修复
+
+作者授权按审查结论重设计不合理部分；以下合同变化均随用例落地，集中验证结果记录在本轮交接中。
+
+### 放弃未切换的恢复
+
+- 新阶段 `abandoned` 与 `POST .../:id/abandon`（`expectedRevision`），操作项 `abandon`。只有尚未提交生产绑定（`switchCommitted` 之前）的恢复可放弃；已提交返回 `database_restore_switched`，只能继续完成。
+- 先持久 `abandonedBy／abandonedAt`，再按幂等步骤释放全部保留：data 结束世代保留（目标库标为 retained 保留供核对，不删除）；待命槽中的候选下线、候选发布转 failed；business-task 撤回迁移屏障（`withdrawMigrationBarrier`）；gateway 退出恢复维护保留；结束原 Job 观察；最后写入 `abandoned`。中断后再次放弃即完成剩余步骤，期间 retry 返回 `database_restore_abandoning`。已放弃的操作对 retry／abandon 幂等返回原结果，随后可以发起新的恢复。
+- 若 data 发现绑定提交先于切换记录完成，操作清除放弃标记、置 `switchCommitted` 并继续完成，不停在半放弃状态。
+
+### 失败尝试、暂态观察与续办
+
+- Job 回执增加 `failure`：`exit | deadline-exceeded | job-lost | pod-missing | receipt-invalid | receipt-mismatch`。首次观察前 Job 已丢失时合成 `job-lost`；TTL 删除后同样为 `job-lost`；`activeDeadlineSeconds = 3600`；Pod 尚未终止时以暂态 `restore_job_terminating` 等待，不提前判定。
+- 任一终态失败都是可重试的尝试：retry 把原 Job ID 与回执追加到 `previousAttempts`，分配新的 attempt ID；目标、镜像、备份引用与冻结环境不变。校验 receipt 的备份摘要不符记为 `receipt-mismatch` 失败尝试，不进入可切换状态。
+- 基础设施或未知错误只写 `observation`（message／at／failures，同一消息 60 秒节流），平台自动重新观察；平台拒绝（conflict／precondition／forbidden／validation／not_found）写 `error`，等待管理员重试或放弃。
+- 已确认的切换由任一平台管理员 retry 继续，`switchActor` 更新为该管理员。
+
+### 前置检查取代触发器
+
+迁移 release `0015`、data `0010`、gateway `0014` 删除把跨操作规则变成 HTTP 500 的触发器；同服务第二次恢复可以正常切换。规则改由应用层统一前置检查，返回具名码：
+
+| 场景 | 结果 |
+| --- | --- |
+| 未结束恢复期间发布、下线、延期下线、重新部署、切流 | `database_restore_active` |
+| 资源中心维护恢复保留的候选槽（正式槽仍可维护） | `database_restore_active`；待命槽清扫跳过 |
+| 切流到连接旧世代的槽（例如恢复完成后保留的旧槽） | `database_generation_retained`，以 data 绑定为活动世代唯一来源 |
+| 恢复维护保留期间设置／退出维护 | `database_restore_maintenance_held` |
+| 生产临时授权按请求时世代固定，世代已变 | `database_generation_changed` |
+| 过期 revision | `stale_revision` |
+
+`database_restores` 的 stage CHECK 与「每服务一个未结束恢复」唯一索引排除 `abandoned`；原输入保持不可变，尝试历史只追加。
+
+### Job 资源与环境变量
+
+- 恢复／校验 Job 使用服务套餐的 cpu／memory（与候选槽一致），不再固定 500m。
+- Job 注入 `CS_OBJECTS_TOKEN`（AW 读取此名）；`PLATFORM_ENV.databaseRestoreObjectsToken` 原值 `CS_DATABASE_RESTORE_OBJECTS_TOKEN` 从未被注入，已更正为 `CS_OBJECTS_TOKEN`（`bun run contracts:lock --breaking` 记录，依据为作者 2026-10-16 指示与 AW RFC-370 §9.2 V13 跟进：常量应命名实际注入的变量）。
+- `CS_DATABASE_RESTORE_REFERENCE` 原样注入，`backupReferenceDigest` 为原始字节的 SHA-256；合同拒绝首尾空白，使 CS 与 AW（读取时去首尾空白）的摘要一致。
+
+### 页面
+
+恢复页增加「放弃恢复」（ConfirmDialog，确认词 `abandon`），展示放弃影响与保留的目标库；显示自动观察与「正在放弃」提示；完成或放弃后停止轮询。

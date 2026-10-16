@@ -9,6 +9,8 @@ export interface ReleaseHandoffSnapshot {
 }
 export interface BusinessReleaseHandoff {
   migrationBarrier(serviceId: ServiceId, request: { operationId: string; targetReleaseId: ReleaseId; expectedActiveReleaseId: ReleaseId; supersedesOperationId?: string }): Promise<{ ready: boolean; epoch: number; blocked: string[]; preparationDigest?: string }>;
+  /** RFC-042: the barrier of an abandoned, never-switched operation is withdrawn; idempotent. */
+  withdrawMigrationBarrier(serviceId: ServiceId, operationId: string): Promise<void>;
   precheck(serviceId: ServiceId, targetReleaseId: ReleaseId): Promise<{ supported: boolean; blocked: Array<{ taskId: string; taskContractVersion: string }> }>;
   freeze(serviceId: ServiceId, request: ReleaseHandoffRequest): Promise<ReleaseHandoffSnapshot>;
   inspect(serviceId: ServiceId): Promise<ReleaseHandoffSnapshot>;

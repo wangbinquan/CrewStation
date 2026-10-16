@@ -73,8 +73,10 @@ export async function switchRestoreCandidate(deps:ReleaseUseCaseDeps,op:Database
     if(!op.candidateProof||jsonHash(proof)!==jsonHash(op.candidateProof))throw conflict('确认后的恢复候选物理绑定变化');
     await c.database.commit({operationId:op.id,serviceId:op.serviceId,sourceGenerationId:op.sourceGenerationId,targetGenerationId:op.targetGenerationId,expectedRevision:op.sourceBindingRevision});
     const now=deps.clock.now().toISOString();
-    await deps.uow.run(async scope=>{await scope.slots.get(op.serviceId);if(await scope.handoffs.get(op.id))return;
-      await scope.handoffs.insert({id:op.id,requestKey:'database-restore:'+op.id,projectId:op.projectId,serviceId:op.serviceId,expectedActiveReleaseId:op.sourceReleaseId,targetReleaseId:op.candidateReleaseId,targetSlot:op.targetSlot,stage:'freezing',actorUserId:op.switchActor!.userId,reason:'数据库恢复 '+op.id,createdAt:now,updatedAt:now,revision:1,owner:null,leaseUntil:null});});
+    // The handoff and the operation's committed mark share one transaction: from here only forward completion remains.
+    return deps.uow.run(async scope=>{await scope.slots.get(op.serviceId);
+      if(!await scope.handoffs.get(op.id))await scope.handoffs.insert({id:op.id,requestKey:'database-restore:'+op.id,projectId:op.projectId,serviceId:op.serviceId,expectedActiveReleaseId:op.sourceReleaseId,targetReleaseId:op.candidateReleaseId,targetSlot:op.targetSlot,stage:'freezing',actorUserId:op.switchActor!.userId,reason:'数据库恢复 '+op.id,createdAt:now,updatedAt:now,revision:1,owner:null,leaseUntil:null});
+      const next={...op,switchCommitted:true,revision:op.revision+1,updatedAt:now};await scope.databaseRestores!.save(op,next);return next;});
   }
-  return op;
+  return op.switchCommitted?op:c.save(op,{switchCommitted:true});
 }

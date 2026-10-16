@@ -45,6 +45,7 @@ export async function prepareAgentResume(deps: BusinessExecutionDeps, serviceId:
   if (input.materialId) {
     const material = await deps.materials.get(serviceId, view.taskId, input.materialId);
     if (!material || material.view.digest !== source.view.materialDigest) throw conflict('续跑不能改变原会话材料', { code: 'session_incompatible' });
+    if ((material.state ?? 'ready') !== 'ready') throw precondition('材料对象引用已释放，请用原 requestKey 重新受理材料', { code: 'material_released' });
   }
   const plan: ExecutionAgentPlan = { ...original, request: { ...input, materialId: original.request.materialId }, nonce: randomBytes(32).toString('hex'), command: {
     ...original.command, id: view.executionId, agentId: view.executionId, processAttemptId: view.executionId, initialPrompt: input.prompt, resumeSessionId: input.resumeSessionId,

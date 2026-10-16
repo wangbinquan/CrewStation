@@ -1,5 +1,5 @@
-import { probeModelMapping } from './modelMappingProbe';
-import { startMcpProbe } from './mcpProbeServer';
+import { probeModelMapping, probeNativeMaterial } from './modelMappingProbe';
+import { localMcpProbeCommand, startMcpProbe } from './mcpProbeServer';
 import { randomBytes } from 'node:crypto';
 import type { BusinessExecutionProof, ProfileTestStage, StartAgentCommand } from '@crewstation/contracts';
 import { PLATFORM_AGENT_PERMISSION, StartAgentCommandSchema } from '@crewstation/contracts';
@@ -27,7 +27,8 @@ export async function probeBusinessProfile(deps: Input): Promise<BusinessExecuti
     return turn;
   };
   const firstToken = nonce(), first = await probe('events', command({ initialPrompt: `Remember this token in this conversation and reply with it exactly, without markup: ${firstToken}` }), firstToken);
-  if (!first.ok) return { protocolVersion: 3, capabilities };
+  // nativeProbeVersion 2: any native capability below comes from the full sub-agent／plugin／inline MCP probe (RFC-040 V12).
+  if (!first.ok) return { protocolVersion: 3, capabilities, nativeProbeVersion: 2 };
   capabilities.events = true;
   const usages = first.events.filter((event) => event.type === 'usage' && event.usage);
   capabilities.usage = usages.length ? (usages.some((event) => event.usage!.mode === 'delta') ? 'incremental' : 'final') : 'none';
@@ -43,11 +44,11 @@ export async function probeBusinessProfile(deps: Input): Promise<BusinessExecuti
     const tested = await probe('mcp', command({ ...(connected.capabilities?.startupInventoryVersion === 1 ? { startupInventoryVersion: 1 } : {}), mcp: [{ name: 'crewstation-probe', url: 'http://127.0.0.1:18089/mcp', headers: {} }], initialPrompt: 'Call the crewstation-probe MCP tool named nonce and reply only with its returned token.' }), mcpToken);
     capabilities.mcp = tested.ok && tested.events.some((event) => event.type === 'tool-start' && event.tool?.name.includes('nonce'));
     if (tested.events.some((event) => event.type === 'startup-inventory' && event.inventory?.state === 'verified' && event.inventory.mcpServers.some((mcp) => mcp.name === 'crewstation-probe' && mcp.status === 'connected'))) capabilities.startupInventoryVersion = 1;
-    if (connected.capabilities?.nativeConfigVersion === 1 && deps.input.launch.protocol !== 'terminal') {
-      const expected = nonce();
-      const native = await probe('nativeConfig', command({ businessNativeConfig: { version: 1, protocol: deps.input.launch.protocol, agent: { name: 'business-proof', body: `Reply with exactly ${expected}.`, options: { description: 'Native material proof' } }, subagents: [], mcp: [], plugins: [] }, initialPrompt: 'Follow your Agent definition.' }), expected);
-      if (native.ok) capabilities.nativeConfigVersion = 1;
-      if (native.ok && connected.capabilities?.nativeModelMappingVersion === 1 && await probeModelMapping(deps.input, nonce(), command, probe)) capabilities.nativeModelMappingVersion = 1;
+    // Claude native material is not verified: no native probe, no claim (RFC-040 V12).
+    if (connected.capabilities?.nativeConfigVersion === 1 && deps.input.launch.protocol === 'opencode') {
+      const native = await probeNativeMaterial(nonce, command, probe, { url: 'http://127.0.0.1:18089/mcp', token: mcpToken }, localMcpProbeCommand);
+      if (native) capabilities.nativeConfigVersion = 1;
+      if (native && connected.capabilities?.nativeModelMaterialVersion === 1 && await probeModelMapping(deps.input, nonce(), command, probe)) capabilities.nativeModelMappingVersion = 1;
     }
     if (connected.capabilities?.materialObjectsVersion === 1) {
       const object = { objectId: newResourceId(), sha256: new Bun.CryptoHasher('sha256').update(materialContent).digest('hex'), size: Buffer.byteLength(materialContent) };
@@ -55,5 +56,5 @@ export async function probeBusinessProfile(deps: Input): Promise<BusinessExecuti
       if (material.ok) capabilities.materialObjectsVersion = 1;
     }
   } finally { await deps.runner.sendCommand(deps.taskId, { id: newResourceId(), type: 'cancelBusinessExecution', executionId: server }); }
-  return { protocolVersion: 3, capabilities };
+  return { protocolVersion: 3, capabilities, nativeProbeVersion: 2 };
 }

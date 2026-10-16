@@ -73,5 +73,20 @@ describe.skipIf(!available)('RFC-027 migration write barrier', () => {
     expect((await f.request(f.path, { ...f.input, stopAuthority, fence: undefined, requestKey: 'no-spawn' })).status).toBe(400);
     expect((await f.module.api.releaseHandoff.migrationBarrier(f.serviceId, migration)).blocked).toEqual(['application_write_barrier_missing']);
   });
-
+  // RFC-042: an abandoned restore that never switched must release its write barrier;
+  // before this the frozen execution authority could only be superseded by another migration.
+  test('withdrawing a never-switched barrier lets the original release claim again under a new epoch; foreign ids are no-ops', async () => {
+    db = await createTestDatabase([businessTaskMigrations]); const f = await executionCommandFixture(db.db), root = '/v3/business-execution/control';
+    const input = { operationId: newResourceId(), expectedActiveReleaseId: f.releaseId, targetReleaseId: newResourceId() as ReleaseId };
+    const frozen = await f.module.api.releaseHandoff.migrationBarrier(f.serviceId, input);
+    expect((await f.request(`${root}/claim`, { instanceId: newResourceId() })).status).toBe(412);
+    await f.module.api.releaseHandoff.withdrawMigrationBarrier(f.serviceId, newResourceId());
+    expect((await f.module.api.releaseHandoff.inspect(f.serviceId)).migration?.operationId).toBe(input.operationId);
+    await f.module.api.releaseHandoff.withdrawMigrationBarrier(f.serviceId, input.operationId);
+    await f.make().module.api.releaseHandoff.withdrawMigrationBarrier(f.serviceId, input.operationId);
+    const after = await f.module.api.releaseHandoff.inspect(f.serviceId);
+    expect(after.migration).toBeUndefined(); expect(after.epoch).toBe(frozen.epoch + 1);
+    const lease = await (await f.request(`${root}/claim`, { instanceId: newResourceId() })).json() as BusinessControlDto;
+    expect(lease.epoch).toBeGreaterThan(after.epoch); expect(lease.phase).toBe('preparing');
+  });
 });

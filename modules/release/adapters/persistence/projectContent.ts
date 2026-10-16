@@ -70,7 +70,7 @@ function report(rows: readonly Row[], target: ProjectDeletionTarget, blockers: P
     .sort((a, b) => (a.table + ':' + a.key).localeCompare(b.table + ':' + b.key));
   const consumers: ReleaseDeletionContent['consumers'][number][] = [], callbacks: ReleaseCallbackRecord[] = [];
   for (const row of own) {
-    if(row.table==='database_restores'&&row.body.stage!=='completed')blockers.push(blocker('database-restore-active','原数据库恢复尚未结束，原目标、Job 与数据库必须保留'));
+    if(row.table==='database_restores'&&!['completed','abandoned'].includes(String(row.body.stage)))blockers.push(blocker('database-restore-active','原数据库恢复尚未结束，请先完成或放弃原恢复操作'));
     const serviceId = [...row.services][0]; if (!serviceId) continue;
     if (row.table === 'deletion_callbacks') {
       const callback = releaseCallbackContent(row.body);

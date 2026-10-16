@@ -97,3 +97,40 @@ Claude 从该次根会话 init 读取实际清单；OpenCode 在该次私有运�
 MCP 子进程 env 名称兼容 POSIX 大小写（与 AW 的既有声明一致），保留 128 字符限制、平台保留名及 loader 命名空间拒绝；命令／根 Agent 的环境变量合同不变。正则由大写集合扩展为大小写集合，所有原来有效的输入保持有效。合同工具将任何 pattern 差异机械归为 breaking，本项是接受集合的兼容扩展，锁文件更新以此处为依据，不要求既有业务迁移。
 
 联合接线中原生 Agent／MCP／插件名称上限从 80 扩展到 128，与 AW 已有资源名称合同一致；正则、平台保留空间与原型键拒绝不变。此项只扩展接受集合，不改变已保存材料的名字或摘要；CS 子任务展示名仍为 80。本轮补充只验证 OpenCode。
+
+## 5. 2026-10-16 审查修复（AW RFC-370 §9.2 跟进）
+
+作者授权按审查结论重设计不合理部分。以下合同变化均随用例落地；集中验证结果记录在本轮交接中，未据此宣称 Done。
+
+### 5.1 对象固定引用的释放与复活
+
+- `business_task.execution_materials` 增加 `releasing`／`released` 两态及 `pin_revision`、`object_count`、`pinned_at`（新迁移 `0039_material_pin_release.sql`）。旧行不改写：`object_count` 为 NULL 表示迁移前受理，首次清扫解密一次后补记；`pinned_at` 为空时回退 `created_at`。
+- 可释放条件：父任务已 closed；或固定时间早于 `MATERIAL_PIN_RETENTION_DAYS`（= `BUSINESS_EXECUTION_LIMITS.retentionDays`，7 天），且不存在引用该材料摘要的未终态尝试或保留期内结束的尝试。
+- 释放分两段：业务库事务内 `ready／preparing → releasing`；事务外调用 data 的 `release`（按 pin revision 幂等，对象存储冻结时等待，已不存在的对象跳过，释放墓碑同时阻止同 revision 迟到的 pin）；最后 `releasing → released`。中断停在 `releasing`，下一轮清扫或复活时重复。
+- 同一 requestKey 再次受理已释放材料即复活：先完成未完成的释放，再 `released → preparing`、`pin_revision + 1` 重新固定同一批不可变对象，材料 ID 与摘要不变。
+- 尝试受理（计划、续接、重试）与 `beginRelease` 共用服务锁：已释放材料不能产生新尝试（`material_released`）。data `check` 接受任一 active revision；全部释放时返回 `material_objects_released`，dispatch 把它与 `material_objects_unpinned` 作为终态拒绝。
+- `size_bytes` 上限调整为 5 MiB（1 MiB 内联信封 + 4 MiB 对象文件描述，见 5.5）。
+
+### 5.2 原生能力探针 v2
+
+- 仅 OpenCode 执行原生探针。`nativeConfig` 探针同时覆盖：根 Agent 经 `task` 委派给内部子代理，子代理调用插件工具 `business_proof_token`；内联 remote MCP（`oauth: false`）与本地 stdio MCP（`localMcpProbeCommand`）。指令放在 `initialPrompt`，原生正文为空，避免探针依赖 systemPrompt。
+- 模型映射探针要求 Runner 声明 `nativeModelMaterialVersion: 1`（见 5.4）。
+- 探针结果写入 `nativeProbeVersion: 2`。`testedAgentCapabilities` 只在 `nativeProbeVersion === 2` 且协议为 opencode 时授予 `nativeConfigVersion`／`nativeModelMappingVersion`；旧证明保留其余能力，原生能力需重新测试档位后才恢复（能力影响见 proposal）。
+
+### 5.3 原生正文要求 systemPrompt 能力
+
+OpenCode 的原生 Agent 正文与 systemPrompt 走同一个 prompt 字段。根 Agent 或任一子代理正文非空时，档位必须已通过 systemPrompt 探针，否则启动前报 `unsupported_capability: systemPrompt`；正文为空不受影响。
+
+### 5.4 单一 provider 渲染器
+
+- `PlatformOpencodeModels` 升为 version 2：`providers[alias] = { provider: OpencodeProvider, secrets }`，承载结构化 provider 材料而不是预渲染配置。
+- `packages/agent-drivers/drivers/opencode/modelConfig.ts` 的 `renderOpencodeProvider` 是唯一渲染器，独立 Agent 与内部子代理两条路径共用；business-task 只固定和转发（`agentMaterial.ts` 吸收 `pinOpencodeModels`，删除 `application/model-mapping/`）。
+- Runner hello 增加 `nativeModelMaterialVersion: 1` 并不再宣称 `nativeModelMappingVersion`；session 协商对 `platformOpencodeModels` 要求该能力位。Runner 脱敏覆盖 provider secrets 及 options 的字符串叶子。
+
+### 5.5 对象文件描述预算
+
+`BUSINESS_NATIVE_MATERIAL_LIMITS.descriptorBytes = 4 MiB`。`businessMaterialAccounting` 把引用对象的文件条目（技能与插件文件）计入描述预算，其余计入 1 MiB 内联信封；schema 与 HTTP 受理使用同一计算。材料请求体上限为 1 MiB + 4 MiB + 64 KiB，其余执行请求仍为 2 MiB。能力 DTO 的 `nativeMaterialLimits.descriptorBytes` 为可选新增字段。
+
+### 5.6 目录规模（工程规则 §11）
+
+超过规模阈值的模块不再新增更深子目录，本轮把被触及的小子目录并回既有文件：`application/execution/command/material.ts` → `commandDispatch.ts`；`ports/materials/objects.ts` → `ports/executionMaterials.ts`；data `ports/objects/materials.ts` → `ports/objectContent.ts`；data 数据库世代的端口／适配器／应用分别并入 `ports/repositories.ts`、`adapters/persistence/databaseGenerations.ts`、`application/serviceData.ts`；release `adapters/persistence/database/restores.ts` → `adapters/persistence/databaseRestores.ts`。release `application/database-restore/` 暂保留：`release/application` 已有 19 个文件，并入 6 个文件会超出每目录 20 个文件的上限，记为剩余结构债。

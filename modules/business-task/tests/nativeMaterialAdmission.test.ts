@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { eq, sql } from 'drizzle-orm';
 import type { BusinessMaterialDto, BusinessSubtaskV3Dto } from '@crewstation/contracts';
+import { BUSINESS_EXECUTION_LIMITS, BUSINESS_NATIVE_MATERIAL_LIMITS } from '@crewstation/contracts';
 import { newResourceId, precondition } from '@crewstation/kernel';
 import { createTestDatabase, testDatabaseAvailable, type TestDatabase } from '@crewstation/testkit';
 import { businessTaskMigrations } from '../wiring';
@@ -8,7 +9,7 @@ import { executionCommandFixture } from './executionCommandFixture';
 import { drizzleExecutionMaterials } from '../adapters/persistence/materials/repository';
 import { executionCipher } from '../adapters/crypto/executionCipher';
 import { executionSubtasks } from '../adapters/persistence/execution/subtaskTables';
-import type { ExecutionMaterialObjects } from '../ports/materials/objects';
+import type { ExecutionMaterialObjects } from '../ports/executionMaterials';
 import type { ExecutionAgentSecrets } from '../ports/executionAgentSecrets';
 
 const available = await testDatabaseAvailable();
@@ -28,7 +29,7 @@ describe.skipIf(!available)('RFC-040 durable materials and command secrets', () 
         if (!held.has(scope.materialId)) expect(row?.state).toBe('preparing');
         else expect(['preparing', 'ready']).toContain(row!.state ?? 'missing');
         held.add(scope.materialId); calls.push(scope.materialId); if (lost) throw new Error('pin reply lost');
-      }, check: async () => {}, grants: async () => [],
+      }, check: async () => {}, grants: async () => [], release: async () => {},
     };
     const input = { requestKey: 'object-material', fence: f.fence, skills: [{ path: 'review/data.bin', object: { objectId: newResourceId(), sha256: 'a'.repeat(64), size: 2_000_000 } }] };
     expect((await f.make({ materialObjects }).request(path, input)).status).toBe(500);
@@ -46,13 +47,31 @@ describe.skipIf(!available)('RFC-040 durable materials and command secrets', () 
   test('new material needs source identity and a current fence and cannot appear ready if object pinning rejects', async () => {
     const f = await executionCommandFixture(tdb.db), path = `/v3/business-tasks/${f.task.id}/materials`;
     const input = { requestKey: 'forbidden-object', fence: f.fence, skills: [{ path: 'review/data', object: { objectId: newResourceId(), sha256: 'a'.repeat(64), size: 1 } }] };
-    const objects: ExecutionMaterialObjects = { pin: async () => { throw precondition('对象不属于服务', { code: 'material_object_mismatch' }); }, check: async () => {}, grants: async () => [] };
+    const objects: ExecutionMaterialObjects = { pin: async () => { throw precondition('对象不属于服务', { code: 'material_object_mismatch' }); }, check: async () => {}, grants: async () => [], release: async () => {} };
     const api = f.make({ materialObjects: objects });
     expect((await api.request(path, input, 'invalid')).status).toBe(403);
     expect((await api.request(path, { ...input, fence: undefined })).status).toBe(409);
     expect((await api.request(path, input)).status).toBe(412);
     const row = (await drizzleExecutionMaterials(tdb.db).find(f.serviceId, f.task.id, input.requestKey))!;
     expect(row.state).toBe('preparing'); expect(await drizzleExecutionMaterials(tdb.db).get(f.serviceId, f.task.id, row.view.materialId)).toBeUndefined();
+  });
+  // RFC-040 review: material requests shared the generic 2 MiB execution body cap, so a tree whose
+  // object-file descriptors exceed 2 MiB was refused before its own descriptor budget ever applied.
+  test('object-file descriptors over 2 MiB are admitted within their budget; inline over 1 MiB and descriptors over 4 MiB are refused', async () => {
+    const f = await executionCommandFixture(tdb.db), path = `/v3/business-tasks/${f.task.id}/materials`, pinned: number[] = [];
+    const objects: ExecutionMaterialObjects = { pin: async (_caller, scope) => { pinned.push(scope.objects.length); }, check: async () => {}, grants: async () => [], release: async () => {} };
+    const tree = (count: number, segment: string) => Array.from({ length: count }, (_, i) => ({ path: `tree/package-${i}/${segment}/index.js`, object: { objectId: newResourceId(), sha256: i.toString(16).padStart(64, '0'), size: 1 } }));
+    const input = { requestKey: 'large-tree', fence: f.fence, skills: tree(9_000, 'lib-'.repeat(40)) }, api = f.make({ materialObjects: objects });
+    expect(Buffer.byteLength(JSON.stringify(input))).toBeGreaterThan(2 * 1024 * 1024);
+    const admitted = await api.request(path, input); expect(admitted.status).toBe(201); expect(pinned).toEqual([9_000]);
+    expect((await admitted.json() as BusinessMaterialDto).sizeBytes).toBeGreaterThan(2 * 1024 * 1024);
+    expect((await api.request(path, { requestKey: 'inline', fence: f.fence, systemPrompt: 'x'.repeat(BUSINESS_EXECUTION_LIMITS.materialBytes) })).status).toBe(413);
+    const over = { requestKey: 'descriptors', fence: f.fence, skills: tree(BUSINESS_NATIVE_MATERIAL_LIMITS.files, 'lib-'.repeat(65)) };
+    expect(Buffer.byteLength(JSON.stringify(over.skills))).toBeGreaterThan(BUSINESS_NATIVE_MATERIAL_LIMITS.descriptorBytes);
+    expect(Buffer.byteLength(JSON.stringify(over))).toBeLessThan(BUSINESS_EXECUTION_LIMITS.materialBytes + BUSINESS_NATIVE_MATERIAL_LIMITS.descriptorBytes);
+    expect((await api.request(path, over)).status).toBe(413); expect(pinned).toEqual([9_000]);
+    const rows = await tdb.db.execute(sql`SELECT request_key FROM business_task.execution_materials WHERE task_id=${f.task.id}`);
+    expect(rows.map((row) => row['request_key'])).toEqual(['large-tree']);
   });
   test('command admission freezes Secret versions, preserves replay through rotation and never persists plaintext', async () => {
     const f = await executionCommandFixture(tdb.db, { agentProfiles: [], compute: { resolve: async () => { throw new Error('unused'); }, launchMaterial: async () => { throw new Error('unused'); } }, commandBusinessConfig: { allowedEnvNames: ['GIT_TOKEN'] } });

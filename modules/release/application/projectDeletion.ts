@@ -133,10 +133,11 @@ export function admittedReleaseApi(deps: ReleaseUseCaseDeps, api: ReleaseModuleA
     });
   };
   return { ...api,
-    publish: (actor, id, input, source) => service(id, { actor, input, source }, async () => {await deps.databaseRestore?.coordination.assertAvailable(id);return api.publish(actor, id, input, source);}, 'publish'),
-    switchTraffic: (actor, id, input) => service(id, { actor, input }, async () => {await deps.databaseRestore?.coordination.assertAvailable(id);return api.switchTraffic(actor, id, input);}),
-    takeOffline: (actor, id, input) => service(id, { actor, input }, async () => {await deps.databaseRestore?.coordination.assertAvailable(id);return api.takeOffline(actor, id, input);}),
-    postponeOffline: (actor, id, input) => service(id, { actor, input }, async () => {await deps.databaseRestore?.coordination.assertAvailable(id);return api.postponeOffline(actor, id, input);}),
+    // Restore reservations are checked inside `api` by restoreGuardedReleaseApi / switchTraffic (RFC-042).
+    publish: (actor, id, input, source) => service(id, { actor, input, source }, () => api.publish(actor, id, input, source), 'publish'),
+    switchTraffic: (actor, id, input) => service(id, { actor, input }, () => api.switchTraffic(actor, id, input)),
+    takeOffline: (actor, id, input) => service(id, { actor, input }, () => api.takeOffline(actor, id, input)),
+    postponeOffline: (actor, id, input) => service(id, { actor, input }, () => api.postponeOffline(actor, id, input)),
     notePreviewAccess: (id) => service(id, { access: id }, () => api.notePreviewAccess(id)),
     redeploy: (actor, id, input) => release(id, { actor, input }, () => api.redeploy(actor, id, input)),
     redeployPrecheck: (actor, id) => release(id, { actor, id }, () => api.redeployPrecheck(actor, id)),

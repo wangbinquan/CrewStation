@@ -3,9 +3,9 @@ import { DatabasePhysicalIdentitySchema, ProjectIdSchema, ServiceIdSchema } from
 import { conflict, notFound, precondition } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
 import { sql } from 'drizzle-orm';
-import type { DatabaseGeneration, DatabaseEnvironmentBinding } from '../../../domain/databaseGeneration';
-import { restoreDatabaseName, sameDatabaseIdentity } from '../../../domain/databaseGeneration';
-import type { DatabaseGenerations } from '../../../ports/database/generations';
+import type { DatabaseGeneration, DatabaseEnvironmentBinding } from '../../domain/databaseGeneration';
+import { restoreDatabaseName, sameDatabaseIdentity } from '../../domain/databaseGeneration';
+import type { DatabaseGenerations } from '../../ports/repositories';
 
 type Row = { id: string; resource_id: string; project_id: string; service_id: string; env: DataEnv; object_name: string; credential_resource_id: string; secret_box: string | null; origin: DatabaseGeneration['origin']; restore_operation_id: string | null; state: DatabaseGeneration['state']; identity: DatabaseGeneration['identity']; empty_proof: DatabaseGeneration['emptyProof']; created_at: Date | string; updated_at: Date | string };
 type BindingRow = { resource_id: string; project_id: string; service_id: string; env: DataEnv; generation_id: string; revision: number; restore_operation_id: string | null; last_restore_operation_id: string | null; previous_generation_id: string | null };
@@ -45,8 +45,16 @@ export function databaseGenerationRepository(db: Database): DatabaseGenerations 
       if (row.restore_operation_id && row.restore_operation_id !== operationId) throw conflict('数据库已被另一恢复保留');
       await tx.execute(sql`UPDATE data.database_environment_bindings SET restore_operation_id=NULL,updated_at=now() WHERE resource_id=${row.resource_id}`);
     }),
+    // RFC-042 abandon: an uncommitted reservation ends and the target database is retained, never deleted.
+    abandon: (serviceId, operationId) => db.transaction(async (tx) => {
+      const row = await current(tx, serviceId, 'production', true);
+      if (!row) throw precondition('服务尚无生产数据库世代');
+      if (row.last_restore_operation_id === operationId) throw conflict('原恢复已提交数据库切换，只能继续完成', { code: 'database_restore_switched' });
+      if (row.restore_operation_id === operationId) await tx.execute(sql`UPDATE data.database_environment_bindings SET restore_operation_id=NULL,updated_at=now() WHERE resource_id=${row.resource_id}`);
+      await tx.execute(sql`UPDATE data.database_generations SET state='retained',updated_at=now() WHERE restore_operation_id=${operationId} AND service_id=${serviceId} AND state IN ('provisioning','ready')`);
+    }),
     withUnreserved: (serviceId, effect) => db.transaction(async (tx) => {
-      if ((await current(tx, serviceId, 'production', true))?.restore_operation_id) throw conflict('服务数据库正被恢复操作保留');
+      if ((await current(tx, serviceId, 'production', true))?.restore_operation_id) throw conflict('服务数据库正被恢复操作保留，请在原恢复操作完成或放弃后重试', { code: 'database_restore_active' });
       return effect();
     }),
     assertUnreserved: async (serviceId) => { if ((await current(db, serviceId, 'production'))?.restore_operation_id) throw conflict('服务数据库正被恢复操作保留，请在原恢复操作完成后重试', { code: 'database_restore_active' }); },

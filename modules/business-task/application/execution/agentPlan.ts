@@ -1,5 +1,4 @@
-import { pinOpencodeModels } from '../model-mapping/opencodeModels';
-import { agentCommand, agentPayloadDigest } from './agentMaterial';
+import { agentCommand, agentPayloadDigest, pinOpencodeModels } from './agentMaterial';
 import { prepareAgentResume } from './agentResume';
 import { randomBytes } from 'node:crypto';
 import { BusinessOutputMaterialSchema, BusinessMaterialRequestSchema, businessMaterialObjects, PLATFORM_AGENT_PERMISSION } from '@crewstation/contracts';
@@ -27,6 +26,7 @@ export async function prepareAgentPlan(deps: BusinessExecutionDeps, parent: Exec
   if (profile.systemPromptFile && publishedPrompt === undefined) throw precondition('固定发布缺少系统提示文件', { code: 'release_material_missing' });
   const stored = input.materialId ? await deps.materials.get(serviceId, view.taskId, input.materialId) : undefined;
   if (input.materialId && !stored) throw notFound('父任务执行材料', input.materialId);
+  if (stored && (stored.state ?? 'ready') !== 'ready') throw precondition('材料对象引用已释放，请用原 requestKey 重新受理材料', { code: 'material_released' });
   const { requestKey: _key, fence: _fence, ...material } = BusinessMaterialRequestSchema.parse({ requestKey: 'internal', ...(stored ? JSON.parse(await deps.cipher.open(stored.sealed)) : {}) });
   const resolved = await deps.compute.resolve(profile.compute, 'subtask', projectId);
   const capabilities = requireBusinessAgent(resolved);

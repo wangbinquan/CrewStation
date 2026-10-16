@@ -7,5 +7,7 @@ export interface DatabaseGenerationApi {
   envFor(serviceId: ServiceId, generationId: string, operationId?: string): Promise<Record<string, string>>;
   commit(input: { operationId: string; serviceId: ServiceId; sourceGenerationId: string; targetGenerationId: string; expectedRevision: number }): Promise<DatabaseBindingDto>;
   finish(serviceId: ServiceId, operationId: string): Promise<void>;
+  /** RFC-042: ends an uncommitted restore reservation and retains its target; refuses with database_restore_switched after commit. */
+  abandon(serviceId: ServiceId, operationId: string): Promise<void>;
   assertUnreserved(serviceId: ServiceId): Promise<void>;
 }

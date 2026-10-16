@@ -3,6 +3,8 @@ import type { DatabaseRestoreOperation, RestoreJobProof } from '../domain/databa
 export interface DatabaseRestoreRepository {
   get(id: string): Promise<DatabaseRestoreOperation | undefined>;
   forJob(id: string): Promise<DatabaseRestoreOperation | undefined>;
+  /** The service's unfinished operation (not completed and not abandoned), if any. */
+  active(serviceId: ServiceId): Promise<DatabaseRestoreOperation | undefined>;
   list(serviceId: ServiceId): Promise<DatabaseRestoreOperation[]>;
   pending(limit: number, afterId?: string): Promise<DatabaseRestoreOperation[]>;
   insert(op: DatabaseRestoreOperation): Promise<void>;
@@ -21,10 +23,13 @@ export interface RestoreDatabaseOwner {
   envFor(serviceId: ServiceId, id: string, operationId?: string): Promise<Record<string,string>>;
   commit(input: { operationId: string; serviceId: ServiceId; sourceGenerationId: string; targetGenerationId: string; expectedRevision: number }): Promise<DatabaseBindingDto>;
   finish(serviceId: ServiceId, operationId: string): Promise<void>;
+  /** Ends an uncommitted reservation and retains the target database for inspection; idempotent. */
+  abandon(serviceId: ServiceId, operationId: string): Promise<void>;
   assertUnreserved(serviceId: ServiceId): Promise<void>;
 }
 export interface RestoreJobObserver {
   candidate(input: {namespace:string;serviceName:string;physical:'blue'|'green';releaseId:string;revision:number;image:string;environment:Readonly<Record<string,string>>}): Promise<{deploymentUid:string;secretUid:string;environmentDigest:string}|null>;
+  /** Terminal observations are explicit failed attempts (named `failure`) so the same operation can open a new attempt. */
   observe(input: { namespace: string; name: string; jobId: string; purpose: 'database-restore' | 'database-verify'; image: string; command: readonly string[]; target: DatabasePhysicalIdentity; environment: Readonly<Record<string,string>>; previous: RestoreJobProof | null }): Promise<RestoreJobProof | null>;
 }
 export interface DatabaseRestoreSupport {

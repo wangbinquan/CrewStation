@@ -3,7 +3,7 @@ import { precondition } from '@crewstation/kernel';
 import type { BusinessReleaseHandoff } from '../api/releaseHandoff';
 import type { BusinessExecutionDeps } from './execution/dependencies';
 
-export function migrationBarrier(deps: BusinessExecutionDeps): Pick<BusinessReleaseHandoff, 'migrationBarrier'> {
+export function migrationBarrier(deps: BusinessExecutionDeps): Pick<BusinessReleaseHandoff, 'migrationBarrier' | 'withdrawMigrationBarrier'> {
   return {
     migrationBarrier: async (serviceId, request) => {
       const registration = await deps.uow.read.contracts.forRelease(serviceId, request.expectedActiveReleaseId);
@@ -19,5 +19,6 @@ export function migrationBarrier(deps: BusinessExecutionDeps): Pick<BusinessRele
       return { ready: blocked.length === 0, epoch: control!.epoch, blocked,
         ...(control?.migration?.preparationDigest ? { preparationDigest: control.migration.preparationDigest } : {}) };
     },
+    withdrawMigrationBarrier: async (serviceId, operationId) => { await deps.controls.withdrawMigration(serviceId, operationId); },
   };
 }

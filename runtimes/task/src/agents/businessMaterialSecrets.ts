@@ -14,6 +14,7 @@ export function businessMaterialSecrets(native: BusinessNativeConfig | undefined
     if (mcp.type === 'remote' && mcp.oauth) collect(mcp.oauth.clientSecret);
   }
   for (const plugin of native?.plugins ?? []) collect(plugin.options);
-  for (const provider of Object.values(models?.providers ?? {})) collect(provider.options);
+  // Structured provider material (RFC-040 V12): forwarded credential values and the operator's option leaves.
+  for (const entry of Object.values(models?.providers ?? {})) { collect(entry.secrets); collect(entry.provider.options); }
   return [...new Set(values)];
 }

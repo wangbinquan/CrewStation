@@ -24,17 +24,35 @@ test('restore proof requires original immutable environment, Pod exit, image and
  await f.k8s.delete(Resources.Job!,f.input.name,f.input.namespace);expect(await f.observer.observe({...f.input,previous:proof})).toEqual(proof);
  expect(()=>retainJobProof(proof,{...proof,podUid:'replacement'})).toThrow('身份已变化');
 });
-test('a Job success label does not substitute for exited bytes, unique Pod, receipt or actual image digest',async()=>{
- const f=await fixture();await f.complete();f.output('CS_DATABASE_RESTORE_RECEIPT={}\n');await expect(f.observer.observe(f.input)).rejects.toThrow('合同');
- f.output('no receipt');await expect(f.observer.observe(f.input)).rejects.toThrow('唯一');
+// RFC-042 review: a missing or invalid verify receipt, a Job past activeDeadlineSeconds (Pod removed)
+// and a Job removed by its TTL used to throw on every observation, so the operation could never retry.
+test('a Job success label does not substitute for exited bytes; a missing or invalid receipt is a named failed attempt', async () => {
+ const f=await fixture();await f.complete();f.output('CS_DATABASE_RESTORE_RECEIPT={}\n');
+ expect(await f.observer.observe(f.input)).toMatchObject({receipt:{state:'failed',exitCode:0,failure:'receipt-invalid'},podUid:f.pod.metadata.uid});
+ f.output('no receipt');const missing=(await f.observer.observe(f.input))!;expect(missing.receipt).toMatchObject({state:'failed',failure:'receipt-invalid'});expect(missing).not.toHaveProperty('verification');
+ expect(await f.observer.observe({...f.input,previous:missing})).toEqual(missing);
  await f.k8s.mergePatch(Resources.Pod!,'restore-pod',f.input.namespace,{status:{containerStatuses:[{imageID:'containerd://sha256:'+'d'.repeat(64),state:{terminated:{exitCode:0}}}]}});
  await expect(f.observer.observe(f.input)).rejects.toThrow('镜像摘要');
  await f.k8s.create<K8sObject>({...f.pod,metadata:{...f.pod.metadata,name:'second-pod',uid:'second-pod'}});await expect(f.observer.observe(f.input)).rejects.toThrow('多个执行 Pod');
 });
-test('unknown or failed-without-Pod results cannot create a fresh attempt; template and secret drift fail closed',async()=>{
- const f=await fixture();const observed=(await f.observer.observe(f.input))!;await f.k8s.delete(Resources.Pod!,'restore-pod',f.input.namespace);
- await f.k8s.mergePatch(Resources.Job!,f.input.name,f.input.namespace,{status:{conditions:[{type:'Failed',status:'True'}]}});await expect(f.observer.observe(f.input)).rejects.toThrow('终止证明');
- await f.k8s.delete(Resources.Job!,f.input.name,f.input.namespace);await expect(f.observer.observe({...f.input,previous:observed})).rejects.toThrow('不能按同名重建');
+test('deadline, missing Pod and TTL loss end the attempt as retryable failures; a still-running Pod is waited for', async () => {
+ const f=await fixture(),running=(await f.observer.observe(f.input))!;
+ await f.k8s.mergePatch(Resources.Pod!,'restore-pod',f.input.namespace,{status:{phase:'Running',containerStatuses:[{name:'main',imageID:'containerd://sha256:'+'a'.repeat(64),state:{running:{}}}]}});
+ await f.k8s.mergePatch(Resources.Job!,f.input.name,f.input.namespace,{status:{conditions:[{type:'Failed',status:'True',reason:'DeadlineExceeded'}]}});
+ await expect(f.observer.observe({...f.input,previous:running})).rejects.toMatchObject({kind:'unavailable',details:{code:'restore_job_terminating'}});
+ await f.k8s.delete(Resources.Pod!,'restore-pod',f.input.namespace);
+ const deadline=(await f.observer.observe({...f.input,previous:running}))!;
+ expect(deadline.receipt).toMatchObject({state:'failed',exitCode:null,failure:'deadline-exceeded'});expect(deadline.podUid).toBe(running.podUid);
+ const g=await fixture();await g.k8s.delete(Resources.Pod!,'restore-pod',g.input.namespace);await g.k8s.mergePatch(Resources.Job!,g.input.name,g.input.namespace,{status:{conditions:[{type:'Failed',status:'True',reason:'BackoffLimitExceeded'}]}});
+ expect((await g.observer.observe(g.input))!.receipt.failure).toBe('pod-missing');
+ const h=await fixture(),observed=(await h.observer.observe(h.input))!;await h.k8s.delete(Resources.Job!,h.input.name,h.input.namespace);
+ await h.k8s.mergePatch(Resources.Pod!,'restore-pod',h.input.namespace,{status:{phase:'Running'}});
+ await expect(h.observer.observe({...h.input,previous:observed})).rejects.toMatchObject({details:{code:'restore_job_terminating'}});
+ await h.k8s.delete(Resources.Pod!,'restore-pod',h.input.namespace);
+ expect((await h.observer.observe({...h.input,previous:observed}))!.receipt).toMatchObject({state:'failed',failure:'job-lost',uid:observed.receipt.uid});
+ expect(await h.observer.observe(h.input)).toBeNull();
+});
+test('template and secret drift still fail closed instead of opening an attempt', async () => {
  const g=await fixture();await g.k8s.mergePatch(Resources.Job!,g.input.name,g.input.namespace,{spec:{template:{spec:{containers:[{...g.container,args:['--database=other']}]}}}});await expect(g.observer.observe(g.input)).rejects.toThrow('命令');
  const h=await fixture();await h.k8s.mergePatch(Resources.Secret!,h.input.name+'-env',h.input.namespace,{data:{CS_DATABASE_URL:Buffer.from('postgres://different').toString('base64')}});await expect(h.observer.observe(h.input)).rejects.toThrow('原输入');
 });

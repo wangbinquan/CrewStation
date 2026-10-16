@@ -48,3 +48,14 @@ test('native material, object transfer, inventory and command Secret each requir
   expect(() => assertLaunchSupported(command, caps)).toThrow('Secret');
   expect(() => assertLaunchSupported(command, { ...caps, commandSecretEnvVersion: 1 })).not.toThrow();
 });
+
+// RFC-040 V12: the structured platform model wire is only sent to Runners that render it in
+// agent-drivers. The retired rendered-wire bit (nativeModelMappingVersion) no longer qualifies.
+test('platform model material requires the structured-material Runner capability, not the retired wire bit', () => {
+  const caps: RunnerHello['capabilities'] = { protocols: ['opencode'], preview: false, pty: true, businessExecutionV3: 1 };
+  const profile = Bun.randomUUIDv7(), provider = { id: 'gateway', npm: '@ai-sdk/openai-compatible', models: { m: {} }, options: {}, credentials: { apiKey: 'KEY' } };
+  const command = RunnerCommandSchema.parse({ id: 'a', type: 'startAgent', agentId: 'a', processAttemptId: 'attempt', compute: profile, profileRevision: 1, launch: { protocol: 'opencode', binaryPath: '/bin/agent' }, permission: 'full', mode: 'oneshot', beforeStart: { profile, revision: 1, contentHash: 'h', steps: [], vars: {}, secrets: {}, configFile: { kind: 'none' }, captureOutput: false },
+    platformOpencodeModels: { version: 2, root: 'cs-platform-a/m', subagents: {}, providers: { 'cs-platform-a': { provider, secrets: { KEY: 'v' } } }, identities: { 'cs-platform-a/m': { model: 'gateway/m', computeProfileId: profile, revision: 1 } } } });
+  expect(() => assertLaunchSupported(command, { ...caps, nativeModelMappingVersion: 1 })).toThrow('不支持');
+  expect(() => assertLaunchSupported(command, { ...caps, nativeModelMaterialVersion: 1 })).not.toThrow();
+});

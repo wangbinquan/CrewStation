@@ -21,3 +21,22 @@
 本机证据：`/private/tmp/cs-rfc040-rfc042-central-validation-final-20261016.log`、`cs-rfc040-rfc042-final-gate-receipt.json`、`cs-rfc040-rfc042-quiet-project-deletion.log`、`cs-rfc040-rfc042-quiet-project-deletion-receipt.json`、`cs-rfc040-rfc042-built-images.json`、`cs-rfc040-rfc042-targets.json`、`cs-rfc040-rfc042-deployment-plan.json`。
 
 发布前 `git diff --check` 检出新增代码一处行末空格，已仅删除该空格，逻辑词元保持一致；按新原始字节重建候选 `883cc424539e`，控制面配置摘要变为 `sha256:e84b02b3be98f766a9e26bcbb16c96bb6686e64b6362109111f2f4ea7e31c59f`，Console／Runner 配置摘要与前一候选相同。原门禁证据按语义不变复用，不重复全量测试。见 `cs-rfc040-rfc042-whitespace-receipt.json` 和 `cs-rfc040-rfc042-built-images-r2.json`。
+
+
+## 2026-10-16 推荐方案部署及实机缺陷修复
+
+推荐实现提交 `3c1d2eab1a71430045f18624139991834f5bb8b2` 的 [CI 38887997096](https://github.com/wangbinquan/CrewStation/actions/runs/38887997096) 九项全部成功。四份追加迁移通过独立 Job 应用，八个系统 Deployment Ready；正式 AW 蓝绿 Pod 的 UID 与零重启记录保持。
+
+实际 API 复制档位时发现旧纯摘要引用被存成裸仓库路径，复制返回 400。修复保留 tag/digest，并且只从该修订已冻结摘要补全精确旧平台裸路径。实际恢复页还发现开发数据库被标成当前生产，已将该列表限定为生产数据库。修复提交 `15f6eee2de2878318a75ca2a948c44b7aded8afa`，九个精确路径，[CI 38894628979](https://github.com/wangbinquan/CrewStation/actions/runs/38894628979) 九项全部成功；8 个系统 Deployment 已更新且 Ready。
+
+修复本地集中门禁：结构、lint、两侧类型通过，5950 项中 5773 pass／176 skip／1 fail。唯一失败为未改动的 `modules/task-runtime/tests/deletion/owner.test.ts` 原有 CAS 清理用例超过 5000ms；完整门禁结束后保持文件与超时不变，整文件 6 项通过，原超时项 1959.86ms。原失败记录保留，不写成一次全量全绿。另有档位 33 项、恢复页面 9 项定向检查通过。
+
+按实际 OCI manifest 部署：控制面 `sha256:00753389f3ef28940211ef37e02e000da93f5bee6c4d2ae7b7a3ddeccee70d2e`，Console `sha256:b6b8b7f09cd57f1788bd098b97296ad61ac412c8d9ef242b5f13ae8acd68379f`，Runner 保持 `sha256:5f389279419c1a967aea7dcb57a4f5c4c2d47774b373172a26fb3ce49e3a2268`。镜像源码与已提交 blobs 核对一致；正式 AW 两个 Pod UID `67808ecd-2cb8-418b-98f1-4e7ce338bce3`、`0039a97f-e2ae-4647-9913-a99b4839c1cc` 仍 Running/Ready、0 restarts。
+
+Chrome 正式页面与 390px 窄屏验证：仅有一个原生产数据库世代；开发世代不出现。页面 scrollWidth=390；空恢复版本时禁止创建；取消统一表单后焦点返回新建恢复按钮。截图、结果在 `/private/tmp/cs-rfc042-ui-acceptance-r3.json`。这不替代恢复 Job、独立 verify Job 和显式切换的实际验收。
+
+原验收服务的 v0.1.3（`424645c203a618a73d07f5b8e94a23cd41b1878b`，发布 `01a1446e-1c6f-7000-9db6-4bb60c5ae834`）已完成构建，迁移请求 500m CPU，单节点剩余额度约 295m，故 Pending/Insufficient cpu。已通过正式 pause API 暂停本次旧闲置父任务 `01a14294-79d0-7000-b7d6-f0db13390656`，保留原 PVC UID `67b82c7d-980a-4de0-bedc-7d50428816d9`；没有暂停其他项目。原生产数据库未切换，独立恢复与切换仍未验收。
+
+OpenCode 双模型使用另外的 50m 服务／100m 任务隔离项目 `rfc040-two-model-20261016`（`01a1447f-5806-7000-a736-47bf6783f71f`）。两个隐藏副本已实际复制并保存到 r2：GLM `01a14489-d40c-7000-8179-fd183c445c4b`，DeepSeek `01a14489-d4f8-7000-bbac-f691878394df`。源档位 r3 与默认档位 r16 的 contentHash、内容、凭据状态和默认标记均与原快照相同。真实兼容探针运行中，跨模型内部委派尚未宣称通过。
+
+机器回执：`/private/tmp/cs-rfc040-rfc042-repair-ci-result.json`、`cs-rfc040-rfc042-repair-deployed.json`、`cs-rfc040-digest-gate-reconciled.json`、`cs-rfc040-source-profile-preservation.json`；完整失败日志与之前已通过的实机记录保留。RFC-040/042 继续 In Progress，只验证 OpenCode。

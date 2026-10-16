@@ -2,7 +2,7 @@ import type { ServiceId } from '@crewstation/contracts';
 import { completeFinalizationPorts } from './application/storage/storageCapabilities';
 import type { BusinessCalls } from './ports/runtime';
 import type { StorageControlSink } from './ports/storage/control';
-import type { ExecutionMaterialObjects } from './ports/materials/objects';
+import type { ExecutionMaterialObjects } from './ports/executionMaterials';
 import type { TaskInputPreparation } from './ports/storage/taskInputs';
 import { finalizationRevisions, archiveRevisionIntake } from './application/finalization/revisions';
 import { storageOperator } from './application/finalization/operator';
@@ -171,9 +171,10 @@ export function createBusinessTaskModule(deps: BusinessTaskModuleDeps): Business
   const { progressCancellation, ...cancellationV3 } = executionCancellationUseCases(executionDeps);
   const { progressLifecycle, ...lifecycleV3 } = executionLifecycleUseCases(executionDeps);
   const { progressMessage, ...messagesV3 } = executionMessageUseCases(executionDeps);
-  const rawV3 = { ...executionCapabilities(executionDeps), ...messagesV3, ...executionMaterialUseCases(executionDeps), ...lifecycleV3, ...executionRetryUseCases(executionDeps), ...cancellationV3, ...tasksV3, ...subtasksV3, ...projectionV3, ...executionControlUseCases(executionDeps), ...executionFileUseCases(executionDeps), ...executionOperationQueries(executionDeps),
+  const { progressMaterials, ...materialsV3 } = executionMaterialUseCases(executionDeps);
+  const rawV3 = { ...executionCapabilities(executionDeps), ...messagesV3, ...materialsV3, ...lifecycleV3, ...executionRetryUseCases(executionDeps), ...cancellationV3, ...tasksV3, ...subtasksV3, ...projectionV3, ...executionControlUseCases(executionDeps), ...executionFileUseCases(executionDeps), ...executionOperationQueries(executionDeps),
     ...recoveryIntakeUseCases(executionDeps), ...restartExecutionUseCase(executionDeps), ...finalizationIntake(executionDeps, finalizations, finalizationPorts), ...archiveRevisionIntake(executionDeps, finalizations, finalizationPorts),
-    runOnce: async () => (await synchronizedControls?.syncPending() ?? 0) + (await tasksV3.runOnce()) + (await progressSubtask()) + (await progressProjection()) + (await progressCancellation()) + (await progressLifecycle()) + (await progressMessage()) + (await recoveryRequests.reconcile()) + (await prepareStorage()) + (await archiveStorage()) + (await cleanupStorage()) + (await reviseStorage()),
+    runOnce: async () => (await synchronizedControls?.syncPending() ?? 0) + (await tasksV3.runOnce()) + (await progressSubtask()) + (await progressProjection()) + (await progressCancellation()) + (await progressLifecycle()) + (await progressMessage()) + (await progressMaterials()) + (await recoveryRequests.reconcile()) + (await prepareStorage()) + (await archiveStorage()) + (await cleanupStorage()) + (await reviseStorage()),
   };
   const v3 = scopedBusinessServiceApi(rawV3, executionDeps);
   const operatorQueries = recoveryQueries(deps.db);

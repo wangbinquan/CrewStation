@@ -32,3 +32,14 @@ test('only a frozen command allowlist grants Secret injection; old literal reque
   expect(authorizeCommandEnvironment({ ...spec, commandBusinessConfig: { allowedEnvNames: ['GIT_TOKEN'] } }, secret)).toEqual({ GIT_TOKEN: id });
   expect(() => authorizeCommandEnvironment({ ...spec, commandBusinessConfig: { allowedEnvNames: [] } }, raw)).toThrow('未允许');
 });
+// RFC-040 V12: OpenCode delivers native agent bodies through the same prompt field as systemPrompt,
+// so a profile whose systemPrompt probe failed cannot be given native agent instructions either.
+test('native root and sub-agent bodies require the systemPrompt capability; empty bodies do not', () => {
+  const withoutPrompt = { ...BUSINESS_AGENT_CAPABILITIES, systemPrompt: false };
+  expect(() => validateBusinessMaterial(profile, material, withoutPrompt, platform, [profile])).not.toThrow();
+  for (const patch of [{ agent: { name: 'review', body: 'Review the change.', options: {} } }, { subagents: [{ name: 'helper', body: 'Check tests.', options: {} }] }]) {
+    const bodied = BusinessMaterialRequestSchema.parse({ requestKey: 'body', nativeConfig: { ...material.nativeConfig!, ...patch } });
+    expect(() => validateBusinessMaterial(profile, bodied, withoutPrompt, platform, [profile])).toThrow('systemPrompt');
+    expect(() => validateBusinessMaterial(profile, bodied, BUSINESS_AGENT_CAPABILITIES, platform, [profile])).not.toThrow();
+  }
+});

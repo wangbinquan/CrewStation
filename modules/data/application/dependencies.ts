@@ -1,11 +1,10 @@
 import type { DatabaseGenerationApi } from '../api/databaseGenerations';
-import type { DatabaseGenerations } from '../ports/database/generations';
 import type { Clock, Logger } from '@crewstation/kernel';
 import type { DataSettings, ProjectAuthorizer, ServiceResolver } from '../ports/platform';
 import type { DataCredentials } from '../ports/credentials';
 import type { DataLedger } from '../ports/ledger';
 import type { PostgresProvider, SecretCipher } from '../ports/providers';
-import type { DataResourceRepository, TaskDataBindingRepository } from '../ports/repositories';
+import type { DatabaseGenerations, DataResourceRepository, TaskDataBindingRepository } from '../ports/repositories';
 import type { UserDirectory } from '../ports/userDirectory';
 import type { ProductionAccessTasks } from '../ports/resource-center/productionTasks';
 

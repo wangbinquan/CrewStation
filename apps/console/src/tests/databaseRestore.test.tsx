@@ -55,3 +55,21 @@ test('production restore list never labels the active development database as cu
  expect(page.text()).not.toContain('01a1428f-eabe-7000-af4c-887037988564');
  expect(page.text().match(/当前生产/g)).toHaveLength(1);expect(f.writes).toHaveLength(0);
 });
+
+// RFC-042 review: an unfinished restore blocked publish, traffic switch and data operations with no
+// way to end it. Abandon is an irreversible action, so it goes through the typed-word ConfirmDialog.
+test('abandon needs the typed confirmation word, sends the current revision and shows the retained target', async () => {
+ const f=databaseRestoreFixture();f.op.actions=['switch','abandon'];page=await renderApp(detail);
+ await page.click('放弃恢复');expect(document.querySelectorAll('[role="alertdialog"]')).toHaveLength(1);expect(page.text()).toContain('恢复目标数据库保留');
+ expect(button('放弃并释放保留')?.disabled).toBe(true);
+ const field=document.querySelector<HTMLInputElement>('[role="alertdialog"] input')!;
+ await act(async()=>{field.focus();Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(field,'abandon');field.dispatchEvent(new Event('input',{bubbles:true}));field.dispatchEvent(new KeyboardEvent('keyup',{key:'n',bubbles:true}));});await page.settle();
+ expect(button('放弃并释放保留')?.disabled).toBe(false);await page.click('放弃并释放保留');
+ expect(f.writes).toHaveLength(1);expect(f.writes[0]).toEqual({path:expect.stringMatching(/\/abandon$/),body:{expectedRevision:5}});
+ expect(document.querySelectorAll('[role="alertdialog"]')).toHaveLength(0);
+});
+test('viewers never see abandon and a cancelled confirmation sends nothing', async () => {
+ const f=databaseRestoreFixture();f.op.actions=['switch','abandon'];page=await renderApp(detail);
+ await page.click('放弃恢复');await page.click('取消');expect(f.writes).toHaveLength(0);expect(document.querySelectorAll('[role="alertdialog"]')).toHaveLength(0);
+ page.unmount();f.delivery.state.admin=false;page=await renderApp(detail);expect(button('放弃恢复')).toBeUndefined();
+});

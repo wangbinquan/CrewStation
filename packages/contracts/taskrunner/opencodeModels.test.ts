@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { OpencodeProviderSchema, PlatformOpencodeModelsSchema } from './opencodeModels';
+import { OpencodeProviderSchema, PlatformOpencodeModelsSchema, opencodeProviderSecretNames } from './opencodeModels';
 import { LaunchSpecSchema } from './launch';
 import { BusinessNativeConfigSchema } from '../api/business/nativeConfig';
 
@@ -31,4 +31,18 @@ test('only OpenCode subagents can reference a platform profile; root and busines
   expect(BusinessNativeConfigSchema.safeParse({ ...native, platformOpencodeModels: {} }).success).toBe(false);
   expect(BusinessNativeConfigSchema.safeParse({ ...native, subagents: [{ ...child, agentProfileId: 'default' }] }).success).toBe(false);
   expect(PlatformOpencodeModelsSchema.safeParse({ version: 1, root: 'gateway/model-a', providers: {}, subagents: {}, identities: {}, arbitrary: 'forbidden' }).success).toBe(false);
+});
+
+// RFC-040 V12: platform code forwards structured provider material plus only its declared
+// secret values; agent-drivers is the single renderer. The rendered v1 wire is no longer accepted.
+test('platform model material v2 carries structured providers with only declared secrets and rejects the rendered v1 wire', () => {
+  const identity = { model: 'gateway/model-a', computeProfileId: Bun.randomUUIDv7(), revision: 1 };
+  const material = { version: 2, root: 'cs-platform-a/model-a', subagents: { child: 'cs-platform-a/model-a' }, providers: { 'cs-platform-a': { provider, secrets: { MODEL_KEY: 'value' } } }, identities: { 'cs-platform-a/model-a': identity } };
+  expect(PlatformOpencodeModelsSchema.parse(material).providers['cs-platform-a']?.provider.credentials).toEqual({ apiKey: 'MODEL_KEY' });
+  expect(PlatformOpencodeModelsSchema.safeParse({ ...material, version: 1 }).success).toBe(false);
+  const rendered = { npm: provider.npm, models: provider.models, options: { ...provider.options, apiKey: 'value' }, whitelist: ['model-a'] };
+  expect(PlatformOpencodeModelsSchema.safeParse({ ...material, providers: { 'cs-platform-a': rendered } }).success).toBe(false);
+  expect(PlatformOpencodeModelsSchema.safeParse({ ...material, providers: { 'cs-platform-a': { provider, secrets: { 'bad name': 'value' } } } }).success).toBe(false);
+  expect(opencodeProviderSecretNames({ credentials: { apiKey: 'MODEL_KEY', headers: { 'x-a': 'HEADER_KEY', 'x-b': 'MODEL_KEY' } } })).toEqual(['HEADER_KEY', 'MODEL_KEY']);
+  expect(opencodeProviderSecretNames({ credentials: {} })).toEqual([]);
 });

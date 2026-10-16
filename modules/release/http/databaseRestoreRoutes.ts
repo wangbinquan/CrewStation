@@ -1,5 +1,5 @@
 import type { UserId } from '@crewstation/contracts';
-import { CreateDatabaseRestoreSchema,RetryDatabaseRestoreSchema,SwitchDatabaseRestoreSchema,ServiceIdSchema,ResourceIdSchema } from '@crewstation/contracts';
+import { AbandonDatabaseRestoreSchema,CreateDatabaseRestoreSchema,RetryDatabaseRestoreSchema,SwitchDatabaseRestoreSchema,ServiceIdSchema,ResourceIdSchema } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import {parseBody,parseParams,requireUser} from '@crewstation/http';
 import {Hono} from 'hono';
@@ -17,5 +17,6 @@ export function databaseRestoreRoutes(api:ReleaseModuleApi,isAdmin:(id:UserId)=>
   r.get('/v1/services/:serviceId/database-restores/:id',async c=>{const p=ids(c);return c.json(await api.getDatabaseRestore(await actor(c),p.serviceId,p.id));});
   r.post('/v1/services/:serviceId/database-restores/:id/retry',async c=>{const p=ids(c);return c.json(await api.retryDatabaseRestore(await actor(c),p.serviceId,p.id,await parseBody(c,RetryDatabaseRestoreSchema)),202);});
   r.post('/v1/services/:serviceId/database-restores/:id/switch',async c=>{const p=ids(c);return c.json(await api.switchDatabaseRestore(await actor(c),p.serviceId,p.id,await parseBody(c,SwitchDatabaseRestoreSchema)),202);});
+  r.post('/v1/services/:serviceId/database-restores/:id/abandon',async c=>{const p=ids(c);return c.json(await api.abandonDatabaseRestore(await actor(c),p.serviceId,p.id,await parseBody(c,AbandonDatabaseRestoreSchema)));});
   return r;
 }

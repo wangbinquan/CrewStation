@@ -10,7 +10,7 @@ import { executionCipher } from '../adapters/crypto/executionCipher';
 import { executionSubtasks } from '../adapters/persistence/execution/subtaskTables';
 import { drizzleExecutionSubtasks } from '../adapters/persistence/execution/subtasks';
 import { drizzleExecutionProjection } from '../adapters/persistence/execution/projection';
-import type { ExecutionMaterialObjects } from '../ports/materials/objects';
+import type { ExecutionMaterialObjects } from '../ports/executionMaterials';
 
 const available = await testDatabaseAvailable();
 describe.skipIf(!available)('RFC-040 frozen Agent plans and inventory projection', () => {
@@ -24,6 +24,7 @@ describe.skipIf(!available)('RFC-040 frozen Agent plans and inventory projection
       pin: async (_caller, scope) => { expect(scope.objects).toEqual([object]); pinned = true; },
       check: async (scope) => { expect(pinned).toBe(true); expect(scope.objects).toEqual([object]); },
       grants: async (scope) => { expect(pinned).toBe(true); expect(scope.objects).toEqual([object]); issued++; return [{ object, url: 'http://platform.test/internal/material', token: `ephemeral-private-${issued}`, expiresAt: new Date(Date.now() + issued * 60_000).toISOString() }]; },
+      release: async () => {},
     };
     const nativeConfig = { version: 1, protocol: 'opencode', agent: { name: 'reviewer', body: 'business root', options: { permission: { bash: 'deny' } } }, subagents: [{ name: 'helper', body: 'business helper' }], plugins: [{ name: 'plugin', entry: 'index.mjs', files: [{ kind: 'file', path: 'index.mjs', object }] }] };
     const api = f.make({ materialObjects: objects });

@@ -37,3 +37,9 @@ async function awaitListening(deps: BusinessProbeTurnDeps, executionId: string):
     await Bun.sleep(deps.pollMs);
   }
 }
+
+/** RFC-040 V12: a stdio MCP server for the inline local MCP probe; newline-delimited JSON-RPC, no tenant material. */
+export function localMcpProbeCommand(token: string): string[] {
+  const source = `let b='';process.stdin.setEncoding('utf8');process.stdin.on('data',(chunk)=>{b+=chunk;let i;while((i=b.indexOf('\\n'))>=0){const line=b.slice(0,i).trim();b=b.slice(i+1);if(!line)continue;let q;try{q=JSON.parse(line);}catch{continue;}if(q.id===undefined)continue;let result;if(q.method==='initialize')result={protocolVersion:q.params?.protocolVersion??'2024-11-05',capabilities:{tools:{}},serverInfo:{name:'business-proof-local',version:'1'}};else if(q.method==='tools/list')result={tools:[{name:'nonce',description:'Get the capability probe token',inputSchema:{type:'object',properties:{}}}]};else if(q.method==='tools/call')result={content:[{type:'text',text:${JSON.stringify(token)}}]};else result={};process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:q.id,result})+'\\n');}});`;
+  return ['bun', '-e', source];
+}

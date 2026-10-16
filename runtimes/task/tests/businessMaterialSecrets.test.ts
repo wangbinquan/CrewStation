@@ -27,9 +27,12 @@ test('OpenCode OAuth and nested plugin values are redacted before durable events
 
 test('isolated provider credentials and option strings are removed from streamed and structured business events', async () => {
   const { PlatformOpencodeModelsSchema } = await import('@crewstation/contracts');
-  const models = PlatformOpencodeModelsSchema.parse({ version: 1, root: 'cs-platform-root/m', subagents: {}, providers: { 'cs-platform-root': { npm: '@ai-sdk/openai-compatible', models: { m: { name: 'M' } }, whitelist: ['m'], options: { baseURL: 'https://private-endpoint.example', apiKey: 'private-provider-key', headers: { Authorization: 'private-provider-auth' } } } }, identities: { 'cs-platform-root/m': { model: 'original/m', computeProfileId: Bun.randomUUIDv7(), revision: 2 } } });
+  // RFC-040 V12: credentials travel as structured `secrets` values beside the provider material.
+  const provider = { id: 'original', npm: '@ai-sdk/openai-compatible', models: { m: { name: 'M' } }, options: { baseURL: 'https://private-endpoint.example' }, credentials: { apiKey: 'KEY', headers: { Authorization: 'AUTH' } } };
+  const models = PlatformOpencodeModelsSchema.parse({ version: 2, root: 'cs-platform-root/m', subagents: {}, providers: { 'cs-platform-root': { provider, secrets: { KEY: 'private-provider-key', AUTH: 'private-provider-auth' } } }, identities: { 'cs-platform-root/m': { model: 'original/m', computeProfileId: Bun.randomUUIDv7(), revision: 2 } } });
   const secrets = businessMaterialSecrets(undefined, models);
-  expect(secrets).toContain('private-provider-key'); expect(secrets).toContain('private-provider-auth');
+  expect(secrets).toContain('private-provider-key'); expect(secrets).toContain('private-provider-auth'); expect(secrets).toContain('https://private-endpoint.example');
+  expect(secrets).not.toContain('KEY');
   const base = { agentId: 'agent', at: new Date().toISOString() };
   const input: AgentEvent[] = [{ ...base, seq: 1, type: 'text', text: 'private-provider-' }, { ...base, seq: 2, type: 'text', text: 'key' }, { ...base, seq: 3, type: 'tool-start', tool: { name: 'model', input: { auth: 'private-provider-auth' } } }];
   const events = await Array.fromAsync(redactBusinessEvents((async function* () { yield* input; })(), secrets));
