@@ -300,3 +300,19 @@ Chrome 正式项目中选中成功开发 Agent `01a13efc-55c0-7000-86c8-54558318
 根因是 `agentTranscript.lineOf` 投影只保留 `tool.name`，未带入结构化 input/output。正式投影现在保留原 tool；Bot 执行行显示工具名与命令（`input.command`）或参数预览，预览超过 600 字符截为摘要；完整命令、全部输入、返回结果和调用 ID 在既有统一 Dialog 展示，支持原样复制，长内容只限制视口高度、不截断数据。返回 false、0、null 均保留，缺少字段明确写明该记录未保存。工具内容作为纯文本转义，仍不进入 Bot 回答；旧截断兼容及浅绿气泡不变。
 
 三个故障回归先红，修复后 Bot/历史/模式切换/执行订阅七文件 36 pass / 0 fail / 238 断言；文案两文件 19 pass / 0 fail / 37 断言；console 类型、精确 lint、架构检查通过。新增用例包含 80 条记录的末行打开统一弹窗、完整多行命令和长输出、Esc 返回焦点与列表滚动、字段缺失及 false/0/null。未重复原本机全量超时轮次，继续采用作者批准的准确 GitHub gate/e2e 门槛。源码提交 CI、镜像和实机结果随后补记；并行 RFC-040 文档不纳入本提交。
+
+首次源码 `f3d146f2ba231f97997906cee748e672cdef44cb` 的 CI 38843086761 中，static、console、unit、e2e 和三个 module 分片通过；module 1/4 的 RFC-040 `nativeMaterialAdmission.test.ts:25` 在三请求并发重放时读到 ready，而测试预期 preparing，导致该片及 gate 失败。同 SHA 只重试失败作业后 module 1/4 成功，但 gate 下载到了同名的旧失败产物（artifact 12022481279）与新成功产物（12021839801），仍报“分片有失败用例或执行错误”。两次回执和失败原日志保留于 `.local/cli-bot-acceptance/bot-tools-ci-*`，没有删除历史产物或放宽断言。
+
+GitHub 拒绝以历史 SHA 直接 workflow_dispatch（HTTP 422 No ref found）。核对当前 main `8e8bc0724828fc71a381be79159f4f7dab5655ec` 仅多出 RFC-040 四份文档，八个本任务提交文件 blob 全部一致后，启动独立 CI 38844486779，并用该准确提交构建配套 console 镜像；其结果及部署随后记录。独立 run 避免重试产物重名，不将旧 run 宣称为成功。
+
+### Bot 工具详情的准确 CI、部署与实机复验
+
+部署来源 `8e8bc0724828fc71a381be79159f4f7dab5655ec` 的独立 [CI 38844486779](https://github.com/wangbinquan/CrewStation/actions/runs/38844486779) 九项全部成功，包含 gate 和 e2e。第一次失败进一步定位到 `nativeMaterialAdmission.test.ts:25` 的测试替身：并发请求可以先把共享材料发布为 ready，另一个 pin 回调才读取状态，替身无条件要求 preparing 而抛错。这不是 Bot 文件引入的改动；没有修改该用例、放宽断言或将两次失败记录改写为绿色，也不宣称这个并发防护问题已经修复。独立 run 使用独立产物，八个已通过定向验证的候选文件与 f3d146f2 逐 blob 相同。
+
+准确提交归档构建的 `cs-console:rfc039-bot-tools-release-8e8bc072` 导入本机后，核对存储合同 1，以 resourceVersion CAS 仅更新 console 镜像。Deployment generation 311、Ready 1；Pod `console-5897c9498-2vhzm` / UID `5b35601a-c6a2-48b2-91f6-39d055289344` Running / containerReady=true，实际 imageID 为 `sha256:78aa9c68f6e19e0d3c9c0b8129c99ed27633b33bb6be60aa4a86cec5d2b00f61`。同一时间窗的十二个系统 Deployment 比对仅 console 变化，其余十一项 UID、generation、镜像保持。早期部署证明脚本误用 app=console 标签得到空 Pod 列表，随后按 Deployment 的实际 selector 定位 Pod，单独保存运行证明；不将空列表当就绪依据。
+
+正式 Chrome 重放成功开发 Agent，86 条工具详情按钮中有 39 条 bash。短命令 `cd /work && bun test src/game/snake.test.ts 2>&1 | tail -40`、完整输入及 16 pass / 0 fail 输出，与原持久事件逐字一致；另一个 2161 字符多行命令、全部输入 JSON 与输出同样完全相等。弹窗位于聊天日志之外，命令及返回内容仍为纯文本；八条回答与部署前逐条全文相等，八个气泡均为 `rgb(234, 246, 239)`。
+
+独立验收页签用 Enter 打开指定末段工具行，Esc 关闭后焦点回原“查看 bash 执行详情”按钮，聊天 scrollTop 前后均为 2145。390×844 下文档宽 390，弹窗 left=16 / right=374 / top=16 / bottom=828，正文 clientWidth 与 scrollWidth 均为 356，2161 字符命令完整保留；恢复桌面后保存短命令、参数、结果及游戏预览的最终截图。预览仍按既有按钮手动重新加载；未把这个既有边界记为已修复。全程未发送新的模型消息、创建 Agent 或执行历史命令，原用户页签和草稿未被覆盖。
+
+证据在 `.local/cli-bot-acceptance/`：`ci-bot-tools-release-deployment-gate.json`、`bot-tools-deployment-proof.json`、`bot-tools-running-pod-proof.json`、`bot-tools-replay-proof.json`、`bot-tools-browser-equality.json`、`bot-tools-focus-proof.json`、`bot-tools-mobile-proof.json`、`bot-tools-final.png` 与 `bot-tools-detail-mobile.png`。本次纯文档收尾不再次部署；后续文档 SHA 的 CI 与以上已部署来源的 CI 分开记录。

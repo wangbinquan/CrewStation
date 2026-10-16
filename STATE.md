@@ -1,3 +1,19 @@
+## 2026-10-15 RFC-040：准确 CI、七后端部署与 OpenCode 实机验收完成，AW 联合接线继续
+
+源码 `92889e87a7be3db1cbc4f2aad8c63a85f1f577c9` 的 [CI 38838520891](https://github.com/wangbinquan/CrewStation/actions/runs/38838520891) 九项全部成功。控制面 manifest `004edc4e…`、Runner `b27a7fb8…` 已导入；仅新增 `business_task/0038_material_objects.sql`，七后端 Ready 1，console 保留其他会话已发布版本。原本地 425 项范围验证及 ignored 文件 lint 的历史失败不改写。
+
+用户最新明确“不要验证claude code了，只验证opencode”。独立 OpenCode 1.18.29／GLM-5.2 档位 r2 的 nativeConfig、materialObjects、startupInventory 三个新能力位均来自真实探针；原 systemPrompt 探针失败保持 false，不将档位 passed 误写成全部可选能力通过。独立项目 `rfc040-native-acceptance` 经实际服务 Pod 身份、冻结发布合同与执行权，验证了完整插件依赖树／安全链接／0755、2,097,169 字节对象、local／remote MCP 的 env／header 摘要、内部子 Agent、权限／模型选项、Secret v1→v2 后原重试不漂移、新命令取 v2、OpenCode 原 session 冷续接及取消后 fresh retry。后三组脚本分别 12／7／7 项通过；首次 MCP 明文回显断言被正确脱敏触发的失败如实保留。证据见 [RFC-040 验收](proposal/rfc/RFC-040-business-native-materials/acceptance.md) 与 [机器可读实机记录](proposal/rfc/RFC-040-business-native-materials/opencode-live-20261015.json)。
+
+CS 实现／发布／OpenCode 实机范围已完成；AW RFC-370 原生材料编译、私有 Git 及联合全链路仍待完成，RFC-040 保持 In Progress。验收项目与父卷保留，平台默认档位未改。AW 正式服务 blue／green UID 保持、Ready、0 restarts，未停用、删除或替换。下面全部历史与并发产出保留。
+
+## 2026-10-15 RFC-039：Bot 执行记录显示实际参数，已部署并完成 Chrome 复验
+
+作者指出执行记录只显示 bash 等工具名。正式 Chrome 复现；正常 OIDC 只读重放贪吃蛇成功开发执行 `01a13efc-5590-7000-bbf3-43c34d53e0a6`，203 帧 / 195 个 Agent 事件，86 次工具调用均有 input，其中 39 次 bash。问题在前端转录只取 tool.name，持久参数并未丢失。现保留结构化 tool，记录直接展示命令/参数预览，统一 Dialog 提供完整命令、输入和返回结果及复制；正文与浅绿气泡保持独立。旧截断记录继续保留原文，不臆造缺失参数。
+
+三个回归先红，修复后相关七文件 36 pass / 0 fail / 238 断言；文案两文件 19 pass / 0 fail / 37 断言，console 类型、精确 lint、结构通过。源码 f3d146f2 首次 CI 的 RFC-040 并发测试失败与重试产物重名导致的 gate 失败原件均保留。确认随后 8e8bc072 仅新增四份 RFC-040 文档、八个候选文件 blob 完全一致后，独立 [CI 38844486779](https://github.com/wangbinquan/CrewStation/actions/runs/38844486779) 九项全部成功；用该准确提交构建并仅部署 console，generation 311 / Ready 1，manifest `sha256:78aa9c68f6e19e0d3c9c0b8129c99ed27633b33bb6be60aa4a86cec5d2b00f61`，其余 11 个系统 Deployment 不变。
+
+正式 Chrome 的短命令、2161 字符长命令、完整输入和输出均与原服务端记录一致；八条回答正文逐条相等、浅绿气泡保持。统一弹窗关闭后回到原触发按钮且滚动 2145 不变；390px 下弹窗在视口内，无水平溢出。复用真实历史，未发送或新建 Agent。详见 [本轮验收](proposal/rfc/RFC-039-first-delivery/acceptance.md#bot-工具详情的准确-ci部署与实机复验)。本次收尾保留同一 STATE 中并行 RFC-040 接力记录，未修改其实现或四份验收文档。以下历史保持。
+
 ## 2026-10-15 RFC-039：Bot 重开时丢失对话选择已修复并部署
 
 真实 Chrome 复现选中贪吃蛇只读验收对话后刷新，自动跳回首条失败对话；手动切回原对象的全文一致，根因是选择只存在 React state。正式 Bot 现在按用户、项目、开发任务保留同一浏览器页签内的选择（包含新对话），默认选择锁定身份，名册重排不切对象；正文继续从原事件流回放。
