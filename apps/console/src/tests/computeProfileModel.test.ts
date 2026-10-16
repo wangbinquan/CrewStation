@@ -140,3 +140,16 @@ describe('列表状态与查询串', () => {
     expect(parseComputeSearch({ profile: 'Not A Slug', create: true })).toEqual({ create: true });
   });
 });
+
+
+test('OpenCode provider material round trips through existing editor and validates JSON without accepting inline credentials', () => {
+  const provider = { id: 'gateway', npm: '@ai-sdk/openai-compatible', models: { m: { name: 'M' } }, options: { baseURL: 'https://models.example/v1' }, credentials: { apiKey: 'MODEL_KEY' } };
+  const draft = { ...blankDraft('opencode'), name: 'model', image: 'image', model: 'gateway/m', opencodeProvider: JSON.stringify(provider) };
+  expect(toContent(draft).launch.opencodeProvider).toEqual(provider);
+  expect(validateProfileDraft({ ...draft, opencodeProvider: '{bad' }, true).opencodeProvider).toBe('opencodeProvider');
+  expect(validateProfileDraft({ ...draft, opencodeProvider: JSON.stringify({ ...provider, options: { apiKey: 'private' } }) }, true).opencodeProvider).toBe('opencodeProvider');
+  expect(toContent(withProtocol(draft, 'terminal')).launch).not.toHaveProperty('opencodeProvider');
+  const detail = profileDetail({ name: 'model' });
+  detail.protocol = 'opencode'; detail.content.launch = ComputeProfileContentSchema.parse(toContent(draft)).launch;
+  expect(JSON.parse(draftFromDetail(detail).opencodeProvider)).toEqual(provider);
+});

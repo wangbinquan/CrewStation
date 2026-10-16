@@ -30,7 +30,7 @@ export interface Environments {
   rebuildBusinessWorkspace?(input: { projectId: ProjectId; serviceId: ServiceId; taskId: TaskId; operationId: string; generation: number; volumeUid: string }): Promise<EnvironmentView>;
   inspectBusinessRecovery?(scope: { projectId: ProjectId; serviceId: ServiceId; taskId: TaskId }): Promise<{
     state: string; persistent: boolean; stopped: boolean; activeChildren: boolean;
-    volumeUid: string | null; volumeVerified: boolean; image?: string; runtimeImage?: RuntimeImageExecutionSnapshot;
+    volumeUid: string | null; volumeVerified: boolean; volumePresent?: boolean; image?: string; runtimeImage?: RuntimeImageExecutionSnapshot;
   } | undefined>;
   blockBusinessAdmission?(serviceId: ServiceId, taskId: TaskId): Promise<boolean>;
   createEnvironment(input: { objectInputsGeneration?: number; runtimeImage?: RuntimeImageExecutionSnapshot; serviceId: ServiceId; kind: 'business'; admission?: { id: TaskId; fingerprint: string }; businessStorage?: 'isolated-v1'; completionPolicy?: 'archive-and-delete'; volumeMode?: VolumeMode; profile?: string; traceId?: TraceId; labels?: Record<string, string> }): Promise<EnvironmentView>;

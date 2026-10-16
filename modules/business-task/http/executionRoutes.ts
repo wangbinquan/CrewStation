@@ -21,6 +21,7 @@ export function executionRoutes(api: BusinessExecutionApi): Hono<AppEnv> {
   router.get('/v3/business-execution/capabilities', async (c) => c.json(await api.capabilities(caller(c))));
   router.post('/v3/business-tasks', async (c) => { const result = await api.createTask(caller(c), await body(c, CreateBusinessTaskV3Schema), c.req.header('x-cs-trace-id')); return c.json(result.task, result.status); });
   router.get('/v3/business-tasks/:taskId', async (c) => c.json(await api.getTask(caller(c), parseParams(c, z.object({ taskId: TaskIdSchema })).taskId)));
+  router.get('/v3/business-tasks/:taskId/workspace-inspection', async (c) => c.json(await api.inspectWorkspace(caller(c), parseParams(c, z.object({ taskId: TaskIdSchema })).taskId)));
   router.get('/v3/business-tasks/:taskId/file', async (c) => c.json(await api.readFile(caller(c), parseParams(c, z.object({ taskId: TaskIdSchema })).taskId, parseQuery(c, BusinessFileQuerySchema))));
   router.get('/v3/business-tasks/:taskId/files', async (c) => c.json(await api.listFiles(caller(c), parseParams(c, z.object({ taskId: TaskIdSchema })).taskId, parseQuery(c, BusinessDirectoryQuerySchema))));
   const taskParams = z.object({ taskId: TaskIdSchema }), subtaskParams = taskParams.extend({ subtaskId: SubtaskIdSchema });

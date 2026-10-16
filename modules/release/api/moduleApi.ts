@@ -1,3 +1,4 @@
+import type { CreateDatabaseRestore, RetryDatabaseRestore, SwitchDatabaseRestore, DatabaseRestoreDto, DatabaseGenerationList } from '@crewstation/contracts';
 import type { RuntimeImageHistoryRead, RuntimeImageHistoryItem } from '@crewstation/contracts';
 import type { ReleaseJourneySource } from '@crewstation/contracts';
 import type { ReleaseJourneyDetail, ReleaseJourneyHistory, ReleaseJourneyPage, ReleaseJourneyPageRequest, VerifyReleaseJourneyRequest } from '@crewstation/contracts';
@@ -5,6 +6,8 @@ import type { ProjectDeletionInventory, ProjectDeletionOwner, ProjectDeletionTar
 import type { ReleaseResourceUsage } from '@crewstation/contracts';
 import type { ClusterResource, ClusterInspectRequest, ClusterInspection, ClusterOperation } from '@crewstation/contracts';
 import type { Actor, AutoOfflinePolicyDto, PostponeOfflineRequest, ProjectId, PublishRequest, RedeployPrecheckDto, RedeployRequest, ReleaseDto, ReleaseId, ServiceId, SetAutoOfflinePolicyRequest, SlotDto, SlotEventDto, TakeOfflineRequest, TrafficSwitchDto, TrafficSwitchRequest } from '@crewstation/contracts';
+
+export interface RestoreObjectSource { projectId: ProjectId; serviceId: ServiceId; env: 'production'; fenced: false; writeAllowed: false; planId: string }
 
 export type PhysicalSlot = 'blue' | 'green';
 
@@ -21,7 +24,7 @@ export interface SlotDeployRef {
 export interface JobRef {
   readonly recordId: string;
   readonly releaseId: string;
-  readonly purpose: 'build' | 'migration';
+  readonly purpose: 'build' | 'migration' | 'database-restore' | 'database-verify';
 }
 
 export interface ActiveEndpoint {
@@ -45,6 +48,14 @@ export interface ReleaseProjectContent {
 
 /** release 模块对外能力：发布、切流、查询；流水线推进由工作器调用。 */
 export interface ReleaseModuleApi {
+  databaseGenerations(actor:Actor,serviceId:ServiceId):Promise<DatabaseGenerationList>;
+  listDatabaseRestores(actor:Actor,serviceId:ServiceId):Promise<{items:DatabaseRestoreDto[]}>;
+  getDatabaseRestore(actor:Actor,serviceId:ServiceId,id:string):Promise<DatabaseRestoreDto>;
+  createDatabaseRestore(actor:Actor,serviceId:ServiceId,input:CreateDatabaseRestore):Promise<DatabaseRestoreDto>;
+  retryDatabaseRestore(actor:Actor,serviceId:ServiceId,id:string,input:RetryDatabaseRestore):Promise<DatabaseRestoreDto>;
+  switchDatabaseRestore(actor:Actor,serviceId:ServiceId,id:string,input:SwitchDatabaseRestore):Promise<DatabaseRestoreDto>;
+  progressDatabaseRestores():Promise<number>;
+  restoreObjectSource(jobId:string,token:string):Promise<RestoreObjectSource|undefined>;
   /** Composition acquires the complete callback graph before entering another owner's original work. */
   sharedAdmissionKeys(projectId: ProjectId): readonly string[];
   listJourneys(actor: Actor, serviceId: ServiceId, input: ReleaseJourneyPageRequest): Promise<ReleaseJourneyPage>;

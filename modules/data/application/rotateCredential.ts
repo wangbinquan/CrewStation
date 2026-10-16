@@ -10,10 +10,14 @@ export function rotateCredentialUseCase(deps: DataUseCaseDeps) {
     const resource = await deps.resources.getById(id);
     if (!resource) throw notFound('数据资源', id);
     if (resource.kind !== 'postgres' || resource.state !== 'ready') throw conflict('只有已就绪的 PostgreSQL 数据库可以轮换口令');
+    const effect = async () => {
+    const active = deps.generations ? await deps.generations.store.active(resource.serviceId, resource.env) : undefined;
     const rotate = deps.provisioning?.credentials.rotateCredential;
     if (!rotate) throw conflict('平台尚未启用数据面口令轮换');
-    await rotate(resource.id, resource.projectId);
+    await rotate(active?.generation.credentialResourceId ?? resource.id, resource.projectId);
     deps.logger.info('database credential rotated', { resourceId: id, projectId: resource.projectId, by: actor.userId });
     return toDto(resource);
+    };
+    return deps.generations ? deps.generations.store.withUnreserved(resource.serviceId, effect) : effect();
   };
 }

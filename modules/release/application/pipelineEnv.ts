@@ -7,7 +7,7 @@ import type { ReleaseUseCaseDeps } from './dependencies';
 export interface RenderedEnv { values: Record<string, string>; configVersion: number }
 
 /** 槽容器的环境：平台约定变量＋生产组配置＋生产数据连接；缺失的配置键在此拒绝，不进入部署。 */
-export async function renderSlotEnv(deps: Pick<ReleaseUseCaseDeps, 'config' | 'data' | 'settings'>, input: { projectId: ProjectId; serviceId: ServiceId; projectSlug: string; serviceName: string; physical: PhysicalSlot; manifest: Manifest }): Promise<RenderedEnv> {
+export async function renderSlotEnv(deps: Pick<ReleaseUseCaseDeps, 'config' | 'data' | 'settings'>, input: { projectId: ProjectId; serviceId: ServiceId; projectSlug: string; serviceName: string; physical: PhysicalSlot; manifest: Manifest; databaseGeneration?: { id: string; operationId: string } }): Promise<RenderedEnv> {
   const { manifest } = input;
   const keys = manifest.spec.env.map((e) => e.configDefinitionId);
   const { missing } = await deps.config.validate(input.projectId, 'production', keys);
@@ -16,7 +16,8 @@ export async function renderSlotEnv(deps: Pick<ReleaseUseCaseDeps, 'config' | 'd
   const blocking = missing.filter((key) => !defaults.has(key));
   if (blocking.length > 0) throw validation(`生产组配置缺少 Manifest env 段声明的键：${blocking.join('、')}`, { missing: blocking });
   const config = await deps.config.render(input.projectId, 'production');
-  const data = await deps.data.envFor(input.serviceId, 'production');
+  if (input.databaseGeneration && !deps.data.databaseGenerations) throw precondition('数据库世代渲染尚未配置');
+  const data = input.databaseGeneration ? await deps.data.databaseGenerations!.envFor(input.serviceId,input.databaseGeneration.id,input.databaseGeneration.operationId) : await deps.data.envFor(input.serviceId, 'production');
   const objectPlan = manifest.kind === 'DigitalWorker' ? manifest.spec.data?.objects.planId : undefined;
   if (objectPlan && !deps.data.objectEnv) throw precondition('平台尚未提供对象存储');
   const objects = objectPlan ? await deps.data.objectEnv!(input.serviceId, 'production', objectPlan) : {};
@@ -27,8 +28,8 @@ export async function renderSlotEnv(deps: Pick<ReleaseUseCaseDeps, 'config' | 'd
     if (value !== undefined) declared[entry.name] = value;
   }
   const values: Record<string, string> = {
-    ...data,
     ...declared,
+    ...data,
     ...objects,
     [PLATFORM_ENV.project]: input.projectSlug,
     [PLATFORM_ENV.service]: input.serviceName,

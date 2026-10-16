@@ -4,6 +4,8 @@ import { TaskStorageStatus } from '../../features/object-storage';
 import { QueryStatus } from '../../shared/ui/QueryStatus';
 import { useAdminPage } from '../../shared/admin/useAdminRead';
 import { useState } from 'react';
+import { useSearch } from '@tanstack/react-router';
+import { parseBusinessRecoverySearch } from '../../features/business-recovery/model/recoverySearch';
 import type { LegacyRecoveryItem } from '@crewstation/api-client';
 import { api } from '../../shared/api/client';
 import { AUTO_REFRESH, errorMessage, useApiMutation, useApiQuery } from '../../shared/api/useApi';
@@ -20,7 +22,13 @@ import { ConfirmationDialog } from '../../shared/ui/dialog/ConfirmationDialog';
 import { Dialog } from '../../shared/ui/dialog/Dialog';
 
 export function AdminBusinessRecoveryPage() {
-  const t = useT(), [projectId, setProjectId] = useState(''), [cursor, setCursor] = useState<string>(), [selected, setSelected] = useState<BusinessExecutionTaskItem>();
+  const search = parseBusinessRecoverySearch(useSearch({ strict: false }));
+  return <BusinessRecoveryContent key={`${search.projectId ?? ''}:${search.taskId ?? ''}:${search.subtaskId ?? ''}`} search={search} />;
+}
+
+function BusinessRecoveryContent({ search }: { readonly search: ReturnType<typeof parseBusinessRecoverySearch> }) {
+  const t = useT(), [projectId, setProjectId] = useState(search.projectId ?? ''), [cursor, setCursor] = useState<string>(), [selected, setSelected] = useState<BusinessExecutionTaskItem>();
+  const [linked, setLinked] = useState<{ taskId: string; subtaskId?: string } | undefined>(search.taskId ? { taskId: search.taskId, subtaskId: search.subtaskId } : undefined);
   const [state, setState] = useState<BusinessExecutionTaskQuery['state']>();
   const { query, me, allowed } = useAdminPage(['business-execution-tasks', projectId, state, cursor], () => api.tasks.listExecutionTasks({ projectId: projectId || undefined, state, cursor, limit: 30 }), true, true);
   const projects = useApiQuery(['business-execution-projects'], () => api.projects.list(), { ...AUTO_REFRESH, enabled: allowed });
@@ -40,10 +48,15 @@ export function AdminBusinessRecoveryPage() {
         <QueryStatus isPending={query.isPending} error={query.error} isEmpty={query.data?.items.length === 0} emptyTitle={t('executionRecovery.noTasks')} />
         {query.data?.items.length ? <DataTable columns={[t('executionRecovery.task'), t('executionRecovery.project'), t('executionRecovery.state'), t('executionRecovery.reason'), t('executionRecovery.updated'), t('executionRecovery.actions')]}>
           {query.data.items.map((item) => <tr key={`${item.protocol}:${item.id}`}><td>{taskName(item)}</td><td>{projectName(item.projectId)}</td><td>{t(`executionRecovery.state.${item.state}`)}{item.attention !== 'none' ? <p>{t(`executionRecovery.attention.${item.attention}`)}</p> : null}</td>
-            <td>{item.latestFailure?.message || item.message || '—'}{item.failedSubtasks ? <p>{t('executionRecovery.failedChildren', { count: item.failedSubtasks })}</p> : null}</td><td>{new Date(item.updatedAt).toLocaleString()}</td><td><Button size="small" onClick={() => setSelected(item)}>{t('executionRecovery.openTask')}</Button></td></tr>)}
+            <td>{item.latestFailure?.message || item.message || '—'}{item.failedSubtasks ? <p>{t('executionRecovery.failedChildren', { count: item.failedSubtasks })}</p> : null}</td><td>{new Date(item.updatedAt).toLocaleString()}</td><td><Button size="small" onClick={() => { setLinked(undefined); setSelected(item); }}>{t('executionRecovery.openTask')}</Button></td></tr>)}
         </DataTable> : null}
         <ActionRow>{cursor ? <Button onClick={() => { setCursor(undefined); setSelected(undefined); }}>{t('executionRecovery.first')}</Button> : null}{query.data?.next ? <Button onClick={() => { setCursor(query.data!.next); setSelected(undefined); }}>{t('executionRecovery.next')}</Button> : null}</ActionRow>
       </Stack></Card>
+      {linked ? <Dialog title={t('executionRecovery.taskNumber', { id: linked.taskId.slice(-12) })} size="large" initialFocus="dialog" onClose={() => setLinked(undefined)}
+        footer={<ActionRow><Button variant="ghost" onClick={() => setLinked(undefined)}>{t('ui.dialog.close')}</Button></ActionRow>}>
+        <TaskRecoveryPanel key={`${linked.taskId}:${linked.subtaskId ?? ''}`} taskId={linked.taskId} initialSubtaskId={linked.subtaskId}
+          name={t('executionRecovery.taskNumber', { id: linked.taskId.slice(-12) })} onOpenTask={(taskId) => setLinked({ taskId })} />
+      </Dialog> : null}
       {current ? <Dialog title={`${projectName(current.projectId)} · ${taskName(current)}`} size="large" initialFocus="dialog" onClose={() => setSelected(undefined)}
         footer={<ActionRow><Button variant="ghost" onClick={() => setSelected(undefined)}>{t('ui.dialog.close')}</Button></ActionRow>}><Stack>
         {current.protocol === 'v3' ? <TaskRecoveryPanel key={current.id} taskId={current.id} name={taskName(current)} onOpenTask={(id) => setSelected({ ...current, id, state: 'unknown', message: undefined, latestFailure: undefined, labels: {} })} /> : <>

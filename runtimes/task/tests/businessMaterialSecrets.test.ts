@@ -23,3 +23,16 @@ test('OpenCode OAuth and nested plugin values are redacted before durable events
   for (const secret of secrets) expect(JSON.stringify(events)).not.toContain(secret);
   expect(events.filter((event) => event.type === 'text').map((event) => event.text).join('')).toBe('*** ***');
 });
+
+
+test('isolated provider credentials and option strings are removed from streamed and structured business events', async () => {
+  const { PlatformOpencodeModelsSchema } = await import('@crewstation/contracts');
+  const models = PlatformOpencodeModelsSchema.parse({ version: 1, root: 'cs-platform-root/m', subagents: {}, providers: { 'cs-platform-root': { npm: '@ai-sdk/openai-compatible', models: { m: { name: 'M' } }, whitelist: ['m'], options: { baseURL: 'https://private-endpoint.example', apiKey: 'private-provider-key', headers: { Authorization: 'private-provider-auth' } } } }, identities: { 'cs-platform-root/m': { model: 'original/m', computeProfileId: Bun.randomUUIDv7(), revision: 2 } } });
+  const secrets = businessMaterialSecrets(undefined, models);
+  expect(secrets).toContain('private-provider-key'); expect(secrets).toContain('private-provider-auth');
+  const base = { agentId: 'agent', at: new Date().toISOString() };
+  const input: AgentEvent[] = [{ ...base, seq: 1, type: 'text', text: 'private-provider-' }, { ...base, seq: 2, type: 'text', text: 'key' }, { ...base, seq: 3, type: 'tool-start', tool: { name: 'model', input: { auth: 'private-provider-auth' } } }];
+  const events = await Array.fromAsync(redactBusinessEvents((async function* () { yield* input; })(), secrets));
+  for (const secret of secrets) expect(JSON.stringify(events)).not.toContain(secret);
+  expect(events.filter((event) => event.type === 'text').map((event) => event.text).join('')).toBe('***');
+});

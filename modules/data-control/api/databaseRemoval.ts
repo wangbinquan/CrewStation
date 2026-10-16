@@ -12,7 +12,7 @@ export interface DatabaseRemoval {
 }
 
 /** Internal original-session DDL port; the composition root supplies project ownership. */
-export interface NativePostgresOrigin { readonly projectId: ProjectId; readonly resourceId: string }
+export interface NativePostgresOrigin { readonly projectId: ProjectId; readonly resourceId: string; readonly independentDatabase?: true }
 export interface NativePostgresWork {
   run<T>(origin: NativePostgresOrigin, names: readonly string[], effect: (connection: NativeDdlConnection) => Promise<T>): Promise<T>;
   /** Optional on a lock-only fixture; production composition persists encrypted credentials first. */

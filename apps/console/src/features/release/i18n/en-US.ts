@@ -1,6 +1,7 @@
 import type { MessagesShapedLike } from '../../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
 import { journeyMessages } from './journey/en-US';
+import { databaseRestoreMessages } from './database-restore/en-US';
 
 export const messages: MessagesShapedLike<typeof zhCN> = {
   "release.commit.review": "Review and commit {count} changes",
@@ -36,6 +37,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   "release.audience.result.contact": "No access. The visitor is directed to the project owner.",
 
   ...journeyMessages,
+  ...databaseRestoreMessages,
   'release.handoff.freezing': 'Freezing execution authority and reconciling in-flight operations.',
   'release.handoff.preparing': 'Waiting for the target application to prepare and reconcile.',
   'release.handoff.routing': 'Preparation confirmed. Switching production routes.',

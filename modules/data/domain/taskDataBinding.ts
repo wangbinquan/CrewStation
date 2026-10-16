@@ -19,6 +19,8 @@ export interface TaskDataBinding {
   /** 批准后为该绑定创建的临时数据库角色；到期由数据库拒绝登录，撤权时删除。 */
   readonly roleName?: string;
   readonly secretBox?: string;
+  /** Immutable physical target: revocation must never follow a later production cutover. */
+  readonly databaseName?: string;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }

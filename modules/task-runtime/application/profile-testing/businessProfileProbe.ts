@@ -1,3 +1,4 @@
+import { probeModelMapping } from './modelMappingProbe';
 import { startMcpProbe } from './mcpProbeServer';
 import { randomBytes } from 'node:crypto';
 import type { BusinessExecutionProof, ProfileTestStage, StartAgentCommand } from '@crewstation/contracts';
@@ -46,6 +47,7 @@ export async function probeBusinessProfile(deps: Input): Promise<BusinessExecuti
       const expected = nonce();
       const native = await probe('nativeConfig', command({ businessNativeConfig: { version: 1, protocol: deps.input.launch.protocol, agent: { name: 'business-proof', body: `Reply with exactly ${expected}.`, options: { description: 'Native material proof' } }, subagents: [], mcp: [], plugins: [] }, initialPrompt: 'Follow your Agent definition.' }), expected);
       if (native.ok) capabilities.nativeConfigVersion = 1;
+      if (native.ok && connected.capabilities?.nativeModelMappingVersion === 1 && await probeModelMapping(deps.input, nonce(), command, probe)) capabilities.nativeModelMappingVersion = 1;
     }
     if (connected.capabilities?.materialObjectsVersion === 1) {
       const object = { objectId: newResourceId(), sha256: new Bun.CryptoHasher('sha256').update(materialContent).digest('hex'), size: Buffer.byteLength(materialContent) };

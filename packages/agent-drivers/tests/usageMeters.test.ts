@@ -263,3 +263,15 @@ test('业务 usage 事件：一次执行一个累计范围，四个总量为各�
   expect(usage).toMatchObject({ measurementId: 'run-1:3', scope: 'run-1', mode: 'cumulative', inputTokens: 11, cacheReadTokens: 22, cacheWriteTokens: 33, outputTokens: 44, complete: false });
   expect(usage.snapshot?.models).toHaveLength(2);
 });
+
+
+test('OpenCode delegated usage translates private aliases to original model names after native tree reconciliation', () => {
+  const f = nativeStore(), startedAt = Date.now() - 1000;
+  const root = f.step('root', null, startedAt + 10, { input: 9, output: 3 }, ['cs-platform-root', 'a']);
+  f.step('child', 'root', startedAt + 20, { input: 4, output: 2 }, ['cs-platform-child', 'b']);
+  const meter = createOpencodeUsageMeter({ resumed: false, configuredModel: 'original/a', startedAt, env: f.env, modelAliases: { 'cs-platform-root/a': 'original/a', 'cs-platform-child/b': 'original/b' } });
+  meter.observe(stepFinish('root', root, { input: 9, output: 3 })); meter.observe(taskTool('root'));
+  expect(meter.snapshot().state).toBe('partial'); expect(meter.refresh?.()).toBe(true);
+  expect(meter.snapshot().models.map((row) => [row.model, row.input, row.output])).toEqual([['original/a', 9, 3], ['original/b', 4, 2]]);
+  expect(JSON.stringify(meter.snapshot())).not.toContain('cs-platform'); f.db.close();
+});

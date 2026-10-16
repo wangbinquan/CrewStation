@@ -23,6 +23,7 @@ import { BeforeStartStepEditor } from './BeforeStartStepEditor';
 import { BeforeStartStepList } from './BeforeStartStepList';
 import styles from './ComputeEditor.module.css';
 import { ProfileBasicsSection } from './ProfileBasicsSection';
+import { ProfileModelMaterialEditor } from './ProfileModelMaterialEditor';
 import { ProfileLaunchSection } from './ProfileLaunchSection';
 import { ProfileEditorFeedback } from './ProfileEditorFeedback';
 import { ConfigFileSection, TerminalTestSection } from './ProfileProtocolSections';
@@ -104,6 +105,7 @@ function ProfileEditorForm({ detail, onClose, onCreated }: { readonly detail?: C
       <Tabs label={t('admin.profile.editor.navigation')} items={items} value={view.section} onChange={view.select}>
         <div data-editor-section="basics" hidden={view.section !== 'basics'} className={styles.panel}>
           <ProfileBasicsSection draft={editor.draft} errors={editor.errors} disabled={busy} creating={creating} onChange={editor.update} />
+          <ProfileModelMaterialEditor draft={editor.draft} errors={editor.errors} disabled={busy} onChange={editor.update} />
           <ProfileLaunchSection draft={editor.draft} errors={editor.errors} disabled={busy} taskProfiles={tasks.data?.items ?? []} taskProfilesUnavailable={!tasks.data || !!tasks.error} onChange={editor.update} />
         </div>
         <div data-editor-section="startup" hidden={view.section !== 'startup'} className={styles.panel}>

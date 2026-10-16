@@ -1,3 +1,5 @@
+import { databaseRestoreJobEnvironment } from './database-restore/owner';
+import { restoreEnvironment } from './database-restore/jobs';
 import { migrationWriteBarrier } from './execution/migrationBarrier';
 import type { ReleaseId, ServiceId } from '@crewstation/contracts';
 import { notFound, precondition } from '@crewstation/kernel';
@@ -25,6 +27,13 @@ export function slotOwnerUseCases(deps: ReleaseUseCaseDeps) {
       if (!wants(slot, ref)) throw precondition('这一次部署已不再需要：槽上换了版本或已下线');
       const [release, svc] = await Promise.all([uow.read.releases.getById(ref.releaseId as ReleaseId), deps.services.resolveServiceById(ref.serviceId as ServiceId)]);
       if (!release?.manifest || !svc) throw notFound('发布', ref.releaseId);
+      if(slot.workload.databaseRestoreOperationId){
+        const op=await uow.read.databaseRestores?.get(slot.workload.databaseRestoreOperationId);
+        if(!op||op.candidateReleaseId!==release.id||op.targetGenerationId!==slot.workload.databaseGenerationId)throw precondition('恢复槽原数据库绑定不匹配');
+        return restoreEnvironment(deps,op);
+      }
+      const generation=slot.workload.databaseGenerationId;
+      if(generation){const active=await deps.data.databaseGenerations?.active(release.serviceId,'production');if(active?.generationId!==generation)throw precondition('保留槽不能自动重连恢复后的生产数据库');}
       const env = await renderSlotEnv(deps, { projectId: release.projectId, serviceId: release.serviceId, projectSlug: svc.slug, serviceName: svc.name, physical: ref.physical, manifest: release.manifest });
       if (release.configVersion !== env.configVersion) await uow.read.releases.recordConfigVersion(release.id, env.configVersion);
       return env.values;
@@ -34,6 +43,7 @@ export function slotOwnerUseCases(deps: ReleaseUseCaseDeps) {
      * 资源中心建的，拒绝——调和器不会为已放弃的发布建 Job。
      */
     jobEnvValues: async (ref: JobRef): Promise<Readonly<Record<string, string>>> => {
+      if(ref.purpose==='database-restore'||ref.purpose==='database-verify')return databaseRestoreJobEnvironment(deps,ref);
       const release = await uow.read.releases.getById(ref.releaseId as ReleaseId);
       const step = ref.purpose === 'build' ? ['pending', 'building'] : ['building', 'migrating'];
       if (!release || release.pipeline.jobs !== 'ledger' || !step.includes(release.status)) throw precondition('这次发布已不在这一步，不再建它的 Job');

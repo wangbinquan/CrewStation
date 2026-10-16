@@ -83,3 +83,11 @@ test('OpenCode native OAuth and MCP child env preserve exact values without open
   const unsafe = JSON.parse('{"nested":{"__proto__":{"escape":true}}}');
   expect(BusinessNativeConfigSchema.safeParse({ ...native(), plugins: [{ name: 'extension', entry: 'index.js', files: [file('index.js')], options: unsafe }] }).success).toBe(false);
 });
+
+
+test('OpenCode native names retain AW identifiers through 128 characters', () => {
+  const name = 'a'.repeat(128);
+  expect(BusinessNativeConfigSchema.parse({ ...native(), agent: { name, body: '', options: {} }, mcp: [{ name, type: 'local', command: ['tool'] }], plugins: [{ name, entry: 'index.js', files: [file('index.js')] }] }).agent.name).toBe(name);
+  expect(BusinessNativeConfigSchema.safeParse({ ...native(), agent: { name: name + 'a', body: '', options: {} } }).success).toBe(false);
+  for (const name of ['crewstation-agent', 'cs-platform-task', '__proto__', '../escape']) expect(BusinessNativeConfigSchema.safeParse({ ...native(), agent: { name, body: '', options: {} } }).success).toBe(false);
+});

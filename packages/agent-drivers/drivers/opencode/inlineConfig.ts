@@ -8,6 +8,7 @@
 //  - `options.outputs` 留空数组：源用它承载 agent 的输出端口声明，CrewStation 的输出契约
 //    由 TaskRunner 的 verifyContract 校验，不进 CLI。
 
+import { opencodeModelConfig } from './modelConfig';
 import { opencodeNativeAgents } from '../../injection/nativeMaterials';
 import type { AgentSpawnContext } from '../../contract/spawnPlan';
 import { renderOpencodeMcpInjection } from '../../injection/mcpInjection';
@@ -41,8 +42,8 @@ export function renderOpencodeAgentEntry(ctx: AgentSpawnContext): Record<string,
 
 /** 内联配置整体；`mcp` 键在没有启用条目时整体省略（也避免遮蔽仓库 `.opencode/config.json` 的同名条目）。 */
 export function buildOpencodeInlineConfig(ctx: AgentSpawnContext, agentName = OPENCODE_AGENT_NAME): OpencodeInlineConfig {
-  const config: OpencodeInlineConfig = { agent: ctx.businessNativeConfig ? opencodeNativeAgents(ctx.businessNativeConfig, ctx.systemPrompt, ctx.model, renderOpencodeAgentEntry(ctx)) : { [agentName]: renderOpencodeAgentEntry(ctx) } };
+  const config: OpencodeInlineConfig = { agent: ctx.businessNativeConfig ? opencodeNativeAgents(ctx.businessNativeConfig, ctx.systemPrompt, ctx.platformOpencodeModels?.root ?? ctx.model, renderOpencodeAgentEntry(ctx), ctx.platformOpencodeModels?.subagents) : { [agentName]: renderOpencodeAgentEntry(ctx) } };
   const mcp = renderOpencodeMcpInjection(ctx.mcps);
   if (mcp.entries !== null) config.mcp = mcp.entries;
-  return config;
+  return { ...config, ...opencodeModelConfig(ctx) };
 }

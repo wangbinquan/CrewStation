@@ -1,3 +1,4 @@
+import { opencodeOriginalModels } from './modelConfig';
 import { readStartupInventory, renderStartupInventoryPlugin } from './startupInventory';
 import { stageNativeMaterials } from '../../injection/nativeMaterials';
 import { BusinessNativeConfigSchema, BusinessMaterialRequestSchema } from '@crewstation/contracts';
@@ -108,7 +109,7 @@ async function prepareOpencode(spec: DriverAgentSpec, context: DriverLaunchConte
   return {
     ...(spec.startupInventoryVersion === 1 ? { startupInventory: (sessionId: string | undefined) => readStartupInventory(inventoryFile, inventoryNonce, sessionId) } : {}),
     // 计量器只用最终环境定位原生存储（每轮拉起用的就是这一份 env）。
-    usageMeter: ({ resumed, startedAt }) => createOpencodeUsageMeter({ resumed, startedAt, configuredModel: spec.launch.model ?? null, env }),
+    usageMeter: ({ resumed, startedAt }) => createOpencodeUsageMeter({ resumed, startedAt, configuredModel: spec.launch.model ?? null, modelAliases: opencodeOriginalModels(base), env }),
     plan: (input) => ({
       cmd: buildOpencodeArgv(
         {
@@ -132,7 +133,7 @@ async function prepareOpencode(spec: DriverAgentSpec, context: DriverLaunchConte
 
 function baseContext(spec: DriverAgentSpec, context: DriverLaunchContext, runDir: string): AgentSpawnContext {
   return {
-    agentId: spec.agentId, businessNativeConfig: spec.businessNativeConfig,
+    agentId: spec.agentId, businessNativeConfig: spec.businessNativeConfig, platformOpencodeModels: spec.platformOpencodeModels,
     prompt: '',
     ...(spec.systemPrompt === undefined ? {} : { systemPrompt: spec.systemPrompt }),
     ...launchSpawnFields(spec.launch),

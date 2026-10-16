@@ -1,3 +1,4 @@
+import { postgresDatabaseGenerationInspector } from './adapters/postgres/databaseGenerations';
 import { join } from 'node:path';
 import type { Clock, Logger } from '@crewstation/kernel';
 import { noopLogger, systemClock } from '@crewstation/kernel';
@@ -93,7 +94,9 @@ export function createDataControlModule(deps: DataControlModuleDeps): DataContro
     if (!vault) throw new Error('未配置口令存储，无法轮换');
     return { cipher: vault.cipher, store: drizzleCredentialStore(transaction as Executor) };
   };
+  const generationInspector = deps.adminUrl && nativeWork && deps.nativePostgresSource ? postgresDatabaseGenerationInspector(deps.adminUrl, nativeWork.journal, deps.nativePostgresSource) : undefined;
   const api: DataControlModuleApi = {
+    ...(generationInspector ? { databaseGenerations: { inspect: (input) => forResource({ projectId: input.projectId, resourceId: input.resourceId }, () => generationInspector.inspect(input)) } } : {}),
     name: 'data-control', credentialOf: async (resourceId) => {
       if (!vault) return undefined;
       const origin = await originOf(resourceId);

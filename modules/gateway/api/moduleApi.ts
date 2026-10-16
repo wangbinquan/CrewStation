@@ -69,6 +69,8 @@ export interface GatewayModuleApi {
   relistObservedPods(pods: readonly ObservedPodObject[]): Promise<number>;
 
   // —— RFC-021：正式版本维护 ——
+  enterDatabaseRestoreMaintenance(actor: Actor, serviceId: ServiceId, operationId: string): Promise<{revision:number;wasOpen:boolean}>;
+  exitDatabaseRestoreMaintenance(actor: Actor, serviceId: ServiceId, operationId: string, revision: number): Promise<void>;
   getMaintenance(actor: Actor, serviceId: ServiceId): Promise<ServiceMaintenanceView>;
   setMaintenance(actor: Actor, serviceId: ServiceId, input: SetMaintenanceRequest): Promise<MaintenanceDto>;
   exitMaintenance(actor: Actor, serviceId: ServiceId, input: ExitMaintenanceRequest): Promise<ServiceMaintenanceView>;

@@ -20,8 +20,8 @@ export function taskBindingUseCases(deps: DataUseCaseDeps) {
   /** 没存连接串的绑定（RFC-025 I28）：开发模式照开发库现取；临时角色经端口向 data-control 要口令，用生产库名拼。 */
   const liveDsn = async (binding: TaskDataBinding): Promise<string | undefined> => {
     if (binding.mode === 'development') return (await data.envFor(binding.serviceId as ServiceId, 'development')).CS_DATABASE_URL;
-    const prod = await data.productionDatabase(binding.serviceId as ServiceId);
-    return prod ? dataControlDsn(deps, binding.id, prod.databaseName) : undefined;
+    const name = binding.databaseName ?? (await data.productionDatabase(binding.serviceId as ServiceId))?.databaseName;
+    return name ? dataControlDsn(deps, binding.id, name) : undefined;
   };
 
   const load = async (id: string): Promise<TaskDataBinding> => {
@@ -40,6 +40,7 @@ export function taskBindingUseCases(deps: DataUseCaseDeps) {
         const task = await deps.productionTasks.get(ids.taskId);
         if (!task || task.projectId !== svc.projectId || task.serviceId !== ids.serviceId || task.kind !== 'dev-session') throw notFound('项目开发工作区');
       }
+      if (requiresApproval(input.mode)) await deps.generations?.store.assertUnreserved(ids.serviceId);
       const now = clock.now();
       let binding: TaskDataBinding = { id: newId('tdb'), taskId: ids.taskId, serviceId: ids.serviceId, projectId: svc.projectId, mode: input.mode, state: 'requested', ...(input.reason ? { reason: input.reason } : {}), requestedBy: actor.userId, ttlMinutes: input.ttlMinutes, createdAt: now, updatedAt: now };
       if (!requiresApproval(input.mode)) {
@@ -75,17 +76,7 @@ export function taskBindingUseCases(deps: DataUseCaseDeps) {
       return withRequesterNames(deps.users, (await bindings.listByProject(projectId, states)).map(toBindingDto));
     },
     /** 任务容器启动或续期时读取：只含仍有效的绑定。 */
-    envForTask: async (taskId: TaskId): Promise<Record<string, string>> => {
-      const now = clock.now();
-      const values: Record<string, string> = {};
-      for (const b of await bindings.listByTask(taskId)) {
-        if (!isUsable(b, now)) continue;
-        await deps.authorizer.assertProjectAvailable?.(b.projectId as ProjectId);
-        const dsn = b.mode === 'development' ? await liveDsn(b) : b.secretBox ? await cipher.decrypt(b.secretBox) : await liveDsn(b);
-        if (dsn) values[ENV_BY_MODE[b.mode]] = dsn;
-      }
-      return values;
-    },
+    envForTask: (taskId: TaskId) => taskBindingEnvironment(deps, liveDsn, taskId),
     expireBindings: async (): Promise<number> => {
       const now = clock.now();
       let n = 0;
@@ -112,4 +103,17 @@ export function toBindingDto(b: TaskDataBinding): TaskDataBindingDto {
     id: b.id, taskId: b.taskId, mode: b.mode, state: b.state, ttlMinutes: b.ttlMinutes, ...(b.reason ? { reason: b.reason } : {}), ...(b.decision ? { decision: b.decision } : {}),
     requestedBy: b.requestedBy, ...(b.decidedBy ? { decidedBy: b.decidedBy } : {}), ...(b.expiresAt ? { expiresAt: b.expiresAt.toISOString() } : {}), createdAt: b.createdAt.toISOString(),
   };
+}
+
+async function taskBindingEnvironment(deps: DataUseCaseDeps, liveDsn: (binding: TaskDataBinding) => Promise<string | undefined>, taskId: TaskId): Promise<Record<string, string>> {
+  const now = deps.clock.now();
+  const values: Record<string, string> = {};
+  for (const b of await deps.bindings.listByTask(taskId)) {
+    if (!isUsable(b, now)) continue;
+    await deps.authorizer.assertProjectAvailable?.(b.projectId as ProjectId);
+    if (b.mode !== 'development') await deps.generations?.store.assertUnreserved(b.serviceId as ServiceId);
+    const dsn = b.mode === 'development' ? await liveDsn(b) : b.secretBox ? await deps.cipher.decrypt(b.secretBox) : await liveDsn(b);
+    if (dsn) values[ENV_BY_MODE[b.mode]] = dsn;
+  }
+  return values;
 }

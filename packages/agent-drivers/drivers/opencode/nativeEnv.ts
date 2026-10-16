@@ -8,6 +8,7 @@ import { buildOpencodeEnv } from './env';
  */
 export function buildOpencodeNativeEnv(ctx: AgentSpawnContext, configDir: string): Record<string, string> {
   const { env } = buildOpencodeEnv(ctx, configDir);
+  if (ctx.platformOpencodeModels || ctx.opencodeProvider) return env;
   if (ctx.model === undefined || ctx.model.length === 0) return env;
   const separator = ctx.model.indexOf('/');
   if (separator < 1 || separator === ctx.model.length - 1) throw validation('OpenCode 算力档位的模型必须为 provider/model');

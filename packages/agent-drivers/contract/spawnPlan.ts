@@ -1,4 +1,4 @@
-import type { BusinessNativeConfig } from '@crewstation/contracts';
+import type { BusinessNativeConfig, PlatformOpencodeModels, OpencodeProvider } from '@crewstation/contracts';
 // ← agent-workflow `runtime/types.ts` 的 SpawnPlan / AgentSpawnContext 段，裁到 CrewStation 实际用到的字段。
 // 源里的 persona／business 两条装配路径（`taskMounts === undefined` 分支）与两个 @deprecated 旧上下文
 // 一并合并为单一形状：CrewStation 没有对拍需求，也没有工作区边界（沙箱关闭，见 index.ts）。
@@ -34,6 +34,8 @@ export interface SpawnPlan {
 /** 组装一次拉起需要的全部平台输入。 */
 export interface AgentSpawnContext {
   businessNativeConfig?: BusinessNativeConfig;
+  platformOpencodeModels?: PlatformOpencodeModels;
+  opencodeProvider?: OpencodeProvider;
   agentId: string;
   /** CLI 命令头：档位修订的二进制路径（RFC-006 C5：必有，不回落 `claude`／`opencode`）。 */
   head: readonly string[];
@@ -66,11 +68,12 @@ export interface AgentSpawnContext {
 }
 
 /** 档位修订的 launch → 装配上下文里与二进制、参数、模型相关的那几项。 */
-export function launchSpawnFields(launch: LaunchSpec): Pick<AgentSpawnContext, 'head' | 'model' | 'extraArgs' | 'isSandbox' | 'configDir' | 'opencode'> {
+export function launchSpawnFields(launch: LaunchSpec): Pick<AgentSpawnContext, 'head' | 'model' | 'extraArgs' | 'isSandbox' | 'configDir' | 'opencode' | 'opencodeProvider'> {
   const configDir = launch.configDirEnv === undefined && launch.configDirName === undefined ? undefined
     : { ...(launch.configDirEnv === undefined ? {} : { env: launch.configDirEnv }), ...(launch.configDirName === undefined ? {} : { name: launch.configDirName }) };
   return {
     head: [launch.binaryPath],
+    ...(launch.opencodeProvider ? { opencodeProvider: launch.opencodeProvider } : {}),
     ...(launch.model === undefined ? {} : { model: launch.model }),
     extraArgs: launch.extraArgs,
     isSandbox: launch.isSandbox,

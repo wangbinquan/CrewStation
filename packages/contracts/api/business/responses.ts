@@ -38,3 +38,11 @@ export type BusinessTaskV3Dto = z.infer<typeof BusinessTaskV3DtoSchema>;
 export type BusinessSubtaskV3Dto = z.infer<typeof BusinessSubtaskV3DtoSchema>;
 export type BusinessOperationDto = z.infer<typeof BusinessOperationDtoSchema>;
 export type BusinessOutputDto = z.infer<typeof BusinessOutputDtoSchema>;
+
+/** Physical observation, scoped to the authenticated source service. It never
+ * creates or reconciles a workspace. Unknown is distinct from proved absence. */
+export const BusinessWorkspaceInspectionSchema = z.strictObject({
+  taskId: TaskIdSchema, generation: BusinessGenerationSchema,
+  volumeUid: z.string().nullable(), state: z.enum(['present','absent','unknown']),
+});
+export type BusinessWorkspaceInspection = z.infer<typeof BusinessWorkspaceInspectionSchema>;

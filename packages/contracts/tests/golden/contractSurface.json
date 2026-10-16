@@ -30,6 +30,11 @@
         "internalApiBase": "CS_INTERNAL_API_BASE",
         "jwksUrl": "CS_JWKS_URL",
         "databaseUrl": "CS_DATABASE_URL",
+        "databaseGenerationId": "CS_DATABASE_GENERATION_ID",
+        "databaseGenerationOperation": "CS_DATABASE_GENERATION_OPERATION",
+        "databaseRestoreOperation": "CS_DATABASE_RESTORE_OPERATION",
+        "databaseRestoreReference": "CS_DATABASE_RESTORE_REFERENCE",
+        "databaseRestoreObjectsToken": "CS_DATABASE_RESTORE_OBJECTS_TOKEN",
         "objectSpaceId": "CS_OBJECT_SPACE_ID",
         "objectsUrl": "CS_OBJECTS_URL",
         "port": "PORT",
@@ -921,7 +926,7 @@
                       "type": "string"
                     },
                     "name": {
-                      "maxLength": 80,
+                      "maxLength": 128,
                       "minLength": 1,
                       "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
                       "type": "string"
@@ -964,7 +969,7 @@
                             "type": "object"
                           },
                           "name": {
-                            "maxLength": 80,
+                            "maxLength": 128,
                             "minLength": 1,
                             "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
                             "type": "string"
@@ -1045,7 +1050,7 @@
                             "type": "object"
                           },
                           "name": {
-                            "maxLength": 80,
+                            "maxLength": 128,
                             "minLength": 1,
                             "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
                             "type": "string"
@@ -1165,7 +1170,7 @@
                         "type": "array"
                       },
                       "name": {
-                        "maxLength": 80,
+                        "maxLength": 128,
                         "minLength": 1,
                         "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
                         "type": "string"
@@ -1203,12 +1208,16 @@
                   "items": {
                     "additionalProperties": false,
                     "properties": {
+                      "agentProfileId": {
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                        "type": "string"
+                      },
                       "body": {
                         "maxLength": 1048576,
                         "type": "string"
                       },
                       "name": {
-                        "maxLength": 80,
+                        "maxLength": 128,
                         "minLength": 1,
                         "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
                         "type": "string"
@@ -1558,6 +1567,45 @@
               "type": "string"
             }
           },
+          "type": "object"
+        }
+      },
+      "BusinessWorkspaceInspection": {
+        "direction": "platform-to-business",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "generation": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "state": {
+              "enum": [
+                "absent",
+                "present",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            "taskId": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "volumeUid": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "required": [
+            "generation",
+            "state",
+            "taskId",
+            "volumeUid"
+          ],
           "type": "object"
         }
       },
@@ -3969,6 +4017,10 @@
                         "const": 1,
                         "type": "number"
                       },
+                      "nativeModelMappingVersion": {
+                        "const": 1,
+                        "type": "number"
+                      },
                       "opaqueInternalDelegation": {
                         "type": "boolean"
                       },
@@ -5937,6 +5989,36 @@
                           "minItems": 1,
                           "type": "array"
                         },
+                        "databaseRestore": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "command": {
+                              "items": {
+                                "maxLength": 4096,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "maxItems": 64,
+                              "minItems": 1,
+                              "type": "array"
+                            },
+                            "verifyCommand": {
+                              "items": {
+                                "maxLength": 4096,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "maxItems": 64,
+                              "minItems": 1,
+                              "type": "array"
+                            }
+                          },
+                          "required": [
+                            "command",
+                            "verifyCommand"
+                          ],
+                          "type": "object"
+                        },
                         "healthPath": {
                           "default": "/healthz",
                           "format": "starts_with",
@@ -6602,6 +6684,36 @@
                           "minItems": 1,
                           "type": "array"
                         },
+                        "databaseRestore": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "command": {
+                              "items": {
+                                "maxLength": 4096,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "maxItems": 64,
+                              "minItems": 1,
+                              "type": "array"
+                            },
+                            "verifyCommand": {
+                              "items": {
+                                "maxLength": 4096,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "maxItems": 64,
+                              "minItems": 1,
+                              "type": "array"
+                            }
+                          },
+                          "required": [
+                            "command",
+                            "verifyCommand"
+                          ],
+                          "type": "object"
+                        },
                         "healthPath": {
                           "default": "/healthz",
                           "format": "starts_with",
@@ -6976,6 +7088,36 @@
                           },
                           "minItems": 1,
                           "type": "array"
+                        },
+                        "databaseRestore": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "command": {
+                              "items": {
+                                "maxLength": 4096,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "maxItems": 64,
+                              "minItems": 1,
+                              "type": "array"
+                            },
+                            "verifyCommand": {
+                              "items": {
+                                "maxLength": 4096,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "maxItems": 64,
+                              "minItems": 1,
+                              "type": "array"
+                            }
+                          },
+                          "required": [
+                            "command",
+                            "verifyCommand"
+                          ],
+                          "type": "object"
                         },
                         "healthPath": {
                           "default": "/healthz",
@@ -7843,6 +7985,17 @@
       "basis": "RFC-040 design OpenCode 联合接线补充：MCP 子进程 env 正则为兼容扩展，保留所有旧输入与 128 字符限制",
       "changes": [
         "～ schemas/BusinessMaterialRequest/properties/nativeConfig/properties/mcp/items/oneOf[1]/properties/env/propertyNames/pattern：\"^[A-Z_][A-Z0-9_]*$\" → \"^[A-Za-z_][A-Za-z0-9_]*$\""
+      ]
+    },
+    {
+      "date": "2026-10-16",
+      "basis": "RFC-040 已批准原生材料与 RFC-370 联合接线：名称 maxLength 80 到 128 为兼容扩展，保留正则及保留名限制；见 proposal/rfc/RFC-040-business-native-materials/design.md OpenCode 联合接线补充",
+      "changes": [
+        "～ schemas/BusinessMaterialRequest/properties/nativeConfig/properties/agent/properties/name/maxLength：80 → 128",
+        "～ schemas/BusinessMaterialRequest/properties/nativeConfig/properties/mcp/items/oneOf[0]/properties/name/maxLength：80 → 128",
+        "～ schemas/BusinessMaterialRequest/properties/nativeConfig/properties/mcp/items/oneOf[1]/properties/name/maxLength：80 → 128",
+        "～ schemas/BusinessMaterialRequest/properties/nativeConfig/properties/plugins/items/properties/name/maxLength：80 → 128",
+        "～ schemas/BusinessMaterialRequest/properties/nativeConfig/properties/subagents/items/properties/name/maxLength：80 → 128"
       ]
     }
   ]

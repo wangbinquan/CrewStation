@@ -28,6 +28,7 @@ export function drizzleDataResourceRepository(db: Executor): DataResourceReposit
 
 export function drizzleTaskBindingRepository(db: Executor): TaskDataBindingRepository {
   const toBinding = (r: typeof taskBindings.$inferSelect): TaskDataBinding => ({
+    ...(r.databaseName ? { databaseName: r.databaseName } : {}),
     ...(r.legacyResourceId ? { legacyResourceId: r.legacyResourceId } : {}),
     id: r.id, taskId: r.taskId as TaskId, serviceId: r.serviceId, projectId: r.projectId, mode: r.mode as TaskDataMode, state: r.state as TaskDataBindingState,
     ...(r.reason ? { reason: r.reason } : {}), ...(r.decision ? { decision: r.decision } : {}), requestedBy: r.requestedBy as UserId, ...(r.decidedBy ? { decidedBy: r.decidedBy as UserId } : {}),
@@ -35,7 +36,7 @@ export function drizzleTaskBindingRepository(db: Executor): TaskDataBindingRepos
     createdAt: r.createdAt, updatedAt: r.updatedAt,
   });
   const toRow = (b: TaskDataBinding): typeof taskBindings.$inferInsert => ({
-    ...b, reason: b.reason ?? null, decision: b.decision ?? null, decidedBy: b.decidedBy ?? null, expiresAt: b.expiresAt ?? null, roleName: b.roleName ?? null, secretBox: b.secretBox ?? null,
+    ...b, databaseName: b.databaseName ?? null, reason: b.reason ?? null, decision: b.decision ?? null, decidedBy: b.decidedBy ?? null, expiresAt: b.expiresAt ?? null, roleName: b.roleName ?? null, secretBox: b.secretBox ?? null,
   });
   return {
     insert: async (b) => { await db.insert(taskBindings).values(toRow(b)); },
@@ -55,7 +56,7 @@ type NativeResourceRow = NativeSnapshot['resources'][number];
 type NativeBindingRow = NativeSnapshot['bindings'][number];
 type SqlDates<T> = Omit<T, 'createdAt' | 'updatedAt' | 'expiresAt'> & { createdAt: string; updatedAt: string; expiresAt?: string | null };
 
-async function nativeHistoryPages<T extends { id: string } & Record<string, unknown>>(tx: Transaction, select: ReturnType<typeof sql>, projectId: ProjectId, table: 'resources' | 'task_bindings'): Promise<T[]> {
+async function nativeHistoryPages<T extends { id: string } & Record<string, unknown>>(tx: Transaction, select: ReturnType<typeof sql>, projectId: ProjectId, table: 'resources' | 'task_bindings' | 'database_generations'): Promise<T[]> {
   const out: T[] = [];
   let cursor: string | null = null;
   for (;;) {
@@ -80,6 +81,8 @@ export function drizzleNativePostgresHistory(db: Database): NativePostgresHistor
   return { read: (projectId) => db.transaction(async (tx) => {
     const common = sql`id,project_id AS "projectId",service_id AS "serviceId",state,secret_box AS "secretBox",created_at AS "createdAt",updated_at AS "updatedAt"`;
     const resourceRows = await nativeHistoryPages<SqlDates<NativeResourceRow>>(tx, sql`${common},kind,env,object_name AS "objectName"`, projectId, 'resources');
+    const generationRows = await nativeHistoryPages<SqlDates<NativeResourceRow> & { origin: string }>(tx, sql`${common},'postgres' AS kind,env,object_name AS "objectName",origin`, projectId, 'database_generations');
+    resourceRows.push(...generationRows.filter((row) => row.origin === 'restore').map(({ origin: _origin, ...row }) => ({...row,state:row.state==='provisioning'?'provisioning':'ready'})));
     const bindingRows = await nativeHistoryPages<SqlDates<NativeBindingRow>>(tx, sql`${common},task_id AS "taskId",legacy_resource_id AS "legacyResourceId",mode,role_name AS "roleName",expires_at AS "expiresAt"`, projectId, 'task_bindings');
     return {
       resources: resourceRows.map((row) => ({ ...row, createdAt: new Date(row.createdAt), updatedAt: new Date(row.updatedAt) })),

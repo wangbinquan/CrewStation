@@ -1,3 +1,4 @@
+import type { DatabaseRestoreRepository } from './databaseRestore';
 import type { HandoffRepository } from './executionHandoff';
 import type { JourneyRepository } from './journey';
 import type { PhysicalSlot, ServiceSlots } from '../domain/slots';
@@ -13,6 +14,7 @@ export interface DomainEventPublisher {
 }
 
 export interface RepositoryScope {
+  readonly databaseRestores?: DatabaseRestoreRepository;
   readonly journeys: JourneyRepository;
   readonly handoffs: HandoffRepository;
   readonly maintenance: MaintenanceRepository;
@@ -33,6 +35,7 @@ export interface RepositoryScope {
     job(job: JobProjection): Promise<void>;
     /** 读一次发布的构建或迁移 Job 记录（读不到当作没有）；放弃资源中心建的 Job 时报 Failed（T8）。 */
     jobRecord(releaseId: string, kind: JobProjection['kind']): Promise<JobRecordRef | undefined>;
+    restoreJobObserved(jobId: string): Promise<void>;
     failJob(releaseId: string, kind: JobProjection['kind'], message: string): Promise<void>;
   };
 }

@@ -47,7 +47,7 @@ export async function provisionDatabase(deps: ProvisionDeps, snapshot: DataPlane
   if (stored.pendingBox) return snapshot;
   const password = await deps.cipher.decrypt(stored.secretBox);
   // 临时角色（第二步）同一套：口令先存再建，到期时间由数据库自己执行。
-  const origin = record.projectId ? { projectId: record.projectId, resourceId: record.id } : undefined;
+  const origin = record.projectId ? { projectId: record.projectId, resourceId: record.id, ...(record.spec['independentDatabase'] === true ? { independentDatabase: true as const } : {}) } : undefined;
   if (database) await deps.plane.ensureDatabase({ ...database, password, origin });
   else await deps.plane.ensureTemporaryRole({ ...temporary!, password, origin });
   deps.stats.provisioned += 1;

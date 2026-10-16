@@ -19,7 +19,7 @@ interface NativePostgresJournalRecord {
 interface OriginalPostgresRole { readonly name: string; readonly oid: string; readonly source: string; readonly identity: string }
 interface OriginalPostgresDatabase extends OriginalPostgresRole { readonly directories: readonly { readonly tablespaceOid: string | null; readonly root: string }[] }
 
-interface NativePostgresOrigin { readonly projectId: ProjectId; readonly resourceId: string }
+interface NativePostgresOrigin { readonly projectId: ProjectId; readonly resourceId: string; readonly independentDatabase?: true }
 
 /** 数据面的只读快照：平台数据库集群上带平台前缀的库与角色（实现在 adapters/postgres）。 */
 export interface DataPlaneReader {

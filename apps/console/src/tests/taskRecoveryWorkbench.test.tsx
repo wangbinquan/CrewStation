@@ -108,3 +108,30 @@ test('恢复进度轮询完成后立即同步工作区状态与可用动作', as
   expect(page.text()).not.toContain('工作区：已暂停');
   expect(f.posts).toHaveLength(0);
 });
+
+test('应用直达链接打开原尝试弹窗，关闭保留列表；链接本身不提交恢复', async () => {
+  const f = fixture();
+  f.assessment.actions = [{ assessmentDigest: 'c'.repeat(64), target: { taskId, action: 'resume-subtask', expectedGeneration: 2, materialDigest: 'a'.repeat(64), subtaskId: childId, expectedAttempt: 1, resumeSessionId: 'original-session' } }];
+  page = await renderApp(`/admin/business-execution?taskId=${taskId}&subtaskId=${childId}`);
+  const dialog = document.querySelector<HTMLDialogElement>('dialog[open][role="dialog"]')!;
+  expect(dialog).not.toBeNull(); expect(dialog.textContent).toContain('original-session');
+  expect(document.querySelector<HTMLSelectElement>('dialog select')?.value).toBe(childId);
+  expect(f.reads.some((path) => path.includes(`subtaskId=${childId}`))).toBe(true);
+  expect(f.posts).toHaveLength(0);
+  const table = document.querySelector('main table');
+  await act(async () => { dialog.dispatchEvent(new Event('cancel', { cancelable: true })); }); await page.settle();
+  expect(document.querySelectorAll('dialog[open]')).toHaveLength(0); expect(document.querySelector('main table')).toBe(table);
+  expect(f.posts).toHaveLength(0);
+});
+test('直达不存在的尝试不降级为工作区动作，失权仍由原查询拒绝', async () => {
+  const f = fixture();
+  page = await renderApp(`/admin/business-execution?taskId=${taskId}&subtaskId=01900000-0000-7000-8000-000000000099`);
+  expect([...document.querySelectorAll<HTMLButtonElement>('dialog button')].find(button => button.textContent === '恢复任务')?.disabled).toBe(true);
+  expect(f.posts).toHaveLength(0);
+  f.state.denied = true; await page.reread(); expect(page.text()).toContain('权限已撤销'); expect(f.posts).toHaveLength(0);
+});
+test('无效恢复链接不打开任务，也不从 URL 接受执行动作', async () => {
+  const f = fixture(); page = await renderApp('/admin/business-execution?taskId=not-a-resource&action=restart-task');
+  expect(document.querySelectorAll('dialog[open]')).toHaveLength(0);
+  expect(f.reads.some(path => path.includes('not-a-resource'))).toBe(false); expect(f.posts).toHaveLength(0);
+});

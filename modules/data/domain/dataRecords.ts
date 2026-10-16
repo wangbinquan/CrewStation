@@ -14,7 +14,7 @@ export interface DatabaseDeclaration {
   readonly ref: string;
   readonly projectId: ProjectId;
   /** provision：由 data-control 建（RFC-025 I28）；没有的是 data 自己建的旧库。 */
-  readonly spec: { readonly children: readonly Child[]; readonly engine: 'postgres'; readonly env: DataEnv; readonly plan: string; readonly provision?: 'data-control' };
+  readonly spec: { readonly children: readonly Child[]; readonly engine: 'postgres'; readonly env: DataEnv; readonly plan: string; readonly provision?: 'data-control'; readonly independentDatabase?: true };
   readonly display: Readonly<Record<string, string>>;
   readonly conditions: readonly Condition[];
 }

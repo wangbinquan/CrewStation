@@ -5,6 +5,7 @@
 import type { AgentUsageModel, AgentUsageSnapshot, BusinessUsage } from '@crewstation/contracts';
 
 export interface UsageMeterInput {
+  readonly modelAliases?: Readonly<Record<string, string>>;
   /** 本次执行恢复一个已有原生会话。 */
   readonly resumed: boolean;
   /** 档位修订配置的模型（可能为空：交给二进制默认）。 */

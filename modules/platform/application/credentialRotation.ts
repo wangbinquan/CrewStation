@@ -16,3 +16,18 @@ export async function rotateDataCredential(ledger: RotationLedger, control: Rota
   };
   return control.withCredentialAdmission ? control.withCredentialAdmission(id, rotate) : rotate();
 }
+
+/** Data credential adapter keeps the creation-mode admission beside rotation policy. */
+export function dataCredentialPorts(
+  ledger: () => RotationLedger,
+  control: () => RotationControl & { credentialOf(id: string): Promise<{ role: string; password: string } | undefined> },
+  ledgerCreation: boolean,
+) {
+  return {
+    credentialOf: (id: string) => control().credentialOf(id),
+    rotateCredential: async (id: string, projectId: ProjectId) => {
+      if (!ledgerCreation) throw new Error('口令轮换需要工作负载与发布均由资源中心创建');
+      await rotateDataCredential(ledger(), control(), id, projectId);
+    },
+  };
+}

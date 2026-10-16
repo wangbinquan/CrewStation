@@ -1,3 +1,5 @@
+import type { DatabaseGenerationApi } from '../api/databaseGenerations';
+import type { DatabaseGenerations } from '../ports/database/generations';
 import type { Clock, Logger } from '@crewstation/kernel';
 import type { DataSettings, ProjectAuthorizer, ServiceResolver } from '../ports/platform';
 import type { DataCredentials } from '../ports/credentials';
@@ -8,6 +10,7 @@ import type { UserDirectory } from '../ports/userDirectory';
 import type { ProductionAccessTasks } from '../ports/resource-center/productionTasks';
 
 export interface DataUseCaseDeps {
+  generations?: { store: DatabaseGenerations; api: DatabaseGenerationApi };
   resources: DataResourceRepository;
   bindings: TaskDataBindingRepository;
   postgres: PostgresProvider;

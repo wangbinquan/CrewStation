@@ -10,6 +10,8 @@ export interface DataContentTable {
 const space = (table: string, keys = ['id']): DataContentTable => ({ table, keys, from: `data.${table} r LEFT JOIN data.object_spaces s ON s.id=r.space_id`, project: 's.project_id', service: 's.service_id', invalid: 's.id IS NULL' });
 const binding = (table: string, keys: string[]): DataContentTable => ({ table, keys, from: `data.${table} r LEFT JOIN data.finalization_bindings b ON b.id=r.binding_id LEFT JOIN data.object_spaces s ON s.id=b.space_id`, project: 's.project_id', service: 's.service_id', task: 'b.task_id', invalid: 'b.id IS NULL OR s.id IS NULL' });
 export const DATA_CONTENT: readonly DataContentTable[] = [
+  { table: 'database_environment_bindings', keys: ['resource_id'], project: 'r.project_id', service: 'r.service_id' },
+  { table: 'database_generations', keys: ['id'], project: 'r.project_id', service: 'r.service_id', origin: 'database-generation', physical: true },
   { table: 'resources', keys: ['id'], project: 'r.project_id', service: 'r.service_id', origin: 'resource', invalid: "r.kind<>'postgres'" },
   { table: 'task_bindings', keys: ['id'], project: 'r.project_id', service: 'r.service_id', task: 'r.task_id', origin: 'data-binding' },
   { table: 'resource_allocations', keys: ['operation_id'], project: 'r.project_id' },
@@ -41,7 +43,7 @@ export const DATA_SHARED = ['object_backends','object_plans','object_credential_
  * block reclamation closes it briefly, including foreign-project requests. */
 export const DATA_NATIVE_BLOCK_ADMISSION = 'data.native-block-admission';
 /** Children are removed before parents; no shared owner record is deleted. */
-export const DATA_REMOVAL = ['archive_helper_closures','archive_file_results','archive_binding_revisions','archive_helper_grants','task_input_grants','task_object_inputs','object_references','object_read_transfers','object_mutations','object_work','object_upload_attempts','objects','object_uploads','archive_plans','finalization_bindings','object_write_control','resource_allocations','object_project_policies','task_bindings','resources','object_spaces'] as const;
+export const DATA_REMOVAL = ['database_environment_bindings','database_generations','archive_helper_closures','archive_file_results','archive_binding_revisions','archive_helper_grants','task_input_grants','task_object_inputs','object_references','object_read_transfers','object_mutations','object_work','object_upload_attempts','objects','object_uploads','archive_plans','finalization_bindings','object_write_control','resource_allocations','object_project_policies','task_bindings','resources','object_spaces'] as const;
 
 const digest = z.string().regex(/^[a-f0-9]{64}$/), count = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 export const DataDeletionScopeSchema = z.object({

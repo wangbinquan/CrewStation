@@ -23,7 +23,7 @@ export function businessAgentFactory(deps: Omit<AgentSupervisorDeps, 'emit'>, pe
     return { send: (text) => inner.send(text), cancel: () => inner.cancel(), events: {
       async *[Symbol.asyncIterator]() {
         const events = command.businessOutputContract ? withBusinessOutput(inner.events, () => verifyBusinessOutput(createBusinessFiles(deps.paths.root), relative(deps.paths.root, cwd) || '.', command.businessOutputContract!)) : inner.events;
-        try { yield* redactBusinessEvents(events, [...Object.values(command.beforeStart.secrets), ...(command.businessSecretEnvNames ?? []).map((key) => command.env[key] ?? ''), ...command.mcp.flatMap((entry) => Object.values(entry.headers)), ...businessMaterialSecrets(command.businessNativeConfig), ...(command.businessMaterialDownloads?.map((entry) => entry.token) ?? [])]); }
+        try { yield* redactBusinessEvents(events, [...Object.values(command.beforeStart.secrets), ...(command.businessSecretEnvNames ?? []).map((key) => command.env[key] ?? ''), ...command.mcp.flatMap((entry) => Object.values(entry.headers)), ...businessMaterialSecrets(command.businessNativeConfig, command.platformOpencodeModels), ...(command.businessMaterialDownloads?.map((entry) => entry.token) ?? [])]); }
         finally { deps.beforeStart.release(command.agentId); }
       },
     } };

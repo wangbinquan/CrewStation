@@ -8,7 +8,7 @@ import type { BusinessExecutionDeps } from './dependencies';
 import { executionSource } from './source';
 import { admissionTaskView } from './taskView';
 
-export function executionTaskUseCases(deps: BusinessExecutionDeps): Pick<BusinessExecutionApi, 'createTask' | 'getTask' | 'runOnce'> {
+export function executionTaskUseCases(deps: BusinessExecutionDeps): Pick<BusinessExecutionApi, 'createTask' | 'getTask' | 'inspectWorkspace' | 'runOnce'> {
   const source = executionSource(deps);
   const progress = async (id?: string): Promise<boolean> => {
     const claimed = await deps.operations.claim({ ...(id ? { id } : {}), owner: newResourceId(), leaseSeconds: 30 });
@@ -43,6 +43,16 @@ export function executionTaskUseCases(deps: BusinessExecutionDeps): Pick<Busines
       if (operation.state === 'retryable-rejected') throw quotaExceeded('并发任务额度不足，请使用同一 requestKey 重试', { code: 'quota_exceeded', retryAfterSeconds: 1 });
       if (operation.state === 'failed') throw precondition('任务准入失败', { code: operation.errorCode ?? 'admission_failed', taskId: operation.intent.task.id });
       return { task: await admissionTaskView(deps, operation), status: operation.state === 'succeeded' ? (created ? 201 : 200) : 202 };
+    },
+    inspectWorkspace: async (caller, taskId) => {
+      const context = await source(caller), operation = await deps.operations.forTask(context.serviceId,taskId);
+      if(!operation)throw notFound('业务任务',taskId);
+      const before = await admissionTaskView(deps,operation);
+      const proof = await deps.environments.inspectBusinessRecovery?.({projectId:operation.intent.projectId,serviceId:context.serviceId,taskId});
+      const after = await admissionTaskView(deps,operation);
+      if(before.generation!==after.generation)throw conflict('工作区检查期间世代已变化');
+      return {taskId,generation:after.generation,volumeUid:proof?.volumeUid??null,
+        state:proof?.persistent&&proof.volumeVerified?'present':proof?.persistent&&proof.volumePresent===false&&proof.stopped&&!proof.activeChildren?'absent':'unknown'};
     },
     getTask: async (caller, taskId) => {
       const context = await source(caller);

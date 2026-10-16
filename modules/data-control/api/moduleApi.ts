@@ -1,3 +1,4 @@
+import type { DatabaseGenerationInspector } from './databaseGenerations';
 import type { DatabaseReclamationReader } from './databaseReclamation';
 import type { NativePostgresWork } from './databaseRemoval';
 import type { NativePostgresJournal, NativePostgresSource } from './storageSource';
@@ -21,6 +22,7 @@ export interface ObjectDataPlaneApi {
 /** data-control 模块对外能力；每个用例在此增加一个方法签名，实现放在 application/。 */
 export interface DataControlModuleApi {
   readonly name: 'data-control';
+  readonly databaseGenerations?: DatabaseGenerationInspector;
   readonly objects?: ObjectDataPlaneApi;
   /** Internal original-OID physical evidence; does not authorize or perform deletion. */
   readonly databaseReclamation?: DatabaseReclamationReader;

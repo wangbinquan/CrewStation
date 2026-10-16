@@ -23,6 +23,7 @@ export function inspectBusinessRecovery(deps: TaskRuntimeUseCaseDeps) {
     const volumeUid = env.businessWorkspace?.volumeUid ?? null;
     return {
       state: env.state, persistent, stopped: pod === null && !env.connected && await storageStopProved(deps, env), activeChildren, volumeUid,
+      volumePresent: volume !== null,
       volumeVerified: Boolean(persistent && volumeUid && volume && volume.uid === volumeUid && volume.phase === 'Bound' && volume.belongsToTask && !volume.deleting),
       image: env.render?.image, runtimeImage: env.render?.runtimeImage,
     };

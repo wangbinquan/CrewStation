@@ -8,8 +8,8 @@ import type { ProjectDeletionCurrentAssets } from '@crewstation/contracts';
 import { gatewayDocumentRepair, gatewayOperatorRepairs, gatewayPodRepair } from './operatorRepairs';
 import type { AllowlistOwnership, GatewayDeletionRepository, GatewayOriginalDirectory, GatewayProcess, GatewayProcessOwners } from '../../ports/repositories';
 
-const CONTENT = ['pod_identities', 'routes', 'service_maintenance', 'maintenance_events', 'rate_limits', 'rate_limit_receipts'] as const;
-const CONTENT_KEYS: Record<typeof CONTENT[number], readonly string[]> = { pod_identities: ['namespace', 'pod_name'], routes: ['service_id'], service_maintenance: ['service_id'], maintenance_events: ['id'], rate_limits: ['scope'], rate_limit_receipts: ['operation_id'] };
+const CONTENT = ['database_restore_maintenance','pod_identities', 'routes', 'service_maintenance', 'maintenance_events', 'rate_limits', 'rate_limit_receipts'] as const;
+const CONTENT_KEYS: Record<typeof CONTENT[number], readonly string[]> = { database_restore_maintenance: ['operation_id'], pod_identities: ['namespace', 'pod_name'], routes: ['service_id'], service_maintenance: ['service_id'], maintenance_events: ['id'], rate_limits: ['scope'], rate_limit_receipts: ['operation_id'] };
 const FACTS = ['resource_identity_aliases', 'deletion_fences', 'deletion_entities', 'deletion_document_owners', 'deletion_work', 'deletion_process_stops', 'allowlists', 'operator_confirmations'] as const;
 const admissionKey = (id: string) => `gateway.project-admission:${id}`;
 export const gatewayAdmissionKeys = (id: ProjectId): readonly string[] => [admissionKey(id)];
@@ -104,6 +104,7 @@ async function scan(db: Executor, target: ProjectDeletionTarget, originals: Gate
         }
         if (!owner && !(table === 'pod_identities' && body['workload'] === 'platform') && !(table === 'rate_limits' && body['scope'] === 'platform')) blockers.push({ participant: 'gateway', code: 'ownership-unknown', message: '网关历史内容的原项目身份无法核实', resourceId: jsonHash(body) });
         if (owner !== target.id) continue;
+        if(table==='database_restore_maintenance'&&body['completed']!==true)blockers.push({participant:'gateway',code:'database-restore-active',message:'原数据库恢复仍持有维护窗口，完成原恢复后才能删除项目',resourceId:String(body['operation_id'])});
         if (seed && table === 'pod_identities') await remember(db, 'pod', podKey(podRecord(body)), owner);
         if (seed && (table === 'routes' || table === 'maintenance_events' || table === 'service_maintenance')) await remember(db, 'service', String(body['service_id']), owner);
         count += 1; hash = jsonHash({ previous: hash, body: fingerprint(body, table) });

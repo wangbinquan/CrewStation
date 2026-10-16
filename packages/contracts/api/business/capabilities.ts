@@ -3,7 +3,7 @@ import { ReleaseIdSchema, ResourceIdSchema } from '../../ids';
 import { BUSINESS_EXECUTION_VERSION, BusinessGenerationSchema } from './executionValues';
 
 export const BusinessAgentCapabilitiesSchema = z.strictObject({
-  nativeConfigVersion: z.literal(1).optional(), materialObjectsVersion: z.literal(1).optional(), startupInventoryVersion: z.literal(1).optional(),
+  nativeModelMappingVersion: z.literal(1).optional(), nativeConfigVersion: z.literal(1).optional(), materialObjectsVersion: z.literal(1).optional(), startupInventoryVersion: z.literal(1).optional(),
   events: z.boolean(), usage: z.enum(['none', 'final', 'incremental']), resume: z.boolean(),
   systemPrompt: z.boolean(), skills: z.boolean(), mcp: z.boolean(), platformDelegation: z.boolean(), opaqueInternalDelegation: z.boolean(),
 });

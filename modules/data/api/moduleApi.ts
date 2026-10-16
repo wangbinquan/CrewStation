@@ -1,3 +1,4 @@
+import type { DatabaseGenerationApi } from './databaseGenerations';
 import type { Actor, DataEnv, DataResourceDto, DecideTaskDataBinding, ProjectDeletionOwner, ProjectId, RequestTaskDataBinding, ServiceId, TaskDataBindingDto, TaskDataBindingState, TaskId } from '@crewstation/contracts';
 import type { ObjectStorageAdminApi } from './objectStorageApi';
 import type { MaterialObjectApi } from './materialObjectApi';
@@ -12,6 +13,7 @@ import type { ObjectRequestHistory } from './objectRequestHistory';
 
 /** data 模块对外能力：服务数据供给与环境变量渲染、开发会话的数据访问绑定。 */
 export interface DataModuleApi {
+  readonly databaseGenerations?: DatabaseGenerationApi;
   readonly deletionOwner?: ProjectDeletionOwner;
   readonly objectRequestHistory?: { read(projectId: ProjectId): Promise<ObjectRequestHistory> };
   /** Internal retained-history read; does not issue credentials or prove physical absence. */

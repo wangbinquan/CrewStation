@@ -1,8 +1,14 @@
-import type { MessagesShapedLike } from '../../../shared/lib/i18n';
+import type {  MessagesShapedLike } from '../../../shared/lib/i18n';
 import type { computeMessages as zhCN } from './compute.zh-CN';
 
 /** Messages for compute profiles and the platform registry (RFC-006), merged into the admin catalog by en-US.ts. */
 export const computeMessages: MessagesShapedLike<typeof zhCN> = {
+  "admin.profile.provider.title": "OpenCode model material",
+  "admin.profile.provider.hint": "Configure a revisioned provider for internal subagents. Profiles without this material can run independently but cannot participate in model delegation. Use provider/model names and non-secret settings here.",
+  "admin.profile.provider.material": "Provider configuration (JSON)",
+  "admin.profile.provider.secrets": "Reference declared Secret variable names in credentials; never enter secret values here. Available: {names}",
+  'admin.profile.error.opencodeProvider': "Enter valid provider material. Use credentials references; file and environment interpolation are not allowed.",
+
   "admin.profile.column.execution": "Execution",
   "admin.profile.configurationDetails": "Configuration details",
   "admin.profile.moreActions": "More actions",

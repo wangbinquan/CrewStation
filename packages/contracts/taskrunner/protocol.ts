@@ -1,5 +1,6 @@
 import { BotContextLaunchSchema } from './bot/context';
 import { BusinessMaterialDownloadsSchema } from './businessMaterial';
+import { PlatformOpencodeModelsSchema } from './opencodeModels';
 import { BusinessNativeConfigSchema } from '../api/business/nativeConfig';
 import { BusinessOutputMaterialSchema } from '../api/business/releaseMaterials';
 import { BusinessMaterialRequestSchema } from '../api/business/materials';
@@ -57,7 +58,7 @@ export const RunnerHelloSchema = z.object({
     workspaceCommit: z.literal(1).optional(),
     /** RFC-027: reliable business execution, materials and replay; omitted by older runners. */
     businessExecutionV3: z.literal(1).optional(),
-    nativeConfigVersion: z.literal(1).optional(), materialObjectsVersion: z.literal(1).optional(), startupInventoryVersion: z.literal(1).optional(), commandSecretEnvVersion: z.literal(1).optional(),
+    nativeModelMappingVersion: z.literal(1).optional(), nativeConfigVersion: z.literal(1).optional(), materialObjectsVersion: z.literal(1).optional(), startupInventoryVersion: z.literal(1).optional(), commandSecretEnvVersion: z.literal(1).optional(),
     /** RFC-028：逐容器初始化、工具检查、持久去重和命令门控。 */
     runtimeInitialization: z.literal(1).optional(),
     /** 2026-09-23：输入控制记住持有人、同一用户的另一视图直接转移，换人或释放即推 `terminalControl` 事件。同样用能力位而不升协议版本。 */
@@ -90,6 +91,7 @@ const ProfileLaunchShape = {
 export const StartAgentCommandSchema = z.object({
   botContext: BotContextLaunchSchema.optional(),
   businessOutputContract: BusinessOutputMaterialSchema.optional(),
+  platformOpencodeModels: PlatformOpencodeModelsSchema.optional(),
   businessNativeConfig: BusinessNativeConfigSchema.optional(), businessMaterialDownloads: BusinessMaterialDownloadsSchema.optional(),
   startupInventoryVersion: z.literal(1).optional(),
   businessSkills: BusinessMaterialRequestSchema.shape.skills.optional(),
@@ -102,6 +104,7 @@ export const StartAgentCommandSchema = z.object({
   resumeSessionId: z.string().optional(),
 }).superRefine((command, ctx) => {
   // headless 与业务子任务要解析事件与会话：通用终端协议只能进「＋ CLI」（RFC-006 C6）。
+  if (command.platformOpencodeModels && command.launch.protocol !== 'opencode') ctx.addIssue({ code: 'custom', message: '平台模型材料只适用于 OpenCode', path: ['platformOpencodeModels'] });
   if (command.launch.protocol === 'terminal') ctx.addIssue({ code: 'custom', message: '通用终端协议的档位只能用于「＋ CLI」', path: ['launch', 'protocol'] });
 });
 

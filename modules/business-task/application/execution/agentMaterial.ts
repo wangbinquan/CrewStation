@@ -1,3 +1,4 @@
+import { renderPinnedOpencodeModels } from '../model-mapping/opencodeModels';
 import { businessAgentDigestInput, businessMaterialObjects, ServiceIdSchema } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
 import type { ExecutionAgentPlan } from '../../domain/executionAgent';
@@ -29,5 +30,6 @@ export async function agentCommand(deps: BusinessExecutionDeps, plan: ExecutionA
   const objects = businessMaterialObjects(plan.material);
   if (objects.length && (!deps.materialObjects || !plan.materialIdentity)) throw precondition('对象材料引用不可用', { code: 'material_objects_unpinned' });
   const downloads = objects.length ? await deps.materialObjects!.grants({ projectId: plan.projectId, serviceId: ServiceIdSchema.parse(plan.materialIdentity!.serviceId), materialId: plan.materialIdentity!.materialId, objects }) : undefined;
-  return { ...plan.command, ...(downloads ? { businessMaterialDownloads: downloads } : {}), beforeStart: { ...plan.command.beforeStart, secrets: provider }, env, mcp };
+  const platformOpencodeModels = plan.opencodeModels ? await renderPinnedOpencodeModels(deps, plan.opencodeModels) : undefined;
+  return { ...plan.command, ...(platformOpencodeModels ? { platformOpencodeModels } : {}), ...(downloads ? { businessMaterialDownloads: downloads } : {}), beforeStart: { ...plan.command.beforeStart, secrets: provider }, env, mcp };
 }

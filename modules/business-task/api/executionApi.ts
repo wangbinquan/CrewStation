@@ -1,3 +1,4 @@
+import type { BusinessWorkspaceInspection } from '@crewstation/contracts';
 import type { BusinessCapabilitiesDto, BusinessMigrationReady, BusinessSubtaskMessageV3, BusinessRecoveryClaim, BusinessRecoveryClaimReceipt, BusinessRecoveryRead, BusinessRecoveryReject, BusinessRecoveryRequest } from '@crewstation/contracts';
 import type { BusinessMaterialRequest, BusinessMaterialDto } from '@crewstation/contracts';
 import type { BusinessTaskMutation, RestartBusinessTask } from '@crewstation/contracts';
@@ -8,6 +9,7 @@ import type { FinalizeBusinessTask, BusinessFinalizationDto, ReviseBusinessArchi
 
 export interface BusinessExecutionCaller { identity: string; token?: string }
 export interface BusinessExecutionApi {
+  inspectWorkspace(caller: BusinessExecutionCaller, taskId: TaskId): Promise<BusinessWorkspaceInspection>;
   finalize(caller: BusinessExecutionCaller, taskId: TaskId, input: FinalizeBusinessTask): Promise<BusinessFinalizationDto>;
   finalization(caller: BusinessExecutionCaller, taskId: TaskId): Promise<BusinessFinalizationDto>;
   reviseArchive(caller: BusinessExecutionCaller, taskId: TaskId, input: ReviseBusinessArchive): Promise<BusinessFinalizationDto>;

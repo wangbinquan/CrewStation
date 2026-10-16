@@ -1,3 +1,6 @@
+import { databaseGenerationRepository } from './adapters/persistence/database/generations';
+import { databaseGenerationUseCases, projectGeneration } from './application/database/generations';
+import type { DatabaseGenerationPlane } from './ports/database/generations';
 import { taskStorageStatus } from './application/objects/taskStorageStatus';
 import type { ObjectTransferOwners } from './ports/objectTransferOwners';
 import { recoverStoppedReads } from './adapters/persistence/objects/readRecovery';
@@ -16,6 +19,7 @@ import { newResourceId, noopLogger, systemClock } from '@crewstation/kernel';
 import type { Database, MigrationSet } from '@crewstation/persistence';
 import { readMigrationDir } from '@crewstation/persistence';
 import type { Hono } from 'hono';
+import { databaseRestoreObjectRoutes } from './http/databaseRestoreObjectRoutes';
 import { secretboxCipher } from './adapters/crypto/secretboxCipher';
 import { drizzleDataResourceRepository, drizzleNativePostgresHistory, drizzleTaskBindingRepository } from './adapters/persistence/drizzleRepositories';
 import type { PostgresProviderSettings } from './adapters/postgres/postgresProvider';
@@ -93,6 +97,7 @@ export function createDataObjectDeletionPhysics(db: Database, deps: Omit<GarageD
 }
 
 export interface DataModuleDeps {
+  databaseGenerationPlane?: DatabaseGenerationPlane;
   deletion?: DataProjectDeletion;
   productionTasks?: ProductionAccessTasks;
   /** 申请人／审批人名字来源；缺省时绑定 DTO 只带 ID。 */
@@ -146,7 +151,8 @@ export const dataMigrations: MigrationSet = {
 export function createDataModule(deps: DataModuleDeps): DataModule {
   const logger = deps.logger ?? noopLogger;
   const byDataControl = Boolean(deps.ledger && deps.credentials);
-  const projection = deps.ledger ? dataLedgerProjection(deps.ledger, logger, byDataControl) : undefined;
+  const generationStore = databaseGenerationRepository(deps.db);
+  const projection = deps.ledger ? dataLedgerProjection(deps.ledger, logger, byDataControl, async id=>!!(await generationStore.get(id))?.identity) : undefined;
   const stored = { resources: drizzleDataResourceRepository(deps.db), bindings: drizzleTaskBindingRepository(deps.db) };
   const useCaseDeps: DataUseCaseDeps = {
     resources: projection ? projection.resources(stored.resources) : stored.resources,
@@ -162,6 +168,9 @@ export function createDataModule(deps: DataModuleDeps): DataModule {
     ...(deps.users ? { users: deps.users } : {}),
     ...(deps.ledger && deps.credentials ? { provisioning: { credentials: deps.credentials, ledger: deps.ledger, dsnOf: (role: string, password: string, database: string) => postgresDsn(deps.settings.postgres, role, password, database), ...deps.provisioningTiming } } : {}),
   };
+  const generationDeps = { data: useCaseDeps, store: generationStore, ledger: deps.ledger, plane: deps.databaseGenerationPlane };
+  const databaseGenerations = databaseGenerationUseCases(generationDeps);
+  useCaseDeps.generations = { store: generationStore, api: databaseGenerations };
   const service = serviceDataUseCases(useCaseDeps);
   const nativeHistory = nativePostgresHistoryUseCases(drizzleNativePostgresHistory(deps.db), useCaseDeps.cipher);
   const bindings = { ...taskBindingUseCases(useCaseDeps), ...productionResourceAccess(useCaseDeps, deps.productionTasks, deps.isAdmin) };
@@ -181,7 +190,7 @@ export function createDataModule(deps: DataModuleDeps): DataModule {
   const helper = deps.objects ? archiveHelpers({ ...(requests ? { requests } : {}), helpers: helperStore, bindings: archiveBindingRepository(deps.db), plans: archivePlanRepository(deps.db), catalog: objectCatalog, uploads: objectUploads, plane: objectPlane!, owner: objectOwner, secretKeyBase64: deps.settings.secretKeyBase64 }) : undefined;
   const archiveApi = deps.objects?.tasks ? archiveFinalization(archiveBindingRepository(deps.db), deps.objects.tasks, { plans: archivePlanRepository(deps.db), reads: objectReadRepository(deps.db), helpers: helperStore }) : undefined;
   const archiveAdmin = deps.objects?.tasks ? archiveAdministration({ plans: archivePlanRepository(deps.db), catalog: objectCatalog, tasks: deps.objects.tasks, authorizer: deps.authorizer, bindings: archiveBindingRepository(deps.db), loss: archiveLossRepository(deps.db) }) : undefined;
-  const api: DataModuleApi = { ...(materials ? { materialObjects: materials } : {}), ...(requests ? { objectRequestHistory: requests.history } : {}), ...(deps.deletion ? { deletionOwner: dataDeletionOwner(dataDeletionRepository(deps.db,deps.deletion),deps.deletion) } : {}), nativePostgresHistory: nativeHistory, taskStorageStatus: taskStorageStatus(objectCatalog, storageContractRepository(deps.db)), ...(inputs ? { taskInputs: inputs } : {}), storageContract: storageContractRepository(deps.db), ...(archiveAdmin ? { archiveAdministration: archiveAdmin } : {}), ...(archives ? { archiveService: archives } : {}), ...(helper ? { archiveHelper: helper } : {}), ...(archiveApi ? { archiveFinalization: archiveApi } : {}), name: 'data', applyObjectWriteControl: objectCatalog.applyWriteControl, ensureServiceData: service.ensureServiceData, envFor: service.envFor, listResources: service.listResources, rotateCredential: rotateCredentialUseCase(useCaseDeps), ...bindings, ...(objects ? { objects } : {}), ...(objectBusiness ? { objectService: objectBusiness } : {}), ...(deps.objects?.provisioning ? { objectEnv: objectProvisioning(objectCatalog, deps.services, deps.objects.provisioning) } : {}) };
+  const api: DataModuleApi = { databaseGenerations, ...(materials ? { materialObjects: materials } : {}), ...(requests ? { objectRequestHistory: requests.history } : {}), ...(deps.deletion ? { deletionOwner: dataDeletionOwner(dataDeletionRepository(deps.db,deps.deletion),deps.deletion) } : {}), nativePostgresHistory: nativeHistory, taskStorageStatus: taskStorageStatus(objectCatalog, storageContractRepository(deps.db)), ...(inputs ? { taskInputs: inputs } : {}), storageContract: storageContractRepository(deps.db), ...(archiveAdmin ? { archiveAdministration: archiveAdmin } : {}), ...(archives ? { archiveService: archives } : {}), ...(helper ? { archiveHelper: helper } : {}), ...(archiveApi ? { archiveFinalization: archiveApi } : {}), name: 'data', applyObjectWriteControl: objectCatalog.applyWriteControl, ensureServiceData: service.ensureServiceData, envFor: service.envFor, listResources: service.listResources, rotateCredential: rotateCredentialUseCase(useCaseDeps), ...bindings, ...(objects ? { objects } : {}), ...(objectBusiness ? { objectService: objectBusiness } : {}), ...(deps.objects?.provisioning ? { objectEnv: objectProvisioning(objectCatalog, deps.services, deps.objects.provisioning) } : {}) };
   let timer: ReturnType<typeof setInterval> | undefined, expiring = false;
   const expireTick = () => {
     if (expiring) return;
@@ -195,9 +204,14 @@ export function createDataModule(deps: DataModuleDeps): DataModule {
   const revokeReleased = revokeBindingsOfReleasedTask(useCaseDeps);
   const consumer = createEventConsumer({ db: deps.db, consumer: 'data', ...(deps.logger ? { logger: deps.logger } : {}) })
     .on(DomainTopic.taskReleased, async (event) => { await revokeReleased(event.payload.taskId); });
-  const resync = projection ? [dataLedgerResyncWorker(() => projection.resync(stored.resources, stored.bindings), logger)] : [];
+  const resync = projection ? [dataLedgerResyncWorker(async () => {
+    const resources = await stored.resources.listAll();
+    for (const resource of resources) await generationStore.ensureInitial(resource);
+    for (const id of new Set(resources.map((resource) => resource.serviceId))) for (const value of await generationStore.list(id)) await projectGeneration(generationDeps, value);
+    return projection.resync(stored.resources, stored.bindings);
+  }, logger)] : [];
   const internalHttp = deps.objects ? [objectMetricsExporter(deps.objects.plane.metrics, deps.objects.exporterToken)] : [];
-  const transferHttp = [...(materials ? [materialObjectRoutes(materials)] : []), ...(inputs ? [taskInputRoutes(inputs)] : []), ...(helper ? [archiveHelperRoutes(helper)] : []), ...(archives ? [archiveServiceRoutes(archives)] : []), ...(objectBusiness ? [objectServiceRoutes(objectBusiness)] : []), ...(objects ? [objectAdminRoutes(objects, deps.isAdmin)] : [])];
+  const transferHttp = [...(objectBusiness ? [databaseRestoreObjectRoutes(objectBusiness)] : []),...(materials ? [materialObjectRoutes(materials)] : []), ...(inputs ? [taskInputRoutes(inputs)] : []), ...(helper ? [archiveHelperRoutes(helper)] : []), ...(archives ? [archiveServiceRoutes(archives)] : []), ...(objectBusiness ? [objectServiceRoutes(objectBusiness)] : []), ...(objects ? [objectAdminRoutes(objects, deps.isAdmin)] : [])];
   return { api, http: [dataRoutes(api, deps.isAdmin), ...transferHttp, ...internalHttp], transferHttp, internalHttp, workers: [expiry, ...resync, ...objectWorkers, ...(objectProjection ? [dataLedgerResyncWorker(objectProjection.resync, logger, 30_000)] : [])], subscriptions: [consumer], migrations: dataMigrations };
 }
 

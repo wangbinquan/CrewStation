@@ -10,7 +10,7 @@ function fixture() {
   const commands: RunnerCommand[] = [], receipts = new Map<string, RunnerBusinessReceipt>(), events = new Map<string, RunnerBusinessEvent[]>();
   const state = { supported: true, modern: false, materialToken: '', inventory: true, mismatch: undefined as string | undefined, unknown: false, gap: false, rejectStart: false, lostReply: false, sessionToken: '', mcpToken: '' };
   const runner: TestRunner = {
-    connectionStatus: async () => ({ connected: true, capabilities: { protocols: ['opencode'], pty: false, preview: false, ...(state.supported ? { businessExecutionV3: 1 as const } : {}), ...(state.modern ? { nativeConfigVersion: 1 as const, materialObjectsVersion: 1 as const, startupInventoryVersion: 1 as const } : {}) } }),
+    connectionStatus: async () => ({ connected: true, capabilities: { protocols: ['opencode'], pty: false, preview: false, ...(state.supported ? { businessExecutionV3: 1 as const } : {}), ...(state.modern ? { nativeModelMappingVersion: 1 as const, nativeConfigVersion: 1 as const, materialObjectsVersion: 1 as const, startupInventoryVersion: 1 as const } : {}) } }),
     listEvents: async () => [],
     getBusinessExecution: async (taskId, id) => ({ taskId, receipt: receipts.get(id)!, persistedThrough: receipts.get(id)!.lastSequence, acknowledgedThrough: receipts.get(id)!.lastSequence, complete: receipts.get(id)!.phase === 'finished' }),
     listBusinessExecutionEvents: async (_taskId, id, after = 0) => (events.get(id) ?? []).filter((event) => event.sequence > after),
@@ -33,11 +33,12 @@ function fixture() {
         const digest = new Bun.CryptoHasher('sha256').update(businessAgentDigestInput(wire.agent, wire.digestNonce)).digest('hex');
         if (digest !== command.payloadDigest) throw precondition('Agent 执行参数摘要不匹配', { code: 'execution_conflict' });
         expect(digest).toBe(command.payloadDigest);
-        const agent = command.agent, step = agent.businessNativeConfig ? 'nativeConfig' : agent.businessMaterialDownloads?.length ? 'materialObjects' : agent.resumeSessionId ? 'resume' : agent.systemPrompt ? 'systemPrompt' : agent.businessSkills?.length ? 'skills' : agent.mcp.length ? 'mcp' : 'events';
+        const agent = command.agent, step = agent.platformOpencodeModels ? 'nativeModelMapping' : agent.businessNativeConfig ? 'nativeConfig' : agent.businessMaterialDownloads?.length ? 'materialObjects' : agent.resumeSessionId ? 'resume' : agent.systemPrompt ? 'systemPrompt' : agent.businessSkills?.length ? 'skills' : agent.mcp.length ? 'mcp' : 'events';
         const token = step === 'materialObjects' ? state.materialToken : step === 'resume' ? state.sessionToken : step === 'mcp' ? state.mcpToken : JSON.stringify(agent).match(/cs-proof-[a-f0-9]+/)![0];
         if (step === 'events') state.sessionToken = token;
         const fields: Array<Partial<AgentEvent> & Pick<AgentEvent, 'type'>> = [{ type: 'session', sessionId: 'native-session' }, { type: 'text', text: state.mismatch === step ? 'unsupported' : token }, { type: 'usage', usage: { measurementId: 'turn', scope: 'session', mode: 'delta', inputTokens: 3, outputTokens: 1, cacheReadTokens: null, cacheWriteTokens: null, complete: true } }];
         if (agent.startupInventoryVersion === 1) fields.push({ type: 'startup-inventory', inventory: state.inventory ? { version: 1, state: 'verified', source: 'opencode-inventory', mcpServers: [{ name: 'crewstation-probe', status: 'connected' }] } : { version: 1, state: 'unavailable', reason: 'inventory-not-reported' } });
+        if (step === 'nativeModelMapping') fields.push({ type: 'tool-start', tool: { name: 'task' } });
         if (step === 'mcp') fields.push({ type: 'tool-start', tool: { name: 'crewstation_probe_nonce' } });
         const frames: RunnerBusinessEvent[] = fields.map((event, index) => ({ sequence: index + (state.gap ? 2 : 1), occurredAt: new Date().toISOString(), frame: { type: 'agent', event: { ...event, agentId: agent.agentId, seq: index + 1, at: new Date().toISOString() } } }));
         events.set(command.executionId, frames);
@@ -111,4 +112,15 @@ test('new Runner declarations alone do not grant native, object or inventory pro
   }
   const missing = fixture(); missing.state.modern = true; missing.state.inventory = false;
   expect((await missing.run())?.capabilities.startupInventoryVersion).toBeUndefined();
+});
+
+
+test('structured model delegation capability requires successful mapped internal task turn, not Runner declaration alone', async () => {
+  const f = fixture(); f.state.modern = true;
+  expect((await f.run())?.capabilities.nativeModelMappingVersion).toBeUndefined();
+  f.input.launch = LaunchSpecSchema.parse({ protocol: 'opencode', binaryPath: '/usr/bin/opencode', model: 'gateway/m', opencodeProvider: { id: 'gateway', npm: '@ai-sdk/openai-compatible', models: { m: { name: 'M' } }, options: {} } });
+  expect((await f.run())?.capabilities.nativeModelMappingVersion).toBe(1);
+  const mapped = f.commands.find((entry) => entry.type === 'startBusinessAgent' && entry.agent.platformOpencodeModels);
+  expect(mapped?.type === 'startBusinessAgent' && mapped.agent.platformOpencodeModels?.root).toBe('cs-platform-proof-root/m');
+  f.state.mismatch = 'nativeModelMapping'; expect((await f.run())?.capabilities.nativeModelMappingVersion).toBeUndefined();
 });

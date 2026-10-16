@@ -15,8 +15,8 @@ import { RecoveryHistory } from './RecoveryHistory';
 
 type Option = BusinessRecoveryAssessment['actions'][number];
 const active = (r: BusinessRecoveryRequest) => ['pending', 'claimed', 'running'].includes(r.state);
-export function TaskRecoveryPanel({ taskId, name, onOpenTask }: { readonly taskId: string; readonly name: string; readonly onOpenTask: (taskId: TaskId) => void }) {
-  const t = useT(), [childId, setChildId] = useState('');
+export function TaskRecoveryPanel({ taskId, name, onOpenTask, initialSubtaskId }: { readonly taskId: string; readonly name: string; readonly onOpenTask: (taskId: TaskId) => void; readonly initialSubtaskId?: string }) {
+  const t = useT(), [childId, setChildId] = useState(initialSubtaskId ?? '');
   const client = useQueryClient();
   const detail = useApiQuery(['recovery-detail', taskId], () => api.tasks.describeRecoveryTask(taskId), AUTO_REFRESH);
   const requests = useApiQuery(['recovery-requests', taskId], () => api.tasks.listRecoveries(taskId), { ...AUTO_REFRESH, refetchIntervalMs: (data) => data?.items.some(active) ? 2000 : 30_000 });
@@ -35,6 +35,7 @@ export function TaskRecoveryPanel({ taskId, name, onOpenTask }: { readonly taskI
       <FormField label={t('recovery.target')}><select value={childId} onChange={(e) => setChildId(e.target.value)}>
         <option value="">{t('recovery.parent')}</option>{detail.data!.subtasks.map((s) => <option key={s.id} value={s.id}>{s.name} · {t('recovery.attempt', { attempt: s.attempt })} · {t(`recovery.state.${s.state}`)}</option>)}
       </select></FormField>
+      {childId && !child ? <ActionNote tone="error">{t('recovery.changed')}</ActionNote> : null}
       {child ? <Stack><p>{child.name} · {t('recovery.attempt', { attempt: child.attempt })} · {t(`recovery.state.${child.state}`)}</p>
         <p>{t('recovery.process')}：{t(`recovery.process.${child.process}`)}</p>
         {child.error ? <ActionNote tone="error">{child.error.message}</ActionNote> : null}

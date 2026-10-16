@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { OpencodeProviderSchema } from './opencodeModels';
 import { EnvNameSchema } from './beforeStart';
 
 /**
@@ -37,7 +38,9 @@ export const LaunchSpecSchema = z.object({
   /** 传给 CLI 的模型；留空则不传，由二进制用自己的默认值（P2）。 */
   model: z.string().min(1).max(200).optional(),
   opencode: OpencodeParamsSchema.optional(),
+  opencodeProvider: OpencodeProviderSchema.optional(),
 }).strict().superRefine((spec, ctx) => {
+  if (spec.opencodeProvider && spec.protocol !== 'opencode') ctx.addIssue({ code: 'custom', message: '结构化 provider 只支持 OpenCode', path: ['opencodeProvider'] });
   for (const issue of launchApplicabilityIssues(spec)) ctx.addIssue({ code: 'custom', message: issue.message, path: [issue.field] });
 });
 

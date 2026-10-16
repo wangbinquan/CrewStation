@@ -123,7 +123,7 @@ export interface SlotOwners {
 export interface JobRef {
   readonly recordId: string;
   readonly releaseId: string;
-  readonly purpose: 'build' | 'migration';
+  readonly purpose: 'build' | 'migration' | 'database-restore' | 'database-verify';
 }
 
 /**

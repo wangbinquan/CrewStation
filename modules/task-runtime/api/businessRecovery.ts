@@ -6,6 +6,6 @@ export interface RestartBusinessWorkspaceInput extends BusinessRecoveryScope { n
 /** Positive, read-only observations. Missing or failed inspection must never count as stopped. */
 export interface BusinessWorkspaceProof {
   state: string; persistent: boolean; stopped: boolean; activeChildren: boolean;
-  volumeUid: string | null; volumeVerified: boolean;
+  volumeUid: string | null; volumeVerified: boolean; volumePresent?: boolean;
   image?: string; runtimeImage?: RuntimeImageExecutionSnapshot;
 }

@@ -1,9 +1,10 @@
 import { z } from 'zod';
+import { ResourceIdSchema } from '../../ids';
 import { BusinessEnvironmentNameSchema, BusinessRelativePathSchema } from './executionValues';
 import { BusinessPluginFileSchema, BUSINESS_NATIVE_MATERIAL_LIMITS, materialTreeIssue } from './materialFiles';
 
 const forbiddenKeys = new Set(['__proto__', 'prototype', 'constructor']);
-export const BusinessNativeNameSchema = z.string().min(1).max(80).regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/).refine((value) => !forbiddenKeys.has(value) && !/^crewstation(?:$|[._-])/i.test(value) && !/^cs-platform(?:$|[._-])/i.test(value), '名称属于平台保留空间');
+export const BusinessNativeNameSchema = z.string().min(1).max(128).regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/).refine((value) => !forbiddenKeys.has(value) && !/^crewstation(?:$|[._-])/i.test(value) && !/^cs-platform(?:$|[._-])/i.test(value), '名称属于平台保留空间');
 const key = z.string().min(1).max(256).refine((value) => !forbiddenKeys.has(value), '禁止原型键');
 const text = z.string().max(32768).refine((value) => !value.includes('\0'), '不能包含 NUL');
 const permissionAction = z.enum(['allow', 'ask', 'deny']);
@@ -44,7 +45,7 @@ const plugin = z.strictObject({
 }).superRefine((value, ctx) => { const issue = materialTreeIssue(value.files, value.entry); if (issue) ctx.addIssue({ code: 'custom', message: issue, path: ['files'] }); });
 export const BusinessNativeConfigSchema = z.strictObject({
   version: z.literal(1), protocol: z.enum(['opencode', 'claude-code']), agent,
-  subagents: z.array(agent).max(128).default([]), mcp: z.array(mcp).max(64).default([]), plugins: z.array(plugin).max(128).default([]),
+  subagents: z.array(agent.extend({ agentProfileId: ResourceIdSchema.optional() })).max(128).default([]), mcp: z.array(mcp).max(64).default([]), plugins: z.array(plugin).max(128).default([]),
 }).superRefine((value, ctx) => {
   const schema = value.protocol === 'opencode' ? BusinessOpencodeAgentOptionsSchema : BusinessClaudeAgentOptionsSchema;
   for (const [i, definition] of [value.agent, ...value.subagents].entries()) {
@@ -60,6 +61,7 @@ export const BusinessNativeConfigSchema = z.strictObject({
   }
   if (value.protocol === 'claude-code') for (const [i, item] of value.mcp.entries()) if (item.timeoutMs !== undefined) ctx.addIssue({ code: 'custom', message: 'Claude 不支持逐 MCP timeoutMs', path: ['mcp', i, 'timeoutMs'] });
   if (value.protocol === 'claude-code') {
+    for (const [i, entry] of value.subagents.entries()) if (entry.agentProfileId) ctx.addIssue({ code: 'custom', message: '独立档位映射只支持 OpenCode', path: ['subagents', i, 'agentProfileId'] });
     for (const [i, item] of value.mcp.entries()) if (item.type === 'remote' && item.oauth !== undefined) ctx.addIssue({ code: 'custom', message: '当前协议不支持 MCP oauth', path: ['mcp', i, 'oauth'] });
     for (const [i, item] of value.plugins.entries()) if (item.options && Object.keys(item.options).length) ctx.addIssue({ code: 'custom', message: '当前协议不支持插件 options', path: ['plugins', i, 'options'] });
   }

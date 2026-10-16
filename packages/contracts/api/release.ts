@@ -15,6 +15,7 @@ export const ReleaseDtoSchema = z.object({
   commitSha: z.string(),
   branch: z.string(),
   image: z.string().optional(),
+  databaseRestoreSupported: z.boolean().optional(),
   status: ReleaseStatusSchema,
   slot: SlotNameSchema.optional(),
   configVersion: z.number().int().optional(),

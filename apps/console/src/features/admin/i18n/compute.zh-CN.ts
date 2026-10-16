@@ -1,7 +1,13 @@
-import type { Messages } from '../../../shared/lib/i18n';
+import type {  Messages } from '../../../shared/lib/i18n';
 
 /** 算力档位与平台仓库（RFC-006）的文案；由 zh-CN.ts 合并进 admin 的目录，单独成文件只是为了守住文件行数上限。 */
 export const computeMessages = {
+  "admin.profile.provider.title": "OpenCode 模型材料",
+  "admin.profile.provider.hint": "为内部子 Agent 配置可固定版本的 provider。留空的档位仍可单独运行，但不能参与独立模型委派。模型使用 provider/model 格式；这里只填写非秘密配置。",
+  "admin.profile.provider.material": "Provider 配置（JSON）",
+  "admin.profile.provider.secrets": "credentials 引用已声明的凭据变量名，不填写密钥原值。当前可选：{names}",
+  'admin.profile.error.opencodeProvider': "请填写有效的 provider 配置，凭据通过 credentials 引用，禁止文件或环境替换。",
+
   "admin.profile.column.execution": "执行配置",
   "admin.profile.configurationDetails": "配置详情",
   "admin.profile.moreActions": "更多操作",

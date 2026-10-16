@@ -1,3 +1,4 @@
+import type { CreateDatabaseRestore, RetryDatabaseRestore, SwitchDatabaseRestore, DatabaseRestoreDto, DatabaseGenerationList } from '@crewstation/contracts';
 import type {
   BranchDto, ExitMaintenanceRequest, ListBranchesQuery, MaintenanceDto, ManifestUpgradePreview, PostponeOfflineRequest, RedeployPrecheckDto, RedeployRequest, ReleaseDto, RepositoryBindingDto,
   ServiceDto, ServiceMaintenanceView, SetMaintenanceRequest, SlotDto, SlotEventDto, TagDto, TakeOfflineRequest, TrafficSwitchDto, TrafficSwitchRequest,
@@ -10,6 +11,12 @@ import { segment } from '../requestUrl';
 
 /** 服务视角：仓库、分支与标签（scm）、Release、两个部署槽与切流（release）。 */
 export interface ServicesResource {
+  databaseGenerations(serviceId:string):Promise<DatabaseGenerationList>;
+  listDatabaseRestores(serviceId:string):Promise<{items:DatabaseRestoreDto[]}>;
+  getDatabaseRestore(serviceId:string,id:string):Promise<DatabaseRestoreDto>;
+  createDatabaseRestore(serviceId:string,input:CreateDatabaseRestore):Promise<DatabaseRestoreDto>;
+  retryDatabaseRestore(serviceId:string,id:string,input:RetryDatabaseRestore):Promise<DatabaseRestoreDto>;
+  switchDatabaseRestore(serviceId:string,id:string,input:SwitchDatabaseRestore):Promise<DatabaseRestoreDto>;
   listReleaseJourneys(serviceId: string, query?: Partial<ReleaseJourneyPageRequest>): Promise<ReleaseJourneyPage>;
   getReleaseJourney(journeyId: string): Promise<ReleaseJourneyDetail>;
   getReleaseJourneyHistory(releaseId: string): Promise<ReleaseJourneyHistory>;
@@ -58,6 +65,12 @@ export interface ServicesResource {
 export function servicesResource(transport: Transport): ServicesResource {
   const base = (serviceId: string) => `/v1/services/${segment(serviceId)}`;
   return {
+    databaseGenerations:id=>transport.request('GET',`${base(id)}/database-generations`),
+    listDatabaseRestores:id=>transport.request('GET',`${base(id)}/database-restores`),
+    getDatabaseRestore:(id,op)=>transport.request('GET',`${base(id)}/database-restores/${segment(op)}`),
+    createDatabaseRestore:(id,input)=>transport.request('POST',`${base(id)}/database-restores`,{body:input}),
+    retryDatabaseRestore:(id,op,input)=>transport.request('POST',`${base(id)}/database-restores/${segment(op)}/retry`,{body:input}),
+    switchDatabaseRestore:(id,op,input)=>transport.request('POST',`${base(id)}/database-restores/${segment(op)}/switch`,{body:input}),
     listReleaseJourneys: (serviceId, query) => transport.request<ReleaseJourneyPage>('GET', `${base(serviceId)}/release-journeys`, { query }),
     getReleaseJourney: (id) => transport.request<ReleaseJourneyDetail>('GET', `/v1/release-journeys/${segment(id)}`),
     getReleaseJourneyHistory: (id) => transport.request<ReleaseJourneyHistory>('GET', `/v1/releases/${segment(id)}/journey-history`),

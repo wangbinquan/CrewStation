@@ -1,3 +1,4 @@
+import { pinOpencodeModels } from '../model-mapping/opencodeModels';
 import { agentCommand, agentPayloadDigest } from './agentMaterial';
 import { prepareAgentResume } from './agentResume';
 import { randomBytes } from 'node:crypto';
@@ -43,6 +44,7 @@ export async function prepareAgentPlan(deps: BusinessExecutionDeps, parent: Exec
   if (launch.id !== resolved.id || launch.revision !== resolved.revision || launch.protocol !== resolved.protocol) throw precondition('固定档位材料不一致');
   const mcp = deps.settings.mcp.map((entry) => ({ ...entry, headers: {} as Record<string, string> }));
   validateBusinessMaterial(profile, material, capabilities, { protocol: resolved.protocol, mcp, reservedEnv: [...Object.keys(launch.beforeStart.vars), ...Object.keys(launch.beforeStart.secrets)] }, tasksSpec.agentProfiles);
+  const opencodeModels = await pinOpencodeModels(deps, { projectId, profiles: tasksSpec.agentProfiles, native: material.nativeConfig, compute: resolved, launch, stamp: credentialStamp });
   const ids = materialSecretReferences(material, profile);
   if (ids.length && !deps.agentSecrets) throw precondition('未启用项目 Secret 版本解析', { code: 'unsupported_capability' });
   const secretVersions = ids.length ? await deps.agentSecrets!.versions(projectId, ids) : [];
@@ -53,7 +55,7 @@ export async function prepareAgentPlan(deps: BusinessExecutionDeps, parent: Exec
     for (const [key, value] of Object.entries(selected.parameters)) url.searchParams.set(key, value);
     mcp.push({ name: connection.name, url: url.href, headers: {} }); secretMcp.push({ name: connection.name, headers: connection.secretHeaders });
   }
-  const plan: ExecutionAgentPlan = { kind: 'agent-plan', ...(stored ? { materialIdentity: { serviceId, materialId: stored.view.materialId } } : {}), sessionKey: runtimeTaskId, volumeUid, credentialStamp, request: input, projectId, compute: resolved, material, secretVersions, secretMcp, nonce: randomBytes(32).toString('hex'), command: {
+  const plan: ExecutionAgentPlan = { kind: 'agent-plan', ...(opencodeModels ? { opencodeModels } : {}), ...(stored ? { materialIdentity: { serviceId, materialId: stored.view.materialId } } : {}), sessionKey: runtimeTaskId, volumeUid, credentialStamp, request: input, projectId, compute: resolved, material, secretVersions, secretMcp, nonce: randomBytes(32).toString('hex'), command: {
     businessOutputContract, ...(material.nativeConfig ? { businessNativeConfig: material.nativeConfig } : {}), ...(capabilities.startupInventoryVersion === 1 ? { startupInventoryVersion: 1 } : {}), id: view.executionId, type: 'startAgent', agentId: view.executionId, processAttemptId: view.executionId, compute: resolved.id, profileRevision: resolved.revision,
     launch: launch.launch, beforeStart: { ...launch.beforeStart, secrets: {} }, permission: PLATFORM_AGENT_PERMISSION, businessSkills: material.skills, businessSecretEnvNames: Object.entries(material.env).filter(([, value]) => typeof value !== 'string').map(([key]) => key), mode: input.mode, initialPrompt: input.prompt,
     ...(input.cwd ? { cwd: input.cwd } : {}), ...(systemPrompt ? { systemPrompt } : {}), env: {}, mcp,
@@ -63,6 +65,7 @@ export async function prepareAgentPlan(deps: BusinessExecutionDeps, parent: Exec
     if (!deps.runtimeImages?.reserveAgent) throw precondition('未启用业务 Agent 运行镜像选择', { code: 'unsupported_capability' });
     const selection = { ...(profile.runtimeImageVersionId ? { runtimeImageVersionId: profile.runtimeImageVersionId } : {}), ...(profile.allowedRuntimeImageVersionIds ? { allowedRuntimeImageVersionIds: profile.allowedRuntimeImageVersionIds } : {}) };
     plan.runtimeImage = await deps.runtimeImages.reserveAgent(projectId, runtimeTaskId, selection, { profileId: resolved.id, revision: resolved.revision }, input.runtimeImageVersionId);
+    if (opencodeModels && plan.runtimeImage?.image !== resolved.image) throw precondition('内部模型映射不能更换已证明的 OpenCode 运行镜像', { code: 'unsupported_capability', capability: 'nativeModelMappingVersion' });
     if (!plan.runtimeImage) throw precondition('业务 Agent 运行镜像选择未返回固定快照', { code: 'unsupported_capability' });
   }
   return { plan, payloadDigest: agentPayloadDigest(command, plan.nonce), view: { ...view, image: plan.runtimeImage?.image ?? resolved.image, agentProfileId: profile.id, computeProfileId: resolved.id, profileRevision: resolved.revision, ...(plan.runtimeImage ? { runtimeImage: plan.runtimeImage } : {}), ...(stored ? { materialDigest: stored.view.digest } : {}) } };

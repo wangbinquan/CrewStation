@@ -42,6 +42,7 @@ export function productionResourceAccess(deps: DataUseCaseDeps, tasks: Productio
       const parsed = RequestTaskDataBindingSchema.parse(input.values);
       if (parsed.mode === 'development') throw precondition('开发数据访问不走生产授权');
       const task = await loadTask(projectId, input.taskId);
+      await deps.generations?.store.assertUnreserved(task.serviceId);
       let binding = await deps.bindings.getById(input.operationId);
       if (binding) {
         if (binding.projectId !== projectId || binding.taskId !== input.taskId || binding.mode !== parsed.mode || binding.ttlMinutes !== parsed.ttlMinutes || binding.requestedBy !== input.requestedBy) throw conflict('生产访问操作标识对应的内容已变化');

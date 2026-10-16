@@ -207,10 +207,10 @@ describe.skipIf(!available)('RFC-027 business workspace safe pause and original-
     ]) {
       await f.k8s.delete(Resources.PersistentVolumeClaim!, f.env.pvcName, f.env.namespace);
       await f.k8s.create(changed);
-      expect(await f.runtime.api.inspectBusinessRecovery(input)).toMatchObject({ volumeVerified: false, volumeUid: original.metadata.uid });
+      expect(await f.runtime.api.inspectBusinessRecovery(input)).toMatchObject({ volumeVerified: false, volumeUid: original.metadata.uid, volumePresent: true });
     }
     await f.k8s.delete(Resources.PersistentVolumeClaim!, f.env.pvcName, f.env.namespace);
-    expect(await f.runtime.api.inspectBusinessRecovery(input)).toMatchObject({ stopped: true, volumeVerified: false });
+    expect(await f.runtime.api.inspectBusinessRecovery(input)).toMatchObject({ stopped: true, volumeVerified: false, volumePresent: false });
     const get = f.k8s.get;
     f.k8s.get = async () => { throw new Error('cluster unavailable'); };
     await expect(f.runtime.api.inspectBusinessRecovery(input)).rejects.toThrow('cluster unavailable');

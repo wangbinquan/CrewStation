@@ -1,4 +1,4 @@
-import type { BusinessMaterialRequest, BusinessMaterialDownload } from '@crewstation/contracts';
+import type { PlatformOpencodeModels, BusinessMaterialRequest, BusinessMaterialDownload } from '@crewstation/contracts';
 // 驱动对外契约。与 `runtimes/task/src/agents/driver.ts` 的 AgentDriver／AgentProcess 结构一致，
 // 但不能直接 import 它（技术包不依赖运行时），于是在这里重新声明；宿主的 cliDriver.ts 做适配。
 
@@ -12,6 +12,7 @@ import type { ManagedRuntimeContext } from './managedRuntime';
 export interface DriverAgentSpec {
   businessSkills?: BusinessMaterialRequest['skills'];
   businessNativeConfig?: BusinessMaterialRequest['nativeConfig'];
+  platformOpencodeModels?: PlatformOpencodeModels;
   businessMaterialDownloads?: BusinessMaterialDownload[];
   startupInventoryVersion?: 1;
   /** RFC-027：业务执行（事件缓冲有上限、usage 事件携带业务用量）。 */

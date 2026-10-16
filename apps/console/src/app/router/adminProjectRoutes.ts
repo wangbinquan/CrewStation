@@ -3,7 +3,7 @@ import { createRoute, redirect } from '@tanstack/react-router';
 import { adminRoute } from '../../features/admin';
 import { HistoricalConversationsPage } from '../../features/dev-session';
 import { ProjectOverviewPage } from '../../features/projects';
-import { ReleasePage, PublishWizardPage, ReleaseJourneyPage, ReleaseVersionPage } from '../../features/release';
+import { DatabaseRestorePage,parseRestoreSearch,ReleasePage, PublishWizardPage, ReleaseJourneyPage, ReleaseVersionPage } from '../../features/release';
 import { parseDevelopmentSearch, parseConversationSearch } from '../../shared/project/developmentSearch';
 import { hasLegacyOperationsTab, parseOperationsSearch } from '../../shared/project/operationsSearch';
 import { parseResourceSearch, resourceDestination, resourceTarget } from '../../shared/project/resourceSearch';
@@ -18,6 +18,8 @@ import { parseCenterSearch } from '../../features/project-resources';
 import { ProjectResourceCenterPage } from '../project/ProjectResourceCenterPage';
 
 export const adminProjectRoute = createRoute({ getParentRoute: () => adminRoute, path: 'integrations/$projectId', component: AdminProjectLayout });
+const databaseRestores=createRoute({getParentRoute:()=>adminProjectRoute,path:'database-restores',validateSearch:parseRestoreSearch,component:DatabaseRestorePage});
+const databaseRestore=createRoute({getParentRoute:()=>adminProjectRoute,path:'database-restores/$restoreId',validateSearch:parseRestoreSearch,component:DatabaseRestorePage});
 const observability = createRoute({ getParentRoute: () => adminProjectRoute, path: 'observability', component: ProjectRuntimeStatisticsPage, validateSearch: parseRuntimeSearch });
 const observationTask = createRoute({ getParentRoute: () => adminProjectRoute, path: 'observability/tasks/$taskId', component: ProjectRuntimeStatisticsPage, validateSearch: parseRuntimeSearch });
 const overview = createRoute({ getParentRoute: () => adminProjectRoute, path: '/', component: ProjectOverviewPage });
@@ -49,4 +51,4 @@ const resources = createRoute({ getParentRoute: () => adminProjectRoute, path: '
   beforeLoad: ({ params, search }) => { redirectResource(params, search); },
 });
 const resourceCenter = createRoute({ getParentRoute: () => adminProjectRoute, path: 'resource-center', component: ProjectResourceCenterPage, validateSearch: parseCenterSearch });
-export const adminProjectRoutes = adminProjectRoute.addChildren([overview, observability, observationTask, development, conversations, release, publishWizard, releaseJourney, releaseVersion, operations, settings, resources, resourceCenter]);
+export const adminProjectRoutes = adminProjectRoute.addChildren([databaseRestores,databaseRestore,overview, observability, observationTask, development, conversations, release, publishWizard, releaseJourney, releaseVersion, operations, settings, resources, resourceCenter]);

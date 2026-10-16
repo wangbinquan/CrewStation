@@ -47,6 +47,9 @@
 - [I34. Agent fresh 重试的镜像与档位快照](#i34-agent-fresh-重试的镜像与档位快照)
 - [I35. RFC-037 全平台巡检历史的项目删除边界](#i35-rfc-037-全平台巡检历史的项目删除边界)
 
+- [I37. RFC-040 OpenCode 内部子代理的独立模型材料](#i37-rfc-040-opencode-内部子代理的独立模型材料)
+- [I38. RFC-370 恢复器所需的 CS 独立空目标数据库](#i38-rfc-370-恢复器所需的-cs-独立空目标数据库)
+
 ## I1. 操作 MCP 的「以本服务身份调用内部 API」用的是谁的身份
 
 **现状**：`call_internal_api` 工具从 mcp-operations 进程出去，网关按源 Pod IP 解析调用方，解析到的是 mcp-operations，不是发起调用的数字人。
@@ -526,3 +529,25 @@ spec.env.0.configDefinitionId / spec.env.1.configDefinitionId: expected string, 
 **可选做法**：(a) 恢复可核对的真实原历史，来源未恢复继续阻断；(b) 新增管理员逐项重新确权流程与专用历史事件盘点合同，保存明确的新当前资源基线，原历史NULL及未知状态保持；不能确认的条目、共享/活跃消费者和缺失原停止证明仍拒绝，旧事件不得重新执行或伪造为当前Manifest。具体范围、交互、owner落位和验收见[旧来源恢复方案](../../proposal/rfc/RFC-037-project-creation-and-deletion/legacy-recovery-options.md)。
 
 **作者已裁定（2026-10-06，“按你推荐执行”）**：采用(b)及链接中的历史事件专用盘点合同。逐项管理员确认新的当前基线；原未知归属和14条历史NULL保持，停止证明、七阶段回收、两次删除确认与独立after不变。I35生产范围不扩大；代码提交、推送、本机部署和原专用项目自主验收授权继续。 作者进一步明确“批准严格保留外项目活跃记录（推荐）”：仅对公开外项目服务归属、命名空间/标签、现存原Pod UID和所有实际容器一致且无目标/共享引用的网关记录逐项retain；旧出生不补写，运行实体不停止、不回收，变化后确认失效。其他活跃/未知原消费者仍拒绝。
+
+## I37. RFC-040 OpenCode 内部子代理的独立模型材料
+
+**状态：2026-10-16 作者批准方案 A，实施中。** 用户要求 RFC-370 完整等价，同时最新明确只验证 OpenCode；没有因此取消单机已支持的依赖 Agent 独立模型能力。
+
+**现状与缺口**：`packages/agent-drivers/injection/nativeMaterials.ts:33` 的 `opencodeNativeAgents` 把一个根 model 应用于全部子代理；`packages/contracts/api/business/nativeConfig.ts:11` 的业务 options 白名单不接受原始 model/provider/credential。AW 的依赖模型不同时会拒绝派发，因此同模型实测不能证明完整等价。
+
+**建议 A（推荐）**：业务只引用父 Manifest 授权的 `agentProfileId`；平台冻结根／子档位修订、credentialStamp 和结构化 provider 材料，Runner 使用稳定 provider 别名防止同名网关碰撞；fresh retry／resume 复用原快照，不读取今日凭据。缺少结构化 provider 材料的档位先明确提示缺失，不能猜测 Hook 或内置 provider 的凭据规则。
+
+**选项 B**：本期只允许继承根模型。此项会收缩 AW 能力、改变 RFC-370 完整等价标准，必须由作者明确接受。
+
+可评审合同、落位及完整用例在 [模型映射补充](../../proposal/rfc/RFC-040-business-native-materials/model-mapping-supplement.md)。作者在当前会话明确“按推荐实现”，批准引用平台档位并冻结 provider 材料；继续生产接线和用例，不缩减为同模型。
+
+## I38. RFC-370 恢复器所需的 CS 独立空目标数据库
+
+**状态：RFC-042 In Progress，2026-10-16 作者批准推荐设计与原型。**
+
+**现状与缺口**：`modules/data/application/serviceData.ts:22` 复用 ready 资源，`:56` 的 `envFor` 读取该环境已就绪库；平台没有供恢复器使用的新数据库世代及明确切换操作。AW 的恢复器拒绝覆盖非空目标，不能把原正式库直接作为恢复目的地。
+
+**建议**：独立空目标供给，固定发布镜像声明的 restore/verify 命令，保持原服务运行直至明确确认维护；停写证明完整后 CAS 切换数据库世代与执行权／路由，保留原库和备份，不自动重放旧任务。工作卷由 AW 对账与独立恢复，平台不凭数据库成功取消业务 hold。
+
+已完成 [RFC-042 proposal](../../proposal/rfc/RFC-042-service-database-restore/proposal.md)、design、plan 和可交互原型。作者明确“按推荐实现”，继续完整生产实现和用例；实际验收使用独立服务，正式 AW 不执行恢复切换或停止。

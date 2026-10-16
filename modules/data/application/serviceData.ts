@@ -51,6 +51,7 @@ export function serviceDataUseCases(deps: DataUseCaseDeps) {
       await deps.authorizer.assertProjectAvailable?.(svc.projectId);
       const out: DataResource[] = [];
       for (const env of ['production', 'development'] as DataEnv[]) out.push(await provision(serviceId, svc.projectId, svc.slug, env));
+      for (const resource of out) await deps.generations?.store.ensureInitial(resource);
       return out.map(toDto);
     },
     envFor: async (serviceId: ServiceId, env: DataEnv): Promise<Record<string, string>> => {
@@ -58,6 +59,12 @@ export function serviceDataUseCases(deps: DataUseCaseDeps) {
       for (const resource of await resources.listByService(serviceId)) {
         if (resource.env !== env || resource.state !== 'ready') continue;
         await deps.authorizer.assertProjectAvailable?.(resource.projectId as ProjectId);
+        if (resource.kind === 'postgres' && deps.generations) {
+          await deps.generations.store.ensureInitial(resource);
+          const binding = await deps.generations.api.active(serviceId, env);
+          Object.assign(values, await deps.generations.api.envFor(serviceId, binding.generationId));
+          continue;
+        }
         // 旧库的连接串 data 自己存着；data-control 建的（I28）经端口要口令，这里拼成连接串，不落库。
         const dsn = await dataControlDsn(deps, resource.id, resource.objectName) ?? (resource.secretBox ? await cipher.decrypt(resource.secretBox) : undefined);
         if (dsn) values[resource.envVar] = dsn;
@@ -71,6 +78,8 @@ export function serviceDataUseCases(deps: DataUseCaseDeps) {
     /** 供开发会话与业务任务的临时角色使用：生产库的对象名与运行角色。 */
     productionDatabase: async (serviceId: ServiceId): Promise<{ databaseName: string; roleName: string } | undefined> => {
       const prod = await resources.find(serviceId, 'production', 'postgres');
+      const current = deps.generations ? await deps.generations.store.active(serviceId, 'production') : undefined;
+      if (current && prod?.state === 'ready') return { databaseName: current.generation.objectName, roleName: current.generation.objectName };
       return prod?.state === 'ready' ? { databaseName: prod.objectName, roleName: prod.objectName } : undefined;
     },
   };

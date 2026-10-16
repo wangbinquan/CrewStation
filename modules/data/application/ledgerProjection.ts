@@ -14,7 +14,7 @@ const GONE: ReleaseReason = { code: 'binding-missing', message: '访问绑定已
  * 按 I28 裁定，byDataControl 时生产库、开发库与访问绑定的临时角色由 data-control 建（期望里标明），旧形状仍由 data 建。投影跟在仓储写入之后；台账写失败只告警——
  * 数据资源的操作照常完成，每 5 分钟的补投影会追上。
  */
-export function dataLedgerProjection(ledger: DataLedger, logger: Logger, byDataControl = false) {
+export function dataLedgerProjection(ledger: DataLedger, logger: Logger, byDataControl = false, preserveDatabase?: (id:string)=>Promise<boolean>) {
   const apply = async <D extends { readonly id: string }>(projection: Projection<D> | undefined, declare: (input: D) => Promise<unknown>): Promise<void> => {
     if (!projection) return;
     if (!projection.release) {
@@ -25,11 +25,19 @@ export function dataLedgerProjection(ledger: DataLedger, logger: Logger, byDataC
     const record = await ledger.get(projection.declaration.id);
     if (record?.desired === 'present') await ledger.requestRelease(record.id, projection.release);
   };
-  const projectResource = (resource: DataResource) => apply(databaseProjection(resource, byDataControl), ledger.declare);
+  const projectResource = async (resource: DataResource) => {
+    const projection=databaseProjection(resource,byDataControl);
+    if(projection&&await preserveDatabase?.(resource.id)){
+      const {provision:_provision,...spec}=projection.declaration.spec;
+      return apply({...projection,declaration:{...projection.declaration,spec:{...spec,independentDatabase:true}}},ledger.declare);
+    }
+    return apply(projection,ledger.declare);
+  };
   // 临时角色建在生产库上：期望里带上库名与运行角色（同名），data-control 删角色时据此转交它拥有的对象。
   const projectBinding = async (binding: TaskDataBinding, resources: Pick<DataResourceRepository, 'find'>) => {
     const prod = await resources.find(binding.serviceId as ServiceId, 'production', 'postgres');
-    const target = prod?.state === 'ready' ? { database: prod.objectName, ownerRole: prod.objectName } : undefined;
+    const name = binding.databaseName ?? (prod?.state === 'ready' ? prod.objectName : undefined);
+    const target = name ? { database: name, ownerRole: name } : undefined;
     await apply(bindingProjection(binding, target, byDataControl), ledger.declare);
   };
   const safely = async (id: string, project: () => Promise<void>): Promise<boolean> => {

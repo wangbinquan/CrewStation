@@ -95,3 +95,5 @@ Claude 从该次根会话 init 读取实际清单；OpenCode 在该次私有运�
 按已批准的原生 MCP／插件与 AW RFC-370 能力等价范围，对照 [OpenCode 1.18.29 的插件合同](https://github.com/anomalyco/opencode/blob/v1.18.29/packages/core/src/v1/config/plugin.ts)，非空插件 options 经 `[fileURL, options]` 传入；MCP remote 的 `oauth=false` 或显式 clientId／clientSecret／scope／redirectUri 原样传入 OpenCode。OAuth clientSecret 与插件 options 的全部非空字符串叶子纳入持久事件脱敏。Claude 不增加这些能力，本轮不做其 CLI 实测。
 
 MCP 子进程 env 名称兼容 POSIX 大小写（与 AW 的既有声明一致），保留 128 字符限制、平台保留名及 loader 命名空间拒绝；命令／根 Agent 的环境变量合同不变。正则由大写集合扩展为大小写集合，所有原来有效的输入保持有效。合同工具将任何 pattern 差异机械归为 breaking，本项是接受集合的兼容扩展，锁文件更新以此处为依据，不要求既有业务迁移。
+
+联合接线中原生 Agent／MCP／插件名称上限从 80 扩展到 128，与 AW 已有资源名称合同一致；正则、平台保留空间与原型键拒绝不变。此项只扩展接受集合，不改变已保存材料的名字或摘要；CS 子任务展示名仍为 80。本轮补充只验证 OpenCode。

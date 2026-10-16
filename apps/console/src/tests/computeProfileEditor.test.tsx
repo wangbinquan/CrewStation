@@ -228,3 +228,17 @@ describe('编辑算力档位', () => {
     expect(page.text()).toContain('有未保存的修改：先保存，保存后会自动测试。');
   });
 });
+
+
+test('OpenCode administrator provider editor keeps drafts and locates invalid material before any save', async () => {
+  backend = computeBackend(); page = await renderApp('/admin/compute?create=true');
+  await setField('协议', 'opencode');
+  expect(labels()).toContain('Provider 配置（JSON）');
+  await setField('档位名', 'structured-provider'); await setField('镜像', 'registry.cs.local/runtimes/opencode:1');
+  await setField('Provider 配置（JSON）', '{invalid'); await press('创建档位');
+  expect(page.text()).toContain('请填写有效的 provider 配置'); expect(backend.writes).toHaveLength(0);
+  await openTab('变量与凭据'); await openTab('基础配置'); expect(control('Provider 配置（JSON）').value).toBe('{invalid');
+  await setField('Provider 配置（JSON）', JSON.stringify({ id: 'gateway', npm: '@ai-sdk/openai-compatible', models: { m: { name: 'M' } }, options: { baseURL: 'https://gateway.example/v1' } }));
+  await setField('模型', 'gateway/m');
+  expect(control('Provider 配置（JSON）').value).toContain('gateway');
+});

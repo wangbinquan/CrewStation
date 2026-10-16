@@ -54,7 +54,9 @@ export function createOpencodeUsageMeter(input: UsageMeterInput): UsageMeter {
       const tree = readOpencodeTreeUsage(opencodeUsageDatabasePath(input.env), [...roots], input.startedAt);
       // 存储里的根步骤少于流上已见的：不是本次执行的存储或尚未落盘，保留流上的视图。
       if (!tree || tree.rootSteps < steps.size) return false;
-      summary = tree.models;
+      const canonical = new UsageAccumulator();
+      for (const row of tree.models) canonical.add(input.modelAliases?.[row.model] ?? row.model, row);
+      summary = canonical.models();
       stream.clear();
       delegated = false;
       return true;

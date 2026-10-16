@@ -5,7 +5,7 @@ import { BusinessFileQuerySchema, BusinessDirectoryQuerySchema, BusinessFileDtoS
 import { BusinessControlActivateSchema, BusinessControlClaimSchema, BusinessControlDtoSchema, BusinessControlLeaseRequestSchema, BusinessHandoffReadySchema } from '../api/business/control';
 import { BusinessEventPageSchema, BusinessEventQuerySchema } from '../api/business/events';
 import { BusinessCapabilitiesDtoSchema } from '../api/business/capabilities';
-import { BusinessOperationDtoSchema, BusinessOutputDtoSchema, BusinessSubtaskV3DtoSchema, BusinessTaskV3DtoSchema } from '../api/business/responses';
+import { BusinessWorkspaceInspectionSchema, BusinessOperationDtoSchema, BusinessOutputDtoSchema, BusinessSubtaskV3DtoSchema, BusinessTaskV3DtoSchema } from '../api/business/responses';
 
 /** Include the complete external v3 surface in the same compatibility gate as deployed v2 clients. */
 export function businessExecutionSurface() {
@@ -17,6 +17,7 @@ export function businessExecutionSurface() {
     BusinessHandoffReady: BusinessHandoffReadySchema, BusinessEventQuery: BusinessEventQuerySchema,
   };
   const received = {
+    BusinessWorkspaceInspection: BusinessWorkspaceInspectionSchema,
     BusinessTaskV3Dto: BusinessTaskV3DtoSchema, BusinessSubtaskV3Dto: BusinessSubtaskV3DtoSchema, BusinessOperationDto: BusinessOperationDtoSchema,
     BusinessOutputDto: BusinessOutputDtoSchema, BusinessMaterialDto: BusinessMaterialDtoSchema, BusinessFileDto: BusinessFileDtoSchema,
     BusinessDirectoryDto: BusinessDirectoryDtoSchema, BusinessControlDto: BusinessControlDtoSchema, BusinessEventPage: BusinessEventPageSchema,

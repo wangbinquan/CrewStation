@@ -246,6 +246,10 @@ interface RedeployTarget { readonly physical: PhysicalSlot; readonly prepared: S
  * 没有进行中的发布与运维；部署前检查（Manifest、套餐与副本、档位、生产配置）；平台部分——集群 dry-run。任何一项不过都返回标准原因，不写库。
  */
 async function checkRedeploy(deps: Deps, release: Release, svc: ResolvedService): Promise<RedeployTarget | { readonly reason: PrecheckReason; readonly extra?: Readonly<Record<string, unknown>> }> {
+  const restores=await deps.uow.read.databaseRestores?.list(release.serviceId)??[];
+  if(restores.some(op=>op.stage!=='completed'))return {reason:precheckReason('release-in-progress','服务数据库恢复尚未结束')};
+  const latest=restores.find(op=>op.stage==='completed');
+  if(latest&&release.id!==latest.candidateReleaseId&&release.createdAt.getTime()<=Date.parse(latest.createdAt))return {reason:precheckReason('not-redeployable','数据库恢复前的发布必须通过新的明确恢复操作切回')};
   const seen = await deps.uow.read.slots.get(release.serviceId);
   if (!seen) return { reason: precheckReason('no-deployment', '服务尚无任何部署', '先发布一个版本') };
   if (seen[seen.active].releaseId === release.id) return { reason: precheckReason('already-active', `${release.tag} 就是当前正式版本`) };
@@ -262,7 +266,8 @@ async function checkRedeploy(deps: Deps, release: Release, svc: ResolvedService)
   const spec: SlotDeploySpec = { namespace: svc.namespace, projectSlug: svc.slug, serviceName: svc.name, physical, releaseId: release.id, image: release.image ?? '', manifest: release.manifest!, replicas: prepared.replicas, env: prepared.env.values, plan: prepared.plan };
   // 由资源中心建出（T8）：预检的是这一次部署要写进台账的期望（接着这个槽上一次的 revision 数）。
   const service = release.manifest!.spec.service;
-  const workload = deps.creation === 'ledger' ? nextWorkload(seen[physical], { releaseId: release.id, image: release.image ?? '', command: service.command, port: service.port, healthPath: service.healthPath, ...(service.probes ? { probes: service.probes } : {}), replicas: prepared.replicas, resources: { cpu: prepared.plan.cpu, memory: prepared.plan.memory } }) : undefined;
+  const generation=prepared.env.values.CS_DATABASE_URL?await deps.data.databaseGenerations?.active(release.serviceId,'production'):undefined;
+  const workload = deps.creation === 'ledger' ? nextWorkload(seen[physical], { ...(generation?{databaseGenerationId:generation.generationId}:{}), releaseId: release.id, image: release.image ?? '', command: service.command, port: service.port, healthPath: service.healthPath, ...(service.probes ? { probes: service.probes } : {}), replicas: prepared.replicas, resources: { cpu: prepared.plan.cpu, memory: prepared.plan.memory } }) : undefined;
   const rejected = await dryRunReason(deps, spec, workload ? slotSpecOf(release.serviceId, svc, physical, workload) : undefined);
   return rejected ? { reason: rejected } : { physical, prepared, spec, ...(workload ? { workload } : {}) };
 }

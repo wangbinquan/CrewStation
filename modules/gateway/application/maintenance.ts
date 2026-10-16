@@ -1,6 +1,6 @@
 import type { Actor, ExitMaintenanceRequest, MaintenanceDto, MaintenanceEventDto, ServiceId, ServiceMaintenanceView, SetMaintenanceRequest, UserId, WorkloadIdentity } from '@crewstation/contracts';
 import { DomainTopic } from '@crewstation/contracts';
-import { conflict, newId, notFound, validation } from '@crewstation/kernel';
+import { conflict, forbidden, newId, notFound, precondition, validation } from '@crewstation/kernel';
 import type { EntryVerdict } from '../api/moduleApi';
 import type { Maintenance } from '../domain/maintenance';
 import { applyMaintenance, assertExitRevision, blocksServiceCall, fullWindow, holdsEvents, retryAfterSeconds } from '../domain/maintenance';
@@ -82,6 +82,16 @@ function maintenanceCommands(deps: GatewayUseCaseDeps, cache: Cache) {
     return { current: current ? await toDto(current) : null, history: events.map(eventToDto) };
   };
   return {
+    enterDatabaseRestoreMaintenance: async (actor:Actor,serviceId:ServiceId,operationId:string) => {
+      if(!actor.isAdmin)throw forbidden('只有管理员可以切换恢复数据库');
+      const svc=await resolve(serviceId);await deps.access.authorize(actor,svc.projectId,'manage-maintenance');
+      const value=await uow.run(async scope=>{if(!scope.maintenance.beginRestore)throw precondition('恢复维护保留未配置');const receipt=await scope.maintenance.beginRestore({serviceId,projectId:svc.projectId,operationId,actor:actor.userId,now:deps.clock.now()});await scope.publish(DomainTopic.maintenanceChanged,{occurredAt:deps.clock.now().toISOString(),projectId:svc.projectId,serviceId,active:true,holdEvents:true});return receipt;});cache.invalidate();return value;
+    },
+    exitDatabaseRestoreMaintenance: async (actor:Actor,serviceId:ServiceId,operationId:string,revision:number) => {
+      if(!actor.isAdmin)throw forbidden('只有管理员可以完成恢复维护');
+      const svc=await resolve(serviceId);await deps.access.authorize(actor,svc.projectId,'manage-maintenance');
+      await uow.run(async scope=>{if(!scope.maintenance.endRestore)throw precondition('恢复维护保留未配置');await scope.maintenance.endRestore({serviceId,operationId,revision,actor:actor.userId,now:deps.clock.now()});const restored=await scope.maintenance.get(serviceId);await scope.publish(DomainTopic.maintenanceChanged,{occurredAt:deps.clock.now().toISOString(),projectId:svc.projectId,serviceId,active:!!restored,holdEvents:!!restored?.switches.events});});cache.invalidate();
+    },
     getMaintenance: async (actor: Actor, serviceId: ServiceId): Promise<ServiceMaintenanceView> => {
       const svc = await resolve(serviceId);
       await deps.access.authorize(actor, svc.projectId, 'view');
@@ -136,6 +146,7 @@ function maintenanceQueries(deps: GatewayUseCaseDeps, cache: Cache) {
       if (slot === 'prod') {
         const hit = (await cache.active()).find((e) => e.service.projectSlug === projectSlug);
         const m = hit?.maintenance;
+        if(hit&&await deps.maintenanceUow.read.maintenance.restoreHeld?.(hit.service.serviceId))return {kind:'maintenance',projectSlug,reason:m!.reason};
         if (!hit || !m?.switches.users || m.allowUserIds.includes(userId) || await deps.access.isMemberOrAdmin(userId, hit.service.projectId)) return { kind: 'open' };
         const retry = retryAfterSeconds(m, deps.clock.now());
         return { kind: 'maintenance', projectSlug, reason: m.reason, ...(m.expectedEndAt ? { expectedEndAt: m.expectedEndAt.toISOString() } : {}), ...(retry ? { retryAfterSeconds: retry } : {}) };

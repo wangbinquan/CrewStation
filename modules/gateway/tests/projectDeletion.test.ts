@@ -22,7 +22,8 @@ describe.skipIf(!available)('网关项目清理（真实 PG、正式项目许可
     const report = await owner().inspect(await scope());
     expect(report.complete).toBe(true); expect(report.blockers).toEqual([]);
     expect(report.references).toEqual([{ kind: 'allowlist-incoming-caller', id: f.other.id, projectId: f.other.id, description: '本项目接口关闭后，该项目在共享放行表中的相关授权关系会移除，其他授权保留' }]);
-    expect(report.resources.filter((r) => r.kind !== 'allowlist-project-parts').map((r) => r.count)).toEqual([1, 1, 1, 1, 1, 1]);
+    expect(report.resources.find((r) => r.kind === 'database_restore_maintenance')?.count).toBe(0);
+    expect(report.resources.filter((r) => !['allowlist-project-parts', 'database_restore_maintenance'].includes(r.kind)).map((r) => r.count)).toEqual([1, 1, 1, 1, 1, 1]);
     expect(report.resources.find((r) => r.kind === 'allowlist-project-parts')?.count).toBe(7);
     expect(JSON.stringify(report)).not.toContain('erase-owned'); expect(JSON.stringify(report)).not.toContain('retain-other-entry');
     expect((await f.project.api.resolveServiceOfSlug(f.own.slug))?.projectId).toBe(f.own.id);

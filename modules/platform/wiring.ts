@@ -1,3 +1,5 @@
+import { dataCredentialPorts } from './application/credentialRotation';
+import { objectTransferOwners } from './adapters/k8s/objectTransferOwners';
 import { agentCallReleaseConsumer } from './adapters/observability/agentCallRelease';
 import { businessCallPorts, developmentCallPorts, profileTestCallPorts, sessionCallSink } from './application/observability/agentCallPorts';
 import {withOperationalHistory} from './application/observability/operationalHistory';
@@ -23,7 +25,7 @@ import { objectStorageSources } from './application/objectStorageSources';
 import { nativeWorkloadOwnership, originalGatewayPodProject } from './adapters/k8s/workloadOwnership';
 import { nativePostgresSource } from './adapters/k8s/nativePostgresSource';
 import { nativeProjectObjectSources } from './adapters/k8s/nativeGarage/objectSources'; import { nativeRegistryWriterAdmission } from '@crewstation/filesystem-metrics';
-import { assertStorageConsumers } from './adapters/k8s/storageContract'; import { objectTransferOwners } from './adapters/k8s/objectTransferOwners';
+import { assertStorageConsumers } from './adapters/k8s/storageContract';
 import { releaseImagePorts } from './application/releaseImagePorts';
 import { eventDeliveryOwners, projectCallbackOwners, provisioningWorkPorts } from './adapters/k8s/eventDeliveryOwners';
 import { imageValidationPorts } from './application/imageValidationPorts';
@@ -34,7 +36,6 @@ import { createManagedRuntimeEnvironmentModule, createNativeRuntimeImageWorkPhys
 import { runtimeImagePlatformPorts } from './application/runtimeImagePorts';
 import { assertRuntimeImageBuildIsolation } from './adapters/k8s/runtimeImageIsolation';
 import { projectHostAccess } from './application/projectHostAccess';
-import { rotateDataCredential } from './application/credentialRotation';
 import { resourceIdentityDirectory, type Database, type MigrationSet, type ResourceIdentityDirectory } from '@crewstation/persistence';
 import { createClusterManagementModule } from '@crewstation/module-cluster-management';
 import { createClusterControlModule, type ClusterControlModuleApi, type SlotSpec } from '@crewstation/module-cluster-control';
@@ -94,30 +95,7 @@ export const SYSTEM_ACTOR: Actor = { userId: BUILTIN_RESOURCES.systemActor as Us
 const consumerLifecycle = (consumer: EventConsumer): Lifecycle => ({ start: () => consumer.start(), stop: () => consumer.stop() });
 interface Late { clusterManagement?: ReturnType<typeof createClusterManagementModule>['api']; resourceAccess?: ReturnType<typeof createResourceAccessModule>['api']; observability?: ObservabilityModuleApi; objectHistory?: NonNullable<NonNullable<Parameters<typeof createDataModule>[0]['objects']>['history']>; businessTask?: BusinessTaskModuleApi; events?: EventsModuleApi; project?: ProjectModuleApi; gateway?: GatewayModuleApi; taskRuntime?: TaskRuntimeModuleApi; release?: ReleaseModuleApi; resources?: ResourcesModuleApi; dataControl?: DataControlModuleApi; clusterControl?: ClusterControlModuleApi }
 type CompositionDeps = PlatformModuleDeps & { identities: ResourceIdentityDirectory };
-function dataPorts(settings: PlatformSettings, late: Late, sources: ReturnType<typeof objectStorageSources>, k8s: PlatformModuleDeps['k8s']): Pick<Parameters<typeof createDataModule>[0], 'ledger' | 'credentials' | 'objects' | 'nativePostgres'> {
-  const ledger = () => { if (!late.resources) throw new Error('resources 尚未装配'); return late.resources; };
-  const dataControl = () => { if (!late.dataControl) throw new Error('data-control 尚未装配'); return late.dataControl; };
-  const objectPlane = () => { const plane = dataControl().objects; if (!plane) throw new Error('对象数据面尚未配置'); return plane; };
-  const requestOwners = settings.platformPodUid ? projectCallbackOwners(k8s, settings.systemNamespace, settings.platformPodUid, 'crewstation.io/data-project-stop') : undefined;
-  return {
-    nativePostgres: { run: (origin, names, effect) => { const work = dataControl().nativePostgres; if (!work) throw precondition('原数据库写入端口尚未装配'); return work.run(origin, names, effect); }, credential: (origin, role) => { const work = dataControl().nativePostgres; if (!work?.credential) throw precondition('原数据库口令端口尚未装配'); return work.credential(origin, role); } },
-    objects: { inputApiUrl: `http://cs-api.${settings.systemNamespace}.svc:8087`, transferOwners: objectTransferOwners(k8s, settings.systemNamespace, settings.platformPodUid), ...(requestOwners ? { work: { processes: { ...requestOwners, protectCurrent: requestOwners.protectCurrentProcess }, assertAvailable: (id: ProjectId) => { if (!late.project) throw precondition('原项目准入尚未装配'); return late.project.assertProjectAvailable(id); } } } : {}), sources, provisioning: { deploymentMode: settings.objectStorage?.deploymentMode ?? 'production', apiUrl: settings.objectStorage?.apiUrl ?? `http://api.${settings.serviceDomain}:8088` }, exporterToken: settings.clusterMetrics?.exporterToken ?? '', history: { read: (input) => { if (!late.objectHistory) throw new Error('对象历史指标尚未装配'); return late.objectHistory.read(input); } }, plane: {
-      configure: (...args) => objectPlane().configure(...args), prepareRotation: (...args) => { const plane = objectPlane(); if (!plane.prepareRotation) throw precondition('对象凭据轮换不可用'); return plane.prepareRotation(...args); }, probe: (...args) => objectPlane().probe(...args), metrics: () => objectPlane().metrics(),
-      inspectWrite: (...args) => objectPlane().inspectWrite?.(...args) ?? Promise.resolve('unknown'), put: (...args) => objectPlane().put(...args), get: (...args) => objectPlane().get(...args), verify: (...args) => objectPlane().verify(...args), remove: (...args) => objectPlane().remove(...args),
-    }, tasks: { revision: (id) => { if (!late.businessTask) throw new Error('业务归档修订尚未装配'); return late.businessTask.acceptedArchiveRevision(id); }, accepted: (id) => { if (!late.businessTask) throw new Error('业务终结意图尚未装配'); return late.businessTask.acceptedFinalization(id); }, read: (serviceId, taskId) => { if (!late.businessTask) throw new Error('业务归档身份尚未装配'); return late.businessTask.archiveTask(serviceId, taskId); } } },
-    ledger: {
-      declare: (input) => ledger().owner('data').declare(input), get: (id) => ledger().get(id), requestRelease: (id, reason) => ledger().owner('data').requestRelease(id, reason),
-      presentBindings: async () => (await ledger().list({ kind: 'data-binding' })).filter((record) => record.owner.module === 'data' && record.desired === 'present'),
-    },
-    ...(settings.dataProvisioning === 'data-control' ? { credentials: {
-      credentialOf: (id: string) => dataControl().credentialOf(id),
-      rotateCredential: async (id: string, projectId: ProjectId) => {
-        if (settings.workloadCreation !== 'ledger' || settings.releaseCreation !== 'ledger') throw new Error('口令轮换需要工作负载与发布均由资源中心创建');
-        await rotateDataCredential(ledger(), dataControl(), id, projectId);
-      },
-    } } : {}),
-  };
-}
+
 function composeCore(deps: CompositionDeps, late: Late) {
   const { db, settings, logger } = deps;
   const hosts = projectHosts(settings);
@@ -205,6 +183,7 @@ function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeC
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, scm, apiCatalog, hosts, isAdmin, resolveById } = core;
   const release = createReleaseModule({
+    databaseRestore:{secretKeyBase64:settings.secretKeyBase64,objectReadUrl:`http://cs-api.${settings.systemNamespace}.svc:8087/internal/database-restore-objects`},
     ...(deps.deletion ? { deletion: { physics: deps.deletion.release, assertGrant: project.api.assertProjectDeletionGrant }, deletionIdentities: deps.identities } : {}),
     ...(settings.platformPodUid ? { projectAdmission: { protectCurrent: projectCallbackOwners(k8s, settings.systemNamespace, settings.platformPodUid, 'crewstation.io/release-project-stop').protectCurrentProcess, assertAvailable: (id: string) => project.api.assertProjectAvailable(id as ProjectId),
       ...(settings.projectDeletionNative?.registry ? { assertNativeRegistryAvailable: nativeRegistryWriterAdmission(settings.projectDeletionNative.registry).assertAvailable } : {}) } } : {}),
@@ -239,9 +218,9 @@ function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeC
       render: async (projectId, env) => ({ values: await config.api.renderDefinitions(projectId, env), version: await config.api.currentVersion(projectId, env) }),
       validate: (projectId, env, keys) => config.api.validateManifestEnv(projectId, env, keys.map((configDefinitionId) => ({ name: 'CONFIG', configDefinitionId, from: 'config' as const }))),
     },
-    data: { envFor: data.api.envFor, ...(data.api.objectEnv ? { objectEnv: data.api.objectEnv } : {}) },
+    data: { databaseGenerations: data.api.databaseGenerations, envFor: data.api.envFor, ...(data.api.objectEnv ? { objectEnv: data.api.objectEnv } : {}) },
     // RFC-021：项目完整维护即破坏性迁移窗口（gateway 在 release 之后装配，故惰性取）；自动下线的提醒发给负责人。
-    maintenance: { open: (serviceId) => { if (!late.gateway) throw new Error('gateway 尚未装配'); return late.gateway.maintenanceWindowOpen(serviceId); } },
+    maintenance: { enterRestore: (actor,id,op) => {if(!late.gateway)throw new Error('gateway 尚未装配');return late.gateway.enterDatabaseRestoreMaintenance(actor,id,op);}, exitRestore: (actor,id,op,revision) => {if(!late.gateway)throw new Error('gateway 尚未装配');return late.gateway.exitDatabaseRestoreMaintenance(actor,id,op,revision);}, open: (serviceId) => { if (!late.gateway) throw new Error('gateway 尚未装配'); return late.gateway.maintenanceWindowOpen(serviceId); } },
     owners: { ownerOf: project.api.ownerOf },
     notifier: { notify: async (projectId, users, message) => { logger.warn('slot offline notice', { projectId, users, message }); } },
     settings: { userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, registryBase: settings.registryBase, buildTimeoutSeconds: 1800, deployTimeoutSeconds: 600, builderImage: settings.builderImage, buildkitAddress: settings.buildkitAddress, workerOwner: `${deps.instance}.release` },
@@ -529,6 +508,26 @@ function productionDeletion(deps: CompositionDeps, late: Late, core: () => Retur
     objects: createDataObjectDeletionPhysics(db, native.objects(createObjectDeletionTransport(db, settings.secretKeyBase64), createGarageDeletionTransport), assertGrant),
   };
 }
+function dataPorts(settings: PlatformSettings, late: Late, sources: ReturnType<typeof objectStorageSources>, k8s: K8sClient): Pick<Parameters<typeof createDataModule>[0], 'ledger' | 'credentials' | 'objects' | 'nativePostgres' | 'databaseGenerationPlane'> {
+  const ledger = () => { if (!late.resources) throw new Error('resources 尚未装配'); return late.resources; };
+  const dataControl = () => { if (!late.dataControl) throw new Error('data-control 尚未装配'); return late.dataControl; };
+  const objectPlane = () => { const plane = dataControl().objects; if (!plane) throw new Error('对象数据面尚未配置'); return plane; };
+  const requestOwners = settings.platformPodUid ? projectCallbackOwners(k8s, settings.systemNamespace, settings.platformPodUid, 'crewstation.io/data-project-stop') : undefined;
+  return {
+    databaseGenerationPlane: { inspect: (input) => { const plane = dataControl().databaseGenerations; if (!plane) throw precondition('数据库世代物理观测尚未装配'); return plane.inspect(input); } },
+    nativePostgres: { run: (origin, names, effect) => { const work = dataControl().nativePostgres; if (!work) throw precondition('原数据库写入端口尚未装配'); return work.run(origin, names, effect); }, credential: (origin, role) => { const work = dataControl().nativePostgres; if (!work?.credential) throw precondition('原数据库口令端口尚未装配'); return work.credential(origin, role); } },
+    objects: { inputApiUrl: `http://cs-api.${settings.systemNamespace}.svc:8087`, transferOwners: objectTransferOwners(k8s, settings.systemNamespace, settings.platformPodUid), ...(requestOwners ? { work: { processes: { ...requestOwners, protectCurrent: requestOwners.protectCurrentProcess }, assertAvailable: (id: ProjectId) => { if (!late.project) throw precondition('原项目准入尚未装配'); return late.project.assertProjectAvailable(id); } } } : {}), sources, provisioning: { deploymentMode: settings.objectStorage?.deploymentMode ?? 'production', apiUrl: settings.objectStorage?.apiUrl ?? `http://api.${settings.serviceDomain}:8088` }, exporterToken: settings.clusterMetrics?.exporterToken ?? '', history: { read: (input) => { if (!late.objectHistory) throw new Error('对象历史指标尚未装配'); return late.objectHistory.read(input); } }, plane: {
+      configure: (...args) => objectPlane().configure(...args), prepareRotation: (...args) => { const plane = objectPlane(); if (!plane.prepareRotation) throw precondition('对象凭据轮换不可用'); return plane.prepareRotation(...args); }, probe: (...args) => objectPlane().probe(...args), metrics: () => objectPlane().metrics(),
+      inspectWrite: (...args) => objectPlane().inspectWrite?.(...args) ?? Promise.resolve('unknown'), put: (...args) => objectPlane().put(...args), get: (...args) => objectPlane().get(...args), verify: (...args) => objectPlane().verify(...args), remove: (...args) => objectPlane().remove(...args),
+    }, tasks: { revision: (id) => { if (!late.businessTask) throw new Error('业务归档修订尚未装配'); return late.businessTask.acceptedArchiveRevision(id); }, accepted: (id) => { if (!late.businessTask) throw new Error('业务终结意图尚未装配'); return late.businessTask.acceptedFinalization(id); }, read: (serviceId, taskId) => { if (!late.businessTask) throw new Error('业务归档身份尚未装配'); return late.businessTask.archiveTask(serviceId, taskId); } } },
+    ledger: {
+      declare: (input) => ledger().owner('data').declare(input), get: (id) => ledger().get(id), requestRelease: (id, reason) => ledger().owner('data').requestRelease(id, reason),
+      presentBindings: async () => (await ledger().list({ kind: 'data-binding' })).filter((record) => record.owner.module === 'data' && record.desired === 'present'),
+    },
+    ...(settings.dataProvisioning === 'data-control' ? { credentials: dataCredentialPorts(ledger, dataControl, settings.workloadCreation === 'ledger' && settings.releaseCreation === 'ledger') } : {}),
+  };
+}
+
 function composeModules(deps: CompositionDeps) {
   const late: Late = {};
   deps = { ...deps, deletion: deps.deletion ?? productionDeletion(deps, late, () => core) };

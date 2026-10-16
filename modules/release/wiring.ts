@@ -34,6 +34,14 @@ import { releaseDeletionRepository } from './adapters/persistence/projectDeletio
 import { admittedReleaseApi, protectedReleaseEffects, releaseProjectWork, releaseResourceCreationWork, releaseProjectDeletionOwner } from './application/projectDeletion';
 import type { ReleaseModuleApi } from './api/moduleApi';
 import type { ReleaseUseCaseDeps } from './application/dependencies';
+import { createHmac } from 'node:crypto';
+import { encryptString, decryptString } from '@crewstation/secretbox';
+import { databaseRestoreCommands } from './application/database-restore/commands';
+import { databaseRestoreProgress } from './application/database-restore/progress';
+import { restoreObjectSource } from './application/database-restore/owner';
+import { databaseRestoreCoordination } from './adapters/persistence/database/restores';
+import { kubernetesRestoreJobObserver } from './adapters/k8s/databaseRestoreJobs';
+import { databaseRestoreRoutes } from './http/databaseRestoreRoutes';
 import { pipelineStepUseCase } from './application/pipeline';
 import { publishUseCase } from './application/publish';
 import { activeWebhookIngress, releaseObjectStorage, releaseQueries } from './application/queries';
@@ -53,6 +61,7 @@ import { resyncSlotLedger } from './application/slotLedgerResync';
 import type { SlotLedger } from './ports/ledger';
 
 export interface ReleaseModuleDeps {
+  databaseRestore?: {secretKeyBase64:string;objectReadUrl:string};
   /** Only old retained identities use this directory; normal release commands keep their UUID boundary. */
   deletionIdentities?: ReleaseContentDirectory;
   projectAdmission?: { protectCurrent(): Promise<ReleaseCallbackProcess>; assertAvailable(projectId: string): Promise<void>; assertNativeRegistryAvailable?: () => Promise<void> };
@@ -110,20 +119,27 @@ export const releaseMigrations: MigrationSet = {
   files: readMigrationDir(join(import.meta.dir, 'adapters', 'persistence', 'migrations')),
 };
 
-export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
-  const logger = deps.logger ?? noopLogger;
-  const admission = deps.projectAdmission ? releaseProjectAdmissions({ db: deps.db, ...deps.projectAdmission }) : undefined;
-  const uow = drizzleUnitOfWork(deps.db, deps.ledger ? { ledger: deps.ledger, services: deps.services, logger } : undefined);
-  const effects = <T extends object>(source: T) => protectedReleaseEffects(source, admission);
-  const jobs = queueReleaseJobs(deps.db, admission ? async (id, work) => {
+function releasePipelineJobs(deps: ReleaseModuleDeps, uow: ReturnType<typeof drizzleUnitOfWork>, admission: ReturnType<typeof releaseProjectAdmissions> | undefined) {
+  return queueReleaseJobs(deps.db, admission ? async (id, work) => {
     const release = await uow.read.releases.getById(id as ReleaseId); if (!release) return;
     await releaseProjectWork({ services: deps.services, admission }, release.serviceId, 'pipeline', release.id, { enqueue: release.id }, async () => {
       if ((await deps.services.resolveServiceById(release.serviceId))?.projectId !== release.projectId) throw new Error('原发布项目与队列服务归属冲突');
       await admission.checkCurrent(); await work(); await admission.checkCurrent();
     });
   } : undefined);
+}
+
+export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
+  const logger = deps.logger ?? noopLogger;
+  const admission = deps.projectAdmission ? releaseProjectAdmissions({ db: deps.db, ...deps.projectAdmission }) : undefined;
+  const uow = drizzleUnitOfWork(deps.db, deps.ledger ? { ledger: deps.ledger, services: deps.services, logger } : undefined);
+  const effects = <T extends object>(source: T) => protectedReleaseEffects(source, admission);
+  const jobs = releasePipelineJobs(deps, uow, admission);
   const useCaseDeps: ReleaseUseCaseDeps = {
     uow, admission,
+    ...(deps.databaseRestore?{databaseRestore:{coordination:databaseRestoreCoordination(deps.db),jobs:effects(kubernetesRestoreJobObserver(deps.k8s)),objectReadUrl:deps.databaseRestore.objectReadUrl,isAdmin:deps.isAdmin,
+      encrypt:(plain:string)=>encryptString(deps.databaseRestore!.secretKeyBase64,plain),decrypt:(boxed:string)=>decryptString(deps.databaseRestore!.secretKeyBase64,boxed),
+      token:(jobId:string,digest:string)=>createHmac('sha256',Buffer.from(deps.databaseRestore!.secretKeyBase64,'base64')).update('database-restore-object-read\0'+jobId+'\0'+digest).digest('base64url')}}:{}),
     tagger: effects(deps.tagger),
     repo: effects(deps.repo), executionHandoff: deps.executionHandoff ? effects(deps.executionHandoff) : undefined,
     ...(deps.runtimeImages ? { runtimeImages: effects(deps.runtimeImages) } : {}),
@@ -146,6 +162,9 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
     ...(deps.ledger && deps.creation === 'ledger' ? { creation: 'ledger' as const } : {}), ...(deps.renderer ? { renderer: effects(deps.renderer) } : {}),
   };
   const implementation: ReleaseModuleApi = {
+    ...databaseRestoreCommands(useCaseDeps),
+    progressDatabaseRestores:databaseRestoreProgress(useCaseDeps),
+    restoreObjectSource:restoreObjectSource(useCaseDeps),
     sharedAdmissionKeys: releaseAdmissionKeys,
     name: 'release',
     ...journeyQueries(useCaseDeps),
@@ -178,8 +197,8 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
   return {
     api,
     withResourceCreationAdmission: (input, work) => releaseResourceCreationWork(useCaseDeps, input, work),
-    http: [releaseRoutes(api, deps.isAdmin), journeyRoutes(api, deps.isAdmin)],
-    workers: [createWorker({ db: deps.db, kinds: [PIPELINE_JOB_KIND], owner: deps.settings.workerOwner, concurrency: 4, logger, handler: pipelineJobHandler(api, jobs) }), sweep, periodicJob(() => api.progressHandoffs().then(() => undefined), (error) => logger.warn('execution handoff progress failed', { error: String(error) }), 1000),
+    http: [databaseRestoreRoutes(api,deps.isAdmin),releaseRoutes(api, deps.isAdmin), journeyRoutes(api, deps.isAdmin)],
+    workers: [periodicJob(()=>api.progressDatabaseRestores().then(()=>undefined),(error)=>logger.warn('database restore progress failed',{error:String(error)}),3000),createWorker({ db: deps.db, kinds: [PIPELINE_JOB_KIND], owner: deps.settings.workerOwner, concurrency: 4, logger, handler: pipelineJobHandler(api, jobs) }), sweep, periodicJob(() => api.progressHandoffs().then(() => undefined), (error) => logger.warn('execution handoff progress failed', { error: String(error) }), 1000),
       periodicJob(() => api.progressJourneys().then(() => undefined), (error) => logger.warn('release journey observation failed', { error: String(error) }), 3000),
       ...(deps.ledger ? [slotLedgerResyncWorker(() => resyncSlotLedger(useCaseDeps.uow, logger, useCaseDeps), logger)] : [])],
     migrations: releaseMigrations,

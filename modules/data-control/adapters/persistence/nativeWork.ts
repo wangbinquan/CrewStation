@@ -59,7 +59,10 @@ export function nativePostgresWork(input: { db: Database; adminUrl: string; avai
           assertSharedDatabaseAdmissionActive(db, nativeAdmissionKey(origin.projectId));
           await guard.execute(sql`SELECT 1`); await connection.assertHeld();
         }, query: async (text, parameters) => { await observation.assertHeld(); return connection.query(text, parameters); } };
-        return journaledEffect(db, workId, names, checked, observation, input.source, effect);
+        return journaledEffect(db, workId, names, checked, observation, input.source, async (connection) => {
+          if (origin.independentDatabase) await assertIndependentDatabase(db, origin, workId, names, connection, input.source);
+          return effect(connection);
+        });
       });
     } finally {
       await db.transaction(async (tx) => {
@@ -149,4 +152,24 @@ export async function readNativeJournalSnapshot(tx: Executor, projectId: Project
       cursor = records.at(-1)!.workId;
     }
     return { retainedRecordsComplete: true as const, records, revision: jsonHash({ projectId, records }) };
+}
+
+/** Restores may complete their original partial DDL, but never adopt or recreate a physical object. */
+async function assertIndependentDatabase(db: Database, origin: NativePostgresOrigin, workId: string, names: readonly string[], connection: NativeDdlConnection, source: NativePostgresSource | undefined) {
+  if (!source) throw precondition('独立恢复目标要求原生存储身份观测');
+  const storage = await captureStorage(source, connection, false);
+  const prior = (await db.transaction((tx) => readNativeJournalSnapshot(tx, origin.projectId))).records.filter((row) => row.resourceId === origin.resourceId && row.workId !== workId && row.before);
+  const known = new Map<string, CatalogIdentity>();
+  for (const entry of prior) {
+    if (!entry.after || entry.before?.storage?.identity !== storage?.identity || entry.after.storage?.identity !== storage?.identity) throw conflict('原恢复供给回调尚未结算或存储身份已变化');
+    for (const item of entry.before!.catalog) if (known.get(item.kind + ':' + item.name)?.oid !== item.oid) throw conflict('原恢复供给曾遇到不属于本操作的对象');
+    for (const item of entry.after.catalog) {
+      const key = item.kind + ':' + item.name, previous = known.get(key);
+      if (previous && previous.oid !== item.oid) throw conflict('原恢复目标存在同名替换历史');
+      known.set(key, item);
+    }
+  }
+  const current = await catalog(connection, names);
+  for (const item of current) if (known.get(item.kind + ':' + item.name)?.oid !== item.oid) throw conflict('独立恢复目标已存在且不属于原供给');
+  for (const item of known.values()) if (!current.some((now) => now.kind === item.kind && now.name === item.name && now.oid === item.oid)) throw conflict('原恢复目标已丢失，禁止同名重建');
 }

@@ -19,6 +19,13 @@ export function validateProfileContent(protocol: AgentProtocol, content: Compute
   if (configDirEnv !== undefined && (isPlatformSpawnEnv(configDirEnv) || isReservedEnvName(configDirEnv))) {
     throw fail(`配置目录变量名 ${configDirEnv} 被平台保留（会与平台注入的变量互相覆盖），请换一个`, 'content.launch.configDirEnv');
   }
+  const provider = content.launch.opencodeProvider;
+  if (provider) {
+    const prefix = `${provider.id}/`, model = content.launch.model;
+    if (!model?.startsWith(prefix) || !Object.hasOwn(provider.models, model.slice(prefix.length))) throw fail('模型必须引用结构化 provider 声明的模型', 'content.launch.model');
+    const refs = [provider.credentials.apiKey, ...Object.values(provider.credentials.headers ?? {})].filter((name): name is string => name !== undefined);
+    if (refs.some((name) => !content.secrets.some((secret) => secret.name === name))) throw fail('provider 凭据必须引用本修订声明的 Secret', 'content.launch.opencodeProvider.credentials');
+  }
   validateTerminalTest(protocol, content);
   validateConfigBinding(protocol, content);
   validateRevisionContent(content);

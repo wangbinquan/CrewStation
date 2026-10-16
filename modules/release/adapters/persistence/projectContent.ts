@@ -10,6 +10,7 @@ import type { ServiceResolver } from '../../ports/platform';
 import { validateJourneyContent } from './journey/content';
 
 const columns: Readonly<Record<string, readonly string[]>> = {
+  database_restores: ['id','project_id','service_id','stage','revision','body','created_at','updated_at'],
   observation_roles:['active','at','blue_release','green_release','sequence','service_id'],
   release_journeys: ['id', 'project_id', 'service_id', 'release_id', 'kind', 'status', 'revision', 'request_key', 'body', 'created_at'],
   release_journey_events: ['id', 'project_id', 'service_id', 'release_id', 'journey_id', 'sequence', 'transition_key', 'body', 'created_at'],
@@ -69,6 +70,7 @@ function report(rows: readonly Row[], target: ProjectDeletionTarget, blockers: P
     .sort((a, b) => (a.table + ':' + a.key).localeCompare(b.table + ':' + b.key));
   const consumers: ReleaseDeletionContent['consumers'][number][] = [], callbacks: ReleaseCallbackRecord[] = [];
   for (const row of own) {
+    if(row.table==='database_restores'&&row.body.stage!=='completed')blockers.push(blocker('database-restore-active','原数据库恢复尚未结束，原目标、Job 与数据库必须保留'));
     const serviceId = [...row.services][0]; if (!serviceId) continue;
     if (row.table === 'deletion_callbacks') {
       const callback = releaseCallbackContent(row.body);

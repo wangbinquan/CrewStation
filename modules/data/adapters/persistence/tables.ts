@@ -32,6 +32,7 @@ export const taskBindings = dataSchema.table('task_bindings', {
   ttlMinutes: integer('ttl_minutes').notNull(),
   expiresAt: timestamp('expires_at', { withTimezone: true }),
   roleName: text('role_name'),
+  databaseName: text('database_name'),
   secretBox: text('secret_box'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),

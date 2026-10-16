@@ -5,12 +5,13 @@ interface ObjectIdentity {
   resolveDevelopmentSource(token: string): Promise<(WorkloadIdentity & { developmentSource: DevelopmentSourceBinding }) | undefined>;
 }
 interface ObjectDirectory { resolveServiceIdentity(identity: string): Promise<{ serviceId: ServiceId; projectId: ProjectId; state: string } | undefined> }
-interface ObjectRelease { objectStorageContract(serviceId: ServiceId, releaseId: ReleaseId): Promise<{ planId: string; fenced: boolean } | undefined> }
+interface ObjectRelease { restoreObjectSource?(jobId:string,token:string):Promise<{projectId:ProjectId;serviceId:ServiceId;env:'production';fenced:false;writeAllowed:false;planId:string}|undefined>; objectStorageContract(serviceId: ServiceId, releaseId: ReleaseId): Promise<{ planId: string; fenced: boolean } | undefined> }
 interface ObjectDevelopment { resolveDevelopmentObjectSource(source: DevelopmentSourceBinding): Promise<{ projectId: ProjectId; serviceId: ServiceId; planId: string } | undefined> }
 
 export function objectStorageSources(identity: ObjectIdentity, project: ObjectDirectory, release: () => ObjectRelease | undefined, development: () => ObjectDevelopment | undefined) {
   return { resolve: async (caller: { identity: string; token?: string }) => {
     if (!caller.token) return undefined;
+    if(caller.identity.startsWith('database-restore:'))return release()?.restoreObjectSource?.(caller.identity.slice('database-restore:'.length),caller.token);
     const workload = caller.token ? await identity.resolveServiceSource(caller.token) : undefined;
     if (workload) {
       if (workload.kind !== 'service' || workload.identity !== caller.identity || !workload.source.ready) return undefined;

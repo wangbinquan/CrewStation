@@ -8,7 +8,7 @@ export interface JobRender {
   readonly name: string;
   readonly secret: string;
   readonly releaseId: string;
-  readonly purpose: 'build' | 'migration';
+  readonly purpose: 'build' | 'migration' | 'database-restore' | 'database-verify';
   readonly image: string;
   readonly command: readonly string[];
   readonly env: Readonly<Record<string, string>>;
@@ -27,7 +27,7 @@ const strings = (value: unknown): value is Readonly<Record<string, string>> => i
 /** 构建、迁移 Job 记录的渲染输入；没有（旧形状：release 自己建）或字段不全都返回 undefined。 */
 export function jobRenderOf(spec: Spec): JobRender | undefined {
   const job = spec['job'];
-  if (!isFields(job) || !text(job['releaseId']) || !text(job['image']) || !text(job['envSecret']) || (job['purpose'] !== 'build' && job['purpose'] !== 'migration')) return undefined;
+  if (!isFields(job) || !text(job['releaseId']) || !text(job['image']) || !text(job['envSecret']) || (job['purpose'] !== 'build' && job['purpose'] !== 'migration' && job['purpose'] !== 'database-restore' && job['purpose'] !== 'database-verify')) return undefined;
   const command = job['command'], resources = job['resources'];
   if (!Array.isArray(command) || !command.length || !command.every(text) || !strings(job['env']) || !isFields(resources) || !text(resources['cpu']) || !text(resources['memory'])) return undefined;
   if (!positive(job['activeDeadlineSeconds']) || !positive(job['ttlSecondsAfterFinished'])) return undefined;

@@ -10,6 +10,8 @@ export { HistoricalReleaseRegisteredInventorySchema } from './events/history/rel
 export * from './events/delivery';
 export * from './gateway/identity';
 export * from './gateway/allowlist';
+export * from './taskrunner/opencodeModels';
+export * from './api/data/databaseRestore';
 export * from './gateway/routes';
 export * from './taskrunner/agentEvents';
 export * from './taskrunner/beforeStart';

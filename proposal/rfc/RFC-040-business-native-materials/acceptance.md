@@ -90,3 +90,34 @@ MCP／冷续接脚本 12 项、Secret 脚本 7 项、取消／fresh retry 脚本
 文档提交 `8e8bc0724828fc71a381be79159f4f7dab5655ec` 的 CI 38843444570 中，static、unit、console、e2e 与其余 module 分片通过；module 1/4 的 RFC-040 `nativeMaterialAdmission` 用例失败，gate 随之失败。精确日志 `/private/tmp/cs-rfc040-docs-ci-failed.log` 显示另一请求已将材料置为 ready，后进入的幂等 pin 回调仍强制要求 preparing。此断言由本会话引入并修正：第一次实际 pin 必须看到 preparing；已有 pin 的并发重入允许 preparing/ready，不改变生产状态转换。
 
 补充候选实现 OpenCode 插件 options tuple、MCP OAuth／大小写 env 和新增字段的持久事件脱敏；源码依据和兼容扩展边界见 design。集中检查：四文件 21 pass／0 fail（包含真实 PostgreSQL 模块用例、无 skip），仅 OpenCode 驱动准备 1 pass／0 fail／5 filtered；根类型、十文件精确 lint、结构检查通过。日志为 `/private/tmp/cs-rfc040-opencode-extras-{types,tests,driver,lint,arch}.log`。这些补充字段尚未重新部署或作真实 OpenCode 模型轮次；原部署与前节实机证据仍对应 `92889e87`。
+
+
+补充提交 `de9c69ccb8d28e455de1a0a6766ed7473ad85606` 已推送；准确 SHA 的 CI [38845648786](https://github.com/wangbinquan/CrewStation/actions/runs/38845648786) 中 static／unit／console／e2e／module 1–3 成功，module 4 与 gate 失败。失败点为 `modules/session/tests/sessionAdmissionProgress.test.ts:123`：四路握手及命令回执均成功，随后立即读事件列表得到 `[]`，期望 `[1]`。只读归因显示既有 `5beff15a` 让命令回复独立于排队事件持久化推进，测试最后修改在 `dcfadfba`；本补充的 13 路径没有修改该 Session 调用链。保留失败日志 `/private/tmp/cs-rfc040-opencode-extras-ci-failed.log`，不代改或回退其他 session 的代码，不声称整仓 CI 通过。共享主干随后推进到文档提交 `22d916e8`，其 CI 38846674085 也在 module 4／gate 失败；本条没有把较新的失败当成成功证据。
+
+后续镜像导入一度受本机 Docker 节点可用空间约 1.1 GiB 阻塞。仅按精确 ID 回收 320 条至少三天未用、可回收且不与镜像共享的构建缓存，空间回升至约 2.25 GiB；完整记录 `/private/tmp/cs-rfc040-cache-reclaim-exact.json` 与同前缀日志。没有删除平台镜像、卷、容器，也没有停止或替换 AW。补充代码的部署与 OpenCode 实机验收仍待完成。
+
+## 2026-10-15 深链／名称候选与补充字段实机验收
+
+恢复深链仅接受合法 UUIDv7 的 project/task/subtask，使用原恢复工作台与统一 Dialog；原 child 不存在时不会自动转成父任务恢复，关闭保持筛选。原生名称上限从 80 兼容扩大到 128，与 AW 标识符能力对齐，路径逃逸与平台保留名仍被拒绝。两文件集中回归 **17 pass / 0 fail / 147 assertions**；候选八路径的前后 SHA256 一致，记录 `/private/tmp/cs-rfc040-link-name-validation.json`。`bun run check:static` 的架构、全仓 lint、后端与 Console 类型均通过；该批 UI／名称候选没有重新运行整仓功能门禁，也尚未提交或部署。
+
+后续只读核对发现，并发发布的 `3fb767e61c1e6878af01ae81efadbb6ab6e1bc6c` 已包含 `de9c69cc` 补充，准确 [CI 38855659848](https://github.com/wangbinquan/CrewStation/actions/runs/38855659848) 九项成功。本轮模型实测前 cs-api／cs-session／cs-controller 镜像为 `sha256:7bb49c8178f5ff49649b528b477611ff42ba5db05021a565b237d99d2c5e2d06`；Runner 配置为 `sha256:0f87aceb9eb8c51ac3dd97bc4460e4d5b101aa6482b1d7f0bd41c590a3254e79`，与该发布回执一致。原 `de9` 准确 CI 的失败历史保留，不能改写为当时已绿。
+
+仅更新隔离 OpenCode 验收档位 `01a14282-7979-7000-b517-f3d4a3207d56` 到 r3／该固定 Runner，保留原配置和凭据，未改平台默认档位。首次自动测试 `01a14361-1f93-7000-b0d2-defbd89be246` 为 environment-lost：容器启动前的 Job 续租查询失败。只读证据显示 Docker 节点可用空间为 0，PostgreSQL `could not extend file ... No space left on device`；不是已执行后模型失败。
+
+按精确 ID 回收 326 条至少 12 小时未用、可回收且不与镜像共享的构建缓存，工具报告 1.869 GB，随后节点可用空间约 3.76 GiB；记录 `/private/tmp/cs-rfc040-diskfull-reclaim-exact.json` 与同前缀日志。没有删除镜像、卷、容器或停止正式 AW。环境恢复后的手工测试 `01a14366-4b0a-7000-9dd8-b0f7b983b824` passed，真实模型、resume、MCP、nativeConfig、materialObjects 及启动清单能力成功；原失败另存，不覆盖。
+
+原隔离父任务 `01a14294-79d0-7000-b7d6-f0db13390656` 上的新子任务 `01a1436b-6137-7000-9938-1d16f43e6e94` 使用 r3／上述镜像，实际 OpenCode 调用插件和 local MCP 后 succeeded／exitCode 0。18 项实机回执检查通过，见 [补充证据](./opencode-options-live-20261015.json)：
+
+- 原生插件 tuple 的 options（布尔值、随机标记及秘密叶值）在实际 OpenCode 配置中保留；文件回执校验内容 SHA256 与大小。
+- OAuth 显式 clientId／clientSecret／scope 和 `oauth:false` 在原生 MCP 配置中保留，三个 MCP 均 connected；未将该测试描述为外部 OAuth 授权握手。
+- 小写与混合大小写 env 在真正的 MCP 子进程中读取，回执摘要与原输入相符。
+- 原始 options nonce 在公共事件中被 `***` 替换。首次脚本错误地断言应出现原 nonce，因此失败于 `observed-nonce`；保留原脚本及失败日志，后续直接核对同一次执行的原生文件和持久事件，没有重跑或替换该模型轮次。新增四类合成秘密的摘要检查、事件回放与实际工具调用核对全部通过。
+
+最新范围仍只有 OpenCode；没有启动 Claude Code 验证。尚待裁定的子代理独立模型合同见 [补充设计](./model-mapping-supplement.md)／实施问题 I37；它与本节已完成的同模型／字段实测分开。RFC-040 保持 In Progress，不以 CS 单侧证据代替 AW RFC-370 完整接线验收。
+
+时序复核：本轮子任务实际执行为 `2026-10-16T06:34:47.210Z` 至 `06:35:55.184Z`。平台随后并发更新到 `sha256:2d98fd65094cafb37b0225b6a097056aa49f48acfc1605387d263978dc741108`，新 cs-api／controller／session Pod 分别在 `06:46:41Z`／`06:46:53Z`／`06:47:38Z` 创建，均晚于本轮模型完成；本节原生实测继续归属 3fb767e6 与固定 r3 Runner，不外推后续整套版本验收。
+
+
+## 2026-10-16 独立子模型候选
+
+用户已批准平台档位引用和固定 provider 材料的推荐方案。生产实现及用例已写齐，集中门禁与修复复验记录见 [RFC-042 验收](../RFC-042-service-database-restore/acceptance.md)。三个候选镜像已构建并校验导入；GLM-5.2 根与 DeepSeek V4.1 Flash 子代理的真实 OpenCode 委派待新版部署后验证。源档位和默认档位保持，验收使用独立隐藏副本。下方或上方旧记录均只覆盖当时的候选。

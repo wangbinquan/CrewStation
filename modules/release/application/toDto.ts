@@ -20,6 +20,7 @@ export function releaseToDto(release: Release, slots: ServiceSlots | undefined):
     branch: release.branch,
     ...(release.image ? { image: release.image } : {}),
     status: release.status,
+    databaseRestoreSupported: !!(release.pipeline.readyAt && release.manifest?.spec.service.databaseRestore && release.manifest.kind==='DigitalWorker' && release.manifest.spec.tasks?.executionControl==='fenced'),
     ...(onSlot && slots ? { slot: roleOf(slots, onSlot) } : {}),
     ...(release.configVersion !== undefined ? { configVersion: release.configVersion } : {}),
     ...(release.message ? { message: release.message } : {}),

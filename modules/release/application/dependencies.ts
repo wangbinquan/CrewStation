@@ -1,3 +1,4 @@
+import type { DatabaseRestoreSupport } from '../ports/databaseRestore';
 import type { ExecutionHandoff } from '../ports/executionHandoff';
 import type { ReleaseRuntimeImages } from '../ports/runtimeImages';
 import type { Clock, Logger } from '@crewstation/kernel';
@@ -8,6 +9,7 @@ import type { UnitOfWork } from '../ports/unitOfWork';
 import type { ReleaseProjectAdmissions } from '../ports/unitOfWork';
 
 export interface ReleaseUseCaseDeps {
+  databaseRestore?: DatabaseRestoreSupport;
   admission?: ReleaseProjectAdmissions;
   executionHandoff?: ExecutionHandoff;
   uow: UnitOfWork;

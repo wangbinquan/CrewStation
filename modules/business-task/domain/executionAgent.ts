@@ -1,6 +1,12 @@
 import type { BusinessExecutionProof, TaskId } from '@crewstation/contracts';
 import type { AgentProtocol, BusinessMaterialRequest, BusinessAgentCapabilities, ProjectId, StartAgentCommand, RuntimeImageExecutionSnapshot, SubmitBusinessSubtaskV3 } from '@crewstation/contracts';
 
+export interface PinnedOpencodeModel {
+  compute: ResolvedBusinessCompute;
+  credentialStamp: string;
+  model: string;
+  binaryPath: string;
+}
 export interface AgentSecretVersion { definitionId: string; itemId: string; version: number }
 export interface ResolvedBusinessCompute {
   businessExecution?: BusinessExecutionProof;
@@ -14,6 +20,7 @@ export interface ExecutionAgentPlan {
   sessionKey: TaskId;
   volumeUid: string;
   credentialStamp?: string;
+  opencodeModels?: { root: PinnedOpencodeModel; subagents: Record<string, PinnedOpencodeModel> };
   request: Extract<SubmitBusinessSubtaskV3, { kind: 'agent' }>;
   projectId: ProjectId;
   compute: ResolvedBusinessCompute;
@@ -25,7 +32,7 @@ export interface ExecutionAgentPlan {
   nonce: string;
 }
 export const BUSINESS_AGENT_CAPABILITIES: BusinessAgentCapabilities = {
-  nativeConfigVersion: 1, materialObjectsVersion: 1, startupInventoryVersion: 1,
+  nativeModelMappingVersion: 1, nativeConfigVersion: 1, materialObjectsVersion: 1, startupInventoryVersion: 1,
   events: true, usage: 'incremental', resume: true, systemPrompt: true, skills: true,
   mcp: true, platformDelegation: false, opaqueInternalDelegation: true,
 };

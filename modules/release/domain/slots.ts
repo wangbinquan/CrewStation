@@ -38,6 +38,8 @@ export interface SlotOffline {
  * restartedAt 是运维重启的标记（C6，一变就重新铺开）。下线后留着：调和器据此删工作负载与环境，下次部署接着数 revision。
  */
 export interface SlotWorkload {
+  readonly databaseGenerationId?: string;
+  readonly databaseRestoreOperationId?: string;
   readonly releaseId: ReleaseId;
   readonly revision: number;
   readonly image: string;

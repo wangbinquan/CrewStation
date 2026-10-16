@@ -1,5 +1,5 @@
 import type { AgentProtocol, ComputeProfileContentInput, ComputeProfileDetailDto, CreateComputeProfileInput, ProfileCredentialState, SaveComputeProfileInput } from '@crewstation/contracts';
-import { ConfigDirNameSchema, ComputeProfileNameSchema, EnvNameSchema, isPlatformSpawnEnv, reservedLaunchArg } from '@crewstation/contracts';
+import { OpencodeProviderSchema, ConfigDirNameSchema, ComputeProfileNameSchema, EnvNameSchema, isPlatformSpawnEnv, reservedLaunchArg } from '@crewstation/contracts';
 import type { ProfilePreset } from './profilePresets';
 import { presetContent, presetsFor } from './profilePresets';
 import { configFileKindFor, showsField, suggestedBinaryPath } from './protocolFields';
@@ -23,6 +23,7 @@ export interface ProfileDraft {
   configDirName: string;
   isSandbox: boolean;
   model: string;
+  opencodeProvider: string;
   opencode: { variant: string; temperature: string; steps: string; maxSteps: string };
   taskProfile: string;
   steps: StepDraft[];
@@ -41,7 +42,7 @@ const EMPTY_OPENCODE = { variant: '', temperature: '', steps: '', maxSteps: '' }
 
 export function blankDraft(protocol: AgentProtocol, preset: ProfilePreset = 'blank'): ProfileDraft {
   return applyPreset({
-    name: '', description: '', defaultVisible: true, protocol, image: '', binaryPath: suggestedBinaryPath(protocol), extraArgs: '', configDirEnv: '', configDirName: '', isSandbox: false, model: '',
+    name: '', description: '', defaultVisible: true, protocol, image: '', binaryPath: suggestedBinaryPath(protocol), extraArgs: '', configDirEnv: '', configDirName: '', isSandbox: false, model: '', opencodeProvider: '',
     opencode: { ...EMPTY_OPENCODE }, taskProfile: '', steps: [], vars: [], secrets: [], credentials: {}, configFileKind: 'none', configFilePath: '',
     testCommand: '', testExpect: '', testTimeoutSeconds: '60',
   }, preset);
@@ -85,7 +86,7 @@ export function draftFromDetail(detail: ComputeProfileDetailDto): ProfileDraft {
   const { content } = detail, launch = content.launch, test = content.terminalTest;
   return {
     name: detail.name, description: detail.description, defaultVisible: detail.defaultVisible ?? true, protocol: detail.protocol, image: content.image, binaryPath: launch.binaryPath,
-    extraArgs: launch.extraArgs.join('\n'), configDirEnv: launch.configDirEnv ?? '', configDirName: launch.configDirName ?? '', isSandbox: launch.isSandbox, model: launch.model ?? '',
+    extraArgs: launch.extraArgs.join('\n'), configDirEnv: launch.configDirEnv ?? '', configDirName: launch.configDirName ?? '', isSandbox: launch.isSandbox, model: launch.model ?? '', opencodeProvider: launch.opencodeProvider ? JSON.stringify(launch.opencodeProvider, null, 2) : '',
     opencode: { variant: launch.opencode?.variant ?? '', temperature: numberText(launch.opencode?.temperature), steps: numberText(launch.opencode?.steps), maxSteps: numberText(launch.opencode?.maxSteps) },
     taskProfile: content.taskProfile ?? '', steps: content.steps.map(stepFromDto), vars: Object.entries(content.vars).map(([name, value]) => ({ name, value })),
     secrets: content.secrets.map((secret) => ({ ...secret })), credentials: credentialOps(content.secrets, detail.credentials),
@@ -113,6 +114,9 @@ function validateLaunch(draft: ProfileDraft, errors: DraftErrors): void {
     if (env && !EnvNameSchema.safeParse(env).success) errors.configDirEnv = 'envName';
     else if (env && isPlatformSpawnEnv(env)) errors.configDirEnv = 'reservedEnv';
     if (leaf && !ConfigDirNameSchema.safeParse(leaf).success) errors.configDirName = 'configDirName';
+  }
+  if (p === 'opencode' && draft.opencodeProvider.trim()) {
+    try { if (!OpencodeProviderSchema.safeParse(JSON.parse(draft.opencodeProvider)).success) errors.opencodeProvider = 'opencodeProvider'; } catch { errors.opencodeProvider = 'opencodeProvider'; }
   }
   if (showsField(p, 'opencode')) {
     const temperature = draft.opencode.temperature.trim();
@@ -173,6 +177,7 @@ export function toContent(draft: ProfileDraft): ComputeProfileContentInput {
       ...(showsField(p, 'isSandbox') ? { isSandbox: draft.isSandbox } : {}),
       ...(showsField(p, 'model') && trimmed(draft.model) ? { model: trimmed(draft.model) } : {}),
       ...(opencode ? { opencode } : {}),
+      ...(p === 'opencode' && draft.opencodeProvider.trim() ? { opencodeProvider: OpencodeProviderSchema.parse(JSON.parse(draft.opencodeProvider)) } : {}),
     },
     ...(trimmed(draft.taskProfile) ? { taskProfile: trimmed(draft.taskProfile) } : {}),
     steps: draft.steps.map(stepToDto),

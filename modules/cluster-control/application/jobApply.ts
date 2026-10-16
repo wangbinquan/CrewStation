@@ -48,8 +48,12 @@ export async function applyJob(deps: JobApplyDeps, record: LedgerRecordView): Pr
     deps.logger.warn('resource job spec incomplete', { resourceId: record.id });
     return;
   }
-  if (isTrue(record, 'Finished')) return dropSecret(deps, record, job);
+  if (isTrue(record, 'Finished')) {
+    if (job.purpose.startsWith('database-') && !isTrue(record, 'RestoreObserved')) return;
+    return dropSecret(deps, record, job);
+  }
   if (isTrue(record, 'Failed')) {
+    if (job.purpose.startsWith('database-') && !isTrue(record, 'RestoreObserved')) return;
     if (job.purpose === 'migration' && deps.cluster.stopMigrationJob && await deps.cluster.stopMigrationJob(job)) {
       await deps.ledger.observeConditions(record.id, [{ type: 'Stopped', status: 'true', reason: 'suspended-no-pods', message: '迁移 Job 已封锁，实际 Pod 已清理' }]);
     }

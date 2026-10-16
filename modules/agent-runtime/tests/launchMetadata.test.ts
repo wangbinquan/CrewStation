@@ -6,6 +6,8 @@ import { newResourceId, noopLogger, systemClock } from '@crewstation/kernel';
 import { queueMigrations } from '@crewstation/queue';
 import { createTestDatabase, testDatabaseAvailable, type TestDatabase } from '@crewstation/testkit';
 import { drizzleUnitOfWork } from '../adapters/persistence/drizzleUnitOfWork';
+import { launchVersionUseCases } from '../application/launchVersions';
+import type { AgentRuntimeUseCaseDeps } from '../application/dependencies';
 import { resolveProfileUseCases } from '../application/resolveProfile';
 import type { ProfileLaunchMetadata } from '../api/moduleApi';
 import type { AgentRuntimeModuleDeps } from '../wiring';
@@ -26,7 +28,7 @@ async function fixture() {
   const resolver = resolveProfileUseCases({ ...deps, defaultTaskProfile: 'fixture-small', uow: { ...uow, read: { ...uow.read, credentials: { ...uow.read.credentials, list: async () => { state.credentialReads++; throw new Error('metadata must not read credentials'); } } } }, projects: { authorize: async () => {}, name: async () => 'Fixture project' }, cipher, registry, clock: systemClock, logger: noopLogger });
   const input = CreateComputeProfileRequestSchema.parse({ name: 'Frozen compute', content: { image: 'runtime/model:1', launch: { protocol: 'opencode', binaryPath: '/opt/opencode', model: 'configured-old' }, taskProfile: newResourceId(), secrets: [{ id: newResourceId(), name: 'TOKEN' }] } });
   const profile = await module.api.createProfile(admin, input);
-  return { module, resolver, state, input, profile, ref: { profileId: profile.id, revision: 1 } };
+  return { module, resolver, state, input, profile, deps, uow, ref: { profileId: profile.id, revision: 1 } };
 }
 
 describe.skipIf(!available)('fixed launch metadata on actual profile PG records', () => {
@@ -58,4 +60,16 @@ describe.skipIf(!available)('fixed launch metadata on actual profile PG records'
     }
     expect(f.state).toEqual({ decrypts: 0, credentialReads: 0 });
   });
+});
+
+test.skipIf(!available)('RFC-040 fixed model material decrypts only retained credentials, even when current credentials cannot be read',async()=>{
+ const f=await fixture(),secretId=f.input.content.secrets[0]!.id;
+ await f.module.api.saveProfile(admin,f.profile.id,{expectedRevision:1,name:'Fixed model',content:f.input.content,credentials:{[secretId]:{op:'replace',value:'original-key'}}});
+ const ref={profileId:f.profile.id,revision:2},stamp=await f.module.api.pinLaunchVersion(ref);
+ const decrypted:string[]=[];
+ const deps={...f.deps,defaultTaskProfile:'fixture-small',clock:systemClock,logger:noopLogger,projects:{authorize:async()=>{},name:async()=> 'Fixture'},uow:{...f.uow,read:{...f.uow.read,credentials:{...f.uow.read.credentials,list:async()=>{throw new Error('today credentials are unavailable');}}}},cipher:{...f.deps.cipher!,decrypt:async(value:string)=>{decrypted.push(value);if(value!=='fixture:original-key')throw new Error('wrong credential revision');return 'original-key';}}} as AgentRuntimeUseCaseDeps;
+ const versions=launchVersionUseCases(deps,async()=>{throw new Error('must not use live material');});
+ await f.module.api.saveProfile(admin,f.profile.id,{expectedRevision:2,name:'Changed model',content:{...f.input.content,launch:{...f.input.content.launch,model:'new-model'}},credentials:{[secretId]:{op:'replace',value:'rotated-key'}}});
+ const restored=await versions.launchMaterialAt(ref,stamp);expect(restored.launch.model).toBe('configured-old');expect(restored.beforeStart.secrets).toEqual({TOKEN:'original-key'});expect(decrypted).toEqual(['fixture:original-key']);
+ await expect(versions.launchMaterialAt(ref,'missing-stamp')).rejects.toMatchObject({kind:'precondition',details:{code:'secret_version_unavailable'}});
 });

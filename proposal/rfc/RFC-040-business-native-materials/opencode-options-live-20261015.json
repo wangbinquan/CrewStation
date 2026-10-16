@@ -1,0 +1,136 @@
+{
+  "taskId": "01a14294-79d0-7000-b7d6-f0db13390656",
+  "subtaskId": "01a1436b-6137-7000-9938-1d16f43e6e94",
+  "profileRevision": 3,
+  "image": "registry.crewstation-system.svc.cluster.local:5000/crewstation/task-runtime@sha256:0f87aceb9eb8c51ac3dd97bc4460e4d5b101aa6482b1d7f0bd41c590a3254e79",
+  "material": {
+    "materialId": "01a1436b-60b0-7000-85e0-596e892f3df3",
+    "digest": "ac8cea21576aac3f1294961b5cf726af76c252b539d686aeee642417a44fe38d"
+  },
+  "originalHarnessError": "Error: observed-nonce",
+  "explanation": "The original nonce assertion expected a raw plugin-options string in public events. Native receipt preserves it; the event correctly masks it.",
+  "proof": {
+    "pluginTuple": true,
+    "flag": true,
+    "optionHash": "fb0c3243dfdb1f8ac692fdb67fbc7240065aa04c004c2a49b82792e907ba16d4",
+    "oauthClientId": "rfc040-explicit-client",
+    "oauthScope": "rfc040:read",
+    "oauthHash": "d353b034145dfd44da173bb188291097782202137e05e2e51abbbef6ce009f5e",
+    "oauthDisabled": true,
+    "nonceHash": "00e2b4f0064b4106bdb0e4490883822f9ee69f5ef18f5a81814b4c3e1393806c"
+  },
+  "envProof": {
+    "lowerHash": "da1c8a2a974eb675db9d7d72e6cae9846bfdd5522828b5a0bd55f7e997fee2cb",
+    "mixedHash": "01ca0e1005b97a0c122acd33e3f965124aa82101602949fdf905571d6347f0c0"
+  },
+  "proofFiles": {
+    "rfc040-options-native-proof.json": {
+      "version": "d7be6baf4ca4efcfc6d6b1d2e0d12b95e0869d114ebc361bdfe91200ae5eb8c7",
+      "size": 327
+    },
+    "rfc040-options-env-proof.json": {
+      "version": "83cfb22b8379bd984cd65b06280c485a8ceba32117738e41b553bc59ad3be5ac",
+      "size": 159
+    }
+  },
+  "checks": [
+    {
+      "name": "original-execution-succeeded",
+      "ok": true
+    },
+    {
+      "name": "original-runner-profile",
+      "ok": true
+    },
+    {
+      "name": "complete-rfc040-options-native-proof.json",
+      "ok": true
+    },
+    {
+      "name": "digest-rfc040-options-native-proof.json",
+      "ok": true
+    },
+    {
+      "name": "plugin-tuple-and-options-native",
+      "ok": true
+    },
+    {
+      "name": "oauth-native-config",
+      "ok": true
+    },
+    {
+      "name": "complete-rfc040-options-env-proof.json",
+      "ok": true
+    },
+    {
+      "name": "digest-rfc040-options-env-proof.json",
+      "ok": true
+    },
+    {
+      "name": "actual-mcp-process-environment",
+      "ok": true
+    },
+    {
+      "name": "durable-replay",
+      "ok": true
+    },
+    {
+      "name": "actual-startup-inventory",
+      "ok": true
+    },
+    {
+      "name": "actual-native-tool-invocations",
+      "ok": true
+    },
+    {
+      "name": "option-nonce-was-redacted",
+      "ok": true
+    },
+    {
+      "name": "observed-optionHash",
+      "ok": true
+    },
+    {
+      "name": "observed-oauthHash",
+      "ok": true
+    },
+    {
+      "name": "observed-lowerHash",
+      "ok": true
+    },
+    {
+      "name": "observed-mixedHash",
+      "ok": true
+    },
+    {
+      "name": "persisted-events-do-not-contain-synthetic-secrets",
+      "ok": true
+    }
+  ],
+  "eventCount": 15,
+  "scope": "OpenCode actual plugin tuple, OAuth configuration and lowercase child environment. No external OAuth authorization handshake was exercised.",
+  "sourceSha": "3fb767e61c1e6878af01ae81efadbb6ab6e1bc6c",
+  "ci": "https://github.com/wangbinquan/CrewStation/actions/runs/38855659848",
+  "controlPlaneImage": "sha256:7bb49c8178f5ff49649b528b477611ff42ba5db05021a565b237d99d2c5e2d06",
+  "profileId": "01a14282-7979-7000-b517-f3d4a3207d56",
+  "profileTestId": "01a14366-4b0a-7000-9dd8-b0f7b983b824",
+  "priorEnvironmentFailure": {
+    "testId": "01a14361-1f93-7000-b0d2-defbd89be246",
+    "state": "unknown",
+    "outcome": "environment-lost",
+    "cause": "Docker node available disk 0; PostgreSQL No space left on device before container startup"
+  },
+  "executionWindow": {
+    "startedAt": "2026-10-16T06:34:47.210Z",
+    "resultAt": "2026-10-16T06:35:55.184Z"
+  },
+  "subsequentPlatformDeployment": {
+    "image": "sha256:2d98fd65094cafb37b0225b6a097056aa49f48acfc1605387d263978dc741108",
+    "podCreationTimes": {
+      "cs-api": "2026-10-16T06:46:41Z",
+      "cs-controller": "2026-10-16T06:46:53Z",
+      "cs-session": "2026-10-16T06:47:38Z"
+    },
+    "notClaimedByThisAcceptance": true
+  }
+}

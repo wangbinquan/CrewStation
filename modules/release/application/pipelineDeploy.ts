@@ -33,6 +33,7 @@ export function deploySteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): Dep
     // RFC-025 T8：由资源中心建出时这里只写期望（随槽状态进台账），调和器建对象；否则照旧自己部署。
     const ledger = deps.creation === 'ledger';
     if (!ledger) await deps.deployer.deploy({ namespace: svc.namespace, projectSlug: svc.slug, serviceName: svc.name, physical: release.targetSlot, releaseId: release.id, image: release.image ?? '', manifest, replicas, env: env.values, plan });
+    const generation=env.values.CS_DATABASE_URL?await deps.data.databaseGenerations?.active(release.serviceId,'production'):undefined;
     const now = clock.now();
     await uow.run(async (scope) => {
       const slots = await scope.slots.get(release.serviceId);
@@ -44,7 +45,7 @@ export function deploySteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): Dep
         if (old) await interruptReleaseJourneys(scope, old, now, '待验证部署已被后续发布替换');
       }
       const service = manifest.spec.service;
-      const workload = ledger ? { workload: nextWorkload(current, { releaseId: release.id, image: release.image ?? '', command: service.command, port: service.port, healthPath: service.healthPath, ...(service.probes ? { probes: service.probes } : {}), replicas, resources: { cpu: plan.cpu, memory: plan.memory } }) } : {};
+      const workload = ledger ? { workload: nextWorkload(current, { ...(generation?{databaseGenerationId:generation.generationId}:{}), releaseId: release.id, image: release.image ?? '', command: service.command, port: service.port, healthPath: service.healthPath, ...(service.probes ? { probes: service.probes } : {}), replicas, resources: { cpu: plan.cpu, memory: plan.memory } }) } : {};
       await scope.slots.save(withSlot(slots, { physical: release.targetSlot, releaseId: release.id, state: 'deploying', replicas, readyReplicas: 0, updatedAt: now, ...workload }, now));
       await ctx.save(release, 'deploying', { manifest, configVersion: env.configVersion, pipeline: { ...release.pipeline, deployStartedAt: now.toISOString() } }, undefined, scope);
     });

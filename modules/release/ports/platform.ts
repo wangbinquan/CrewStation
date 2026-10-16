@@ -1,3 +1,4 @@
+import type { RestoreDatabaseOwner } from './databaseRestore';
 import type { Actor, ComputeProfileSelector, ConfigEnv, ProjectId, ServiceId, ServicePlanDto, UserId } from '@crewstation/contracts';
 
 /** `manage-slots`：下线待验证版本、推迟自动下线、重新部署历史版本（RFC-021，负责人与管理员）。 */
@@ -8,6 +9,8 @@ export interface ProjectAuthorizer {
 /** 由 gateway 模块经装配提供：项目处于维护中且三个开关都拦，即破坏性迁移的维护窗口（RFC-021 M14、M17）。直接读库，不走缓存。 */
 export interface MaintenanceWindow {
   open(serviceId: ServiceId): Promise<boolean>;
+  enterRestore?(actor: Actor, serviceId: ServiceId, operationId: string): Promise<{revision: number; wasOpen: boolean}>;
+  exitRestore?(actor: Actor, serviceId: ServiceId, operationId: string, revision: number): Promise<void>;
 }
 
 /** 由 project 模块提供：自动下线的提醒发给项目负责人。 */
@@ -43,6 +46,7 @@ export interface ConfigSource {
 
 /** 由 data 模块提供：生产数据资源的连接环境变量。 */
 export interface DataSource {
+  databaseGenerations?: RestoreDatabaseOwner;
   envFor(serviceId: ServiceId, env: ConfigEnv): Promise<Record<string, string>>;
   objectEnv?(serviceId: ServiceId, env: ConfigEnv, planId: string): Promise<Record<string, string>>;
 }

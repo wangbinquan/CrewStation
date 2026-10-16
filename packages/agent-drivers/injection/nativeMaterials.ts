@@ -30,11 +30,11 @@ export async function stageNativeMaterials(native: BusinessNativeConfig | undefi
     return { plugins, dispose };
   } catch (error) { dispose(); throw error; }
 }
-export function opencodeNativeAgents(native: BusinessNativeConfig, systemPrompt: string | undefined, model: string | undefined, base: Record<string, unknown>): Record<string, Record<string, unknown>> {
+export function opencodeNativeAgents(native: BusinessNativeConfig, systemPrompt: string | undefined, model: string | undefined, base: Record<string, unknown>, models?: Readonly<Record<string, string>>): Record<string, Record<string, unknown>> {
   return Object.fromEntries([native.agent, ...native.subagents].map((agent, index) => [agent.name, {
     ...(index === 0 ? base : {}), ...BusinessOpencodeAgentOptionsSchema.parse(agent.options),
     mode: agent.options.mode ?? (index === 0 ? 'primary' : 'subagent'), description: agent.options.description ?? agent.name,
-    prompt: [systemPrompt, agent.body].filter(Boolean).join('\n\n'), ...(model ? { model } : {}),
+    prompt: [systemPrompt, agent.body].filter(Boolean).join('\n\n'), ...((models?.[agent.name] ?? model) ? { model: models?.[agent.name] ?? model } : {}),
   }]));
 }
 /** Models remain platform-owned; every accepted business option is handed to the native parser. */

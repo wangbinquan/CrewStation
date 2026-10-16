@@ -50,6 +50,11 @@ export const PLATFORM_ENV = {
   internalApiBase: 'CS_INTERNAL_API_BASE',
   jwksUrl: 'CS_JWKS_URL',
   databaseUrl: 'CS_DATABASE_URL',
+  databaseGenerationId: 'CS_DATABASE_GENERATION_ID',
+  databaseGenerationOperation: 'CS_DATABASE_GENERATION_OPERATION',
+  databaseRestoreOperation: 'CS_DATABASE_RESTORE_OPERATION',
+  databaseRestoreReference: 'CS_DATABASE_RESTORE_REFERENCE',
+  databaseRestoreObjectsToken: 'CS_DATABASE_RESTORE_OBJECTS_TOKEN',
   /** 服务对象空间的稳定标识与平台代理地址；不含后端凭据或物理 key。 */
   objectSpaceId: 'CS_OBJECT_SPACE_ID',
   objectsUrl: 'CS_OBJECTS_URL',

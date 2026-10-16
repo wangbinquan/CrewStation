@@ -164,3 +164,19 @@ describe.skipIf(!available)('RFC-021 正式版本维护', () => {
     expect(((await exit.json()) as { current: unknown }).current).toBeNull();
   });
 });
+
+describe.skipIf(!available)('RFC-042 original restore maintenance hold',()=>{
+ test('original revision is held across restart and all users; exit restores prior settings and rejects stale/foreign operations',async()=>{
+  const serviceId=Bun.randomUUIDv7() as ServiceId,projectId=Bun.randomUUIDv7() as ProjectId,operationId=Bun.randomUUIDv7();
+  services.push({...services[0]!,serviceId,projectId,projectSlug:'restore',serviceName:'restore',identity:'restore/restore'});
+  const before=await gateway.api.setMaintenance(admin,serviceId,{switches:{users:false,services:true,events:false},allowUserIds:[],reason:'original window',expectedRevision:0});
+  const held=await gateway.api.enterDatabaseRestoreMaintenance(admin,serviceId,operationId);expect(held).toEqual({revision:before.revision+1,wasOpen:true});
+  const restarted=newGateway();expect(await restarted.api.enterDatabaseRestoreMaintenance(admin,serviceId,operationId)).toEqual(held);
+  expect(await restarted.api.userEntry(admin.userId,'restore','prod')).toMatchObject({kind:'maintenance'});
+  await expect(restarted.api.exitMaintenance(admin,serviceId,{expectedRevision:held.revision})).rejects.toBeDefined();
+  await expect(restarted.api.exitDatabaseRestoreMaintenance(admin,serviceId,Bun.randomUUIDv7(),held.revision)).rejects.toBeDefined();
+  await expect(Promise.resolve(tdb.db.execute(sql`DELETE FROM gateway.database_restore_maintenance WHERE operation_id=${operationId}`))).rejects.toBeDefined();
+  await restarted.api.exitDatabaseRestoreMaintenance(admin,serviceId,operationId,held.revision);await restarted.api.exitDatabaseRestoreMaintenance(admin,serviceId,operationId,held.revision);
+  expect((await restarted.api.getMaintenance(admin,serviceId)).current).toMatchObject({reason:'original window',switches:before.switches,revision:held.revision+1});
+ });
+});

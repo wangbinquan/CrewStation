@@ -1,3 +1,4 @@
+import { databaseRestoreRepository, bindRestoreTransaction } from './database/restores';
 import { drizzleHandoffs } from './handoff/repository';
 import { drizzleJourneys } from './journey/repository';
 import { drizzleMaintenance } from './drizzleMaintenance';
@@ -22,6 +23,7 @@ export function scopeOver(executor: Executor, lockSlots = false, projection?: Sl
   const releases = drizzleReleaseRepository(executor), slots = drizzleSlotRepository(executor, lockSlots), offlinePolicy = drizzleOfflinePolicyRepository(executor);
   const sources = { releases, offlinePolicy };
   return {
+    databaseRestores: databaseRestoreRepository(executor),
     journeys: drizzleJourneys(executor),
     handoffs: drizzleHandoffs(executor),
     maintenance: drizzleMaintenance(executor),
@@ -32,6 +34,7 @@ export function scopeOver(executor: Executor, lockSlots = false, projection?: Sl
       slot: (serviceId: Parameters<typeof findSlotRecord>[2], physical: Parameters<typeof findSlotRecord>[3]) => findSlotRecord(executor, projection, serviceId, physical),
       job: (job: Parameters<typeof projectJob>[2]) => projectJob(executor, projection, job),
       jobRecord: (releaseId: string, kind: Parameters<typeof projectJob>[2]['kind']) => findJobRecord(executor, projection, releaseId, kind),
+      restoreJobObserved: async (jobId: string) => { const writer = projection.ledger.within(executor); const record = await writer.find(jobId+'/migration', 'migration-job'); if (record) await writer.report(record.id, { conditions: [{type:'RestoreObserved',status:'true'}] }); },
       failJob: (releaseId: string, kind: Parameters<typeof projectJob>[2]['kind'], message: string) => failJobRecord(executor, projection, releaseId, kind, message),
     } } : {}),
     switches: drizzleTrafficSwitchRepository(executor),
@@ -42,9 +45,10 @@ export function scopeOver(executor: Executor, lockSlots = false, projection?: Sl
 }
 
 export function drizzleUnitOfWork(db: Database, projection?: SlotProjectionDeps): UnitOfWork {
-  const run: UnitOfWork['run'] = (fn) => db.transaction((tx) => fn(scopeOver(tx, true, projection))), read = scopeOver(db, false, projection);
+  const run: UnitOfWork['run'] = (fn) => db.transaction(async (tx) => { await bindRestoreTransaction(db,tx); return fn(scopeOver(tx, true, projection)); }), read = scopeOver(db, false, projection);
   // These historical "read" repositories also expose writes. Route every write through a real UOW so admission identity reaches SQL.
   return { run, read: { ...read,
+    databaseRestores: { ...read.databaseRestores!, insert: op => run(s => s.databaseRestores!.insert(op)), save: (op,next) => run(s => s.databaseRestores!.save(op,next)) },
     journeys: { ...read.journeys, insert: (r) => run((s) => s.journeys.insert(r)), append: (id, event, patch) => run((s) => s.journeys.append(id, event, patch)) },
     releases: { ...read.releases, insert: (r) => run((s) => s.releases.insert(r)), update: (r) => run((s) => s.releases.update(r)), recordConfigVersion: (id, version) => run((s) => s.releases.recordConfigVersion(id, version)) },
     slots: { ...read.slots, initialize: (r) => run((s) => s.slots.initialize(r)), save: (r) => run((s) => s.slots.save(r)) },

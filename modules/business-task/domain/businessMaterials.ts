@@ -15,6 +15,10 @@ export function validateBusinessMaterial(profile: AgentProfile, material: Materi
     if (native.protocol !== platform.protocol) denied('nativeConfig.protocol');
     if (!policy?.nativeConfig?.agentDefinitions) denied('nativeConfig.agentDefinitions');
     if (native.subagents.length && !capabilities.opaqueInternalDelegation) unsupported('opaqueInternalDelegation');
+    for (const agent of native.subagents) if (agent.agentProfileId) {
+      if (capabilities.nativeModelMappingVersion !== 1) unsupported('nativeModelMappingVersion');
+      if (!parentProfiles.some((entry) => entry.id === agent.agentProfileId)) denied(`nativeConfig.subagents.${agent.name}.agentProfileId`);
+    }
     if (native.plugins.length && !policy?.nativeConfig?.plugins) denied('nativeConfig.plugins');
     const names = new Set([...platform.mcp.map((entry) => entry.name), ...material.mcp.map((entry) => policy?.mcpConnections.find((connection) => connection.id === entry.connectionId)?.name)]);
     for (const entry of native.mcp) {
