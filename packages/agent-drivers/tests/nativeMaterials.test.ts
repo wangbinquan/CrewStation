@@ -17,7 +17,7 @@ async function root() { const path = await mkdtemp(join(tmpdir(), 'native-materi
 for (const protocol of ['opencode', 'claude-code'] as const) test(`${protocol} compiles root, subagent, MCP and complete plugin tree without changing the platform model`, async () => {
   const path = await root(), home = join(path, 'home'); await mkdir(home);
   const host = createFakeProcessHost([{ stdout: ['1.18.29'] }]);
-  const native = BusinessNativeConfigSchema.parse({ version: 1, protocol, agent: { name: 'review', body: 'root instructions', options: protocol === 'opencode' ? { temperature: 0.2, permission: { bash: 'deny' } } : { tools: ['Read'], disallowedTools: ['Bash'], permissionMode: 'dontAsk', maxTurns: 5 } }, subagents: [{ name: 'helper', body: 'helper instructions', options: { description: 'Inspect files' } }], mcp: [{ name: 'local-tool', type: 'local', command: ['node', 'tool.js'], env: { APP_TOKEN: 'private-mcp' } }], plugins: [{ name: 'extension', entry: protocol === 'opencode' ? 'package/index.js' : 'package', files: [
+  const native = BusinessNativeConfigSchema.parse({ version: 1, protocol, agent: { name: 'review', body: 'root instructions', options: protocol === 'opencode' ? { temperature: 0.2, permission: { bash: 'deny' } } : { tools: ['Read'], disallowedTools: ['Bash'], permissionMode: 'dontAsk', maxTurns: 5 } }, subagents: [{ name: 'helper', body: 'helper instructions', options: { description: 'Inspect files' } }], mcp: [{ name: 'local-tool', type: 'local', command: ['node', 'tool.js'], env: { APP_TOKEN: 'private-mcp', apiKey: 'lowercase-mcp' } }, ...(protocol === 'opencode' ? [{ name: 'remote-tool', type: 'remote', url: 'https://mcp.test', oauth: { clientId: 'public-client', clientSecret: 'private-oauth', scope: 'read', redirectUri: 'http://127.0.0.1:19876/callback' } }, { name: 'unauthenticated', type: 'remote', url: 'https://mcp.test/public', oauth: false }] : [])], plugins: [{ name: 'extension', ...(protocol === 'opencode' ? { options: { enabled: true, nested: { value: 42 } } } : {}), entry: protocol === 'opencode' ? 'package/index.js' : 'package', files: [
     { kind: 'file', path: 'package/index.js', content: 'export default {}', mode: 0o755 },
     { kind: 'file', path: 'package/.claude-plugin/plugin.json', content: '{"name":"extension","version":"1.0.0"}' },
     { kind: 'file', path: 'node_modules/dependency/index.js', content: 'export default 42' },
@@ -35,7 +35,12 @@ for (const protocol of ['opencode', 'claude-code'] as const) test(`${protocol} c
     expect(config.agent.helper.model).toBe('provider/platform-model');
     const promptPath = String(config.agent.review.prompt).slice(6, -1); expect(await readFile(promptPath, 'utf8')).toBe('root instructions');
     expect(config.mcp['local-tool']).toMatchObject({ type: 'local', command: ['node', 'tool.js'], environment: { APP_TOKEN: 'private-mcp' } });
-    const entry = new URL(config.plugin[0]); expect((await stat(entry)).mode & 0o777).toBe(0o755);
+    expect(config.plugin[0][1]).toEqual({ enabled: true, nested: { value: 42 } });
+    expect(config.mcp['remote-tool'].oauth).toEqual({ clientId: 'public-client', clientSecret: 'private-oauth', scope: 'read', redirectUri: 'http://127.0.0.1:19876/callback' });
+    expect(config.mcp.unauthenticated.oauth).toBe(false);
+    expect(config.mcp['local-tool'].environment.apiKey).toBe('lowercase-mcp');
+    expect(plan.cmd.join(' ')).not.toContain('private-oauth');
+    const entry = new URL(config.plugin[0][0]); expect((await stat(entry)).mode & 0o777).toBe(0o755);
     expect(await readFile(new URL('./dependency/index.js', entry), 'utf8')).toBe('export default 42');
   } else {
     const agents = JSON.parse(plan.cmd[plan.cmd.indexOf('--agents') + 1]!);

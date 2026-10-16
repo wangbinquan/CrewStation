@@ -22,7 +22,11 @@ describe.skipIf(!available)('RFC-040 durable materials and command secrets', () 
     const materialObjects: ExecutionMaterialObjects = {
       pin: async (_caller, scope) => {
         const row = await drizzleExecutionMaterials(tdb.db).find(f.serviceId, f.task.id, 'object-material');
-        expect(row?.view.materialId).toBe(scope.materialId); expect(row?.state).toBe('preparing');
+        expect(row?.view.materialId).toBe(scope.materialId);
+        // An already-entered idempotent pin may read after a parallel caller's
+        // successful publication. Only the first actual pin must see preparing.
+        if (!held.has(scope.materialId)) expect(row?.state).toBe('preparing');
+        else expect(['preparing', 'ready']).toContain(row!.state ?? 'missing');
         held.add(scope.materialId); calls.push(scope.materialId); if (lost) throw new Error('pin reply lost');
       }, check: async () => {}, grants: async () => [],
     };

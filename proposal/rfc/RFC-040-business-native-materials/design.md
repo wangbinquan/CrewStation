@@ -88,3 +88,10 @@ Claude 从该次根会话 init 读取实际清单；OpenCode 在该次私有运�
 - Secret 版本轮换后重试仍用原版本；原版本不可用则具名拒绝。旧 Runner／未授权键／跨项目 Secret 均在派发前拒绝，不把密钥塞进 argv。
 
 按 `docs/engineering/testing.md`：schema 正反例、领域授权矩阵、双协议真实 argv/env/配置文件断言、FakeProcessHost 失败与取消、模块持久 requestKey/摘要/重连测试、旧材料回归；发布后 CLI 实机验收遵循用户最新裁定：2026-10-15 明确只验证 OpenCode，Claude Code 不作为本轮实机收口条件。每个拒绝分支都有测试。完整实现和测试编写结束后集中执行检查；精确 SHA CI 与本机部署证据分别记录。
+
+
+### OpenCode 联合接线补充（2026-10-15）
+
+按已批准的原生 MCP／插件与 AW RFC-370 能力等价范围，对照 [OpenCode 1.18.29 的插件合同](https://github.com/anomalyco/opencode/blob/v1.18.29/packages/core/src/v1/config/plugin.ts)，非空插件 options 经 `[fileURL, options]` 传入；MCP remote 的 `oauth=false` 或显式 clientId／clientSecret／scope／redirectUri 原样传入 OpenCode。OAuth clientSecret 与插件 options 的全部非空字符串叶子纳入持久事件脱敏。Claude 不增加这些能力，本轮不做其 CLI 实测。
+
+MCP 子进程 env 名称兼容 POSIX 大小写（与 AW 的既有声明一致），保留 128 字符限制、平台保留名及 loader 命名空间拒绝；命令／根 Agent 的环境变量合同不变。正则由大写集合扩展为大小写集合，所有原来有效的输入保持有效。合同工具将任何 pattern 差异机械归为 breaking，本项是接受集合的兼容扩展，锁文件更新以此处为依据，不要求既有业务迁移。

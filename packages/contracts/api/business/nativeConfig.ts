@@ -32,9 +32,11 @@ const options = z.preprocess((value, ctx) => {
   return value;
 }, z.record(key, z.json()));
 const agent = z.strictObject({ name: BusinessNativeNameSchema, body: z.string().max(1024 * 1024), options: options.default({}) });
+const oauth = z.union([z.literal(false), z.strictObject({ clientId: text.optional(), clientSecret: text.optional(), scope: text.optional(), redirectUri: z.url().refine((value) => ['http:', 'https:'].includes(new URL(value).protocol)).optional() })]);
+const mcpEnvironmentName = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/).max(128).refine((name) => !forbiddenKeys.has(name) && BusinessEnvironmentNameSchema.safeParse(name.toUpperCase()).success, '不能覆盖平台或驱动保留的环境变量');
 const mcp = z.discriminatedUnion('type', [
-  z.strictObject({ name: BusinessNativeNameSchema, type: z.literal('remote'), url: z.url().refine((value) => { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password; }, 'MCP URL 必须是无内嵌凭据的 HTTP(S) 地址'), headers: z.record(key, text).optional(), timeoutMs: z.number().int().min(1).max(600_000).optional() }),
-  z.strictObject({ name: BusinessNativeNameSchema, type: z.literal('local'), command: z.array(text).min(1).max(128).refine((value) => !!value[0]), env: z.record(BusinessEnvironmentNameSchema, text).optional(), timeoutMs: z.number().int().min(1).max(600_000).optional() }),
+  z.strictObject({ name: BusinessNativeNameSchema, type: z.literal('remote'), url: z.url().refine((value) => { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password; }, 'MCP URL 必须是无内嵌凭据的 HTTP(S) 地址'), headers: z.record(key, text).optional(), oauth: oauth.optional(), timeoutMs: z.number().int().min(1).max(600_000).optional() }),
+  z.strictObject({ name: BusinessNativeNameSchema, type: z.literal('local'), command: z.array(text).min(1).max(128).refine((value) => !!value[0]), env: z.record(mcpEnvironmentName, text).optional(), timeoutMs: z.number().int().min(1).max(600_000).optional() }),
 ]);
 const plugin = z.strictObject({
   name: BusinessNativeNameSchema, entry: BusinessRelativePathSchema,
@@ -57,7 +59,10 @@ export const BusinessNativeConfigSchema = z.strictObject({
     if (new Set(entries.map((entry) => entry.name)).size !== entries.length) ctx.addIssue({ code: 'custom', message: '名称重复', path: [name] });
   }
   if (value.protocol === 'claude-code') for (const [i, item] of value.mcp.entries()) if (item.timeoutMs !== undefined) ctx.addIssue({ code: 'custom', message: 'Claude 不支持逐 MCP timeoutMs', path: ['mcp', i, 'timeoutMs'] });
-  // Neither native CLI currently has an equivalent arbitrary local-plugin options channel.
-  for (const [i, item] of value.plugins.entries()) if (item.options && Object.keys(item.options).length) ctx.addIssue({ code: 'custom', message: '当前协议不支持插件 options', path: ['plugins', i, 'options'] });
+  if (value.protocol === 'claude-code') {
+    for (const [i, item] of value.mcp.entries()) if (item.type === 'remote' && item.oauth !== undefined) ctx.addIssue({ code: 'custom', message: '当前协议不支持 MCP oauth', path: ['mcp', i, 'oauth'] });
+    for (const [i, item] of value.plugins.entries()) if (item.options && Object.keys(item.options).length) ctx.addIssue({ code: 'custom', message: '当前协议不支持插件 options', path: ['plugins', i, 'options'] });
+  }
+
 });
 export type BusinessNativeConfig = z.infer<typeof BusinessNativeConfigSchema>;

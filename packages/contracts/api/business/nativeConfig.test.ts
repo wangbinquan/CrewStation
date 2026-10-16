@@ -27,12 +27,13 @@ test('protocol whitelists reject every platform override and preserve unknown fi
   const unsafe = JSON.parse('{"version":1,"protocol":"opencode","agent":{"name":"review","body":"","options":{"permission":{"__proto__":"allow"}}}}');
   expect(BusinessNativeConfigSchema.safeParse(unsafe).success).toBe(false);
 });
-test('Claude rejects unsupported per-server timeout and plugins reject unsupported options instead of dropping them', () => {
+test('protocol-specific options are preserved or rejected instead of silently dropped', () => {
   const claude = { ...native(), protocol: 'claude-code', agent: { name: 'review', body: '', options: { tools: ['Read'], maxTurns: 3, permissionMode: 'dontAsk' } } };
   expect(BusinessNativeConfigSchema.safeParse(claude).success).toBe(true);
   expect(BusinessNativeConfigSchema.safeParse({ ...claude, mcp: [{ name: 'docs', type: 'remote', url: 'https://mcp.test', timeoutMs: 5000 }] }).success).toBe(false);
   for (const mcp of [{ name: 'docs', type: 'remote', url: 'https://token:private@mcp.test' }, { name: 'docs', type: 'local', command: ['tool'], env: { OPENCODE_CONFIG: '/escape' } }]) expect(BusinessNativeConfigSchema.safeParse({ ...native(), mcp: [mcp] }).success).toBe(false);
-  expect(BusinessNativeConfigSchema.safeParse({ ...native(), plugins: [{ name: 'extension', entry: 'index.js', files: [file('index.js')], options: { ignored: true } }] }).success).toBe(false);
+  expect(BusinessNativeConfigSchema.parse({ ...native(), plugins: [{ name: 'extension', entry: 'index.js', files: [file('index.js')], options: { nested: { value: 42 } } }] }).plugins[0]!.options).toEqual({ nested: { value: 42 } });
+  expect(BusinessNativeConfigSchema.safeParse({ ...claude, plugins: [{ name: 'extension', entry: 'index.js', files: [file('index.js')], options: { ignored: true } }] }).success).toBe(false);
 });
 test('plugin trees retain executable files and dependency links while refusing every path escape', () => {
   const files = [file('packages/tool/index.js'), { ...file('node_modules/dependency/bin.js'), mode: 0o755 }, link('packages/tool/dependency', '../../node_modules/dependency')];
@@ -64,4 +65,21 @@ test('command Secret requests use references while Runner stamps require the exa
   expect(BusinessCommandSecretEnvironmentSchema.safeParse(stamp).success).toBe(true);
   expect(BusinessCommandSecretEnvironmentSchema.safeParse({ ...stamp, versions: [] }).success).toBe(false);
   expect(BusinessCommandSecretEnvironmentSchema.safeParse({ ...stamp, versions: [...stamp.versions, ...stamp.versions] }).success).toBe(false);
+});
+
+
+test('OpenCode native OAuth and MCP child env preserve exact values without opening reserved namespaces', () => {
+  for (const oauth of [false, { clientId: 'client', clientSecret: 'secret', scope: 'read', redirectUri: 'http://127.0.0.1:19876/callback' }]) {
+    const parsed = BusinessNativeConfigSchema.parse({ ...native(), mcp: [{ name: 'remote', type: 'remote', url: 'https://mcp.test', oauth }] });
+    expect(parsed.mcp[0]).toMatchObject({ oauth });
+  }
+  const local = { name: 'local', type: 'local' as const, command: ['tool'], env: { apiKey: 'value', token: 'secret' } };
+  expect(BusinessNativeConfigSchema.parse({ ...native(), mcp: [local] }).mcp[0]).toEqual(local);
+  for (const name of ['opencode_config', 'LD_PRELOAD', 'DyLd_TEST', 'constructor']) {
+    const env = { [name]: 'unsafe' };
+    expect(BusinessNativeConfigSchema.safeParse({ ...native(), mcp: [{ ...local, env }] }).success).toBe(false);
+  }
+  for (const oauth of [{ unknown: true }, { redirectUri: 'file:///private' }]) expect(BusinessNativeConfigSchema.safeParse({ ...native(), mcp: [{ name: 'remote', type: 'remote', url: 'https://mcp.test', oauth }] }).success).toBe(false);
+  const unsafe = JSON.parse('{"nested":{"__proto__":{"escape":true}}}');
+  expect(BusinessNativeConfigSchema.safeParse({ ...native(), plugins: [{ name: 'extension', entry: 'index.js', files: [file('index.js')], options: unsafe }] }).success).toBe(false);
 });

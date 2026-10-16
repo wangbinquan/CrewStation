@@ -969,6 +969,36 @@
                             "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
                             "type": "string"
                           },
+                          "oauth": {
+                            "anyOf": [
+                              {
+                                "const": false,
+                                "type": "boolean"
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "clientId": {
+                                    "maxLength": 32768,
+                                    "type": "string"
+                                  },
+                                  "clientSecret": {
+                                    "maxLength": 32768,
+                                    "type": "string"
+                                  },
+                                  "redirectUri": {
+                                    "format": "uri",
+                                    "type": "string"
+                                  },
+                                  "scope": {
+                                    "maxLength": 32768,
+                                    "type": "string"
+                                  }
+                                },
+                                "type": "object"
+                              }
+                            ]
+                          },
                           "timeoutMs": {
                             "maximum": 600000,
                             "minimum": 1,
@@ -1009,7 +1039,7 @@
                             },
                             "propertyNames": {
                               "maxLength": 128,
-                              "pattern": "^[A-Z_][A-Z0-9_]*$",
+                              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
                               "type": "string"
                             },
                             "type": "object"
@@ -7806,6 +7836,13 @@
         "－ schemas/BusinessMaterialRequest/properties/nativeConfig/properties/plugins/default（原值 []）",
         "－ schemas/BusinessMaterialRequest/properties/nativeConfig/properties/subagents/default（原值 []）",
         "－ schemas/BusinessMaterialRequest/properties/nativeConfig/properties/subagents/items/properties/options/default（原值 {}）"
+      ]
+    },
+    {
+      "date": "2026-10-16",
+      "basis": "RFC-040 design OpenCode 联合接线补充：MCP 子进程 env 正则为兼容扩展，保留所有旧输入与 128 字符限制",
+      "changes": [
+        "～ schemas/BusinessMaterialRequest/properties/nativeConfig/properties/mcp/items/oneOf[1]/properties/env/propertyNames/pattern：\"^[A-Z_][A-Z0-9_]*$\" → \"^[A-Za-z_][A-Za-z0-9_]*$\""
       ]
     }
   ]

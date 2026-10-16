@@ -2,6 +2,7 @@ import { relative } from 'node:path';
 import { verifyBusinessOutput, withBusinessOutput } from '../contract/businessOutput';
 import { createBusinessFiles } from '../files/businessFiles';
 import { redactBusinessEvents } from './businessEventRedaction';
+import { businessMaterialSecrets } from './businessMaterialSecrets';
 import { isKnownProtocol } from '@crewstation/contracts';
 import type { StartAgentCommand } from '@crewstation/contracts';
 import type { AgentSupervisorDeps } from './agentSupervisor';
@@ -22,7 +23,7 @@ export function businessAgentFactory(deps: Omit<AgentSupervisorDeps, 'emit'>, pe
     return { send: (text) => inner.send(text), cancel: () => inner.cancel(), events: {
       async *[Symbol.asyncIterator]() {
         const events = command.businessOutputContract ? withBusinessOutput(inner.events, () => verifyBusinessOutput(createBusinessFiles(deps.paths.root), relative(deps.paths.root, cwd) || '.', command.businessOutputContract!)) : inner.events;
-        try { yield* redactBusinessEvents(events, [...Object.values(command.beforeStart.secrets), ...(command.businessSecretEnvNames ?? []).map((key) => command.env[key] ?? ''), ...command.mcp.flatMap((entry) => Object.values(entry.headers)), ...(command.businessNativeConfig?.mcp.flatMap((entry) => Object.values(entry.type === 'remote' ? entry.headers ?? {} : entry.env ?? {})) ?? []), ...(command.businessMaterialDownloads?.map((entry) => entry.token) ?? [])]); }
+        try { yield* redactBusinessEvents(events, [...Object.values(command.beforeStart.secrets), ...(command.businessSecretEnvNames ?? []).map((key) => command.env[key] ?? ''), ...command.mcp.flatMap((entry) => Object.values(entry.headers)), ...businessMaterialSecrets(command.businessNativeConfig), ...(command.businessMaterialDownloads?.map((entry) => entry.token) ?? [])]); }
         finally { deps.beforeStart.release(command.agentId); }
       },
     } };

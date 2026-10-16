@@ -9,7 +9,7 @@ import type { ManagedRuntimeContext } from './managedRuntime';
 /** MCP 服务器的注入形状；CrewStation 的 McpConnection 只有 remote 一种，local 保留给将来的本地 MCP。 */
 export type McpServerSpec =
   | { name: string; enabled?: boolean; type: 'local'; command: string[]; env?: Record<string, string>; timeoutMs?: number }
-  | { name: string; enabled?: boolean; type: 'remote'; url: string; headers?: Record<string, string>; timeoutMs?: number };
+  | { name: string; enabled?: boolean; type: 'remote'; url: string; headers?: Record<string, string>; timeoutMs?: number; oauth?: false | { clientId?: string; clientSecret?: string; scope?: string; redirectUri?: string } };
 
 /** 把协议里的 McpConnection（Streamable HTTP）转成注入形状。 */
 export function toMcpServerSpec(connection: McpConnection): McpServerSpec {

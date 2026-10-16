@@ -83,3 +83,10 @@ MCP／冷续接脚本 12 项、Secret 脚本 7 项、取消／fresh retry 脚本
 - AW RFC-370 原生材料编译、私有 Git 凭据助手及其发布契约接线仍属 AW 后续工作，不以 CS 单侧通过替代。
 
 本机 AW 正式 `agent-workflow.cs.localhost` 保留运行。CS 部署及上述验收后再次只读核对：blue／green 均 Ready、0 restarts，Pod UID 分别仍为 `67808ecd-2cb8-418b-98f1-4e7ce338bce3` 与 `0039a97f-e2ae-4647-9913-a99b4839c1cc`。未替换、停止或删除它们。RFC 状态保持 **In Progress**。
+
+
+## OpenCode 联合接线补充候选与 CI 并发用例修复
+
+文档提交 `8e8bc0724828fc71a381be79159f4f7dab5655ec` 的 CI 38843444570 中，static、unit、console、e2e 与其余 module 分片通过；module 1/4 的 RFC-040 `nativeMaterialAdmission` 用例失败，gate 随之失败。精确日志 `/private/tmp/cs-rfc040-docs-ci-failed.log` 显示另一请求已将材料置为 ready，后进入的幂等 pin 回调仍强制要求 preparing。此断言由本会话引入并修正：第一次实际 pin 必须看到 preparing；已有 pin 的并发重入允许 preparing/ready，不改变生产状态转换。
+
+补充候选实现 OpenCode 插件 options tuple、MCP OAuth／大小写 env 和新增字段的持久事件脱敏；源码依据和兼容扩展边界见 design。集中检查：四文件 21 pass／0 fail（包含真实 PostgreSQL 模块用例、无 skip），仅 OpenCode 驱动准备 1 pass／0 fail／5 filtered；根类型、十文件精确 lint、结构检查通过。日志为 `/private/tmp/cs-rfc040-opencode-extras-{types,tests,driver,lint,arch}.log`。这些补充字段尚未重新部署或作真实 OpenCode 模型轮次；原部署与前节实机证据仍对应 `92889e87`。

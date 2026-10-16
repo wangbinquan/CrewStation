@@ -1,0 +1,19 @@
+import type { BusinessNativeConfig } from '@crewstation/contracts';
+
+/** Native options are opaque application data. Keep every string leaf out of
+ * public events, just as for MCP environment/header values. */
+export function businessMaterialSecrets(native: BusinessNativeConfig | undefined): string[] {
+  if (!native) return [];
+  const values: string[] = [];
+  const collect = (value: unknown): void => {
+    if (typeof value === 'string') { if (value) values.push(value); }
+    else if (Array.isArray(value)) for (const child of value) collect(child);
+    else if (value && typeof value === 'object') for (const child of Object.values(value)) collect(child);
+  };
+  for (const mcp of native.mcp) {
+    collect(mcp.type === 'local' ? mcp.env : mcp.headers);
+    if (mcp.type === 'remote' && mcp.oauth) collect(mcp.oauth.clientSecret);
+  }
+  for (const plugin of native.plugins) collect(plugin.options);
+  return [...new Set(values)];
+}

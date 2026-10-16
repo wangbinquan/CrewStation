@@ -90,7 +90,13 @@ async function prepareOpencode(spec: DriverAgentSpec, context: DriverLaunchConte
     const observer = await runDir.write('startup-inventory-observer.mjs', renderStartupInventoryPlugin(inventoryFile, inventoryNonce));
     configured.plugin = [...(configured.plugin ?? []), `file://${observer}`];
   }
-  if (native?.plugins.length) configured.plugin = [...native.plugins, ...(configured.plugin ?? [])];
+  if (native?.plugins.length) configured.plugin = [
+    ...native.plugins.map((path, index) => {
+      const options = checked?.plugins[index]?.options;
+      // OpenCode 1.18.29 ConfigPluginV1.Spec: string | [string, Options].
+      return options && Object.keys(options).length ? [path, options] : path;
+    }), ...(configured.plugin ?? []),
+  ];
   if (checked) {
     for (const [name, definition] of Object.entries(configured.agent) as Array<[string, Record<string, unknown>]>) if (typeof definition.prompt === 'string') definition.prompt = `{file:${await runDir.write(`agent-${name}.md`, definition.prompt)}}`;
   }
