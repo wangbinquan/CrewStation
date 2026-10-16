@@ -38,6 +38,7 @@ describe.skipIf(!available)('durable default Bot conversation', () => {
     await f.message('recall random marker'); f.botState.volume = false; await f.tick();
     // RFC-041 live cold resume: observing the ended old Agent must not mark its replacement paused.
     expect((await f.current()).state).toBe('preparing');
+    expect((await f.repo.execution(original.execution!.agentId))?.state).toBe('paused');
     await expect(f.message('another page while the replacement starts')).rejects.toMatchObject({ kind: 'precondition' });
     f.botState.volume = true; await f.tick(); expect((await f.current()).state).toBe('preparing');
     await f.connectBot();
@@ -49,6 +50,17 @@ describe.skipIf(!available)('durable default Bot conversation', () => {
     const history = await f.botApi.botHistory(actor, task, { limit: 1 });
     expect(history.items).toHaveLength(1); expect(history.next).toBe(resumed.execution!.agentId);
     expect((await f.botApi.botHistory(actor, task, { limit: 1, after: history.next })).items[0]?.agentId).toBe(original.execution?.agentId);
+    // An already persisted stale preparation label must also use the finished environment's actual state.
+    const oldExecution = (await f.repo.execution(original.execution!.agentId))!;
+    await f.repo.putExecution({ ...oldExecution, state: 'preparing' });
+    expect((await f.botApi.botHistory(actor, task, { limit: 1, after: history.next })).items[0]?.state).toBe('paused');
+    expect((await f.repo.execution(oldExecution.agentId))?.state).toBe('preparing'); // Read projection, no mutation.
+    const oldEnvironment = f.environments.get(oldExecution.executionTaskId)!;
+    oldEnvironment.native!.state = 'cleaning';
+    expect((await f.botApi.botHistory(actor, task, { limit: 1, after: history.next })).items[0]?.state).toBe('preparing');
+    oldEnvironment.native!.state = 'finished';
+    await f.repo.putExecution({ ...oldExecution, state: 'preparing', nativeSessionId: undefined });
+    expect((await f.botApi.botHistory(actor, task, { limit: 1, after: history.next })).items[0]?.state).toBe('unavailable');
   });
   test('lost response reconciles the original receipt and never resends the model message', async () => {
     f = await botConversationFixture(); await f.message('first'); await f.tick(); await f.connectBot();

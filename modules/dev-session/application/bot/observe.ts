@@ -22,11 +22,12 @@ export async function observeBot(deps: DevSessionUseCaseDeps, repo: BotConversat
       next.reason = next.nativeSessionId ? undefined : start.failure ?? '原生 session 尚未保存，不能无损恢复';
     } else next.state = 'stopping';
   }
+  // Execution history describes this executor, before applying intent for a future turn or context.
+  observed.state = next.state;
   // User stop/fresh intent wins over late running/waiting events.
   if (current.state === 'stopping' && pending.some(op => op.kind !== 'message')) next.state = 'stopping';
   // The previous execution cannot reopen input while the accepted next turn is still being prepared.
   if (current.state === 'preparing' && pending.some(op => op.kind === 'message' && op.receipt.state === 'accepted') && next.continuity !== 'unavailable') next.state = 'preparing';
-  observed.state = next.state;
   await repo.putExecution(observed); await repo.save(next);
   return next;
 }

@@ -22,7 +22,14 @@ export function botConversationUseCases(deps: DevSessionUseCaseDeps, repo: BotCo
     },
     botHistory: async (actor: Actor, taskId: TaskId, query: BotHistoryQuery) => {
       await guard(actor, taskId, false);
-      const rows = await repo.history(taskId, query.after, query.limit + 1), items = rows.slice(0, query.limit).map(executionDto);
+      const rows = await repo.history(taskId, query.after, query.limit + 1), current = await repo.get(taskId);
+      const items = await Promise.all(rows.slice(0, query.limit).map(async row => {
+        if (row.agentId !== current?.currentAgentId && ['preparing', 'running', 'stopping'].includes(row.state)) {
+          const env = await deps.environments.getEnvironment(row.executionTaskId);
+          if (env?.native?.state === 'finished') return executionDto({ ...row, state: row.nativeSessionId ? 'paused' : 'unavailable' });
+        }
+        return executionDto(row);
+      }));
       return { items, ...(rows.length > query.limit ? { next: items.at(-1)!.agentId } : {}) };
     },
     sendBotMessage: async (actor: Actor, taskId: TaskId, input: SendBotMessageRequest): Promise<BotReceiptDto> => {
