@@ -9,6 +9,8 @@ export interface TranscriptLine {
   readonly at: string;
   /** 工具调用出错，渲染成告警色。 */
   readonly failed: boolean;
+  /** 保留结构化调用，执行记录才能展示实际参数及结果，而不是只剩工具名。 */
+  readonly tool?: AgentEvent['tool'];
 }
 
 export type TranscriptsByAgent = Readonly<Record<string, readonly TranscriptLine[]>>;
@@ -46,7 +48,7 @@ function lineOf(event: AgentEvent): TranscriptLine {
   // 仅兼容该旧 OpenCode 工具信封；正常原生文本带 raw，哪怕正文演示同样的 JSON 也不改类。
   const legacyTool = event.type === 'text' && event.raw === undefined && event.text?.length === 8192
     && /^\{"type":"tool_use","timestamp":\d+,"sessionID":"[^"\\]+","part":\{"type":"tool","tool":"[^"\\]+","callID":"[^"\\]+",/u.test(event.text);
-  return { id: `${event.agentId}:${event.seq}`, type: legacyTool ? 'tool-start' : event.type, body: bodyOf(event), at: event.at, failed: event.tool?.isError === true };
+  return { id: `${event.agentId}:${event.seq}`, type: legacyTool ? 'tool-start' : event.type, body: bodyOf(event), at: event.at, failed: event.tool?.isError === true, tool: event.tool };
 }
 
 /** 连续的 text 增量属于同一段输出，合并成一行；其余事件各占一行。 */

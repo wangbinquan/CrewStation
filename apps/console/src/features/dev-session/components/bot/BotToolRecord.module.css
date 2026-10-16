@@ -1,0 +1,10 @@
+.row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.row > code { font-family: var(--cs-font-mono); overflow-wrap: anywhere; }
+.row > button { margin-left: auto; }
+.row + .preview { padding: 8px 10px; border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-sm); background: var(--cs-color-surface-muted); font: 12px/1.6 var(--cs-font-mono); overflow-wrap: anywhere; }
+.section { min-width: 0; margin-top: 16px; }
+.heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.heading > h3 { margin: 0; font-size: 13px; }
+.value { margin: 8px 0 0; padding: 12px; max-height: 360px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.6 var(--cs-font-mono); border: 1px solid var(--cs-color-border); border-radius: var(--cs-radius-sm); background: var(--cs-color-surface-muted); }
+.identity { margin: 0; font-size: 12px; color: var(--cs-color-text-muted); overflow-wrap: anywhere; }
+.missing { font-size: 13px; color: var(--cs-color-text-muted); }

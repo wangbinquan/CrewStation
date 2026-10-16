@@ -5,6 +5,7 @@ import { GlyphIcon } from '../../../../shared/ui/icons/GlyphIcon';
 import { useTailFollow } from '../../hooks/useTailFollow';
 import type { TranscriptLine } from '../../model/agentTranscript';
 import { BotMessageBody } from './BotMessageBody';
+import { BotToolRecord } from './BotToolRecord';
 import styles from './BotConversation.module.css';
 
 type Entry = { kind: 'user'; line: TranscriptLine } | { kind: 'answer'; line: TranscriptLine } | { kind: 'activity'; lines: TranscriptLine[] };
@@ -41,7 +42,9 @@ export function BotTranscript({ lines, running, onSuggestion, hasConversation }:
         const failed = item.lines.some(line => line.failed || line.type === 'error');
         return <details key={`activity:${item.lines[0]?.id ?? index}`} className={styles.activity} open={failed || undefined}>
           <summary>{failed ? t('devSession.bot.activityFailed') : t('devSession.bot.activity')} <span>{item.lines.length}</span></summary>
-          {item.lines.map(line => <div key={line.id} data-failed={line.failed || line.type === 'error'}><span>{t(`devSession.agentEvent.${line.type}`)}</span>{line.body ? <pre>{line.body}</pre> : null}</div>)}
+          {item.lines.map(line => <div key={line.id} data-failed={line.failed || line.type === 'error'}>{line.tool
+            ? <BotToolRecord tool={line.tool} label={t(`devSession.agentEvent.${line.type}`)} />
+            : <><span>{t(`devSession.agentEvent.${line.type}`)}</span>{line.body ? <pre>{line.body}</pre> : null}</>}</div>)}
         </details>;
       })}
       {running ? <div className={styles.working} role="status"><span className={styles.pulse} />{t('devSession.bot.working')}</div> : null}

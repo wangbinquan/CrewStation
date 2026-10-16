@@ -292,3 +292,11 @@ Chrome 在真实贪吃蛇项目复现：手动选择只读验收 Agent `01a13f4b
 Chrome 正式项目中选中成功开发 Agent `01a13efc-55c0-7000-86c8-545583181bb5`，完整八条回答与部署前逐条对比全文相等。刷新、CLI → Bot、项目概览 → 开发 → Bot 三条实际路径均恢复同一 Agent，八条正文及顺序保持一致；选择新对话后刷新，选择仍为空且没有 Bot 回答。再次选回成功开发对话后，八条浅绿气泡均为 `rgb(234, 246, 239)`，名册仍为原三条 Agent，没有发送或创建新请求。刷新前独立确认输入草稿为空；预览空白时点既有“重新加载”恢复，原预览重载边界未纳入这次修复。
 
 证据保存在 `.local/cli-bot-acceptance/bot-history-before-proof.json`、`bot-history-development-before.json`、`bot-history-after-proof.json`、`ci-bot-history-deployment-gate.json`、`bot-history-deployment-proof.json` 与 `bot-history-fixed.png`。浏览器保留成功开发对话和贪吃蛇预览。本条与 STATE 为纯验收文档提交，准确 CI 在最终交付记录。
+
+### Bot 工具参数与结果详情修复（2026-10-15）
+
+作者反馈执行记录只显示二进制/工具名，实际命令不可见。Chrome 展开成功开发历史的「执行遇到问题 19」复现只显示「调用 bash」。正常 OIDC 只读重放原执行 `01a13efc-5590-7000-bbf3-43c34d53e0a6`，`streamReady.replayComplete=true`，共 203 帧、195 个 Agent 事件；86 次工具调用全部带 input，39 次为 bash。首条真实命令是 `pwd && ls -la && git status && git log --oneline -10 2>/dev/null`，其 output 长 1014。事件保存在 `.local/cli-bot-acceptance/actual-bot-tools-before.json`。本次没有发送消息、创建 Agent 或执行这些历史命令。
+
+根因是 `agentTranscript.lineOf` 投影只保留 `tool.name`，未带入结构化 input/output。正式投影现在保留原 tool；Bot 执行行显示工具名与命令（`input.command`）或参数预览，预览超过 600 字符截为摘要；完整命令、全部输入、返回结果和调用 ID 在既有统一 Dialog 展示，支持原样复制，长内容只限制视口高度、不截断数据。返回 false、0、null 均保留，缺少字段明确写明该记录未保存。工具内容作为纯文本转义，仍不进入 Bot 回答；旧截断兼容及浅绿气泡不变。
+
+三个故障回归先红，修复后 Bot/历史/模式切换/执行订阅七文件 36 pass / 0 fail / 238 断言；文案两文件 19 pass / 0 fail / 37 断言；console 类型、精确 lint、架构检查通过。新增用例包含 80 条记录的末行打开统一弹窗、完整多行命令和长输出、Esc 返回焦点与列表滚动、字段缺失及 false/0/null。未重复原本机全量超时轮次，继续采用作者批准的准确 GitHub gate/e2e 门槛。源码提交 CI、镜像和实机结果随后补记；并行 RFC-040 文档不纳入本提交。
