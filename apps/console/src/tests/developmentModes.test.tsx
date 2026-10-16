@@ -31,8 +31,10 @@ test('CLI 和 Bot 是对等模式；切换保留草稿，不启动 Agent、不�
   expect(input.closest('[hidden]')).not.toBeNull();
   await page!.click('Bot 聊天'); expect(textarea()).toBe(input); expect(textarea().value).toBe('做一个贪吃蛇游戏');
   expect(f.starts).toHaveLength(0); expect(f.sends).toHaveLength(0);
-  await page!.go(`/projects/${activityProjectId}`); expect(document.querySelector('dialog[open]')?.textContent).toContain('继续编辑');
-  await page!.click('继续编辑'); expect(textarea().value).toBe('做一个贪吃蛇游戏');
+  await page!.go(`/projects/${activityProjectId}`); expect(page!.path()).toBe(`/projects/${activityProjectId}`);
+  expect(document.querySelector('dialog[open]')).toBeNull();
+  await page!.go(`${path}?view=guided`); expect(textarea().value).toBe('做一个贪吃蛇游戏');
+  expect(f.starts).toHaveLength(0); expect(f.sends).toHaveLength(0); expect(f.botMessages).toHaveLength(0);
 });
 
 test('发送中的 Bot 请求跨模式完成；返回后显示本次消息和输出且不重复派发', async () => {
