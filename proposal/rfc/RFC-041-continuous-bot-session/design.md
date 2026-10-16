@@ -89,3 +89,9 @@ RFC-039 design.md §5 的 CLI/Bot 独立语义继续有效。本 RFC 取代其�
 | 实机 | 在隔离项目用真实模型记住随机标记；追问、停止继续、换 Pod 冷续接、浏览器刷新后仍能回答标记；同时核对原生 sessionId、存储 UID、实际 Pod 身份与事件 |
 
 先通过相应层级及准确 SHA gate/e2e 再部署。本 RFC 的原型只有本地模拟数据；没有将其截图或 sessionStorage 当成原生持久化证明。原源码回归、RFC-039 已部署工具详情及并行 RFC-040 工作均保持独立证据。
+
+### 实机补充：跨模块准入连接饥饿
+
+正式 Chrome 同时读取 Bot 历史、状态与 CLI 名册时，四个 dev-session 外层 shared 准入占满专用四连接池，后续 task-runtime shared 准入再次申请该池连接，形成应用层相互等待；普通数据库连接仍空闲，就绪探针不能发现此故障，HTTP 返回 502。真实 PG 四请求屏障用例稳定复现。
+
+修复落在既有 `packages/persistence/transactionContext.ts`：同一数据库的嵌套单 key shared 准入复用原 backend，实际取得新 key 的 shared advisory lock，子 scope 只在其回调内授权；实际锁保留至原事务退出。所有嵌套 scope 跟随原 backend 失效，普通 UOW 仍独立提交。记录整条事务实际持有的 key，防止子 scope 返回后外层尝试对自己仍持有的锁执行排他封闭。既有显式多 key 准入不允许隐式扩展的规则保持。回归必须覆盖四请求无饥饿、真实锁排他等待、授权边界与原 backend 断线后拒绝迟到调用。

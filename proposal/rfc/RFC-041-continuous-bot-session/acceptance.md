@@ -27,7 +27,7 @@
 | 失败的本机环境对照 | 正常本机权限下 PTY 定向检查 1 pass / 0 fail / 6 断言（`rfc041-terminal-outside-sandbox.log`）；独立 PostgreSQL 17.11 设置 `max_prepared_transactions=10` 后对应文件 18 pass / 0 fail / 135 断言（`rfc041-prepared-transactions-isolated.log`），不修改现有测试库配置、不覆盖全量原失败 |
 | Runner 重启与设置草稿补充 | `rfc041-supervisor-options-final.log`：7 pass / 0 fail / 41 断言；真实 SQLite 回执跨监督器重建不重复派发、未挂载/错误 epoch 拒绝、设置关闭和刷新保留并在首条发送固定 |
 | 历史升级审计修正 | `rfc041-upgrade-regression-fixed.log`：2 pass / 0 fail / 27 断言；升级前逐表证明三个 Bot 表不存在，升级后证明新表创建且为空，同时保留逐行旧数据指纹检查；原封闭回归一并通过，精确 lint 通过 |
-| 准确 SHA GitHub gate/e2e | 待提交并等待终态；部署前必须确认同一来源提交 |
+| 准确 SHA GitHub gate/e2e | `3fb767e61c1e6878af01ae81efadbb6ab6e1bc6c` 的 [CI 38855659848](https://github.com/wangbinquan/CrewStation/actions/runs/38855659848) 九项全部成功；该源码八组件已部署，修复下述实机并发断点后的新提交须重新取准确 CI |
 
 ## 实机验收清单
 
@@ -45,3 +45,17 @@
 | CB-10 | 各分层结果如上 | 候选 SHA CI、镜像来源、实际部署/Ready 与模型/浏览器事实 |
 
 旧版本已经删除 HOME 的贪吃蛇 cancelled Agent 不具备可恢复原生数据。本实现不会通过复制聊天记录来宣称它已恢复。既有工具详情、浅绿色回答气泡与发布的贪吃蛇继续保留。
+
+## 正式部署与实机阶段记录（尚未收口）
+
+`3fb767e6` 通过准确 CI 后，以 `git archive` 构建并部署后端、Console、Runner。后端 manifest `7bb49c8178f5ff49649b528b477611ff42ba5db05021a565b237d99d2c5e2d06`，Console `0c4c10d0fed50adc35b2994b2fcf2b444b7c25df620c8a16065951e2b5604111`，Runner `0f87aceb9eb8c51ac3dd97bc4460e4d5b101aa6482b1d7f0bd41c590a3254e79`；两条 Bot 迁移成功，八个 Deployment Ready 1。
+
+默认 OpenCode/DeepSeek 档位仅更新镜像至 r16，首次探针因本机 10 核 CPU 请求额度耗尽而超时；下线本次新项目的待命模板版本，释放从未启动的空父容器，并仅将该项目开发 TaskProfile 设为既有 100m CPU/2Gi/2Gi 模板后重新打开。未修改平台默认资源规格或其他项目。手动探针 `01a1433e-8ccb-7000-93a6-62b2575ec94e` passed；真实模型、resume、MCP、nativeConfig 成功，独立的可选 materialObjects 能力失败仍保持不可用，不能将整体 passed 写成全部能力通过。
+
+隔离项目 `01a1432d-f9d3-7000-8fc6-c5abd3b64781`，父 task `01a1433e-acbc-7000-a4b8-3dd5484dd297`，conversation `01a14340-df08-7000-81c0-e4fba486bbed`。实际三轮沿用 Agent `01a14340-ef15-7000-9b74-113d12b79b70` 与 OpenCode `ses_ebcbec57fffecKX95xBPqYqrZR`，后两轮未再次提供随机标记，模型准确复述。第三轮同键提交两次，仍只有三条消息、一项执行和一次该轮原生输入。Chrome 切换与刷新保留草稿。
+
+实际 `sleep 120` 子进程运行时通过 Chrome 点击“停止本轮”；OpenCode JSON 在工具完成前未输出 tool-start，停止时机使用 Pod 内真实进程清单证明，不冒称捕获了实时工具事件。整 Pod `c992ed8e-fc65-4922-9520-a45334fe3a49` 退出，消费者准入关闭并留下 kubelet-terminated 证明；新 Pod `7a302124-72ba-4211-bf29-496d8e0ddf7e` 使用相同原生 session/PVC UID `897430a0-a723-4295-be96-a52b9a25f28d`，准确回忆原标记。之后从集群侧按 UID 正常删除第二个 Pod，平台再次留下精确停止证明并暂停，第三个 Pod 冷续接尚待继续。
+
+独立 CLI 从正式界面创建并实际回答 `CLI_INDEPENDENT_OK`。工作区文件 API 拒绝绝对路径和 `../` 访问 Bot 私有目录，Git 未提交/未推送均为 0；父 Pod 不挂 Bot 卷。贪吃蛇旧 ended/live-only 提示在正式页面可见，未向旧 Agent 发送消息。原工具查看按钮以旧 prompt 作标题曾被自动审批误判，核对实际仅本地选择记录的处理后获准只读继续，无执行副作用。
+
+随后并发页面读取稳定触发 502：四个外层开发准入占满专用池，又等待跨模块内层准入申请新连接。原始 `CONNECTION_CLOSED`、HTTP 502 和失败验收脚本结果保留；`nestedAdmission.test.ts` 的四请求真实 PG 屏障先红（starved），修复原 backend 的嵌套锁/授权生命周期后，持久层三文件 11 项/66 断言通过。此修复尚待新准确 CI、后端部署及继续验收，RFC 不标 Done。
