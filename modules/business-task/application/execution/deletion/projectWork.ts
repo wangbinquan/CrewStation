@@ -19,6 +19,7 @@ export function scopedBusinessPorts<T extends BusinessExecutionDeps>(deps: T, op
     runner: guardedBusinessPort(deps.runner, work, optional, ['getExecutionCompletionProof', 'consumeBusinessExecution', 'getBusinessExecution', 'listBusinessExecutionEvents']),
     compute: guardedBusinessPort(deps.compute, work, optional, ['pinLaunchVersion', 'launchMaterialAt']),
     ...(deps.runtimeImages ? { runtimeImages: guardedBusinessPort(deps.runtimeImages, work, optional) } : {}),
+    ...(deps.materialObjects ? { materialObjects: guardedBusinessPort(deps.materialObjects, work, optional) } : {}),
     ...(deps.taskInputs ? { taskInputs: guardedBusinessPort(deps.taskInputs, work, optional) } : {}),
     ...(deps.agentSecrets ? { agentSecrets: guardedBusinessPort(deps.agentSecrets, work, optional) } : {}),
     ...(deps.agentCalls ? { agentCalls: guardedBusinessPort(deps.agentCalls, work, optional) } : {}),

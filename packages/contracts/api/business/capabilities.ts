@@ -3,6 +3,7 @@ import { ReleaseIdSchema, ResourceIdSchema } from '../../ids';
 import { BUSINESS_EXECUTION_VERSION, BusinessGenerationSchema } from './executionValues';
 
 export const BusinessAgentCapabilitiesSchema = z.strictObject({
+  nativeConfigVersion: z.literal(1).optional(), materialObjectsVersion: z.literal(1).optional(), startupInventoryVersion: z.literal(1).optional(),
   events: z.boolean(), usage: z.enum(['none', 'final', 'incremental']), resume: z.boolean(),
   systemPrompt: z.boolean(), skills: z.boolean(), mcp: z.boolean(), platformDelegation: z.boolean(), opaqueInternalDelegation: z.boolean(),
 });
@@ -13,6 +14,8 @@ export const BusinessCapabilitiesDtoSchema = z.strictObject({
     summaryBytes: z.number().int().positive(), fileChunkBytes: z.number().int().positive(), eventPageDefault: z.number().int().positive(), eventPageMax: z.number().int().positive(),
     retentionDays: z.number().int().positive(), leaseSeconds: z.number().int().positive(), renewSeconds: z.number().int().positive(),
   }),
+  commandSecretEnvVersion: z.literal(1).optional(),
+  nativeMaterialLimits: z.strictObject({ files: z.number().int().positive(), bytes: z.number().int().positive() }).optional(),
   storage: z.strictObject({ version: z.literal(1), objects: z.boolean(), taskInputs: z.boolean(), finalization: z.boolean(), unavailableReason: z.string().nullable() }).optional(),
   agentProfiles: z.array(z.strictObject({ agentProfileId: ResourceIdSchema, computeProfileId: ResourceIdSchema, profileRevision: BusinessGenerationSchema, capabilities: BusinessAgentCapabilitiesSchema })),
 });

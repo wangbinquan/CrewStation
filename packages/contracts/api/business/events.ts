@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BusinessStartupInventorySchema } from './startupInventory';
 import { SubtaskIdSchema, TaskIdSchema } from '../../ids';
 import { BusinessDigestSchema, BusinessGenerationSchema, BusinessProcessStateSchema, BusinessSubtaskStateV3Schema, BusinessTaskStateV3Schema } from './executionValues';
 import { AgentUsageSnapshotSchema } from '../../taskrunner/usage';
@@ -20,6 +21,7 @@ const envelope = {
   cursor: z.string().min(1), occurredAt: z.iso.datetime(), sourceEventId: z.string().min(1),
 };
 export const BusinessEventSchema = z.discriminatedUnion('type', [
+  z.strictObject({ ...envelope, type: z.literal('startup-inventory'), data: BusinessStartupInventorySchema }),
   z.strictObject({ ...envelope, type: z.literal('task-state'), data: z.strictObject({ state: BusinessTaskStateV3Schema, generation: BusinessGenerationSchema }) }),
   z.strictObject({ ...envelope, type: z.literal('execution-state'), data: z.strictObject({ state: BusinessSubtaskStateV3Schema, process: BusinessProcessStateSchema, reason: z.string().optional() }) }),
   z.strictObject({ ...envelope, type: z.literal('text'), data: z.strictObject({ text: z.string() }) }),

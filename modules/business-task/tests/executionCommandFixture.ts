@@ -12,12 +12,12 @@ export async function executionCommandFixture(db: Database, options?: Parameters
     const task = await (await f.request('/v3/business-tasks', { requestKey: 'parent', taskContractVersion: 'v1', fence })).json() as BusinessTaskV3Dto;
     const env = f.environments.get(task.id)!; env.state = 'running'; env.connected = true;
     const receipts = new Map<string, RunnerBusinessReceipt>(), commands: RunnerCommand[] = [];
-    const behavior = { incarnation: newResourceId(), starts: 0, loseReply: false, unavailable: false, notSupported: false, disconnectAfterInfo: false };
+    const behavior = { incarnation: newResourceId(), starts: 0, loseReply: false, unavailable: false, notSupported: false, disconnectAfterInfo: false, commandSecretEnv: false };
     f.runner.sendCommand = async (_taskId, command) => {
       commands.push(command);
       if (behavior.notSupported) throw new PlatformError('precondition', 'old runner', { code: 'unsupported_capability' });
       if (behavior.unavailable) throw new Error('connection lost');
-      if (command.type === 'businessExecutionInfo') { if (behavior.disconnectAfterInfo) env.connected = false; return { incarnation: behavior.incarnation, limits: { outputBytes: 1024, spoolBytes: 2048, eventBytes: 1024 } }; }
+      if (command.type === 'businessExecutionInfo') { if (behavior.disconnectAfterInfo) env.connected = false; return { ...(behavior.commandSecretEnv ? { commandSecretEnvVersion: 1 } : {}), incarnation: behavior.incarnation, limits: { outputBytes: 1024, spoolBytes: 2048, eventBytes: 1024 } }; }
       if (command.type === 'getBusinessExecution') {
         const receipt = receipts.get(command.executionId); if (!receipt) throw new PlatformError('not_found', 'missing', { code: 'execution_not_found' }); return receipt;
       }

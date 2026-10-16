@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BusinessEnvironmentValueSchema } from './materials';
 import { ResourceIdSchema, TraceIdSchema } from '../../ids';
 import { VolumeModeSchema } from '../../manifest/tasks';
 import { BusinessExecutionFenceSchema } from './control';
@@ -18,13 +19,14 @@ export const CreateBusinessTaskV3Schema = z.strictObject({
 }).refine((input) => input.completionPolicy !== 'archive-and-delete' || input.volumeMode === 'persistent', '归档回收必须显式选择 persistent 工作卷')
   .refine((input) => !input.inputObjects || input.completionPolicy === 'archive-and-delete', '对象输入需要归档终结策略保护引用');
 
-export const BusinessCommandEnvironmentSchema = z.record(BusinessEnvironmentNameSchema, z.string().max(32768).refine((value) => !value.includes('\0'), '环境变量值不能含 NUL'));
+export const BusinessCommandEnvironmentSchema = z.record(BusinessEnvironmentNameSchema, BusinessEnvironmentValueSchema);
 const invocation = { ...mutation, name: z.string().trim().min(1).max(80), cwd: BusinessCwdSchema.optional() };
 export const SubmitBusinessSubtaskV3Schema = z.discriminatedUnion('kind', [
   z.strictObject({
     ...invocation, kind: z.literal('agent'), agentProfileId: ResourceIdSchema, outputContractId: ResourceIdSchema.optional(),
     runtimeImageVersionId: ResourceIdSchema.optional(),
     prompt: z.string().min(1).max(1024 * 1024), mode: z.enum(['oneshot', 'interactive']).default('oneshot'),
+    startupInventoryVersion: z.literal(1).optional(),
     materialId: ResourceIdSchema.optional(), resumeSessionId: z.string().min(1).max(512).optional(),
   }),
   z.strictObject({

@@ -1,7 +1,12 @@
+import { readStartupInventory, renderStartupInventoryPlugin } from './startupInventory';
+import { stageNativeMaterials } from '../../injection/nativeMaterials';
+import { BusinessNativeConfigSchema, BusinessMaterialRequestSchema } from '@crewstation/contracts';
+import { validation } from '@crewstation/kernel';
 import { createOpencodeUsageMeter } from '../usage/opencodeMeter';
 import { stageBusinessSkills, nativeSkillRoots } from '../../injection/businessSkills';
 // ← agent-workflow `runtime/opencode/driver.ts` 的装配段（`assembleOpencodePersonaSpawn`）。
-// 不复制的部分：清单插件物化、skill staging、工作区边界、SQLite 会话捕获、模型列举、
+// 工作区边界、SQLite 会话捕获、模型列举不复制；RFC-040 独立提供材料物化与启动清单。
+// 不复制源里的
 // `AGENT_WORKFLOW_OPENCODE_BIN` ／ `OPENCODE_PURE` 环境开关（依据见包根 index.ts）。
 //
 // 每次运行建出的目录：`<runDir>/.opencode/skills/` —— 即使零个 skill 也要建，
@@ -42,8 +47,22 @@ export function createOpencodeDriver(which: (binary: string) => string | null): 
 
 async function prepareOpencode(spec: DriverAgentSpec, context: DriverLaunchContext): Promise<PreparedRuntime> {
   assertLaunchForKnownProtocol(spec.launch);
+  BusinessMaterialRequestSchema.parse({ requestKey: 'driver', skills: spec.businessSkills, nativeConfig: spec.businessNativeConfig });
   const runDir = await createRunDirectory(context.runDir ?? defaultRunDir(spec.agentId), context.host);
+  let native: Awaited<ReturnType<typeof stageNativeMaterials>>;
+  let skills: Awaited<ReturnType<typeof stageBusinessSkills>>;
+  try {
+  const checked = spec.businessNativeConfig ? BusinessNativeConfigSchema.parse(spec.businessNativeConfig) : undefined;
+  if (checked && checked.protocol !== spec.launch.protocol) throw validation('原生材料协议与档位不符', { code: 'invalid_configuration' });
+  const names = new Set(spec.mcp.map((mcp) => mcp.name));
+  if (checked?.mcp.some((mcp) => names.has(mcp.name))) throw validation('原生 MCP 与平台连接重名', { code: 'invalid_configuration' });
+  const admin = await readManagedOpencodeConfig(context.managed);
+  const managedMcp = admin?.mcp as Record<string, unknown> | undefined;
+  const managedAgents = admin?.agent as Record<string, unknown> | undefined;
+  if (checked?.mcp.some((entry) => managedMcp && Object.hasOwn(managedMcp, entry.name))) throw validation('业务 MCP 与管理员配置重名', { code: 'invalid_configuration' });
+  if (checked && [checked.agent, ...checked.subagents].some((entry) => managedAgents && Object.hasOwn(managedAgents, entry.name))) throw validation('业务 Agent 与管理员配置重名', { code: 'invalid_configuration' });
   const base = baseContext(spec, context, runDir.path);
+  native = await stageNativeMaterials(checked, runDir.path, context.host, spec.businessMaterialDownloads ?? [], context.signal);
   const head = [...base.head];
   const configDir = join(runDir.path, opencodeConfigDirName(base));
   mkdirSync(join(configDir, 'skills'), { recursive: true, mode: 0o700 });
@@ -57,22 +76,37 @@ async function prepareOpencode(spec: DriverAgentSpec, context: DriverLaunchConte
   await materializeOpencodeConfig(env, context.managed, runDir);
   // auto-approve flag 的拼写在 1.18.0 改过，拼错会让每次拉起都只剩一整块 usage ＋ exit 1，所以先探版本。
   const binaryVersion = await ensureOpencodeBinaryVersion(context.host, head, { cwd: context.cwd, env: context.env, logger: context.logger });
-  const adminSkills = (await readManagedOpencodeConfig(context.managed))?.skills as { paths?: unknown } | undefined;
+  const adminSkills = admin?.skills as { paths?: unknown } | undefined;
   const adminPaths = Array.isArray(adminSkills?.paths) ? adminSkills.paths.filter((value): value is string => typeof value === 'string') : [];
-  const skills = await stageBusinessSkills(spec.businessSkills, context.host, [...nativeSkillRoots(context.cwd, context.managed?.home ?? context.env.HOME ?? '/', context.env.XDG_CONFIG_HOME), ...adminPaths]);
+  skills = await stageBusinessSkills(spec.businessSkills, context.host, [...nativeSkillRoots(context.cwd, context.managed?.home ?? context.env.HOME ?? '/', context.env.XDG_CONFIG_HOME), ...adminPaths], { runDir: runDir.path, downloads: spec.businessMaterialDownloads, signal: context.signal });
   if (skills) {
     const config = JSON.parse(env.OPENCODE_CONFIG_CONTENT ?? '{}');
     config.skills = { ...(config.skills ?? {}), paths: [...new Set([...adminPaths, ...(config.skills?.paths ?? []), skills.skills])] };
     env.OPENCODE_CONFIG_CONTENT = JSON.stringify(config);
   }
+  const inventoryNonce = crypto.randomUUID(), inventoryFile = join(runDir.path, 'startup-inventory.json');
+  const configured = JSON.parse(env.OPENCODE_CONFIG_CONTENT ?? '{}');
+  if (spec.startupInventoryVersion === 1) {
+    const observer = await runDir.write('startup-inventory-observer.mjs', renderStartupInventoryPlugin(inventoryFile, inventoryNonce));
+    configured.plugin = [...(configured.plugin ?? []), `file://${observer}`];
+  }
+  if (native?.plugins.length) configured.plugin = [...native.plugins, ...(configured.plugin ?? [])];
+  if (checked) {
+    for (const [name, definition] of Object.entries(configured.agent) as Array<[string, Record<string, unknown>]>) if (typeof definition.prompt === 'string') definition.prompt = `{file:${await runDir.write(`agent-${name}.md`, definition.prompt)}}`;
+  }
+  env.OPENCODE_CONFIG_CONTENT = JSON.stringify(configured);
+  if (Buffer.byteLength(env.OPENCODE_CONFIG_CONTENT) > 120 * 1024) throw validation('OpenCode 原生配置超过环境变量预算', { code: 'invalid_configuration' });
+  await materializeOpencodeConfig(env, context.managed, runDir);
+  context.signal?.throwIfAborted();
   return {
+    ...(spec.startupInventoryVersion === 1 ? { startupInventory: (sessionId: string | undefined) => readStartupInventory(inventoryFile, inventoryNonce, sessionId) } : {}),
     // 计量器只用最终环境定位原生存储（每轮拉起用的就是这一份 env）。
     usageMeter: ({ resumed, startedAt }) => createOpencodeUsageMeter({ resumed, startedAt, configuredModel: spec.launch.model ?? null, env }),
     plan: (input) => ({
       cmd: buildOpencodeArgv(
         {
           head,
-          agentName: OPENCODE_AGENT_NAME,
+          agentName: checked?.agent.name ?? OPENCODE_AGENT_NAME,
           ...(input.resumeSessionId === undefined ? {} : { resumeSessionId: input.resumeSessionId }),
           binaryVersion,
         },
@@ -84,18 +118,19 @@ async function prepareOpencode(spec: DriverAgentSpec, context: DriverLaunchConte
     }),
     parseEvent,
     detectSessionNotFound: detectOpencodeSessionNotFound,
-    dispose: () => { skills?.dispose(); runDir.dispose(); },
+    dispose: () => { skills?.dispose(); native?.dispose(); runDir.dispose(); },
   };
+  } catch (error) { skills?.dispose(); native?.dispose(); runDir.dispose(); throw error; }
 }
 
 function baseContext(spec: DriverAgentSpec, context: DriverLaunchContext, runDir: string): AgentSpawnContext {
   return {
-    agentId: spec.agentId,
+    agentId: spec.agentId, businessNativeConfig: spec.businessNativeConfig,
     prompt: '',
     ...(spec.systemPrompt === undefined ? {} : { systemPrompt: spec.systemPrompt }),
     ...launchSpawnFields(spec.launch),
     permission: spec.permission,
-    mcps: spec.mcp.map(toMcpServerSpec),
+    mcps: [...spec.mcp.map(toMcpServerSpec), ...(spec.businessNativeConfig?.mcp ?? [])],
     cwd: context.cwd,
     runDir,
     baseEnv: context.env,

@@ -1,3 +1,5 @@
+import { BusinessMaterialDownloadsSchema } from './businessMaterial';
+import { BusinessNativeConfigSchema } from '../api/business/nativeConfig';
 import { BusinessOutputMaterialSchema } from '../api/business/releaseMaterials';
 import { BusinessMaterialRequestSchema } from '../api/business/materials';
 import { BusinessMessageCommands, BusinessMessageReceiptSchema } from './businessMessages';
@@ -53,6 +55,7 @@ export const RunnerHelloSchema = z.object({
     workspaceCommit: z.literal(1).optional(),
     /** RFC-027: reliable business execution, materials and replay; omitted by older runners. */
     businessExecutionV3: z.literal(1).optional(),
+    nativeConfigVersion: z.literal(1).optional(), materialObjectsVersion: z.literal(1).optional(), startupInventoryVersion: z.literal(1).optional(), commandSecretEnvVersion: z.literal(1).optional(),
     /** RFC-028：逐容器初始化、工具检查、持久去重和命令门控。 */
     runtimeInitialization: z.literal(1).optional(),
     /** 2026-09-23：输入控制记住持有人、同一用户的另一视图直接转移，换人或释放即推 `terminalControl` 事件。同样用能力位而不升协议版本。 */
@@ -84,6 +87,8 @@ const ProfileLaunchShape = {
 
 export const StartAgentCommandSchema = z.object({
   businessOutputContract: BusinessOutputMaterialSchema.optional(),
+  businessNativeConfig: BusinessNativeConfigSchema.optional(), businessMaterialDownloads: BusinessMaterialDownloadsSchema.optional(),
+  startupInventoryVersion: z.literal(1).optional(),
   businessSkills: BusinessMaterialRequestSchema.shape.skills.optional(),
   businessSecretEnvNames: z.array(z.string()).max(1024).optional(),
   ...cmd('startAgent'),

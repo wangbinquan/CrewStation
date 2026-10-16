@@ -158,3 +158,16 @@ describe('durable business execution journal', () => {
     } finally { proc.kill(); await proc.exited; }
   });
 });
+
+
+test('a registered attempt can persist only unavailable startup inventory before a proven setup failure', async () => {
+  const root = await directory(), journal = open(root); journal.reserve(identity);
+  const base = { agentId: 'agent', seq: 0, at: new Date().toISOString() };
+  expect(() => journal.agent(identity.executionId, { ...base, type: 'text', text: 'not running' })).toThrow('活动执行');
+  expect(() => journal.agent(identity.executionId, { ...base, type: 'startup-inventory', inventory: { version: 1, state: 'verified', source: 'claude-init', mcpServers: [] } })).toThrow('活动执行');
+  journal.agent(identity.executionId, { ...base, type: 'startup-inventory', inventory: { version: 1, state: 'unavailable', reason: 'inventory-start-failed' } });
+  expect(journal.get(identity.executionId)?.phase).toBe('registered');
+  const result = journal.finish(identity.executionId, { reason: 'spawn_failed', exitCode: null, durationMs: 0 });
+  expect(result.phase).toBe('finished'); expect(result.lastSequence).toBe(2);
+  expect(open(root, 'cold').replay(identity.executionId, 0).map((entry) => entry.frame.type)).toEqual(['agent', 'result']);
+});

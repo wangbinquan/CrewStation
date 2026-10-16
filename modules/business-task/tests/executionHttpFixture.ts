@@ -1,3 +1,4 @@
+import type { TasksSpec } from '@crewstation/contracts';
 import type { AgentProfile, BusinessReleaseMaterials, OutputContract } from '@crewstation/contracts';
 import type { ReleaseId, ProjectId, ServiceId, WorkloadIdentity, TaskId, RuntimeImageSelection } from '@crewstation/contracts';
 import { ManifestSchema } from '@crewstation/contracts';
@@ -8,7 +9,7 @@ import type { BusinessRuntimeImages } from '../ports/runtimeImages';
 import type { ComputeCatalog, EnvironmentView, Environments } from '../ports/runtime';
 import { createBusinessTaskModule } from '../wiring';
 
-export async function executionHttpFixture(db: Database, images?: { port?: BusinessRuntimeImages; selection: RuntimeImageSelection }, options?: { releaseMaterials?: BusinessReleaseMaterials; outputContracts?: OutputContract[]; agentProfiles: AgentProfile[]; compute: ComputeCatalog }) {
+export async function executionHttpFixture(db: Database, images?: { port?: BusinessRuntimeImages; selection: RuntimeImageSelection }, options?: { commandBusinessConfig?: TasksSpec['commandBusinessConfig']; releaseMaterials?: BusinessReleaseMaterials; outputContracts?: OutputContract[]; agentProfiles: AgentProfile[]; compute: ComputeCatalog }) {
   const serviceId = newResourceId() as ServiceId, projectId = newResourceId() as ProjectId, releaseId = newResourceId() as ReleaseId, taskProfileId = newResourceId();
   const environments = new Map<TaskId, EnvironmentView>(), sources = new Map<string, WorkloadIdentity & { source: NonNullable<WorkloadIdentity['source']> }>();
   sources.set('trusted', { identity: 'demo/demo', project: 'demo', service: 'demo', kind: 'service', slot: 'prod',
@@ -38,7 +39,7 @@ export async function executionHttpFixture(db: Database, images?: { port?: Busin
     compute: options?.compute ?? { resolve: async () => { throw new Error('not used'); }, launchMaterial: async () => { throw new Error('not used'); } },
     settings: { mcp: [], outputLimitBytes: 262144, consumerName: newResourceId(), secretKeyBase64: Buffer.alloc(32, 27).toString('base64') },
   };
-  const make = (overrides: Partial<Pick<Parameters<typeof createBusinessTaskModule>[0], 'settings' | 'storageControl' | 'deletionWorkSources' | 'agentCalls' | 'finalizationPreparation' | 'authorizer' | 'taskStorageStatus' | 'runner'>> = {}) => {
+  const make = (overrides: Partial<Pick<Parameters<typeof createBusinessTaskModule>[0], 'materialObjects' | 'agentSecrets' | 'settings' | 'storageControl' | 'deletionWorkSources' | 'agentCalls' | 'finalizationPreparation' | 'authorizer' | 'taskStorageStatus' | 'runner'>> = {}) => {
     const module = createBusinessTaskModule({ ...deps, ...overrides }), app = createApp({ name: 'v3-test' }); app.route('/', module.http.service);
     const request = (path: string, body?: unknown, token = 'trusted', headers: Record<string, string> = {}) => app.request(path, {
       method: body === undefined ? 'GET' : 'POST', headers: { 'x-cs-source-service': 'demo/demo', 'x-cs-source-token': token, 'content-type': 'application/json', ...headers }, ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -48,7 +49,7 @@ export async function executionHttpFixture(db: Database, images?: { port?: Busin
   const first = make();
   await first.module.api.registerContracts({ occurredAt: new Date().toISOString(), projectId, serviceId, releaseId, tag: 'v1', commitSha: 'a'.repeat(40),
     executionMaterials: options?.releaseMaterials, manifest: ManifestSchema.parse({ apiVersion: images ? 'crewstation/v3' : 'crewstation/v2', kind: 'DigitalWorker', spec: { service: { command: ['bun'], port: 3000, servicePlanId: newResourceId() },
-      tasks: { ...images?.selection, agentProfiles: options?.agentProfiles, outputContracts: options?.outputContracts, taskProfileId, executionControl: 'fenced', acceptedTaskContractVersions: ['v1'], defaultVolumeMode: 'persistent' } } }),
+      tasks: { ...images?.selection, commandBusinessConfig: options?.commandBusinessConfig, agentProfiles: options?.agentProfiles, outputContracts: options?.outputContracts, taskProfileId, executionControl: 'fenced', acceptedTaskContractVersions: ['v1'], defaultVolumeMode: 'persistent' } } }),
   });
   return { ...first, make, environmentInputs, sources, serviceId, projectId, releaseId, taskProfileId, behavior, environments, runner: deps.runner, environmentPort: deps.environments };
 }

@@ -13,7 +13,8 @@ export async function* redactBusinessEvents(source: AsyncIterable<AgentEvent>, v
   let pending = '', sequence = 0, textEvent: AgentEvent | undefined;
   const safe = (event: AgentEvent): AgentEvent => {
     const { raw: _raw, ...rest } = event;
-    return { ...rest, seq: ++sequence, ...(event.error ? { error: object(event.error) as AgentEvent['error'] } : {}),
+    const inventory = event.inventory && secrets.some((secret) => JSON.stringify(event.inventory).includes(secret)) ? { version: 1 as const, state: 'malformed' as const, reason: 'inventory-malformed' as const } : event.inventory;
+    return { ...rest, ...(inventory ? { inventory } : {}), seq: ++sequence, ...(event.error ? { error: object(event.error) as AgentEvent['error'] } : {}),
       ...(event.tool ? { tool: object(event.tool) as AgentEvent['tool'] } : {}), ...(event.result?.summary ? { result: { ...event.result, summary: redact(event.result.summary) } } : {}) };
   };
   // Keep only a suffix that could still be the start of a credential split across text frames.

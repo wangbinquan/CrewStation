@@ -8,9 +8,9 @@ import type { TestRunner } from '../ports/platform';
 
 function fixture() {
   const commands: RunnerCommand[] = [], receipts = new Map<string, RunnerBusinessReceipt>(), events = new Map<string, RunnerBusinessEvent[]>();
-  const state = { supported: true, mismatch: undefined as string | undefined, unknown: false, gap: false, rejectStart: false, lostReply: false, sessionToken: '', mcpToken: '' };
+  const state = { supported: true, modern: false, materialToken: '', inventory: true, mismatch: undefined as string | undefined, unknown: false, gap: false, rejectStart: false, lostReply: false, sessionToken: '', mcpToken: '' };
   const runner: TestRunner = {
-    connectionStatus: async () => ({ connected: true, capabilities: { protocols: ['opencode'], pty: false, preview: false, ...(state.supported ? { businessExecutionV3: 1 as const } : {}) } }),
+    connectionStatus: async () => ({ connected: true, capabilities: { protocols: ['opencode'], pty: false, preview: false, ...(state.supported ? { businessExecutionV3: 1 as const } : {}), ...(state.modern ? { nativeConfigVersion: 1 as const, materialObjectsVersion: 1 as const, startupInventoryVersion: 1 as const } : {}) } }),
     listEvents: async () => [],
     getBusinessExecution: async (taskId, id) => ({ taskId, receipt: receipts.get(id)!, persistedThrough: receipts.get(id)!.lastSequence, acknowledgedThrough: receipts.get(id)!.lastSequence, complete: receipts.get(id)!.phase === 'finished' }),
     listBusinessExecutionEvents: async (_taskId, id, after = 0) => (events.get(id) ?? []).filter((event) => event.sequence > after),
@@ -19,7 +19,8 @@ function fixture() {
       commands.push(command);
       if (command.type === 'businessExecutionInfo') return { incarnation: '00000000-0000-4000-8000-000000000001', limits: { outputBytes: 100000, spoolBytes: 100000, eventBytes: 10000 } };
       if (command.type === 'startBusinessCommand') {
-        state.mcpToken = command.command.join(' ').match(/cs-proof-[a-f0-9]+/)![0];
+        state.mcpToken = command.command.join(' ').match(/text:"(cs-proof-[a-f0-9]+)"/)?.[1] ?? '';
+        state.materialToken = command.command.join(' ').match(/Reply with exactly (cs-proof-[a-f0-9]+)/)?.[1] ?? '';
         receipts.set(command.executionId, { executionId: command.executionId, attempt: 1, payloadDigest: command.payloadDigest, incarnation: command.incarnation, phase: 'running', lastSequence: 1, acknowledgedSequence: 0, outputBytes: 18, result: null });
         events.set(command.executionId, [{ sequence: 1, occurredAt: new Date().toISOString(), frame: { type: 'output', stream: 'stdout', text: 'CS_MCP_PROBE_READY' } }]); return {};
       }
@@ -32,10 +33,11 @@ function fixture() {
         const digest = new Bun.CryptoHasher('sha256').update(businessAgentDigestInput(wire.agent, wire.digestNonce)).digest('hex');
         if (digest !== command.payloadDigest) throw precondition('Agent 执行参数摘要不匹配', { code: 'execution_conflict' });
         expect(digest).toBe(command.payloadDigest);
-        const agent = command.agent, step = agent.resumeSessionId ? 'resume' : agent.systemPrompt ? 'systemPrompt' : agent.businessSkills?.length ? 'skills' : agent.mcp.length ? 'mcp' : 'events';
-        const token = step === 'resume' ? state.sessionToken : step === 'mcp' ? state.mcpToken : JSON.stringify(agent).match(/cs-proof-[a-f0-9]+/)![0];
+        const agent = command.agent, step = agent.businessNativeConfig ? 'nativeConfig' : agent.businessMaterialDownloads?.length ? 'materialObjects' : agent.resumeSessionId ? 'resume' : agent.systemPrompt ? 'systemPrompt' : agent.businessSkills?.length ? 'skills' : agent.mcp.length ? 'mcp' : 'events';
+        const token = step === 'materialObjects' ? state.materialToken : step === 'resume' ? state.sessionToken : step === 'mcp' ? state.mcpToken : JSON.stringify(agent).match(/cs-proof-[a-f0-9]+/)![0];
         if (step === 'events') state.sessionToken = token;
         const fields: Array<Partial<AgentEvent> & Pick<AgentEvent, 'type'>> = [{ type: 'session', sessionId: 'native-session' }, { type: 'text', text: state.mismatch === step ? 'unsupported' : token }, { type: 'usage', usage: { measurementId: 'turn', scope: 'session', mode: 'delta', inputTokens: 3, outputTokens: 1, cacheReadTokens: null, cacheWriteTokens: null, complete: true } }];
+        if (agent.startupInventoryVersion === 1) fields.push({ type: 'startup-inventory', inventory: state.inventory ? { version: 1, state: 'verified', source: 'opencode-inventory', mcpServers: [{ name: 'crewstation-probe', status: 'connected' }] } : { version: 1, state: 'unavailable', reason: 'inventory-not-reported' } });
         if (step === 'mcp') fields.push({ type: 'tool-start', tool: { name: 'crewstation_probe_nonce' } });
         const frames: RunnerBusinessEvent[] = fields.map((event, index) => ({ sequence: index + (state.gap ? 2 : 1), occurredAt: new Date().toISOString(), frame: { type: 'agent', event: { ...event, agentId: agent.agentId, seq: index + 1, at: new Date().toISOString() } } }));
         events.set(command.executionId, frames);
@@ -96,4 +98,17 @@ test('档位首轮未带可选技能时，摘要仍与真正 Runner 解析后的
   expect(accepted).toHaveLength(1);
   expect(accepted[0]).toMatchObject({ agentId, businessSkills: [] });
   expect(f.commands.filter(command => command.type === 'startBusinessAgent')).toHaveLength(1);
+});
+
+
+test('new Runner declarations alone do not grant native, object or inventory proof without successful observed turns', async () => {
+  const f = fixture(); f.state.modern = true;
+  expect((await f.run())?.capabilities).toMatchObject({ nativeConfigVersion: 1, materialObjectsVersion: 1, startupInventoryVersion: 1 });
+  expect(f.commands.filter((command) => command.type === 'startBusinessAgent')).toHaveLength(7);
+  for (const feature of ['nativeConfig', 'materialObjects'] as const) {
+    const failed = fixture(); failed.state.modern = true; failed.state.mismatch = feature;
+    expect((await failed.run())?.capabilities[feature === 'nativeConfig' ? 'nativeConfigVersion' : 'materialObjectsVersion']).toBeUndefined();
+  }
+  const missing = fixture(); missing.state.modern = true; missing.state.inventory = false;
+  expect((await missing.run())?.capabilities.startupInventoryVersion).toBeUndefined();
 });

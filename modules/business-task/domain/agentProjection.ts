@@ -3,6 +3,7 @@ import type { AgentEvent, BusinessEvent, BusinessSubtaskV3Dto } from '@crewstati
 type Envelope = Pick<BusinessEvent, 'taskId' | 'subtaskId' | 'attempt' | 'cursor' | 'occurredAt' | 'sourceEventId'>;
 /** The journal's final result closes output. CLI completed/error events alone cannot declare a durable result. */
 export function projectAgentFrame(view: BusinessSubtaskV3Dto, input: AgentEvent, common: Envelope): { event: BusinessEvent; view: BusinessSubtaskV3Dto } {
+  if (input.type === 'startup-inventory' && input.inventory) return { view, event: { ...common, type: 'startup-inventory', data: input.inventory } };
   if (input.type === 'text') return { view, event: { ...common, type: 'text', data: { text: input.text ?? '' } } };
   if (input.type === 'session' && input.sessionId) return { view: { ...view, sessionId: input.sessionId }, event: { ...common, type: 'session', data: { sessionId: input.sessionId } } };
   if (input.type === 'usage' && input.usage) return { view, event: { ...common, type: 'usage', data: { ...input.usage, scope: `${view.executionId}:${input.usage.scope}`, measurementId: `${view.executionId}:${input.usage.measurementId}` } } };

@@ -1,7 +1,8 @@
+import { prepareCommandPlan } from './command/material';
 import { prepareAgentPlan } from './agentPlan';
 import { admitWithRuntimeImage } from '../taskRuntimeImage';
 import { dispatchBusinessAgent, cleanupAgentEnvironments } from './agentDispatch';
-import { businessCommandDigestInput, BusinessExecutionInfoSchema } from '@crewstation/contracts';
+import { BusinessExecutionInfoSchema } from '@crewstation/contracts';
 import type { BusinessSubtaskV3Dto, SubmitBusinessSubtaskV3, SubtaskId, TaskId } from '@crewstation/contracts';
 import { quotaExceeded, conflict, jsonHash, newResourceId, notFound, precondition } from '@crewstation/kernel';
 import type { BusinessExecutionApi, BusinessExecutionCaller } from '../../api/executionApi';
@@ -47,13 +48,13 @@ export function executionSubtaskUseCases(deps: BusinessExecutionDeps): Pick<Busi
       };
       const { requestKey: _key, fence: _fence, ...payload } = input;
       const runtimeTaskId = input.kind === 'agent' ? newResourceId() as TaskId : undefined;
-      BusinessExecutionInfoSchema.parse(await deps.runner.sendCommand(taskId, { id: newResourceId(), type: 'businessExecutionInfo' }));
+      const info = BusinessExecutionInfoSchema.parse(await deps.runner.sendCommand(taskId, { id: newResourceId(), type: 'businessExecutionInfo' }));
       const agent = input.kind === 'agent' ? await prepareAgentPlan(deps, context.parent, context.serviceId, view, runtimeTaskId!, input) : undefined;
-      const commandDigest = input.kind === 'command' ? new Bun.CryptoHasher('sha256').update(businessCommandDigestInput({ command: input.argv, cwd: input.cwd, env: input.env, timeoutSeconds: input.timeoutSeconds })).digest('hex') : '';
+      const command = input.kind === 'command' ? await prepareCommandPlan(deps, context.parent, input, info) : undefined;
       const saved = await admitWithRuntimeImage(deps.runtimeImages, agent?.plan.runtimeImage, { type: 'agent', id: runtimeTaskId! }, async () => deps.subtasks.reserve({ serviceId: context.serviceId, taskId, requestKind: 'submit', requestParent: '', requestKey: input.requestKey, requestDigest: digest,
         ...(agent ? { runtimeTaskId, sessionKey: agent.plan.sessionKey, sessionVolumeUid: agent.plan.volumeUid } : {}),
-        sealedPayload: await deps.cipher.seal(JSON.stringify(agent?.plan ?? { ...payload, requestKey: input.requestKey })),
-        payloadDigest: agent?.payloadDigest ?? commandDigest,
+        sealedPayload: await deps.cipher.seal(JSON.stringify(agent?.plan ?? command?.plan ?? { ...payload, requestKey: input.requestKey })),
+        payloadDigest: agent?.payloadDigest ?? command!.payloadDigest,
         fenced: context.parent.intent.tasksSpec.executionControl === 'fenced', epoch: input.fence?.epoch ?? null, view: agent?.view ?? view,
       }, authority), (result) => result.subtask.runtimeTaskId);
       await progress(saved.subtask.view.id);

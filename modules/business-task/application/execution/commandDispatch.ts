@@ -1,6 +1,7 @@
-import { BusinessExecutionInfoSchema, BusinessExecutionReceiptSchema, SubmitBusinessSubtaskV3Schema } from '@crewstation/contracts';
+import { readCommandPlan, renderCommand } from './command/material';
+import { BusinessExecutionInfoSchema, BusinessExecutionReceiptSchema } from '@crewstation/contracts';
 import type { RunnerBusinessReceipt } from '@crewstation/contracts';
-import { isPlatformError, newResourceId } from '@crewstation/kernel';
+import { isPlatformError, newResourceId, precondition } from '@crewstation/kernel';
 import type { ExecutionSubtask } from '../../domain/executionSubtask';
 import type { BusinessExecutionDeps } from './dependencies';
 
@@ -20,19 +21,20 @@ export async function dispatchBusinessCommand(deps: BusinessExecutionDeps, claim
     if (incarnation && incarnation !== info.incarnation) {
       await unknown(deps, claimed, 'execution_incarnation_changed'); return;
     }
+    const plan = readCommandPlan(JSON.parse(await deps.cipher.open(claimed.sealedPayload)));
+    if (plan.kind === 'command-plan' && info.commandSecretEnvVersion !== 1) throw precondition('Runner 未声明命令 Secret 能力', { code: 'unsupported_capability' });
+    const command = await renderCommand(deps, plan);
     if (!await deps.subtasks.checkpoint(claimed, info.incarnation)) return;
     incarnation = info.incarnation;
-    const input = SubmitBusinessSubtaskV3Schema.parse(JSON.parse(await deps.cipher.open(claimed.sealedPayload)));
-    if (input.kind !== 'command') throw new Error('command dispatcher received a different invocation kind');
     const result = BusinessExecutionReceiptSchema.parse(await deps.runner.sendCommand(claimed.runtimeTaskId ?? claimed.taskId, {
       id: newResourceId(), type: 'startBusinessCommand', executionId: claimed.view.executionId, attempt: claimed.view.attempt,
-      incarnation, payloadDigest: claimed.payloadDigest, command: input.argv, cwd: input.cwd, env: input.env, timeoutSeconds: input.timeoutSeconds,
+      incarnation, payloadDigest: claimed.payloadDigest, ...command,
     }));
     await acceptReceipt(deps, { ...claimed, incarnation }, result);
   } catch (error) {
     const code = errorCode(error);
     // Only a pre-start capability/config rejection proves no process was admitted.
-    if (!incarnation && ['unsupported_capability', 'unsupported_runner', 'invalid_configuration'].includes(code ?? '')) {
+    if (!incarnation && ['unsupported_capability', 'unsupported_runner', 'invalid_configuration', 'secret_version_unavailable'].includes(code ?? '')) {
       await deps.subtasks.settle(claimed, { dispatch: 'failed', view: { ...claimed.view, state: 'failed', process: 'not-started', error: { code: code!, message: '运行环境不支持该执行' }, endedAt: deps.clock.now().toISOString() } });
     } else if (!incarnation) {
       await deps.subtasks.settle(claimed, { dispatch: 'pending', view: claimed.view });

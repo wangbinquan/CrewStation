@@ -1,7 +1,7 @@
 import { agentCommand, agentPayloadDigest } from './agentMaterial';
 import { prepareAgentResume } from './agentResume';
 import { randomBytes } from 'node:crypto';
-import { BusinessOutputMaterialSchema, BusinessMaterialRequestSchema, PLATFORM_AGENT_PERMISSION } from '@crewstation/contracts';
+import { BusinessOutputMaterialSchema, BusinessMaterialRequestSchema, businessMaterialObjects, PLATFORM_AGENT_PERMISSION } from '@crewstation/contracts';
 import type { BusinessSubtaskV3Dto, ServiceId, TaskId, SubmitBusinessSubtaskV3 } from '@crewstation/contracts';
 import { notFound, precondition, validation } from '@crewstation/kernel';
 import { materialSecretReferences, validateBusinessMaterial } from '../../domain/businessMaterials';
@@ -30,13 +30,19 @@ export async function prepareAgentPlan(deps: BusinessExecutionDeps, parent: Exec
   const resolved = await deps.compute.resolve(profile.compute, 'subtask', projectId);
   const capabilities = requireBusinessAgent(resolved);
   if (publishedPrompt && !capabilities.systemPrompt) throw precondition('档位不支持发布系统提示', { code: 'unsupported_capability' });
+  if (input.startupInventoryVersion && capabilities.startupInventoryVersion !== 1) throw precondition('固定档位不支持启动清单', { code: 'unsupported_capability', capability: 'startupInventoryVersion' });
+  const objects = businessMaterialObjects(material);
+  if (objects.length) {
+    if (!stored || !deps.materialObjects) throw precondition('对象材料尚不可用', { code: 'unsupported_capability', capability: 'materialObjectsVersion' });
+    await deps.materialObjects.check({ projectId, serviceId, materialId: stored.view.materialId, objects });
+  }
   const systemPrompt = [publishedPrompt, material.systemPrompt].filter(Boolean).join('\n\n');
   if (Buffer.byteLength(systemPrompt) > 1_048_576) throw validation('合成系统提示超过字节上限');
   const ref = { profileId: resolved.id, revision: resolved.revision }, credentialStamp = await deps.compute.pinLaunchVersion?.(ref);
   const launch = credentialStamp && deps.compute.launchMaterialAt ? await deps.compute.launchMaterialAt(ref, credentialStamp) : await deps.compute.launchMaterial(ref);
   if (launch.id !== resolved.id || launch.revision !== resolved.revision || launch.protocol !== resolved.protocol) throw precondition('固定档位材料不一致');
   const mcp = deps.settings.mcp.map((entry) => ({ ...entry, headers: {} as Record<string, string> }));
-  validateBusinessMaterial(profile, material, capabilities, { mcp, reservedEnv: [...Object.keys(launch.beforeStart.vars), ...Object.keys(launch.beforeStart.secrets)] }, tasksSpec.agentProfiles);
+  validateBusinessMaterial(profile, material, capabilities, { protocol: resolved.protocol, mcp, reservedEnv: [...Object.keys(launch.beforeStart.vars), ...Object.keys(launch.beforeStart.secrets)] }, tasksSpec.agentProfiles);
   const ids = materialSecretReferences(material, profile);
   if (ids.length && !deps.agentSecrets) throw precondition('未启用项目 Secret 版本解析', { code: 'unsupported_capability' });
   const secretVersions = ids.length ? await deps.agentSecrets!.versions(projectId, ids) : [];
@@ -47,8 +53,8 @@ export async function prepareAgentPlan(deps: BusinessExecutionDeps, parent: Exec
     for (const [key, value] of Object.entries(selected.parameters)) url.searchParams.set(key, value);
     mcp.push({ name: connection.name, url: url.href, headers: {} }); secretMcp.push({ name: connection.name, headers: connection.secretHeaders });
   }
-  const plan: ExecutionAgentPlan = { kind: 'agent-plan', sessionKey: runtimeTaskId, volumeUid, credentialStamp, request: input, projectId, compute: resolved, material, secretVersions, secretMcp, nonce: randomBytes(32).toString('hex'), command: {
-    businessOutputContract, id: view.executionId, type: 'startAgent', agentId: view.executionId, processAttemptId: view.executionId, compute: resolved.id, profileRevision: resolved.revision,
+  const plan: ExecutionAgentPlan = { kind: 'agent-plan', ...(stored ? { materialIdentity: { serviceId, materialId: stored.view.materialId } } : {}), sessionKey: runtimeTaskId, volumeUid, credentialStamp, request: input, projectId, compute: resolved, material, secretVersions, secretMcp, nonce: randomBytes(32).toString('hex'), command: {
+    businessOutputContract, ...(material.nativeConfig ? { businessNativeConfig: material.nativeConfig } : {}), ...(capabilities.startupInventoryVersion === 1 ? { startupInventoryVersion: 1 } : {}), id: view.executionId, type: 'startAgent', agentId: view.executionId, processAttemptId: view.executionId, compute: resolved.id, profileRevision: resolved.revision,
     launch: launch.launch, beforeStart: { ...launch.beforeStart, secrets: {} }, permission: PLATFORM_AGENT_PERMISSION, businessSkills: material.skills, businessSecretEnvNames: Object.entries(material.env).filter(([, value]) => typeof value !== 'string').map(([key]) => key), mode: input.mode, initialPrompt: input.prompt,
     ...(input.cwd ? { cwd: input.cwd } : {}), ...(systemPrompt ? { systemPrompt } : {}), env: {}, mcp,
   } };

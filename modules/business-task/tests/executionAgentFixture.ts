@@ -1,12 +1,12 @@
 import { BUSINESS_AGENT_CAPABILITIES } from '../domain/executionAgent';
 import { LaunchSpecSchema } from '@crewstation/contracts';
-import type { BusinessSubtaskV3Dto, RunnerBusinessReceipt, RunnerCommand, TaskId } from '@crewstation/contracts';
+import type { BusinessConfig, BusinessSubtaskV3Dto, RunnerBusinessReceipt, RunnerCommand, TaskId } from '@crewstation/contracts';
 import { newResourceId, PlatformError, quotaExceeded } from '@crewstation/kernel';
 import type { Database } from '@crewstation/persistence';
 import { executionCommandFixture } from './executionCommandFixture';
 import type { ComputeCatalog, CreateSubtaskExecutionInput, EnvironmentView } from '../ports/runtime';
 
-export async function executionAgentFixture(db: Database, materials?: { prompt?: string; schema?: string; missing?: boolean }) {
+export async function executionAgentFixture(db: Database, materials?: { prompt?: string; schema?: string; missing?: boolean }, businessConfig?: BusinessConfig) {
   const contractId = newResourceId();
   const profileId = newResourceId(), computeId = newResourceId(), image = `registry.test/agent@sha256:${'1'.repeat(64)}`;
   const behavior = { businessSupported: true, revision: 1, providerKey: 'provider-secret-one', resolveCount: 0, quota: false, createLost: false, startLost: false, starts: 0, createGate: undefined as Promise<void> | undefined };
@@ -15,7 +15,7 @@ export async function executionAgentFixture(db: Database, materials?: { prompt?:
     launchMaterial: async (ref) => ({ id: ref.profileId, name: 'compute', revision: ref.revision, image, protocol: 'opencode', launch: LaunchSpecSchema.parse({ protocol: 'opencode', binaryPath: '/usr/bin/opencode' }),
       beforeStart: { profile: ref.profileId, revision: ref.revision, contentHash: 'fixed', vars: {}, secrets: { PROVIDER_KEY: behavior.providerKey }, steps: [], configFile: { kind: 'none' }, captureOutput: false } }),
   };
-  const f = await executionCommandFixture(db, { compute, ...(materials ? { releaseMaterials: materials.missing ? {} : { 'prompt.md': materials.prompt ?? '', 'schema.json': materials.schema ?? '{}' }, outputContracts: [{ id: contractId, name: 'result', required: ['result.json'], schema: 'schema.json' }] } : {}), agentProfiles: [{ id: profileId, name: 'review', compute: { kind: 'default' }, ...(materials ? { systemPromptFile: 'prompt.md' } : {}), businessConfig: { allowSystemPromptAppend: true, allowSkills: false, allowedEnvNames: ['APP_VALUE'], mcpConnections: [] } }] });
+  const f = await executionCommandFixture(db, { compute, ...(materials ? { releaseMaterials: materials.missing ? {} : { 'prompt.md': materials.prompt ?? '', 'schema.json': materials.schema ?? '{}' }, outputContracts: [{ id: contractId, name: 'result', required: ['result.json'], schema: 'schema.json' }] } : {}), agentProfiles: [{ id: profileId, name: 'review', compute: { kind: 'default' }, ...(materials ? { systemPromptFile: 'prompt.md' } : {}), businessConfig: businessConfig ?? { allowSystemPromptAppend: true, allowSkills: false, allowedEnvNames: ['APP_VALUE'], mcpConnections: [] } }] });
   f.environments.get(f.task.id)!.businessWorkspace = { volumeUid: 'workspace-volume-one', phase: 'ready' };
   const creates: CreateSubtaskExecutionInput[] = [], starts: Array<{ taskId: TaskId; command: RunnerCommand }> = [], receipts = new Map<string, RunnerBusinessReceipt>();
   f.environmentPort.createNativeExecution = async (input) => {

@@ -30,6 +30,7 @@ export function createCliAgentDriver(adapter: CliRuntimeAdapter, which: (binary:
 function failedBeforeStart(spec: DriverAgentSpec, code: string, message: string): DriverAgentProcess {
   const events = createEventStream<AgentEvent>(spec.businessEvents ? 4 * 1024 * 1024 : undefined);
   const event = createAgentEventFactory(spec.agentId);
+  if (spec.startupInventoryVersion === 1) events.push(event('startup-inventory', { inventory: { version: 1, state: 'unavailable', reason: 'inventory-start-failed' } }));
   events.push(event('error', { error: { code, message } }));
   events.close();
   return {
@@ -42,18 +43,22 @@ function failedBeforeStart(spec: DriverAgentSpec, code: string, message: string)
 function start(adapter: CliRuntimeAdapter, spec: DriverAgentSpec, context: DriverLaunchContext): DriverAgentProcess {
   // prepare 是异步的（要建运行目录、写文件），而 start 必须同步返回一个事件流：
   // 先返回一个占位进程，装配失败时它只发一条 error 事件。
-  const pending = createPendingRun(spec);
+  const abort = new AbortController();
+  const pending = createPendingRun(spec, abort);
   void adapter
-    .prepare(spec, context)
+    .prepare(spec, { ...context, signal: context.signal ? AbortSignal.any([context.signal, abort.signal]) : abort.signal })
     .then((prepared) => {
+      if (abort.signal.aborted || context.signal?.aborted) { prepared.dispose(); pending.cancelled(); return; }
       const resident = spec.mode === 'interactive' && adapter.supportsResidentStream;
-      const run = resident
+      let run: AgentRunBase;
+      try { run = resident
         ? new ResidentAgentRun(spec, context, prepared, adapter.protocol)
         : new ChainedAgentRun(spec, context, prepared, adapter.protocol);
+      } catch (error) { prepared.dispose(); throw error; }
       pending.attach(run);
     })
     .catch((error: unknown) => {
-      pending.fail(error instanceof Error ? error.message : String(error));
+      if (abort.signal.aborted || context.signal?.aborted) pending.cancelled(); else pending.fail(error instanceof Error ? error.message : String(error));
     });
   return pending;
 }
@@ -61,10 +66,11 @@ function start(adapter: CliRuntimeAdapter, spec: DriverAgentSpec, context: Drive
 interface PendingRun extends DriverAgentProcess {
   attach(run: AgentRunBase): void;
   fail(message: string): void;
+  cancelled(): void;
 }
 
 /** 装配期的门面：把真实运行的事件转发出去，并把装配前到达的 send／cancel 排到装配之后。 */
-function createPendingRun(spec: DriverAgentSpec): PendingRun {
+function createPendingRun(spec: DriverAgentSpec, abort: AbortController): PendingRun {
   const events = createEventStream<AgentEvent>(spec.businessEvents ? 4 * 1024 * 1024 : undefined);
   const event = createAgentEventFactory(spec.agentId);
   let attached: AgentRunBase | undefined;
@@ -82,7 +88,12 @@ function createPendingRun(spec: DriverAgentSpec): PendingRun {
       })();
       ready?.();
     },
+    cancelled() {
+      if (spec.startupInventoryVersion === 1) events.push(event('startup-inventory', { inventory: { version: 1, state: 'unavailable', reason: 'inventory-cancelled' } }));
+      events.push(event('cancelled')); events.close(); ready?.();
+    },
     fail(message) {
+      if (spec.startupInventoryVersion === 1) events.push(event('startup-inventory', { inventory: { version: 1, state: 'unavailable', reason: 'inventory-start-failed' } }));
       events.push(event('error', { error: { code: 'driver_setup_failed', message } }));
       events.close();
       ready?.();
@@ -93,6 +104,7 @@ function createPendingRun(spec: DriverAgentSpec): PendingRun {
       await attached.send(text);
     },
     async cancel() {
+      abort.abort();
       await whenReady;
       if (attached === undefined) {
         events.close();

@@ -36,10 +36,22 @@ export async function probeBusinessProfile(deps: Input): Promise<BusinessExecuti
   }
   const systemToken = nonce(); capabilities.systemPrompt = (await probe('systemPrompt', command({ systemPrompt: `For the next response output only this exact token: ${systemToken}`, initialPrompt: 'Follow the system instruction for your response. Do not use tools.' }), systemToken)).ok;
   const skillToken = nonce(); capabilities.skills = (await probe('skills', command({ businessSkills: [{ path: 'crewstation-probe/SKILL.md', content: `---\nname: crewstation-probe\ndescription: Mandatory CrewStation capability probe\n---\nReply with exactly ${skillToken}, without any other text.\n` }], initialPrompt: 'Load and follow the crewstation-probe skill. It contains the exact response required for this capability test.' }), skillToken)).ok;
-  const mcpToken = nonce(); const server = await startMcpProbe(deps, mcpToken);
+  const materialToken = nonce(), materialContent = `---\nname: material-proof\ndescription: Material download proof\n---\nReply with exactly ${materialToken}.\n`, materialGrant = nonce();
+  const mcpToken = nonce(); const server = await startMcpProbe(deps, mcpToken, { token: materialGrant, content: materialContent });
   try {
-    const tested = await probe('mcp', command({ mcp: [{ name: 'crewstation-probe', url: 'http://127.0.0.1:18089/mcp', headers: {} }], initialPrompt: 'Call the crewstation-probe MCP tool named nonce and reply only with its returned token.' }), mcpToken);
+    const tested = await probe('mcp', command({ ...(connected.capabilities?.startupInventoryVersion === 1 ? { startupInventoryVersion: 1 } : {}), mcp: [{ name: 'crewstation-probe', url: 'http://127.0.0.1:18089/mcp', headers: {} }], initialPrompt: 'Call the crewstation-probe MCP tool named nonce and reply only with its returned token.' }), mcpToken);
     capabilities.mcp = tested.ok && tested.events.some((event) => event.type === 'tool-start' && event.tool?.name.includes('nonce'));
+    if (tested.events.some((event) => event.type === 'startup-inventory' && event.inventory?.state === 'verified' && event.inventory.mcpServers.some((mcp) => mcp.name === 'crewstation-probe' && mcp.status === 'connected'))) capabilities.startupInventoryVersion = 1;
+    if (connected.capabilities?.nativeConfigVersion === 1 && deps.input.launch.protocol !== 'terminal') {
+      const expected = nonce();
+      const native = await probe('nativeConfig', command({ businessNativeConfig: { version: 1, protocol: deps.input.launch.protocol, agent: { name: 'business-proof', body: `Reply with exactly ${expected}.`, options: { description: 'Native material proof' } }, subagents: [], mcp: [], plugins: [] }, initialPrompt: 'Follow your Agent definition.' }), expected);
+      if (native.ok) capabilities.nativeConfigVersion = 1;
+    }
+    if (connected.capabilities?.materialObjectsVersion === 1) {
+      const object = { objectId: newResourceId(), sha256: new Bun.CryptoHasher('sha256').update(materialContent).digest('hex'), size: Buffer.byteLength(materialContent) };
+      const material = await probe('materialObjects', command({ businessSkills: [{ path: 'material-proof/SKILL.md', object }], businessMaterialDownloads: [{ object, url: 'http://127.0.0.1:18089/native-material', token: materialGrant, expiresAt: new Date(Date.now() + deps.budgetMs + 60_000).toISOString() }], initialPrompt: 'Load the material-proof skill and follow its exact response instruction.' }), materialToken);
+      if (material.ok) capabilities.materialObjectsVersion = 1;
+    }
   } finally { await deps.runner.sendCommand(deps.taskId, { id: newResourceId(), type: 'cancelBusinessExecution', executionId: server }); }
   return { protocolVersion: 3, capabilities };
 }

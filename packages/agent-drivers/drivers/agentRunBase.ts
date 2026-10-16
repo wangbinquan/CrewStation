@@ -38,6 +38,7 @@ export abstract class AgentRunBase implements DriverAgentProcess {
   private reported: AgentUsageSnapshot = NO_USAGE;
   private usageTimer: ReturnType<typeof setTimeout> | undefined;
   private lastUsageAt = 0;
+  private inventoryReported = false;
 
   constructor(
     protected readonly spec: DriverAgentSpec,
@@ -65,6 +66,10 @@ export abstract class AgentRunBase implements DriverAgentProcess {
   }
 
   protected push(event: AgentEvent): void {
+    if (event.type === 'startup-inventory') {
+      if (this.spec.startupInventoryVersion !== 1 || this.inventoryReported) return;
+      this.inventoryReported = true;
+    }
     this.events.push(event);
   }
 
@@ -84,6 +89,7 @@ export abstract class AgentRunBase implements DriverAgentProcess {
 
   /** 一轮的进程排空之后：先做原生汇总（含子 Agent），再立即上报。 */
   protected settleTurnUsage(): void {
+    if (this.spec.startupInventoryVersion === 1 && !this.inventoryReported && this.prepared.startupInventory && !this.cancelled) this.push(this.emit('startup-inventory', { inventory: this.prepared.startupInventory(this.sessionId) }));
     this.meter.refresh?.();
     this.flushUsage();
   }
@@ -154,6 +160,7 @@ export abstract class AgentRunBase implements DriverAgentProcess {
   /** 最终快照先作为 usage 发出，终态事件再带上同一份（观测侧据此一次写定终态与用量）。 */
   private terminate(type: 'completed' | 'error' | 'cancelled', fields: AgentEventFields, exitCode: number | null): void {
     if (this.events.closed) return;
+    if (this.spec.startupInventoryVersion === 1 && !this.inventoryReported) this.push(this.emit('startup-inventory', { inventory: { version: 1, state: 'unavailable', reason: type === 'cancelled' ? 'inventory-cancelled' : type === 'error' ? 'inventory-start-failed' : 'inventory-not-reported' } }));
     this.flushUsage();
     const snapshot = this.meter.snapshot();
     const usage = resultUsageOf(snapshot);

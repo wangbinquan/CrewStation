@@ -75,3 +75,4 @@ proposal/rfc/RFC-NNN-{slug}/
 | [RFC-037](./RFC-037-project-creation-and-deletion/proposal.md) | 项目创建弹窗：域名与模板用途直接可见；管理员二次确认永久删除并回收全部项目资源。 | Done · 2026-10-09 · 创建弹窗／用途说明与管理员永久删除已部署；原操作154回执／两确认、九项独立AFTER与外项目完整保留通过；源码 `05f6acc6` 六CI全绿，见 [最终证据](./RFC-037-project-creation-and-deletion/acceptance/complete-deletion.md) |
 | [RFC-038](./RFC-038-release-wizard/proposal.md) | 应用发布向导：独立页面连续完成准备、部署、验证、确认上线；发布页签可回看和接续每次历史流程。 | Done · 2026-10-09 · 5faa6427 六 CI、八组件部署、37 项实机回归通过；两次上线与同版本重部署的三条独立流程保持，见 [实际验收](./RFC-038-release-wizard/acceptance.md)。 |
 | [RFC-039](./RFC-039-first-delivery/proposal.md) | 首次交付连续引导：创建、CLI / Bot 自由切换、满屏开发、代码确认、验证上线、访问范围与开发权限申请。 | Done · 2026-10-15 · 正式代码部署与准确 CI 全绿；真实 Bot 贪吃蛇 v0.1.1 完成构建、验证、正式切流及不同身份访问验收，见[验收记录](./RFC-039-first-delivery/acceptance.md)。 |
+| [RFC-040](./RFC-040-business-native-materials/proposal.md) | 业务 Agent 原生配置材料：根 Agent／子代理、模型选项、内联 MCP 与插件，平台保留配置不可覆盖。 | In Progress · 2026-10-15 · 用户授权本会话接手，AW RFC-370 M2 配套实现。 |

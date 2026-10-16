@@ -1,3 +1,4 @@
+import { MATERIAL_REFERENCE_PREFIX } from '../ports/objects/materials';
 import { forbidden, newResourceId, notFound, precondition, validation } from '@crewstation/kernel';
 import type { ObjectServiceApi, ObjectServiceCaller } from '../api/objectServiceApi';
 import { spaceDto, storedObjectDto, uploadDto } from '../domain/objectStorage';
@@ -41,7 +42,7 @@ export function objectService(deps: ObjectServiceDeps): ObjectServiceApi {
     commit: async (caller, id, input) => { const { source } = await uploadScope(caller, id); return uploadDto(await deps.uploads.requestCommit(id, { source, ...(input.fence ? { fence: input.fence } : {}) })); },
     list: async (caller, input) => { const { space } = await scope(caller), page = await deps.reads.page(space.id, input.cursor, input.limit); return { items: page.items.map(storedObjectDto), nextCursor: page.nextCursor }; },
     get: async (caller, id) => storedObjectDto((await objectScope(caller, id)).object),
-    reference: async (caller, id, input, desired) => { const { source } = await objectScope(caller, id); return storedObjectDto(await deps.content.reference(id, input, desired, { source, ...(input.fence ? { fence: input.fence } : {}) })); },
+    reference: async (caller, id, input, desired) => { if (input.ownerId.startsWith(MATERIAL_REFERENCE_PREFIX)) throw forbidden('平台执行材料引用不能通过业务引用接口修改'); const { source } = await objectScope(caller, id); return storedObjectDto(await deps.content.reference(id, input, desired, { source, ...(input.fence ? { fence: input.fence } : {}) })); },
     delete: async (caller, id, input) => { const { source } = await objectScope(caller, id); return storedObjectDto(await deps.content.delete(id, input, { source, ...(input.fence ? { fence: input.fence } : {}) })); },
     download: async (caller, id, input) => {
       const { source } = await objectScope(caller, id);

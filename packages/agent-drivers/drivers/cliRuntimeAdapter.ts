@@ -1,3 +1,4 @@
+import type { BusinessStartupInventory } from '@crewstation/contracts';
 // 两个 CLI 共用的运行时适配面：把「装配」与「运行」分开，运行循环（chainedRun／residentRun）
 // 因此对具体 CLI 一无所知。源里没有这层抽象（agent-workflow 的 RuntimeDriver 把装配、解析、
 // 会话捕获、清单读取全挂在一个对象上）；这里只留 CrewStation 实际要的四件事。
@@ -17,6 +18,7 @@ export interface TurnInput {
 }
 
 export interface PreparedRuntime {
+  startupInventory?(sessionId: string | undefined): BusinessStartupInventory;
   /** RFC-034 v2：本次执行的计量器（一次执行一个，跨轮累计；与 agent-workflow RFC-371 v2 同算法）。 */
   usageMeter(execution: { resumed: boolean; startedAt: number }): UsageMeter;
   /** 组装一次拉起的 argv／env／stdin 约定。 */

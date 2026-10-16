@@ -1,12 +1,29 @@
-import type { AgentProfile, BusinessAgentCapabilities, BusinessMaterialRequest, McpConnection } from '@crewstation/contracts';
+import { businessMaterialObjects } from '@crewstation/contracts';
+import type { AgentProtocol, AgentProfile, BusinessAgentCapabilities, BusinessMaterialRequest, McpConnection } from '@crewstation/contracts';
 import { precondition, validation } from '@crewstation/kernel';
 
 type Material = Omit<BusinessMaterialRequest, 'requestKey' | 'fence'>;
 /** Validate only the immutable parent release. A newer registration cannot grant permissions to an old task. */
-export function validateBusinessMaterial(profile: AgentProfile, material: Material, capabilities: BusinessAgentCapabilities, platform: { reservedEnv: readonly string[]; mcp: readonly McpConnection[] }, parentProfiles: readonly AgentProfile[]): void {
+export function validateBusinessMaterial(profile: AgentProfile, material: Material, capabilities: BusinessAgentCapabilities, platform: { protocol?: AgentProtocol; reservedEnv: readonly string[]; mcp: readonly McpConnection[] }, parentProfiles: readonly AgentProfile[]): void {
   const policy = profile.businessConfig;
   const unsupported = (name: string) => { throw precondition(`档位不支持 ${name}`, { code: 'unsupported_capability', capability: name }); };
   const denied = (name: string) => { throw validation(`发布契约未允许 ${name}`, { code: 'invalid_configuration' }); };
+  if (businessMaterialObjects(material).length && capabilities.materialObjectsVersion !== 1) unsupported('materialObjectsVersion');
+  const native = material.nativeConfig;
+  if (native) {
+    if (capabilities.nativeConfigVersion !== 1) unsupported('nativeConfigVersion');
+    if (native.protocol !== platform.protocol) denied('nativeConfig.protocol');
+    if (!policy?.nativeConfig?.agentDefinitions) denied('nativeConfig.agentDefinitions');
+    if (native.subagents.length && !capabilities.opaqueInternalDelegation) unsupported('opaqueInternalDelegation');
+    if (native.plugins.length && !policy?.nativeConfig?.plugins) denied('nativeConfig.plugins');
+    const names = new Set([...platform.mcp.map((entry) => entry.name), ...material.mcp.map((entry) => policy?.mcpConnections.find((connection) => connection.id === entry.connectionId)?.name)]);
+    for (const entry of native.mcp) {
+      if (!capabilities.mcp) unsupported('mcp');
+      if (entry.type === 'local' ? !policy?.nativeConfig?.inlineLocalMcp : !policy?.nativeConfig?.inlineRemoteMcp) denied('nativeConfig.mcp');
+      if (names.has(entry.name)) denied('nativeConfig.mcp.name');
+      if (entry.type === 'local' && Object.keys(entry.env ?? {}).some((key) => platform.reservedEnv.includes(key))) denied('nativeConfig.mcp.env');
+    }
+  }
   if (material.systemPrompt) { if (!capabilities.systemPrompt) unsupported('systemPrompt'); if (!policy?.allowSystemPromptAppend) denied('systemPrompt'); }
   if (material.skills.length) { if (!capabilities.skills) unsupported('skills'); if (!policy?.allowSkills) denied('skills'); }
   for (const key of Object.keys(material.env)) if (!policy?.allowedEnvNames.includes(key) || platform.reservedEnv.includes(key)) denied(`env.${key}`);

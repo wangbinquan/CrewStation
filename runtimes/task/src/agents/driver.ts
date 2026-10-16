@@ -1,4 +1,4 @@
-import type { BusinessMaterialRequest } from '@crewstation/contracts';
+import type { BusinessMaterialRequest, BusinessMaterialDownload } from '@crewstation/contracts';
 import type { AgentEvent, AgentEventType, AgentPermission, KnownAgentProtocol, LaunchSpec, McpConnection } from '@crewstation/contracts';
 import type { ManagedRuntimeContext } from '@crewstation/agent-drivers';
 import type { Logger } from '@crewstation/kernel';
@@ -7,6 +7,9 @@ import type { ProcessLauncher } from '../process/launcher';
 /** 一次 startAgent 命令剥掉协议外壳后的启动规格。 */
 export interface AgentSpec {
   businessSkills?: BusinessMaterialRequest['skills'];
+  businessNativeConfig?: BusinessMaterialRequest['nativeConfig'];
+  businessMaterialDownloads?: BusinessMaterialDownload[];
+  startupInventoryVersion?: 1;
   /** RFC-027：业务执行（事件缓冲有上限、usage 事件携带业务用量）。 */
   businessEvents?: boolean;
   agentId: string;

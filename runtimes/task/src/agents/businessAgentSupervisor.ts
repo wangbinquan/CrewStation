@@ -1,3 +1,4 @@
+import { boundedStartupInventory } from '@crewstation/contracts';
 import type { AgentEvent } from '@crewstation/contracts';
 import type { Logger } from '@crewstation/kernel';
 import { RunnerCommandError } from '../commandError';
@@ -6,7 +7,7 @@ import type { AgentProcess } from './driver';
 
 interface ActiveAgent {
   agent?: AgentProcess; done?: Promise<void>; cancellation?: Promise<void>; cancelRequested: boolean;
-  startedAt: number; failure?: ExecutionResult['reason'];
+  startedAt: number; inventoryRequested?: boolean; inventoryReported?: boolean; failure?: ExecutionResult['reason'];
 }
 
 /** A durable receipt precedes CLI construction. Repeated starts and old incarnations never construct a second Agent. */
@@ -14,10 +15,10 @@ export class BusinessAgentSupervisor {
   private readonly active = new Map<string, ActiveAgent>();
   constructor(private readonly journal: ExecutionJournal, private readonly logger: Logger) {}
 
-  start(identity: ExecutionIdentity, create: () => Promise<AgentProcess>): ExecutionReceipt {
+  start(identity: ExecutionIdentity, create: () => Promise<AgentProcess>, startupInventoryVersion?: 1): ExecutionReceipt {
     const reserved = this.journal.reserve(identity);
     if (!reserved.created) return reserved.receipt;
-    const entry: ActiveAgent = { cancelRequested: false, startedAt: Date.now() };
+    const entry: ActiveAgent = { cancelRequested: false, startedAt: Date.now(), inventoryRequested: startupInventoryVersion === 1 };
     this.active.set(identity.executionId, entry);
     entry.done = this.run(identity.executionId, entry, create).catch(() => {
       // A storage error cannot become a false successful result or permit another process.
@@ -61,6 +62,7 @@ export class BusinessAgentSupervisor {
     try {
       entry.agent = await create();
     } catch {
+      this.inventoryFallback(id, entry, 'inventory-start-failed');
       this.journal.finish(id, { reason: entry.cancelRequested ? 'cancelled' : 'spawn_failed', exitCode, durationMs: Date.now() - entry.startedAt }); return;
     }
     try {
@@ -72,7 +74,12 @@ export class BusinessAgentSupervisor {
           if (input.type === 'cancelled') entry.cancelRequested = true;
         }
         if (entry.failure === 'output_limit' || entry.failure === 'event_persistence_failed') continue;
-        try { this.journal.agent(id, publicEvent(input)); }
+        try {
+          if (input.type === 'startup-inventory') {
+            if (!entry.inventoryRequested || entry.inventoryReported) continue;
+            this.journal.agent(id, { ...publicEvent(input), inventory: boundedStartupInventory(input.inventory) }); entry.inventoryReported = true;
+          } else this.journal.agent(id, publicEvent(input));
+        }
         catch (error) {
           entry.failure = error instanceof RunnerCommandError && error.code === 'output_limit' ? 'output_limit' : 'event_persistence_failed';
           this.requestStop(entry);
@@ -85,7 +92,13 @@ export class BusinessAgentSupervisor {
     }
     // Driver streams close only after process exit/drain or a proven pre-start failure.
     if (!ended) throw new RunnerCommandError('execution_unknown', 'Agent 未提供结束证明');
+    if (!entry.failure || entry.failure === 'agent_failed') this.inventoryFallback(id, entry, entry.failure ? 'inventory-start-failed' : 'inventory-not-reported');
     this.journal.finish(id, { reason: entry.failure ?? (entry.cancelRequested ? 'cancelled' : 'exited'), exitCode, durationMs: Date.now() - entry.startedAt });
+  }
+  private inventoryFallback(id: string, entry: ActiveAgent, reason: 'inventory-start-failed' | 'inventory-not-reported'): void {
+    if (!entry.inventoryRequested || entry.inventoryReported) return;
+    this.journal.agent(id, { agentId: id, seq: 0, type: 'startup-inventory', at: new Date().toISOString(), inventory: { version: 1, state: 'unavailable', reason: entry.cancelRequested ? 'inventory-cancelled' : reason } });
+    entry.inventoryReported = true;
   }
 }
 function publicEvent(input: AgentEvent): Omit<AgentEvent, 'raw'> {

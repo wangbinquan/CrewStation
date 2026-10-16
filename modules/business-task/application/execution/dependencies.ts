@@ -1,3 +1,4 @@
+import type { ExecutionMaterialObjects } from '../../ports/materials/objects';
 import type { ServiceId } from '@crewstation/contracts';
 import type { ExecutionAgentSecrets } from '../../ports/executionAgentSecrets';
 import type { ExecutionSessions } from '../../ports/executionSessions';
@@ -21,6 +22,7 @@ import type { BusinessProjectWork } from '../../ports/deletion/work';
 export interface BusinessExecutionDeps extends Pick<BusinessTaskUseCaseDeps, 'uow' | 'environments' | 'directory' | 'clock' | 'logger' | 'runner' | 'compute' | 'settings'> {
   projectWork?: BusinessProjectWork;
   taskInputs?: TaskInputPreparation;
+  materialObjects?: ExecutionMaterialObjects;
   storageStatus?: (serviceId: ServiceId) => Promise<{ available: boolean; reason: string | null }>;
   /** RFC-034 v2：Agent 子任务执行记录；不给则不记录。 */
   agentCalls?: BusinessCalls;

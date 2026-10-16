@@ -292,6 +292,10 @@
                 "runtimeImageVersionId": {
                   "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
                   "type": "string"
+                },
+                "startupInventoryVersion": {
+                  "const": 1,
+                  "type": "number"
                 }
               },
               "required": [
@@ -321,8 +325,34 @@
                 },
                 "env": {
                   "additionalProperties": {
-                    "maxLength": 32768,
-                    "type": "string"
+                    "anyOf": [
+                      {
+                        "maxLength": 32768,
+                        "type": "string"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "secret": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "configDefinitionId": {
+                                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "configDefinitionId"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        "required": [
+                          "secret"
+                        ],
+                        "type": "object"
+                      }
+                    ]
                   },
                   "default": {},
                   "propertyNames": {
@@ -751,6 +781,39 @@
       "BusinessMaterialRequest": {
         "direction": "business-to-platform",
         "schema": {
+          "$defs": {
+            "__schema0": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                },
+                {
+                  "items": {
+                    "$ref": "#/$defs/__schema0"
+                  },
+                  "type": "array"
+                },
+                {
+                  "additionalProperties": {
+                    "$ref": "#/$defs/__schema0"
+                  },
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              ]
+            }
+          },
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "additionalProperties": false,
           "properties": {
@@ -847,6 +910,312 @@
               "maxItems": 64,
               "type": "array"
             },
+            "nativeConfig": {
+              "additionalProperties": false,
+              "properties": {
+                "agent": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "body": {
+                      "maxLength": 1048576,
+                      "type": "string"
+                    },
+                    "name": {
+                      "maxLength": 80,
+                      "minLength": 1,
+                      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
+                      "type": "string"
+                    },
+                    "options": {
+                      "additionalProperties": {
+                        "$ref": "#/$defs/__schema0"
+                      },
+                      "propertyNames": {
+                        "maxLength": 256,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "body",
+                    "name"
+                  ],
+                  "type": "object"
+                },
+                "mcp": {
+                  "default": [],
+                  "items": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "headers": {
+                            "additionalProperties": {
+                              "maxLength": 32768,
+                              "type": "string"
+                            },
+                            "propertyNames": {
+                              "maxLength": 256,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "type": "object"
+                          },
+                          "name": {
+                            "maxLength": 80,
+                            "minLength": 1,
+                            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
+                            "type": "string"
+                          },
+                          "timeoutMs": {
+                            "maximum": 600000,
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "type": {
+                            "const": "remote",
+                            "type": "string"
+                          },
+                          "url": {
+                            "format": "uri",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "type",
+                          "url"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "command": {
+                            "items": {
+                              "maxLength": 32768,
+                              "type": "string"
+                            },
+                            "maxItems": 128,
+                            "minItems": 1,
+                            "type": "array"
+                          },
+                          "env": {
+                            "additionalProperties": {
+                              "maxLength": 32768,
+                              "type": "string"
+                            },
+                            "propertyNames": {
+                              "maxLength": 128,
+                              "pattern": "^[A-Z_][A-Z0-9_]*$",
+                              "type": "string"
+                            },
+                            "type": "object"
+                          },
+                          "name": {
+                            "maxLength": 80,
+                            "minLength": 1,
+                            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
+                            "type": "string"
+                          },
+                          "timeoutMs": {
+                            "maximum": 600000,
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "type": {
+                            "const": "local",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "command",
+                          "name",
+                          "type"
+                        ],
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "maxItems": 64,
+                  "type": "array"
+                },
+                "plugins": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "entry": {
+                        "maxLength": 4096,
+                        "type": "string"
+                      },
+                      "files": {
+                        "items": {
+                          "oneOf": [
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "content": {
+                                  "maxLength": 1048576,
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "const": "file",
+                                  "type": "string"
+                                },
+                                "mode": {
+                                  "maximum": 511,
+                                  "minimum": 0,
+                                  "type": "integer"
+                                },
+                                "object": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "objectId": {
+                                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                                      "type": "string"
+                                    },
+                                    "sha256": {
+                                      "pattern": "^[a-f0-9]{64}$",
+                                      "type": "string"
+                                    },
+                                    "size": {
+                                      "maximum": 1073741824,
+                                      "minimum": 0,
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "required": [
+                                    "objectId",
+                                    "sha256",
+                                    "size"
+                                  ],
+                                  "type": "object"
+                                },
+                                "path": {
+                                  "maxLength": 4096,
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "path"
+                              ],
+                              "type": "object"
+                            },
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "kind": {
+                                  "const": "symlink",
+                                  "type": "string"
+                                },
+                                "path": {
+                                  "maxLength": 4096,
+                                  "type": "string"
+                                },
+                                "target": {
+                                  "maxLength": 4096,
+                                  "minLength": 1,
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "path",
+                                "target"
+                              ],
+                              "type": "object"
+                            }
+                          ]
+                        },
+                        "maxItems": 10000,
+                        "minItems": 1,
+                        "type": "array"
+                      },
+                      "name": {
+                        "maxLength": 80,
+                        "minLength": 1,
+                        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
+                        "type": "string"
+                      },
+                      "options": {
+                        "additionalProperties": {
+                          "$ref": "#/$defs/__schema0"
+                        },
+                        "propertyNames": {
+                          "maxLength": 256,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "required": [
+                      "entry",
+                      "files",
+                      "name"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 128,
+                  "type": "array"
+                },
+                "protocol": {
+                  "enum": [
+                    "claude-code",
+                    "opencode"
+                  ],
+                  "type": "string"
+                },
+                "subagents": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "body": {
+                        "maxLength": 1048576,
+                        "type": "string"
+                      },
+                      "name": {
+                        "maxLength": 80,
+                        "minLength": 1,
+                        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
+                        "type": "string"
+                      },
+                      "options": {
+                        "additionalProperties": {
+                          "$ref": "#/$defs/__schema0"
+                        },
+                        "propertyNames": {
+                          "maxLength": 256,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "required": [
+                      "body",
+                      "name"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 128,
+                  "type": "array"
+                },
+                "version": {
+                  "const": 1,
+                  "type": "number"
+                }
+              },
+              "required": [
+                "agent",
+                "protocol",
+                "version"
+              ],
+              "type": "object"
+            },
             "requestKey": {
               "maxLength": 128,
               "minLength": 1,
@@ -862,18 +1231,46 @@
                     "maxLength": 1048576,
                     "type": "string"
                   },
+                  "mode": {
+                    "maximum": 511,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "object": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "objectId": {
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                        "type": "string"
+                      },
+                      "sha256": {
+                        "pattern": "^[a-f0-9]{64}$",
+                        "type": "string"
+                      },
+                      "size": {
+                        "maximum": 1073741824,
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "objectId",
+                      "sha256",
+                      "size"
+                    ],
+                    "type": "object"
+                  },
                   "path": {
                     "maxLength": 4096,
                     "type": "string"
                   }
                 },
                 "required": [
-                  "content",
                   "path"
                 ],
                 "type": "object"
               },
-              "maxItems": 128,
+              "maxItems": 10000,
               "type": "array"
             },
             "subagents": {
@@ -2483,6 +2880,202 @@
                         "type": "string"
                       },
                       "data": {
+                        "oneOf": [
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "agents": {
+                                "items": {
+                                  "maxLength": 512,
+                                  "minLength": 1,
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:@*-]*$",
+                                  "type": "string"
+                                },
+                                "maxItems": 2048,
+                                "type": "array"
+                              },
+                              "mcpServers": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "name": {
+                                      "maxLength": 512,
+                                      "minLength": 1,
+                                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:@*-]*$",
+                                      "type": "string"
+                                    },
+                                    "status": {
+                                      "enum": [
+                                        "connected",
+                                        "disabled",
+                                        "failed",
+                                        "unknown"
+                                      ],
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "name",
+                                    "status"
+                                  ],
+                                  "type": "object"
+                                },
+                                "maxItems": 2048,
+                                "type": "array"
+                              },
+                              "skills": {
+                                "items": {
+                                  "maxLength": 512,
+                                  "minLength": 1,
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:@*-]*$",
+                                  "type": "string"
+                                },
+                                "maxItems": 2048,
+                                "type": "array"
+                              },
+                              "source": {
+                                "enum": [
+                                  "claude-init",
+                                  "opencode-inventory"
+                                ],
+                                "type": "string"
+                              },
+                              "state": {
+                                "const": "verified",
+                                "type": "string"
+                              },
+                              "tools": {
+                                "items": {
+                                  "maxLength": 512,
+                                  "minLength": 1,
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:@*-]*$",
+                                  "type": "string"
+                                },
+                                "maxItems": 2048,
+                                "type": "array"
+                              },
+                              "version": {
+                                "const": 1,
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "mcpServers",
+                              "source",
+                              "state",
+                              "version"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "reason": {
+                                "enum": [
+                                  "inventory-cancelled",
+                                  "inventory-identity-mismatch",
+                                  "inventory-malformed",
+                                  "inventory-not-reported",
+                                  "inventory-start-failed",
+                                  "inventory-too-large",
+                                  "inventory-unavailable"
+                                ],
+                                "type": "string"
+                              },
+                              "state": {
+                                "const": "unavailable",
+                                "type": "string"
+                              },
+                              "version": {
+                                "const": 1,
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "reason",
+                              "state",
+                              "version"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "reason": {
+                                "enum": [
+                                  "inventory-cancelled",
+                                  "inventory-identity-mismatch",
+                                  "inventory-malformed",
+                                  "inventory-not-reported",
+                                  "inventory-start-failed",
+                                  "inventory-too-large",
+                                  "inventory-unavailable"
+                                ],
+                                "type": "string"
+                              },
+                              "state": {
+                                "const": "malformed",
+                                "type": "string"
+                              },
+                              "version": {
+                                "const": 1,
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "reason",
+                              "state",
+                              "version"
+                            ],
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "occurredAt": {
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                        "type": "string"
+                      },
+                      "sourceEventId": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "subtaskId": {
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                        "type": "string"
+                      },
+                      "taskId": {
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                        "type": "string"
+                      },
+                      "type": {
+                        "const": "startup-inventory",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "cursor",
+                      "data",
+                      "occurredAt",
+                      "sourceEventId",
+                      "taskId",
+                      "type"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "attempt": {
+                        "maximum": 9007199254740991,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "cursor": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "data": {
                         "additionalProperties": false,
                         "properties": {
                           "generation": {
@@ -3335,8 +3928,16 @@
                       "events": {
                         "type": "boolean"
                       },
+                      "materialObjectsVersion": {
+                        "const": 1,
+                        "type": "number"
+                      },
                       "mcp": {
                         "type": "boolean"
+                      },
+                      "nativeConfigVersion": {
+                        "const": 1,
+                        "type": "number"
                       },
                       "opaqueInternalDelegation": {
                         "type": "boolean"
@@ -3349,6 +3950,10 @@
                       },
                       "skills": {
                         "type": "boolean"
+                      },
+                      "startupInventoryVersion": {
+                        "const": 1,
+                        "type": "number"
                       },
                       "systemPrompt": {
                         "type": "boolean"
@@ -3393,6 +3998,10 @@
                 "type": "object"
               },
               "type": "array"
+            },
+            "commandSecretEnvVersion": {
+              "const": 1,
+              "type": "number"
             },
             "limits": {
               "additionalProperties": false,
@@ -3465,6 +4074,26 @@
                 "renewSeconds",
                 "retentionDays",
                 "summaryBytes"
+              ],
+              "type": "object"
+            },
+            "nativeMaterialLimits": {
+              "additionalProperties": false,
+              "properties": {
+                "bytes": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer"
+                },
+                "files": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "bytes",
+                "files"
               ],
               "type": "object"
             },
@@ -5561,6 +6190,28 @@
                                     },
                                     "maxItems": 64,
                                     "type": "array"
+                                  },
+                                  "nativeConfig": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "agentDefinitions": {
+                                        "default": false,
+                                        "type": "boolean"
+                                      },
+                                      "inlineLocalMcp": {
+                                        "default": false,
+                                        "type": "boolean"
+                                      },
+                                      "inlineRemoteMcp": {
+                                        "default": false,
+                                        "type": "boolean"
+                                      },
+                                      "plugins": {
+                                        "default": false,
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "type": "object"
                                   }
                                 },
                                 "type": "object"
@@ -5642,6 +6293,22 @@
                           },
                           "maxItems": 32,
                           "type": "array"
+                        },
+                        "commandBusinessConfig": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "allowedEnvNames": {
+                              "default": [],
+                              "items": {
+                                "maxLength": 128,
+                                "pattern": "^[A-Z_][A-Z0-9_]*$",
+                                "type": "string"
+                              },
+                              "maxItems": 128,
+                              "type": "array"
+                            }
+                          },
+                          "type": "object"
                         },
                         "defaultVolumeMode": {
                           "default": "follow-container",
@@ -7038,6 +7705,107 @@
       "changes": [
         "＋ schemas/BusinessTaskV3Dto/properties/state/enum{finalizing}",
         "＋ schemas/BusinessEventPage/properties/items/items/oneOf[0]/properties/data/properties/state/enum{finalizing}"
+      ]
+    },
+    {
+      "date": "2026-10-16",
+      "basis": "RFC-040 用户于 2026-10-15 明确接手实施；新增启动清单事件分支、Secret 命令环境与对象材料联合分支，旧字段和请求语义保留",
+      "changes": [
+        "－ schemas/SubmitBusinessSubtaskV3/oneOf[1]/properties/env/additionalProperties/maxLength（原值 32768）",
+        "－ schemas/SubmitBusinessSubtaskV3/oneOf[1]/properties/env/additionalProperties/type（原值 \"string\"）",
+        "－ schemas/BusinessMaterialRequest/properties/skills/items/required{content}",
+        "～ schemas/BusinessMaterialRequest/properties/skills/maxItems：128 → 10000",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[0]/properties/data/additionalProperties（原值 false）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[0]/properties/data/properties（原值 {\"generation\":{\"maximum\":9007199254740991,\"minimum\":1,\"type\":\"integer\"},\"stat…）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[0]/properties/data/required（原值 [\"generation\",\"state\"]）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[0]/properties/data/type（原值 \"object\"）",
+        "～ schemas/BusinessEventPage/properties/items/items/oneOf[0]/properties/type/const：\"task-state\" → \"startup-inventory\"",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[1]/properties/data/properties/process（原值 {\"enum\":[\"exited\",\"live\",\"not-started\",\"unknown\"],\"type\":\"string\"}）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[1]/properties/data/properties/reason（原值 {\"type\":\"string\"}）",
+        "＋ schemas/BusinessEventPage/properties/items/items/oneOf[1]/properties/data/properties/state/enum{closed}",
+        "＋ schemas/BusinessEventPage/properties/items/items/oneOf[1]/properties/data/properties/state/enum{closing}",
+        "＋ schemas/BusinessEventPage/properties/items/items/oneOf[1]/properties/data/properties/state/enum{creating}",
+        "＋ schemas/BusinessEventPage/properties/items/items/oneOf[1]/properties/data/properties/state/enum{finalizing}",
+        "＋ schemas/BusinessEventPage/properties/items/items/oneOf[1]/properties/data/properties/state/enum{paused}",
+        "＋ schemas/BusinessEventPage/properties/items/items/oneOf[1]/properties/data/properties/state/enum{pausing}",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[1]/properties/data/properties/state/enum{awaiting-input}",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[1]/properties/data/properties/state/enum{cancelled}",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[1]/properties/data/properties/state/enum{cancelling}",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[1]/properties/data/properties/state/enum{pending}",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[1]/properties/data/properties/state/enum{succeeded}",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[1]/properties/data/properties/state/enum{verifying}",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[1]/properties/data/required{process}",
+        "～ schemas/BusinessEventPage/properties/items/items/oneOf[1]/properties/type/const：\"execution-state\" → \"task-state\"",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[2]/properties/data/properties/text（原值 {\"type\":\"string\"}）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[2]/properties/data/required{text}",
+        "～ schemas/BusinessEventPage/properties/items/items/oneOf[2]/properties/type/const：\"text\" → \"execution-state\"",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[3]/properties/data/properties/callId（原值 {\"type\":\"string\"}）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[3]/properties/data/properties/input（原值 {}）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[3]/properties/data/properties/name（原值 {\"type\":\"string\"}）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[3]/properties/data/required{callId}",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[3]/properties/data/required{name}",
+        "～ schemas/BusinessEventPage/properties/items/items/oneOf[3]/properties/type/const：\"tool-start\" → \"text\"",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[4]/properties/data/properties/isError（原值 {\"type\":\"boolean\"}）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[4]/properties/data/properties/output（原值 {}）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[4]/properties/data/required{isError}",
+        "～ schemas/BusinessEventPage/properties/items/items/oneOf[4]/properties/type/const：\"tool-end\" → \"tool-start\"",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[5]/properties/data/properties/sessionId（原值 {\"minLength\":1,\"type\":\"string\"}）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[5]/properties/data/required{sessionId}",
+        "～ schemas/BusinessEventPage/properties/items/items/oneOf[5]/properties/type/const：\"session\" → \"tool-end\"",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[6]/properties/data/properties/cacheReadTokens（原值 {\"anyOf\":[{\"maximum\":9007199254740991,\"minimum\":0,\"type\":\"integer\"},{\"type\":\"…）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[6]/properties/data/properties/cacheWriteTokens（原值 {\"anyOf\":[{\"maximum\":9007199254740991,\"minimum\":0,\"type\":\"integer\"},{\"type\":\"…）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[6]/properties/data/properties/complete（原值 {\"type\":\"boolean\"}）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[6]/properties/data/properties/inputTokens（原值 {\"anyOf\":[{\"maximum\":9007199254740991,\"minimum\":0,\"type\":\"integer\"},{\"type\":\"…）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[6]/properties/data/properties/measurementId（原值 {\"maxLength\":256,\"minLength\":1,\"type\":\"string\"}）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[6]/properties/data/properties/mode（原值 {\"enum\":[\"cumulative\",\"delta\"],\"type\":\"string\"}）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[6]/properties/data/properties/outputTokens（原值 {\"anyOf\":[{\"maximum\":9007199254740991,\"minimum\":0,\"type\":\"integer\"},{\"type\":\"…）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[6]/properties/data/properties/scope（原值 {\"maxLength\":256,\"minLength\":1,\"type\":\"string\"}）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[6]/properties/data/properties/snapshot（原值 {\"additionalProperties\":false,\"properties\":{\"models\":{\"items\":{\"additionalPro…）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[6]/properties/data/required{cacheReadTokens}",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[6]/properties/data/required{cacheWriteTokens}",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[6]/properties/data/required{complete}",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[6]/properties/data/required{inputTokens}",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[6]/properties/data/required{measurementId}",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[6]/properties/data/required{mode}",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[6]/properties/data/required{outputTokens}",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[6]/properties/data/required{scope}",
+        "～ schemas/BusinessEventPage/properties/items/items/oneOf[6]/properties/type/const：\"usage\" → \"session\"",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[7]/properties/data/properties/stream（原值 {\"enum\":[\"stderr\",\"stdout\"],\"type\":\"string\"}）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[7]/properties/data/properties/text（原值 {\"type\":\"string\"}）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[7]/properties/data/required{stream}",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[7]/properties/data/required{text}",
+        "～ schemas/BusinessEventPage/properties/items/items/oneOf[7]/properties/type/const：\"output\" → \"usage\"",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[8]/properties/data/properties/exitCode（原值 {\"anyOf\":[{\"maximum\":9007199254740991,\"minimum\":-9007199254740991,\"type\":\"int…）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[8]/properties/data/properties/files（原值 {\"items\":{\"additionalProperties\":false,\"properties\":{\"path\":{\"type\":\"string\"}…）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[8]/properties/data/properties/finalCursor（原值 {\"minLength\":1,\"type\":\"string\"}）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[8]/properties/data/properties/reason（原值 {\"maxLength\":4096,\"type\":\"string\"}）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[8]/properties/data/properties/stderr（原值 {\"type\":\"string\"}）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[8]/properties/data/properties/stdout（原值 {\"type\":\"string\"}）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[8]/properties/data/properties/truncated（原值 {\"type\":\"boolean\"}）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[8]/properties/data/required{exitCode}",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[8]/properties/data/required{files}",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[8]/properties/data/required{finalCursor}",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[8]/properties/data/required{reason}",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[8]/properties/data/required{stderr}",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[8]/properties/data/required{stdout}",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[8]/properties/data/required{truncated}",
+        "～ schemas/BusinessEventPage/properties/items/items/oneOf[8]/properties/type/const：\"result\" → \"output\"",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[9]/properties/data/properties/earliestCursor（原值 {\"type\":\"string\"}）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[9]/properties/data/properties/snapshotUrl（原值 {\"type\":\"string\"}）",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[9]/properties/data/required{earliestCursor}",
+        "－ schemas/BusinessEventPage/properties/items/items/oneOf[9]/properties/data/required{snapshotUrl}",
+        "～ schemas/BusinessEventPage/properties/items/items/oneOf[9]/properties/type/const：\"gap\" → \"result\"",
+        "＋ schemas/BusinessEventPage/properties/items/items/oneOf[10] = {\"additionalProperties\":false,\"properties\":{\"attempt\":{\"maximum\":900719925474…"
+      ]
+    },
+    {
+      "date": "2026-10-16",
+      "basis": "RFC-040 原型键必须在 Zod 归一化前拒绝；预检管线使生成 JSON Schema 省略新 nativeConfig 的四处 default 注释，运行时默认行为不变且已由旧请求与默认值测试锁定",
+      "changes": [
+        "－ schemas/BusinessMaterialRequest/properties/nativeConfig/properties/agent/properties/options/default（原值 {}）",
+        "－ schemas/BusinessMaterialRequest/properties/nativeConfig/properties/plugins/default（原值 []）",
+        "－ schemas/BusinessMaterialRequest/properties/nativeConfig/properties/subagents/default（原值 []）",
+        "－ schemas/BusinessMaterialRequest/properties/nativeConfig/properties/subagents/items/properties/options/default（原值 {}）"
       ]
     }
   ]

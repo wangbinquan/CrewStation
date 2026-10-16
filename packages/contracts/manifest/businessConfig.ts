@@ -8,6 +8,7 @@ const connection = z.strictObject({
   allowedParameterKeys: z.array(z.string().min(1).max(128)).max(128).default([]),
 });
 export const BusinessConfigSchema = z.strictObject({
+  nativeConfig: z.strictObject({ agentDefinitions: z.boolean().default(false), inlineRemoteMcp: z.boolean().default(false), inlineLocalMcp: z.boolean().default(false), plugins: z.boolean().default(false) }).optional(),
   allowSystemPromptAppend: z.boolean().default(false), allowSkills: z.boolean().default(false),
   allowedEnvNames: z.array(BusinessEnvironmentNameSchema).max(128).default([]),
   mcpConnections: z.array(connection).max(64).default([]),

@@ -7,7 +7,10 @@
 //  - 新增 `terminalError`：源用独立的 `parseResultError(line)` 再解析一遍同一行，这里合并；
 //  - 用量不在这一层：`source` 交给每次执行的计量器（drivers/usage，RFC-034 v2），与源 RFC-371 v2 同算法。
 
+import type { BusinessStartupInventory } from '@crewstation/contracts';
+
 export type NormalizedEventKind =
+  | 'startup_inventory'
   | 'tool_use'
   | 'tool_result'
   | 'text'
@@ -28,6 +31,7 @@ export interface NormalizedToolCall {
 
 export interface NormalizedEvent {
   kind: NormalizedEventKind;
+  inventory?: BusinessStartupInventory;
   /** 贡献给输出的可见文本；无则 null。 */
   text?: string | null;
   /** 根会话的原生 id（子代理侧链帧必须省略），出现后即可用于 resume。 */

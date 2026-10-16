@@ -90,3 +90,13 @@ describe('放行表路径模板', () => {
     expect(matchesOperationPath('/v1/issues/{id}', '/v1/issues/42/notes')).toBe(false);
   });
 });
+
+
+test('material download renewal leaves the Agent digest stable but cannot change the pinned object descriptor', async () => {
+  const { businessAgentDigestInput } = await import('./businessExecution');
+  const object = { objectId: Bun.randomUUIDv7(), sha256: 'a'.repeat(64), size: 1 };
+  const grant = { object, url: 'http://platform.test/object', token: 'first', expiresAt: '2026-10-15T00:00:00.000Z' };
+  const digest = (value: unknown) => businessAgentDigestInput(value, 'b'.repeat(64));
+  expect(digest({ businessMaterialDownloads: [grant] })).toBe(digest({ businessMaterialDownloads: [{ ...grant, token: 'renewed', expiresAt: '2026-10-16T00:00:00.000Z' }] }));
+  expect(digest({ businessMaterialDownloads: [grant] })).not.toBe(digest({ businessMaterialDownloads: [{ ...grant, object: { ...object, size: 2 } }] }));
+});

@@ -88,3 +88,34 @@ test('managed event queue rejects unconsumed receipts and acknowledges only comp
     for (const result of [receipt, waiting, blocked]) expect(await result).toBeInstanceOf(Error);
   }
 });
+
+
+test('startup inventory is bounded, emitted once for the attempt and durably precedes its final watermark', async () => {
+  const f = await fixture(1024, 4096), events = createEventQueue<AgentEvent>(); let starts = 0;
+  const create = async () => { starts++; return { events, send: async () => {}, cancel: async () => {} }; };
+  f.supervisor.start(identity, create, 1);
+  const inventory = { version: 1 as const, state: 'verified' as const, source: 'opencode-inventory' as const, mcpServers: [{ name: 'docs', status: 'connected' as const }], agents: ['review'] };
+  events.push(event('startup-inventory', { inventory })); events.push(event('startup-inventory', { inventory }));
+  events.push(event('completed', { result: { exitCode: 0 } })); events.close();
+  const result = await f.supervisor.settled(identity.executionId), replay = f.journal.replay(identity.executionId, 0);
+  const observed = replay.filter(({ frame }) => frame.type === 'agent' && frame.event.type === 'startup-inventory');
+  expect(observed).toHaveLength(1); expect(observed[0]!.sequence).toBeLessThan(result.lastSequence);
+  const cold = new ExecutionJournal(f.root, 'cold', { outputBytes: 1024, spoolBytes: 4096, eventBytes: 4096 }); journals.push(cold);
+  expect(cold.replay(identity.executionId, 0)).toEqual(replay);
+  expect(new BusinessAgentSupervisor(cold, noopLogger).start(identity, create, 1).phase).toBe('finished'); expect(starts).toBe(1);
+});
+test('factory failure and an absent driver observation produce unavailable before the result; legacy executions gain no event', async () => {
+  for (const [name, requested, throws] of [['failed', true, true], ['absent', true, false], ['legacy', false, false]] as const) {
+    const f = await fixture(1024, 4096), execution = { ...identity, executionId: name };
+    f.supervisor.start(execution, async () => {
+      if (throws) throw new Error('private setup failure');
+      const events = createEventQueue<AgentEvent>(); events.push(event('completed', { result: { exitCode: 0 } })); events.close();
+      return { events, send: async () => {}, cancel: async () => {} };
+    }, requested ? 1 : undefined);
+    expect(await f.supervisor.settled(execution.executionId)).toMatchObject({ phase: 'finished', result: { reason: throws ? 'spawn_failed' : 'exited' } });
+    const replay = f.journal.replay(execution.executionId, 0), inventories = replay.filter(({ frame }) => frame.type === 'agent' && frame.event.type === 'startup-inventory');
+    expect(inventories).toHaveLength(requested ? 1 : 0);
+    if (requested) expect(inventories[0]).toMatchObject({ frame: { event: { inventory: { state: 'unavailable', reason: throws ? 'inventory-start-failed' : 'inventory-not-reported' } } } });
+    expect(replay.at(-1)?.frame.type).toBe('result'); expect(JSON.stringify(replay)).not.toContain('private setup failure');
+  }
+});

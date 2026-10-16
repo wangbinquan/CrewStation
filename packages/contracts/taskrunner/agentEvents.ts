@@ -1,3 +1,4 @@
+import { BusinessStartupInventorySchema } from '../api/business/startupInventory';
 import { AgentUsageSnapshotSchema } from './usage';
 import { BusinessUsageSchema } from '../api/business/events';
 import { z } from 'zod';
@@ -6,7 +7,7 @@ import { KnownAgentProtocolSchema } from './launch';
 
 /** 驱动层把两个 CLI 的输出归一为这一种事件；工作台流式面板与 execution_events 都消费它。 */
 export const AgentEventTypeSchema = z.enum([
-  'usage', 'started', 'session', 'user-message', 'text', 'thinking', 'tool-start', 'tool-end', 'permission', 'status', 'error', 'completed', 'cancelled',
+  'startup-inventory', 'usage', 'started', 'session', 'user-message', 'text', 'thinking', 'tool-start', 'tool-end', 'permission', 'status', 'error', 'completed', 'cancelled',
 ]);
 
 export const AgentEventSchema = z.object({
@@ -14,6 +15,7 @@ export const AgentEventSchema = z.object({
   seq: z.number().int().min(0),
   at: z.iso.datetime(),
   type: AgentEventTypeSchema,
+  inventory: BusinessStartupInventorySchema.optional(),
   /** 发给业务应用的同一份用量（RFC-027 业务事件）；由 usageSnapshot 派生，四个总量为各模型合计。 */
   usage: BusinessUsageSchema.optional(),
   /** RFC-034 v2：本次执行到目前为止按实际模型拆分的用量，整份替换上一份。 */

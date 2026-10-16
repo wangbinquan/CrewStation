@@ -21,9 +21,9 @@ describe('Claude stream-json 解析', () => {
     expect(parseEvent('"a string"')).toBeNull();
   });
 
-  test('system/init：kind 为 step_start，贡献根会话 id', () => {
+  test('system/init：kind 为 startup_inventory，贡献根会话 id', () => {
     const event = parseEvent(INIT);
-    expect(event?.kind).toBe('step_start');
+    expect(event?.kind).toBe('startup_inventory');
     expect(event?.sessionId).toBe('sess-1');
   });
 
@@ -90,8 +90,8 @@ describe('归一事件 → AgentEvent', () => {
     expect(toAgentEvent(parseEvent(THINK)!, emit)).toBeNull(); // thinking 块没有可见文本
     expect(toAgentEvent(parseEvent(TOOL_USE)!, emit)?.type).toBe('tool-start');
     expect(toAgentEvent(parseEvent(TOOL_RESULT)!, emit)?.type).toBe('tool-end');
-    // step_start／step_finish 不单独成事件：会话认领与终止由运行循环处理。
-    expect(toAgentEvent(parseEvent(INIT)!, emit)).toBeNull();
+    // 根 init 清单独立投影；旧请求由运行层过滤。result 仍由运行循环终结。
+    expect(toAgentEvent(parseEvent(INIT)!, emit)).toMatchObject({ type: 'startup-inventory', inventory: { state: 'verified', mcpServers: [] } });
     expect(toAgentEvent(parseEvent(RESULT)!, emit)).toBeNull();
   });
 

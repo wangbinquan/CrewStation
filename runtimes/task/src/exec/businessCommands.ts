@@ -14,7 +14,7 @@ import type { BusinessFiles } from '../files/businessFiles';
 import { createBusinessFiles } from '../files/businessFiles';
 
 export interface BusinessCommands {
-  info(): Promise<{ incarnation: string; limits: JournalLimits }>;
+  info(): Promise<{ incarnation: string; limits: JournalLimits; commandSecretEnvVersion?: 1 }>;
   start(input: CommandOf<'startBusinessCommand'>): Promise<unknown>;
   sendMessage(input: CommandOf<'sendBusinessMessage'>): Promise<unknown>;
   getMessage(input: CommandOf<'getBusinessMessage'>): Promise<unknown>;
@@ -37,13 +37,13 @@ export function createBusinessCommands(deps: Omit<BusinessExecDeps, 'journal'>, 
   return {
     ...messages,
     files: createBusinessFiles(deps.paths.root),
-    info: async () => ({ incarnation, limits }),
+    info: async () => ({ incarnation, limits, commandSecretEnvVersion: 1 as const }),
     startAgent: async (input) => {
       if (!createAgent) throw new RunnerCommandError('unsupported_capability', 'Runner 未启用业务 Agent');
       if (input.incarnation !== incarnation) throw new RunnerCommandError('execution_incarnation_changed', 'Runner 已更换，先查询旧执行回执');
       const digest = new Bun.CryptoHasher('sha256').update(businessAgentDigestInput(input.agent, input.digestNonce)).digest('hex');
       if (digest !== input.payloadDigest) throw new RunnerCommandError('execution_conflict', 'Agent 执行参数摘要不匹配');
-      return agents.start(input, () => createAgent(input.agent));
+      return agents.start(input, () => createAgent(input.agent), input.agent.startupInventoryVersion);
     },
     start: async (input) => {
       if (input.incarnation !== incarnation) throw new RunnerCommandError('execution_incarnation_changed', 'Runner 已更换，先查询旧执行回执');

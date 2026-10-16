@@ -43,13 +43,13 @@ export class ResidentAgentRun extends AgentRunBase {
 
   private async begin(): Promise<void> {
     this.emitStarted();
+    let stream: DriverChildProcessWithStdin;
+    try {
     const plan = this.prepared.plan({
       prompt: this.spec.initialPrompt ?? '',
       ...(this.spec.resumeSessionId === undefined ? {} : { resumeSessionId: this.spec.resumeSessionId }),
       resident: true,
     });
-    let stream: DriverChildProcessWithStdin;
-    try {
       stream = this.context.host.spawnWithStdin({ cmd: plan.cmd, cwd: this.context.cwd, env: plan.env });
     } catch (error) {
       this.finishFailed('spawn_failed', error instanceof Error ? error.message : String(error), null);

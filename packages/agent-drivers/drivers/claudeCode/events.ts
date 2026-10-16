@@ -6,12 +6,13 @@
 //   {type:'user', message:{content:[{type:'tool_result',…}]|string}, session_id}
 //   {type:'result', subtype:'success', is_error, result, session_id, usage:{…}}
 // 与源的差异：
-//  - 删掉 `inventoryFacesFromInitEvent`（清单对账面不复制）；
+//  - RFC-040 只从当前根 init 投影有界清单，未知字段与诊断不进入业务事件；
 //  - `parseResultError` 合并进 NormalizedEvent.terminalError（源为独立函数、把同一行再解析一遍）；
 //  - 新增工具调用展开（`tool_use` / `tool_result` 内容块）：源只判定 kind，CrewStation 的
 //    AgentEvent 契约有 `tool` 字段，工作台直接消费；
 //  - 用量由 drivers/usage/claudeMeter.ts 从 `source` 计量（RFC-034 v2，与源 RFC-371 v2 同算法）。
 
+import { claudeStartupInventory } from './startupInventory';
 import type {
   NormalizedEvent,
   NormalizedEventKind,
@@ -41,7 +42,8 @@ export function parseEvent(line: string): NormalizedEvent | null {
   const tool = extractToolCall(parts);
   const sessionId = rootSessionId(evt, type);
   return {
-    kind: inferKind(type, parts),
+    kind: type === 'system' && evt.subtype === 'init' && sessionId ? 'startup_inventory' : inferKind(type, parts),
+    ...(type === 'system' && evt.subtype === 'init' && sessionId ? { inventory: claudeStartupInventory(evt) } : {}),
     text: concatText(parts),
     ...(sessionId === undefined ? {} : { sessionId }),
     ...(tool === undefined ? {} : { tool }),

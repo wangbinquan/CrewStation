@@ -1,5 +1,6 @@
+import { secretOutputRedactor } from './secretOutput';
 import { createHash } from 'node:crypto';
-import { BusinessCommandEnvironmentSchema, businessCommandDigestInput } from '@crewstation/contracts';
+import { BusinessRenderedCommandEnvironmentSchema, businessCommandDigestInput, type BusinessCommandSecretEnvironment } from '@crewstation/contracts';
 import type { Logger } from '@crewstation/kernel';
 import { RunnerCommandError } from '../commandError';
 import type { WorkdirPaths } from '../files/workdirPath';
@@ -12,6 +13,7 @@ export interface BusinessExecInput extends ExecutionIdentity {
   command: string[];
   cwd?: string;
   env: Record<string, string>;
+  secretEnvironment?: BusinessCommandSecretEnvironment;
   timeoutSeconds: number;
 }
 interface ActiveExecution {
@@ -20,6 +22,7 @@ interface ActiveExecution {
   reason?: ExecutionResult['reason'];
   timer?: ReturnType<typeof setTimeout>;
   done?: Promise<void>;
+  secrets: string[];
 }
 export interface BusinessExecDeps { journal: ExecutionJournal; launcher: ProcessLauncher; paths: WorkdirPaths; logger: Logger }
 
@@ -39,7 +42,7 @@ export class BusinessExecSupervisor {
     if (businessExecDigest(input) !== input.payloadDigest) throw new RunnerCommandError('execution_conflict', '执行参数摘要不匹配');
     if (!input.command.length || input.command.some((part) => typeof part !== 'string' || part.includes('\0')) || !input.command[0]
       || !Number.isInteger(input.timeoutSeconds) || input.timeoutSeconds < 1 || input.timeoutSeconds > 86400) throw new RunnerCommandError('invalid_execution', '命令或超时参数无效');
-    if (!BusinessCommandEnvironmentSchema.safeParse(input.env).success) throw new RunnerCommandError('invalid_configuration', '业务命令环境包含保留变量或非法值');
+    if (!BusinessRenderedCommandEnvironmentSchema.safeParse(input.env).success) throw new RunnerCommandError('invalid_configuration', '业务命令环境包含保留变量或非法值');
     // reserve 是同步持久事务；路径解析等异步操作之前先取得唯一 spawn 权。
     const reserved = this.deps.journal.reserve(input);
     if (!reserved.created) return this.starting.get(input.executionId) ?? reserved.receipt;
@@ -100,7 +103,7 @@ export class BusinessExecSupervisor {
       // 此分支已证明没有成功返回的进程；spawn 后的日志故障绝不能走这里。
       return this.deps.journal.finish(input.executionId, { reason: 'spawn_failed', exitCode: null, durationMs: 0 });
     }
-    const entry: ActiveExecution = { proc, startedAt: Date.now() };
+    const entry: ActiveExecution = { proc, startedAt: Date.now(), secrets: Object.keys(input.secretEnvironment?.references ?? {}).map((key) => input.env[key] ?? '') };
     this.active.set(input.executionId, entry);
     try { this.deps.journal.state(input.executionId, 'running'); }
     catch { this.storageFailure(input.executionId, entry); }
@@ -128,7 +131,12 @@ export class BusinessExecSupervisor {
       try { this.deps.journal.output(id, stream, text); }
       catch (error) { this.storageFailure(id, entry, error); }
     };
-    const pumps = Promise.all([pumpStream(entry.proc.stdout, sink('stdout')), pumpStream(entry.proc.stderr, sink('stderr'))])
+    const pump = async (stream: 'stdout' | 'stderr') => {
+      const redact = secretOutputRedactor(entry.secrets), write = sink(stream);
+      await pumpStream(entry.proc[stream], (text) => { const safe = redact.push(text); if (safe) write(safe); });
+      const tail = redact.finish(); if (tail) write(tail);
+    };
+    const pumps = Promise.all([pump('stdout'), pump('stderr')])
       .then(() => true, () => { this.storageFailure(id, entry); return false; });
     await entry.proc.exited;
     // 主进程退出后仍持有管道的后代不能让结果提前完整；杀残余组并等管道闭合。

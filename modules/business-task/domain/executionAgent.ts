@@ -10,6 +10,7 @@ type MaterialContent = Omit<BusinessMaterialRequest, 'requestKey' | 'fence'>;
 /** No secret values persist here. The protected nonce binds dispatch bytes without publishing a secret oracle. */
 export interface ExecutionAgentPlan {
   kind: 'agent-plan';
+  materialIdentity?: { serviceId: string; materialId: string };
   sessionKey: TaskId;
   volumeUid: string;
   credentialStamp?: string;
@@ -24,6 +25,7 @@ export interface ExecutionAgentPlan {
   nonce: string;
 }
 export const BUSINESS_AGENT_CAPABILITIES: BusinessAgentCapabilities = {
+  nativeConfigVersion: 1, materialObjectsVersion: 1, startupInventoryVersion: 1,
   events: true, usage: 'incremental', resume: true, systemPrompt: true, skills: true,
   mcp: true, platformDelegation: false, opaqueInternalDelegation: true,
 };

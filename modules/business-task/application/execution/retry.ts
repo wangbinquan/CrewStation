@@ -1,3 +1,4 @@
+import { readCommandPlan } from './command/material';
 import { dispatchBusinessAgent } from './agentDispatch';
 import { prepareAgentPlan } from './agentPlan';
 import { prepareAgentFreshRetry } from './agentResume';
@@ -45,7 +46,8 @@ export function executionRetryUseCases(deps: BusinessExecutionDeps): Pick<Busine
       if (env?.state !== 'running' || !env.connected) throw precondition('工作区当前不可执行', { code: 'workspace_unavailable' });
       BusinessExecutionInfoSchema.parse(await deps.runner.sendCommand(taskId, { id: newResourceId(), type: 'businessExecutionInfo' }));
       const stored = JSON.parse(await deps.cipher.open(previous.sealedPayload));
-      const payload = SubmitBusinessSubtaskV3Schema.parse(previous.view.kind === 'agent' ? (stored as ExecutionAgentPlan).request : stored);
+      const command = previous.view.kind === 'command' ? readCommandPlan(stored) : undefined;
+      const payload = SubmitBusinessSubtaskV3Schema.parse(previous.view.kind === 'agent' ? (stored as ExecutionAgentPlan).request : command?.kind === 'command-plan' ? command.request : command);
       const { id: _id, previousId: _previous, result: _result, error: _error, startedAt: _started, endedAt: _ended, cancelRequestedAt: _cancelled, sessionId: _session, ...stable } = previous.view;
       const view: BusinessSubtaskV3Dto = { ...stable, id: newResourceId() as typeof previous.view.id, previousId: previous.view.id, executionId: newResourceId(), attempt: previous.view.attempt + 1, state: 'pending', process: 'not-started', createdAt: deps.clock.now().toISOString() };
       const runtimeTaskId = payload.kind === 'agent' ? newResourceId() as TaskId : undefined;
@@ -56,7 +58,7 @@ export function executionRetryUseCases(deps: BusinessExecutionDeps): Pick<Busine
         if (input.resumePolicy === 'resume' && agent?.plan.sessionKey !== previous.sessionKey) throw conflict('重试只能恢复原 attempt 的会话目录', { code: 'session_incompatible' });
         return deps.subtasks.reserve({ serviceId: context.serviceId, taskId, requestKind: 'retry', requestParent: subtaskId, requestKey, requestDigest: digest,
         ...(agent ? { runtimeTaskId, sessionKey: agent.plan.sessionKey, sessionVolumeUid: agent.plan.volumeUid } : {}),
-        sealedPayload: await deps.cipher.seal(JSON.stringify(agent?.plan ?? { ...payload, requestKey })), payloadDigest: agent?.payloadDigest ?? previous.payloadDigest, fenced: previous.fenced, epoch: fence?.epoch ?? null,
+        sealedPayload: await deps.cipher.seal(JSON.stringify(agent?.plan ?? (command?.kind === 'command-plan' ? { ...command, request: { ...command.request, requestKey } } : { ...payload, requestKey }))), payloadDigest: agent?.payloadDigest ?? previous.payloadDigest, fenced: previous.fenced, epoch: fence?.epoch ?? null,
         view: agent?.view ?? view,
         }, authorization);
       }, (result) => result.subtask.runtimeTaskId);

@@ -17,3 +17,11 @@ test('credentials split across text frames, tool payloads and errors never enter
   expect(JSON.stringify(events)).not.toContain('private-token'); expect(JSON.stringify(events)).not.toContain('raw');
   expect(events.map((event) => event.seq)).toEqual(events.map((_, index) => index + 1));
 });
+
+
+test('inventory names cannot disclose a known credential and become an explicit malformed observation', async () => {
+  const input: AgentEvent = { agentId: 'agent', seq: 1, at: new Date().toISOString(), type: 'startup-inventory', inventory: { version: 1, state: 'verified', source: 'claude-init', mcpServers: [{ name: 'private-token', status: 'connected' }] } };
+  const events = await Array.fromAsync(redactBusinessEvents((async function* () { yield input; })(), ['private-token']));
+  expect(events[0]).toMatchObject({ type: 'startup-inventory', inventory: { state: 'malformed', reason: 'inventory-malformed' } });
+  expect(JSON.stringify(events)).not.toContain('private-token');
+});

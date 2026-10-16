@@ -2,7 +2,7 @@ import { AgentEventSchema } from './agentEvents';
 import { z } from 'zod';
 import { TaskIdSchema } from '../ids';
 import { BusinessDirectoryQuerySchema, BusinessFileQuerySchema } from '../api/business/files';
-import { BusinessCommandEnvironmentSchema } from '../api/business/requests';
+import { BusinessRenderedCommandEnvironmentSchema, BusinessCommandSecretEnvironmentSchema, type BusinessCommandSecretEnvironment } from '../api/business/commandSecrets';
 
 const ExecutionId = z.string().min(1).max(128);
 const Sequence = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
@@ -27,6 +27,7 @@ export const BusinessExecutionFrameSchema = z.discriminatedUnion('type', [
 ]);
 export const BusinessExecutionEventSchema = z.object({ sequence: Sequence, occurredAt: z.iso.datetime(), frame: BusinessExecutionFrameSchema }).strict();
 export const BusinessExecutionInfoSchema = z.object({
+  commandSecretEnvVersion: z.literal(1).optional(),
   incarnation: z.uuid(), limits: z.object({ outputBytes: Sequence, spoolBytes: Sequence, eventBytes: Sequence }).strict(),
 }).strict();
 export type RunnerBusinessReceipt = z.infer<typeof BusinessExecutionReceiptSchema>;
@@ -42,7 +43,7 @@ export const BusinessExecutionCommands = [
   z.object({ ...command('startBusinessCommand'), executionId: ExecutionId, attempt: z.number().int().positive(),
     incarnation: z.uuid(), payloadDigest: z.string().regex(/^[a-f0-9]{64}$/),
     command: z.array(z.string().max(32768).refine((value) => !value.includes('\0'))).min(1).max(1024),
-    cwd: z.string().optional(), env: BusinessCommandEnvironmentSchema.default({}),
+    cwd: z.string().optional(), env: BusinessRenderedCommandEnvironmentSchema.default({}), secretEnvironment: BusinessCommandSecretEnvironmentSchema.optional(),
     timeoutSeconds: z.number().int().min(1).max(86400).default(3600),
   }).strict(),
   z.object({ ...command('getBusinessExecution'), executionId: ExecutionId }).strict(),
@@ -54,8 +55,8 @@ export const BusinessExecutionCommands = [
 ] as const;
 
 /** Canonical command bytes shared by admission and Runner; no secret values are logged. */
-export function businessCommandDigestInput(input: { command: string[]; cwd?: string; env: Record<string, string>; timeoutSeconds: number }): string {
-  return JSON.stringify({ command: input.command, cwd: input.cwd ?? '.', env: Object.fromEntries(Object.entries(input.env).sort(([a], [b]) => a.localeCompare(b))), timeoutSeconds: input.timeoutSeconds });
+export function businessCommandDigestInput(input: { command: string[]; cwd?: string; env: Record<string, string>; timeoutSeconds: number; secretEnvironment?: BusinessCommandSecretEnvironment }): string {
+  return JSON.stringify({ command: input.command, cwd: input.cwd ?? '.', env: Object.fromEntries(Object.entries(input.env).sort(([a], [b]) => a.localeCompare(b))), timeoutSeconds: input.timeoutSeconds, ...(input.secretEnvironment ? { secretEnvironment: { ...input.secretEnvironment, references: Object.fromEntries(Object.entries(input.secretEnvironment.references).sort(([a], [b]) => a.localeCompare(b))), versions: [...input.secretEnvironment.versions].sort((a, b) => a.definitionId.localeCompare(b.definitionId)) } } : {}) });
 }
 
 /** Text contributes to the common output budget; metadata has a separate per-event/spool ceiling. */
@@ -71,5 +72,7 @@ export function businessAgentDigestInput(agent: unknown, digestNonce: string): s
     if (value !== null && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, canonical(v)]));
     return value;
   };
-  return JSON.stringify({ nonce: digestNonce, agent: canonical(agent) });
+  const immutable = agent && typeof agent === 'object' && !Array.isArray(agent) ? { ...agent } as Record<string, unknown> : agent;
+  if (immutable && typeof immutable === 'object' && 'businessMaterialDownloads' in immutable && Array.isArray(immutable.businessMaterialDownloads)) immutable.businessMaterialDownloads = immutable.businessMaterialDownloads.map((grant: { object: unknown }) => grant.object);
+  return JSON.stringify({ nonce: digestNonce, agent: canonical(immutable) });
 }

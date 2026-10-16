@@ -88,7 +88,9 @@ export class ExecutionJournal {
     const frame = BusinessExecutionFrameSchema.parse({ type: 'agent', event: raw });
     return this.db.transaction(() => {
       const row = this.owned(executionId);
-      if (row.phase !== 'running' && row.phase !== 'cancelling') fail('execution_conflict', '只有活动执行可以追加 Agent 事件');
+      // A proven setup failure can report unavailable before any process exists. Other pre-start frames remain forbidden.
+      const preparationFailure = row.phase === 'registered' && frame.type === 'agent' && frame.event.type === 'startup-inventory' && frame.event.inventory?.state === 'unavailable';
+      if (row.phase !== 'running' && row.phase !== 'cancelling' && !preparationFailure) fail('execution_conflict', '只有活动执行可以追加 Agent 事件');
       return this.append(row, frame, businessFrameOutputBytes(frame), false);
     }).immediate();
   }

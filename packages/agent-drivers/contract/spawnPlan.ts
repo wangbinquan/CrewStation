@@ -1,3 +1,4 @@
+import type { BusinessNativeConfig } from '@crewstation/contracts';
 // ← agent-workflow `runtime/types.ts` 的 SpawnPlan / AgentSpawnContext 段，裁到 CrewStation 实际用到的字段。
 // 源里的 persona／business 两条装配路径（`taskMounts === undefined` 分支）与两个 @deprecated 旧上下文
 // 一并合并为单一形状：CrewStation 没有对拍需求，也没有工作区边界（沙箱关闭，见 index.ts）。
@@ -32,6 +33,7 @@ export interface SpawnPlan {
 
 /** 组装一次拉起需要的全部平台输入。 */
 export interface AgentSpawnContext {
+  businessNativeConfig?: BusinessNativeConfig;
   agentId: string;
   /** CLI 命令头：档位修订的二进制路径（RFC-006 C5：必有，不回落 `claude`／`opencode`）。 */
   head: readonly string[];

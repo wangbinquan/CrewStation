@@ -150,3 +150,25 @@ describe('business command durable supervisor', () => {
     } finally { recovered.close(); }
   });
 });
+
+
+test('frozen command Secret values reach only the child env and are redacted before durable output and cold replay', async () => {
+  const f = await boot(), secret = 'RFC040-private-credential', definitionId = Bun.randomUUIDv7(), itemId = Bun.randomUUIDv7();
+  const input = command('printf %s "$GIT_TOKEN"; printf %s "$GIT_TOKEN" >&2; printf safe', {
+    env: { GIT_TOKEN: secret }, secretEnvironment: { version: 1, nonce: 'b'.repeat(64), references: { GIT_TOKEN: definitionId }, versions: [{ definitionId, itemId, version: 1 }] },
+  });
+  await f.supervisor.start(input); const done = await f.supervisor.settled(input.executionId);
+  expect(done.result).toMatchObject({ reason: 'exited', exitCode: 0 });
+  const entries = f.journal.replay(input.executionId, 0);
+  expect(entries.flatMap(({ frame }) => frame.type === 'output' && frame.stream === 'stdout' ? [frame.text] : []).join('')).toBe('***safe');
+  expect(entries.flatMap(({ frame }) => frame.type === 'output' && frame.stream === 'stderr' ? [frame.text] : []).join('')).toBe('***');
+  expect(JSON.stringify(entries)).not.toContain(secret); expect(f.lines.join('')).not.toContain(secret);
+  const reopened = new ExecutionJournal(f.directory, 'cold', { outputBytes: 65536, spoolBytes: 262144, eventBytes: 65536 });
+  try {
+    expect(reopened.replay(input.executionId, 0)).toEqual(entries);
+    expect(reopened.reserve(input).created).toBe(false);
+  } finally { reopened.close(); }
+  const changed = { ...input, secretEnvironment: { ...input.secretEnvironment!, nonce: 'c'.repeat(64) } };
+  expect(businessExecDigest(changed)).not.toBe(input.payloadDigest);
+  await expect(f.supervisor.start(changed)).rejects.toThrow('摘要');
+});

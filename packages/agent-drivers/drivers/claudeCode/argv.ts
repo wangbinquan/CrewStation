@@ -6,12 +6,13 @@
 // 与源的差异（都在 index.ts 的「不复制」清单里有依据）：
 //  - 不写 `settings.json`、不传 `--settings`：CrewStation 在任务容器内关闭 Claude 内置沙箱（已登记的偏离），
 //    而源的 settings 文件正是 `sandbox.enabled: true` 的载体；
-//  - 不传 `--agents`：子代理闭包属于 agent-workflow 的 DAG 编排面，不复制；
+//  - RFC-040 经授权原生材料显式传入 `--agents`；平台不解释或编排其内部子代理；
 //  - 不传 `--add-dir`；RFC-006 起档位可带 `extraArgs`（fork 私有 flag），追加在全部平台 argv 之后，
 //    平台独占 flag 表与保存时的校验同源（contracts 的 CLAUDE_RESERVED_ARGS）；
 //  - 新增 `--input-format stream-json`：交互式常驻流（见 streamInput.ts）。
 
-import { CLAUDE_RESERVED_ARGS } from '@crewstation/contracts';
+import { claudeNativeAgents } from '../../injection/nativeMaterials';
+import { BusinessClaudeAgentOptionsSchema, CLAUDE_RESERVED_ARGS } from '@crewstation/contracts';
 import { validation } from '@crewstation/kernel';
 import type { AgentSpawnContext, SpawnPlan } from '../../contract/spawnPlan';
 import { assertClaudeExtraArgs } from '../../injection/launchArgs';
@@ -96,6 +97,15 @@ export function buildClaudeArgv(input: ClaudeArgvInput): string[] {
   if (input.mcpConfigFile !== undefined) cmd.push('--mcp-config', input.mcpConfigFile);
   if (input.settingsFile !== undefined) cmd.push('--settings', input.settingsFile);
   if (ctx.resumeSessionId !== undefined && ctx.resumeSessionId.length > 0) cmd.push('--resume', ctx.resumeSessionId);
+  if (ctx.businessNativeConfig) {
+    const native = ctx.businessNativeConfig, options = BusinessClaudeAgentOptionsSchema.parse(native.agent.options);
+    cmd.push('--agents', claudeNativeAgents(native, model), '--agent', native.agent.name);
+    if (options.tools) { const at = cmd.indexOf('--tools'); if (at >= 0) cmd[at + 1] = options.tools.join(','); }
+    if (options.permissionMode) { const at = cmd.indexOf('--permission-mode'); if (at >= 0) cmd[at + 1] = options.permissionMode; }
+    if (options.disallowedTools?.length) cmd.push('--disallowedTools', options.disallowedTools.join(','));
+    if (options.maxTurns !== undefined) cmd.push('--max-turns', String(options.maxTurns));
+    if (options.effort) cmd.push('--effort', options.effort);
+  }
   cmd.push(...extraArgs);
   return cmd;
 }

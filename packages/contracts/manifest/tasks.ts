@@ -1,5 +1,6 @@
 import { ComputeProfileSelectorSchema } from '../api/compute/computeProfile';
 import { z } from 'zod';
+import { BusinessEnvironmentNameSchema } from '../api/business/executionValues';
 import { BusinessConfigSchema } from './businessConfig';
 import { BusinessTaskContractVersionSchema } from '../api/business/executionValues';
 import { RuntimeImageSelectionSchema } from '../api/runtimeImages/values';
@@ -47,6 +48,7 @@ export const TasksSpecSchema = z.object({
   taskProfileId: ResourceIdSchema,
   executionControl: z.enum(['legacy', 'fenced']).optional(),
   recovery: BusinessRecoveryCapabilitySchema.optional(),
+  commandBusinessConfig: z.strictObject({ allowedEnvNames: z.array(BusinessEnvironmentNameSchema).max(128).default([]) }).refine((value) => new Set(value.allowedEnvNames).size === value.allowedEnvNames.length, '环境变量名重复').optional(),
   acceptedTaskContractVersions: z.array(BusinessTaskContractVersionSchema).min(1).max(128).optional(),
   defaultVolumeMode: VolumeModeSchema.default('follow-container'),
   agentProfiles: z.array(AgentProfileSchema).default([]),

@@ -37,6 +37,7 @@ export async function prepareAgentResume(deps: BusinessExecutionDeps, serviceId:
   if (!source || !source.runtimeReleased) throw conflict('原会话资源释放尚未确认', { code: 'session_in_use' });
   const original = JSON.parse(await deps.cipher.open(source.sealedPayload)) as ExecutionAgentPlan;
   if (original.kind !== 'agent-plan' || original.sessionKey !== session.sessionKey || original.volumeUid !== volumeUid) throw conflict('原会话执行快照不可用', { code: 'session_incompatible' });
+  if (input.startupInventoryVersion === 1 && requireBusinessAgent(original.compute).startupInventoryVersion !== 1) throw precondition('固定档位不支持启动清单', { code: 'unsupported_capability', capability: 'startupInventoryVersion' });
   if (!requireBusinessAgent(original.compute).resume) throw precondition('固定档位修订不支持会话恢复', { code: 'unsupported_capability', capability: 'resume' });
   const sameCwd = posix.resolve('/work', input.cwd ?? '.') === posix.resolve('/work', original.request.cwd ?? '.');
   if (input.agentProfileId !== original.request.agentProfileId || input.mode !== original.request.mode || !sameCwd || input.outputContractId !== original.request.outputContractId) throw conflict('续跑不能改变原会话档案、模式、目录或输出契约', { code: 'session_incompatible' });

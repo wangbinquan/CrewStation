@@ -55,6 +55,7 @@
     "modules/business-task/adapters/persistence/migrations/0035_original_parent_links.sql": "c9e9f65c48bdefe2a56b08d9fd6dcebb75b21d51c155ac6a74cda53c96444425",
     "modules/business-task/adapters/persistence/migrations/0036_legacy_callback_links.sql": "01885d77a1ec827d98c649176d8993ad2a291ae391be0bd0ab3cd6b3fd86f45c",
     "modules/business-task/adapters/persistence/migrations/0037_operator_confirmations.sql": "a688575a7a02acd1174149e99bc579ad5b6203ca3644f50c3a037148b0883996",
+    "modules/business-task/adapters/persistence/migrations/0038_material_objects.sql": "33018deaefcc238343f86c812c5ce3e5140df06268d9b066e0fc1b74ca9f7fe9",
     "modules/cluster-management/adapters/persistence/migrations/0001_create_schema.sql": "d48761a3bca9fc384d3d4e74679de0d99090f142e3eaabb374029efcf7de6121",
     "modules/cluster-management/adapters/persistence/migrations/0002_inventory_operations.sql": "9a29b237e57dad98b85f10b74f04232590b64bd9711546fbde5edf9e624d0569",
     "modules/cluster-management/adapters/persistence/migrations/0003_snapshot_sequence.sql": "2349c5cb8f0186ff9a8a365b957a53118e4b6176bc5d8eda48f1da669395c079",

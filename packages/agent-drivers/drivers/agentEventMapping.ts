@@ -17,6 +17,7 @@ export function createAgentEventFactory(agentId: string): (type: AgentEventType,
 }
 
 const KIND_TO_TYPE: Readonly<Record<NormalizedEventKind, AgentEventType | null>> = Object.freeze({
+  startup_inventory: 'startup-inventory',
   text: 'text',
   reasoning: 'thinking',
   tool_use: 'tool-start',
@@ -36,7 +37,7 @@ export function toAgentEvent(
 ): AgentEvent | null {
   const type = KIND_TO_TYPE[event.kind];
   if (type === null) return null;
-  const fields: AgentEventFields = { raw: event.rawLine };
+  const fields: AgentEventFields = event.kind === 'startup_inventory' ? { inventory: event.inventory } : { raw: event.rawLine };
   if (typeof event.text === 'string' && event.text.length > 0) fields.text = event.text;
   if (event.tool !== undefined) fields.tool = event.tool;
   if (event.kind === 'error') fields.error = { code: 'runtime_error', message: event.text ?? '运行时报告错误' };

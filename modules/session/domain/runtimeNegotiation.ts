@@ -14,8 +14,10 @@ export function assertLaunchSupported(command: RunnerCommand, capabilities: Runn
   if (BUSINESS_EXECUTION_COMMANDS.has(command.type) && capabilities.businessExecutionV3 !== 1) {
     throw new PlatformError('precondition', '当前任务容器未声明可靠业务执行能力', { code: 'unsupported_capability', capability: 'businessExecutionV3' });
   }
+  if (command.type === 'startBusinessCommand' && command.secretEnvironment && capabilities.commandSecretEnvVersion !== 1) throw new PlatformError('precondition', '当前 Runner 不支持固定版本命令 Secret', { code: 'unsupported_capability', capability: 'commandSecretEnvVersion' });
   if (command.type === 'startBusinessAgent') { assertLaunchSupported(command.agent, capabilities); return; }
   if (command.type !== 'startAgent' && command.type !== 'startAgentTerminal' && command.type !== 'probeTerminal') return;
+  if (command.type === 'startAgent') for (const [needed, key] of [[!!command.businessNativeConfig, 'nativeConfigVersion'], [!!command.businessMaterialDownloads?.length, 'materialObjectsVersion'], [command.startupInventoryVersion === 1, 'startupInventoryVersion']] as const) if (needed && capabilities[key] !== 1) throw new PlatformError('precondition', '当前 Runner 不支持所请求的材料能力', { code: 'unsupported_capability', capability: key });
   const material = command.beforeStart;
   if (!capabilities.protocols.includes(command.launch.protocol)) {
     throw new PlatformError('precondition', `当前任务容器里的 Runner 不支持 ${command.launch.protocol} 协议；请基于当前平台底座镜像重建镜像`, { code: 'protocol_unsupported', protocol: command.launch.protocol, profile: material.profile, revision: material.revision });

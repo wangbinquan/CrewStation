@@ -20,7 +20,8 @@ test('durable Agent start over WS preserves native HOME, normalized events and c
   await tr.runner.whenConnected();
   // RFC-034 v2：业务执行不再协商用量能力，Agent 的 usage 事件本身携带执行快照。
   const info = RunnerResultPayloads.businessExecutionInfo.parse(await session.call({ id: 'info', type: 'businessExecutionInfo' }));
-  expect(Object.keys(info).sort()).toEqual(['incarnation', 'limits']);
+  expect(Object.keys(info).sort()).toEqual(['commandSecretEnvVersion', 'incarnation', 'limits']);
+  expect(info.commandSecretEnvVersion).toBe(1);
   const agent = StartAgentCommandSchema.parse({ id: 'agent', type: 'startAgent', agentId: 'agent', processAttemptId: 'attempt-one', compute: 'profile', profileRevision: 1,
     launch: { protocol: 'opencode', binaryPath: '/usr/bin/opencode' }, permission: 'full', mode: 'interactive', initialPrompt: 'hello protected-model-secret agent',
     beforeStart: { profile: '01a0bf5d-8f4b-7001-8458-107366e7de39', revision: 1, contentHash: 'hash', steps: [], vars: { APP_VALUE: 'platform-value' }, secrets: { KEY: 'protected-model-secret' }, configFile: { kind: 'none' }, captureOutput: false } });

@@ -1,4 +1,4 @@
-import { businessAgentDigestInput } from '@crewstation/contracts';
+import { businessAgentDigestInput, businessMaterialObjects, ServiceIdSchema } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
 import type { ExecutionAgentPlan } from '../../domain/executionAgent';
 import type { BusinessExecutionDeps } from './dependencies';
@@ -26,5 +26,8 @@ export async function agentCommand(deps: BusinessExecutionDeps, plan: ExecutionA
     }
     return { ...entry, headers };
   });
-  return { ...plan.command, beforeStart: { ...plan.command.beforeStart, secrets: provider }, env, mcp };
+  const objects = businessMaterialObjects(plan.material);
+  if (objects.length && (!deps.materialObjects || !plan.materialIdentity)) throw precondition('对象材料引用不可用', { code: 'material_objects_unpinned' });
+  const downloads = objects.length ? await deps.materialObjects!.grants({ projectId: plan.projectId, serviceId: ServiceIdSchema.parse(plan.materialIdentity!.serviceId), materialId: plan.materialIdentity!.materialId, objects }) : undefined;
+  return { ...plan.command, ...(downloads ? { businessMaterialDownloads: downloads } : {}), beforeStart: { ...plan.command.beforeStart, secrets: provider }, env, mcp };
 }

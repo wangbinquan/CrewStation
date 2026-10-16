@@ -1,5 +1,6 @@
 import type { Actor, DataEnv, DataResourceDto, DecideTaskDataBinding, ProjectDeletionOwner, ProjectId, RequestTaskDataBinding, ServiceId, TaskDataBindingDto, TaskDataBindingState, TaskId } from '@crewstation/contracts';
 import type { ObjectStorageAdminApi } from './objectStorageApi';
+import type { MaterialObjectApi } from './materialObjectApi';
 import type { ObjectServiceApi } from './objectServiceApi';
 import type { ArchiveFinalizationApi } from './archiveFinalizationApi';
 import type { ArchiveHelperApi } from './archiveHelperApi';
@@ -25,6 +26,7 @@ export interface DataModuleApi {
   taskStorageStatus(serviceId: ServiceId): Promise<{ available: boolean; reason: string | null }>;
   readonly objects?: ObjectStorageAdminApi;
   readonly taskInputs?: TaskInputApi;
+  readonly materialObjects?: MaterialObjectApi;
   readonly objectService?: ObjectServiceApi;
   readonly archiveFinalization?: ArchiveFinalizationApi;
   readonly archiveHelper?: ArchiveHelperApi;

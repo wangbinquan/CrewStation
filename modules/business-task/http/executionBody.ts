@@ -20,7 +20,7 @@ export async function executionBody<T extends z.ZodType>(c: Context, schema: T):
   try { raw = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw validation('请求体必须是 JSON', { code: 'invalid_configuration' }); }
   if ((schema as z.ZodType) === BusinessMaterialRequestSchema && raw && typeof raw === 'object' && !Array.isArray(raw)) {
     const { fence: _fence, requestKey: _key, ...material } = raw as Record<string, unknown>;
-    if (Buffer.byteLength(JSON.stringify(material)) > BUSINESS_EXECUTION_LIMITS.materialBytes || (Array.isArray(material['skills']) && material['skills'].length > BUSINESS_EXECUTION_LIMITS.materialFiles)) throw payloadTooLarge('执行材料超过容量', { code: 'material_too_large' });
+    if (Buffer.byteLength(JSON.stringify(material)) > BUSINESS_EXECUTION_LIMITS.materialBytes || (Array.isArray(material['skills']) && material['skills'].filter((file) => file && typeof file === 'object' && 'content' in file).length > BUSINESS_EXECUTION_LIMITS.materialFiles)) throw payloadTooLarge('执行材料超过容量', { code: 'material_too_large' });
   }
   const parsed = schema.safeParse(raw);
   if (parsed.success) return parsed.data;
