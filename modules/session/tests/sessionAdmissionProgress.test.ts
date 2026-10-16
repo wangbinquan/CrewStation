@@ -3,7 +3,7 @@
 // This test uses real PostgreSQL, the real Session router and real WebSockets;
 // the controlled TaskRuntime port reproduces the deployed owner-lock topology.
 import { describe, expect, test } from 'bun:test';
-import { TASKRUNNER_PROTOCOL_VERSION } from '@crewstation/contracts';
+import { IDENTITY_HEADERS, TASKRUNNER_PROTOCOL_VERSION } from '@crewstation/contracts';
 import { createApp } from '@crewstation/http';
 import { noopLogger, systemClock } from '@crewstation/kernel';
 import { sessionConnectionHistory } from '../adapters/persistence/deletion/lifetime';
@@ -106,6 +106,7 @@ async function originalBirthRejectionFixture(pauseBirth: boolean) {
 describe.skipIf(!available)('Session original handshake admission progress', () => {
   test('four concurrent real hellos finish nested TaskRuntime authentication without exhausting the original four guard slots', async () => {
     const g = await originalHelloFixture(4), tasks = Array.from({ length: 4 }, () => g.f.task());
+    let browser: WebSocket | undefined;
     try {
       const runners = await withinOriginalBudget(Promise.all(tasks.map((task) => openRunner(g.address, task))), 'four original hellos could not reach welcome');
       expect(runners.every((runner) => runner.frames.some((frame) => frame.type === 'welcome'))).toBe(true);
@@ -114,15 +115,26 @@ describe.skipIf(!available)('Session original handshake admission progress', () 
       for (const task of tasks) expect(await g.module.api.connectionStatus(task)).toMatchObject({ connected: true });
       expect([...g.ready.keys()].sort()).toEqual([...tasks].sort());
       await withinOriginalBudget(Promise.all(g.ready.values()), 'original ready callbacks inherited an ended Session guard');
+      const streamReady = Promise.withResolvers<void>(), delivered = Promise.withResolvers<Record<string, unknown>>();
+      browser = new WebSocket(`${g.address.replace('http:', 'ws:')}/v1/tasks/${tasks[0]!}/stream?sinceSeq=0`, { headers: { [IDENTITY_HEADERS.userId]: '01a0bf5d-8f4b-7793-867c-efd7527b386b' } } as never);
+      browser.onerror = () => streamReady.reject(new Error('original event observer failed'));
+      browser.onmessage = message => {
+        const frame = JSON.parse(String(message.data)) as Record<string, unknown>;
+        if (frame.type === 'streamReady') streamReady.resolve();
+        if (frame.type === 'event' && frame.seq === 1) delivered.resolve(frame);
+      };
+      await withinOriginalBudget(streamReady.promise, 'original event observer did not become ready');
       const at = new Date().toISOString(), first = runners[0]!;
       first.ws.send(JSON.stringify({ type: 'event', seq: 1, at, event: { kind: 'agent', event: { agentId: 'original', seq: 1, at, type: 'text', text: 'original event' } } }));
       const pending = g.module.api.sendCommand(tasks[0]!, { id: 'after-hello', type: 'previewStatus' });
       await withinOriginalBudget(first.next((frame) => frame.id === 'after-hello'), 'original command did not reach Runner');
       first.ws.send(JSON.stringify({ type: 'result', id: 'after-hello', payload: { state: 'ready' } }));
       expect(await withinOriginalBudget(pending, 'original command reply did not finish')).toEqual({ state: 'ready' });
+      // Replies intentionally bypass the event persistence queue; a command result is not an event commit barrier.
+      expect(await withinOriginalBudget(delivered.promise, 'original event was not durably broadcast')).toMatchObject({ type: 'event', seq: 1 });
       expect((await g.module.api.listEvents(tasks[0]!, {})).map((event) => event.seq)).toEqual([1]);
       for (const runner of runners) runner.ws.close();
-    } finally { await g.drop(); }
+    } finally { browser?.close(); await g.drop(); }
   }, 25_000);
 
   test('shutdown waits for the original pending authentication and leaves no accepted connection after that callback exits', async () => {
