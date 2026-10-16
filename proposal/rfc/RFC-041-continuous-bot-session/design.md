@@ -1,6 +1,6 @@
 # RFC-041｜Bot 持续对话设计
 
-> 状态：Draft · 2026-10-15 · 不改生产实现；批准后按 plan.md 分层实施。
+> 状态：In Progress · 2026-10-15 · 用户已批准完整正式实现、本机部署与真实模型验收。
 
 ## 1. 当前源码与实机事实
 
@@ -60,6 +60,8 @@ RFC-039 design.md §5 的 CLI/Bot 独立语义继续有效。本 RFC 取代其�
 沿用当前真实 interactive 多轮路径，不为每个成功答复换 Pod。普通执行中断可先通过现有取消路径结束当前 Agent，再等待 task-runtime 提供精确旧 Pod/进程停止证明；之后新执行挂同一个原生目录并传原 sessionId。前端保持 conversationId 和消息时间线不变；每次执行仍独立可追踪。此实现不要求先给两种驱动都发明常驻进程“暂停”协议。
 
 恢复条件是原生目录存在且通过检查、协议/固定档位/运行镜像兼容、nativeSessionId 确定，以及旧执行已停止。不能以租约超时、断线、HTTP 500 或 status=failed 代替物理停止证明。新执行受理前以 conversation 的跨实例锁固定一位写入者，task-runtime 使用 expectedPreviousExecutionId 与旧 UID 停止证明裁决；未知状态停在“正在确认执行状态”。
+
+首版持续 Bot 仅开放已经核对目录协议的 OpenCode 1.18.29 / 1.19.0，其他驱动/版本明确拒绝，原独立 CLI 与高级 Agent 不受影响。原生会话数据库通过 `OPENCODE_DB` 指向私有卷，持久化 `tool-output` / `snapshot` / `storage` 数据目录；HOME、启动配置和凭据仍留在单次执行临时目录。恢复前只读验证数据库可读与原 session 存在，驱动再验证实际回报 sessionId 严格一致。当前运行镜像中的 1.18.29 已通过自定义 DB 路径探针，此探针不是模型恢复验收。
 
 上下文兼容身份被冻结；管理员删除固定修订、镜像不再可用、原生 runtime 找不到 session 都返回可解释的恢复失败，不偷偷用新默认模型创建空 session。原生事件回报不同 sessionId 时将本次恢复标记不成立，不把它写成连续成功。
 

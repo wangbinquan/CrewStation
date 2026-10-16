@@ -1,3 +1,4 @@
+import { continuousBotFixture } from './continuousBotFixture';
 import './domSetup';
 import { afterEach, expect, test } from 'bun:test';
 import { act } from 'react';
@@ -123,11 +124,11 @@ test('发布前确认弹窗绑定任务、HEAD 和指纹，提交后重读干净
 });
 
 test('简化开发页只在发送需求后启动默认 Agent，已有输出与实时预览同时可见', async () => {
-  const f = historicalConversationFixture(); restore = f.restore; f.agents.splice(0); Object.assign(f.preview, { state: 'ready' });
+  const f = continuousBotFixture(); restore = f.restore; f.agents.splice(0); Object.assign(f.preview, { state: 'ready' });
   page = await renderDeliveryHarness(`/projects/${activityProjectId}/dev-session?view=guided`); expect(f.starts).toHaveLength(0); expect(page.text()).toContain('Bot 聊天');
   expect(document.querySelector('iframe[title="开发预览"]')).not.toBeNull();
-  await input('textarea[aria-label]', '制作一个周报填写页面'); await page.click('发送'); expect(f.starts).toHaveLength(1); expect(f.starts[0]?.input).toEqual({ compute: { kind: 'default' }, prompt: '制作一个周报填写页面' });
-  await act(async () => f.finishStart(0)); await page.settle(); expect(f.starts).toHaveLength(1);
+  await input('textarea[aria-label]', '制作一个周报填写页面'); await page.click('发送'); expect(f.botMessages).toHaveLength(1); expect(f.botMessages[0]?.input).toMatchObject({ expectedRevision: 0, content: '制作一个周报填写页面' });
+  await act(async () => f.finishMessage(0)); await page.settle(); expect(f.botMessages).toHaveLength(1); expect(f.starts).toHaveLength(0);
 });
 
 test('权限读取失败禁用需求与预览控制，保留只读预览且不发写请求', async () => {

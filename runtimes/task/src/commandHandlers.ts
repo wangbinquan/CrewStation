@@ -1,3 +1,4 @@
+import { RunnerCommandError } from './commandError';
 import type { AgentSupervisor } from './agents/agentSupervisor';
 import type { TerminalProbes } from './agents/terminalProbe';
 import type { CommandHandlers, CommandOf } from './commandDispatcher';
@@ -37,7 +38,11 @@ const ack = (): Record<string, never> => ({});
 
 /** 协议命令 → 各监督器；无内容的命令统一回 `{}`（RunnerResultPayloads.ack）。 */
 export function buildCommandHandlers(targets: CommandTargets): CommandHandlers {
+  const bot = <T>(call: (() => T) | undefined): T => { if (!call) throw new RunnerCommandError('bot_context_unsupported', '此 Runner 不支持持续 Bot 上下文'); return call(); };
   return {
+    botContextInfo: async () => bot(targets.agents.botContextInfo),
+    botMessageReceipt: async (c) => bot(targets.agents.botReceipt ? () => targets.agents.botReceipt!(c.requestId) ?? null : undefined),
+    sendBotMessage: (c) => bot(targets.agents.sendBot ? () => targets.agents.sendBot!(c.agentId, c.content, c.requestId) : undefined),
     runtimeInitializationStatus: async () => targets.initialization?.status() ?? { enabled: false, state: 'succeeded', steps: [], checks: [] },
     cancelRuntimeInitialization: async () => targets.initialization ? targets.initialization.cancel() : { enabled: false, state: 'succeeded', steps: [], checks: [] },
     businessExecutionInfo: () => targets.business.info(),

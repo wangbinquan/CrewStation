@@ -3,12 +3,18 @@
 import { createJsonLogger } from '@crewstation/kernel';
 import { loadConfigFromEnv } from './config';
 import { startRunner } from './runner';
+import { prepareBotVolumeCommand } from './bot/volume';
 import { prepareBusinessVolumeCommand } from './storage/businessVolume';
 import { storageContractCommand } from './storage/storageContract';
 import { materializeTaskInputsFromEnv } from './object-inputs/materialize';
 
 const storageContract = storageContractCommand(process.argv.slice(2), 'task-runner');
 if (storageContract) { console.log(JSON.stringify(storageContract)); process.exit(0); }
+
+if (process.argv[2] === 'prepare-bot-context') {
+  await prepareBotVolumeCommand(process.argv.slice(3));
+  process.exit(0);
+}
 
 if (process.argv[2] === 'prepare-business-volume') {
   await prepareBusinessVolumeCommand(process.argv.slice(3));

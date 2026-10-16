@@ -18,7 +18,8 @@ export async function developmentWorkOrigin(db: Executor, sources: DevelopmentDe
   }
   if (kind !== 'task') throw precondition('开发回调的原公开来源缺失');
   const parents = await db.execute<{ task_id: string }>(sql`SELECT task_id FROM dev_session.agent_starts WHERE execution_task_id=${key}
-    UNION ALL SELECT task_id FROM dev_session.native_terminal_starts WHERE execution_task_id=${key}`);
+    UNION ALL SELECT task_id FROM dev_session.native_terminal_starts WHERE execution_task_id=${key}
+    UNION ALL SELECT task_id FROM dev_session.bot_executions b WHERE execution_task_id=${key} AND NOT EXISTS(SELECT 1 FROM dev_session.agent_starts a WHERE a.execution_task_id=b.execution_task_id)`);
   if (parents.length !== 1) throw precondition('开发回调缺少唯一原受理父工作区');
   const parent = DevelopmentWorkOriginSchema.parse(await sources.resolve('task', parents[0]!.task_id, 'current'));
   if (parent.id !== parents[0]!.task_id) throw precondition('开发回调原父工作区已替换');

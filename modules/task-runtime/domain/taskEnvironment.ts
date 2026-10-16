@@ -1,4 +1,4 @@
-import type { BusinessSessionStorage } from '@crewstation/contracts';
+import type { BotContextStorage, BusinessSessionStorage } from '@crewstation/contracts';
 import type { RuntimeInitializationStatus, RuntimeImageExecutionSnapshot, ProjectId, ServiceId, StartupRecord, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
 import { precondition } from '@crewstation/kernel';
 import { cancelStartup, completeThrough, defaultFailureCode, failStartup } from './podStartup';
@@ -47,6 +47,8 @@ export interface NativeExecution {
  * 每次（重新）启动是第几次（start）决定 Runner Secret 的名字，恢复换一个新的，旧的由孤儿回收删掉。之前受理的环境没有它，照旧由 task-runtime 自己建。
  */
 export interface WorkloadRender {
+  readonly botVolume?: { readonly conversationId: string; readonly pvcName: string; readonly size: '1Gi'; readonly volumeUid?: string };
+  readonly botContext?: BotContextStorage;
   /** 开会话所选分支的对象档位；保卷重建与子执行继承，不读取生产发布。 */
   readonly developmentObjectPlanId?: string;
   readonly objectInputsGeneration?: number;

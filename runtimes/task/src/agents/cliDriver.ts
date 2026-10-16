@@ -58,7 +58,7 @@ function rethrow(error: unknown): never {
 
 function toDriverSpec(spec: AgentSpec): DriverAgentSpec {
   return {
-    businessEvents: spec.businessEvents, businessNativeConfig: spec.businessNativeConfig, businessMaterialDownloads: spec.businessMaterialDownloads, startupInventoryVersion: spec.startupInventoryVersion,
+    strictSession: spec.strictSession, businessEvents: spec.businessEvents, businessNativeConfig: spec.businessNativeConfig, businessMaterialDownloads: spec.businessMaterialDownloads, startupInventoryVersion: spec.startupInventoryVersion,
     ...(spec.businessSkills === undefined ? {} : { businessSkills: spec.businessSkills }),
     agentId: spec.agentId,
     compute: spec.compute,

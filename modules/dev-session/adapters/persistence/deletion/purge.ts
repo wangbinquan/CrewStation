@@ -7,7 +7,7 @@ import type { DevelopmentWorkSources } from '../../../ports/deletion/work';
 import { DEVELOPMENT_CONTENT } from './contentTables';
 import { inspectDevelopmentContent } from './inspection';
 
-const order = ['native_activity_reads', 'native_activity_items',
+const order = ['bot_messages', 'bot_executions', 'bot_conversations', 'native_activity_reads', 'native_activity_items',
   'native_activity_states', 'native_activity_sources', 'native_activity_progress', 'workspace_layouts', 'comparison_references',
   'idle_reminders', 'cluster_agent_restarts', 'agent_starts', 'native_terminal_starts', 'original_callbacks'];
 

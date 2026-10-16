@@ -40,12 +40,13 @@ export async function syncEnvironmentLedger(executor: Executor, ledger: Environm
     await executor.transaction(async (savepoint) => {
       const writer = ledger.within(savepoint);
       await syncRecord(writer, projection.workload, projection.connected);
+      if (projection.botVolume) await syncRecord(writer, projection.botVolume);
       if (projection.volume) await syncRecord(writer, projection.volume);
       if (projection.route) await syncRecord(writer, projection.route, undefined, env.id);
     });
   } catch (error) {
     // RFC-027 的额度释放依赖清理确认条件，投影失败必须与环境状态一起回滚。
-    if (env.render?.businessStorage) throw error;
+    if (env.render?.businessStorage || env.render?.botContext || env.render?.botVolume) throw error;
     logger.warn('resource ledger projection failed', { taskId: env.id, error: error instanceof Error ? error.message : String(error) });
   }
 }

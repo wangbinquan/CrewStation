@@ -69,6 +69,12 @@ function verifyPod(pod: K8sObject, env: TaskEnvironment): string {
 /** 所有写入只针对本次执行 Pod／Secret；接口没有创建、修改或删除 PVC 的能力。 */
 export function kubernetesNativeExecutions(k8s: K8sClient, workerUid: number): NativeExecutionCluster {
   return {
+    inspectBotVolume: async (parent, pvcName) => {
+      const volume = await k8s.get<Volume>(Resources.PersistentVolumeClaim!, pvcName, parent.namespace);
+      if (!volume) return undefined;
+      if (!volume.metadata.uid || volume.metadata.deletionTimestamp || volume.metadata.labels?.[LABELS.task] !== parent.id || volume.metadata.labels?.['crewstation.io/storage'] !== 'bot-context') throw precondition('Bot 上下文卷归属已变化');
+      return { uid: volume.metadata.uid };
+    },
     inspectWorkspace: (parent) => inspectWorkspace(k8s, parent),
     prepare: async (env, values) => {
       const n = env.native!;

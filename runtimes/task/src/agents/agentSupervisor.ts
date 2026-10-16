@@ -1,34 +1,15 @@
-import type { RunnerEvent, StartAgentCommand } from '@crewstation/contracts';
+import type { AgentSupervisor, AgentSupervisorDeps } from './supervisorContracts';
+export type { AgentSupervisor, AgentSupervisorDeps } from './supervisorContracts';
+import type { StartAgentCommand } from '@crewstation/contracts';
 import { isKnownProtocol } from '@crewstation/contracts';
-import type { Logger } from '@crewstation/kernel';
-import type { BeforeStartRunner } from '../beforeStart/beforeStartRunner';
 import { RunnerCommandError, alreadyExists, notFound } from '../commandError';
-import type { WorkdirPaths } from '../files/workdirPath';
-import type { ProcessLauncher } from '../process/launcher';
-import type { AgentDriverFactory, AgentProcess, AgentSpec } from './driver';
+import type { AgentProcess, AgentSpec } from './driver';
 import { createAgentEventFactory } from './driver';
 import { ManagedAgentProcess } from './managedAgent';
-
-export interface AgentSupervisor {
-  start(command: StartAgentCommand): Promise<void>;
-  send(agentId: string, content: string): Promise<void>;
-  cancel(agentId: string): Promise<void>;
-  cancelAll(): Promise<void>;
-  readonly size: number;
-}
-
-export interface AgentSupervisorDeps {
-  drivers: AgentDriverFactory;
-  launcher: ProcessLauncher;
-  paths: WorkdirPaths;
-  /** 启动前 Hook 执行器：RFC-006 起每次启动都先经它（步骤可以为空），再创建 CLI 进程。 */
-  beforeStart: BeforeStartRunner;
-  emit: (event: RunnerEvent) => void;
-  logger: Logger;
-}
+import { withBotContext } from '../bot/supervisor';
 
 /** 多个 Agent 并行运行（开发会话的多个流式交互 Agent）；每个 Agent 的事件流独立泵入 RunnerEvent。 */
-export function createAgentSupervisor(deps: AgentSupervisorDeps): AgentSupervisor { return new PendingAgentSupervisor(deps); }
+export function createAgentSupervisor(deps: AgentSupervisorDeps): AgentSupervisor { return withBotContext(new PendingAgentSupervisor(deps), deps); }
 
 interface PendingAgent { cancelled: boolean; process?: AgentProcess }
 class PendingAgentSupervisor implements AgentSupervisor {
@@ -53,7 +34,7 @@ class PendingAgentSupervisor implements AgentSupervisor {
       }
       const logger = deps.logger.child({ agentId: command.agentId, protocol });
       // Hook 成功后才创建 CLI 进程；凭据只来自档位的启动前材料与命令追加的变量（RFC-006 删除了部署配置的凭据文件）。
-      const agent = new ManagedAgentProcess(toSpec(command), { driver, beforeStart: deps.beforeStart, launcher: deps.launcher, cwd, commandEnv: command.env, material: command.beforeStart, processAttemptId: command.processAttemptId, logger });
+      const agent = new ManagedAgentProcess(toSpec(command), { driver, beforeStart: deps.beforeStart, launcher: deps.launcher, cwd, commandEnv: command.env, material: command.beforeStart, processAttemptId: command.processAttemptId, logger, ...(command.botContext && deps.botContext ? { botContext: deps.botContext, botRoots: deps.botRoots } : {}) });
       entry.process = agent; this.running.set(command.agentId, agent);
       logger.info('agent started', { mode: command.mode, profile: command.compute + '@' + command.profileRevision, model: command.launch.model ?? null, mcp: command.mcp.length, envKeys: Object.keys(command.env).length, steps: command.beforeStart.steps.length });
       const pumping = pumpAgent(deps, this.running, command.agentId, agent);
@@ -87,6 +68,7 @@ class PendingAgentSupervisor implements AgentSupervisor {
 
 function toSpec(command: StartAgentCommand): AgentSpec {
   return {
+    strictSession: command.botContext !== undefined,
     agentId: command.agentId,
     compute: command.compute,
     profileRevision: command.profileRevision,

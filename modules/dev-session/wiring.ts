@@ -1,3 +1,7 @@
+import { drizzleBotConversations } from './adapters/persistence/bot/repository';
+import { botConversationUseCases } from './application/bot/conversations';
+import { BotConversationLifecycle } from './application/bot/lifecycle';
+import { botRoutes } from './http/botRoutes';
 import type { DevelopmentRuntimeImages } from './ports/runtimeImages';
 import type { DevelopmentCalls } from './ports/agentCalls';
 import { join } from 'node:path';
@@ -100,7 +104,7 @@ export function createDevSessionModule(deps: DevSessionModuleDeps): DevSessionMo
   const drain = () => projectWork?.drain() ?? Promise.resolve();
   return {
     api,
-    http: [devSessionRoutes(api, deps.isAdmin), nativeTerminalRoutes(api, deps.isAdmin), workspaceLayoutRoutes(api, deps.isAdmin)],
+    http: [botRoutes(api, deps.isAdmin), devSessionRoutes(api, deps.isAdmin), nativeTerminalRoutes(api, deps.isAdmin), workspaceLayoutRoutes(api, deps.isAdmin)],
     workers: [developmentWorker(api.sendIdleReminders, 60_000, drain, (error) => useCaseDeps.logger.error('idle reminder failed', { error: String(error) })),
       developmentWorker(api.reconcileNativeExecutions, 2000, drain, () => useCaseDeps.logger.error('execution reconciliation failed'))],
     migrations: devSessionMigrations,
@@ -112,6 +116,8 @@ function developmentApi(deps: DevSessionModuleDeps, useCaseDeps: DevSessionUseCa
   const rawAgentStarts = drizzleAgentStarts(deps.db, !!projectWork), agentStarts = projectWork ? guardedDevelopmentPort(rawAgentStarts, projectWork) : rawAgentStarts;
   const rawTerminals = drizzleNativeTerminals(deps.db, !!projectWork), terminals = projectWork ? guardedDevelopmentPort(rawTerminals, projectWork) : rawTerminals;
   const agentExecutions = new AgentExecutionLifecycle(useCaseDeps, agentStarts);
+  const rawBot = drizzleBotConversations(deps.db, !!projectWork), bots = projectWork ? guardedDevelopmentPort(rawBot, projectWork) : rawBot;
+  const botLifecycle = new BotConversationLifecycle(useCaseDeps, bots, agentStarts, agentExecutions);
   const agents = agentUseCases(useCaseDeps, agentStarts, agentExecutions);
   const remind = idleReminderUseCase(useCaseDeps);
   const rawActivity = drizzleNativeActivity(deps.db), activity = nativeActivityUseCases(useCaseDeps, projectWork ? guardedDevelopmentPort(rawActivity, projectWork) : rawActivity, terminals);
@@ -126,10 +132,11 @@ function developmentApi(deps: DevSessionModuleDeps, useCaseDeps: DevSessionUseCa
     ...(deps.deletionWorkSources ? { deletionOwner: developmentDeletionOwner(developmentDeletionRepository(deps.db, deps.deletionWorkSources), deps.deletionWorkSources) } : {}),
     invokeApi: apiInvocationUseCase(useCaseDeps),
     ...clusterAgentUseCases(useCaseDeps, agentStarts, agentExecutions), ...clusterNativeUseCases(useCaseDeps, terminals),
+    ...botConversationUseCases(useCaseDeps, bots),
     name: 'dev-session', ...lifecycle, ...agents, ...native, ...activity, ...workspaceLayoutUseCases(useCaseDeps, projectWork ? guardedDevelopmentPort(drizzleWorkspaceLayouts(deps.db), projectWork) : drizzleWorkspaceLayouts(deps.db), terminals),
     // 子 Runner 连上时由组合根调用：headless Agent 的执行环境先认领，其余按「＋ CLI」处理（RFC-006）。
     dispatchPendingNativeExecution: async (executionTaskId) => { if (!(await agentExecutions.dispatchExecution(executionTaskId))) await native.dispatchPendingNativeExecution(executionTaskId); },
-    reconcileNativeExecutions: async () => { await Promise.all([native.reconcileNativeExecutions(), agentExecutions.sweep()]); },
+    reconcileNativeExecutions: async () => { await Promise.all([native.reconcileNativeExecutions(), agentExecutions.sweep()]); await botLifecycle.sweep(); },
     ...rebuildSessionUseCases(useCaseDeps), ...previewControlUseCases(useCaseDeps),
     ...versionComparisonUseCases(useCaseDeps), workspaceStatus: workspaceStatusUseCase(useCaseDeps), commitWorkspace: commitWorkspaceUseCase(useCaseDeps), publish: publishFromSessionUseCase(useCaseDeps), sendIdleReminders: remind,
     async listNativeTerminals(actor, taskId) {

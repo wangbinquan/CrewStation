@@ -3,6 +3,7 @@ import type { DevSessionModuleApi } from '../../api/moduleApi';
 import type { DevelopmentProjectWork } from '../../ports/deletion/work';
 
 const origins = {
+  getBot: 'task', botHistory: 'task', sendBotMessage: 'task', interruptBot: 'task', freshBotContext: 'task',
   inspectSessionRebuild: 'project', rebuildSession: 'project', invokeApi: 'project', previewStatus: 'project', controlPreview: 'project', previewLogs: 'project',
   openSession: 'project', getSession: 'project', listBranches: 'project', workspaceStatus: 'project', commitWorkspace: 'project', versionComparison: 'project', versionComparisonDetails: 'project',
   refreshComparisonHistory: 'project', releaseSession: 'project', publish: 'self-admitted', inspectClusterNative: 'task', inspectClusterAgent: 'task',

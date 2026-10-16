@@ -5,7 +5,8 @@ import type { MiddlewareRef } from './traefik';
 import { ingressRouteObject } from './traefik';
 import type { ContainerSpec } from './workloads';
 import { podObject } from './workloads';
-import type { BusinessStorage } from '@crewstation/contracts';
+import { botContextMounts } from './botContext';
+import type { BotContextStorage, BusinessStorage } from '@crewstation/contracts';
 import { businessStorageMounts } from './businessStorage';
 
 /**
@@ -40,6 +41,7 @@ export interface TaskPodInput {
   /** 工作目录的卷：任务用自己的 PVC；档位测试用 Pod 内的临时目录（RFC-006 §5.2）。 */
   readonly workVolume: { readonly pvc: string } | { readonly emptyDir: true };
   readonly businessStorage?: BusinessStorage;
+  readonly botContext?: BotContextStorage;
   /** 明文环境变量（旧形状）；新形状的凭据都在 Runner Secret 里，经 `envFromSecret` 引用。 */
   readonly env?: Readonly<Record<string, string>>;
   readonly envFromSecret?: string;
@@ -81,14 +83,16 @@ function checkoutContainer(image: string, source: TaskCheckout, uid: number): Co
 /** 任务容器的 Pod：Runner 作 PID 1 之下的主进程，工作卷挂在 /work，有分支时先由 init 容器检出源码。 */
 export function taskPodObject(input: TaskPodInput): K8sObject {
   if (input.businessStorage && (input.workload !== 'business-task' || !('pvc' in input.workVolume) || input.checkout)) throw new Error('可靠业务执行需要独立业务 PVC 布局且不得检出源码');
+  if (input.botContext && (input.businessStorage || input.checkout || input.workload !== 'dev-session')) throw new Error('Bot context belongs only to a development Agent');
+  const bot = input.botContext ? botContextMounts({ image: input.image, workerUid: input.workerUid, storage: input.botContext }) : undefined;
   const business = input.businessStorage && 'pvc' in input.workVolume ? businessStorageMounts({ taskId: input.taskId, image: input.image, workerUid: input.workerUid, pvc: input.workVolume.pvc, storage: input.businessStorage }) : undefined;
   const pod = podObject({
     name: input.name, namespace: input.namespace, image: input.image, imagePullPolicy: 'IfNotPresent', command: [...TASK_RUNNER_COMMAND], runAsUser: 0,
     labels: { [LABELS.project]: input.project, [LABELS.service]: input.service, [LABELS.workload]: input.workload, [LABELS.task]: input.taskId },
-    env: [...Object.entries(input.env ?? {}).filter(([name]) => !business?.env.some((entry) => entry.name === name) && name !== 'CS_RUNTIME_POD_UID').map(([name, value]) => ({ name, value })), ...(business?.env ?? []), ...(input.runtimeInitialization ? [{ name: 'CS_RUNTIME_POD_UID', valueFrom: { fieldRef: { fieldPath: 'metadata.uid' } } }] : [])],
+    env: [...Object.entries(input.env ?? {}).filter(([name]) => !business?.env.some((entry) => entry.name === name) && !bot?.env.some((entry) => entry.name === name) && name !== 'CS_RUNTIME_POD_UID').map(([name, value]) => ({ name, value })), ...(business?.env ?? []), ...(bot?.env ?? []), ...(input.runtimeInitialization ? [{ name: 'CS_RUNTIME_POD_UID', valueFrom: { fieldRef: { fieldPath: 'metadata.uid' } } }] : [])],
     resources: { cpu: input.resources.cpu, memory: input.resources.memory, ephemeralStorage: input.resources.storage },
-    volumes: [...(business?.volumes ?? ['emptyDir' in input.workVolume ? { name: 'work', mountPath: '/work', emptyDir: true } : { name: 'work', mountPath: '/work', pvc: input.workVolume.pvc }]), ...(input.runtimeInitialization ? [{ name: 'runtime-initialization', mountPath: '/run/crewstation/runtime-initialization', emptyDir: true }] : [])],
-    ...(business ? { initContainers: [business.init] } : input.checkout ? { initContainers: [checkoutContainer(input.image, input.checkout, input.workerUid)] } : {}),
+    volumes: [...(bot?.volumes ?? []), ...(business?.volumes ?? ['emptyDir' in input.workVolume ? { name: 'work', mountPath: '/work', emptyDir: true } : { name: 'work', mountPath: '/work', pvc: input.workVolume.pvc }]), ...(input.runtimeInitialization ? [{ name: 'runtime-initialization', mountPath: '/run/crewstation/runtime-initialization', emptyDir: true }] : [])],
+    ...(bot ? { initContainers: [bot.init] } : business ? { initContainers: [business.init] } : input.checkout ? { initContainers: [checkoutContainer(input.image, input.checkout, input.workerUid)] } : {}),
   });
   for (const [key, value] of Object.entries(input.labels ?? {})) pod.metadata.labels![key] = value;
   if (input.nodeName) (pod.spec as Record<string, unknown>).affinity = { nodeAffinity: { requiredDuringSchedulingIgnoredDuringExecution: { nodeSelectorTerms: [{ matchFields: [{ key: 'metadata.name', operator: 'In', values: [input.nodeName] }] }] } } };

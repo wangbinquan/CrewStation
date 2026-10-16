@@ -56,6 +56,7 @@ import { reconcileRebuildUseCase } from './application/reconcileRebuild';
 import { rebuildUseCases } from './application/requestRebuild';
 import { rebuildWorker } from './workers/rebuildWorker';
 import { nativeExecutionWorker } from './workers/nativeExecutionWorker';
+import { prepareBotContextUseCase } from './application/bot/contextStorage';
 import { createNativeExecutionUseCase } from './application/nativeExecution';
 import { resolveDevelopmentObjectSource } from './application/development/objectStorage';
 import { createTestEnvironmentUseCase } from './application/testEnvironment';
@@ -209,6 +210,7 @@ export function createTaskRuntimeModule(deps: TaskRuntimeModuleDeps): TaskRuntim
     ...rebuild,
     createEnvironment: async (input) => environmentToDto(await create(input)),
     resolveDevelopmentObjectSource: resolveDevelopmentObjectSource(useCaseDeps),
+    prepareBotContext: prepareBotContextUseCase(executionDeps),
     createNativeExecution: async (input) => environmentToDto(await createNative(input)),
     releaseEnvironment: async (taskId, reason) => environmentToDto(await lifecycle.releaseEnvironment(taskId, reason)),
     pauseEnvironment: async (taskId) => environmentToDto(await lifecycle.pauseEnvironment(taskId)),

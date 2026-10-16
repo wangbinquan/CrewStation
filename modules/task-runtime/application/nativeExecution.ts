@@ -1,6 +1,7 @@
-import type { TaskId } from '@crewstation/contracts';
+import { admitBotContext } from './bot/contextStorage';
+import type { BotContextStorage, TaskId } from '@crewstation/contracts';
 import { DomainTopic, RuntimeImageExecutionSnapshotSchema } from '@crewstation/contracts';
-import { conflict, jsonHash, notFound, precondition } from '@crewstation/kernel';
+import { conflict, jsonHash, newResourceId, notFound, precondition } from '@crewstation/kernel';
 import type { CreateNativeExecutionInput, ReleaseReason } from '../api/moduleApi';
 import { cancelStartup, completeStage, failStartup, initialStartup } from '../domain/podStartup';
 import { hashRunnerToken, newRunnerToken } from '../domain/runnerToken';
@@ -21,7 +22,8 @@ export const requireExecutionLease = async (heartbeat: ExecutionLease) => { if (
 function sameRequest(env: TaskEnvironment, input: CreateNativeExecutionInput): boolean {
   const n = env.native;
   return !!n && purposeOf(n) === (input.purpose ?? 'cli') && n.parentTaskId === input.parentTaskId && env.createdBy === input.createdBy && n.agentId === input.agentId
-    && n.terminalId === input.terminalId && n.runnerId === input.runnerId && n.fingerprint === input.fingerprint && n.requestedProfile === (input.profile ?? null) && jsonHash(env.render?.runtimeImage ?? null) === jsonHash(input.runtimeImage ?? null) && jsonHash(env.render?.businessStorage?.session ?? null) === jsonHash(input.businessSession ?? null);
+    && n.terminalId === input.terminalId && n.runnerId === input.runnerId && n.fingerprint === input.fingerprint && n.requestedProfile === (input.profile ?? null) && jsonHash(env.render?.runtimeImage ?? null) === jsonHash(input.runtimeImage ?? null) && jsonHash(env.render?.businessStorage?.session ?? null) === jsonHash(input.businessSession ?? null)
+    && jsonHash(env.render?.botContext ? { conversationId: env.render.botContext.conversationId, epoch: env.render.botContext.epoch, mode: env.render.botContext.mode } : null) === jsonHash(input.botContext ? { conversationId: input.botContext.conversationId, epoch: input.botContext.epoch, mode: input.botContext.mode } : null);
 }
 
 /** 各用途的父任务种类与被拒时给用户的话（RFC-006 §5.2）：额度满只影响这一个 Agent。 */
@@ -53,13 +55,15 @@ export function createNativeExecutionUseCase(deps: NativeExecutionDeps) {
       const parent = await scope.environments.getById(input.parentTaskId);
       if (!parent || parent.native || parent.kind !== rule.parentKind || parent.state !== 'running' || !parent.connected) throw precondition(rule.unavailable);
       assertBusinessStorageMutable(parent);
+      if (input.botContext && (purpose !== 'agent' || deps.creation !== 'ledger' || input.businessSession)) throw precondition('Bot 上下文只属于开发 Agent');
+      const botContext = input.botContext ? await admitBotContext(deps, scope, parent, input.botContext) : undefined;
       if (input.businessSession && (!parent.render?.businessStorage || purpose !== 'subtask' || (input.businessSession.mode === 'create' && input.businessSession.key !== input.id))) throw precondition('原生会话必须绑定隔离业务卷和独立 Agent 身份');
       if (parent.render?.businessStorage && deps.creation !== 'ledger') throw precondition('隔离业务卷不支持回退到旧执行容器创建路径');
       const profile = await deps.profiles.getTaskProfile(input.profile ?? deps.settings.defaultProfile);
       if (!profile) throw precondition(`算力档位指定的资源套餐 ${input.profile ?? deps.settings.defaultProfile} 不存在，请联系管理员调整算力档位`);
       const workspace = await deps.nativeCluster.inspectWorkspace(parent);
       const limit = (await deps.quotas.quotaLimit(parent.projectId)) ?? 0;
-      const env = executionEnvironment(deps, input, parent, workspace, profile);
+      const env = executionEnvironment(deps, input, parent, workspace, profile, botContext);
       await scope.quota.acquire(env, limit, rule.quota);
       await scope.environments.insert(env);
       // 由资源中心建出（I25 第二步）：期望随记录进台账，调和器照它建 Runner Secret 与 Pod；只有本模块自己建的才进准备队列。
@@ -71,7 +75,7 @@ export function createNativeExecutionUseCase(deps: NativeExecutionDeps) {
 
 type TaskProfileRecord = { id: string; name: string; cpu: string; memory: string; storage: string };
 
-function executionEnvironment(deps: NativeExecutionDeps, input: CreateNativeExecutionInput, parent: TaskEnvironment, workspace: { podUid: string; pvcUid: string; nodeName: string }, profile: TaskProfileRecord): TaskEnvironment {
+function executionEnvironment(deps: NativeExecutionDeps, input: CreateNativeExecutionInput, parent: TaskEnvironment, workspace: { podUid: string; pvcUid: string; nodeName: string }, profile: TaskProfileRecord, botContext?: BotContextStorage): TaskEnvironment {
   const purpose = input.purpose ?? 'cli', now = deps.clock.now();
   const native: NativeExecution = { ...(purpose === 'cli' ? {} : { purpose }), parentTaskId: parent.id, parentPodUid: workspace.podUid, pvcUid: workspace.pvcUid, nodeName: workspace.nodeName,
     agentId: input.agentId, ...(input.terminalId ? { terminalId: input.terminalId } : {}), runnerId: input.runnerId, fingerprint: input.fingerprint, requestedProfile: input.profile ?? null,
@@ -82,7 +86,7 @@ function executionEnvironment(deps: NativeExecutionDeps, input: CreateNativeExec
     traceId: parent.traceId, runnerTokenHash: hashRunnerToken(newRunnerToken()), connected: false, labels: parent.labels, ...(input.createdBy ? { createdBy: input.createdBy } : {}),
     native, message: `已受理，正在准备此${EXECUTION_NOUN[purpose]}的独立执行环境`, createdAt: now, updatedAt: now, lastActivityAt: now, startup: initialStartup(now),
     // 资源中心建出时的期望（I25 第二步，不含凭据）：镜像与资源取自受理时固定的档位；节点、父 Pod 与卷的 UID 在 native 里。
-    ...(deps.creation === 'ledger' ? { render: { ...storageStart(parent.render?.completionPolicy), ...(parent.kind === 'dev-session' && parent.render?.developmentObjectPlanId ? { developmentObjectPlanId: parent.render.developmentObjectPlanId } : {}), ...(input.runtimeImage ? { runtimeImage: input.runtimeImage } : {}), image: native.image, workerUid: parent.render?.businessStorage ? parent.render.workerUid : deps.settings.workerUid, resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, start: 1, execution: { workspacePod: parent.podName }, ...(parent.render?.businessStorage ? { businessStorage: { ...parent.render.businessStorage, ...(input.businessSession ? { session: input.businessSession } : {}) } } : {}) } } : {}) };
+    ...(deps.creation === 'ledger' ? { render: { ...(botContext ? { botContext, workloadConsumerId: newResourceId() } : {}), ...storageStart(parent.render?.completionPolicy), ...(parent.kind === 'dev-session' && parent.render?.developmentObjectPlanId ? { developmentObjectPlanId: parent.render.developmentObjectPlanId } : {}), ...(input.runtimeImage ? { runtimeImage: input.runtimeImage } : {}), image: native.image, workerUid: parent.render?.businessStorage ? parent.render.workerUid : deps.settings.workerUid, resources: { cpu: profile.cpu, memory: profile.memory, storage: profile.storage }, start: 1, execution: { workspacePod: parent.podName }, ...(parent.render?.businessStorage ? { businessStorage: { ...parent.render.businessStorage, ...(input.businessSession ? { session: input.businessSession } : {}) } } : {}) } } : {}) };
 }
 
 /** 准备执行环境反复失败时给用户的话：只说这一个 Agent，不牵连其他 Agent、窗口与工作树。 */

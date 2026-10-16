@@ -5,8 +5,8 @@ import { ActionNote } from '../../../../shared/ui/ActionNote';
 import type { AgentComposerProps } from '../agents/AgentComposer';
 import styles from './BotConversation.module.css';
 
-export function BotComposer({ disabled, sending, draft, error, onDraftChange, onSend, onCancel, canCancel, compute, onOptions, unavailable }: AgentComposerProps & {
-  readonly compute: string; readonly onOptions?: () => void; readonly unavailable?: string;
+export function BotComposer({ disabled, sending, draft, error, onDraftChange, onSend, onCancel, canCancel, compute, onOptions, unavailable, stopLabel }: AgentComposerProps & {
+  readonly stopLabel?: string; readonly compute: string; readonly onOptions?: () => void; readonly unavailable?: string;
 }) {
   const t = useT();
   const send = () => { if (!disabled && !sending && draft.trim()) onSend(); };
@@ -22,7 +22,7 @@ export function BotComposer({ disabled, sending, draft, error, onDraftChange, on
       <div className={styles.composerTools}>
         {onOptions ? <Button size="small" disabled={disabled || sending} onClick={onOptions}>{compute}</Button> : <span className={styles.compute}>{compute}</span>}
         <span className={styles.shortcut}>{t('devSession.bot.shortcut')}</span>
-        {canCancel ? <Button size="small" disabled={sending} onClick={onCancel}>{t('devSession.bot.stop')}</Button> : null}
+        {canCancel ? <Button size="small" disabled={sending} onClick={onCancel}>{stopLabel ?? t('devSession.bot.stop')}</Button> : null}
         <Button variant="primary" size="small" disabled={disabled || sending || !draft.trim()} onClick={send}>{sending ? t('devSession.agents.sending') : t('devSession.agents.send')}</Button>
       </div>
     </div>

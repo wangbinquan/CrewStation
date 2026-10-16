@@ -8,12 +8,13 @@ import { BotMessageBody } from './BotMessageBody';
 import { BotToolRecord } from './BotToolRecord';
 import styles from './BotConversation.module.css';
 
-type Entry = { kind: 'user'; line: TranscriptLine } | { kind: 'answer'; line: TranscriptLine } | { kind: 'activity'; lines: TranscriptLine[] };
+type Entry = { kind: 'boundary'; line: TranscriptLine } | { kind: 'user'; line: TranscriptLine } | { kind: 'answer'; line: TranscriptLine } | { kind: 'activity'; lines: TranscriptLine[] };
 const visibleActivity = (line: TranscriptLine) => !['usage', 'session', 'started'].includes(line.type);
 function entries(lines: readonly TranscriptLine[]): Entry[] {
   const result: Entry[] = [];
   for (const line of lines) {
-    if (line.type === 'user-message') result.push({ kind: 'user', line });
+    if (line.boundary) result.push({ kind: 'boundary', line });
+    else if (line.type === 'user-message') result.push({ kind: 'user', line });
     else if (line.type === 'text' || line.type === 'completed' && line.body && !lines.some(item => item.type === 'text' && item.body === line.body)) result.push({ kind: 'answer', line });
     else if (visibleActivity(line)) {
       const previous = result.at(-1);
@@ -37,6 +38,7 @@ export function BotTranscript({ lines, running, onSuggestion, hasConversation }:
         </Button>)}</div>
       </div> : null}
       {items.map((item, index) => {
+        if (item.kind === 'boundary') return <p key={item.line.id} className={styles.epochBoundary}>{item.line.boundary}</p>;
         if (item.kind === 'user') return <article key={item.line.id} className={styles.userMessage} aria-label={t('devSession.bot.you')}><div>{item.line.body}</div></article>;
         if (item.kind === 'answer') return <article key={item.line.id} className={styles.botMessage} aria-label="Crew Bot"><div className={styles.author}><GlyphIcon name="assistant" plain /><strong>Crew Bot</strong></div><div className={styles.botBubble}><BotMessageBody text={item.line.body} /></div></article>;
         const failed = item.lines.some(line => line.failed || line.type === 'error');

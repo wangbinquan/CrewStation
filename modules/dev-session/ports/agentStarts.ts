@@ -14,7 +14,7 @@ export interface AgentStart {
   readonly computeName?: string;
   readonly profile: ProfileRevisionRef;
   readonly permission: AgentPermission;
-  readonly request: { readonly prompt: string; readonly cwd?: string; readonly resumeSessionId?: string };
+  readonly request: { readonly botContext?: { volumeUid: string; conversationId: string; epoch: number; requestId: string; mode: 'create' | 'existing' }; readonly prompt: string; readonly cwd?: string; readonly resumeSessionId?: string };
   readonly execution: { readonly runtimeImage?: RuntimeImageExecutionSnapshot; readonly previousTaskId?: TaskId; readonly taskId: TaskId; readonly runnerId: string; readonly taskProfile?: string; readonly image: string };
   /** pending：等执行环境就绪后派发；dispatched：startAgent 已被 Runner 受理；ended：已结束（含受理失败与未启动即取消）。 */
   readonly state: 'pending' | 'dispatched' | 'ended';

@@ -1,3 +1,5 @@
+import { BotContextStorageSchema } from '@crewstation/contracts';
+import type { BotContextStorage } from '@crewstation/contracts';
 import type { BusinessStorage, WorkloadConsumerIntent } from '@crewstation/contracts';
 import { BusinessStorageSchema, TaskIdSchema, WorkloadConsumerIntentSchema } from '@crewstation/contracts';
 
@@ -7,6 +9,7 @@ import { BusinessStorageSchema, TaskIdSchema, WorkloadConsumerIntentSchema } fro
  * 记录是数据：字段不全或类型不对就不渲染，不猜。
  */
 export interface WorkloadPodRender {
+  readonly botContext?: BotContextStorage;
   readonly archive?: { readonly ownerTaskId: string; readonly bindOnly?: boolean };
   readonly consumer?: WorkloadConsumerIntent;
   /** Filled only after durable consumer registration against the observed original PVC. */
@@ -105,13 +108,16 @@ function podOf(recordId: string, pod: unknown, child: { readonly namespace?: str
   if (pod['runtimeInitialization'] !== undefined && pod['runtimeInitialization'] !== true) return undefined;
   const checkout = pod['checkout'], extras = extrasOf(pod);
   const businessStorage = pod['businessStorage'] === undefined ? undefined : BusinessStorageSchema.safeParse(pod['businessStorage']);
+  const bot = pod['botContext'] === undefined ? undefined : BotContextStorageSchema.safeParse(pod['botContext']);
+  if (bot && (!bot.success || businessStorage || !extras?.workspace || pod['workload'] !== 'dev-session' || !TaskIdSchema.safeParse(recordId).success || bot.data.ownerTaskId === recordId || extras.labels?.['crewstation.io/workspace-task'] !== bot.data.ownerTaskId)) return undefined;
   const consumer = pod['consumer'] === undefined ? undefined : WorkloadConsumerIntentSchema.safeParse(pod['consumer']);
+  if (bot && (!consumer?.success || consumer.data.purpose !== 'agent')) return undefined;
   const archive = pod['archive'];
   if (archive !== undefined) {
     if (!isFields(archive) || Object.keys(archive).some((key) => !['ownerTaskId', 'bindOnly'].includes(key)) || archive['bindOnly'] !== undefined && typeof archive['bindOnly'] !== 'boolean' || !TaskIdSchema.safeParse(archive['ownerTaskId']).success
       || !consumer?.success || consumer.data.purpose !== 'archive' || !consumer.data.finalization || consumer.data.taskId !== archive['ownerTaskId'] || businessStorage || checkout
       || pod['workspace'] || pod['nodeName'] || pod['runtimeInitialization'] || !text(pod['expectedVolumeUid']) || pod['workload'] !== 'archive-helper') return undefined;
-  } else if (consumer && (!consumer.success || consumer.data.purpose === 'archive' || !businessStorage?.success || consumer.data.taskId !== businessStorage.data.ownerTaskId)) return undefined;
+  } else if (consumer && (!consumer.success || consumer.data.purpose === 'archive' || !(businessStorage?.success || bot?.success) || consumer.data.taskId !== (bot?.success ? bot.data.ownerTaskId : businessStorage?.success ? businessStorage.data.ownerTaskId : undefined))) return undefined;
   if (businessStorage && (!businessStorage.success || !TaskIdSchema.safeParse(recordId).success || !text(pod['pvc']) || pod['workload'] !== 'business-task' || checkout !== undefined || (businessStorage.data.initialize && businessStorage.data.ownerTaskId !== recordId))) return undefined;
   if ((checkout !== undefined && (!texts(checkout, ['repoUrl', 'branch', 'credentialSecretName']) || (checkout['ownedCredential'] !== undefined && typeof checkout['ownedCredential'] !== 'boolean'))) || !extras) return undefined;
   const resources = pod['resources'];
@@ -125,6 +131,7 @@ function podOf(recordId: string, pod: unknown, child: { readonly namespace?: str
     workload: pod['workload'] as string, project: pod['project'], service: pod['service'], ...(text(pod['pvc']) ? { pvc: pod['pvc'] } : { emptyDir: true as const }), secret: pod['secret'] as string,
     ...(checkout ? { checkout: checkoutOf(checkout) } : {}),
     ...(businessStorage?.success ? { businessStorage: businessStorage.data } : {}),
+    ...(bot?.success ? { botContext: bot.data } : {}),
     ...extras,
   };
 }

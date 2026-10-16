@@ -21,6 +21,10 @@ const executionMismatch = "r.execution->>'taskId' IS DISTINCT FROM r.execution_t
 const duplicateExecution = (other: string) => `EXISTS(SELECT 1 FROM dev_session.${other} c WHERE c.execution_task_id=r.execution_task_id OR c.agent_id=r.agent_id)`;
 
 export const DEVELOPMENT_CONTENT: readonly ContentTable[] = [
+  { ...workspace('bot_conversations'), invalid: "r.data->>'taskId' IS DISTINCT FROM r.task_id OR r.data->>'id' IS DISTINCT FROM r.id" },
+  { ...workspace('bot_messages', ['task_id', 'request_id']), invalid: "r.data->>'taskId' IS DISTINCT FROM r.task_id OR r.data->>'requestId' IS DISTINCT FROM r.request_id" },
+  { ...workspace('bot_executions', ['agent_id']), runtime: 'r.execution_task_id', agent: 'r.agent_id',
+    invalid: "r.data->>'taskId' IS DISTINCT FROM r.task_id OR r.data->>'executionTaskId' IS DISTINCT FROM r.execution_task_id OR r.data->>'agentId' IS DISTINCT FROM r.agent_id" },
   workspace('idle_reminders'),
   { ...workspace('native_terminal_starts', ['agent_id']), runtime: 'r.execution_task_id', previous: "r.execution->>'previousTaskId'",
     agent: 'r.agent_id', legacyAgent: "r.legacy_record->>'agentId'",

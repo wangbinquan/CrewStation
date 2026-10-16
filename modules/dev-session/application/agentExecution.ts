@@ -1,6 +1,6 @@
 import type { ServiceId, TaskId } from '@crewstation/contracts';
 import { IDENTITY_HEADERS, PLATFORM_AGENT_PERMISSION } from '@crewstation/contracts';
-import { isPlatformError, jsonHash } from '@crewstation/kernel';
+import { isPlatformError, jsonHash, precondition } from '@crewstation/kernel';
 import type { AgentStart, AgentStartRepository } from '../ports/agentStarts';
 import type { EnvironmentView } from '../ports/runtime';
 import type { DevSessionUseCaseDeps } from './dependencies';
@@ -10,7 +10,7 @@ import { acceptDevelopmentCall, failDevelopmentCall } from './agentCalls';
 
 /** 定性失败：重试也不会成功，记录结束并把原因给用户；其余（网络、Runner 未就绪）留给后台接续。 */
 const DEFINITIVE = new Set(['precondition', 'validation', 'quota_exceeded', 'not_found', 'conflict']);
-const definitive = (error: unknown): error is Error => isPlatformError(error) && DEFINITIVE.has(error.kind);
+const definitive = (error: unknown): error is Error => isPlatformError(error) && DEFINITIVE.has(error.kind) && error.details?.['code'] !== 'bot_execution_stopping';
 const TERMINAL_EVENTS = new Set(['completed', 'error', 'cancelled']);
 const gone = (env: EnvironmentView | undefined) => !env || ['cleaning', 'finished'].includes(env.native?.state ?? '') || ['released', 'failed'].includes(env.state);
 
@@ -31,6 +31,7 @@ export class AgentExecutionLifecycle {
     try {
       await restoreDevelopmentImage(this.deps, start.execution.runtimeImage, start.taskId, start.execution.previousTaskId, start.execution.taskId);
       return await this.deps.environments.createNativeExecution({
+        ...(start.request.botContext ? { botContext: { conversationId: start.request.botContext.conversationId, epoch: start.request.botContext.epoch, mode: start.request.botContext.mode, ...(start.execution.previousTaskId ? { expectedPreviousExecutionId: start.execution.previousTaskId } : {}) } } : {}),
         id: start.execution.taskId, parentTaskId: start.taskId, purpose: 'agent', createdBy: start.createdBy, agentId: start.agentId, runnerId: start.execution.runnerId,
         fingerprint: `${start.agentId}:${start.profile.profileId}@${start.profile.revision}`, ...(start.execution.taskProfile ? { profile: start.execution.taskProfile } : {}),
         image: start.execution.image, ...(start.execution.runtimeImage ? { runtimeImage: start.execution.runtimeImage } : {}), computeProfile: { profileId: start.profile.profileId, revision: start.profile.revision },
@@ -49,12 +50,17 @@ export class AgentExecutionLifecycle {
   }
 
   private async send(start: AgentStart, env: EnvironmentView): Promise<void> {
+    if (start.request.botContext) {
+      const info = await this.deps.runner.sendCommand(env.id, { id: `bot-info-${start.agentId}`, type: 'botContextInfo' }) as { version?: number; conversationId?: string; epoch?: number; volumeUid?: string };
+      if (info.volumeUid !== start.request.botContext.volumeUid || info.version !== 1 || info.conversationId !== start.request.botContext.conversationId || info.epoch !== start.request.botContext.epoch) throw precondition('Runner 未提供匹配的 Bot 上下文能力', { code: 'bot_context_unavailable' });
+    }
     // 连接头在 spawn 时写死、事后改不了，所以派发时现签一枚（Design §5.9）；MCP 与数据身份仍是父开发会话。
     const credential = await this.deps.credentials.issueDevSessionToken({ taskId: start.taskId, projectId: env.projectId, serviceId: env.serviceId as ServiceId, userId: start.createdBy });
     const launch = await profileLaunchFields(this.deps, start.profile, start.agentId);
     await acceptDevelopmentCall(this.deps, { kind: 'agent', sessionId: start.taskId, runtimeTaskId: env.id, agentId: start.agentId,
       profile: { id: start.profile.profileId, revision: start.profile.revision, name: start.computeName ?? null }, protocol: launch.launch.protocol });
     await this.deps.runner.sendCommand(env.id, {
+      ...(start.request.botContext ? { botContext: { version: 1 as const, conversationId: start.request.botContext.conversationId, epoch: start.request.botContext.epoch, requestId: start.request.botContext.requestId } } : {}),
       id: `start-${start.agentId}`, type: 'startAgent', agentId: start.agentId, ...launch, permission: PLATFORM_AGENT_PERMISSION, mode: 'interactive',
       ...(start.request.cwd ? { cwd: start.request.cwd } : {}), initialPrompt: start.request.prompt, ...(start.request.resumeSessionId ? { resumeSessionId: start.request.resumeSessionId } : {}),
       mcp: this.deps.settings.mcp.map((m) => ({ name: m.name, url: m.url, headers: { [IDENTITY_HEADERS.devSessionToken]: credential.token } })), env: {},

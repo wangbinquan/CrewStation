@@ -1,3 +1,9 @@
+## 2026-10-15 RFC-041：已批准，正式实现进行中
+
+用户明确“批准”此前 RFC-041 完整实施、本机部署与真实模型验收方案。CLI/Bot 保持独立；实施稳定对话身份、私有原生上下文卷与安全执行交接，再核对真实模型续接和 Chrome 交互。基线 a3cc3578 与 origin/main 同步，保留其他会话的 RFC-040 验收文档在制品。设计与原型历史如下；尚未将原型视为正式功能。
+
+正式实现已接入 dev-session 默认对话/消息受理、Runner 持久回执、私有 PVC 与真实消费者停止证明、默认持续 Bot 和历史弹窗。定向真实 PG、Runtime/driver、Console 回归及结构/lint/前后端类型通过；全量本地门禁运行中，准确 SHA CI、本机部署与真实模型冷续接仍待完成。OpenCode 1.18.29 镜像的 `OPENCODE_DB` 路径探针通过；不把路径探针或模拟 Runner 回归当作 CB-03/04 实机证明。实现任务进度见 [计划](proposal/rfc/RFC-041-continuous-bot-session/plan.md)。
+
 ## 2026-10-15 RFC-041：Bot 持续对话设计与原型（Draft）
 
 作者反馈一个 session 被拆成多个对话，并明确“cli 和 bot 先保持独立”。实机原事件表明贪吃蛇成功开发三次输入本来沿用同一 OpenCode session，另外两项是先前失败与另开的验收 Agent；实际断点是停止结束 Agent、清理临时 HOME 后不能续接。新 [RFC-041](proposal/rfc/RFC-041-continuous-bot-session/proposal.md) 提议默认 Bot 对话身份稳定、停止本轮、独立原生上下文持久化与执行交接，旧历史不自动合并，无法恢复时明确告知。CLI 保持独立；业务模块不改。

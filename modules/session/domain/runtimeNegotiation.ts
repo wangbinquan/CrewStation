@@ -10,6 +10,7 @@ const BUSINESS_EXECUTION_COMMANDS: ReadonlySet<RunnerCommand['type']> = new Set(
  * 让原因以管理员能处理的话回到调用方，而不是让 Runner 半途失败。
  */
 export function assertLaunchSupported(command: RunnerCommand, capabilities: RunnerHello['capabilities']): void {
+  if ((['botContextInfo', 'botMessageReceipt', 'sendBotMessage'].includes(command.type) || command.type === 'startAgent' && command.botContext) && capabilities.botContextVersion !== 1) throw new PlatformError('precondition', '当前任务容器未声明持续 Bot 上下文能力，请更新运行镜像', { code: 'bot_context_unsupported' });
   if ((command.type === 'runtimeInitializationStatus' || command.type === 'cancelRuntimeInitialization') && capabilities.runtimeInitialization !== 1) throw new PlatformError('precondition', '当前任务容器未声明运行镜像初始化能力', { code: 'unsupported_capability', capability: 'runtimeInitialization' });
   if (BUSINESS_EXECUTION_COMMANDS.has(command.type) && capabilities.businessExecutionV3 !== 1) {
     throw new PlatformError('precondition', '当前任务容器未声明可靠业务执行能力', { code: 'unsupported_capability', capability: 'businessExecutionV3' });

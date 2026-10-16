@@ -16,6 +16,7 @@ export interface DriverAgentSpec {
   startupInventoryVersion?: 1;
   /** RFC-027：业务执行（事件缓冲有上限、usage 事件携带业务用量）。 */
   businessEvents?: boolean;
+  strictSession?: boolean;
   agentId: string;
   /** 算力档位名（RFC-001）：平台透传，驱动不解释，只在 started 事件里回显。 */
   compute: string;

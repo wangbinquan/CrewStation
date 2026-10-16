@@ -108,7 +108,7 @@ class TaskRunner implements RunnerHandle {
     const interpreters = await detectInterpreters(launcher, (b) => Bun.which(b));
     const beforeStart = new BeforeStartRunner({ afterSteps: (request, env, signal) => initialization.checkAgentTools(request.processAttemptId, env, signal), launcher, interpreters, emit, logger: logger.child({ component: 'before-start' }), ...(config.agentRunDir ? { baseDir: config.agentRunDir } : {}) });
     logger.info('before-start interpreters detected', { interpreters: interpreters.list.map((i) => `${i.language}=${i.version ?? '?'}`) });
-    const agents = createAgentSupervisor({ drivers, launcher, paths, beforeStart, emit, logger: logger.child({ component: 'agents' }) });
+    const agents = createAgentSupervisor({ botContext: config.botContext, drivers, launcher, paths, beforeStart, emit, logger: logger.child({ component: 'agents' }) });
     const probes = createTerminalProbes({ beforeStart, launcher, paths, logger: logger.child({ component: 'probe' }) });
     const execs = createExecSupervisor({ launcher, paths, emit, logger: logger.child({ component: 'exec' }) });
     const business = createBusinessCommands({ launcher, paths, logger: logger.child({ component: 'business-exec' }) }, config.businessJournalDir, { outputBytes: 64 * 1024 * 1024, spoolBytes: 64 * 1024 * 1024, eventBytes: 256 * 1024 }, businessAgentFactory({ drivers, launcher, paths, beforeStart, logger }, config.businessSessionDir));
@@ -128,7 +128,7 @@ class TaskRunner implements RunnerHandle {
       taskId: config.taskId,
       runnerToken: config.runnerToken,
       workdir: paths.root,
-      capabilities: { ...(config.businessJournalDir && process.platform === 'linux' ? { businessExecutionV3: 1 as const, nativeConfigVersion: 1 as const, materialObjectsVersion: 1 as const, startupInventoryVersion: 1 as const, commandSecretEnvVersion: 1 as const } : {}), protocols: [...RUNNER_PROTOCOLS], pty: terminals.backend !== undefined, preview: preview.enabled, ...(apiInvoker.enabled ? { apiInvocations: 1 as const } : {}), previewControl: 1 as const, workspaceCommit: 1 as const, terminalControl: 1 as const, runtimeInitialization: 1 as const, interpreters: interpreters.list },
+      capabilities: { ...(config.botContext ? { botContextVersion: 1 as const } : {}), ...(config.businessJournalDir && process.platform === 'linux' ? { businessExecutionV3: 1 as const, nativeConfigVersion: 1 as const, materialObjectsVersion: 1 as const, startupInventoryVersion: 1 as const, commandSecretEnvVersion: 1 as const } : {}), protocols: [...RUNNER_PROTOCOLS], pty: terminals.backend !== undefined, preview: preview.enabled, ...(apiInvoker.enabled ? { apiInvocations: 1 as const } : {}), previewControl: 1 as const, workspaceCommit: 1 as const, terminalControl: 1 as const, runtimeInitialization: 1 as const, interpreters: interpreters.list },
     });
     const dispatcherRef: { current?: CommandDispatcher } = {};
     const link = createSessionLink({

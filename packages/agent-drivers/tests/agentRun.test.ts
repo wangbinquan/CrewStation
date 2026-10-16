@@ -290,3 +290,14 @@ async function waitFor(predicate: () => boolean, timeoutMs = 2000): Promise<void
     await Bun.sleep(2);
   }
 }
+
+test('strict Bot recovery rejects a different native session before rendering its answer', async () => {
+  recordOpencodeBinaryVersion('/bin/opencode', '1.18.29');
+  const host = createFakeProcessHost([{ stdout: ['{"type":"text","part":{"type":"text","text":"foreign answer"},"sessionID":"ses_foreign"}'] }]);
+  const agent = createOpencodeDriver(() => '/bin/opencode').start(openSpec({ resumeSessionId: 'ses_original', strictSession: true }), context(host));
+  const output: AgentEvent[] = [];
+  const pump = async () => { for await (const event of agent.events) output.push(event); };
+  await expect(pump()).rejects.toMatchObject({ code: 'bot_session_mismatch' });
+  expect(output.some(event => event.text === 'foreign answer' || event.sessionId === 'ses_foreign')).toBe(false);
+  expect(host.spawns.at(-1)?.cmd).toContain('ses_original');
+});

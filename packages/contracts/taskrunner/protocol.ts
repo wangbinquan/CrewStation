@@ -1,3 +1,4 @@
+import { BotContextLaunchSchema } from './bot/context';
 import { BusinessMaterialDownloadsSchema } from './businessMaterial';
 import { BusinessNativeConfigSchema } from '../api/business/nativeConfig';
 import { BusinessOutputMaterialSchema } from '../api/business/releaseMaterials';
@@ -46,6 +47,7 @@ export const RunnerHelloSchema = z.object({
     protocols: z.array(AgentProtocolSchema),
     pty: z.boolean(),
     preview: z.boolean(),
+    botContextVersion: z.literal(1).optional(),
     apiInvocations: z.literal(1).optional(),
     /**
      * RFC-016：懂 startPreview／stopPreview／previewLogs。用能力位而不是升协议版本——
@@ -86,6 +88,7 @@ const ProfileLaunchShape = {
 };
 
 export const StartAgentCommandSchema = z.object({
+  botContext: BotContextLaunchSchema.optional(),
   businessOutputContract: BusinessOutputMaterialSchema.optional(),
   businessNativeConfig: BusinessNativeConfigSchema.optional(), businessMaterialDownloads: BusinessMaterialDownloadsSchema.optional(),
   startupInventoryVersion: z.literal(1).optional(),
@@ -172,6 +175,9 @@ export const RunnerCommandSchema = z.discriminatedUnion('type', [
   /** `viewId` 与 `holder` 都由 cs-session 按浏览器连接改写；旧 Runner 忽略 `holder`。 */
   z.object({ ...cmd('claimTerminalControl'), terminalId: z.string().min(1), viewId: z.string().min(1), runnerId: z.uuid(), holder: TerminalHolderSchema.optional() }),
   z.object({ ...cmd('detachTerminal'), terminalId: z.string().min(1), viewId: z.string().min(1) }),
+  z.object({ ...cmd('botContextInfo') }).strict(),
+  z.object({ ...cmd('botMessageReceipt'), requestId: z.uuid() }).strict(),
+  z.object({ ...cmd('sendBotMessage'), agentId: z.string().min(1), requestId: z.uuid(), content: z.string().min(1).max(200_000) }).strict(),
   z.object({ ...cmd('sendMessage'), agentId: z.string().min(1), content: z.string() }),
   z.object({ ...cmd('cancelAgent'), agentId: z.string().min(1) }),
   /** wait=false：立即回 ack，输出以 execOutput/execExited 事件流出；wait=true：结束后一次性回 RunnerResultPayloads.exec（输出有上限）。 */

@@ -90,3 +90,12 @@ describe('工作卷记录 → 渲染输入', () => {
     for (const broken of [{ pvc: undefined }, { pvc: { size: '' } }, { pvc: { size: '10Gi', labels: { a: 1 } } }, { children: [{ kind: 'PersistentVolumeClaim', name: 'x' }] }]) expect(volumeRenderOf({ ...spec, ...broken })).toBeUndefined();
   });
 });
+
+test('Bot mounts require a matching guarded Agent consumer and parent workspace identity', () => {
+  const ownerTaskId = '01a0bf5d-8f4b-7001-8458-107366e7de39', id = '01a0bf5d-8f4b-7001-8458-107366e7de41';
+  const botContext = { version: 1, ownerTaskId, conversationId: '01a0bf5d-8f4b-7001-8458-107366e7de40', epoch: 1, mode: 'create', pvcName: `bot-${ownerTaskId.replaceAll('-', '')}`, volumeUid: 'private-original' };
+  const consumer = { id: '01a0bf5d-8f4b-7001-8458-107366e7de42', taskId: ownerTaskId, revision: 1, purpose: 'agent', finalization: null };
+  const valid = { ...pod, botContext, consumer, nodeName: 'node-a', workspace: { pod: 'parent', podUid: 'parent-uid', pvcUid: 'shared-uid' }, labels: { 'crewstation.io/workspace-task': ownerTaskId } };
+  expect(workloadRenderOf(id, { children, pod: valid })?.pod.botContext).toMatchObject(botContext);
+  for (const patch of [{ consumer: undefined }, { consumer: { ...consumer, purpose: 'business' } }, { consumer: { ...consumer, taskId: id } }, { workspace: undefined }, { labels: {} }, { workload: 'business-task' }, { botContext: { ...botContext, epoch: 0 } }]) expect(workloadRenderOf(id, { children, pod: { ...valid, ...patch } })).toBeUndefined();
+});

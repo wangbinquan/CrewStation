@@ -15,6 +15,8 @@ export function historicalConversationFixture(rosterReady?: Promise<void>) {
   let eventSequence = 1;
   globalThis.fetch = (async (raw, init) => {
     const path = new URL(String(raw), 'http://localhost').pathname;
+    if (path.endsWith('/bot')) return Response.json({ conversation: null });
+    if (path.endsWith('/bot/history')) return Response.json({ items: [] });
     if (path.endsWith('/agents') && (init?.method ?? 'GET') === 'GET') { rosterRequests.push(path); if (rosterReady) await rosterReady; return Response.json({ items: agents }); }
     if (path === `/v1/projects/${activityProjectId}/compute-profiles`) return Response.json({ items: [{ id: '01a0bf5d-8f4b-7111-8111-111111111111', name: 'standard', description: '通用档位', terminalOnly: false, isDefault: true, available: true }, { id: '01a0bf5d-8f4b-7222-8222-222222222222', name: 'fast', description: '快速档位', terminalOnly: false, isDefault: false, available: true }] });
     if (path.endsWith('/agents') && init?.method === 'POST') return new Promise<Response>((resolve) => starts.push({ input: JSON.parse(String(init.body)), resolve }));

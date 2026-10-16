@@ -11,6 +11,7 @@ export function workloadPodObject(pod: WorkloadPodRender): K8sObject {
     ...(pod.runtimeInitialization ? { runtimeInitialization: true } : {}),
     name: pod.name, namespace: pod.namespace, taskId: pod.taskId, workload: pod.workload, project: pod.project, service: pod.service, image: pod.image,
     workerUid: pod.workerUid, resources: pod.resources, workVolume: pod.pvc ? { pvc: pod.pvc } : { emptyDir: true }, envFromSecret: pod.secret, ...(pod.checkout ? { checkout: pod.checkout } : {}),
+    ...(pod.botContext ? { botContext: pod.botContext } : {}),
     ...(pod.businessStorage ? { businessStorage: pod.businessStorage } : {}),
     ...(pod.nodeName ? { nodeName: pod.nodeName } : {}), ...(pod.labels ? { labels: pod.labels } : {}),
   });

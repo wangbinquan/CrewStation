@@ -144,6 +144,8 @@ export abstract class AgentRunBase implements DriverAgentProcess {
   }
 
   protected claimSession(sessionId: string): void {
+    const expected = this.sessionId ?? this.spec.resumeSessionId;
+    if (this.spec.strictSession && expected && sessionId !== expected) throw new DriverStateError('bot_session_mismatch', '原生运行时返回了其他 session，已停止本次恢复');
     if (sessionId === this.sessionId) return;
     this.sessionId = sessionId;
     this.push(this.emit('session', { sessionId }));

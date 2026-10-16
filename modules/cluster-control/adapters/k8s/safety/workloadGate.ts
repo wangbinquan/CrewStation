@@ -14,7 +14,8 @@ export async function inspectWorkloadStart(k8s: K8sClient, pod: WorkloadPodRende
   assertWorkloadGate(object, pod);
   const spec = object.spec as PodSpec, phase = (object['status'] as { phase?: string } | undefined)?.phase;
   if (!spec.nodeName || !object.metadata.uid || phase === 'Failed' || phase === 'Succeeded') return undefined;
-  const volume = pod.pvc && await k8s.get(Resources.PersistentVolumeClaim!, pod.pvc, pod.namespace, signal);
+  const pvc = pod.botContext?.pvcName ?? pod.pvc;
+  const volume = pvc && await k8s.get(Resources.PersistentVolumeClaim!, pvc, pod.namespace, signal);
   if (!volume || volume.metadata.uid !== pod.consumerVolumeUid || volume.metadata.deletionTimestamp || volume.metadata.labels?.[LABELS.task] !== pod.consumer!.taskId) throw precondition('启动许可的原工作卷不再有效');
   if ((volume['status'] as { phase?: string } | undefined)?.phase !== 'Bound') return undefined;
   const node = await nodeEvidence(k8s, spec.nodeName, new Date(), signal);

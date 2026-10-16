@@ -76,4 +76,4 @@ proposal/rfc/RFC-NNN-{slug}/
 | [RFC-038](./RFC-038-release-wizard/proposal.md) | 应用发布向导：独立页面连续完成准备、部署、验证、确认上线；发布页签可回看和接续每次历史流程。 | Done · 2026-10-09 · 5faa6427 六 CI、八组件部署、37 项实机回归通过；两次上线与同版本重部署的三条独立流程保持，见 [实际验收](./RFC-038-release-wizard/acceptance.md)。 |
 | [RFC-039](./RFC-039-first-delivery/proposal.md) | 首次交付连续引导：创建、CLI / Bot 自由切换、满屏开发、代码确认、验证上线、访问范围与开发权限申请。 | Done · 2026-10-15 · 正式代码部署与准确 CI 全绿；真实 Bot 贪吃蛇 v0.1.1 完成构建、验证、正式切流及不同身份访问验收，见[验收记录](./RFC-039-first-delivery/acceptance.md)。 |
 | [RFC-040](./RFC-040-business-native-materials/proposal.md) | 业务 Agent 原生配置材料：根 Agent／子代理、模型选项、内联 MCP 与插件，平台保留配置不可覆盖。 | In Progress · 2026-10-15 · 用户授权本会话接手，AW RFC-370 M2 配套实现。 |
-| [RFC-041](./RFC-041-continuous-bot-session/proposal.md) | Bot 持续对话：CLI 保持独立，停止本轮后沿用原上下文，执行恢复与历史统一呈现。 | Draft · 2026-10-15 · 独立模式边界已确认；交互原型与原生上下文持久化设计待批准。 |
+| [RFC-041](./RFC-041-continuous-bot-session/proposal.md) | Bot 持续对话：CLI 保持独立，停止本轮后沿用原上下文，执行恢复与历史统一呈现。 | In Progress · 2026-10-15 · 独立模式边界已确认；交互原型与原生上下文持久化设计待批准。 |

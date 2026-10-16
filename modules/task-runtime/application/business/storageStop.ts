@@ -3,14 +3,14 @@ import type { TaskEnvironment } from '../../domain/taskEnvironment';
 import type { TaskRuntimeUseCaseDeps } from '../dependencies';
 
 export async function closeStorageAdmission(deps: TaskRuntimeUseCaseDeps, env: TaskEnvironment): Promise<void> {
-  if (!env.render?.completionPolicy) return;
+  if (!env.render?.completionPolicy && !env.render?.botContext) return;
   if (!deps.workloadSafety || !env.render.workloadConsumerId) throw precondition('工作卷停止保护不可用');
   await deps.workloadSafety.closeAdmission({ consumer: { id: env.render.workloadConsumerId, taskId: env.native?.parentTaskId ?? env.id,
     revision: env.render.start, purpose: env.native ? 'agent' : 'business', finalization: null }, resourceId: env.id, namespace: env.namespace, podName: env.podName });
 }
 /** In addition to live Pod absence: closure bars late creates; every admitted writer still needs its proof. */
 export async function storageStopProved(deps: TaskRuntimeUseCaseDeps, env: TaskEnvironment): Promise<boolean> {
-  if (!env.render?.completionPolicy) return true;
+  if (!env.render?.completionPolicy && !env.render?.botContext) return true;
   const safety = deps.workloadSafety, id = env.render.workloadConsumerId;
   if (!safety || !id) return false;
   const closed = await safety.admissionClosed(id), state = await safety.get(id);

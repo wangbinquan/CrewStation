@@ -1,6 +1,7 @@
 import { eq, sql } from 'drizzle-orm';
 import type { Executor } from '@crewstation/persistence';
 import type { WorkloadConsumer } from '@crewstation/contracts';
+import { BotContextStorageSchema } from '@crewstation/contracts';
 import { conflict, notFound, precondition } from '@crewstation/kernel';
 import { drizzleRecordRepository } from '../drizzleRecords';
 import { consumers, storageFences } from './tables';
@@ -16,12 +17,17 @@ export async function requireConsumer(tx: Executor, id: string) {
 }
 export async function assertConsumerOwner(tx: Executor, consumer: WorkloadConsumer): Promise<void> {
   const records = drizzleRecordRepository(tx), record = await records.get(consumer.resourceId), parent = await records.get(consumer.taskId);
-  if (!record || record.owner.module !== 'task-runtime' || record.desired !== 'present' || !parent || parent.owner.module !== 'task-runtime' || parent.kind !== 'business-workspace') throw precondition('执行资源已不可准入', { code: 'workload_admission_closed' });
+  const pod = record?.spec['pod'] as { botContext?: unknown } | undefined;
+  const bot = pod?.botContext === undefined ? undefined : BotContextStorageSchema.safeParse(pod.botContext);
+  const botOwner = bot?.success && parent?.kind === 'dev-workspace' && record?.kind === 'agent-execution' && consumer.purpose === 'agent'
+    && bot.data.ownerTaskId === consumer.taskId && bot.data.volumeUid === consumer.volumeUid && record.spec['workloadConsumerId'] === consumer.id;
+  if (!record || record.owner.module !== 'task-runtime' || record.desired !== 'present' || !parent || parent.owner.module !== 'task-runtime' || parent.desired !== 'present'
+    || (bot ? !botOwner : parent.kind !== 'business-workspace')) throw precondition('执行资源已不可准入', { code: 'workload_admission_closed' });
   if (record.projectId !== parent.projectId || (record.id !== parent.id && record.parentId !== parent.id)) throw conflict('工作卷消费者归属不匹配');
   if (!record.spec.children.some((c) => c.kind === 'Pod' && c.namespace === consumer.namespace && c.name === consumer.podName)) throw conflict('Pod 身份不属于此执行资源');
-  const volume = await records.getByOwner({ module: 'task-runtime', ref: `${consumer.taskId}/work` }, 'volume');
-  if (!volume || volume.parentId !== parent.id || volume.projectId !== parent.projectId || volume.desired !== 'present' || !volume.spec['taskStorage']
-    || !volume.children.some((c) => c.kind === 'PersistentVolumeClaim' && c.namespace === consumer.namespace && c.uid === consumer.volumeUid && c.phase !== 'absent')) throw precondition('消费者原工作卷尚未持久确认或已变化', { code: 'workspace_volume_changed' });
+  const volume = await records.getByOwner({ module: 'task-runtime', ref: `${consumer.taskId}/${botOwner ? 'bot-context' : 'work'}` }, 'volume');
+  if (!volume || volume.parentId !== parent.id || volume.projectId !== parent.projectId || volume.desired !== 'present' || (!botOwner && !volume.spec['taskStorage'])
+    || !volume.children.some((c) => c.kind === 'PersistentVolumeClaim' && c.namespace === consumer.namespace && c.uid === consumer.volumeUid && c.phase !== 'absent' && (!botOwner || c.name === bot.data.pvcName))) throw precondition('消费者原工作卷尚未持久确认或已变化', { code: 'workspace_volume_changed' });
 }
 export async function assertTaskAllowsConsumer(tx: Executor, consumer: WorkloadConsumer): Promise<void> {
   const row = (await tx.select().from(storageFences).where(eq(storageFences.taskId, consumer.taskId)))[0], fence = row?.finalization;

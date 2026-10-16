@@ -37,7 +37,7 @@ export async function rebuildFixture(options: { ledger?: boolean; ownerWithLedge
   const resources = options.ledger || options.ownerWithLedger ? createResourcesModule({ db: tdb.db, quotas: { limitFor: async () => state.quota }, authorizer: { projectAccess: async () => ({ operate: true }) }, isAdmin: async () => true }) : undefined;
   if (resources) {
     const owner = resources.api.owner('task-runtime');
-    runtime = createTaskRuntimeModule({ ...deps, ...(options.ledger ? { creation: 'ledger' as const } : {}), ledger: { within: (tx) => owner.within(tx as object), live: async () => (await resources.api.list({})).filter((r) => r.owner.module === 'task-runtime'), occupancy: resources.api.occupancy } });
+    runtime = createTaskRuntimeModule({ ...deps, workloadSafety: resources.api.workloadSafety, ...(options.ledger ? { creation: 'ledger' as const } : {}), ledger: { within: (tx) => owner.within(tx as object), live: async () => (await resources.api.list({})).filter((r) => r.owner.module === 'task-runtime'), occupancy: resources.api.occupancy } });
     const resync = runtime.workers.at(-1)!; resync.start(); await resync.stop();
   }
   const request = async (): Promise<RebuildDevSessionRequest> => {

@@ -1,5 +1,5 @@
-import type { TaskId } from '@crewstation/contracts';
-import { NativeTerminalRosterSchema, PLATFORM_ENV, TaskIdSchema } from '@crewstation/contracts';
+import type { BotContextStorage, TaskId } from '@crewstation/contracts';
+import { BotContextStorageSchema, BOT_CONTEXT_ENV, NativeTerminalRosterSchema, PLATFORM_ENV, TaskIdSchema } from '@crewstation/contracts';
 import type { Logger } from '@crewstation/kernel';
 import { loadRuntimeInitialization } from './initialization/config';
 import type { RuntimeInitializationConfig } from './initialization/runtimeInitialization';
@@ -13,6 +13,7 @@ export interface PreviewConfig {
 export type TerminalBackendChoice = 'auto' | 'native' | 'script';
 
 export interface RunnerConfig {
+  botContext?: BotContextStorage;
   businessProbe?: boolean;
   runtimeInitialization?: RuntimeInitializationConfig;
   taskId: TaskId;
@@ -53,6 +54,7 @@ export function loadConfigFromEnv(env: Env = process.env): RunnerConfig {
   const taskId = TaskIdSchema.safeParse(env.CS_CANONICAL_RUNNER_TASK_ID ?? env.CS_RUNNER_TASK_ID ?? required(env, 'CS_TASK_ID'));
   if (!taskId.success) throw new RunnerConfigError('CS_TASK_ID 不是合法的任务 ID（36 字符 UUIDv7）');
   return {
+    ...(env[BOT_CONTEXT_ENV] ? { botContext: BotContextStorageSchema.parse(JSON.parse(env[BOT_CONTEXT_ENV]!)) } : {}),
     businessProbe: env.CS_RUNNER_BUSINESS_PROBE === '1',
     runtimeInitialization: loadRuntimeInitialization(env),
     taskId: taskId.data,

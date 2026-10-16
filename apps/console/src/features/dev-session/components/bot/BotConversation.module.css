@@ -45,3 +45,13 @@
 .footnote, .hint { font-size: 11px; color: var(--cs-color-text-muted); line-height: 1.5; margin: 7px 2px 0; }
 .footnote { text-align: center; }
 @media (max-width: 600px) { .messages { padding: 16px; } .welcome { padding-top: 12px; } .shortcut { font-size: 0; } .composerArea { padding: 8px; } }
+
+.botTitle { flex: 1; min-width: 0; }
+.botState { color: var(--cs-color-text-muted); font-size: 12px; }
+.epochBoundary { display: flex; align-items: center; gap: 12px; color: var(--cs-color-text-muted); font-size: 12px; margin: 12px 0 24px; }
+.epochBoundary::before, .epochBoundary::after { content: ''; flex: 1; height: 1px; background: var(--cs-color-border); }
+.historyActions { display: flex; flex-wrap: wrap; gap: 8px; }
+.historyList { list-style: none; padding: 0; margin: 16px 0; display: grid; gap: 8px; }
+.historyList li { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--cs-color-border); padding: 10px 0; }
+.historyList code { overflow-wrap: anywhere; font-size: 11px; }
+.historyList button { text-align: left; white-space: normal; overflow-wrap: anywhere; }

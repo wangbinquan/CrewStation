@@ -1,3 +1,4 @@
+import { botMessages } from './bot/zh-CN';
 import type { Messages } from '../../../shared/lib/i18n';
 
 export const messages = {
@@ -578,4 +579,5 @@ export const messages = {
   'devSession.native.splitNarrow': 'CLI 区太窄，放不下分屏',
   'devSession.native.divider.row': '拖动调整左右宽度，双击均分',
   'devSession.native.divider.column': '拖动调整上下高度，双击均分',
+  ...botMessages,
 } satisfies Messages;

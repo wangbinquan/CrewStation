@@ -91,7 +91,9 @@ export async function applyWorkload(deps: WorkloadApplyDeps, record: LedgerRecor
     return;
   }
   try {
-    pod = await prepareWorkloadAdmission(deps, pod, volume);
+    const contextVolume = pod.botContext ? deps.feed.cached('PersistentVolumeClaim', pod.namespace, pod.botContext.pvcName) : volume;
+    if (pod.botContext && !contextVolume) { enqueue(record.id, deps.retryMs ?? WAIT_MS); return; }
+    pod = await prepareWorkloadAdmission(deps, pod, contextVolume);
     deps.signal?.throwIfAborted();
     if (pod.runtimeInitialization && (await deps.ledger.get(record.id))?.desired !== 'present') return;
     const secret = await deps.cluster.ensureRunnerSecret(pod, () => owners.runnerValues(record.id), deps.signal);

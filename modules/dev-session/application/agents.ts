@@ -100,7 +100,7 @@ async function withExecution(deps: DevSessionUseCaseDeps, start: AgentStart, obs
   const state: AgentInstanceState = start.state === 'ended' && !['completed', 'failed', 'cancelled'].includes(base.state) ? (start.cancelled ? 'cancelled' : start.failure ? 'failed' : 'completed') : base.state;
   const executionState = env?.native?.state ?? (start.finalized || start.state === 'ended' ? 'finished' : 'queued');
   const message = start.failure ?? (['queued', 'starting'].includes(executionState) ? env?.message : undefined);
-  return { ...base, initialPrompt: start.request.prompt, image: start.execution.image, computeName: start.computeName, compute: base.compute || start.compute, profileRevision: base.profileRevision ?? start.profile.revision, state,
+  return { ...base, ...(start.request.botContext ? { botContext: { conversationId: start.request.botContext.conversationId, epoch: start.request.botContext.epoch } } : {}), initialPrompt: start.request.prompt, image: start.execution.image, computeName: start.computeName, compute: base.compute || start.compute, profileRevision: base.profileRevision ?? start.profile.revision, state,
     ...(start.execution.runtimeImage ? { runtimeImage: start.execution.runtimeImage } : {}),
     ...(state !== base.state && start.endedAt ? { endedAt: start.endedAt } : {}), execution: { taskId: start.execution.taskId, state: executionState, ...(message ? { message } : {}) } };
 }

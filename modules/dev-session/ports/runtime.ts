@@ -23,6 +23,7 @@ export interface EnvironmentView {
 
 /** 一个 Agent 的独立执行环境（RFC-006 §5）：「＋ CLI」带 terminalId，headless Agent 没有；image 是档位修订按摘要固定的镜像。 */
 export interface CreateExecutionInput {
+  botContext?: { conversationId: string; epoch: number; mode: 'create' | 'existing'; expectedPreviousExecutionId?: TaskId };
   runtimeImage?: RuntimeImageExecutionSnapshot;
   id: TaskId; parentTaskId: TaskId; purpose: 'cli' | 'agent'; createdBy: UserId; agentId: string; terminalId?: string; runnerId: string; fingerprint: string;
   profile?: string; image?: string; computeProfile?: { profileId: string; revision: number };
@@ -30,6 +31,7 @@ export interface CreateExecutionInput {
 
 /** 由 task-runtime 提供。 */
 export interface Environments {
+  prepareBotContext?(taskId: TaskId, conversationId: string): Promise<{ volumeUid: string } | undefined>;
   createNativeExecution(input: CreateExecutionInput): Promise<EnvironmentView>;
   /** RFC-022：CLI 在准备环境或 Agent 启动中失败时，回收之前留下执行环境主容器日志的尾部（已打码）；读不到返回 undefined。 */
   captureStartupLog(taskId: TaskId): Promise<string | undefined>;

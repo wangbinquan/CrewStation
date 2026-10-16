@@ -76,6 +76,7 @@ async function prepareOpencode(spec: DriverAgentSpec, context: DriverLaunchConte
   await materializeOpencodeConfig(env, context.managed, runDir);
   // auto-approve flag 的拼写在 1.18.0 改过，拼错会让每次拉起都只剩一整块 usage ＋ exit 1，所以先探版本。
   const binaryVersion = await ensureOpencodeBinaryVersion(context.host, head, { cwd: context.cwd, env: context.env, logger: context.logger });
+  if (spec.strictSession && !['1.18.29', '1.19.0'].includes(binaryVersion ?? '')) throw validation('此 OpenCode 版本尚未验证 Bot 原生上下文布局', { code: 'bot_context_unsupported' });
   const adminSkills = admin?.skills as { paths?: unknown } | undefined;
   const adminPaths = Array.isArray(adminSkills?.paths) ? adminSkills.paths.filter((value): value is string => typeof value === 'string') : [];
   skills = await stageBusinessSkills(spec.businessSkills, context.host, [...nativeSkillRoots(context.cwd, context.managed?.home ?? context.env.HOME ?? '/', context.env.XDG_CONFIG_HOME), ...adminPaths], { runDir: runDir.path, downloads: spec.businessMaterialDownloads, signal: context.signal });

@@ -14,6 +14,7 @@ const origins = {
   restartBusinessWorkspace: 'task-input', inspectBusinessRecovery: 'readonly', imageHistory: 'readonly', blockBusinessAdmission: 'service-0',
   imageReferenceState: 'readonly', runRuntimeImageProbe: 'project-input', stopRuntimeImageProbe: 'probe-stop', reconcileRebuild: 'task-0',
   resolveDevelopmentObjectSource: 'task-input',
+  prepareBotContext: 'task-0',
   createEnvironment: 'service-input', createNativeExecution: 'parent-input', releaseEnvironment: 'task-0', pauseEnvironment: 'task-0', resumeEnvironment: 'task-0',
   markFailed: 'task-0', touch: 'task-0', onRunnerConnected: 'task-0', onRunnerDisconnected: 'task-0', onRunnerRejected: 'task-0',
   inspectRebuild: 'project-0', requestRebuild: 'project-0', getRebuild: 'readonly', getEnvironment: 'readonly', describeEnvironment: 'readonly',

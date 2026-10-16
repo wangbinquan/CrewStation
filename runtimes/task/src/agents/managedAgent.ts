@@ -1,3 +1,7 @@
+import { DriverStateError } from '@crewstation/agent-drivers';
+import { BOT_CONTEXT_MOUNT } from '@crewstation/contracts';
+import type { BotContextStorage } from '@crewstation/contracts';
+import { prepareBotNativeData } from '../bot/nativeData';
 import { join } from 'node:path';
 import type { AgentEvent, BeforeStartMaterial } from '@crewstation/contracts';
 import type { Logger } from '@crewstation/kernel';
@@ -10,6 +14,8 @@ import { createAgentEventFactory } from './driver';
 import { createEventQueue } from './eventQueue';
 
 export interface ManagedAgentDeps {
+  botContext?: BotContextStorage;
+  botRoots?: { native: string; receipts: string; scratch: string };
   driver: AgentDriver;
   beforeStart: BeforeStartRunner;
   launcher: ProcessLauncher;
@@ -69,7 +75,14 @@ export class ManagedAgentProcess implements AgentProcess {
       return;
     }
     if (this.cancelled) return;
-    const env = this.deps.launcher.baseEnv({ ...this.deps.commandEnv, ...outcome.env, ...(this.spec.businessEvents ? { HOME: outcome.home, XDG_DATA_HOME: join(outcome.home, '.local/share'), XDG_CONFIG_HOME: join(outcome.home, '.config'), XDG_STATE_HOME: join(outcome.home, '.local/state') } : {}) });
+    let botEnv: Record<string, string> = {};
+    try {
+      if (this.deps.botContext) botEnv = await prepareBotNativeData({ root: this.deps.botRoots?.native ?? BOT_CONTEXT_MOUNT, scratch: this.deps.botRoots?.scratch, home: outcome.home, storage: this.deps.botContext, protocol: this.spec.launch.protocol, sessionId: this.spec.resumeSessionId, launcher: this.deps.launcher });
+    } catch (error) {
+      this.events.push(this.event('error', { error: { code: 'bot_context_unavailable', message: error instanceof Error ? error.message : '原生上下文不可用' } }));
+      this.events.close(); return;
+    }
+    const env = this.deps.launcher.baseEnv({ ...this.deps.commandEnv, ...outcome.env, ...botEnv, ...(this.spec.businessEvents ? { HOME: outcome.home, XDG_DATA_HOME: join(outcome.home, '.local/share'), XDG_CONFIG_HOME: join(outcome.home, '.config'), XDG_STATE_HOME: join(outcome.home, '.local/state') } : {}) });
     const context: AgentLaunchContext = { cwd: this.deps.cwd, env, launcher: this.deps.launcher, logger: this.deps.logger, managed: { home: outcome.home, runDir: outcome.runDir, ...(outcome.configFile ? { configFile: outcome.configFile } : {}) } };
     try { this.inner = this.deps.driver.start(this.spec, context); }
     catch { this.events.push(this.event('error', { error: { code: 'spawn_failed', message: 'Agent 进程未能创建' } })); this.events.close(); return; }
@@ -80,7 +93,7 @@ export class ManagedAgentProcess implements AgentProcess {
     try { for await (const event of inner.events) { if (this.spec.businessEvents) await this.events.writeProcessed(event); else this.events.push(event); } }
     catch (error) {
       if (this.spec.businessEvents) this.events.fail(new RunnerCommandError('execution_unknown', 'Agent 事件流异常，进程退出尚未证明'));
-      else this.events.push(this.event('error', { error: { code: 'driver_failed', message: error instanceof Error ? error.message : String(error) } }));
+      else this.events.push(this.event('error', { error: { code: error instanceof DriverStateError ? error.code : 'driver_failed', message: error instanceof Error ? error.message : String(error) } }));
     }
     finally { this.events.close(); }
   }

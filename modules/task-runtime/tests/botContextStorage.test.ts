@@ -1,0 +1,52 @@
+import { afterEach, describe, expect, test } from 'bun:test';
+import type { TaskId } from '@crewstation/contracts';
+import { newResourceId } from '@crewstation/kernel';
+import { Resources } from '@crewstation/k8s';
+import { testDatabaseAvailable } from '@crewstation/testkit';
+import { rebuildFixture } from './rebuildFixture';
+
+const available = await testDatabaseAvailable();
+let f: Awaited<ReturnType<typeof rebuildFixture>> | undefined;
+afterEach(async () => { await f?.close(); f = undefined; });
+describe.skipIf(!available)('private Bot storage admission', () => {
+  test('lazy parent volume pins original UID; no two Bot writers; finished row alone is not stop proof', async () => {
+    f = await rebuildFixture({ ledger: true, running: true }); f.state.quota = 6;
+    const { runtime, uow, k8s, resources } = f, conversationId = newResourceId();
+    await runtime.api.releaseEnvironment(f.env.id, 'user');
+    for (let attempt = 0; attempt < 4; attempt++) await f.nextNativeAttempt();
+    const parent = await runtime.api.createEnvironment({ serviceId: f.serviceId, kind: 'dev-session', branch: 'bot-context' });
+    const env = (await uow.read.environments.getById(parent.id))!;
+    await k8s.create({ apiVersion: 'v1', kind: 'PersistentVolumeClaim', metadata: { name: env.pvcName, namespace: env.namespace, uid: 'work-uid', labels: { 'crewstation.io/task': env.id } }, spec: { accessModes: ['ReadWriteOnce'] }, status: { phase: 'Bound' } });
+    const pod = await k8s.create({ apiVersion: 'v1', kind: 'Pod', metadata: { name: env.podName, namespace: env.namespace, uid: 'parent-pod-uid', labels: { 'crewstation.io/task': env.id } }, spec: { nodeName: 'worker-one', volumes: [{ name: 'work', persistentVolumeClaim: { claimName: env.pvcName } }] }, status: { phase: 'Running' } });
+    const values = await runtime.api.runnerValues(env.id);
+    await runtime.api.bindWorkload(env.id, pod.metadata.uid!);
+    await runtime.api.onRunnerConnected(env.id, values.CS_RUNNER_TOKEN!);
+    expect((await uow.read.environments.getById(env.id))!.render?.botVolume).toBeUndefined();
+    expect(await runtime.api.prepareBotContext(env.id, conversationId)).toBeUndefined();
+    const stored = (await uow.read.environments.getById(env.id))!, volume = stored.render!.botVolume!;
+    const record = (await resources!.api.list({ parentId: env.id, kind: 'volume' })).find(r => r.display.purpose === 'bot-context')!;
+    expect(record.spec['reclaim']).toBe('delete'); expect(record.spec['pvc']).toMatchObject({ size: '1Gi' });
+    await k8s.create({ apiVersion: 'v1', kind: 'PersistentVolumeClaim', metadata: { name: volume.pvcName, namespace: env.namespace, uid: '11111111-1111-4111-8111-111111111111', labels: { 'crewstation.io/task': env.id, 'crewstation.io/storage': 'bot-context' } }, status: { phase: 'Bound' } });
+    expect(await runtime.api.prepareBotContext(env.id, conversationId)).toEqual({ volumeUid: '11111111-1111-4111-8111-111111111111' });
+    const request = () => ({ id: newResourceId() as TaskId, parentTaskId: env.id, purpose: 'agent' as const, agentId: newResourceId(), runnerId: newResourceId(), fingerprint: newResourceId(), botContext: { conversationId, epoch: 1, mode: 'create' as const } });
+    const child = await runtime.api.createNativeExecution(request()), childRow = (await uow.read.environments.getById(child.id))!;
+    expect(childRow.render?.botContext?.volumeUid).toBe('11111111-1111-4111-8111-111111111111');
+    expect((await resources!.api.get(child.id))!.spec['pod']).toMatchObject({ botContext: { conversationId, epoch: 1 }, consumer: { taskId: env.id, purpose: 'agent' } });
+    await expect(runtime.api.createNativeExecution(request())).rejects.toMatchObject({ details: { code: 'bot_execution_stopping' } });
+    await resources!.api.observe({ child: { kind: 'PersistentVolumeClaim', namespace: env.namespace, name: volume.pvcName, uid: '11111111-1111-4111-8111-111111111111', phase: 'Bound', ready: true } });
+    const consumer = { id: childRow.render!.workloadConsumerId!, taskId: env.id, resourceId: child.id, namespace: env.namespace, podName: childRow.podName, revision: 1, volumeUid: '11111111-1111-4111-8111-111111111111', purpose: 'agent' as const, finalization: null };
+    const permit = { podUid: '22222222-2222-4222-8222-222222222222', nodeUid: '33333333-3333-4333-8333-333333333333', nodeName: 'worker-one' };
+    await resources!.api.workloadSafety.register(consumer); await resources!.api.workloadSafety.grantStart(consumer.id, permit);
+    await uow.run(s => s.environments.update({ ...childRow, native: { ...childRow.native!, state: 'finished' } }));
+    const resume = { ...request(), botContext: { conversationId, epoch: 1, mode: 'existing' as const, expectedPreviousExecutionId: child.id } };
+    await expect(runtime.api.createNativeExecution(resume)).rejects.toMatchObject({ details: { code: 'bot_execution_stopping' } });
+    // A granted writer needs the matching whole-Pod proof, even after its row says finished.
+    await resources!.api.workloadSafety.closeAdmission({ consumer: { id: childRow.render!.workloadConsumerId!, taskId: env.id, revision: childRow.render!.start, purpose: 'agent', finalization: null }, resourceId: child.id, namespace: env.namespace, podName: childRow.podName });
+    await expect(runtime.api.createNativeExecution(resume)).rejects.toMatchObject({ details: { code: 'bot_execution_stopping' } });
+    await resources!.api.workloadSafety.recordStop({ id: newResourceId(), consumer, ...permit, type: 'kubelet-terminated', podResourceVersion: '25', observedAt: new Date().toISOString(), containers: [{ kind: 'container', name: 'runner', state: 'terminated', containerId: 'containerd://original-bot', exitCode: 0 }] });
+    expect((await runtime.api.createNativeExecution(resume)).native?.state).toBe('queued');
+    await k8s.mergePatch(Resources.PersistentVolumeClaim!, volume.pvcName, env.namespace, { metadata: { uid: 'replacement' } });
+    await expect(runtime.api.prepareBotContext(env.id, conversationId)).rejects.toMatchObject({ details: { code: 'bot_context_unavailable' } });
+    expect((await uow.read.environments.getById(env.id))!.render!.botVolume!.volumeUid).toBe('11111111-1111-4111-8111-111111111111');
+  });
+});

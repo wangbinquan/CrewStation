@@ -50,7 +50,8 @@ export class DevelopmentContentSources {
         const id = alias[0]?.id ?? key;
         const rows = await this.db.execute<Accepted>(sql`SELECT 'agent' AS owner,task_id AS workspace,execution_task_id AS id,agent_id AS agent,execution->>'taskId' AS embedded
           FROM dev_session.agent_starts WHERE execution_task_id=${id}
-          UNION ALL SELECT 'native',task_id,execution_task_id,agent_id,execution->>'taskId' FROM dev_session.native_terminal_starts WHERE execution_task_id=${id}`);
+          UNION ALL SELECT 'native',task_id,execution_task_id,agent_id,execution->>'taskId' FROM dev_session.native_terminal_starts WHERE execution_task_id=${id}
+          UNION ALL SELECT 'agent',task_id,execution_task_id,agent_id,data->>'executionTaskId' FROM dev_session.bot_executions b WHERE execution_task_id=${id} AND NOT EXISTS (SELECT 1 FROM dev_session.agent_starts a WHERE a.execution_task_id=b.execution_task_id)`);
         if (!rows.length) return undefined;
         const row = rows[0]!;
         if (rows.length !== 1 || row.id !== row.embedded || row.workspace === row.id || representation(key) === 'current' && id !== key)

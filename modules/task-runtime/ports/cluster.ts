@@ -26,6 +26,7 @@ export interface TaskPodSpec {
 }
 
 export interface NativeExecutionCluster {
+  inspectBotVolume?(parent: TaskEnvironment, pvcName: string): Promise<{ uid: string } | undefined>;
   inspectWorkspace(parent: TaskEnvironment): Promise<{ podUid: string; pvcUid: string; nodeName: string }>;
   prepare(env: TaskEnvironment, values: () => Promise<Record<string, string>>): Promise<{ podUid: string; secretUid: string; token: string }>;
   cleanup(env: TaskEnvironment): Promise<void>;

@@ -163,3 +163,7 @@ export * from './api/business/commandSecrets';
 export * from './taskrunner/businessMaterial';
 
 export * from './api/business/startupInventory';
+
+export * from './taskrunner/bot/context';
+
+export * from './api/bot/conversation';

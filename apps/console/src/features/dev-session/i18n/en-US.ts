@@ -1,3 +1,4 @@
+import { botMessages } from './bot/en-US';
 import type { MessagesShapedLike } from '../../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
 
@@ -580,4 +581,5 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
   'devSession.native.splitNarrow': 'The CLI area is too narrow to split',
   'devSession.native.divider.row': 'Drag to adjust widths; double-click to equalize',
   'devSession.native.divider.column': 'Drag to adjust heights; double-click to equalize',
+  ...botMessages,
 };

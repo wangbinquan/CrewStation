@@ -1,3 +1,4 @@
+import type { BotReadDto, BotHistoryDto, BotHistoryQuery, BotReceiptDto, SendBotMessageRequest, InterruptBotRequest, FreshBotContextRequest } from '@crewstation/contracts';
 import type { CommitWorkspaceDto, CommitWorkspaceRequest } from '@crewstation/contracts';
 import type { AgentInstanceDto, BranchDto, DevSessionDto, OpenDevSessionV2Request, ReleaseDto, SendAgentMessageRequest, StartDevAgentV2Request, WorkspaceStatusDto } from '@crewstation/contracts';
 import type { ComparisonDetailQuery, ComparisonDetails, ComparisonTarget, VersionComparisonDto } from '@crewstation/contracts';
@@ -30,6 +31,11 @@ export interface ReleaseDevSessionOptions {
 
 /** 开发会话：一项目一会话、分支与落后数、并行流式 Agent、从会话发布。 */
 export interface DevSessionResource {
+  getBot(taskId: string): Promise<BotReadDto>;
+  botHistory(taskId: string, query?: Partial<BotHistoryQuery>): Promise<BotHistoryDto>;
+  sendBotMessage(taskId: string, input: SendBotMessageRequest): Promise<BotReceiptDto>;
+  interruptBot(taskId: string, input: InterruptBotRequest): Promise<BotReceiptDto>;
+  freshBotContext(taskId: string, input: FreshBotContextRequest): Promise<BotReceiptDto>;
   inspectRebuild(projectId: string): Promise<DevSessionRebuildInspection>;
   rebuild(projectId: string, input: RebuildDevSessionRequest): Promise<DevSessionRebuildDto>;
   invokeApi(projectId: string, input: ApiInvocationRequest): Promise<ApiInvocationResponse>;
@@ -84,7 +90,13 @@ export function devSessionResource(transport: Transport): DevSessionResource {
   const preview = (projectId: string) => `${project(projectId)}/dev-session/preview`;
   const agents = (taskId: string) => `/v1/tasks/${segment(taskId)}/agents`;
   const terminals = (taskId: string) => `/v1/tasks/${segment(taskId)}/agent-terminals`;
+  const bot = (taskId: string) => `/v2/dev-sessions/${segment(taskId)}/bot`;
   return {
+    getBot: (taskId) => transport.request('GET', bot(taskId)),
+    botHistory: (taskId, query) => transport.request('GET', `${bot(taskId)}/history`, { query }),
+    sendBotMessage: (taskId, input) => transport.request('POST', `${bot(taskId)}/messages`, { body: input }),
+    interruptBot: (taskId, input) => transport.request('POST', `${bot(taskId)}/interrupt`, { body: input }),
+    freshBotContext: (taskId, input) => transport.request('POST', `${bot(taskId)}/context`, { body: input }),
     inspectRebuild: (projectId) => transport.request('GET', `${project(projectId)}/dev-session/rebuild`),
     rebuild: (projectId, input) => transport.request('POST', `${project(projectId)}/dev-session/rebuild`, { body: input }),
     invokeApi: (projectId, input) => transport.request('POST', `${project(projectId)}/dev-session/api-invocations`, { body: input, keepalive: false, redirect: 'error', signal: AbortSignal.timeout(API_INVOCATION_TIMEOUT_MS + 20_000) }),

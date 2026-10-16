@@ -1,4 +1,7 @@
-import type { ClusterPurpose, ResourceConditionStatus, ResourceKind, StartupRecord } from '@crewstation/contracts';
+import type { EnvironmentProjection, ProjectedCondition, ProjectedRecord } from './environmentProjection';
+export type { EnvironmentProjection, ProjectedCondition, ProjectedRecord } from './environmentProjection';
+import { botVolumeProjection } from './botVolumeProjection';
+import type { ClusterPurpose, ResourceKind } from '@crewstation/contracts';
 import { ProjectIdSchema } from '@crewstation/contracts';
 import type { ExecutionPurpose, TaskEnvironment, WorkloadRender } from './taskEnvironment';
 import { canonicalNativeIntent, EXECUTION_INTENT_ANNOTATION, WORKSPACE_TASK_LABEL } from './physicalIdentity';
@@ -8,46 +11,6 @@ import { checkoutSecretOf, podNameFor, purposeOf, reconcilerCreates, runnerSecre
  * 任务环境投影到资源台账（RFC-025 第二期）：每个环境一条工作负载记录（开发工作区、业务任务工作区、Agent 执行），
  * 有自己工作卷的再加一条工作卷记录。期望与领域条件由这里算出，阶段由资源中心按观测与条件算，不在这里写。
  */
-export interface ProjectedCondition {
-  readonly type: string;
-  readonly status: ResourceConditionStatus;
-  readonly reason?: string;
-  readonly message?: string;
-  /** 发生时刻（失败的保留期从这里算，D9）；台账只会把已记的起点往早改。 */
-  readonly since?: Date;
-}
-
-export interface ProjectedRecord {
-  /** 工作负载记录沿用环境 ID；工作卷记录由台账生成。 */
-  readonly id?: string;
-  readonly kind: ResourceKind;
-  readonly ref: string;
-  /** 平台档位自测没有租户项目；项目镜像验证仍用请求固定的真实项目。 */
-  readonly projectId?: TaskEnvironment['projectId'];
-  /** 上级记录的 ID：工作负载记录沿用环境 ID，所以 Agent 执行的上级就是父工作区的环境 ID。 */
-  readonly parentId?: string;
-  readonly purpose?: ClusterPurpose;
-  readonly children: readonly { readonly kind: string; readonly namespace: string; readonly name: string }[];
-  /** 工作卷上级结束后怎么处理（设计 §6.4）：跟随容器的随之删除，持久卷留着待回收。只有工作卷有。 */
-  readonly reclaim?: 'delete' | 'retain';
-  readonly display: Readonly<Record<string, string>>;
-  readonly conditions: readonly ProjectedCondition[];
-  readonly startup?: StartupRecord;
-  /** 期望「不要了」及其原因；没有就是「要」。 */
-  readonly release?: { readonly code: string; readonly message: string };
-  /** 旧身份（设计 §6.5）：RFC-013 之前的 `tsk_…`，写进台账的别名，按旧 ID 也能找回这条记录。 */
-  readonly aliases?: readonly { readonly source: 'tsk'; readonly alias: string }[];
-  /** 资源中心建出子对象要用的期望（RFC-025 I25，不含凭据）：并进记录的 spec；没有就是所属模块自己建。 */
-  readonly render?: Readonly<Record<string, unknown>>;
-}
-
-export interface EnvironmentProjection {
-  readonly workload: ProjectedRecord;
-  readonly volume?: ProjectedRecord;
-  readonly route?: ProjectedRecord;
-  /** Runner 当前是否连着；是否上报「断开」要看台账里是否曾经连上（资源中心按「曾经为真」判降级）。 */
-  readonly connected: boolean;
-}
 
 const EXECUTION_PURPOSE: Record<ExecutionPurpose, ClusterPurpose> = { cli: 'development-cli', agent: 'development-agent', subtask: 'business-subtask' };
 const RELEASE_MESSAGE: Record<string, string> = {
@@ -118,8 +81,9 @@ function workloadRender(env: TaskEnvironment): ProjectedRecord['render'] {
   const render = env.render;
   const { image, workerUid, resources, checkout } = render;
   const pod = {
-    ...(render.completionPolicy ? { consumer: { id: render.workloadConsumerId, taskId: env.native?.parentTaskId ?? env.id, revision: render.start, purpose: env.native ? 'agent' : 'business', finalization: null } } : {}),
+    ...((render.completionPolicy || render.botContext) ? { consumer: { id: render.workloadConsumerId, taskId: env.native?.parentTaskId ?? env.id, revision: render.start, purpose: env.native ? 'agent' : 'business', finalization: null } } : {}),
     ...(env.businessWorkspace ? { expectedVolumeUid: env.businessWorkspace.volumeUid } : {}),
+    ...(render.botContext ? { botContext: render.botContext } : {}),
     ...(render.runtimeImage ? { runtimeInitialization: true } : {}),
     ...(render.businessStorage ? { businessStorage: { ...render.businessStorage, initialize: !env.native && !env.rebuildId && render.start === 1 } } : {}),
     image, workerUid, resources, workload: WORKLOAD_LABELS[env.kind], project: env.labels['crewstation.io/project'] ?? '', service: env.labels['crewstation.io/service'] ?? '',
@@ -159,7 +123,7 @@ function workloadChildren(env: TaskEnvironment): ProjectedRecord['children'] {
   // 资源中心建出的环境（I25）：每次启动一个 Runner Secret（检出用的 Git 凭据由资源中心建的也归这一次启动），预览与 Pod 同名。
   if (reconcilerCreates(env)) {
     const checkout = env.render.checkout && !env.render.checkout.credentialSecretName ? [at('Secret', checkoutSecretOf(env)!)] : [];
-    return [at('Pod', env.podName), at('Secret', runnerSecretOf(env)), ...(env.render.completionPolicy ? [at('Secret', `${env.podName}-admission`)] : []), ...checkout, ...(env.preview ? [at('Service', env.rebuildId ? podNameFor(env.id) : env.podName), at('IngressRoute', env.rebuildId ? podNameFor(env.id) : env.podName)] : [])];
+    return [at('Pod', env.podName), at('Secret', runnerSecretOf(env)), ...((env.render.completionPolicy || env.render.botContext) ? [at('Secret', `${env.podName}-admission`)] : []), ...checkout, ...(env.preview ? [at('Service', env.rebuildId ? podNameFor(env.id) : env.podName), at('IngressRoute', env.rebuildId ? podNameFor(env.id) : env.podName)] : [])];
   }
   const route = env.rebuildId ? podNameFor(env.id) : env.podName;
   return [
@@ -206,7 +170,8 @@ export function projectEnvironment(env: TaskEnvironment, previewRoute: WorkloadR
     render: { ...previewRoute, releaseWithParent: true, service: env.labels['crewstation.io/service'] || env.serviceId, target: { namespace: env.namespace, service: name, port: 80 } },
     ...(release ? { release } : {}),
   } : undefined;
-  return { workload, ...(volume ? { volume } : {}), ...(route ? { route } : {}), connected: env.connected };
+  const botVolume = botVolumeProjection(env, release);
+  return { workload, ...(botVolume ? { botVolume } : {}), ...(volume ? { volume } : {}), ...(route ? { route } : {}), connected: env.connected };
 }
 
 /**

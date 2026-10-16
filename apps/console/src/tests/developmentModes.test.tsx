@@ -5,6 +5,7 @@ import { act } from 'react';
 import { EditorView } from '@codemirror/view';
 import { renderDeliveryHarness } from './renderDeliveryHarness';
 import { historicalConversationFixture } from './historicalConversationFixture';
+import { botAgentId, continuousBotFixture } from './continuousBotFixture';
 import { activityProjectId } from './agentActivityFixture';
 import { createQueryClient } from '../shared/api/queryClient';
 
@@ -20,8 +21,8 @@ async function draft(value: string) {
   }); await page!.settle();
 }
 async function setup(search = 'view=guided') {
-  fixture = historicalConversationFixture(); fixture.agents.splice(0);
-  page = await renderDeliveryHarness(`${path}?${search}`); return fixture;
+  const current = continuousBotFixture(); fixture = current; fixture.agents.splice(0);
+  page = await renderDeliveryHarness(`${path}?${search}`); return current;
 }
 
 test('CLI 和 Bot 是对等模式；切换保留草稿，不启动 Agent、不触发离开确认', async () => {
@@ -35,12 +36,12 @@ test('CLI 和 Bot 是对等模式；切换保留草稿，不启动 Agent、不�
 });
 
 test('发送中的 Bot 请求跨模式完成；返回后显示本次消息和输出且不重复派发', async () => {
-  const f = await setup(); await draft('做一个贪吃蛇游戏'); await page!.click('发送'); expect(f.starts).toHaveLength(1);
-  await page!.click('CLI'); await act(async () => { f.finishStart(0); }); await page!.settle();
-  await act(async () => { f.receiveAgent({ agentId: 'legacy-created-0', type: 'user-message', text: '做一个贪吃蛇游戏' }); f.receiveAgent({ agentId: 'legacy-created-0', type: 'text', text: '游戏已加入方向键控制。' }); await new Promise(resolve => setTimeout(resolve, 100)); });
+  const f = await setup(); await draft('做一个贪吃蛇游戏'); await page!.click('发送'); expect(f.botMessages).toHaveLength(1);
+  await page!.click('CLI'); await act(async () => { f.finishMessage(0); }); await page!.settle();
+  await act(async () => { f.receiveAgent({ agentId: botAgentId, type: 'user-message', text: '做一个贪吃蛇游戏' }); f.receiveAgent({ agentId: botAgentId, type: 'text', text: '游戏已加入方向键控制。' }); await new Promise(resolve => setTimeout(resolve, 100)); });
   await page!.click('Bot 聊天'); expect(textarea().value).toBe('');
   const log = document.querySelector('[role="log"]'); expect(log?.textContent).toContain('做一个贪吃蛇游戏'); expect(log?.textContent).toContain('游戏已加入方向键控制。');
-  expect(f.starts).toHaveLength(1); expect(f.sends).toHaveLength(0);
+  expect(f.botMessages).toHaveLength(1); expect(f.starts).toHaveLength(0); expect(f.sends).toHaveLength(0);
 });
 
 test('CLI 编辑器跨 Bot 切换保持实例、未保存内容与文件定位；隐藏模式不改写当前地址', async () => {
@@ -57,7 +58,7 @@ test('CLI 编辑器跨 Bot 切换保持实例、未保存内容与文件定位�
 test('刷新准备中的 Bot 仍显示已受理需求；原生输入事件回放后不重复消息', async () => {
   fixture = historicalConversationFixture(); const agent = fixture.agents[0]!;
   agent.initialPrompt = '保留尚在准备中的需求'; agent.state = 'preparing';
-  page = await renderDeliveryHarness(`${path}?view=guided`);
+  page = await renderDeliveryHarness(`${path}?view=guided`); await page.click('历史与设置'); await page.click(agent.initialPrompt);
   expect(document.querySelector('[role="log"]')?.textContent).toContain(agent.initialPrompt);
   page.unmount(); page = await renderDeliveryHarness(`${path}?view=guided`);
   expect(document.querySelectorAll('article[aria-label="你"]')).toHaveLength(1);
@@ -68,7 +69,7 @@ test('刷新准备中的 Bot 仍显示已受理需求；原生输入事件回放
 test('执行容器被 OOM 终止而没有 Agent 结束事件时，回到页面恢复真实失败状态并可新建需求', async () => {
   fixture = historicalConversationFixture(); const agent = fixture.agents[0]!;
   agent.state = 'running'; agent.initialPrompt = '实现贪吃蛇';
-  page = await renderDeliveryHarness(`${path}?view=guided`, createQueryClient());
+  page = await renderDeliveryHarness(`${path}?view=guided`, createQueryClient()); await page.click('历史与设置'); await page.click(agent.initialPrompt);
   expect(page.text()).toContain('Bot 正在处理');
   await act(async () => { focusManager.setFocused(false); });
   agent.state = 'failed'; agent.execution = { taskId: agent.taskId, state: 'finished', message: '容器运行失败：OOMKilled，退出码 137' };
@@ -76,6 +77,6 @@ test('执行容器被 OOM 终止而没有 Agent 结束事件时，回到页面�
   await act(async () => { focusManager.setFocused(true); }); await page.settle();
   expect(page.text()).toContain('OOMKilled'); expect(page.text()).not.toContain('Bot 正在处理');
   expect(page.text()).not.toContain('停止执行');
-  await page.click('新对话'); await draft('继续完成工作区里的贪吃蛇');
+  await page.click('历史与设置'); await page.click('返回当前 Bot'); await draft('继续完成工作区里的贪吃蛇');
   expect([...page.host.querySelectorAll('button')].find(node => node.textContent === '发送')?.disabled).toBe(false); expect(fixture.starts).toHaveLength(0);
 });

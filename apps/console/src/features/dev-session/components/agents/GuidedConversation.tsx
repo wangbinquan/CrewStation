@@ -14,7 +14,8 @@ import { GlyphIcon } from '../../../../shared/ui/icons/GlyphIcon';
 import styles from '../bot/BotConversation.module.css';
 import { StartAgentForm } from './StartAgentForm';
 
-export function GuidedConversation({ projectId, agents, selection, transcripts, ready, onActivity }: {
+export function GuidedConversation({ projectId, agents, selection, transcripts, ready, onActivity, onHistory }: {
+  readonly onHistory?: () => void;
   readonly projectId: string; readonly agents: DevAgentsHandle; readonly selection: AgentSelection;
   readonly transcripts: TranscriptsByAgent; readonly ready: boolean; readonly onActivity: () => void;
 }) {
@@ -32,12 +33,13 @@ export function GuidedConversation({ projectId, agents, selection, transcripts, 
     <UnsavedChangesGuard dirty={creation.dirty || messages.dirty || busy} scope={t('devSession.agents.draftScope')} isNavigationBusy={() => busy}
       allowNavigate={(current, next) => current.pathname === next.pathname} />
     <header className={styles.toolbar}><GlyphIcon name="assistant" plain />
-      <select aria-label={t('devSession.bot.chooseConversation')} value={selected?.agentId ?? ''} onChange={event => selection.select(event.target.value)}>
+      {onHistory ? <><strong className={styles.botTitle}>Crew Bot</strong><Button variant="ghost" size="small" onClick={onHistory}>{t('devSession.continuous.history')}</Button></> : <><select aria-label={t('devSession.bot.chooseConversation')} value={selected?.agentId ?? ''} onChange={event => selection.select(event.target.value)}>
         <option value="">{t('devSession.guided.newRequest')}</option>
         {agents.agents.map((agent, index) => <option key={agent.agentId} value={agent.agentId}>{(agent.initialPrompt || transcripts[agent.agentId]?.find(line => line.type === 'user-message')?.body)?.slice(0, 36) || t('devSession.bot.conversationName', { number: index + 1 })}</option>)}
       </select>
-      <Button variant="ghost" size="small" disabled={!allowed || busy} onClick={() => selection.select('')}>{t('devSession.guided.newRequest')}</Button>
+      <Button variant="ghost" size="small" disabled={!allowed || busy} onClick={() => selection.select('')}>{t('devSession.guided.newRequest')}</Button></>}
     </header>
+    {onHistory ? <ActionNote tone="neutral">{t(selected && agentAcceptsInput(selected.state) ? 'devSession.continuous.legacyLive' : 'devSession.continuous.legacyEnded')}</ActionNote> : null}
     {agents.loadError ? <ActionNote tone="error">{errorMessage(agents.loadError)}</ActionNote> : null}
     {selected?.execution?.message ? <ActionNote tone={selected.state === 'failed' ? 'error' : 'neutral'}>{selected.execution.message}</ActionNote> : null}
     <BotTranscript key={selected?.agentId ?? 'new'} lines={lines}
@@ -47,7 +49,7 @@ export function GuidedConversation({ projectId, agents, selection, transcripts, 
       onDraftChange={edit} onSend={send} compute={selected?.computeName || t('devSession.bot.defaultCompute')}
       onOptions={selected ? undefined : () => creation.setOpen(true)}
       unavailable={!allowed ? t('devSession.bot.unavailable') : selected && !agentAcceptsInput(selected.state) ? t(selected.state === 'preparing' ? 'devSession.bot.preparing' : 'devSession.bot.finished') : undefined}
-      canCancel={allowed && !!selected && (running || selected.state === 'awaiting-input') && !agents.cancel.isPending} onCancel={() => { if (selected) agents.cancel.mutate(selected.agentId); }} />
+      canCancel={!onHistory && allowed && !!selected && (running || selected.state === 'awaiting-input') && !agents.cancel.isPending} onCancel={() => { if (selected) agents.cancel.mutate(selected.agentId); }} />
     {agents.cancel.error ? <ActionNote tone="error">{errorMessage(agents.cancel.error)}</ActionNote> : null}
     {creation.open ? <StartAgentForm projectId={projectId} creation={creation} /> : null}
   </div>;

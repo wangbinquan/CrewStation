@@ -1,3 +1,4 @@
+import type { BotReadDto, BotHistoryDto, BotHistoryQuery, BotReceiptDto, SendBotMessageRequest, InterruptBotRequest, FreshBotContextRequest } from '@crewstation/contracts';
 import type { CommitWorkspaceDto, CommitWorkspaceRequest } from '@crewstation/contracts';
 import type { Actor, AgentInstanceDto, BranchDto, DevSessionDto, OpenDevSessionV2Request, ProjectId, PublishDevSessionRequest, ReleaseDto, SendAgentMessageRequest, StartDevAgentV2Request, TaskId, WorkspaceStatusDto } from '@crewstation/contracts';
 import type { ComparisonDetailQuery, ComparisonDetails, ComparisonTarget, VersionComparisonDto } from '@crewstation/contracts';
@@ -18,6 +19,11 @@ export interface NativeTerminalApi {
 }
 
 export interface DevSessionModuleApi extends NativeTerminalApi {
+  getBot(actor: Actor, taskId: TaskId): Promise<BotReadDto>;
+  botHistory(actor: Actor, taskId: TaskId, query: BotHistoryQuery): Promise<BotHistoryDto>;
+  sendBotMessage(actor: Actor, taskId: TaskId, input: SendBotMessageRequest): Promise<BotReceiptDto>;
+  interruptBot(actor: Actor, taskId: TaskId, input: InterruptBotRequest): Promise<BotReceiptDto>;
+  freshBotContext(actor: Actor, taskId: TaskId, input: FreshBotContextRequest): Promise<BotReceiptDto>;
   readonly name: 'dev-session';
   readonly deletionOwner?: ProjectDeletionOwner;
   inspectClusterNative(actor: Actor, id: TaskId): Promise<Record<string, unknown>>;

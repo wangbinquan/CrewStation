@@ -106,6 +106,8 @@
     "modules/dev-session/adapters/persistence/migrations/0020_observation_activity_history.sql": "8cd0f389c5ac959a6ba06c694d76ee300cb6e3b3cf6f62b44d7249fa55641163",
     "modules/dev-session/adapters/persistence/migrations/0021_cli_original_capability.sql": "a220ff2ccc83fab23351cf9e75606d085f936c32e03c7e0563761d2fc9fefe32",
     "modules/dev-session/adapters/persistence/migrations/0022_runtime_observation_v2.sql": "befdd54ee89106d5d64610c03277a0146ad053d2dc195c2c992285a6de920f52",
+    "modules/dev-session/adapters/persistence/migrations/0023_bot_conversations.sql": "210e299a5ebc2e9fa5bd61d116a6644a5e0f043ffaf749ed768e11653ce71e9d",
+    "modules/dev-session/adapters/persistence/migrations/0024_bot_content_links.sql": "a8568ab43be8d538c30c40c0dffe94333173ca32fa99e0b93ca9133341e7c022",
     "modules/events/adapters/persistence/migrations/0001_create_schema.sql": "b19de80e761ea8697df6ddb7349e8c77f0f3953bfb3294b279c546a0545a70cb",
     "modules/events/adapters/persistence/migrations/0002_event_tables.sql": "de4f64852a5917d0f59b4cfcfcf26067fc9ec1ecb0b75e5972c745753da9774d",
     "modules/events/adapters/persistence/migrations/0003_resource_identity.sql": "d738bbf128da82051cb138ab238f50357b2deef7130f9cb0988028113fff5b01",

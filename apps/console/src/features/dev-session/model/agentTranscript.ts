@@ -2,6 +2,7 @@ import type { AgentEvent, AgentEventType, AgentInstanceDto } from '@crewstation/
 
 /** 一条记录；标签文案由组件按 type 查 i18n，模型层不放界面文案。 */
 export interface TranscriptLine {
+  readonly boundary?: string;
   readonly id: string;
   readonly type: AgentEventType;
   /** 事件自带的正文：文本增量、工具名、状态或错误信息。 */

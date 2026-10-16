@@ -1,3 +1,4 @@
+import type { BotContextIdentity } from '@crewstation/contracts';
 import type { ProjectDeletionOwner } from '@crewstation/contracts';
 import type { RuntimeImageHistoryRead, RuntimeImageHistoryItem } from '@crewstation/contracts';
 import type { ResourceWorkload, ResourceWorkloadPage } from '@crewstation/contracts';
@@ -84,6 +85,7 @@ export interface CreateEnvironmentInput {
  * image 是档位修订按摘要固定的镜像；省略时用平台任务镜像（RFC-006 之前受理的 CLI）。
  */
 export interface CreateNativeExecutionInput {
+  botContext?: BotContextIdentity & { mode: 'create' | 'existing'; expectedPreviousExecutionId?: TaskId };
   businessSession?: BusinessSessionStorage;
   runtimeImage?: RuntimeImageExecutionSnapshot;
   id: TaskId;
@@ -110,6 +112,7 @@ export interface RebuildRendering {
 }
 
 export interface TaskRuntimeModuleApi {
+  prepareBotContext(taskId: TaskId, conversationId: string): Promise<{ volumeUid: string } | undefined>;
   readonly deletionOwner?: ProjectDeletionOwner;
   originalInfrastructureOwnership(kind: 'task' | 'rebuild', key: string, representation?: 'current' | 'legacy'): Promise<{ complete: true; id: string; scope: 'project' | 'platform'; projectIds: readonly ProjectId[]; revision: string } | undefined>;
   originalProjectTaskIds(projectId: ProjectId, after: string | null): Promise<readonly TaskId[]>;
