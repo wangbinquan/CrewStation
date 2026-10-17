@@ -126,3 +126,11 @@ MCP／冷续接脚本 12 项、Secret 脚本 7 项、取消／fresh retry 脚本
 ## 2026-10-16 推荐方案部署及实机缺陷修复
 
 `3c1d2eab` 推荐实现及 `15f6eee2` 两个实机缺陷修复的准确 SHA CI 均九项全绿，八组件已部署 Ready，正式 AW 两个 Pod UID 和零重启保持。纯摘要引用复制／保存已通过实际 API，GLM 与 DeepSeek 隐藏副本 r2 已创建，源配置与默认档位均不变。两个真实 OpenCode 探针正在执行，跨模型委派尚未通过；单节点 CPU 限制下使用另一个 50m 服务／100m 任务的隔离项目继续。完整证据与边界见 [最新部署记录](../RFC-042-service-database-restore/acceptance.md#2026-10-16-推荐方案部署及实机缺陷修复)。
+
+## 2026-10-17 任务镜像验证心跳缺陷（AW RFC-370 托管验收发现）
+
+AW 任务镜像（已有镜像修订，底座 `7701acd4`）的任务用途验证在真实平台上 200ms 内以 unknown「验证已取消或租约丢失」结束，没有创建任何验证 Pod。本机运行镜像验证表的最后一次 passed 停在 2026-09-27，即 `463f24d8` 给运行写入加项目删除准入之前。根因：Runner 探针经 task-runtime 的 `runRuntimeImageProbe` 进入 task-runtime 自己的嵌套共享准入，嵌套作用域只携带 `task-runtime.project-admission` 键（`nestedAdmission.test.ts` 明确锁定这一作用域隔离）；探针在其中回调验证心跳时，心跳核对 runtime-environment 的准入键必然抛错，于是第一次心跳即为 false。
+
+修复 `8d127df9`：心跳用 `AsyncLocalStorage.bind` 固定在创建它的原验证回调上下文中执行；嵌套作用域的权限隔离不变，删除封闭仍使心跳为 false。回归用例在另一模块的嵌套准入中回调心跳，修复前得到 `[true, false]`，修复后 `[true, true]` 且验证按 executor 结果落定；`projectAdmission.test.ts` 17 项、runtime-environment 验证／注册表与 task-runtime 共 262 项通过。完整本地门禁（默认测试库）5792 pass／176 skip／2 fail：两项为 `roleRemoval` 与 `nativeProjectDeletion`，要求 `max_prepared_transactions > 0`，在 `max_prepared_transactions=10` 的独立测试库上这两个文件 27 项全过；原失败记录保留。准确 SHA CI `39007600564` 九项全部成功，本机已部署（控制面 `cs-control-plane@sha256:fd10be14…`，Runner 底座 `task-runtime:dev` 仍为 `5a748ec6…`）。
+
+部署后同一版本重新验证：越过心跳进入环境创建，但验证 Pod 因单节点 CPU 不足（平台缺省任务档位 `coding-medium` 1 CPU，节点请求 9.1／10 核）无法调度，按截止时间以「验证环境未能完成初始化」结束。另：本机平台的运行镜像底座仍固定为 `CS_BASE_IMAGE_TAG=rfc027-final-0c8be5fd`，其 Runner 不声明本 RFC 的 `commandSecretEnvVersion`，以项目 Secret 注入命令环境的任务镜像需要改回当前底座；这两项属共享平台配置，待用户决定。

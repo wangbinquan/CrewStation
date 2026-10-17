@@ -1,3 +1,7 @@
+## 2026-10-17 RFC-040：任务镜像验证心跳修复
+
+AW RFC-370 托管验收发现任务镜像验证在真实平台上 200ms 内一律 unknown：Runner 探针在 task-runtime 的嵌套准入里回调心跳，嵌套作用域只带自己的键，心跳核对 runtime-environment 准入必然失败。`8d127df9` 把心跳绑定到原验证回调的上下文，回归用例覆盖嵌套回调；完整本地门禁除两项需 prepared transactions 的用例外全过（两文件在支持的测试库上 27 项通过），准确 SHA CI `39007600564` 九项全绿，已部署本机。验证随后受单节点 CPU 与固定在 `rfc027-final-0c8be5fd` 的平台底座阻塞，待用户决定。详见 [RFC-040 验收记录](proposal/rfc/RFC-040-business-native-materials/acceptance.md)。
+
 ## 2026-10-16 RFC-040/042：推荐方案实现与集中验证，部署验收继续
 
 作者“按推荐实现”已批准平台档位子模型映射，以及独立空库恢复／独立验证／显式维护切换／保留原库。推荐实现 `3c1d2eab` 和实机缺陷修复 `15f6eee2` 的准确 SHA CI 均九项全绿，四份追加迁移已应用，八个系统组件 Ready。修复完整本地门禁 5773 pass／176 skip／1 fail；未改动的旧删除用例 5 秒超时，原文件六项定向复验通过，原失败保留。正式页面和 390px 窄屏生产世代列表、表单状态与焦点恢复通过。两个隐藏 OpenCode 副本已实际复制／保存，源档位及默认档位不变，真实探针和不同模型委派继续。隔离恢复迁移受本机 CPU 请求额度限制，原生产库未切换；RFC 保持 In Progress。正式 AW 两槽 Ready、0 restarts、UID 保持，不停用或删除。详见 [验收记录](proposal/rfc/RFC-042-service-database-restore/acceptance.md)。下方历史与并发产出完整保留。
