@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { NATIVE_REGISTRY_ADMISSION } from '@crewstation/contracts';
 import { jsonHash, newResourceId } from '@crewstation/kernel';
-import { assertSharedDatabaseAdmissionActive, withExclusiveDatabaseAdmission } from '@crewstation/persistence';
+import { assertSharedDatabaseAdmissionActive, withExclusiveDatabaseAdmission, withSharedDatabaseAdmission } from '@crewstation/persistence';
 import { testDatabaseAvailable } from '@crewstation/testkit';
 import { sql } from 'drizzle-orm';
 import { runtimeImageProjectAdmissions, runtimeImageUnitOfWork } from '../adapters/persistence/unitOfWork';
@@ -34,6 +34,23 @@ describe.skipIf(!available)('native registry actual global admission', () => {
       expect((await f.tdb.db.execute<{ exited: boolean }>(sql`SELECT exited_at IS NOT NULL AS exited FROM runtime_environment.deletion_callbacks`))[0]!.exited).toBe(true);
     } finally { await f.tdb.drop(); }
   });
+  // AW RFC-370 实机（2026-10-17）：业务任务在自己的项目准入中保留任务运行镜像，目录事务的多键准入拒绝扩展，
+  // `POST /v3/business-tasks` 一律 500「Cannot expand an active shared admission」。锁住：目录事务嵌套在其他模块准入中仍能提交，
+  // 且原生仓库共享锁在事务内确实持有。
+  test('a catalog transaction inside another module\'s admission nests the native registry admission', async () => {
+    const f = await runtimeImageFixture(); let held = false, locks = 0;
+    const uow = runtimeImageUnitOfWork(f.tdb.db, async () => { assertSharedDatabaseAdmissionActive(f.tdb.db, NATIVE_REGISTRY_ADMISSION); held = true; });
+    try {
+      await withSharedDatabaseAdmission(f.tdb.db, 'business-task.project-admission:' + newResourceId(), async () => {
+        await uow.run(async () => {
+          locks = Number((await f.tdb.db.execute<{ count: number }>(sql`SELECT count(*)::integer AS count FROM pg_locks WHERE locktype='advisory' AND mode='ShareLock' AND granted
+            AND classid=((hashtextextended(${NATIVE_REGISTRY_ADMISSION},0)>>32)&4294967295)::oid AND objid=(hashtextextended(${NATIVE_REGISTRY_ADMISSION},0)&4294967295)::oid`))[0]!.count);
+        });
+      });
+      expect(held).toBe(true); expect(locks).toBe(1);
+    } finally { await f.tdb.drop(); }
+  });
+
   test('a platform build without a project has a durable original callback and excludes reclamation until finally', async () => {
     const f = await runtimeImageFixture(), entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
     const admissions = runtimeImageProjectAdmissions({ db: f.tdb.db, protectCurrent: async () => original, assertAvailable: async () => { throw Error('platform work has no project'); } });

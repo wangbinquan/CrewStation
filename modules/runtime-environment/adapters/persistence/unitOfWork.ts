@@ -1,7 +1,7 @@
 import { allocationReceipts, imageCreationRequests, projectImagePolicies } from './tables';
 import { conflict, jsonHash, newResourceId, precondition } from '@crewstation/kernel';
 import type { Database, Executor } from '@crewstation/persistence';
-import { assertSharedDatabaseAdmissionActive, withSharedDatabaseAdmissions } from '@crewstation/persistence';
+import { assertSharedDatabaseAdmissionActive, withSharedDatabaseAdmission, withSharedDatabaseAdmissions } from '@crewstation/persistence';
 import { NATIVE_REGISTRY_ADMISSION, ProjectIdSchema, ResourceIdSchema } from '@crewstation/contracts';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomBytes } from 'node:crypto';
@@ -39,8 +39,10 @@ export function imageRepositoryScope(db: Executor): RepositoryScope {
     },
   };
 }
+// 目录事务只要原生仓库一把共享准入。业务任务等在自己的项目准入中保留运行镜像，单键准入可嵌套在原 backend 上；
+// 多键入口拒绝扩展已生效准入，曾使业务任务创建在保留任务镜像时一律 500（AW RFC-370 实机）。
 export const runtimeImageUnitOfWork = (db: Database, assertNativeRegistryAvailable?: () => Promise<void>): UnitOfWork => ({ read: imageRepositoryScope(db),
-  run: (fn) => withSharedDatabaseAdmissions(db, [NATIVE_REGISTRY_ADMISSION], async () => {
+  run: (fn) => withSharedDatabaseAdmission(db, NATIVE_REGISTRY_ADMISSION, async () => {
     await assertNativeRegistryAvailable?.(); return db.transaction((tx) => fn(imageRepositoryScope(tx)));
   }) });
 
