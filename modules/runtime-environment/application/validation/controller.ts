@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type { UserId } from '@crewstation/contracts';
 import { compatibilityEvidence, requireAvailable } from '../compatibility';
 import { isPlatformError, jsonHash, newResourceId } from '@crewstation/kernel';
@@ -30,11 +31,13 @@ export function runtimeImageValidationController(deps: RuntimeImageDeps, executo
         claim = await patch({ state: 'running', executionStartedAt: deps.clock.now().toISOString() });
         if (!claim || claim.state !== 'running') return;
         context = { ...context, validation: claim };
-        const heartbeat = async () => {
+        // Runner 探针在 task-runtime 自己的嵌套准入里回调心跳，那里只带它自己的准入键；心跳核对的是
+        // 本验证回调的准入与租约，所以固定在本回调的上下文中执行（RFC-040 实机：未绑定时恒为 false）。
+        const heartbeat = AsyncLocalStorage.bind(async () => {
           try { await deps.projectAdmissions?.check([claim!.projectId]); } catch { return false; }
           const next = await updateClaimedValidation(deps, claim!, async (_s, current) => ({ ...current, leaseUntil: new Date(deps.clock.now().getTime() + 60000).toISOString() }));
           return !!next && next.state === 'running' && (!next.deadline || next.deadline > deps.clock.now().toISOString());
-        };
+        });
         await deps.projectAdmissions?.check([claim.projectId]);
         const outcome = await executor.run(context, heartbeat);
         const matchedImage = outcome.observedImageId === context.snapshot.digest || outcome.observedImageId?.endsWith(`@${context.snapshot.digest}`);

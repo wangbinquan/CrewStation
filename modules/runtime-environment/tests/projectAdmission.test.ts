@@ -1,7 +1,7 @@
 import { testDatabaseAvailable } from '@crewstation/testkit';
 import { afterEach, describe, expect, test } from 'bun:test';
 import { sql } from 'drizzle-orm';
-import { withExclusiveDatabaseAdmission } from '@crewstation/persistence';
+import { withExclusiveDatabaseAdmission, withSharedDatabaseAdmission } from '@crewstation/persistence';
 import { newResourceId } from '@crewstation/kernel';
 import { CreateRuntimeImageRevisionSchema } from '@crewstation/contracts';
 import { runtimeImageFixture, type RuntimeImageFixture } from './runtimeImageFixture';
@@ -147,6 +147,24 @@ test('真正接入的验证心跳看到删除状态后拒绝继续，原 executo
   const after = one(await f.tdb.db.execute(sql`SELECT * FROM runtime_environment.deletion_callbacks WHERE id=${before.id}`));
   expect(after.exited_at).not.toBeNull();
   expect((await f.uow.read.validations.get(validation.id))?.state).toBe('running');
+});
+
+// 2026-10-17 本机实测：任务镜像验证 180ms 内落 unknown「验证已取消或租约丢失」，自 463f24d8 起本机再无验证通过。
+// 根因：Runner 探针经 task-runtime 的 runRuntimeImageProbe 进入它自己的嵌套准入（只带
+// task-runtime.project-admission 键），在其中回调的心跳核对本模块的准入键必然失败。锁住：
+// 心跳在原验证回调的上下文里执行，从别的模块嵌套准入中回调仍为真，验证按 executor 结果结束。
+test('真正接入的验证心跳从其他模块的嵌套准入中回调时，项目可用即保持为真', async () => {
+  const beats: boolean[] = [];
+  const executor: RuntimeImageValidationExecutor = { run: async (context, heartbeat) => {
+    beats.push(await heartbeat());
+    await withSharedDatabaseAdmission(fixtures.at(-1)!.tdb.db, 'task-runtime.project-admission:' + context.validation.projectId, async () => { await Bun.sleep(20); beats.push(await heartbeat()); });
+    return { state: 'failed', error: 'probe-result', checks: [] };
+  }, stop: async () => true };
+  const { f } = await setup(undefined, executor, true), version = await builtVersion(f);
+  const validation = await f.api.startValidation(f.developer, f.project, version.id, { requestKey: 'admitted-heartbeat', target: { usage: 'task' } });
+  await f.api.runValidation(validation.id);
+  expect(beats).toEqual([true, true]);
+  expect(await f.uow.read.validations.get(validation.id)).toMatchObject({ state: 'failed', error: 'probe-result' });
 });
 
 test('源码准备经过原准入，封闭后不能继续读取原仓库；平台镜像定义仍可维护', async () => {
