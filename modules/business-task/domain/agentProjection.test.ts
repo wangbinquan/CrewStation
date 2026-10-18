@@ -21,6 +21,19 @@ test('Agent text, tool calls, native session and usage map to validated durable 
   expect(BusinessEventSchema.safeParse(usage).success).toBe(true);
 });
 
+// AW RFC-370 hosted acceptance (2026-10-18): OpenCode reports a tool only once it has finished, so the driver's
+// tool-start already carries the result. Projecting it as a start dropped the result, and business clients showed
+// every OpenCode tool call as still running with no output.
+test('an OpenCode tool reported once finished projects as tool-end with its input; a start without a result stays a start', () => {
+  const completed = projectCommandEvent(initial, input({ type: 'tool-start', tool: { callId: 'call', name: 'bash', input: { command: 'ls' }, output: 'a.ts' } }), 'cursor', summary).event;
+  expect(completed).toMatchObject({ type: 'tool-end', data: { callId: 'call', name: 'bash', input: { command: 'ls' }, output: 'a.ts', isError: false } });
+  const failed = projectCommandEvent(initial, input({ type: 'tool-start', tool: { callId: 'bad', name: 'bash', input: { command: 'x' }, isError: true } }), 'cursor', summary).event;
+  expect(failed).toMatchObject({ type: 'tool-end', data: { callId: 'bad', isError: true } });
+  const started = projectCommandEvent(initial, input({ type: 'tool-start', tool: { callId: 'claude', name: 'Read', input: { path: 'a' } } }), 'cursor', summary).event;
+  expect(started).toEqual({ ...started, type: 'tool-start', data: { callId: 'claude', name: 'Read', input: { path: 'a' } } });
+  for (const event of [completed, failed, started]) expect(BusinessEventSchema.safeParse(event).success).toBe(true);
+});
+
 test('waiting stays live; CLI completion is verifying until final durable watermark, errors never become success', () => {
   expect(projectCommandEvent(initial, input({ type: 'status', status: 'waiting' }), 'cursor', summary).view).toMatchObject({ state: 'awaiting-input', process: 'live' });
   const completed = projectCommandEvent(initial, input({ type: 'completed' }), 'cursor', summary).view;

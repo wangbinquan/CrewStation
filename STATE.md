@@ -1,6 +1,10 @@
+## 2026-10-18 RFC-040：OpenCode 已完成工具投影为带输入的 tool-end
+
+AW 托管节点会话把每个 OpenCode 工具都显示为运行中、无输出：OpenCode 只在工具完成或出错时报告一次，驱动的 `tool-start` 已带回执，业务投影却只取名字与输入。带结果的 `tool-start` 现投影为 `tool-end`，契约 `tool-end` 新增可选 `input`（金样破坏性 0、新增 1）；Claude 的开始事件不变，Agent 事件流与工作台不受影响。回归用例修复前红、修复后绿；完整本地门禁 5805 pass／176 skip／0 fail，准确 SHA CI 与部署待完成。详见 [RFC-040 验收记录](proposal/rfc/RFC-040-business-native-materials/acceptance.md)。
+
 ## 2026-10-18 RFC-040：已受理 Agent 子任务的容量拒绝留给后台继续
 
-AW RFC-370 托管验收中，额度满时同键重放与后台 claim 竞态，已答 2xx 的 Agent 子任务被后台记为 `retryable-rejected`；该状态只有同键重放才能重新准入，调用方却已无理由重放，节点一直 pending 到 30 分钟截止。修复后仍在等待回执的提交／重试请求照旧 429，后台继续已答复的子任务时容量不足保持 pending、额度空出后用原环境 ID 准入；RFC-027 设计 §3 已补充。回归用例修复前红、修复后绿，相关四文件 15 项通过；完整本地门禁（独立测试库）5804 pass／176 skip／0 fail。准确 SHA CI、本机部署与 AW 托管复跑待完成。此前 `191f9ad1`（CI 39020650971）已部署，任务镜像验证通过，两项共享配置按用户裁定处理。详见 [RFC-040 验收记录](proposal/rfc/RFC-040-business-native-materials/acceptance.md)。
+AW RFC-370 托管验收中，额度满时同键重放与后台 claim 竞态，已答 2xx 的 Agent 子任务被后台记为 `retryable-rejected`；该状态只有同键重放才能重新准入，调用方却已无理由重放，节点一直 pending 到 30 分钟截止。修复后仍在等待回执的提交／重试请求照旧 429，后台继续已答复的子任务时容量不足保持 pending、额度空出后用原环境 ID 准入；RFC-027 设计 §3 已补充。回归用例修复前红、修复后绿，相关四文件 15 项通过；完整本地门禁（独立测试库）5804 pass／176 skip／0 fail；`621e6183` 的准确 SHA CI `39125433559` 全部成功，已部署本机（控制面 `cs-control-plane@sha256:9b0c1c3d…`）。AW 托管复跑：同一失败任务经平台恢复动作 `resume-task` 续跑，节点完成，评审通过后任务 done。此前 `191f9ad1`（CI 39020650971）已部署，任务镜像验证通过，两项共享配置按用户裁定处理。详见 [RFC-040 验收记录](proposal/rfc/RFC-040-business-native-materials/acceptance.md)。
 
 ## 2026-10-17 RFC-040：任务镜像验证心跳修复
 

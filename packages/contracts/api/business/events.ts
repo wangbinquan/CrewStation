@@ -26,7 +26,8 @@ export const BusinessEventSchema = z.discriminatedUnion('type', [
   z.strictObject({ ...envelope, type: z.literal('execution-state'), data: z.strictObject({ state: BusinessSubtaskStateV3Schema, process: BusinessProcessStateSchema, reason: z.string().optional() }) }),
   z.strictObject({ ...envelope, type: z.literal('text'), data: z.strictObject({ text: z.string() }) }),
   z.strictObject({ ...envelope, type: z.literal('tool-start'), data: z.strictObject({ callId: z.string(), name: z.string(), input: z.unknown().optional() }) }),
-  z.strictObject({ ...envelope, type: z.literal('tool-end'), data: z.strictObject({ callId: z.string(), name: z.string(), output: z.unknown().optional(), isError: z.boolean() }) }),
+  // `input` accompanies a call the runtime reports only once, finished (OpenCode); a separately reported start already carried it.
+  z.strictObject({ ...envelope, type: z.literal('tool-end'), data: z.strictObject({ callId: z.string(), name: z.string(), input: z.unknown().optional(), output: z.unknown().optional(), isError: z.boolean() }) }),
   z.strictObject({ ...envelope, type: z.literal('session'), data: z.strictObject({ sessionId: z.string().min(1) }) }),
   z.strictObject({ ...envelope, type: z.literal('usage'), data: BusinessUsageSchema }),
   z.strictObject({ ...envelope, type: z.literal('output'), data: z.strictObject({ stream: z.enum(['stdout', 'stderr']), text: z.string() }) }),

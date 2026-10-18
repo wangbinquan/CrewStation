@@ -3429,6 +3429,7 @@
                           "callId": {
                             "type": "string"
                           },
+                          "input": {},
                           "isError": {
                             "type": "boolean"
                           },
