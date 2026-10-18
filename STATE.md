@@ -1,3 +1,7 @@
+## 2026-10-18 RFC-040 Done：工具结果投影部署，AW RFC-370 联合验收完成
+
+`02b66a22`（OpenCode 已完成工具投影为带输入的 tool-end）的准确 SHA CI 39130776880 唯一失败为未改动的 `runtimes/task/tests/runnerLifecycle.test.ts` 预览监督用例（waitFor 超时），原失败保留、未认领；后继 `34331a3c` 的 CI 39133757698 全部成功并已部署本机（控制面 `cs-control-plane@sha256:17bb84bf…`、控制台 `cs-console@sha256:4ed20b0b…`）。AW 托管任务 `01M57RVYMS1S6BDJM4MR5F5WWB` 的 bash 工具调用在节点会话中为 completed、带输入与输出 `tool-end-42`，真实浏览器渲染一致。连同此前的原生材料、本地 MCP／插件／权限、私有 Git、接管与 `resume-task` 恢复证据，T6 联合验收（按用户裁定只验证 OpenCode）完成，RFC-040 标记 Done；Claude 档位按能力影响补充表不宣称原生能力。注意：安装脚本重新发布任务底座时 `CS_TASK_IMAGE` 摘要变化，已有任务镜像验证全部失效（AW 正式服务约 10 分钟启动被拒，重新验证后恢复）——平台升级换底座后须重新验证在用任务镜像。详见 [RFC-040 验收记录](proposal/rfc/RFC-040-business-native-materials/acceptance.md)。
+
 ## 2026-10-18 RFC-042：发布迁移 Job 改用服务套餐资源
 
 恢复与校验 Job 已用服务套餐资源，发布迁移 Job 仍固定请求 500m：单节点请求约 97%（可用约 245m）时独立恢复服务的首个发布排不上迁移，正式 AW 的 v0.6.15 也因此超时。资源中心路径的迁移 Job 现取服务套餐的 CPU 与内存（取不到时沿用原值），构建 Job 与旧非台账路径不变；回归用例修复前红、修复后绿；完整本地门禁 5804 pass／176 skip／1 fail（未改动的 scm 本机 GitLab 用例机器人令牌时序，单独复跑 6 项通过，原失败保留）。准确 SHA CI、部署与独立服务恢复验收待完成。详见 [RFC-042 验收记录](proposal/rfc/RFC-042-service-database-restore/acceptance.md)。

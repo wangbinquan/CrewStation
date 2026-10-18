@@ -1,6 +1,6 @@
-# RFC-040 验证记录（进行中）
+# RFC-040 验证记录
 
-2026-10-15，用户明确授权“那这个RFC040你接手”。本记录只覆盖已经完成的证据，不代表 RFC Done。
+2026-10-15，用户明确授权“那这个RFC040你接手”。各节按时间记录当时的证据；最终结论见末节「2026-10-18 收口」。
 
 ## 生产实现与集中验证
 
@@ -144,3 +144,21 @@ AW 任务镜像（已有镜像修订，底座 `7701acd4`）的任务用途验证
 这与本合同「已受理后只能继续原操作，不能再变成未受理 429」的意图相悖。修复让 `dispatchBusinessAgent` 区分结果的接收方：提交／重试请求仍在等待时，容量不足照旧记为可重试拒绝并答 429；后台 worker 继续已答复的子任务时，容量不足保持 pending，由 worker 在额度空出后继续准入，环境 ID 不变。RFC-027 设计 §3 对应条目已补充说明。回归用例 `executionAgents.test.ts`「a capacity rejection after the 2xx answer stays queued…」：首次提交因暂时性准入失败得 202，随后后台两次遇额度不足，额度恢复后同一环境 ID 准入并启动 Agent。修复前该用例得到 `retryable-rejected`，修复后通过；原「quota rejection never queues capacity retry」同步 429 用例不变，相关四文件 15 项通过；完整本地门禁（独立测试库 `max_prepared_transactions=10`）5804 pass／176 skip／0 fail。`621e6183` 的准确 SHA [CI 39125433559](https://github.com/wangbinquan/CrewStation/actions/runs/39125433559) 全部成功，本机部署控制面 `cs-control-plane@sha256:9b0c1c3d…`（八组件 Ready，平台配置 `CS_BASE_IMAGE_TAG=dev`、缺省任务档位未设置保持不变，正式 AW 两个 Pod 未重启）。部署后对原失败任务的父任务发起平台恢复动作 `resume-task`（请求 `01a14eef-530f-…` 21 秒内 succeeded），AW 续跑后澄清节点的新尝试完成，评审门批准后任务 done，结果与单机对照逐端口相同。
 
 **OpenCode 工具结果在业务事件中丢失。** 同一轮 AW 托管验收中，AW 的节点会话树把每个 OpenCode 工具调用都显示为「运行中、无输出」：业务事件流对每个工具只有 `tool-start`，没有 `tool-end`。OpenCode 的 `run --format json` 只在工具 part 已 completed 或 error 时输出一次 `tool_use`（opencode `packages/opencode/src/cli/cmd/run.ts:717-720`），驱动因此在 `tool-start` 上已带回执与错误标记，而业务投影只取名字与输入。修复：带结果的 `tool-start`（OpenCode 的已完成调用）投影为 `tool-end`，`tool-end` 契约新增可选 `input`（契约金样：破坏性 0、新增 1）；只有输入的开始事件（Claude 的 `tool_use`）照旧是 `tool-start`。Agent 事件流本身不变，工作台 Bot 记录与档位探针不受影响。回归用例 `agentProjection.test.ts`：已完成与出错的 OpenCode 调用各投影为带输入的 `tool-end`，修复前该用例失败；无结果的开始事件保持 `tool-start`，三者都通过业务事件模式校验。完整本地门禁 5805 pass／176 skip／0 fail。
+
+## 2026-10-18 收口：工具结果投影部署与 AW RFC-370 联合验收（Done）
+
+**投影修复的 CI 与部署。** `02b66a22` 的准确 SHA [CI 39130776880](https://github.com/wangbinquan/CrewStation/actions/runs/39130776880) 唯一失败在 `runtimes/task/tests/runnerLifecycle.test.ts` 的预览监督用例：该文件不在本提交的改动与依赖范围内（本提交只改业务投影与 `tool-end` 契约），原失败记录保留、未认领。紧随其后的 `34331a3c`（RFC-042，父提交即 `02b66a22`，投影相关文件未改）的 [CI 39133757698](https://github.com/wangbinquan/CrewStation/actions/runs/39133757698) 全部成功，作为包含本修复的后继证据。`34331a3c` 已部署本机：控制面 `cs-control-plane@sha256:17bb84bf…`、控制台 `cs-console@sha256:4ed20b0b…`，平台配置不变（控制台镜像的依赖安装在无代理时挂起，改以代理预构建后再执行安装脚本）。安装脚本同时重新发布了任务底座 `task-runtime:dev`（`5a748ec6…` → `5acdc4da…`）；`CS_TASK_IMAGE` 按摘要固定底座并进入任务用途验证的合同摘要（`modules/platform/application/runtimeImagePorts.ts:58`），已有任务镜像验证随之失效，AW 正式服务约 10 分钟内的任务启动被 `412 image_usage_unvalidated` 拒绝，重新验证后恢复（详见 AW `design/RFC-370-crewstation-hosted-deployment/status.md`）。这是运行镜像验证的既有设计，不属本 RFC 范围；平台升级换底座后须重新验证在用的任务镜像。
+
+**AW 托管实测：工具调用以完成态显示输入与输出。** AW 任务 `01M57RVYMS1S6BDJM4MR5F5WWB`（AW 正式 v0.6.19，OpenCode 档位 `opencode-go/deepseek-v4.1-flash`）要求 Agent 用 bash 执行 `echo tool-end-$((6*7))`：节点会话树中该工具调用为 `completed`，输入 `{"command":"echo tool-end-$((6*7))"}`、输出 `tool-end-42`；同一会话经 AW v0.6.21 预览槽在真实浏览器（Playwright 无头 Chromium）中渲染为「工具调用 bash 已完成 … 工具返回 tool-end-42」。修复前同类调用一律显示为运行中、无输出。
+
+**T6 联合验收（按用户裁定只验证 OpenCode）。** AW 侧证据均记在 AW 仓 `design/RFC-370-crewstation-hosted-deployment/status.md`：
+
+| 能力 | AW 托管证据 |
+| --- | --- |
+| 原生材料：托管技能、远程 MCP、内部子代理（跨模型） | `01M5698XA6Q9AGV9ZKDM9W0XHX`：三个端口逐字等于技能／MCP／子代理各自的随机标记；启动清单 verified；平台用量按 `glm-5.2` 与 `deepseek-v4.1-flash` 分列 |
+| 本地 stdio MCP、Git 插件、权限 | `01M57CSZ2BS5YAVZJ7A2PAJS9Q`：插件 system transform 生效、插件 `config` 钩子看到 `bash=deny`、模型工具清单无 bash；MCP env 秘密在公共事件中为 `***` |
+| 私有 Git（命令 Secret） | M1 `01M5634T53TYTZVM2RPZTD4439`：凭据以项目 Secret 引用注入卷内命令，提交推送到本机 GitLab 项目 550 |
+| 重启／接管与恢复 | `01M573PVYFDZZNRS2E4GPTPQQK`：服务切流时新实例按原运行 ID 接管流式中的 Agent 子任务，无第二次执行；`01M5798CMMH92MAD2405HFTXXK`：额度缺陷修复（`621e6183`）后经平台恢复动作 `resume-task` 续跑至 done |
+| 工具结果 | 上文 `01M57RVYMS1S6BDJM4MR5F5WWB` |
+
+**结论：RFC-040 Done（2026-10-18）。** T1–T7 的生产实现与用例、准确 SHA CI、本机部署、CS 单侧 OpenCode 实测与 AW RFC-370 联合实测均已完成。按用户裁定未做 Claude Code 实机验收：双协议的生产实现与合同用例保留，但按「能力影响补充」表，Claude 档位不宣称原生能力，需要时另立 RFC 补齐 Claude 探针后开放。「能力影响补充」表随 `61478743` 落地；用户 2026-10-18 授权本会话统一审视并自主推进或关闭 RFC-040／042，据此收口，未另行记录逐项确认。

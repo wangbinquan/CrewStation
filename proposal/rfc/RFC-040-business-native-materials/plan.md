@@ -1,6 +1,6 @@
 # RFC-040 实施计划
 
-状态：In Progress；2026-10-15 用户授权接手，CS 实现、集中验证、准确 SHA CI、本机部署与 OpenCode 实机验收已完成，AW 联合接线及验收进行中。
+状态：Done（2026-10-18）；2026-10-15 用户授权接手。CS 实现、集中验证、准确 SHA CI、本机部署、OpenCode 实机验收与 AW RFC-370 联合验收均已完成，见 [验证记录](./acceptance.md) 末节。
 
 验收范围裁定：用户随后明确“不要验证claude code了，只验证opencode”。本次仅以 OpenCode 作为实机 CLI 验收范围，不再启动 Claude Code 实测；已完成的双协议生产实现与合同用例保留。
 
