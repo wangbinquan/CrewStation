@@ -31,7 +31,7 @@ export function executionRetryUseCases(deps: BusinessExecutionDeps): Pick<Busine
       if (accepted) {
         if (accepted.requestDigest !== digest) throw conflict('重试幂等键参数不同', { code: 'idempotency_conflict' });
         const replay = fence || accepted.dispatch === 'retryable-rejected' ? await deps.subtasks.adoptPending(accepted, authorization) : accepted;
-        if (accepted.dispatch === 'retryable-rejected') { const claim = await deps.subtasks.claim(newResourceId(), replay.view.id); if (claim) await dispatchBusinessAgent(deps, claim); }
+        if (accepted.dispatch === 'retryable-rejected') { const claim = await deps.subtasks.claim(newResourceId(), replay.view.id); if (claim) await dispatchBusinessAgent(deps, claim, 'caller'); }
         return subtaskResponse((await deps.subtasks.get(context.serviceId, taskId, replay.view.id))!, false);
       }
       const previous = await deps.subtasks.get(context.serviceId, taskId, subtaskId);
@@ -62,7 +62,7 @@ export function executionRetryUseCases(deps: BusinessExecutionDeps): Pick<Busine
         }, authorization, agent?.plan.materialIdentity ? { materialId: agent.plan.materialIdentity.materialId } : undefined);
       }, (result) => result.subtask.runtimeTaskId);
       const claim = await deps.subtasks.claim(newResourceId(), saved.subtask.view.id);
-      if (claim) { if (claim.view.kind === 'agent') await dispatchBusinessAgent(deps, claim); else await dispatchBusinessCommand(deps, claim); }
+      if (claim) { if (claim.view.kind === 'agent') await dispatchBusinessAgent(deps, claim, 'caller'); else await dispatchBusinessCommand(deps, claim); }
       return subtaskResponse((await deps.subtasks.get(context.serviceId, taskId, saved.subtask.view.id))!, saved.created);
     },
   };

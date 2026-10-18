@@ -52,6 +52,23 @@ describe.skipIf(!available)('RFC-027 independent durable Agent execution', () =>
     expect(f.agentBehavior.resolveCount).toBe(1);
     expect((await f.request(f.path, { ...f.input, prompt: 'different' })).status).toBe(409);
   });
+  // RFC-040 live AW acceptance (2026-10-18): a replayed submit answered 200 while the worker's own claim hit the
+  // project quota. The subtask was parked as retryable-rejected, which nothing claims, so the caller saw `pending`
+  // until its 30-minute deadline. Once a request is answered 2xx, capacity rejections must stay with the worker.
+  test('a capacity rejection after the 2xx answer stays queued and the worker admits it without a replay', async () => {
+    const f = await executionAgentFixture(tdb.db); f.agentBehavior.unavailable = true;
+    const response = await f.request(f.path, f.input); expect(response.status).toBe(202);
+    const view = await response.json() as BusinessSubtaskV3Dto; expect(f.creates).toHaveLength(1);
+    const subtasks = drizzleExecutionSubtasks(tdb.db), dispatch = async () => (await subtasks.get(f.serviceId, f.task.id, view.id))!.dispatch;
+    f.agentBehavior.unavailable = false; f.agentBehavior.quota = true;
+    await f.module.api.v3.runOnce(); expect(f.creates).toHaveLength(2); expect(await dispatch()).toBe('pending');
+    await f.module.api.v3.runOnce(); expect(f.creates).toHaveLength(3);
+    f.agentBehavior.quota = false;
+    await f.module.api.v3.runOnce(); expect(f.creates).toHaveLength(4);
+    expect(new Set(f.creates.map((c) => c.id)).size).toBe(1);
+    f.ready(); await f.module.api.v3.runOnce();
+    expect(f.agentBehavior.starts).toBe(1); expect((await f.get(view.id)).process).toBe('live');
+  });
   test('admission receipt lost never creates replacement; cancellation waits for original Pod cleanup and never starts CLI', async () => {
     const f = await executionAgentFixture(tdb.db); f.agentBehavior.createLost = true;
     const view = await (await f.request(f.path, f.input)).json() as BusinessSubtaskV3Dto;

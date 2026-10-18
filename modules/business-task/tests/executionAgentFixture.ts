@@ -9,7 +9,7 @@ import type { ComputeCatalog, CreateSubtaskExecutionInput, EnvironmentView } fro
 export async function executionAgentFixture(db: Database, materials?: { prompt?: string; schema?: string; missing?: boolean }, businessConfig?: BusinessConfig) {
   const contractId = newResourceId();
   const profileId = newResourceId(), computeId = newResourceId(), image = `registry.test/agent@sha256:${'1'.repeat(64)}`;
-  const behavior = { businessSupported: true, revision: 1, providerKey: 'provider-secret-one', resolveCount: 0, quota: false, createLost: false, startLost: false, starts: 0, createGate: undefined as Promise<void> | undefined };
+  const behavior = { businessSupported: true, revision: 1, providerKey: 'provider-secret-one', resolveCount: 0, quota: false, unavailable: false, createLost: false, startLost: false, starts: 0, createGate: undefined as Promise<void> | undefined };
   const compute: ComputeCatalog = {
     resolve: async () => { behavior.resolveCount++; return { id: computeId, name: 'compute', revision: behavior.revision, image, protocol: 'opencode', businessExecution: behavior.businessSupported ? { protocolVersion: 3, capabilities: BUSINESS_AGENT_CAPABILITIES, nativeProbeVersion: 2 } : undefined }; },
     launchMaterial: async (ref) => ({ id: ref.profileId, name: 'compute', revision: ref.revision, image, protocol: 'opencode', launch: LaunchSpecSchema.parse({ protocol: 'opencode', binaryPath: '/usr/bin/opencode' }),
@@ -21,6 +21,7 @@ export async function executionAgentFixture(db: Database, materials?: { prompt?:
   f.environmentPort.createNativeExecution = async (input) => {
     creates.push(input); await behavior.createGate;
     const previous = f.environments.get(input.id); if (previous) return previous;
+    if (behavior.unavailable) throw new Error('runtime owner unavailable');
     if (behavior.quota) throw quotaExceeded('full');
     const env: EnvironmentView = { id: input.id, projectId: f.projectId, state: 'creating', connected: false, profile: f.taskProfileId, traceId: f.task.traceId, podName: `agent-${input.id}`, native: { state: 'starting' } };
     f.environments.set(input.id, env);

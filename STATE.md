@@ -1,3 +1,7 @@
+## 2026-10-18 RFC-040：已受理 Agent 子任务的容量拒绝留给后台继续
+
+AW RFC-370 托管验收中，额度满时同键重放与后台 claim 竞态，已答 2xx 的 Agent 子任务被后台记为 `retryable-rejected`；该状态只有同键重放才能重新准入，调用方却已无理由重放，节点一直 pending 到 30 分钟截止。修复后仍在等待回执的提交／重试请求照旧 429，后台继续已答复的子任务时容量不足保持 pending、额度空出后用原环境 ID 准入；RFC-027 设计 §3 已补充。回归用例修复前红、修复后绿，相关四文件 15 项通过；完整本地门禁（独立测试库）5804 pass／176 skip／0 fail。准确 SHA CI、本机部署与 AW 托管复跑待完成。此前 `191f9ad1`（CI 39020650971）已部署，任务镜像验证通过，两项共享配置按用户裁定处理。详见 [RFC-040 验收记录](proposal/rfc/RFC-040-business-native-materials/acceptance.md)。
+
 ## 2026-10-17 RFC-040：任务镜像验证心跳修复
 
 AW RFC-370 托管验收发现任务镜像验证在真实平台上 200ms 内一律 unknown：Runner 探针在 task-runtime 的嵌套准入里回调心跳，嵌套作用域只带自己的键，心跳核对 runtime-environment 准入必然失败。`8d127df9` 把心跳绑定到原验证回调的上下文，回归用例覆盖嵌套回调；完整本地门禁除两项需 prepared transactions 的用例外全过（两文件在支持的测试库上 27 项通过），准确 SHA CI `39007600564` 九项全绿，已部署本机。验证随后受单节点 CPU 与固定在 `rfc027-final-0c8be5fd` 的平台底座阻塞，待用户决定。详见 [RFC-040 验收记录](proposal/rfc/RFC-040-business-native-materials/acceptance.md)。

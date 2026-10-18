@@ -8,13 +8,21 @@ import { agentCommand, agentPayloadDigest } from './agentMaterial';
 import { acceptReceipt, readReceipt, unknown } from './commandDispatch';
 import { businessExecutionWork } from './deletion/projectWork';
 
+/**
+ * Who receives the outcome of this dispatch. `caller`: the submit or retry request is still open and answers a
+ * capacity rejection itself with 429, so the subtask becomes a retryable rejection that only a same-key replay
+ * re-admits (RFC-027 §3: the platform does not queue for capacity). `background`: that request was already
+ * answered 2xx, so nobody would ever see a rejection; the subtask stays pending and the worker retries admission.
+ */
+export type AgentDispatchCaller = 'caller' | 'background';
+
 /** Environment and RPC always reuse their durable identities, including after ambiguous admission. */
-export async function dispatchBusinessAgent(deps: BusinessExecutionDeps, claimed: ExecutionSubtask): Promise<void> {
+export async function dispatchBusinessAgent(deps: BusinessExecutionDeps, claimed: ExecutionSubtask, caller: AgentDispatchCaller): Promise<void> {
   let incarnation = claimed.incarnation;
   try {
     const plan = JSON.parse(await deps.cipher.open(claimed.sealedPayload)) as ExecutionAgentPlan;
     if (plan.kind !== 'agent-plan' || !claimed.runtimeTaskId) throw new Error('invalid Agent execution plan');
-    const env = await ensureAgentEnvironment(deps, claimed, plan);
+    const env = await ensureAgentEnvironment(deps, claimed, plan, caller);
     if (!env) return;
     if (env.native?.state === 'finished' || env.state === 'failed' || env.state === 'released') {
       if (incarnation) await unknown(deps, claimed, 'agent_environment_lost');
@@ -49,7 +57,7 @@ export async function dispatchBusinessAgent(deps: BusinessExecutionDeps, claimed
     else await deps.subtasks.settle(claimed, { dispatch: 'pending', view: claimed.view });
   }
 }
-async function ensureAgentEnvironment(deps: BusinessExecutionDeps, claimed: ExecutionSubtask, plan: ExecutionAgentPlan) {
+async function ensureAgentEnvironment(deps: BusinessExecutionDeps, claimed: ExecutionSubtask, plan: ExecutionAgentPlan, caller: AgentDispatchCaller) {
   if (plan.runtimeImage) {
     if (!deps.runtimeImages?.confirmAgent) throw precondition('未启用业务 Agent 镜像引用确认', { code: 'unsupported_capability' });
     await deps.runtimeImages.confirmAgent(plan.runtimeImage, claimed.runtimeTaskId!);
@@ -65,7 +73,9 @@ async function ensureAgentEnvironment(deps: BusinessExecutionDeps, claimed: Exec
   } catch (error) {
     if (isPlatformError(error) && error.kind === 'quota_exceeded') {
       // The runtime owner checks the original ID before quota. This rejection proves no resource was admitted.
-      await deps.subtasks.settle(claimed, { dispatch: 'retryable-rejected', runtimeDispatched: false, runtimeAdmitted: false, view: claimed.view });
+      // A rejection after a 2xx answer must not wait for a replay the caller has no reason to send: before this,
+      // the background claim of an accepted subtask parked it here and the caller observed `pending` until its deadline.
+      await deps.subtasks.settle(claimed, { dispatch: caller === 'caller' ? 'retryable-rejected' : 'pending', runtimeDispatched: false, runtimeAdmitted: false, view: claimed.view });
       return undefined;
     }
     throw error;

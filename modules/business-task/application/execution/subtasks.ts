@@ -19,11 +19,13 @@ export function executionSubtaskUseCases(deps: BusinessExecutionDeps): Pick<Busi
     if (!parent) throw notFound('业务任务', taskId);
     return { ...context, parent };
   };
+  // An explicit id is the submit request dispatching its own subtask before it answers; without one the worker
+  // continues subtasks whose requests were already answered.
   const progress = async (id?: string) => {
     const claimed = await deps.subtasks.claim(newResourceId(), id);
     if (!claimed) return 0;
     await businessExecutionWork(deps, { serviceId: claimed.serviceId, taskId: claimed.taskId, kind: 'subtask', reference: claimed.view.id, revision: claimed.revision }, async (scoped) => {
-      if (claimed.view.kind === 'agent') await dispatchBusinessAgent(scoped, claimed); else await dispatchBusinessCommand(scoped, claimed);
+      if (claimed.view.kind === 'agent') await dispatchBusinessAgent(scoped, claimed, id ? 'caller' : 'background'); else await dispatchBusinessCommand(scoped, claimed);
     }); return 1;
   };
   return {
