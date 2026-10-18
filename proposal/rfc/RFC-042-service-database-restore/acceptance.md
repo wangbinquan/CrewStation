@@ -40,3 +40,7 @@ Chrome 正式页面与 390px 窄屏验证：仅有一个原生产数据库世代
 OpenCode 双模型使用另外的 50m 服务／100m 任务隔离项目 `rfc040-two-model-20261016`（`01a1447f-5806-7000-a736-47bf6783f71f`）。两个隐藏副本已实际复制并保存到 r2：GLM `01a14489-d40c-7000-8179-fd183c445c4b`，DeepSeek `01a14489-d4f8-7000-bbac-f691878394df`。源档位 r3 与默认档位 r16 的 contentHash、内容、凭据状态和默认标记均与原快照相同。真实兼容探针运行中，跨模型内部委派尚未宣称通过。
 
 机器回执：`/private/tmp/cs-rfc040-rfc042-repair-ci-result.json`、`cs-rfc040-rfc042-repair-deployed.json`、`cs-rfc040-digest-gate-reconciled.json`、`cs-rfc040-source-profile-preservation.json`；完整失败日志与之前已通过的实机记录保留。RFC-040/042 继续 In Progress，只验证 OpenCode。
+
+## 2026-10-18 发布迁移 Job 改用服务套餐资源
+
+独立服务恢复验收在本机受单节点 CPU 阻塞：恢复与校验 Job 已按「2026-10-16 审查修复」使用服务套餐资源，但发布流水线的迁移 Job 仍固定请求 500m（`MIGRATION_RESOURCES`），节点请求约 97% 时可用约 245m，独立服务的首个发布连迁移都排不上；AW RFC-370 托管验收中正式 AW 的 v0.6.15 也因迁移 Pod 无法调度而超时失败。资源中心路径（`ledgerJobs.ts`）的迁移 Job 现与恢复／校验 Job 一致取服务套餐的 CPU 与内存（取不到套餐时沿用原固定值）；构建 Job 与旧的非台账路径不变。回归用例 `ledgerJobs.test.ts` 断言迁移 Job 带套餐资源，修复前失败。完整本地门禁 5804 pass／176 skip／1 fail：唯一失败是未改动的 `modules/scm/tests/gitlabIntegration.test.ts`「受保护 main」用例，本机 GitLab 刚建的项目机器人令牌在克隆时未被接受（`could not read Password … terminal prompts disabled`）；本改动不涉及 scm，门禁结束后单独复跑该文件 6 项通过，原失败记录保留，不写成一次全量全绿。

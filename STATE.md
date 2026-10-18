@@ -1,3 +1,7 @@
+## 2026-10-18 RFC-042：发布迁移 Job 改用服务套餐资源
+
+恢复与校验 Job 已用服务套餐资源，发布迁移 Job 仍固定请求 500m：单节点请求约 97%（可用约 245m）时独立恢复服务的首个发布排不上迁移，正式 AW 的 v0.6.15 也因此超时。资源中心路径的迁移 Job 现取服务套餐的 CPU 与内存（取不到时沿用原值），构建 Job 与旧非台账路径不变；回归用例修复前红、修复后绿；完整本地门禁 5804 pass／176 skip／1 fail（未改动的 scm 本机 GitLab 用例机器人令牌时序，单独复跑 6 项通过，原失败保留）。准确 SHA CI、部署与独立服务恢复验收待完成。详见 [RFC-042 验收记录](proposal/rfc/RFC-042-service-database-restore/acceptance.md)。
+
 ## 2026-10-18 RFC-040：OpenCode 已完成工具投影为带输入的 tool-end
 
 AW 托管节点会话把每个 OpenCode 工具都显示为运行中、无输出：OpenCode 只在工具完成或出错时报告一次，驱动的 `tool-start` 已带回执，业务投影却只取名字与输入。带结果的 `tool-start` 现投影为 `tool-end`，契约 `tool-end` 新增可选 `input`（金样破坏性 0、新增 1）；Claude 的开始事件不变，Agent 事件流与工作台不受影响。回归用例修复前红、修复后绿；完整本地门禁 5805 pass／176 skip／0 fail，准确 SHA CI 与部署待完成。详见 [RFC-040 验收记录](proposal/rfc/RFC-040-business-native-materials/acceptance.md)。

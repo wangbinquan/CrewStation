@@ -74,7 +74,8 @@ describe.skipIf(!available)('构建、迁移 Job 由资源中心建出（RFC-025
     await release.api.runPipelineStep(rel.id);
     expect((await release.api.getRelease(admin, rel.id)).status).toBe('migrating');
     const migration = (await jobRecord(rel.id, 'migration'))!;
-    expect(migration.spec['job']).toMatchObject({ purpose: 'migration', image: 'registry/jobs:v0.0.1', command: ['bun', 'run', 'migrate'], env: {}, resources: { cpu: '500m', memory: '512Mi' } });
+    // The migration takes the service plan's resources, like the RFC-042 restore Jobs, not a fixed 500m (AW RFC-370 hosted acceptance, 2026-10-18).
+    expect(migration.spec['job']).toMatchObject({ purpose: 'migration', image: 'registry/jobs:v0.0.1', command: ['bun', 'run', 'migrate'], env: {}, resources: { cpu: '1', memory: '1Gi' } });
     // 构建那一步已过：不再给它凭据。
     expect(await release.api.jobEnvValues({ recordId: build.id, releaseId: rel.id, purpose: 'build' }).then(() => 'given', (error: { kind?: string }) => error.kind)).toBe('precondition');
     expect(await finish(rel.id, 'migration')).toMatchObject({ CS_DATABASE_URL: 'postgres://prod', CS_SLOT: 'green' });

@@ -26,9 +26,17 @@ export interface LedgerJobSteps {
  */
 export function ledgerJobSteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): LedgerJobSteps {
   const { settings, clock } = deps;
+  // Like the database restore and verify Jobs (RFC-042), a migration runs with the service plan's resources: the fixed
+  // 500m request left migrations of small plans unschedulable on a busy node until the release timed out (AW RFC-370
+  // hosted acceptance; an independent RFC-042 restore service could not even complete its first release).
+  const migrationResources = async (release: Release) => {
+    const planId = release.manifest?.spec.service.servicePlanId;
+    const plan = planId ? await deps.plans.getServicePlan(planId, release.projectId) : undefined;
+    return plan ? { cpu: plan.cpu, memory: plan.memory } : { ...MIGRATION_RESOURCES };
+  };
   const renderOf = async (release: Release, purpose: JobPurpose): Promise<JobRender> => {
     const envSecret = `${releaseJobName(release, purpose)}-env`, base = { releaseId: release.id, purpose, activeDeadlineSeconds: settings.buildTimeoutSeconds, ttlSecondsAfterFinished: JOB_TTL_SECONDS, envSecret };
-    if (purpose === 'migration') return { ...base, image: release.image ?? '', command: release.manifest?.spec.release.migrationCommand ?? [], env: {}, resources: { ...MIGRATION_RESOURCES } };
+    if (purpose === 'migration') return { ...base, image: release.image ?? '', command: release.manifest?.spec.release.migrationCommand ?? [], env: {}, resources: await migrationResources(release) };
     const { httpUrl } = await deps.repo.buildSource!(release.serviceId);
     return { ...base, image: settings.builderImage, command: ['sh', '-c', buildScript(settings.buildkitAddress)], env: { REPO_URL: httpUrl, REF: release.commitSha, IMAGE: release.image ?? '' }, resources: { ...BUILD_RESOURCES } };
   };
