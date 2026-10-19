@@ -3,7 +3,7 @@ import type { ProjectDeletionOwner } from '@crewstation/contracts';
 import type { RuntimeImageHistoryRead, RuntimeImageHistoryItem } from '@crewstation/contracts';
 import type { ResourceWorkload, ResourceWorkloadPage } from '@crewstation/contracts';
 import type { BusinessStorageFinalization, DevelopmentSourceBinding, WorkloadStopBarrier } from '@crewstation/contracts';
-import type { BusinessRecoveryScope, BusinessWorkspaceProof, RebuildBusinessWorkspaceInput, RestartBusinessWorkspaceInput } from './businessRecovery';
+import type { BusinessRecoveryScope, BusinessWorkspaceProof, RebuildBusinessWorkspaceInput, RepinBusinessWorkspaceInput, RestartBusinessWorkspaceInput } from './businessRecovery';
 import type { BusinessSessionStorage } from '@crewstation/contracts';
 import type { RuntimeImageProbeInput, RuntimeImageProbeResult, RuntimeInitializationStatus, RuntimeImageExecutionSnapshot, Actor, ProjectId, ServiceId, TaskId, TaskKind, TraceId, UserId, VolumeMode } from '@crewstation/contracts';
 import type { DevSessionDto, DevSessionRebuildDto, DevSessionRebuildInspection, RebuildDevSessionRequest, StartupRecord } from '@crewstation/contracts';
@@ -124,6 +124,7 @@ export interface TaskRuntimeModuleApi {
   resolveBusinessStorage(input: BusinessStorageFinalization): Promise<string | null>;
   stopBusinessStorage(input: BusinessStorageFinalization): Promise<WorkloadStopBarrier>;
   rebuildBusinessWorkspace(input: RebuildBusinessWorkspaceInput): Promise<EnvironmentDto>;
+  repinPausedBusinessWorkspace(input: RepinBusinessWorkspaceInput): Promise<EnvironmentDto>;
   restartBusinessWorkspace(input: RestartBusinessWorkspaceInput): Promise<EnvironmentDto>;
   inspectBusinessRecovery(scope: BusinessRecoveryScope): Promise<BusinessWorkspaceProof | undefined>;
   imageHistory(input: RuntimeImageHistoryRead): Promise<RuntimeImageHistoryItem[]>;

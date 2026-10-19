@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import type { Worker } from '@crewstation/queue';
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import type { ProjectId, ServiceId, TaskId, TraceId } from '@crewstation/contracts';
+import type { ProjectId, RuntimeImageExecutionSnapshot, ServiceId, TaskId, TraceId } from '@crewstation/contracts';
 import { eventbusMigrations } from '@crewstation/eventbus';
 import type { K8sObject } from '@crewstation/k8s';
 import { createFakeK8sClient, Resources } from '@crewstation/k8s';
@@ -336,5 +336,49 @@ describe.skipIf(!available)('RFC-027 business workspace safe pause and original-
     await expect(f.runtime.api.restartBusinessWorkspace(input)).rejects.toMatchObject({ details: { code: 'workspace_changed' } });
     expect(await f.runtime.api.getEnvironment(input.newTaskId)).toBeUndefined();
     expect(await f.resources.api.occupancy(f.projectId)).toBe(0);
+  });
+  // RFC-043: an upgrade swaps only the image of a paused durable workspace; resume then starts it over the original volume.
+  const upgradeImage = (): RuntimeImageExecutionSnapshot => {
+    const digest = `sha256:${'b'.repeat(64)}`;
+    return { versionId: newResourceId(), image: `registry.test/upgraded@${digest}`, digest, architecture: 'linux/amd64', initializer: { steps: [], env: {}, secrets: [] }, tools: [], initializerDigest: digest, validationId: newResourceId(), selectionSource: 'configuration' };
+  };
+  test('RFC-043 a paused workspace is repinned once and resumes on the new image over its original volume', async () => {
+    const f = await fixture(), uow = drizzleUnitOfWork(tdb.db), image = upgradeImage();
+    const input = { projectId: f.projectId, serviceId: f.env.serviceId, taskId: f.task.id, operationId: newResourceId(), generation: 3, runtimeImage: image };
+    await expect(f.runtime.api.repinPausedBusinessWorkspace(input)).rejects.toMatchObject({ details: { code: 'task_not_paused' } });
+    await f.runtime.api.pauseEnvironment(f.task.id);
+    const before = (await uow.read.environments.getById(f.task.id))!;
+    expect(before.state).toBe('paused');
+    const results = await Promise.all([f.runtime.api.repinPausedBusinessWorkspace(input), f.make().api.repinPausedBusinessWorkspace(input)]);
+    expect(results.map((env) => [env.state, env.image, env.runtimeImage?.versionId])).toEqual([['paused', image.image, image.versionId], ['paused', image.image, image.versionId]]);
+    const repinned = (await uow.read.environments.getById(f.task.id))!;
+    expect(repinned.render).toMatchObject({ image: image.image, runtimeImage: image, start: before.render!.start, runtimeImageRepin: { operationId: input.operationId, generation: 3, versionId: image.versionId } });
+    expect(repinned.businessWorkspace).toEqual(before.businessWorkspace); expect(repinned.podName).toBe(before.podName);
+    expect(await f.resources.api.occupancy(f.projectId)).toBe(0);
+    await expect(f.runtime.api.repinPausedBusinessWorkspace({ ...input, runtimeImage: { ...image, versionId: newResourceId() } })).rejects.toMatchObject({ details: { code: 'idempotency_conflict' } });
+    await expect(f.runtime.api.repinPausedBusinessWorkspace({ ...input, operationId: newResourceId(), generation: 2 })).rejects.toMatchObject({ details: { code: 'stale_generation' } });
+    expect((await f.make().api.resumeEnvironment(f.task.id)).state).toBe('creating');
+    const resumed = (await uow.read.environments.getById(f.task.id))!;
+    expect(resumed.render).toMatchObject({ image: image.image, runtimeImage: image, start: before.render!.start + 1 });
+    expect((await f.resources.api.get(f.task.id))!.spec['pod']).toMatchObject({ image: image.image, expectedVolumeUid: f.volume.metadata.uid!, businessStorage: { initialize: false } });
+    expect(await f.k8s.get(Resources.PersistentVolumeClaim!, f.env.pvcName, f.env.namespace)).toEqual(f.volume);
+    // A late replay of the same operation returns the environment without touching the resumed render.
+    expect((await f.runtime.api.repinPausedBusinessWorkspace(input)).state).toBe('creating');
+    expect((await uow.read.environments.getById(f.task.id))!.render!.start).toBe(before.render!.start + 1);
+  });
+  test('RFC-043 repin refuses a workspace still pausing, another project and a changed volume, keeping the original image', async () => {
+    const f = await fixture(), uow = drizzleUnitOfWork(tdb.db), remove = f.k8s.delete, image = upgradeImage();
+    const input = { projectId: f.projectId, serviceId: f.env.serviceId, taskId: f.task.id, operationId: newResourceId(), generation: 3, runtimeImage: image };
+    f.k8s.delete = async (ref, name, namespace, options) => ref.kind === 'Pod' ? true : remove(ref, name, namespace, options);
+    expect(await f.runtime.api.pauseEnvironment(f.task.id)).toMatchObject({ state: 'running', businessWorkspace: { phase: 'pausing' } });
+    await expect(f.runtime.api.repinPausedBusinessWorkspace(input)).rejects.toMatchObject({ details: { code: 'task_not_paused' } });
+    f.k8s.delete = remove;
+    await f.make().api.reconcile();
+    expect((await f.runtime.api.getEnvironment(f.task.id))?.state).toBe('paused');
+    await expect(f.runtime.api.repinPausedBusinessWorkspace({ ...input, projectId: newResourceId() as ProjectId })).rejects.toMatchObject({ details: { code: 'workspace_missing' } });
+    await f.k8s.delete(Resources.PersistentVolumeClaim!, f.env.pvcName, f.env.namespace);
+    await expect(f.runtime.api.repinPausedBusinessWorkspace(input)).rejects.toMatchObject({ details: { code: 'workspace_volume_changed' } });
+    const stored = (await uow.read.environments.getById(f.task.id))!;
+    expect(stored.render?.image).toBe(f.env.render!.image); expect(stored.render?.runtimeImage).toBeUndefined(); expect(stored.render?.runtimeImageRepin).toBeUndefined();
   });
 });

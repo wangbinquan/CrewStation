@@ -15,7 +15,7 @@ export function guardedBusinessPort<T extends object>(port: T, work: BusinessPro
 }
 export function scopedBusinessPorts<T extends BusinessExecutionDeps>(deps: T, optional = false): T {
   const work = deps.projectWork; if (!work) return deps;
-  return { ...deps, environments: guardedBusinessPort(deps.environments, work, optional, ['restartBusinessWorkspace', 'rebuildBusinessWorkspace', 'inspectBusinessRecovery', 'blockBusinessAdmission']),
+  return { ...deps, environments: guardedBusinessPort(deps.environments, work, optional, ['restartBusinessWorkspace', 'rebuildBusinessWorkspace', 'repinPausedBusinessWorkspace', 'inspectBusinessRecovery', 'blockBusinessAdmission']),
     runner: guardedBusinessPort(deps.runner, work, optional, ['getExecutionCompletionProof', 'consumeBusinessExecution', 'getBusinessExecution', 'listBusinessExecutionEvents']),
     compute: guardedBusinessPort(deps.compute, work, optional, ['pinLaunchVersion', 'launchMaterialAt']),
     ...(deps.runtimeImages ? { runtimeImages: guardedBusinessPort(deps.runtimeImages, work, optional) } : {}),

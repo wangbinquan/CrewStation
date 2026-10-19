@@ -21,6 +21,7 @@ import { archiveExecutionStore } from './adapters/persistence/archiveExecutions'
 import { archiveExecution } from './application/archive/execution';
 import { archiveExecutionWorker } from './workers/archiveExecutions';
 import { rebuildBusinessWorkspace } from './application/business/rebuild';
+import { repinPausedBusinessWorkspace } from './application/business/repin';
 import { restartBusinessWorkspace } from './application/business/restart';
 import { environmentImageHistory } from './adapters/persistence/imageHistory';
 import { blockBusinessAdmission } from './application/business/blockAdmission';
@@ -262,9 +263,9 @@ function scopedRuntimeApi(api: TaskRuntimeModuleApi, work: RuntimeProjectWork | 
   }, work) : api;
 }
 
-function businessRecoveryApi(deps: TaskRuntimeUseCaseDeps): Pick<TaskRuntimeModuleApi, 'inspectBusinessRecovery' | 'rebuildBusinessWorkspace' | 'restartBusinessWorkspace'> {
-  const rebuild = rebuildBusinessWorkspace(deps), restart = restartBusinessWorkspace(deps);
-  return { inspectBusinessRecovery: inspectBusinessRecovery(deps), rebuildBusinessWorkspace: async (input) => environmentToDto(await rebuild(input)), restartBusinessWorkspace: async (input) => environmentToDto(await restart(input)) };
+function businessRecoveryApi(deps: TaskRuntimeUseCaseDeps): Pick<TaskRuntimeModuleApi, 'inspectBusinessRecovery' | 'rebuildBusinessWorkspace' | 'repinPausedBusinessWorkspace' | 'restartBusinessWorkspace'> {
+  const rebuild = rebuildBusinessWorkspace(deps), restart = restartBusinessWorkspace(deps), repin = repinPausedBusinessWorkspace(deps);
+  return { inspectBusinessRecovery: inspectBusinessRecovery(deps), rebuildBusinessWorkspace: async (input) => environmentToDto(await rebuild(input)), repinPausedBusinessWorkspace: async (input) => environmentToDto(await repin(input)), restartBusinessWorkspace: async (input) => environmentToDto(await restart(input)) };
 }
 
 async function captureStartupLog(deps: TaskRuntimeUseCaseDeps, taskId: TaskId) {

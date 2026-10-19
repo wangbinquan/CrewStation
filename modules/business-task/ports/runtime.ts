@@ -28,6 +28,8 @@ export interface CreateSubtaskExecutionInput {
 export interface Environments {
   restartBusinessWorkspace?(input: { projectId: ProjectId; serviceId: ServiceId; taskId: TaskId; newTaskId: TaskId; fingerprint: string; traceId: TraceId }): Promise<EnvironmentView>;
   rebuildBusinessWorkspace?(input: { projectId: ProjectId; serviceId: ServiceId; taskId: TaskId; operationId: string; generation: number; volumeUid: string }): Promise<EnvironmentView>;
+  /** RFC-043: swap the image of a paused durable workspace; the next resume starts on it. Replays by operation id. */
+  repinPausedBusinessWorkspace?(input: { projectId: ProjectId; serviceId: ServiceId; taskId: TaskId; operationId: string; generation: number; runtimeImage: RuntimeImageExecutionSnapshot }): Promise<EnvironmentView>;
   inspectBusinessRecovery?(scope: { projectId: ProjectId; serviceId: ServiceId; taskId: TaskId }): Promise<{
     state: string; persistent: boolean; stopped: boolean; activeChildren: boolean;
     volumeUid: string | null; volumeVerified: boolean; volumePresent?: boolean; image?: string; runtimeImage?: RuntimeImageExecutionSnapshot;

@@ -9,6 +9,7 @@ import { executionSubtasks } from '../execution/subtaskTables';
 import { readExecutionControl } from '../executionTransaction';
 import { activeExecutionControl } from '../../../domain/executionControl';
 import { recoveryChildStopped } from '../../../domain/taskRecovery';
+import { taskMaterialDigest } from '../../../domain/executionLifecycle';
 import { contracts } from '../tables';
 
 export async function recoveryCapability(tx: Executor, serviceId: string, action: BusinessRecoveryTarget['action'], now: Date, epoch?: number): Promise<void> {
@@ -32,9 +33,9 @@ export async function assertRecoveryTarget(tx: Executor, serviceId: string, proj
   if (generation !== target.expectedGeneration || lifecycle?.operationId) stale();
   if ('subtaskId' in target) {
     if (state !== 'running') stale();
-    await assertRecoveryChild(tx, serviceId, target, parent.effectiveDigest);
+    await assertRecoveryChild(tx, serviceId, target, taskMaterialDigest(parent.effectiveDigest, lifecycle));
   } else {
-    if (target.materialDigest !== parent.effectiveDigest || state !== (target.action === 'resume-task' ? 'paused' : 'failed')) stale();
+    if (target.materialDigest !== taskMaterialDigest(parent.effectiveDigest, lifecycle) || state !== (target.action === 'resume-task' ? 'paused' : 'failed')) stale();
     if ('volumeUid' in target && parent.intent.task.volumeMode !== 'persistent') stale();
     const active = await tx.select({ id: executionSubtasks.id }).from(executionSubtasks).where(and(eq(executionSubtasks.serviceId, serviceId), eq(executionSubtasks.taskId, target.taskId), sql`(${executionSubtasks.view}->>'state' NOT IN ('succeeded','failed','cancelled') OR ${executionSubtasks.view}->>'process' NOT IN ('exited','not-started'))`)).limit(1);
     if (active.length) throw precondition('旧执行尚未确认停止', { code: 'original_execution_not_stopped' });

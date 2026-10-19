@@ -26,7 +26,7 @@ describe('业务契约面金样', () => {
       'BusinessCapabilitiesDto', 'BusinessControlActivate', 'BusinessControlClaim', 'BusinessControlDto', 'BusinessControlLeaseRequest', 'BusinessDirectoryDto', 'BusinessDirectoryQuery',
       'BusinessEventPage', 'BusinessEventQuery', 'BusinessFileDto', 'BusinessFileQuery', 'BusinessHandoffReady', 'BusinessMaterialDto', 'BusinessMaterialRequest', 'BusinessOperationDto',
       'BusinessOutputDto', 'BusinessSubtaskMessageV3', 'BusinessSubtaskMutation', 'BusinessSubtaskV3Dto', 'BusinessTaskMutation', 'BusinessTaskV3Dto', 'CreateBusinessTaskV3',
-      'RetryBusinessSubtaskV3', 'SubmitBusinessSubtaskV3', 'BusinessWorkspaceInspection',
+      'RetryBusinessSubtaskV3', 'SubmitBusinessSubtaskV3', 'BusinessWorkspaceInspection', 'UpgradeBusinessTaskRuntimeImage',
       'CreateObjectUpload', 'CommitObjectUpload', 'DeleteStoredObject', 'ObjectReference', 'ObjectPageQuery', 'CreateArchivePlan', 'ArchivePlanPage', 'SealArchivePlan', 'ArchivePlanEntriesQuery', 'FinalizeBusinessTask', 'ReviseBusinessArchive',
       'ObjectSpaceDto', 'StoredObjectDto', 'StoredObjectPage', 'ObjectUploadDto', 'ArchivePlanDto', 'ArchivePlanEntriesDto', 'BusinessFinalizationDto'].sort());
   });

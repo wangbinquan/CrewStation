@@ -2,7 +2,7 @@ import { appendTaskState } from './logEvents';
 import { and, asc, eq, lt, or, sql } from 'drizzle-orm';
 import type { Database } from '@crewstation/persistence';
 import type { ExecutionLifecycles } from '../../../ports/executionLifecycle';
-import type { ExecutionTaskState } from '../../../domain/executionLifecycle';
+import type { ExecutionLifecycle, ExecutionTaskState } from '../../../domain/executionLifecycle';
 import { businessAdmissionOpen } from '../deletion/admission';
 import { activeExecutionControl } from '../../../domain/executionControl';
 import { executionTransaction, readExecutionControl } from '../executionTransaction';
@@ -10,17 +10,22 @@ import { lifecycleRow, requestLifecycle } from './lifecycleAdmission';
 import { executionLifecycles as ops, executionTaskStates as tasks } from './lifecycleTables';
 
 const ready = () => or(eq(ops.state, 'pending'), and(eq(ops.state, 'running'), lt(ops.leaseUntil, sql`clock_timestamp()`)));
+const owned = (operation: ExecutionLifecycle) => and(eq(ops.id, operation.id), eq(ops.revision, operation.revision), eq(ops.owner, operation.owner!), eq(ops.state, 'running'), sql`${ops.leaseUntil} > clock_timestamp()`);
 export function drizzleExecutionLifecycles(db: Database): ExecutionLifecycles {
   return {
     request: requestLifecycle(db),
     read: async (serviceId, taskId) => (await db.select().from(tasks).where(and(eq(tasks.serviceId, serviceId), eq(tasks.taskId, taskId))))[0] as ExecutionTaskState | undefined,
     get: async (id) => { const row = (await db.select().from(ops).where(eq(ops.id, id)))[0]; return row && lifecycleRow(row); },
     claim: (owner, id) => claimLifecycle(db, owner, id),
+    recordRuntimeImage: (operation, snapshot) => executionTransaction(db, operation.serviceId, async (tx) => {
+      if (!(await tx.select({ id: ops.id }).from(ops).where(owned(operation)).for('update')).length) return false;
+      return (await tx.update(tasks).set({ runtimeImage: snapshot }).where(and(eq(tasks.taskId, operation.taskId), eq(tasks.operationId, operation.id))).returning()).length > 0;
+    }),
     settle: (operation, state, errorCode) => executionTransaction(db, operation.serviceId, async (tx, now) => {
-      const updated = await tx.update(ops).set({ state, owner: null, leaseUntil: null, updatedAt: now, errorCode: errorCode ?? null }).where(and(eq(ops.id, operation.id), eq(ops.revision, operation.revision), eq(ops.owner, operation.owner!), eq(ops.state, 'running'), sql`${ops.leaseUntil} > clock_timestamp()`)).returning();
+      const updated = await tx.update(ops).set({ state, owner: null, leaseUntil: null, updatedAt: now, errorCode: errorCode ?? null }).where(owned(operation)).returning();
       if (!updated.length) return false;
       if (state !== 'pending') {
-        const taskState = state === 'succeeded' ? ({ pause: 'paused', resume: 'running', rebuild: 'running', close: 'closed' } as const)[operation.action] : operation.priorState;
+        const taskState = state === 'succeeded' ? ({ pause: 'paused', resume: 'running', rebuild: 'running', close: 'closed', 'upgrade-runtime-image': 'paused' } as const)[operation.action] : operation.priorState;
         await appendTaskState(tx, operation.serviceId, operation.taskId, taskState, operation.generation, `lifecycle:${operation.id}:settled:${operation.revision}`, now);
         await tx.update(tasks).set({ state: taskState, operationId: null }).where(and(eq(tasks.taskId, operation.taskId), eq(tasks.operationId, operation.id)));
       }

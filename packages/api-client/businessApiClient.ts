@@ -6,6 +6,7 @@ import type {
   CreateBusinessTaskV3Input, RetryBusinessSubtaskV3Input, SubmitBusinessSubtaskV3Input,
   BusinessRecoveryClaim, BusinessRecoveryClaimReceipt, BusinessRecoveryRead, BusinessRecoveryReject, BusinessRecoveryRequest,
   RebuildBusinessTaskInput, RestartBusinessTaskInput, FinalizeBusinessTask, ReviseBusinessArchive, BusinessFinalizationDto,
+  UpgradeBusinessTaskRuntimeImageInput,
 } from '@crewstation/contracts';
 import { IDENTITY_HEADERS } from '@crewstation/contracts';
 import type { RequestOptions, TransportOptions } from './httpTransport';
@@ -32,6 +33,8 @@ export interface BusinessExecutionClient {
   resume(taskId: string, input: BusinessTaskMutationInput): Promise<BusinessOperationDto>;
   rebuild(taskId: string, input: RebuildBusinessTaskInput): Promise<BusinessOperationDto>;
   restart(taskId: string, input: RestartBusinessTaskInput): Promise<BusinessTaskV3Dto>;
+  /** RFC-043: repin a paused durable task; the operation is read back with `operation`. */
+  upgradeRuntimeImage(taskId: string, input: UpgradeBusinessTaskRuntimeImageInput): Promise<BusinessOperationDto>;
   close(taskId: string, input: BusinessTaskMutationInput): Promise<BusinessOperationDto>;
   finalize(taskId: string, input: FinalizeBusinessTask): Promise<BusinessFinalizationDto>;
   finalization(taskId: string): Promise<BusinessFinalizationDto | null>;
@@ -73,6 +76,7 @@ export function createBusinessExecutionClient(options: TransportOptions): Busine
     pause: (id, input) => post(`${task(id)}/pause`, input), resume: (id, input) => post(`${task(id)}/resume`, input), close: (id, input) => post(`${task(id)}/close`, input),
     rebuild: (id, input) => post(`${task(id)}/rebuild`, input),
     restart: (id, input) => post(`${task(id)}/restart`, input),
+    upgradeRuntimeImage: (id, input) => post(`${task(id)}/runtime-image`, input),
     finalize: (id, input) => post(`${task(id)}/finalize`, input), finalization: (id) => get(`${task(id)}/finalization`),
     reviseArchive: (id, input) => post(`${task(id)}/finalization/archive`, input),
     material: (id, input) => post(`${task(id)}/materials`, input), events: (id, query) => get(`${task(id)}/events`, query),

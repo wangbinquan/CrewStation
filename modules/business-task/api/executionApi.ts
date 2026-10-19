@@ -20,7 +20,8 @@ export interface BusinessExecutionApi {
   capabilities(caller: BusinessExecutionCaller): Promise<BusinessCapabilitiesDto>;
   sendMessage(caller: BusinessExecutionCaller, taskId: TaskId, subtaskId: string, input: BusinessSubtaskMessageV3): Promise<BusinessOperationDto>;
   createMaterial(caller: BusinessExecutionCaller, taskId: TaskId, input: BusinessMaterialRequest): Promise<BusinessMaterialDto>;
-  mutateTask(caller: BusinessExecutionCaller, taskId: TaskId, action: 'pause' | 'resume' | 'close' | 'rebuild', input: BusinessTaskMutation): Promise<BusinessOperationDto>;
+  /** `runtimeImageVersionId` is read only by `upgrade-runtime-image` (RFC-043). */
+  mutateTask(caller: BusinessExecutionCaller, taskId: TaskId, action: 'pause' | 'resume' | 'close' | 'rebuild' | 'upgrade-runtime-image', input: BusinessTaskMutation & { runtimeImageVersionId?: string }): Promise<BusinessOperationDto>;
   getOperation(caller: BusinessExecutionCaller, taskId: TaskId, id: string): Promise<BusinessOperationDto>;
   retrySubtask(caller: BusinessExecutionCaller, taskId: TaskId, subtaskId: string, input: RetryBusinessSubtaskV3): Promise<{ subtask: BusinessSubtaskV3Dto; status: 200 | 201 | 202 }>;
   cancelSubtask(caller: BusinessExecutionCaller, taskId: TaskId, subtaskId: string, input: BusinessSubtaskMutation): Promise<BusinessOperationDto>;

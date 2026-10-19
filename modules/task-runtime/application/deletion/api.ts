@@ -10,7 +10,7 @@ const origins = {
   originalInfrastructureOwnership: 'readonly', originalProjectTaskIds: 'readonly', listClusterTasks: 'readonly',
   reconcile: 'background', observeStartup: 'background', runProfileTest: 'platform', archiveExecution: 'nested', storageCleanup: 'nested',
   resourceWorkload: 'readonly', resourceWorkloads: 'readonly',
-  freezeBusinessStorage: 'task-input', resolveBusinessStorage: 'task-input', stopBusinessStorage: 'task-input', rebuildBusinessWorkspace: 'task-input',
+  freezeBusinessStorage: 'task-input', resolveBusinessStorage: 'task-input', stopBusinessStorage: 'task-input', rebuildBusinessWorkspace: 'task-input', repinPausedBusinessWorkspace: 'task-input',
   restartBusinessWorkspace: 'task-input', inspectBusinessRecovery: 'readonly', imageHistory: 'readonly', blockBusinessAdmission: 'service-0',
   imageReferenceState: 'readonly', runRuntimeImageProbe: 'project-input', stopRuntimeImageProbe: 'probe-stop', reconcileRebuild: 'task-0',
   resolveDevelopmentObjectSource: 'task-input',

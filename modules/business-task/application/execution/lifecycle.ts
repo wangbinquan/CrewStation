@@ -9,6 +9,7 @@ import { admissionTaskView } from './taskView';
 import { releaseClosedTaskImages } from '../taskRuntimeImage';
 import { rebuildRecoveryWorkspace } from '../recovery/rebuildExecution';
 import { businessExecutionWork } from './deletion/projectWork';
+import { dispatchRuntimeImageUpgrade, runtimeImageUpgradeRequest } from '../runtime-image/upgrade';
 
 export function executionLifecycleUseCases(deps: BusinessExecutionDeps): Pick<BusinessExecutionApi, 'mutateTask' | 'getOperation'> & { progressLifecycle(): Promise<number> } {
   const source = executionSource(deps);
@@ -22,7 +23,8 @@ export function executionLifecycleUseCases(deps: BusinessExecutionDeps): Pick<Bu
       const context = await source(caller), parent = await deps.operations.forTask(context.serviceId, taskId);
       if (!parent) throw notFound('业务任务', taskId);
       const task = await admissionTaskView(deps, parent);
-      const operation = await deps.lifecycles.request(context.serviceId, taskId, action, input, task.state, { source: context.authority, ...(input.fence ? { fence: input.fence } : {}), ...(input.stopAuthority ? { stopAuthority: input.stopAuthority } : {}) });
+      const upgrade = action === 'upgrade-runtime-image' ? runtimeImageUpgradeRequest(context.registration.tasksSpec!, input.runtimeImageVersionId) : undefined;
+      const operation = await deps.lifecycles.request(context.serviceId, taskId, action, input, task.state, { source: context.authority, ...(input.fence ? { fence: input.fence } : {}), ...(input.stopAuthority ? { stopAuthority: input.stopAuthority } : {}) }, upgrade);
       if (operation.state === 'pending') await progress(operation.id);
       const result = (await deps.lifecycles.get(operation.id))!;
       if (result.state === 'retryable-rejected') throw quotaExceeded('并发任务额度不足，请使用同一 requestKey 重试', { code: 'quota_exceeded', operationId: result.id, retryAfterSeconds: 1 });
@@ -38,6 +40,7 @@ export function executionLifecycleUseCases(deps: BusinessExecutionDeps): Pick<Bu
 }
 async function dispatchLifecycle(deps: BusinessExecutionDeps, operation: ExecutionLifecycle): Promise<void> {
   try {
+    if (operation.action === 'upgrade-runtime-image') { await dispatchRuntimeImageUpgrade(deps, operation); return; }
     let env = await deps.environments.getEnvironment(operation.taskId);
     if (!env) {
       if (operation.action === 'rebuild') { await deps.lifecycles.settle(operation, 'failed', 'original_workspace_unavailable'); return; }

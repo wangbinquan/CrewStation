@@ -72,11 +72,14 @@ test('recovery intake keeps fence and claim in bodies, preserves empty queue and
   const recovery = { recoveryRequestId: '01900000-0000-7000-8000-000000000001', claimId: '01900000-0000-7000-8000-000000000002' };
   await client.rebuild('task/1', { requestKey: 'rebuild-once', expectedGeneration: 2, fence, recovery });
   await client.restart('task/1', { requestKey: 'restart-once', expectedGeneration: 2, fence, recovery });
+  await client.upgradeRuntimeImage('task/1', { requestKey: 'upgrade-once', expectedGeneration: 3, fence });
   expect(calls).toEqual([
     { url: '/v3/business-execution/recovery/claim', method: 'POST', body: { fence } },
     { url: '/v3/business-execution/recovery/request%2F1/read', method: 'POST', body: { fence } },
     { url: '/v3/business-execution/recovery/request%2F1/reject', method: 'POST', body: { fence, claimId: 'claim', reason: 'application archived task' } },
     { url: '/v3/business-tasks/task%2F1/rebuild', method: 'POST', body: { requestKey: 'rebuild-once', expectedGeneration: 2, fence, recovery } },
     { url: '/v3/business-tasks/task%2F1/restart', method: 'POST', body: { requestKey: 'restart-once', expectedGeneration: 2, fence, recovery } },
+    // RFC-043: the upgrade carries the fence and lets the release default choose the version.
+    { url: '/v3/business-tasks/task%2F1/runtime-image', method: 'POST', body: { requestKey: 'upgrade-once', expectedGeneration: 3, fence } },
   ]);
 });

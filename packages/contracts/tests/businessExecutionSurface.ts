@@ -1,5 +1,5 @@
 import { surfaceSchema } from './contractSurface';
-import { CreateBusinessTaskV3Schema, SubmitBusinessSubtaskV3Schema, RetryBusinessSubtaskV3Schema, BusinessTaskMutationSchema, BusinessSubtaskMutationSchema, BusinessSubtaskMessageV3Schema } from '../api/business/requests';
+import { CreateBusinessTaskV3Schema, SubmitBusinessSubtaskV3Schema, RetryBusinessSubtaskV3Schema, BusinessTaskMutationSchema, BusinessSubtaskMutationSchema, BusinessSubtaskMessageV3Schema, UpgradeBusinessTaskRuntimeImageSchema } from '../api/business/requests';
 import { BusinessMaterialRequestSchema, BusinessMaterialDtoSchema } from '../api/business/materials';
 import { BusinessFileQuerySchema, BusinessDirectoryQuerySchema, BusinessFileDtoSchema, BusinessDirectoryDtoSchema } from '../api/business/files';
 import { BusinessControlActivateSchema, BusinessControlClaimSchema, BusinessControlDtoSchema, BusinessControlLeaseRequestSchema, BusinessHandoffReadySchema } from '../api/business/control';
@@ -15,6 +15,7 @@ export function businessExecutionSurface() {
     BusinessMaterialRequest: BusinessMaterialRequestSchema, BusinessFileQuery: BusinessFileQuerySchema, BusinessDirectoryQuery: BusinessDirectoryQuerySchema,
     BusinessControlActivate: BusinessControlActivateSchema, BusinessControlClaim: BusinessControlClaimSchema, BusinessControlLeaseRequest: BusinessControlLeaseRequestSchema,
     BusinessHandoffReady: BusinessHandoffReadySchema, BusinessEventQuery: BusinessEventQuerySchema,
+    UpgradeBusinessTaskRuntimeImage: UpgradeBusinessTaskRuntimeImageSchema,
   };
   const received = {
     BusinessWorkspaceInspection: BusinessWorkspaceInspectionSchema,

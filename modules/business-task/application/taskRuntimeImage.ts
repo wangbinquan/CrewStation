@@ -3,6 +3,7 @@ import { isPlatformError, jsonHash, precondition } from '@crewstation/kernel';
 import type { OperationCandidate } from '../domain/taskAdmission';
 import type { BusinessRuntimeImages } from '../ports/runtimeImages';
 import type { ExecutionLifecycle } from '../domain/executionLifecycle';
+import { currentTaskRuntimeImage } from '../domain/executionLifecycle';
 import type { BusinessExecutionDeps } from './execution/dependencies';
 
 /** A returned winner or an explicit transaction rejection proves this candidate cannot be dispatched. */
@@ -41,9 +42,12 @@ export async function releaseClosedTaskImages(deps: BusinessExecutionDeps, opera
   const children = await deps.subtasks.list(operation.serviceId, operation.taskId);
   const images = children.filter((child) => child.view.runtimeImage);
   if (images.some((child) => !child.runtimeTaskId || !child.runtimeReleased)) return false;
-  if (!parent.intent.task.runtimeImage && !images.length) return true;
+  // RFC-043: the current pin and the admission snapshot (released already by any upgrade; absent rows are a no-op).
+  const admitted = parent.intent.task.runtimeImage, pinned = currentTaskRuntimeImage(admitted, await deps.lifecycles.read(operation.serviceId, operation.taskId));
+  const owned = [...new Set([pinned?.versionId, admitted?.versionId].filter((id): id is string => Boolean(id)))];
+  if (!owned.length && !images.length) return true;
   if (!deps.runtimeImages?.release) throw new Error('关闭任务的镜像引用释放端口不可用');
   for (const child of images) await deps.runtimeImages.release(child.view.runtimeImage!, { type: 'agent', id: child.runtimeTaskId! });
-  if (parent.intent.task.runtimeImage) await deps.runtimeImages.release(parent.intent.task.runtimeImage, { type: 'task', id: operation.taskId });
+  for (const versionId of owned) await deps.runtimeImages.release({ versionId }, { type: 'task', id: operation.taskId });
   return true;
 }

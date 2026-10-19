@@ -1570,6 +1570,60 @@
           "type": "object"
         }
       },
+      "UpgradeBusinessTaskRuntimeImage": {
+        "direction": "business-to-platform",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "expectedGeneration": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "fence": {
+              "additionalProperties": false,
+              "properties": {
+                "epoch": {
+                  "maximum": 9007199254740991,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "instanceId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "leaseId": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "epoch",
+                "instanceId",
+                "leaseId"
+              ],
+              "type": "object"
+            },
+            "requestKey": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u001f\\u007f]+$",
+              "type": "string"
+            },
+            "runtimeImageVersionId": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "expectedGeneration",
+            "fence",
+            "requestKey"
+          ],
+          "type": "object"
+        }
+      },
       "BusinessWorkspaceInspection": {
         "direction": "platform-to-business",
         "schema": {
@@ -4193,6 +4247,10 @@
               "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "type": "string"
             },
+            "runtimeImageUpgrade": {
+              "const": 1,
+              "type": "number"
+            },
             "storage": {
               "additionalProperties": false,
               "properties": {
@@ -4224,6 +4282,17 @@
                 "version"
               ],
               "type": "object"
+            },
+            "taskRuntimeImageVersionId": {
+              "anyOf": [
+                {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": [

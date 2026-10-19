@@ -3,6 +3,8 @@ import type { ProjectId, RuntimeImageExecutionSnapshot, ServiceId, TaskId, Trace
 export interface BusinessRecoveryScope { projectId: ProjectId; serviceId: ServiceId; taskId: TaskId }
 export interface RebuildBusinessWorkspaceInput extends BusinessRecoveryScope { operationId: string; generation: number; volumeUid: string }
 export interface RestartBusinessWorkspaceInput extends BusinessRecoveryScope { newTaskId: TaskId; fingerprint: string; traceId: TraceId }
+/** RFC-043: repin a paused durable workspace to a validated runtime image snapshot; replays by operation id. */
+export interface RepinBusinessWorkspaceInput extends BusinessRecoveryScope { operationId: string; generation: number; runtimeImage: RuntimeImageExecutionSnapshot }
 /** Positive, read-only observations. Missing or failed inspection must never count as stopped. */
 export interface BusinessWorkspaceProof {
   state: string; persistent: boolean; stopped: boolean; activeChildren: boolean;

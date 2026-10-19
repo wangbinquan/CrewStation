@@ -5,7 +5,8 @@ import type { BusinessExecutionDeps } from './dependencies';
 /** 查询只投影已存在的环境，不触发准入或状态机副作用。 */
 export async function admissionTaskView(deps: BusinessExecutionDeps, operation: ExecutionOperation): Promise<BusinessTaskV3Dto> {
   const lifecycle = await deps.lifecycles.read(operation.serviceId, operation.intent.task.id);
-  const task = { ...operation.intent.task, ...(lifecycle ? { generation: lifecycle.generation, state: lifecycle.state } : {}) };
+  // RFC-043: an upgraded task shows its current pin; the admission snapshot itself stays immutable.
+  const task = { ...operation.intent.task, ...(lifecycle ? { generation: lifecycle.generation, state: lifecycle.state } : {}), ...(lifecycle?.runtimeImage ? { runtimeImage: lifecycle.runtimeImage } : {}) };
   if (lifecycle?.state === 'closed' && !lifecycle.operationId) return { ...task, state: 'closed', resourceState: 'released', quotaHeld: false };
   let environment;
   try { environment = await deps.environments.getEnvironment(task.id as TaskId); }

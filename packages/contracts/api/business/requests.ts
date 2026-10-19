@@ -46,6 +46,8 @@ export const BusinessSubtaskMessageV3Schema = BusinessSubtaskMutationSchema.omit
 export const BusinessTaskMutationSchema = z.strictObject({ ...mutation, stopAuthority: BusinessStopAuthoritySchema.optional(), expectedGeneration: BusinessGenerationSchema, recovery: BusinessRecoveryExecutionSchema.optional() });
 export const RebuildBusinessTaskSchema = BusinessTaskMutationSchema.extend({ recovery: BusinessRecoveryExecutionSchema });
 export const RestartBusinessTaskSchema = BusinessTaskMutationSchema.omit({ stopAuthority: true }).extend({ recovery: BusinessRecoveryExecutionSchema, fence: BusinessExecutionFenceSchema });
+/** RFC-043: repin a paused durable task to another validated version of the same runtime image; omitted target = the caller release's default. */
+export const UpgradeBusinessTaskRuntimeImageSchema = BusinessTaskMutationSchema.omit({ stopAuthority: true, recovery: true }).extend({ fence: BusinessExecutionFenceSchema, runtimeImageVersionId: ResourceIdSchema.optional() });
 
 export type CreateBusinessTaskV3 = z.infer<typeof CreateBusinessTaskV3Schema>;
 export type SubmitBusinessSubtaskV3 = z.infer<typeof SubmitBusinessSubtaskV3Schema>;
@@ -56,6 +58,8 @@ export type BusinessTaskMutation = z.infer<typeof BusinessTaskMutationSchema>;
 export type RebuildBusinessTaskInput = z.input<typeof RebuildBusinessTaskSchema>;
 export type RestartBusinessTask = z.infer<typeof RestartBusinessTaskSchema>;
 export type RestartBusinessTaskInput = z.input<typeof RestartBusinessTaskSchema>;
+export type UpgradeBusinessTaskRuntimeImage = z.infer<typeof UpgradeBusinessTaskRuntimeImageSchema>;
+export type UpgradeBusinessTaskRuntimeImageInput = z.input<typeof UpgradeBusinessTaskRuntimeImageSchema>;
 
 export type CreateBusinessTaskV3Input = z.input<typeof CreateBusinessTaskV3Schema>;
 export type SubmitBusinessSubtaskV3Input = z.input<typeof SubmitBusinessSubtaskV3Schema>;

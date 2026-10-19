@@ -33,6 +33,8 @@ export function executionCapabilities(deps: BusinessExecutionDeps): Pick<Busines
       const compute = await deps.compute.resolve(profile.compute, 'subtask', context.projectId);
       agentProfiles.push({ agentProfileId: profile.id, computeProfileId: compute.id, profileRevision: compute.revision, capabilities: testedAgentCapabilities(compute) });
     }
-    return { ...(deps.agentSecrets ? { commandSecretEnvVersion: 1 as const } : {}), ...(deps.materialObjects ? { nativeMaterialLimits: BUSINESS_NATIVE_MATERIAL_LIMITS } : {}), protocolVersion: 3, releaseId: context.authority.releaseId, limits: BUSINESS_EXECUTION_LIMITS, storage: await taskStorageCapabilities(deps, context.serviceId), agentProfiles };
+    // RFC-043: a service compares its tasks' pins with the version its own release declares.
+    const upgrade = deps.runtimeImages?.versionImage && deps.environments.repinPausedBusinessWorkspace ? { runtimeImageUpgrade: 1 as const, taskRuntimeImageVersionId: context.registration.tasksSpec!.runtimeImageVersionId ?? null } : {};
+    return { ...(deps.agentSecrets ? { commandSecretEnvVersion: 1 as const } : {}), ...(deps.materialObjects ? { nativeMaterialLimits: BUSINESS_NATIVE_MATERIAL_LIMITS } : {}), ...upgrade, protocolVersion: 3, releaseId: context.authority.releaseId, limits: BUSINESS_EXECUTION_LIMITS, storage: await taskStorageCapabilities(deps, context.serviceId), agentProfiles };
   } };
 }

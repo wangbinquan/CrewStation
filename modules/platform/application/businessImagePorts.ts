@@ -1,4 +1,5 @@
 import type { Actor, ProjectId, RuntimeImageExecutionSnapshot, RuntimeImageSelection, RuntimeImageValidationTarget, TaskId } from '@crewstation/contracts';
+import { isPlatformError } from '@crewstation/kernel';
 
 export interface BusinessImageBindings {
   inspectReference?(projectId: string, owner: { type: 'task' | 'agent'; id: string }, snapshot: RuntimeImageExecutionSnapshot): Promise<boolean>;
@@ -6,12 +7,18 @@ export interface BusinessImageBindings {
   confirmReference(versionId: string, owner: { type: 'task' | 'agent'; id: string }): Promise<void>;
   releaseReference(versionId: string, owner: { type: 'task' | 'agent'; id: string }): Promise<void>;
   copyReference(projectId: string, versionId: string, from: { type: 'agent' | 'task'; id: string }, to: { type: 'agent' | 'task'; id: string }): Promise<void>;
+  getVersion?(actor: Actor, projectId: string | undefined, versionId: string): Promise<{ imageId: string; state: 'available' | 'disabled' | 'retiring' | 'retired' }>;
 }
 /** 只接给通过来源 Pod 验证的业务执行入口，项目边界与 release 允许集合仍由镜像能力复核。 */
 export function businessImagePorts(images: BusinessImageBindings, actor: Actor) {
   return {
     inspectReference: (projectId: ProjectId, owner: { type: 'task' | 'agent'; id: TaskId }, snapshot: RuntimeImageExecutionSnapshot) => images.inspectReference?.(projectId, owner, snapshot) ?? Promise.resolve(false),
-    release: (snapshot: RuntimeImageExecutionSnapshot, owner: { type: 'task' | 'agent'; id: TaskId }) => images.releaseReference(snapshot.versionId, owner),
+    release: (snapshot: Pick<RuntimeImageExecutionSnapshot, 'versionId'>, owner: { type: 'task' | 'agent'; id: TaskId }) => images.releaseReference(snapshot.versionId, owner),
+    // RFC-043: an upgrade compares image identity and availability; a missing version is not an error here.
+    ...(images.getVersion ? { versionImage: async (projectId: ProjectId, versionId: string) => {
+      try { const version = await images.getVersion!(actor, projectId, versionId); return { imageId: version.imageId, state: version.state }; }
+      catch (error) { if (isPlatformError(error) && error.kind === 'not_found') return undefined; throw error; }
+    } } : {}),
     reserveAgent: (projectId: ProjectId, taskId: TaskId, selection: RuntimeImageSelection, profile: { profileId: string; revision: number }, requestedVersionId?: string) => images.reserveImage(actor, projectId, { owner: { type: 'agent', id: taskId }, selection, target: { usage: 'agent', profile }, ...(requestedVersionId ? { requestedVersionId } : {}) }),
     confirmAgent: (snapshot: RuntimeImageExecutionSnapshot, id: TaskId) => images.confirmReference(snapshot.versionId, { type: 'agent', id }),
     restoreAgent: (projectId: ProjectId, snapshot: RuntimeImageExecutionSnapshot, from: TaskId, to: TaskId) => images.copyReference(projectId, snapshot.versionId, { type: 'agent', id: from }, { type: 'agent', id: to }),

@@ -15,6 +15,8 @@ export const BusinessCapabilitiesDtoSchema = z.strictObject({
     retentionDays: z.number().int().positive(), leaseSeconds: z.number().int().positive(), renewSeconds: z.number().int().positive(),
   }),
   commandSecretEnvVersion: z.literal(1).optional(),
+  /** RFC-043: paused durable tasks can be repinned; the caller release's default task image version is reported beside it. */
+  runtimeImageUpgrade: z.literal(1).optional(), taskRuntimeImageVersionId: ResourceIdSchema.nullable().optional(),
   nativeMaterialLimits: z.strictObject({ files: z.number().int().positive(), bytes: z.number().int().positive(), descriptorBytes: z.number().int().positive().optional() }).optional(),
   storage: z.strictObject({ version: z.literal(1), objects: z.boolean(), taskInputs: z.boolean(), finalization: z.boolean(), unavailableReason: z.string().nullable() }).optional(),
   agentProfiles: z.array(z.strictObject({ agentProfileId: ResourceIdSchema, computeProfileId: ResourceIdSchema, profileRevision: BusinessGenerationSchema, capabilities: BusinessAgentCapabilitiesSchema })),

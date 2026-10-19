@@ -7,6 +7,7 @@ import type { RecoveryQueries } from '../../ports/taskRecovery';
 import { admissionTaskView } from '../execution/taskView';
 import type { BusinessExecutionDeps } from '../execution/dependencies';
 import { recoveryMaterialProof } from './materialProof';
+import { taskMaterialDigest } from '../../domain/executionLifecycle';
 
 export async function assessRecovery(deps: BusinessExecutionDeps, queries: RecoveryQueries, parent: ExecutionOperation, subtaskId?: SubtaskId): Promise<{ assessment: BusinessRecoveryAssessment; epoch: number }> {
   const taskId = parent.intent.task.id, { control, now } = await deps.controls.read(parent.serviceId);
@@ -27,7 +28,7 @@ export async function assessRecovery(deps: BusinessExecutionDeps, queries: Recov
   const operationPending = Boolean(lifecycle?.operationId) || ['pending', 'running'].includes(parent.state) || await deps.recoveryRequests!.hasActive(parent.serviceId, taskId, subtaskId);
   const material = await recoveryMaterialProof(deps, parent, workspace, child);
   return { epoch, assessment: recoveryAssessment({
-    taskId, generation: task.generation, materialDigest: parent.effectiveDigest, state: workspace.state === task.state ? task.state : 'unknown', capability,
+    taskId, generation: task.generation, materialDigest: taskMaterialDigest(parent.effectiveDigest, lifecycle), state: workspace.state === task.state ? task.state : 'unknown', capability,
     controllerOnline: true, controlEpoch: epoch, persistent: workspace.persistent, volumeUid: workspace.volumeUid, volumeVerified: workspace.volumeVerified,
     stopped: workspace.stopped, activeChildren, operationPending, imageCompatible: material.imageCompatible,
     ...(child ? { child: { id: child.view.id, attempt: child.view.attempt, materialDigest: child.payloadDigest, state: child.view.state, process: child.view.process,

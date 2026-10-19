@@ -57,6 +57,8 @@ export interface WorkloadRender {
   readonly workloadConsumerId?: string;
   /** Durable operation marker: an old worker cannot restart a later failed recovery. */
   readonly businessRecovery?: { readonly operationId: string; readonly generation: number; readonly volumeUid: string };
+  /** RFC-043: the upgrade that last repinned this paused workspace's image; replays and older generations are recognised. */
+  readonly runtimeImageRepin?: { readonly operationId: string; readonly generation: number; readonly versionId: string };
   readonly runtimeConnectionDeadline?: { readonly generation: number; readonly at: string };
   readonly runtimeInitializationDeadline?: { readonly generation: number; readonly at: string };
   readonly runtimeValidation?: { readonly projectId: string; readonly usage: 'task' | 'agent'; readonly quotaHeld: boolean };

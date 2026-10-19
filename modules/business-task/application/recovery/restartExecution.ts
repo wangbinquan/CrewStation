@@ -7,6 +7,8 @@ import { executionSource } from '../execution/source';
 import { admissionTaskView } from '../execution/taskView';
 import { admitWithRuntimeImage } from '../taskRuntimeImage';
 import { dispatchTaskAdmission } from '../taskAdmissionDispatch';
+import type { ExecutionTaskState } from '../../domain/executionLifecycle';
+import { currentTaskRuntimeImage, taskMaterialDigest } from '../../domain/executionLifecycle';
 
 /** Caller may request only a linked restart; all executable materials come from the original admission. */
 export function restartExecutionUseCase(deps: BusinessExecutionDeps): Pick<BusinessExecutionApi, 'restartTask'> {
@@ -25,7 +27,7 @@ export function restartExecutionUseCase(deps: BusinessExecutionDeps): Pick<Busin
       if (!original || original.intent.projectId !== context.projectId) throw notFound('原业务任务', taskId);
       const versions = context.registration.tasksSpec?.acceptedTaskContractVersions;
       if (versions && !versions.includes(original.intent.task.taskContractVersion)) throw precondition('当前应用不支持原任务契约', { code: 'task_contract_unsupported' });
-      const candidate = restartCandidate(original, input, digest, deps.clock.now());
+      const candidate = restartCandidate(original, await deps.lifecycles.read(context.serviceId, taskId), input, digest, deps.clock.now());
       const snapshot = candidate.intent.task.runtimeImage;
       if (snapshot) {
         if (!deps.runtimeImages?.restoreTask || !await deps.runtimeImages.inspectReference?.(context.projectId, { type: 'task', id: taskId }, snapshot)) throw precondition('原任务镜像不可恢复', { code: 'original_image_incompatible' });
@@ -45,11 +47,13 @@ export function restartExecutionUseCase(deps: BusinessExecutionDeps): Pick<Busin
     return { task: await admissionTaskView(deps, operation), status: operation.state === 'succeeded' ? (created ? 201 : 200) : 202 };
   } };
 }
-function restartCandidate(original: ExecutionOperation, input: RestartBusinessTask, requestDigest: string, now: Date): OperationCandidate {
+function restartCandidate(original: ExecutionOperation, state: ExecutionTaskState | undefined, input: RestartBusinessTask, requestDigest: string, now: Date): OperationCandidate {
   const taskId = newResourceId() as TaskId, restartOf = { taskId: original.intent.task.id, expectedGeneration: input.expectedGeneration };
+  // RFC-043: a restart inherits the current pin, which is the reference the original task still holds.
+  const runtimeImage = currentTaskRuntimeImage(original.intent.task.runtimeImage, state);
   return {
     id: newResourceId(), serviceId: original.serviceId, kind: 'create-task', parentId: restartOf.taskId, requestKey: input.requestKey, requestDigest,
-    effectiveDigest: jsonHash({ original: original.effectiveDigest, restartOf, requestDigest }), epoch: input.fence.epoch,
-    intent: { ...original.intent, restartOf, task: { ...original.intent.task, id: taskId, state: 'admitting', generation: 1, volumeUid: null, resourceState: 'admitting', quotaHeld: false, createdAt: now.toISOString() } },
+    effectiveDigest: jsonHash({ original: taskMaterialDigest(original.effectiveDigest, state), restartOf, requestDigest }), epoch: input.fence.epoch,
+    intent: { ...original.intent, restartOf, task: { ...original.intent.task, ...(runtimeImage ? { runtimeImage } : {}), id: taskId, state: 'admitting', generation: 1, volumeUid: null, resourceState: 'admitting', quotaHeld: false, createdAt: now.toISOString() } },
   };
 }

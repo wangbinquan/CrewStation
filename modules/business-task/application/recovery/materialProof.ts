@@ -5,11 +5,12 @@ import type { BusinessExecutionDeps } from '../execution/dependencies';
 import { testedAgentCapabilities } from '../execution/capabilities';
 import type { Environments } from '../../ports/runtime';
 import { jsonHash } from '@crewstation/kernel';
+import { currentTaskRuntimeImage } from '../../domain/executionLifecycle';
 
 type Workspace = NonNullable<Awaited<ReturnType<NonNullable<Environments['inspectBusinessRecovery']>>>>;
 /** Read the retained snapshot and native session; never reserve images or resolve current defaults. */
 export async function recoveryMaterialProof(deps: BusinessExecutionDeps, parent: ExecutionOperation, workspace: Workspace, child?: ExecutionSubtask) {
-  const task = parent.intent.task, image = task.runtimeImage;
+  const task = parent.intent.task, image = currentTaskRuntimeImage(task.runtimeImage, await deps.lifecycles.read(parent.serviceId, task.id));
   let imageCompatible = Boolean(workspace.image) && (!task.image || task.image === workspace.image);
   if (image) {
     try { imageCompatible = imageCompatible && workspace.image === image.image && Boolean(workspace.runtimeImage) && jsonHash(image) === jsonHash(workspace.runtimeImage) && Boolean(await deps.runtimeImages?.inspectReference?.(parent.intent.projectId, { type: 'task', id: task.id }, image)); }

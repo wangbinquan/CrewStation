@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import type { Actor, ProjectId, RuntimeImageExecutionSnapshot, TaskId } from '@crewstation/contracts';
-import { newResourceId } from '@crewstation/kernel';
+import { newResourceId, PlatformError } from '@crewstation/kernel';
 import { businessImagePorts } from './businessImagePorts';
 
 test('业务任务和 Agent 使用各自 owner、允许集合与固定档位验证，不互相继承', async () => {
@@ -31,4 +31,22 @@ test('业务任务和 Agent 使用各自 owner、允许集合与固定档位验�
   const readonly = businessImagePorts({ inspectReference: async (...args) => { inspections.push(args); return true; }, reserveImage: async () => { throw new Error('read must not reserve'); }, confirmReference: async () => {}, releaseReference: async () => {}, copyReference: async () => {} }, actor);
   expect(await readonly.inspectReference(project, { type: 'agent', id: child }, selected)).toBe(true);
   expect(inspections).toEqual([[project, { type: 'agent', id: child }, selected]]);
+});
+
+// RFC-043: an upgrade compares the image identity and availability of two versions as the business service's actor.
+test('运行镜像升级按版本读取所属镜像与可用状态，不存在的版本不是错误', async () => {
+  const actor: Actor = { userId: newResourceId() as Actor['userId'], isAdmin: true }, project = newResourceId() as ProjectId;
+  const known = newResourceId(), imageId = newResourceId(), reads: unknown[] = [];
+  const unused = { reserveImage: async () => undefined, confirmReference: async () => {}, releaseReference: async () => {}, copyReference: async () => {} };
+  const ports = businessImagePorts({ ...unused, getVersion: async (...args) => {
+    reads.push(args);
+    if (args[2] !== known) throw new PlatformError('not_found', '运行镜像版本不存在');
+    return { imageId, state: 'disabled' as const };
+  } }, actor);
+  expect(await ports.versionImage!(project, known)).toEqual({ imageId, state: 'disabled' });
+  expect(await ports.versionImage!(project, newResourceId())).toBeUndefined();
+  expect(reads[0]).toEqual([actor, project, known]);
+  const failing = businessImagePorts({ ...unused, getVersion: async () => { throw new PlatformError('forbidden', 'no access'); } }, actor);
+  await expect(failing.versionImage!(project, known)).rejects.toMatchObject({ kind: 'forbidden' });
+  expect('versionImage' in businessImagePorts(unused, actor)).toBe(false);
 });
