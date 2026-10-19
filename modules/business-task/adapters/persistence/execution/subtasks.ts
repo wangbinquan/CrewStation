@@ -12,6 +12,7 @@ import { activeExecutionControl, type ExecutionAuthorization } from '../../../do
 import { ownedRecovery } from '../recovery/ownership';
 import { authorizeExecution, executionTransaction, readExecutionControl } from '../executionTransaction';
 import { executionSubtasks as tasks } from './subtaskTables';
+import { failBeforeStart } from './failBeforeStart';
 import { authorizeRecoveryMutation, bindRecoveryMutation } from '../recovery/mutations';
 
 const scope = (serviceId: string, taskId: TaskId) => and(eq(tasks.serviceId, serviceId), eq(tasks.taskId, taskId));
@@ -68,11 +69,25 @@ export function drizzleExecutionSubtasks(db: Database): ExecutionSubtasks {
       }
       return (await tx.update(tasks).set({ incarnation, updatedAt: now }).where(and(leased(claim), sql`NOT (${tasks.view} ? 'cancelRequestedAt')`, or(sql`${tasks.incarnation} IS NULL`, eq(tasks.incarnation, incarnation)))).returning()).length === 1;
     }),
-    settle: (claim, update) => db.transaction(async (tx) => (await tx.update(tasks).set({ ...update, view: sql`CASE WHEN ${tasks.view} ? 'result' THEN ${tasks.view} WHEN ${tasks.view} ? 'cancelRequestedAt' THEN ${JSON.stringify(update.view)}::jsonb || jsonb_build_object('cancelRequestedAt', ${tasks.view}->'cancelRequestedAt', 'state', 'cancelling') ELSE ${JSON.stringify(update.view)}::jsonb END`,
-      dispatch: sql`CASE WHEN ${tasks.view} ? 'result' THEN 'accepted' ELSE ${update.dispatch} END`,
-      ...(update.receipt ? { receipt: sql`CASE WHEN ${tasks.view} ? 'result' THEN ${tasks.receipt} ELSE ${JSON.stringify(update.receipt)}::jsonb END` } : {}),
-      owner: null, leaseUntil: null, updatedAt: sql`clock_timestamp()` }).where(leased(claim)).returning()).length === 1),
+    settle: (claim, update) => db.transaction((tx) => settleClaim(tx, claim, update)),
+    failBeforeStart: (claim, input) => executionTransaction(db, claim.serviceId, async (tx, now) => {
+      const row = (await tx.select().from(tasks).where(leased(claim)).for('update'))[0];
+      if (!row) return false;
+      if ('result' in row.view || row.view.cancelRequestedAt)
+        return settleClaim(tx, claim, { dispatch: 'failed', ...(input.runtimeAdmitted ? { runtimeAdmitted: true } : {}),
+          view: { ...claim.view, state: 'failed', process: 'not-started', endedAt: now.toISOString(), error: input.error } });
+      await failBeforeStart(tx, row, input, now);
+      return true;
+    }),
   };
+}
+
+/** An earlier result is final; a requested cancel keeps the subtask cancelling until its cancellation ends it. */
+async function settleClaim(tx: Executor, claim: ExecutionSubtask, update: Parameters<ExecutionSubtasks['settle']>[1]): Promise<boolean> {
+  return (await tx.update(tasks).set({ ...update, view: sql`CASE WHEN ${tasks.view} ? 'result' THEN ${tasks.view} WHEN ${tasks.view} ? 'cancelRequestedAt' THEN ${JSON.stringify(update.view)}::jsonb || jsonb_build_object('cancelRequestedAt', ${tasks.view}->'cancelRequestedAt', 'state', 'cancelling') ELSE ${JSON.stringify(update.view)}::jsonb END`,
+    dispatch: sql`CASE WHEN ${tasks.view} ? 'result' THEN 'accepted' ELSE ${update.dispatch} END`,
+    ...(update.receipt ? { receipt: sql`CASE WHEN ${tasks.view} ? 'result' THEN ${tasks.receipt} ELSE ${JSON.stringify(update.receipt)}::jsonb END` } : {}),
+    owner: null, leaseUntil: null, updatedAt: sql`clock_timestamp()` }).where(leased(claim)).returning()).length === 1;
 }
 
 async function recoveryForRetry(tx: Executor, now: Date, candidate: SubtaskCandidate, authorization: ExecutionAuthorization) {

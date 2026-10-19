@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { eq, sql } from 'drizzle-orm';
-import type { BusinessSubtaskV3Dto, BusinessControlDto, ReleaseId } from '@crewstation/contracts';
+import type { BusinessEvent, BusinessSubtaskV3Dto, BusinessControlDto, ReleaseId } from '@crewstation/contracts';
 import { newResourceId } from '@crewstation/kernel';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import type { TestDatabase } from '@crewstation/testkit';
@@ -99,6 +99,29 @@ describe.skipIf(!available)('RFC-027 command durable admission and replay', () =
     const response = await f.request(f.path, f.input);
     expect(response.status).toBe(412); expect(await response.json()).toMatchObject({ details: { code: 'unsupported_capability' } });
     expect(await drizzleExecutionSubtasks(tdb.db).find(f.serviceId, f.task.id, f.input.requestKey)).toBeUndefined();
+    expect(f.behavior.starts).toBe(0);
+  });
+  // AW RFC-370 hosted acceptance (2026-10-19): a subtask the dispatch fails before start must end with a terminal result
+  // event; a caller following the subtask's events otherwise never sees it end.
+  test('an accepted command whose runner turns out unsupported ends with a terminal result event', async () => {
+    const f = await active();
+    // The runner answers the submission, then drops before the dispatch: the command stays pending.
+    f.behavior.disconnectAfterInfo = true;
+    const accepted = await f.request(f.path, f.input);
+    expect(accepted.ok).toBe(true);
+    const view = await accepted.json() as BusinessSubtaskV3Dto;
+    expect(view).toMatchObject({ state: 'pending', process: 'not-started' });
+    f.behavior.disconnectAfterInfo = false; f.env.connected = true; f.behavior.notSupported = true;
+    // Earlier tests in this file leave pending subtasks that a pass may dispatch first.
+    const store = drizzleExecutionSubtasks(tdb.db);
+    for (let pass = 0; pass < 20 && (await store.get(f.serviceId, f.task.id, view.id))!.view.state === 'pending'; pass++) await f.module.api.v3.runOnce();
+    const saved = (await store.get(f.serviceId, f.task.id, view.id))!.view;
+    expect(saved).toMatchObject({ state: 'failed', process: 'not-started', error: { code: 'unsupported_capability' }, result: { exitCode: null, reason: 'failed-before-start: unsupported_capability' } });
+    const events = (await (await f.request(`/v3/business-tasks/${f.task.id}/events?subtaskId=${view.id}`)).json()).items as BusinessEvent[];
+    const results = events.filter((event) => event.type === 'result');
+    expect(results).toHaveLength(1);
+    const only = results[0];
+    if (only?.type === 'result') expect(only.data.finalCursor).toBe(only.cursor);
     expect(f.behavior.starts).toBe(0);
   });
 });

@@ -7,7 +7,12 @@ import { restoreContext } from './context';
 import { freezeRestoreEnvironment, progressRestoreJob } from './jobs';
 import { freezeForRestore, readyRestoreCandidate, switchRestoreCandidate } from './cutover';
 
-const TRANSIENT_CODES = new Set(['restore_job_terminating', 'execution_control_busy', 'object_storage_busy']);
+/**
+ * `native_postgres_source_busy`: the node's single-flight storage probe is serving another measurement. AW RFC-370
+ * hosted acceptance (2026-10-19): an independent restore parked in `requested` on it and each administrator retry lost
+ * the race again within seconds; project deletion already waits it out the same way.
+ */
+const TRANSIENT_CODES = new Set(['restore_job_terminating', 'execution_control_busy', 'object_storage_busy', 'native_postgres_source_busy']);
 /**
  * Platform rejections (identity drift, revoked confirmation, failed probes) wait for an administrator to retry or abandon;
  * infrastructure failures are only recorded and observed again automatically, so they never park the operation (RFC-042).

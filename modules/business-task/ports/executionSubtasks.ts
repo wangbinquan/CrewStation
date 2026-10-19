@@ -18,4 +18,8 @@ export interface ExecutionSubtasks {
   claim(owner: string, id?: string): Promise<ExecutionSubtask | undefined>;
   checkpoint(claim: ExecutionSubtask, incarnation: string): Promise<boolean>;
   settle(claim: ExecutionSubtask, update: { dispatch: 'pending' | 'accepted' | 'unknown' | 'failed' | 'retryable-rejected'; receipt?: RunnerBusinessReceipt; runtimeAdmitted?: boolean; runtimeDispatched?: boolean; view: BusinessSubtaskV3Dto }): Promise<boolean>;
+  /** A dispatch that fails before the start RPC was authorized: the subtask ends `failed`/`not-started` with a terminal
+   * `result` event, so callers following its events see the end. An earlier result stays; a requested cancel still
+   * ends through its cancellation. False when the claim was lost. */
+  failBeforeStart(claim: ExecutionSubtask, input: { error: { code: string; message: string }; runtimeAdmitted?: boolean }): Promise<boolean>;
 }

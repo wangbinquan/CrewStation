@@ -76,7 +76,7 @@ export async function dispatchBusinessCommand(deps: BusinessExecutionDeps, claim
     const code = errorCode(error);
     // Only a pre-start capability/config rejection proves no process was admitted.
     if (!incarnation && ['unsupported_capability', 'unsupported_runner', 'invalid_configuration', 'secret_version_unavailable'].includes(code ?? '')) {
-      await deps.subtasks.settle(claimed, { dispatch: 'failed', view: { ...claimed.view, state: 'failed', process: 'not-started', error: { code: code!, message: '运行环境不支持该执行' }, endedAt: deps.clock.now().toISOString() } });
+      await deps.subtasks.failBeforeStart(claimed, { error: { code: code!, message: '运行环境不支持该执行' } });
     } else if (!incarnation) {
       await deps.subtasks.settle(claimed, { dispatch: 'pending', view: claimed.view });
     } else await unknown(deps, claimed, code ?? 'dispatch_unknown');

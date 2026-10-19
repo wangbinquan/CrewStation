@@ -57,6 +57,16 @@ describe.skipIf(!available)('RFC-042 durable restore workflow',()=>{
   expect(current.error).toContain('凭据来源变化');f.state.jobError=undefined;
   await f.api.retryDatabaseRestore(f.actor,f.serviceId,op.id,{expectedRevision:current.revision});expect((await f.load()).error).toBeNull();
  });
+ // AW RFC-370 hosted acceptance (2026-10-19): the node's single-flight storage probe was serving another measurement; an
+ // independent restore parked in `requested` until an administrator retried, and every retry lost the race again.
+ test('a busy storage probe is observed again automatically instead of parking the restore',async()=>{
+  f=await databaseRestoreFixture();await f.api.createDatabaseRestore(f.actor,f.serviceId,f.input);
+  const {precondition}=await import('@crewstation/kernel');f.state.reserveError=precondition('独立原生卷来源探针正在采样',{code:'native_postgres_source_busy'});
+  await f.worker()();let current=await f.load();
+  expect(current.stage).toBe('requested');expect(current.error).toBeNull();expect(current.observation).toMatchObject({failures:1,message:'独立原生卷来源探针正在采样'});
+  f.state.reserveError=undefined;await f.worker()();current=await f.load();
+  expect(current.stage).toBe('provisioning');expect(current.error).toBeNull();expect(current.observation).toBeNull();
+ });
  test('confirmed digest, current admin and original target are rechecked before maintenance; any administrator can continue the cutover',async()=>{
   f=await databaseRestoreFixture();const ready=await f.verified();expect(ready.stage).toBe('ready-to-switch');expect(ready.confirmationDigest).toMatch(/^[a-f0-9]{64}$/);expect(f.state.maintenance).toBe(false);
   expect(ready.actions).toEqual(['switch','abandon']);

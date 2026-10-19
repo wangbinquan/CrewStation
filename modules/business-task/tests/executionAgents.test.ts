@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import type { BusinessSubtaskV3Dto } from '@crewstation/contracts';
+import type { BusinessEvent, BusinessSubtaskV3Dto } from '@crewstation/contracts';
 import { sql } from 'drizzle-orm';
 import { createTestDatabase, testDatabaseAvailable } from '@crewstation/testkit';
 import type { TestDatabase } from '@crewstation/testkit';
@@ -84,6 +84,13 @@ describe.skipIf(!available)('RFC-027 independent durable Agent execution', () =>
     const view = await (await f.request(f.path, f.input)).json() as BusinessSubtaskV3Dto;
     f.agentBehavior.providerKey = 'rotated-secret'; f.ready(); await f.module.api.v3.runOnce();
     expect(await f.get(view.id)).toMatchObject({ state: 'failed', process: 'not-started', error: { code: 'secret_version_unavailable' } }); expect(f.agentBehavior.starts).toBe(0);
+    // AW RFC-370 hosted acceptance (2026-10-19): a dispatch failure before start ends with a terminal result event, or a
+    // caller that follows the subtask's events never sees it end.
+    const events = (await (await f.request(`/v3/business-tasks/${f.task.id}/events?subtaskId=${view.id}`)).json()).items as BusinessEvent[];
+    const result = events.find((event) => event.type === 'result');
+    expect(result).toMatchObject({ subtaskId: view.id, attempt: 1, data: { exitCode: null, reason: 'failed-before-start: secret_version_unavailable' } });
+    if (result?.type === 'result') expect(result.data.finalCursor).toBe(result.cursor);
+    expect((await f.get(view.id)).result).toMatchObject({ reason: 'failed-before-start: secret_version_unavailable' });
     const rows = await tdb.db.execute(sql`SELECT sealed_payload FROM business_task.execution_subtasks WHERE id=${view.id}`);
     expect(JSON.stringify(rows)).not.toContain('rotated-secret');
     expect((await f.request(f.path, { ...f.input, requestKey: 'resume', resumeSessionId: 'unowned' })).status).toBe(404);

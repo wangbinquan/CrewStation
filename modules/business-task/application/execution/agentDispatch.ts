@@ -82,7 +82,7 @@ async function ensureAgentEnvironment(deps: BusinessExecutionDeps, claimed: Exec
   }
 }
 async function fail(deps: BusinessExecutionDeps, claimed: ExecutionSubtask, code: string) {
-  await deps.subtasks.settle(claimed, { dispatch: 'failed', runtimeAdmitted: true, view: { ...claimed.view, state: 'failed', process: 'not-started', endedAt: deps.clock.now().toISOString(), error: { code, message: 'Agent 未启动，固定执行材料或环境不可用' } } });
+  await deps.subtasks.failBeforeStart(claimed, { runtimeAdmitted: true, error: { code, message: 'Agent 未启动，固定执行材料或环境不可用' } });
 }
 
 export async function cleanupAgentEnvironments(deps: BusinessExecutionDeps): Promise<number> {

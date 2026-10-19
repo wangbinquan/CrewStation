@@ -15,7 +15,14 @@ import { createBuildKitManifestHandler } from './buildkit/qualification/manifest
 import { createPodWorkspaceHandler } from './pod-workspace/server';
 import { processOwnerHttp } from './process-owners/transport';
 
-export function createFilesystemMetricsHandler(options: { token: string; roots: Record<string, string>; timeoutMs?: number; procRoot?: string; podWorkspaceRoot?: string; buildkitTemplateRoot?: string }) {
+/**
+ * The probe serves one measurement at a time. Every handler bounds its own work, but one whose promise never settled kept
+ * the probe busy for good: every later caller got 409 and an independent database restore could never sample its source
+ * (AW RFC-370 hosted acceptance, 2026-10-19). A request therefore ends after this deadline and frees the probe.
+ */
+export const PROBE_REQUEST_DEADLINE_MS = 120_000;
+
+export function createFilesystemMetricsHandler(options: { token: string; roots: Record<string, string>; timeoutMs?: number; procRoot?: string; podWorkspaceRoot?: string; buildkitTemplateRoot?: string; requestDeadlineMs?: number }) {
   if (options.token.length < 32) throw new Error('A dedicated measurement token of at least 32 characters is required');
   if (options.buildkitTemplateRoot && !options.roots['local']) throw new Error('Native BuildKit input installation requires its local root');
   const credential = Buffer.from(`Bearer ${options.token}`); let busy = false;
@@ -31,6 +38,14 @@ export function createFilesystemMetricsHandler(options: { token: string; roots: 
     if (busy) return Response.json({ error: 'A measurement is already running' }, { status: 409 });
     if (Number(request.headers.get('content-length')) > (path === '/garage/inventory' ? 24 * 1024 * 1024 : path === '/buildkit/platform-inputs' ? 8_388_608 : ['/buildkit/inventory', '/buildkit/manifests'].includes(path) ? 1_048_576 : ['/consumers','/process-owners','/registry/inventory'].includes(path) ? 32_768 : 16_384)) return new Response(null, { status: 413 });
     busy = true;
+    let deadline: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([measure(path, request), new Promise<Response>((resolve) => {
+        deadline = setTimeout(() => resolve(Response.json({ error: 'Measurement exceeded its deadline' }, { status: 503 })), options.requestDeadlineMs ?? PROBE_REQUEST_DEADLINE_MS);
+      })]);
+    } finally { clearTimeout(deadline); busy = false; }
+  };
+  async function measure(path: string, request: Request): Promise<Response> {
     try {
       if (path === '/pod-workspace/inventory') return await workspaces!(request);
       if (path === '/buildkit/platform-inputs') return await inputs!(request);
@@ -71,8 +86,7 @@ export function createFilesystemMetricsHandler(options: { token: string; roots: 
       }
       return Response.json({ items });
     } catch { return Response.json({ error: 'Invalid or oversized measurement request' }, { status: 400 }); }
-    finally { busy = false; }
-  };
+  }
 }
 async function consumerResponse(request: Request, procRoot: string, timeoutMs: number): Promise<Response> {
   const input = ConsumerRequestSchema.parse(JSON.parse(await boundedBody(request, 32_768)));
