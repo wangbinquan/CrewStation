@@ -187,6 +187,30 @@ describe.skipIf(!available)('RFC-035 durable finalization intake and completion 
     expect(await finalizationCompletion(tdb.db).page(op.id)).toEqual([]);
     expect((await f.store.get(op.id))!.view.computeStopped).toBe(false);
   });
+  // AW RFC-370 hosted acceptance (2026-10-19): an Agent that failed before its start RPC (`failBeforeStart`,
+  // dispatch `failed`) kept its parent in draining forever, holding the project's quota and the Pod's memory.
+  test('a subtask that failed before its start RPC is never-started evidence; drain does not wait for it', async () => {
+    const f = await fixture(); f.behavior.disconnectAfterInfo = true;
+    const submitted = await (await f.request(f.path, f.commandInput)).json() as BusinessSubtaskV3Dto;
+    // The Agent dispatcher's path: the claimed attempt fails before any start RPC (no incarnation).
+    const subtasks = drizzleExecutionSubtasks(tdb.db), claimed = (await subtasks.claim('failing-dispatch', submitted.id))!;
+    expect(claimed.incarnation).toBeFalsy();
+    expect(await subtasks.failBeforeStart(claimed, { runtimeAdmitted: true, error: { code: 'agent_environment_unavailable', message: 'Agent 未启动，固定执行材料或环境不可用' } })).toBe(true);
+    const child = (await subtasks.get(f.serviceId, f.task.id, submitted.id))!.view;
+    expect(child).toMatchObject({ state: 'failed', process: 'not-started', result: { reason: 'failed-before-start: agent_environment_unavailable' } });
+    expect(f.behavior.starts).toBe(0);
+    const op = await f.accept(), completion = finalizationCompletion(tdb.db);
+    const requested = (await f.store.claim({ id: op.id, owner: 'prepare-failed', leaseSeconds: 30 }))!;
+    await f.store.progress(leaseOf(requested), { phase: 'draining', phaseState: 'running', evidence: { bindingConfirmed: true } });
+    const claim = (await f.store.claim({ id: op.id, owner: 'drain-failed', leaseSeconds: 30 }))!;
+    expect(await completion.page(op.id)).toEqual([{ subtaskId: child.id, executionTaskId: f.task.id, executionId: child.executionId, state: 'failed', requiresSessionProof: false }]);
+    // A session proof for an execution that never started is refused, as for a cancel before start.
+    const at = new Date().toISOString(), forged: ExecutionCompletionProof = { taskId: f.task.id, executionId: child.executionId, attempt: 1, incarnation: 'none', payloadDigest: 'a'.repeat(64), lastSequence: 0, resultDigest: 'b'.repeat(64), complete: true, persistedAt: at };
+    await expect(completion.confirm(leaseOf(claim), [{ subtaskId: child.id, proof: forged }])).rejects.toMatchObject({ details: { code: 'finalization_never_started_unknown' } });
+    const confirmed = (await completion.confirm(leaseOf(claim), [{ subtaskId: child.id, proof: null }]))!;
+    expect(confirmed.completionScan).toMatchObject({ count: 1, complete: true });
+    expect(confirmed.evidence.completionProofDigest).toHaveLength(64);
+  });
   test('bounded proof pages cover every never-started attempt and cannot skip an earlier page', async () => {
     const f = await fixture(); f.behavior.disconnectAfterInfo = true;
     for (let i = 0; i < 21; i++) {
