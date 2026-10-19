@@ -79,3 +79,4 @@ proposal/rfc/RFC-NNN-{slug}/
 | [RFC-041](./RFC-041-continuous-bot-session/proposal.md) | Bot 持续对话：CLI 保持独立，停止本轮后沿用原上下文，执行恢复与历史统一呈现。 | Done · 2026-10-16 · 正式部署与准确 CI 全绿；真实多轮、停止/换 Pod/父重建续接、显式 fresh、Chrome 和两 PVC/PV 回收通过，见 [验收记录](./RFC-041-continuous-bot-session/acceptance.md)。 |
 
 | [RFC-042](./RFC-042-service-database-restore/proposal.md) | 服务数据库空目标恢复与切换：独立目标、验证、维护确认与世代对账，原库保留。 | Done · 2026-10-19 · 独立服务 `rfc042-aw-restore` 的恢复第二次尝试通过（DBR-01–08，见验收记录）；第一次尝试暴露的三个平台缺陷 `0dc7fea4`、`1e5ae7c6`、`a61b3f6e` 已修复部署；现有正式 AW 始终保持运行、未恢复。 |
+| [RFC-043](./RFC-043-business-task-runtime-image-upgrade/proposal.md) | 业务任务运行镜像升级：服务把已暂停的持久业务任务改钉到同一运行镜像的已验证新版本，工作卷与身份不变，下一次恢复以新镜像启动。 | In Progress · 2026-10-19 · 作者已批准按设计实现（来源 AW RFC-370 v4 实机验收）。 |
