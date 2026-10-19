@@ -1,6 +1,6 @@
 # RFC-043 设计：业务任务运行镜像升级
 
-> 状态：In Progress · 2026-10-19（作者批准按本设计实现）。落位：business-task（L4，合同、准入、调度与镜像读者）、task-runtime（L3，暂停环境的改钉）、runtime-environment（L3，引用与校验，沿用）、platform 端口（版本查询）。
+> 状态：Done · 2026-10-19（作者批准按本设计实现；实现 `660a6185`）。落位：business-task（L4，合同、准入、调度与镜像读者）、task-runtime（L3，暂停环境的改钉）、runtime-environment（L3，引用与校验，沿用）、platform 端口（版本查询）。
 
 ## 1. 现状（按源码核对）
 

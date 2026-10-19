@@ -31,6 +31,10 @@ export function failEnvironment(deps: TaskRuntimeUseCaseDeps) {
       await scope.admissions.lock(original.projectId);
       const current = await scope.environments.getById(taskId);
       if (!current || ['released', 'failed', 'releasing'].includes(current.state) || (expectedPodName && expectedPodName !== current.podName)) return;
+      // A pausing or paused business workspace has no Pod by design. The reconciler judges the snapshot it listed before a
+      // pause began, so a missing Pod there is the pause itself (AW RFC-370 hosted acceptance, 2026-10-19: a parent paused
+      // while its task waited for a human answer became "容器不存在" and its task failed).
+      if (current.state === 'paused' || current.businessWorkspace?.phase === 'pausing') return;
       if (expectedState && current.state !== expectedState) return;
       const now = deps.clock.now();
       const startup = advance(current);

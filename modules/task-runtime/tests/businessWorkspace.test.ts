@@ -381,4 +381,19 @@ describe.skipIf(!available)('RFC-027 business workspace safe pause and original-
     const stored = (await uow.read.environments.getById(f.task.id))!;
     expect(stored.render?.image).toBe(f.env.render!.image); expect(stored.render?.runtimeImage).toBeUndefined(); expect(stored.render?.runtimeImageRepin).toBeUndefined();
   });
+  // AW RFC-370 hosted acceptance (2026-10-19): a reconcile pass judged the snapshot it listed before a pause began; the
+  // Pod the pause deleted read as missing and the pausing workspace became "容器不存在", failing its task.
+  test('a failure judged on a pre-pause snapshot leaves a pausing or paused workspace as it is', async () => {
+    const f = await fixture(), remove = f.k8s.delete;
+    f.k8s.delete = async (ref, name, namespace, options) => ref.kind === 'Pod' ? true : remove(ref, name, namespace, options);
+    expect(await f.runtime.api.pauseEnvironment(f.task.id)).toMatchObject({ state: 'running', businessWorkspace: { phase: 'pausing' } });
+    await f.runtime.api.markFailed(f.task.id, '容器不存在');
+    expect(await f.runtime.api.getEnvironment(f.task.id)).toMatchObject({ state: 'running', businessWorkspace: { phase: 'pausing' } });
+    f.k8s.delete = remove;
+    await f.make().api.reconcile();
+    expect((await f.runtime.api.getEnvironment(f.task.id))?.state).toBe('paused');
+    await f.runtime.api.markFailed(f.task.id, '容器不存在');
+    expect(await f.runtime.api.getEnvironment(f.task.id)).toMatchObject({ state: 'paused', businessWorkspace: { phase: 'paused' } });
+    expect((await f.runtime.api.resumeEnvironment(f.task.id)).state).toBe('creating');
+  });
 });

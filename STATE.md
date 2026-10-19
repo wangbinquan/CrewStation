@@ -1,10 +1,12 @@
-## 2026-10-19 RFC-043 In Progress：业务任务运行镜像升级
+## 2026-10-19 RFC-043 Done：业务任务运行镜像升级
 
-AW RFC-370 v4 托管验收发现：持久工作卷的父任务终身停在创建时的任务镜像，服务后续发布新增的卷内命令在这些父任务上永远不可用（开发自动化 `repository-facts-scan` 报未知操作、旧任务「变更」页 410）。新 [RFC-043](proposal/rfc/RFC-043-business-task-runtime-image-upgrade/proposal.md) 让持有执行权的服务把已暂停的持久业务任务改钉到同一运行镜像的已验证版本（缺省取正式发布声明的版本），任务身份、工作卷与文件不变，下一次恢复以新镜像启动；镜像引用随升级迁移。作者已立项并批准按设计实现。
+服务可以把已暂停的持久业务任务改钉到同一运行镜像的已验证新版本，工作卷与身份不变，下一次恢复以新镜像启动；镜像引用随升级迁移。实现 `660a6185`，准确 SHA CI `39286683024` 全绿，已部署本机。AW 正式实例 `v0.6.25` 上主动升级（共享 owner 的暂停父任务）与按需升级（旧任务「变更」视图所需的新卷内命令）均通过，RIU-01–07 见 [验收记录](proposal/rfc/RFC-043-business-task-runtime-image-upgrade/acceptance.md)。
 
-实现 `660a6185`：生命周期动作 `upgrade-runtime-image`、task-runtime 暂停环境改钉、镜像读者随当前钉住版本、迁移 0040（只增两列）。完整本地门禁 5821 pass / 176 skip / 6 fail（1 项为本次契约面名单，已修；5 项为本机已知环境用例），准确 SHA CI `39286683024` 全部成功，已部署本机（迁移 `business_task/0040_runtime_image_upgrade.sql` 已应用）。
+联合验收中修复了两个平台缺陷：
+- RFC-040 的未启动尝试阻塞终结：`563322f8` 已部署。
+- 暂停中的工作区被对账旧快照判「容器不存在」：随本提交修复，终结排空同时写明阻塞的子任务。
 
-联合验收中发现：RFC-040 的 `failBeforeStart` 把未启动的尝试记为派发 `failed`，终结排空只认 `accepted`，带这种尝试的任务永远卡在 draining（`finalization_execution_pending`），父任务一直占用额度与内存。现已把它与启动前取消同样作为从未启动的证明（回归用例修复前红、修复后绿），待集中验证与部署。AW 侧 V21 与 RIU-07 联合验收进行中，见 [验收记录](proposal/rfc/RFC-043-business-task-runtime-image-upgrade/acceptance.md)。
+两处修复的完整本地门禁均只余 5 项本机已知环境用例（5823 / 5824 pass）。
 
 ## 2026-10-19 RFC-042 Done：独立服务恢复第二次尝试通过
 

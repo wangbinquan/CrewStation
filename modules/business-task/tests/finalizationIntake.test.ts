@@ -168,7 +168,8 @@ describe.skipIf(!available)('RFC-035 durable finalization intake and completion 
     const claim = (await f.store.claim({ id: op.id, owner: 'drain', leaseSeconds: 30 }))!;
     expect(await completion.page(op.id)).toEqual([{ subtaskId: view.id, executionTaskId: f.task.id, executionId: view.executionId, state: 'running', requiresSessionProof: true }]);
     await expect(completion.confirm(leaseOf(claim), [])).rejects.toMatchObject({ kind: 'conflict' });
-    await expect(completion.confirm(leaseOf(claim), [{ subtaskId: view.id, proof: null }])).rejects.toMatchObject({ details: { code: 'finalization_execution_pending' } });
+    // The operator message names the attempt that holds the drain and its state.
+    await expect(completion.confirm(leaseOf(claim), [{ subtaskId: view.id, proof: null }])).rejects.toMatchObject({ details: { code: 'finalization_execution_pending', subtaskId: view.id }, message: expect.stringContaining(`子任务 ${view.id} attempt 1：running／live／派发 accepted，无结果`) });
     const projection = drizzleExecutionProjection(tdb.db), subtasks = drizzleExecutionSubtasks(tdb.db), subtask = (await subtasks.get(f.serviceId, f.task.id, view.id))!;
     const result = { reason: 'exited' as const, exitCode: 0, durationMs: 10 }, at = new Date().toISOString();
     const receipt = { ...f.receipts.get(view.executionId)!, phase: 'finished' as const, result, lastSequence: 2 };

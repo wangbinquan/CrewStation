@@ -24,13 +24,15 @@ function rows(tx: Executor, op: FinalizationOperation) {
     .where(and(eq(tasks.serviceId, op.serviceId), eq(tasks.taskId, op.view.taskId), op.completionScan?.after ? gt(tasks.id, op.completionScan.after) : undefined)).orderBy(asc(tasks.id)).limit(BATCH);
 }
 type CompletionRow = Awaited<ReturnType<typeof rows>>[number];
+/** The operator sees which attempt holds the drain and why (no payloads). */
+const pendingFacts = (t: CompletionRow['task']) => `子任务 ${t.id} attempt ${t.view.attempt}：${t.view.state}／${t.view.process}／派发 ${t.dispatch}${t.view.result ? '' : '，无结果'}`;
 function validate(row: CompletionRow, raw: ExecutionCompletionProof | null): Evidence {
   const t = row.task, p = row.projection;
   // A dispatch that failed before its start RPC never ran; `failBeforeStart` ends it with a terminal not-started result,
   // as a cancel before start does (AW RFC-370 hosted acceptance, 2026-10-19: such an Agent kept its parent finalizing forever).
   const failedBeforeStart = t.dispatch === 'failed' && !t.incarnation && t.view.process === 'not-started' && Boolean(t.view.result?.reason.startsWith('failed-before-start'));
-  if (!['succeeded', 'failed', 'cancelled'].includes(t.view.state) || !['exited', 'not-started'].includes(t.view.process) || (t.dispatch !== 'accepted' && !failedBeforeStart)) throw precondition('仍有活动或未知执行，等待应用取消或执行结束', { code: 'finalization_execution_pending' });
-  if (!p?.complete || !p.sourceConsumed || !t.view.result) throw precondition('执行结果或持久消费确认尚未齐备', { code: 'finalization_result_pending' });
+  if (!['succeeded', 'failed', 'cancelled'].includes(t.view.state) || !['exited', 'not-started'].includes(t.view.process) || (t.dispatch !== 'accepted' && !failedBeforeStart)) throw precondition(`仍有活动或未知执行，等待应用取消或执行结束（${pendingFacts(t)}）`, { code: 'finalization_execution_pending', subtaskId: t.id });
+  if (!p?.complete || !p.sourceConsumed || !t.view.result) throw precondition(`执行结果或持久消费确认尚未齐备（${pendingFacts(t)}）`, { code: 'finalization_result_pending', subtaskId: t.id });
   if (p.sourceStopped) throw precondition('执行停止后仍有结果缺口，需要补证或明确损失确认', { code: 'finalization_result_incomplete' });
   if (!t.incarnation) {
     if (raw || t.view.process !== 'not-started' || (t.view.result.reason !== 'cancelled-before-start' && !failedBeforeStart) || p.sourceSequence !== 0) throw precondition('缺少执行从未启动的持久证明', { code: 'finalization_never_started_unknown' });
