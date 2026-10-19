@@ -7,7 +7,8 @@ import type { Database } from '@crewstation/persistence';
 import { z } from 'zod';
 
 interface CreationRecord { id: string; kind: string; projectId?: string; owner?: { module: string; ref: string }; spec: Readonly<Record<string, unknown>> }
-const releaseRef = z.object({ releaseId: ResourceIdSchema, serviceId: ResourceIdSchema.optional(), purpose: z.enum(['build', 'migration']).optional(), physical: z.enum(['blue', 'green']).optional() });
+/** RFC-042 restore and verify Jobs are `migration-job` records owned by `<jobId>/migration`, like a release migration. */
+const releaseRef = z.object({ releaseId: ResourceIdSchema, serviceId: ResourceIdSchema.optional(), purpose: z.enum(['build', 'migration', 'database-restore', 'database-verify']).optional(), physical: z.enum(['blue', 'green']).optional() });
 /** The actual owner records its callback through Secret and Job/Deployment
  * apply. Both owner and resource locks use one original PostgreSQL backend. */
 export function registryCreationAdmission(input: { db: Database; registry?: Parameters<typeof nativeRegistryWriterAdmission>[0];
@@ -32,7 +33,8 @@ export function registryCreationAdmission(input: { db: Database; registry?: Para
     if (ref !== undefined) {
       const parsed = releaseRef.parse(ref);
       const expected = record?.kind === 'service-slot' && parsed.serviceId && parsed.physical ? parsed.serviceId + '/' + parsed.physical
-        : (record?.kind === 'build-job' && parsed.purpose === 'build' || record?.kind === 'migration-job' && parsed.purpose === 'migration') ? parsed.releaseId + '/' + parsed.purpose : undefined;
+        : record?.kind === 'build-job' && parsed.purpose === 'build' ? parsed.releaseId + '/build'
+        : record?.kind === 'migration-job' && parsed.purpose && parsed.purpose !== 'build' ? parsed.releaseId + '/migration' : undefined;
       if (!expected || record?.owner?.module !== 'release' || record.owner.ref !== expected) throw precondition('原发布台账归属变化');
       return input.release.withResourceCreationAdmission({ recordId: record.id, ...parsed, kind: record.kind === 'service-slot' ? 'slot' : 'pipeline' }, protectedApply);
     }

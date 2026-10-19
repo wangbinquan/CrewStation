@@ -82,6 +82,26 @@ describe.skipIf(!available)('native creation interval through actual owners and 
       expect(completed[0]!.exit_digest).toMatch(/^[a-f0-9]{64}$/);
     } finally { exit.resolve(); await f.close(); }
   }, 15_000);
+  // AW RFC-370 / RFC-042 hosted acceptance (2026-10-19): restore and verify Jobs are migration-job records whose purpose
+  // the release reference did not accept, so every creation attempt failed validation and a restore waited in
+  // `restoring` without its Job.
+  test('database restore and verify Jobs are admitted through their restore owner', async () => {
+    const tdb = await createTestDatabase([]), projectId = newResourceId(), routed: unknown[] = []; let applied = 0;
+    const admit = registryCreationAdmission({ db: tdb.db, resources: { withAdmission: async (_id, work) => { await work(); return true; } },
+      images: { withBuildCreationAdmission: async () => { throw Error('A restore Job must not dispatch through the image owner'); } },
+      release: { withResourceCreationAdmission: async (ref, work) => { routed.push(ref); return work(); } } });
+    try {
+      for (const purpose of ['database-restore', 'database-verify'] as const) {
+        const jobId = newResourceId(), record = { id: newResourceId(), kind: 'migration-job', projectId, owner: { module: 'release', ref: jobId + '/migration' },
+          spec: { job: { releaseId: jobId, purpose, image: 'registry.local/restore:1', command: ['restore'], env: {}, envSecret: 'restore-env' } } };
+        expect(await admit(projectId, async () => { applied++; }, record)).toBe(true);
+        expect(routed.at(-1)).toMatchObject({ recordId: record.id, releaseId: jobId, purpose, kind: 'pipeline' });
+        await expect(admit(projectId, async () => { applied++; }, { ...record, owner: { module: 'release', ref: newResourceId() + '/migration' } })).rejects.toThrow('台账归属');
+        await expect(admit(projectId, async () => { applied++; }, { ...record, kind: 'build-job' })).rejects.toThrow('台账归属');
+      }
+      expect(applied).toBe(2); expect(routed).toHaveLength(2);
+    } finally { await tdb.drop(); }
+  }, 15_000);
   test('a closed resource admission or substituted owner/project cannot create a native object or reinterpret the original release', async () => {
     const f = await fixture(); let mutations = 0;
     try {
