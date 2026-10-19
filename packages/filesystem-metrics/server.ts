@@ -16,16 +16,24 @@ import { createPodWorkspaceHandler } from './pod-workspace/server';
 import { processOwnerHttp } from './process-owners/transport';
 
 /**
- * The probe serves one measurement at a time. Every handler bounds its own work, but one whose promise never settled kept
- * the probe busy for good: every later caller got 409 and an independent database restore could never sample its source
- * (AW RFC-370 hosted acceptance, 2026-10-19). A request therefore ends after this deadline and frees the probe.
+ * The probe serves one measurement at a time. Every handler bounds its own work, but one whose promise never settled
+ * would keep its lane busy for good, so every request ends after this deadline and frees it (AW RFC-370 hosted
+ * acceptance, 2026-10-19).
  */
 export const PROBE_REQUEST_DEADLINE_MS = 120_000;
+/**
+ * Metadata-only observations (a few `open`/`stat` calls on bounded paths) are not queued behind the one-at-a-time
+ * measurement: a busy node's storage measurement uses its whole 55 s budget and runs again every 60 s, so a database
+ * restore's source sample and the restore Job's environment rendering lost the race almost every time (AW RFC-370 /
+ * RFC-042 hosted acceptance, 2026-10-19). They have their own small concurrency bound.
+ */
+const OBSERVATION_PATHS = new Set(['/source', '/absence']);
+export const PROBE_OBSERVATION_CONCURRENCY = 4;
 
 export function createFilesystemMetricsHandler(options: { token: string; roots: Record<string, string>; timeoutMs?: number; procRoot?: string; podWorkspaceRoot?: string; buildkitTemplateRoot?: string; requestDeadlineMs?: number }) {
   if (options.token.length < 32) throw new Error('A dedicated measurement token of at least 32 characters is required');
   if (options.buildkitTemplateRoot && !options.roots['local']) throw new Error('Native BuildKit input installation requires its local root');
-  const credential = Buffer.from(`Bearer ${options.token}`); let busy = false;
+  const credential = Buffer.from(`Bearer ${options.token}`); let busy = false, observing = 0;
   const workspaces = options.podWorkspaceRoot ? createPodWorkspaceHandler({ token: options.token, root: options.podWorkspaceRoot }) : undefined;
   const inputs = options.buildkitTemplateRoot ? createBuildKitInputHandler({ token: options.token, root: options.roots['local']!, templateRoot: options.buildkitTemplateRoot }) : undefined;
   const manifests = options.roots['local'] ? createBuildKitManifestHandler({ token: options.token, root: options.roots['local'] }) : undefined;
@@ -35,15 +43,16 @@ export function createFilesystemMetricsHandler(options: { token: string; roots: 
     const supplied = Buffer.from(request.headers.get('authorization') ?? '');
     if (credential.length !== supplied.length || !timingSafeEqual(credential, supplied)) return Response.json({ error: 'Unauthorized' }, { status: 401 });
     if (!['/measure', '/absence', '/source', '/consumers','/process-owners','/registry/inventory','/garage/inventory','/buildkit/inventory', ...(workspaces ? ['/pod-workspace/inventory'] : []), ...(inputs ? ['/buildkit/platform-inputs'] : []), ...(manifests ? ['/buildkit/manifests'] : [])].includes(path) || request.method !== 'POST') return new Response(null, { status: 404 });
-    if (busy) return Response.json({ error: 'A measurement is already running' }, { status: 409 });
+    const observation = OBSERVATION_PATHS.has(path);
+    if (observation ? observing >= PROBE_OBSERVATION_CONCURRENCY : busy) return Response.json({ error: observation ? 'Too many observations are running' : 'A measurement is already running' }, { status: 409 });
     if (Number(request.headers.get('content-length')) > (path === '/garage/inventory' ? 24 * 1024 * 1024 : path === '/buildkit/platform-inputs' ? 8_388_608 : ['/buildkit/inventory', '/buildkit/manifests'].includes(path) ? 1_048_576 : ['/consumers','/process-owners','/registry/inventory'].includes(path) ? 32_768 : 16_384)) return new Response(null, { status: 413 });
-    busy = true;
+    if (observation) observing += 1; else busy = true;
     let deadline: ReturnType<typeof setTimeout> | undefined;
     try {
       return await Promise.race([measure(path, request), new Promise<Response>((resolve) => {
         deadline = setTimeout(() => resolve(Response.json({ error: 'Measurement exceeded its deadline' }, { status: 503 })), options.requestDeadlineMs ?? PROBE_REQUEST_DEADLINE_MS);
       })]);
-    } finally { clearTimeout(deadline); busy = false; }
+    } finally { clearTimeout(deadline); if (observation) observing -= 1; else busy = false; }
   };
   async function measure(path: string, request: Request): Promise<Response> {
     try {

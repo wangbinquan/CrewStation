@@ -4,7 +4,7 @@ import { renameSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { observeFilesystemSource, filesystemSourceEpoch, SourceRequestSchema, SourceResponseSchema } from './source';
-import { createFilesystemMetricsHandler } from './server';
+import { PROBE_OBSERVATION_CONCURRENCY, createFilesystemMetricsHandler } from './server';
 const roots: string[] = [], token = 's'.repeat(48);
 afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
 async function fixture() {
@@ -67,8 +67,11 @@ test('authenticated source protocol is bounded, contains no file contents, and l
   expect((await handler(request({ ...target, extra: true }))).status).toBe(400);
   expect((await handler(request({ ...target, entries: Array.from({ length: 33 }, (_, index) => ({ ...target.entries[0], key: String(index) })) }))).status).toBe(400);
   expect((await handler(request({ padding: 'x'.repeat(20_000) }))).status).toBe(400);
-  const first = handler(request(target)); expect((await handler(request(target))).status).toBe(409);
-  const response = await first, body = await response.json(); expect(response.status).toBe(200); expect(SourceResponseSchema.safeParse(body).success).toBe(true);
+  // Source samples have their own small bound instead of queueing behind a measurement (see probeDeadline.test.ts).
+  const concurrent = Array.from({ length: PROBE_OBSERVATION_CONCURRENCY }, () => handler(request(target)));
+  expect((await handler(request(target))).status).toBe(409);
+  const [response, ...others] = await Promise.all(concurrent), body = await response!.json(); expect(response!.status).toBe(200); expect(SourceResponseSchema.safeParse(body).success).toBe(true);
+  for (const other of others) expect(other.status).toBe(200);
   expect(JSON.stringify(body)).not.toContain('same server identifier'); expect(JSON.stringify(body)).not.toContain(root);
   const missing = await handler(request({ ...target, directory: 'missing' })); expect(missing.status).toBe(400);
   expect((await handler(request(target))).status).toBe(200);
