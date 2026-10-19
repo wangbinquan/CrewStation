@@ -1,3 +1,7 @@
+## 2026-10-19 RFC-042 Done：独立服务恢复第二次尝试通过
+
+独立验收服务 `rfc042-aw-restore` 上以同一备份重做恢复（AW `v0.2.3` 已能在冻结授权下排空自己的父任务）：操作 `01a15487-c618-…` 的恢复 Job、校验 Job 成功，切换一次受理，`freezing` 约 15 秒后部署，14:25:26 `completed`。恢复后备份之后建的 Agent 不在、备份时点的数据都在；原世代与第一次尝试的目标世代均保留；新槽持有唯一执行权，旧槽被拒。第一次尝试暴露的平台缺陷 `0dc7fea4`（恢复 / 校验 Job 准入）、`1e5ae7c6`（存储探针观测与测量分车道）、`a61b3f6e`（失败环境不算写者、等待原因可见）均准确 SHA CI 通过并已部署。DBR-01–08 逐条证据见 [RFC-042 验收记录](proposal/rfc/RFC-042-service-database-restore/acceptance.md)。正式 AW 始终保持运行，未对它执行恢复。
+
 ## 2026-10-18 RFC-040 Done：工具结果投影部署，AW RFC-370 联合验收完成
 
 `02b66a22`（OpenCode 已完成工具投影为带输入的 tool-end）的准确 SHA CI 39130776880 唯一失败为未改动的 `runtimes/task/tests/runnerLifecycle.test.ts` 预览监督用例（waitFor 超时），原失败保留、未认领；后继 `34331a3c` 的 CI 39133757698 全部成功并已部署本机（控制面 `cs-control-plane@sha256:17bb84bf…`、控制台 `cs-console@sha256:4ed20b0b…`）。AW 托管任务 `01M57RVYMS1S6BDJM4MR5F5WWB` 的 bash 工具调用在节点会话中为 completed、带输入与输出 `tool-end-42`，真实浏览器渲染一致。连同此前的原生材料、本地 MCP／插件／权限、私有 Git、接管与 `resume-task` 恢复证据，T6 联合验收（按用户裁定只验证 OpenCode）完成，RFC-040 标记 Done；Claude 档位按能力影响补充表不宣称原生能力。注意：安装脚本重新发布任务底座时 `CS_TASK_IMAGE` 摘要变化，已有任务镜像验证全部失效（AW 正式服务约 10 分钟启动被拒，重新验证后恢复）——平台升级换底座后须重新验证在用任务镜像。详见 [RFC-040 验收记录](proposal/rfc/RFC-040-business-native-materials/acceptance.md)。

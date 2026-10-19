@@ -78,4 +78,4 @@ proposal/rfc/RFC-NNN-{slug}/
 | [RFC-040](./RFC-040-business-native-materials/proposal.md) | 业务 Agent 原生配置材料：根 Agent／子代理、模型选项、内联 MCP 与插件，平台保留配置不可覆盖。 | Done · 2026-10-18 · 准确 CI 与本机部署完成；OpenCode 原生材料（技能／MCP／插件／权限／跨模型子代理）、私有 Git、接管恢复与工具结果经 AW RFC-370 托管联合实测，见 [验收记录](./RFC-040-business-native-materials/acceptance.md)。 |
 | [RFC-041](./RFC-041-continuous-bot-session/proposal.md) | Bot 持续对话：CLI 保持独立，停止本轮后沿用原上下文，执行恢复与历史统一呈现。 | Done · 2026-10-16 · 正式部署与准确 CI 全绿；真实多轮、停止/换 Pod/父重建续接、显式 fresh、Chrome 和两 PVC/PV 回收通过，见 [验收记录](./RFC-041-continuous-bot-session/acceptance.md)。 |
 
-| [RFC-042](./RFC-042-service-database-restore/proposal.md) | 服务数据库空目标恢复与切换：独立目标、验证、维护确认与世代对账，原库保留。 | In Progress · 2026-10-16 · 作者批准推荐设计与交互原型，独立空目标恢复和显式维护切换；现有正式 AW 保持运行。 |
+| [RFC-042](./RFC-042-service-database-restore/proposal.md) | 服务数据库空目标恢复与切换：独立目标、验证、维护确认与世代对账，原库保留。 | Done · 2026-10-19 · 独立服务 `rfc042-aw-restore` 的恢复第二次尝试通过（DBR-01–08，见验收记录）；第一次尝试暴露的三个平台缺陷 `0dc7fea4`、`1e5ae7c6`、`a61b3f6e` 已修复部署；现有正式 AW 始终保持运行、未恢复。 |
