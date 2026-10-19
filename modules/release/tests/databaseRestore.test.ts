@@ -78,7 +78,10 @@ describe.skipIf(!available)('RFC-042 durable restore workflow',()=>{
   const other={userId:Bun.randomUUIDv7() as typeof f.actor.userId,isAdmin:true};
   await f.api.retryDatabaseRestore(other,f.serviceId,ready.id,{expectedRevision:(await f.load()).revision});expect((await f.load()).switchActor?.userId).toBe(other.userId);
   await f.worker()();expect(f.state.maintenance).toBe(true);expect((await f.load()).stage).toBe('freezing');
-  await f.worker()();expect(f.state.binding.generationId).toBe(f.input.expectedActiveGenerationId);f.state.barrier=true;await f.worker()();expect((await f.load()).stage).toBe('deploying');expect(f.state.binding.generationId).toBe(f.input.expectedActiveGenerationId);
+  await f.worker()();expect(f.state.binding.generationId).toBe(f.input.expectedActiveGenerationId);
+  // Waiting for the old writers is reported, never parked (AW RFC-370 / RFC-042 hosted acceptance, 2026-10-19).
+  const waiting=await f.load();expect(waiting.stage).toBe('freezing');expect(waiting.error).toBeNull();expect(waiting.observation?.message).toContain('原恢复正在等待旧写入者停止');
+  f.state.barrier=true;await f.worker()();expect((await f.load()).stage).toBe('deploying');expect((await f.load()).observation).toBeNull();expect(f.state.binding.generationId).toBe(f.input.expectedActiveGenerationId);
   f.state.ready=true;await f.worker()();expect((await f.load()).stage).toBe('switching');await f.worker()();expect(f.state.binding.generationId).toBe((await f.load()).targetGenerationId);
   expect(await f.uow.read.handoffs.get(ready.id)).toMatchObject({id:ready.id,stage:'freezing',actorUserId:other.userId});expect((await f.load()).switchCommitted).toBe(true);
   await expect(f.api.abandonDatabaseRestore(other,f.serviceId,ready.id,{expectedRevision:(await f.load()).revision})).rejects.toMatchObject({details:{code:'database_restore_switched'}});

@@ -12,9 +12,12 @@ export function migrationBarrier(deps: BusinessExecutionDeps): Pick<BusinessRele
       const blocked: string[] = [];
       if (!await deps.controls.quiescent(serviceId)) blocked.push('dispatch_in_flight');
       if (!control?.migration?.preparationDigest) blocked.push('application_write_barrier_missing');
+      // A failed environment runs nothing and cannot be resumed under the freeze (AW RFC-370 / RFC-042 hosted acceptance,
+      // 2026-10-19: parents that failed before their containers started held a restore switch); its absent Pod is still
+      // proved by the release's writer observation.
       for (const id of await deps.controls.writerRuntimes(serviceId)) {
         const env = await deps.environments.getEnvironment(id as TaskId);
-        if (!env || !['paused', 'released'].includes(env.state)) blocked.push(id);
+        if (!env || !['paused', 'released', 'failed'].includes(env.state)) blocked.push(id);
       }
       return { ready: blocked.length === 0, epoch: control!.epoch, blocked,
         ...(control?.migration?.preparationDigest ? { preparationDigest: control.migration.preparationDigest } : {}) };

@@ -45,6 +45,20 @@ describe.skipIf(!available)('RFC-027 migration write barrier', () => {
     expect((await restarted.module.api.releaseHandoff.inspect(f.serviceId)).migration?.operationId).toBe(replacement.operationId);
 
   });
+  // AW RFC-370 / RFC-042 hosted acceptance (2026-10-19): parents that failed before their containers started held a
+  // restore switch in `freezing`; a failed environment runs nothing and cannot be resumed under the freeze.
+  test('a failed environment does not hold the barrier, a starting one does', async () => {
+    db = await createTestDatabase([businessTaskMigrations]); const f = await executionCommandFixture(db.db);
+    const input = { operationId: newResourceId(), expectedActiveReleaseId: f.releaseId, targetReleaseId: newResourceId() as ReleaseId };
+    const first = await f.module.api.releaseHandoff.migrationBarrier(f.serviceId, input);
+    const receipt = { operationId: input.operationId, expectedEpoch: first.epoch, preparationDigest: 'b'.repeat(64) };
+    expect((await f.request(`/v3/business-execution/control/migrations/${input.operationId}/ready`, receipt)).status).toBe(200);
+    expect((await f.module.api.releaseHandoff.migrationBarrier(f.serviceId, input)).blocked).toEqual([f.task.id]);
+    f.env.state = 'failed'; f.env.connected = false;
+    expect(await f.module.api.releaseHandoff.migrationBarrier(f.serviceId, input)).toMatchObject({ ready: true, blocked: [] });
+    f.env.state = 'creating';
+    expect((await f.module.api.releaseHandoff.migrationBarrier(f.serviceId, input)).blocked).toEqual([f.task.id]);
+  });
   test('frozen migration grants only explicit cancellation and pause/close, never resume or new work', async () => {
     db = await createTestDatabase([businessTaskMigrations]); const f = await executionCommandFixture(db.db);
     const child = await (await f.request(f.path, f.input)).json() as BusinessSubtaskV3Dto;

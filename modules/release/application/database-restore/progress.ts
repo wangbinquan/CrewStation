@@ -10,9 +10,10 @@ import { freezeForRestore, readyRestoreCandidate, switchRestoreCandidate } from 
 /**
  * `native_postgres_source_busy`: the node's single-flight storage probe is serving another measurement. AW RFC-370
  * hosted acceptance (2026-10-19): an independent restore parked in `requested` on it and each administrator retry lost
- * the race again within seconds; project deletion already waits it out the same way.
+ * the race again within seconds; project deletion already waits it out the same way. `restore_writers_running`: the
+ * switch waits for the old release to stop its writers (CS RFC-027 stop authority), reported, not parked.
  */
-const TRANSIENT_CODES = new Set(['restore_job_terminating', 'execution_control_busy', 'object_storage_busy', 'native_postgres_source_busy']);
+const TRANSIENT_CODES = new Set(['restore_job_terminating', 'execution_control_busy', 'object_storage_busy', 'native_postgres_source_busy', 'restore_writers_running']);
 /**
  * Platform rejections (identity drift, revoked confirmation, failed probes) wait for an administrator to retry or abandon;
  * infrastructure failures are only recorded and observed again automatically, so they never park the operation (RFC-042).

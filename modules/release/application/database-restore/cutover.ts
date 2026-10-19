@@ -12,11 +12,21 @@ function candidate(op:DatabaseRestoreOperation,now:Date):Release {
   return {id:op.candidateReleaseId,projectId:op.projectId,serviceId:op.serviceId,tag:op.sourceTag+(op.sourceTag.includes('+')?'.':'+')+'restore.'+op.id.replaceAll('-',''),commitSha:op.sourceCommit,branch:op.sourceBranch,status:'deploying',targetSlot:op.targetSlot,image:op.image,manifest:op.manifest,
     configVersion:op.environmentVersion!,pipeline:{step:1,deployStartedAt:now.toISOString(),executionMaterials:op.executionMaterials,...(op.runtimeImage?{runtimeImage:op.runtimeImage}:{}),databaseRestore:{operationId:op.id,generationId:op.targetGenerationId,sourceReleaseId:op.restoreReleaseId}},createdBy:op.createdBy,createdAt:now,updatedAt:now};
 }
+/**
+ * The switch waits for the old writers and never forces them; what it waits for is the operation's observation (AW
+ * RFC-370 / RFC-042 hosted acceptance, 2026-10-19: a restore stayed in `freezing` for half an hour with no reason shown).
+ */
+function waitingForWriters(blocked:readonly string[]){
+  const reasons=blocked.map(item=>item==='application_write_barrier_missing'?'应用尚未确认停写':item==='dispatch_in_flight'?'仍有在途派发':`业务执行环境 ${item} 仍在运行`);
+  const shown=reasons.length?reasons.slice(0,4).join('；')+(reasons.length>4?`；另有 ${reasons.length-4} 项`:''):'业务执行 Pod 尚未全部退出';
+  return precondition(`原恢复正在等待旧写入者停止：${shown}`,{code:'restore_writers_running'});
+}
 async function writeBarrier(deps:ReleaseUseCaseDeps,op:DatabaseRestoreOperation){
   if(!await deps.maintenance.open(op.serviceId))throw precondition('原恢复维护窗口已关闭，不能继续切换');
   const result=await deps.executionHandoff!.migrationBarrier!(op.serviceId,{operationId:op.id,targetReleaseId:op.candidateReleaseId,expectedActiveReleaseId:op.sourceReleaseId});
-  if(!result.ready)return false;
-  return deps.executionHandoff!.observeWritersStopped!(op.serviceId);
+  if(!result.ready)throw waitingForWriters(result.blocked??[]);
+  if(!await deps.executionHandoff!.observeWritersStopped!(op.serviceId))throw waitingForWriters([]);
+  return true;
 }
 export async function freezeForRestore(deps:ReleaseUseCaseDeps,op:DatabaseRestoreOperation){
   const c=restoreContext(deps);if(!op.switchActor)throw precondition('恢复切换缺少管理员确认');
