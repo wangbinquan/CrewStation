@@ -13,6 +13,7 @@ import { executionSubtasks as tasks } from '../execution/subtaskTables';
 import { subtaskProjections as projections } from '../execution/projectionTables';
 import { executionMessages as messages } from '../messages/tables';
 import { finalizations } from './tables';
+import { failBeforeStart } from '../execution/failBeforeStart';
 
 type Evidence = { subtaskId: string; executionId: string; attempt: number; projectionThrough: number; source: 'session' | 'never-started'; proof: ExecutionCompletionProof | null };
 const proofs = businessTaskSchema.table('finalization_execution_proofs', {
@@ -24,6 +25,12 @@ function rows(tx: Executor, op: FinalizationOperation) {
     .where(and(eq(tasks.serviceId, op.serviceId), eq(tasks.taskId, op.view.taskId), op.completionScan?.after ? gt(tasks.id, op.completionScan.after) : undefined)).orderBy(asc(tasks.id)).limit(BATCH);
 }
 type CompletionRow = Awaited<ReturnType<typeof rows>>[number];
+/**
+ * Before `e0b8f149` an attempt that failed before its start RPC ended with no result event and no projection. It never ran.
+ * The drain gives it the terminal result it would get today, so it becomes never-started evidence and a caller following its
+ * events sees it end (AW RFC-370 hosted acceptance, 2026-10-19: such a row held a parent in draining and its caller waiting).
+ */
+const unendedFailure = (t: CompletionRow['task']) => t.view.state === 'failed' && t.view.process === 'not-started' && t.dispatch === 'failed' && !t.incarnation && !t.view.result;
 /** The operator sees which attempt holds the drain and why (no payloads). */
 const pendingFacts = (t: CompletionRow['task']) => `子任务 ${t.id} attempt ${t.view.attempt}：${t.view.state}／${t.view.process}／派发 ${t.dispatch}${t.view.result ? '' : '，无结果'}`;
 function validate(row: CompletionRow, raw: ExecutionCompletionProof | null): Evidence {
@@ -58,8 +65,12 @@ export function finalizationCompletion(db: Database): FinalizationCompletion {
         if (!row || row.body.view.revision !== lease.revision || row.phase !== 'draining') return undefined;
         const op = row.body;
         if (op.completionScan?.complete) { if (items.length) throw conflict('终态扫描已封存'); return op; }
-        const batch = await rows(tx, op);
+        let batch = await rows(tx, op);
         if (items.length !== batch.length || items.some((item, i) => item.subtaskId !== batch[i]!.task.id)) throw conflict('终态证明分页已变化或缺少执行', { code: 'finalization_completion_page_changed' });
+        if (batch.some((item) => unendedFailure(item.task))) {
+          for (const { task } of batch) if (unendedFailure(task)) await failBeforeStart(tx, task, { error: task.view.error ?? { code: 'dispatch_failed', message: '执行未启动' }, ...(task.runtimeAdmitted ? { runtimeAdmitted: true } : {}) }, now);
+          batch = await rows(tx, op);
+        }
         const evidence = batch.map((item, i) => validate(item, items[i]!.proof));
         const scan = op.completionScan ?? { after: null, digest: jsonHash({ operationId: op.id, taskId: op.view.taskId, generation: op.view.taskGeneration }), count: 0, complete: false };
         let digest = scan.digest;

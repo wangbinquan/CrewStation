@@ -13,6 +13,8 @@ import { finalizationOperations } from '../adapters/persistence/finalization/rep
 import { finalizationCompletion } from '../adapters/persistence/finalization/completion';
 import { drizzleExecutionProjection } from '../adapters/persistence/execution/projection';
 import { drizzleExecutionSubtasks } from '../adapters/persistence/execution/subtasks';
+import { executionSubtasks } from '../adapters/persistence/execution/subtaskTables';
+import { businessEvents } from '../adapters/persistence/execution/projectionTables';
 import type { FinalizationAdmission } from '../ports/storage/finalizations';
 import type { FinalizationOperation, FinalizationProgress } from '../domain/finalization/operation';
 import type { FinalizationPreparation } from '../ports/storage/preparation';
@@ -211,6 +213,24 @@ describe.skipIf(!available)('RFC-035 durable finalization intake and completion 
     const confirmed = (await completion.confirm(leaseOf(claim), [{ subtaskId: child.id, proof: null }]))!;
     expect(confirmed.completionScan).toMatchObject({ count: 1, complete: true });
     expect(confirmed.evidence.completionProofDigest).toHaveLength(64);
+  });
+  // AW RFC-370 hosted acceptance (2026-10-19): an attempt that failed before start under the code before `e0b8f149` has
+  // no result event and no projection; it held the formal AW's old system parent in draining and its caller waiting.
+  test('a pre-fix attempt that failed before start without a result is repaired by the drain and ends with one result event', async () => {
+    const f = await fixture(); f.behavior.disconnectAfterInfo = true;
+    const submitted = await (await f.request(f.path, f.commandInput)).json() as BusinessSubtaskV3Dto;
+    const error = { code: 'agent_environment_unavailable', message: 'Agent 未启动，固定执行材料或环境不可用' };
+    await tdb.db.update(executionSubtasks).set({ view: { ...submitted, state: 'failed', process: 'not-started', error }, dispatch: 'failed', owner: null, leaseUntil: null }).where(eq(executionSubtasks.id, submitted.id));
+    const op = await f.accept(), completion = finalizationCompletion(tdb.db);
+    const requested = (await f.store.claim({ id: op.id, owner: 'prepare-legacy', leaseSeconds: 30 }))!;
+    await f.store.progress(leaseOf(requested), { phase: 'draining', phaseState: 'running', evidence: { bindingConfirmed: true } });
+    const claim = (await f.store.claim({ id: op.id, owner: 'drain-legacy', leaseSeconds: 30 }))!;
+    const confirmed = (await completion.confirm(leaseOf(claim), [{ subtaskId: submitted.id, proof: null }]))!;
+    expect(confirmed.completionScan).toMatchObject({ count: 1, complete: true });
+    const repaired = (await drizzleExecutionSubtasks(tdb.db).get(f.serviceId, f.task.id, submitted.id))!.view;
+    expect(repaired).toMatchObject({ state: 'failed', process: 'not-started', error, result: { reason: 'failed-before-start: agent_environment_unavailable' } });
+    const results = (await tdb.db.select().from(businessEvents).where(eq(businessEvents.subtaskId, submitted.id))).filter((row) => row.event.type === 'result');
+    expect(results).toHaveLength(1);
   });
   test('bounded proof pages cover every never-started attempt and cannot skip an earlier page', async () => {
     const f = await fixture(); f.behavior.disconnectAfterInfo = true;
