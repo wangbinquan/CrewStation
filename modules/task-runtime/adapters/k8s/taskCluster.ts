@@ -11,6 +11,7 @@ interface ContainerStatus {
   imageID?: string;
   state?: { terminated?: { reason?: string; exitCode?: number }; waiting?: { reason?: string } };
 }
+type QuotaObject = K8sObject & { status?: { hard?: Record<string, string>; used?: Record<string, string> } };
 type PodObject = K8sObject & { status?: { phase?: string; podIP?: string; message?: string; reason?: string; conditions?: Array<{ type: string; status: string; reason?: string; message?: string }>; containerStatuses?: ContainerStatus[]; initContainerStatuses?: ContainerStatus[] } };
 
 function podMessage(pod: PodObject): string | undefined {
@@ -58,6 +59,15 @@ export function kubernetesTaskCluster(k8s: K8sClient, workerUid: number): TaskCl
     podPhase: async (env) => {
       const pod = await k8s.get<PodObject>(Resources.Pod!, env.podName, env.namespace);
       return pod ? phaseOf(pod) : { phase: 'Missing' };
+    },
+    missingPodCause: async (env) => {
+      if (!env.pvcName || await k8s.get(Resources.PersistentVolumeClaim!, env.pvcName, env.namespace)) return undefined;
+      // 项目命名空间的配额对象由开通模块按固定名字建（provisioning 的 PROJECT_QUOTA）。
+      const quota = await k8s.get<QuotaObject>(Resources.ResourceQuota!, 'crewstation-project', env.namespace);
+      const hard = quota?.status?.hard?.persistentvolumeclaims, used = quota?.status?.used?.persistentvolumeclaims;
+      return hard !== undefined && used !== undefined && Number(used) >= Number(hard)
+        ? `项目持久卷配额已用尽（${used}/${hard}），工作卷没有建出来；关闭或删除不再需要的任务后重试`
+        : '工作卷没有建出来';
     },
     observeStartup: async (env, options) => {
       const pod = await k8s.get<PodObject>(Resources.Pod!, env.podName, env.namespace);

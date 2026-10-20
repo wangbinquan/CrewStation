@@ -105,7 +105,9 @@ async function judgeEnvironment(deps: TaskRuntimeUseCaseDeps, lifecycle: Lifecyc
   // Pod 还在建：记录先提交、Pod 后建，这段空档里的 Missing 不是失败（RFC-022 每秒观测常扫到它）。
   if (phase === 'Missing' && awaitingPodCreation(env, deps.clock.now())) return false;
   if (phase === 'Failed' || phase === 'Succeeded' || phase === 'Missing') {
-    const summary = phase === 'Missing' ? '容器不存在' : phase === 'Failed' ? '容器运行失败' : '容器已退出';
+    // Pod 从没建出来时说清原因：工作卷被项目配额拒绝时，此前只报「容器不存在」（AW RFC-370 托管验收，2026-10-19）。
+    const cause = phase === 'Missing' ? await deps.cluster.missingPodCause?.(env).catch(() => undefined) : undefined;
+    const summary = phase === 'Missing' ? (cause ? `容器没有建出来：${cause}` : '容器不存在') : phase === 'Failed' ? '容器运行失败' : '容器已退出';
     // 执行容器从未连上就退出：多半是镜像不是基于平台底座构建（没有 Runner 启动路径）。
     const hint = env.native?.state === 'starting' && phase !== 'Missing' ? `；${RUNNER_UNAVAILABLE_HINT}` : '';
     await lifecycle.markFailed(env.id, `${summary}${message ? `：${message}` : ''}${hint}`, env.podName, undefined, phase === 'Missing' ? 'pod-missing' : 'pod-exited');

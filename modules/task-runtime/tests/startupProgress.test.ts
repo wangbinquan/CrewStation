@@ -171,6 +171,23 @@ describe.skipIf(!available)('启动进度（RFC-022）', () => {
     expect(kinds(await startupOf(dev.id))).toEqual(['queue:succeeded', 'container:running', 'checkout:pending', 'connect:pending', 'ready:pending']);
   });
 
+  // AW RFC-370 托管验收（2026-10-19）：项目的 20 个 PVC 用满，新任务的工作卷被 Kubernetes 拒绝，Pod 也就一直没建出来；
+  // 过了宽限照旧判失败，但此前只说「容器不存在」，调用方看不出要关闭或删除旧任务。
+  test('工作卷因项目卷配额用尽没建出来：判失败时写明配额已用尽（已用 / 上限）', async () => {
+    const { dev, pending, release } = await creatingWithoutPod();
+    await f!.k8s.delete(Resources.PersistentVolumeClaim!, dev.pvcName, NS);
+    await f!.k8s.create({ apiVersion: 'v1', kind: 'ResourceQuota', metadata: { name: 'crewstation-project', namespace: NS },
+      status: { hard: { persistentvolumeclaims: '20' }, used: { persistentvolumeclaims: '20' } } } as K8sObject);
+    f!.advance(POD_CREATE_GRACE_MS);
+    expect(await f!.runtime.api.observeStartup()).toBe(1);
+    const failed = (await f!.uow.read.environments.getById(dev.id))!;
+    expect(failed.state).toBe('failed');
+    expect(failed.message).toContain('容器没有建出来：项目持久卷配额已用尽（20/20）');
+    expect(failed.startup!.stages[0]).toMatchObject({ kind: 'queue', state: 'failed', error: { code: 'pod-missing' } });
+    release();
+    await pending;
+  });
+
   test('超过两分钟仍没有 Pod（建 Pod 的进程中途没了）：照旧判容器不存在，停在排队', async () => {
     const { dev, pending, release } = await creatingWithoutPod();
     f!.advance(POD_CREATE_GRACE_MS);

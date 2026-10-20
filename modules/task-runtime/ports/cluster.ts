@@ -45,6 +45,8 @@ export interface TaskCluster {
   observeStartup(env: TaskEnvironment, options: { events: boolean }): Promise<{ pod: PodPhaseReading; observation?: StartupObservation }>;
   /** 一个容器日志的最后若干行；判定失败时留证用，读不到就抛错由调用方忽略。 */
   tailLog(env: TaskEnvironment, container: string, lines: number): Promise<string>;
+  /** 判「容器不存在」时说明 Pod 为什么没建出来：工作卷也不在时读项目配额（卷配额用尽是常见原因）；说不出原因返回 undefined。 */
+  missingPodCause?(env: TaskEnvironment): Promise<string | undefined>;
   deletePod(env: TaskEnvironment): Promise<void>;
   deleteVolume(env: TaskEnvironment): Promise<void>;
 }
