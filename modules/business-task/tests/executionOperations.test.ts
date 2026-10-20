@@ -150,4 +150,24 @@ describe.skipIf(!available)('RFC-027 持久执行意图与 outbox', () => {
       expect((await ops.get(input.id))?.state).toBe(mode === 'unknown' ? 'pending' : mode === 'quota' ? 'retryable-rejected' : mode === 'invalid' ? 'failed' : 'succeeded');
     }
   });
+
+  // AW RFC-370 托管验收（2026-10-19）：续租写下只延长期限的新控制版本；认领的预筛选与 activeExecutionControl 一致——
+  // 新期限送达对象存储期间持有者的围栏操作仍可认领，授权（世代、租约、实例、Pod、阶段）变化未确认时不认领。
+  test('续租的新期限送达对象存储期间围栏操作仍可认领；授权变化未确认时不认领', async () => {
+    const ops = drizzleExecutionOperations(tdb.db);
+    const claimUnder = async (storageSync: Record<string, number>) => {
+      const service = newResourceId() as ServiceId, input = { ...candidate(), serviceId: service };
+      await ops.reserve(input);
+      const body = { serviceId: service, activeReleaseId: newResourceId(), physicalSlot: 'blue', epoch: 5, phase: 'active', leaseId: newResourceId(), leaseOwner: newResourceId(),
+        leasePodUid: newResourceId(), leaseExpiresAt: new Date(Date.now() + 30_000).toISOString(), preparationDigest: 'a'.repeat(64), storageSync };
+      await tdb.db.execute(sql`INSERT INTO business_task.execution_controls (service_id, body) VALUES (${service}, ${JSON.stringify(body)}::jsonb)`);
+      await tdb.db.execute(sql`UPDATE business_task.execution_operations SET epoch = 5 WHERE id = ${input.id}`);
+      return ops.claim({ id: input.id, owner: 'worker', leaseSeconds: 30 });
+    };
+    expect(await claimUnder({ version: 3, acknowledgedVersion: 2, authorityVersion: 2 })).toBeDefined();
+    expect(await claimUnder({ version: 3, acknowledgedVersion: 3, authorityVersion: 2 })).toBeDefined();
+    expect(await claimUnder({ version: 3, acknowledgedVersion: 2, authorityVersion: 3 })).toBeUndefined();
+    expect(await claimUnder({ version: 3, acknowledgedVersion: 2 })).toBeUndefined();
+    expect(await claimUnder({ version: 2, acknowledgedVersion: 2 })).toBeDefined();
+  });
 });

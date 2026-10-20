@@ -50,6 +50,43 @@ describe.skipIf(!available)('durable business control and object storage handsha
     expect((await f.reserve(current.control!)).state).toBe('waiting');
     expect(await f.outbox.pending(100)).toHaveLength(0);
   });
+  // AW RFC-370 hosted acceptance (2026-10-19): every 10-second renewal persisted a version that only moved the deadline, and until
+  // object storage acknowledged it the holder's own fenced calls failed as 「执行权已变化」— a hosted Agent submission was abandoned.
+  test('a renewal keeps its holder authorized while object storage receives the later deadline', async () => {
+    const f = await fixture(), claim = (await f.controls.claim(f.serviceId, f.authority, { instanceId: newResourceId() })).control!;
+    const active = (await f.controls.activate(f.serviceId, f.authority, { ...lease(claim), preparationDigest: 'f'.repeat(64) })).control!;
+    const renewed = (await f.raw.renew(f.serviceId, f.authority, lease(active))).control!;
+    expect(renewed.storageSync!.acknowledgedVersion).toBeLessThan(renewed.storageSync!.version);
+    await f.raw.renew(f.serviceId, f.authority, lease(active));
+    const pending = await f.raw.read(f.serviceId);
+    expect(assertExecutionFence(pending.control, { source: f.authority, fence: fence(active) }, pending.now)).toBe(active.epoch);
+    expect(controlDto(pending.control, pending.now).phase).toBe('active');
+    expect((await f.reserve(pending.control!)).state).toBe('waiting');
+    // The later deadline is still owed to storage: synchronization and quiescence wait for every version.
+    expect(await f.controls.quiescent(f.serviceId)).toBe(false);
+    expect(await f.controls.syncPending()).toBe(1);
+    const delivered = await f.raw.read(f.serviceId);
+    expect(delivered.control!.storageSync!.acknowledgedVersion).toBe(delivered.control!.storageSync!.version);
+    expect(await f.controls.quiescent(f.serviceId)).toBe(true);
+  });
+  test('a control row from before authorityVersion: acknowledged it keeps its holder through a renewal, pending it waits for data', async () => {
+    const f = await fixture(), claim = (await f.controls.claim(f.serviceId, f.authority, { instanceId: newResourceId() })).control!;
+    const active = (await f.controls.activate(f.serviceId, f.authority, { ...lease(claim), preparationDigest: '0'.repeat(64) })).control!;
+    const legacy = () => db.db.execute(sql`UPDATE business_task.execution_controls SET body = body #- '{storageSync,authorityVersion}' WHERE service_id = ${f.serviceId}`);
+    await legacy();
+    await f.raw.renew(f.serviceId, f.authority, lease(active));
+    const kept = await f.raw.read(f.serviceId);
+    expect(assertExecutionFence(kept.control, { source: f.authority, fence: fence(active) }, kept.now)).toBe(active.epoch);
+    // Unacknowledged and without authorityVersion: nothing says storage knows this holder, so it waits as before.
+    await legacy();
+    await f.raw.renew(f.serviceId, f.authority, lease(active));
+    const unknown = await f.raw.read(f.serviceId);
+    expect(() => assertExecutionFence(unknown.control, { source: f.authority, fence: fence(active) }, unknown.now)).toThrow('执行权已变化');
+    expect(controlDto(unknown.control, unknown.now).phase).toBe('preparing');
+    expect(await f.controls.syncPending()).toBe(1);
+    const acknowledged = await f.raw.read(f.serviceId);
+    expect(assertExecutionFence(acknowledged.control, { source: f.authority, fence: fence(active) }, acknowledged.now)).toBe(active.epoch);
+  });
   test('freeze cannot report quiescence without data; an older delayed renew never reopens the frozen store', async () => {
     const f = await fixture(), claim = (await f.controls.claim(f.serviceId, f.authority, { instanceId: newResourceId() })).control!;
     const active = (await f.controls.activate(f.serviceId, f.authority, { ...lease(claim), preparationDigest: 'b'.repeat(64) })).control!;

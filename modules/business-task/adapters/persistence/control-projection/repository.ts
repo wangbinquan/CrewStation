@@ -5,7 +5,7 @@ import { jsonDocument } from '@crewstation/persistence';
 import type { ExecutionControl } from '../../../domain/executionControl';
 import { nextEpoch } from '../../../domain/executionControl';
 import type { StorageControlOutbox } from '../../../ports/storage/control';
-import { storageControlUpdate, type StorageControlUpdate } from '../../../domain/storageControl';
+import { sameStorageWriteAuthority, storageControlUpdate, type StorageControlUpdate } from '../../../domain/storageControl';
 import { businessTaskSchema } from '../schema';
 import { executionControls } from '../executionTables';
 import { executionTransaction, readExecutionControl } from '../executionTransaction';
@@ -20,8 +20,15 @@ const deliveries = businessTaskSchema.table('storage_control_outbox', {
 export async function persistExecutionControl(tx: Executor, value: ExecutionControl, previous: ExecutionControl | undefined, enabled: boolean): Promise<ExecutionControl> {
   let control = value;
   if (enabled || previous?.storageSync) {
-    const changed = !previous?.storageSync || JSON.stringify(value) !== JSON.stringify(previous);
-    control = changed ? { ...value, storageSync: { version: nextEpoch(previous?.storageSync?.version ?? 0), acknowledgedVersion: previous?.storageSync?.acknowledgedVersion ?? 0 } } : value;
+    const prior = previous?.storageSync, changed = !prior || JSON.stringify(value) !== JSON.stringify(previous);
+    if (changed) {
+      const version = nextEpoch(prior?.version ?? 0);
+      // A renewal keeps the write authority, so the holder is not fenced while its later deadline is delivered (AW RFC-370, 2026-10-19).
+      // A row from before `authorityVersion` is known to storage only when its own version was acknowledged.
+      const priorAuthority = prior ? prior.authorityVersion ?? (prior.acknowledgedVersion === prior.version ? prior.version : undefined) : undefined;
+      const authorityVersion = priorAuthority !== undefined && sameStorageWriteAuthority(previous!, value) ? priorAuthority : version;
+      control = { ...value, storageSync: { version, acknowledgedVersion: prior?.acknowledgedVersion ?? 0, authorityVersion } };
+    }
     if (control.storageSync!.version !== control.storageSync!.acknowledgedVersion) {
       const update = storageControlUpdate(control);
       await tx.insert(deliveries).values({ serviceId: control.serviceId, version: update.controlVersion, body: update, updatedAt: sql`clock_timestamp()` })

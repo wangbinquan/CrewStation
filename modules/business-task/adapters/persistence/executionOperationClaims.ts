@@ -13,7 +13,8 @@ export async function claimExecutionOperation(db: Database, input: { owner: stri
     (${ops.epoch} IS NULL AND NOT EXISTS (SELECT 1 FROM ${controls} WHERE ${controls.serviceId} = ${ops.serviceId})) OR
     EXISTS (SELECT 1 FROM ${controls} WHERE ${controls.serviceId} = ${ops.serviceId}
       AND ${controls.body}->>'phase' = 'active' AND (${controls.body}->>'epoch')::bigint = ${ops.epoch}
-      AND (${controls.body}->'storageSync' IS NULL OR ${controls.body}->'storageSync'->>'version' = ${controls.body}->'storageSync'->>'acknowledgedVersion')
+      AND (${controls.body}->'storageSync' IS NULL OR (${controls.body}->'storageSync'->>'acknowledgedVersion')::bigint
+        >= COALESCE((${controls.body}->'storageSync'->>'authorityVersion')::bigint, (${controls.body}->'storageSync'->>'version')::bigint))
       AND (${controls.body}->>'leaseExpiresAt')::timestamptz > clock_timestamp()
       AND (${controls.body}->'handoff' IS NULL OR ${controls.body}->'handoff'->>'stage' = 'complete'))) `;
   const open = sql`NOT EXISTS(SELECT 1 FROM business_task.project_admissions a WHERE a.project_id=${ops.intent}->>'projectId')`;

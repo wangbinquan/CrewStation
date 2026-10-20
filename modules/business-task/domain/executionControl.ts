@@ -14,7 +14,8 @@ export interface MigrationFreeze {
   preparationDigest?: string; receiptPodUid?: string;
 }
 export interface ExecutionControl extends Omit<BusinessControlDto, 'leaseId' | 'operationId' | 'migration'> {
-  storageSync?: { version: number; acknowledgedVersion: number };
+  /** `authorityVersion`: the first version granting the current write authority; renewals keep it. Absent on rows written before it. */
+  storageSync?: { version: number; acknowledgedVersion: number; authorityVersion?: number };
   migration?: MigrationFreeze;
   serviceId: string; leaseId: string | null; leasePodUid: string | null; preparationDigest: string | null; handoff?: ExecutionHandoff;
 }
@@ -26,8 +27,18 @@ export function liveControl(control: ExecutionControl, now: Date): boolean {
 export function storageControlAcknowledged(control: ExecutionControl): boolean {
   return !control.storageSync || control.storageSync.acknowledgedVersion === control.storageSync.version;
 }
+/**
+ * Object storage knows who may write: it acknowledged the version that granted the current authority. Every renewal persists a
+ * version that only extends the lease, and until its delivery is acknowledged the holder still writes under the delivered deadline;
+ * a new epoch, lease, holder, Pod or phase counts only once acknowledged. Delivery itself still waits for every version
+ * (`storageControlAcknowledged`: synchronization and quiescence).
+ */
+export function storageAuthorityAcknowledged(control: ExecutionControl): boolean {
+  const sync = control.storageSync;
+  return !sync || sync.acknowledgedVersion >= (sync.authorityVersion ?? sync.version);
+}
 export function activeExecutionControl(control: ExecutionControl, now: Date): boolean {
-  return control.phase === 'active' && liveControl(control, now) && storageControlAcknowledged(control) && (!control.handoff || control.handoff.stage === 'complete');
+  return control.phase === 'active' && liveControl(control, now) && storageAuthorityAcknowledged(control) && (!control.handoff || control.handoff.stage === 'complete');
 }
 export function nextEpoch(epoch: number): number {
   if (!Number.isSafeInteger(epoch + 1)) throw precondition('执行世代已达安全上限');
@@ -57,7 +68,7 @@ export function controlDto(control: ExecutionControl | undefined, now: Date): Bu
   return {
     ...(control.migration ? { migration: { operationId: control.migration.operationId, targetReleaseId: control.migration.targetReleaseId, applicationReady: !!control.migration.preparationDigest } } : {}),
     activeReleaseId: control.activeReleaseId, physicalSlot: control.physicalSlot, epoch: control.epoch,
-    phase: !live && ['active', 'preparing'].includes(control.phase) ? (control.handoff && control.handoff.stage !== 'complete' ? 'frozen' : 'inactive') : control.phase === 'active' && !storageControlAcknowledged(control) ? 'preparing' : control.phase,
+    phase: !live && ['active', 'preparing'].includes(control.phase) ? (control.handoff && control.handoff.stage !== 'complete' ? 'frozen' : 'inactive') : control.phase === 'active' && !storageAuthorityAcknowledged(control) ? 'preparing' : control.phase,
     leaseOwner: live ? control.leaseOwner : null, leaseExpiresAt: live ? control.leaseExpiresAt : null,
     ...(live && control.leaseId ? { leaseId: control.leaseId } : {}), ...(control.handoff ? { operationId: control.handoff.operationId } : {}),
   };
