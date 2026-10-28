@@ -13,13 +13,17 @@ import { freezeForRestore, readyRestoreCandidate, switchRestoreCandidate } from 
  * the race again within seconds; project deletion already waits it out the same way. `restore_writers_running`: the
  * switch waits for the old release to stop its writers (CS RFC-027 stop authority), reported, not parked.
  */
-const TRANSIENT_CODES = new Set(['restore_job_terminating', 'execution_control_busy', 'object_storage_busy', 'native_postgres_source_busy', 'restore_writers_running']);
+const TRANSIENT_CODES = new Set(['restore_job_terminating', 'execution_control_busy', 'object_storage_busy', 'native_postgres_source_busy', 'restore_writers_running', 'coordination_busy']);
 /**
  * Platform rejections (identity drift, revoked confirmation, failed probes) wait for an administrator to retry or abandon;
  * infrastructure failures are only recorded and observed again automatically, so they never park the operation (RFC-042).
  */
+/** A rejection that only means "busy, ask again shortly"; migration Job callbacks answer it with a retryable 503 (RFC-044). */
+export function isTransientRejection(error: unknown): boolean {
+  return isPlatformError(error) && TRANSIENT_CODES.has(String(error.details['code'] ?? ''));
+}
 export function restoreFailureBlocks(error: unknown): boolean {
-  if (!isPlatformError(error) || TRANSIENT_CODES.has(String(error.details['code'] ?? ''))) return false;
+  if (!isPlatformError(error) || isTransientRejection(error)) return false;
   return ['conflict', 'precondition', 'forbidden', 'validation', 'not_found'].includes(error.kind);
 }
 async function stepRestore(deps: ReleaseUseCaseDeps, op: DatabaseRestoreOperation) {

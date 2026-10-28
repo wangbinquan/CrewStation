@@ -4,13 +4,15 @@ import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { ZodError } from 'zod';
 import type { MigrationCallback } from '../application/database-migration/callbacks';
+import { isTransientRejection } from '../application/database-restore/progress';
 export function databaseMigrationCallbackRoutes(callback:(request:MigrationCallback)=>Promise<unknown>){
  const r=new Hono<AppEnv>(),base='/internal/database-migrations/:jobId/:token/v1/operations/:operationId';
  r.use(base+'/*',bodyLimit({maxSize:32*1024*1024,onError:c=>c.json({error:'validation',message:'迁移回调请求超过 32 MiB',details:{}},413)}));
  r.onError((error,c)=>{
   const invalid=error instanceof ZodError||error instanceof SyntaxError;
   const kind=isPlatformError(error)?error.kind:invalid?'validation':'unavailable';
-  const status=kind==='forbidden'?403:kind==='not_found'?404:kind==='validation'?400:kind==='conflict'||kind==='precondition'?409:503;
+  // A busy lock or Job is not a refusal: AW retries 429/503 with Retry-After and treats 409 as final.
+  const status=kind==='forbidden'?403:kind==='not_found'?404:kind==='validation'?400:(kind==='conflict'||kind==='precondition')&&!isTransientRejection(error)?409:503;
   if(status===503)c.header('retry-after','3');
   return c.json({error:isPlatformError(error)?String(error.details['code']??error.kind):kind,message:isPlatformError(error)?error.message:invalid?'回调请求格式不合法':'回调暂不可用',details:isPlatformError(error)?error.details:{}},status);
  });

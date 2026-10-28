@@ -54,4 +54,17 @@ describe.skipIf(!available)('RFC-044 AW HTTP callbacks (production-source-manife
   f=await databaseMigrationFixture();let op=await f.verified();await f.api.rollbackDatabaseMigration(f.actor,f.serviceId,op.id,{expectedRevision:op.revision});await f.tick();op=await f.load();
   expect((await f.callback('rollback',{requestKey:'other:rollback'})).status).toBe(409);const body={requestKey:migrationOperationKey(op.id)+':rollback'};expect((await f.callback('rollback',body)).status).toBe(200);expect((await f.callback('rollback',body)).status).toBe(200);expect((await f.load()).rollbackRequest).toBe(body.requestKey);expect(f.state.binding.generationId).toBe(op.targetGenerationId);
  });
+ // RFC-044 T9 本机验收：进度循环每 3 秒在操作锁内观察 Job，负载高时持锁超过 1.5 秒；同时到达的 AW 产物回调曾被
+ // keyedLock 以 409「权限正在更新，请稍后重试」拒绝，AW 把 409 当作终局，plan Job 以 exit 失败。锁忙必须是可重试的 503。
+ test('a callback that meets the operation lock held by the progress loop is told to retry (503), then succeeds',async()=>{
+  f=await databaseMigrationFixture();await f.api.createDatabaseMigration(f.actor,f.serviceId,f.input);await f.until('planning');await f.tick();const op=await f.load(),operationId=migrationOperationKey(op.id);
+  let release!:()=>void,acquired!:()=>void;const held=new Promise<void>(resolve=>{release=resolve;}),locked=new Promise<void>(resolve=>{acquired=resolve;});
+  const holding=f.deps.databaseMigration!.coordination.run(op.id,async()=>{acquired();await held;});
+  try{
+   await locked;
+   const busy=await f.callback(`artifacts?operationId=${operationId}&name=missing`);
+   expect(busy.status).toBe(503);expect(busy.headers.get('retry-after')).toBe('3');expect(await busy.json()).toMatchObject({error:'coordination_busy'});
+  }finally{release();await holding;}
+  const after=await f.callback(`artifacts?operationId=${operationId}&name=missing`);expect(after.status).toBe(200);expect(await after.json()).toBeNull();
+ });
 });

@@ -2,7 +2,11 @@ import { conflict } from '@crewstation/kernel';
 import { sql } from 'drizzle-orm';
 import type { Database } from './connection';
 
-/** Short, cross-process coordination. Contention never waits while holding a pooled connection. */
+/**
+ * Short, cross-process coordination. Contention never waits while holding a pooled connection.
+ * A key still busy after the deadline is a transient `coordination_busy` conflict: callers that
+ * classify retryable rejections by code (release operations, migration Job callbacks) retry it.
+ */
 export function keyedLock(db: Database) {
   return async <T>(keys: readonly string[], work: () => Promise<T>): Promise<T> => {
     const deadline = Date.now() + 1500;
@@ -21,6 +25,6 @@ export function keyedLock(db: Database) {
       if (result.kind === 'failed') throw result.error;
       await Bun.sleep(100);
     } while (Date.now() < deadline);
-    throw conflict('权限正在更新，请稍后重试');
+    throw conflict('权限正在更新，请稍后重试', { code: 'coordination_busy' });
   };
 }
