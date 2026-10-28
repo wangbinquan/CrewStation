@@ -19,6 +19,12 @@ interface PvSpec { claimRef?: { uid?: string; name?: string; namespace?: string 
 const endpointSlice: ResourceRef = { apiVersion: 'discovery.k8s.io/v1', kind: 'EndpointSlice', plural: 'endpointslices', namespaced: true };
 const unavailable = (message: string) => precondition(message, { code: 'native_postgres_source_unavailable' });
 const unsupported = (message: string) => precondition(message, { code: 'native_postgres_source_unsupported' });
+/**
+ * Something pinned for this observation moved while it ran (a Pod status update, a probe rollout, a lease renewal). Like a probe
+ * that is still sampling, it settles on its own, so it carries the same retry code; a real replacement is still refused by the
+ * next observation's identity check. RFC-044 T9: reported as unavailable, it parked a migration while its plan Job was running.
+ */
+const unsettled = (message: string) => precondition(message, { code: 'native_postgres_source_busy' });
 
 async function complete(k8s: K8sClient, ref: ResourceRef, namespace: string, selector: string): Promise<K8sObject[]> {
   const objects: K8sObject[] = [], cursors = new Set<string>(); let cursor: string | undefined, version: string | undefined;
@@ -113,14 +119,14 @@ export function nativePostgresSource(k8s: K8sClient, options: NativePostgresSour
     }
     const pinned = [service, pod], volumes: Awaited<ReturnType<typeof volumeSource>>[] = [];
     for (const group of [...groups.values()].sort((left, right) => left.mount.mountPath.localeCompare(right.mount.mountPath))) volumes.push(await volumeSource(k8s, options, pod, group.mount, group.entries, node.uid, fetcher, pinned));
-    if (jsonHash(before) !== jsonHash(await sqlSource(connection))) throw unavailable('原生服务器在存储观测期间变化');
+    if (jsonHash(before) !== jsonHash(await sqlSource(connection))) throw unsettled('原生服务器在存储观测期间变化');
     const currentServer = await serverPod(k8s, options, before.server, service);
-    if (currentServer.metadata.uid !== pod.metadata.uid || currentServer.metadata.resourceVersion !== pod.metadata.resourceVersion) throw unavailable('原生服务器端点在观测期间变化');
+    if (currentServer.metadata.uid !== pod.metadata.uid || currentServer.metadata.resourceVersion !== pod.metadata.resourceVersion) throw unsettled('原生服务器端点在观测期间变化');
     for (const original of pinned) {
       const ref = Resources[original.kind]!, current = await k8s.get(ref, original.metadata.name, original.metadata.namespace);
-      if (!original.metadata.resourceVersion || !current || current.metadata.uid !== original.metadata.uid || current.metadata.resourceVersion !== original.metadata.resourceVersion || current.metadata.deletionTimestamp) throw unavailable('原生存储挂载或探针在观测期间变化');
+      if (!original.metadata.resourceVersion || !current || current.metadata.uid !== original.metadata.uid || current.metadata.resourceVersion !== original.metadata.resourceVersion || current.metadata.deletionTimestamp) throw unsettled('原生存储挂载或探针在观测期间变化');
     }
-    if ((await freshPlatformNode(k8s, pod))?.uid !== node.uid) throw unavailable('原生存储节点在观测期间变化');
+    if ((await freshPlatformNode(k8s, pod))?.uid !== node.uid) throw unsettled('原生存储节点在观测期间变化');
     await connection.assertHeld();
     const { address: _address, port: _port, ...stableServer } = before.server;
     return { identity: jsonHash({ serviceUid: service.metadata.uid, server: stableServer, volumes }), serviceUid: service.metadata.uid, volumes, server: { podUid: pod.metadata.uid!, containerId: actual.containerID, nodeUid: node.uid, address: before.server.address }, observedAt: new Date().toISOString() };

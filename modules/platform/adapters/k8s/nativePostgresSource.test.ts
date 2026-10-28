@@ -107,3 +107,18 @@ test('unregistered external endpoints and CSI providers are explicitly unsupport
     expect(error).toMatchObject({ kind: 'precondition', details: { code: mode === 'stale' ? 'native_postgres_source_unavailable' : 'native_postgres_source_unsupported' } });
   }
 });
+// RFC-044 T9 本机验收：平台刚滚动完存储探针，原生来源观测期间 Pod 仍在更新，迁移进度把「挂载或探针在观测期间变化」当作阻塞错误挂起操作，
+// 正在运行的 plan Job 随即失去回调资格。观测期间的变化只说明这一次观测没有结论：它是暂时的，下一次观测得出与原来相同的身份。
+test('objects that move while one observation runs are transient, and the next observation settles on the same identity', async () => {
+  const f = await fixture(), original = await f.adapter.capture(f.connection);
+  for (const target of ['probe', 'postgres-0'] as const) {
+    let moved = false;
+    const fetcher = (async (url, init) => {
+      if (!moved) { moved = true; await f.k8s.mergePatch(Resources.Pod!, target, 'system', { metadata: { annotations: { touched: target } } }); }
+      return f.fetcher(url, init);
+    }) as typeof fetch;
+    const error = await nativePostgresSource(f.k8s, f.options, fetcher).capture(f.connection).then(() => null, (error: unknown) => error);
+    expect(error).toMatchObject({ kind: 'precondition', details: { code: 'native_postgres_source_busy' } });
+    expect((await f.adapter.capture(f.connection)).identity).toBe(original.identity);
+  }
+});
