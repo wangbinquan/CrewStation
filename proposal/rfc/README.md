@@ -80,3 +80,4 @@ proposal/rfc/RFC-NNN-{slug}/
 
 | [RFC-042](./RFC-042-service-database-restore/proposal.md) | 服务数据库空目标恢复与切换：独立目标、验证、维护确认与世代对账，原库保留。 | Done · 2026-10-19 · 独立服务 `rfc042-aw-restore` 的恢复第二次尝试通过（DBR-01–08，见验收记录）；第一次尝试暴露的三个平台缺陷 `0dc7fea4`、`1e5ae7c6`、`a61b3f6e` 已修复部署；现有正式 AW 始终保持运行、未恢复。 |
 | [RFC-043](./RFC-043-business-task-runtime-image-upgrade/proposal.md) | 业务任务运行镜像升级：服务把已暂停的持久业务任务改钉到同一运行镜像的已验证新版本，工作卷与身份不变，下一次恢复以新镜像启动。 | Done · 2026-10-19 · 实现 `660a6185`（准确 SHA CI 全绿、已部署）；AW 正式实例 `v0.6.25` 上主动与按需升级均通过（RIU-07），见 [验收记录](./RFC-043-business-task-runtime-image-upgrade/acceptance.md)。 |
+| [RFC-044](./RFC-044-service-database-epoch-migration/proposal.md) | 服务数据库 epoch 迁移：独立目标转换、计划审批、维护切换、首写前回退与 Job 回调接口，旧库保留。 | In Progress · 2026-10-28 · 作者批准「按推荐实现」；来源 AW RFC-395 T19。 |
