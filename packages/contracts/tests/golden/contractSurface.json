@@ -6090,6 +6090,10 @@
                               "minItems": 1,
                               "type": "array"
                             },
+                            "servicePlanId": {
+                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                              "type": "string"
+                            },
                             "sourceKeyConfig": {
                               "pattern": "^[A-Z][A-Z0-9_]*$",
                               "type": "string"
@@ -6819,6 +6823,10 @@
                               "minItems": 1,
                               "type": "array"
                             },
+                            "servicePlanId": {
+                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                              "type": "string"
+                            },
                             "sourceKeyConfig": {
                               "pattern": "^[A-Z][A-Z0-9_]*$",
                               "type": "string"
@@ -7257,6 +7265,10 @@
                               "maxItems": 64,
                               "minItems": 1,
                               "type": "array"
+                            },
+                            "servicePlanId": {
+                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                              "type": "string"
                             },
                             "sourceKeyConfig": {
                               "pattern": "^[A-Z][A-Z0-9_]*$",

@@ -1,11 +1,13 @@
 import { conflict, jsonHash, newResourceId, precondition } from '@crewstation/kernel';
-import type { DatabaseMigrationJobPurpose } from '@crewstation/contracts';
+import type { DatabaseMigrationJobPurpose, Manifest } from '@crewstation/contracts';
 import type { DatabaseMigrationOperation, MigrationJobProof } from '../../domain/database-migration/operation';
 import { retainJobProof } from '../../domain/databaseRestore';
 import type { ReleaseUseCaseDeps } from '../dependencies';
 import { migrationContext } from './context';
 import { freezeMigrationEnvironment, migrationEnvironment, migrationScratchSize } from './environment';
 import { migrationJobEvidence } from './jobEvidence';
+/** Migration Jobs run with the plan the candidate declares for the migration, else with the service's own plan. */
+export const migrationPlanId=(manifest:Manifest)=>manifest.spec.service.databaseMigration?.servicePlanId??manifest.spec.service.servicePlanId;
 export async function progressMigrationJob(deps:ReleaseUseCaseDeps,original:DatabaseMigrationOperation,purpose:DatabaseMigrationJobPurpose,closing=false){
  const c=migrationContext(deps);let op=await freezeMigrationEnvironment(deps,original);
  if(op.currentAttempt?.purpose!==purpose){
@@ -20,7 +22,7 @@ export async function progressMigrationJob(deps:ReleaseUseCaseDeps,original:Data
  if(!next){
   const record=await deps.uow.read.ledger!.jobRecord(jobId,'migration-job');
   if(!record?.conditions.some(condition=>condition.type==='Created'&&condition.status==='true')&&!closing){
-   const plan=await deps.plans.getServicePlan(op.manifest.spec.service.servicePlanId,op.projectId);if(!plan)throw precondition('迁移服务套餐不可用');
+   const plan=await deps.plans.getServicePlan(migrationPlanId(op.manifest),op.projectId);if(!plan)throw precondition('迁移套餐不可用');
    await deps.uow.run(scope=>scope.ledger!.job({kind:'migration-job',releaseId:jobId,tag:op.candidateTag,projectId:op.projectId,namespace:service.namespace,jobName:name,job:{releaseId:jobId,purpose,image:op.image,command,env:{},envSecret:name+'-env',resources:{cpu:plan.cpu,memory:plan.memory},activeDeadlineSeconds:3600,ttlSecondsAfterFinished:86400,scratchSize:migrationScratchSize(op)}}));return op;
   }
   if(closing&&record&&!record.conditions.some(condition=>condition.type==='Created'&&condition.status==='true'))await deps.uow.read.ledger!.failJob(jobId,'migration-job','迁移关闭，停止未启动尝试');

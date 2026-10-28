@@ -6,6 +6,7 @@ import { buildSteps } from '../pipelineBuild';
 import { createPipelineContext, DONE } from '../pipelineContext';
 import { prepareReleaseImage } from '../releaseImage';
 import { migrationContext } from './context';
+import { migrationPlanId } from './jobs';
 export async function buildMigrationCandidate(deps:ReleaseUseCaseDeps,op:DatabaseMigrationOperation){
  const c=migrationContext(deps),service=await deps.services.resolveServiceById(op.serviceId);if(!service)throw precondition('原服务不可用');
  let release=await deps.uow.read.releases.getById(op.candidateReleaseId);
@@ -17,6 +18,7 @@ export async function buildMigrationCandidate(deps:ReleaseUseCaseDeps,op:Databas
  if(release.status==='pending'){
   release=await prepareReleaseImage(deps,release);
   assertMigrationManifest(release);
+  if(!await deps.plans.getServicePlan(migrationPlanId(release.manifest!),op.projectId))throw precondition('迁移套餐不可用');
  }
  const steps=buildSteps(deps,createPipelineContext(deps),async()=>DONE);
  const result=release.status==='pending'?await steps.startBuild(release,service):await steps.pollBuild(release,service);

@@ -26,6 +26,12 @@ describe('RFC-044 strict requests and DTOs',()=>{
   expect(C.ServiceDatabaseMigrationSchema.safeParse({command:[],verifyCommand:['x']}).success).toBe(false);expect(C.ServiceDatabaseMigrationSchema.safeParse({command:['x\0'],verifyCommand:['x']}).success).toBe(false);
   expect(C.CreateDatabaseMigrationSchema.safeParse({...create,command:['shell']}).success).toBe(false);expect(C.CreateDatabaseMigrationSchema.safeParse({...create,expectedCommitSha:'HEAD'}).success).toBe(false);
  });
+ test('a migration may declare its own service plan; it must be a resource id',()=>{
+  const plan='01a1428f-eabe-7000-af4c-887037988599';
+  expect(C.ServiceDatabaseMigrationSchema.parse({command:['app','migrate'],verifyCommand:['app','verify'],servicePlanId:plan}).servicePlanId).toBe(plan);
+  expect(C.ServiceDatabaseMigrationSchema.parse({command:['app','migrate'],verifyCommand:['app','verify']}).servicePlanId).toBeUndefined();
+  expect(C.ServiceDatabaseMigrationSchema.safeParse({command:['app','migrate'],verifyCommand:['app','verify'],servicePlanId:'large'}).success).toBe(false);
+ });
  test('callback nullable missing artifacts and canonical digests are explicit',()=>{expect(B.MigrationArtifactSchema.parse(null)).toBeNull();expect(C.DatabaseMigrationDigestSchema.safeParse('a'.repeat(64)).success).toBe(false);expect(C.DatabaseMigrationOperationIdSchema.safeParse(id).success).toBe(false);expect(B.MigrationPreparedSchema.safeParse({operationId:op,generationId:id,receiptDigest:digest,location:{kind:'postgresql-target',profileRef:'env:TARGET'},requestKey:'x'}).success).toBe(false);});
  // RFC-044 T9 本机验收：AW 把大产物按 4 MiB 分块写入，base64 约 559 万字符。原先的分组正则在 Bun 1.3.13（平台与 CI 所用版本）上
  // 对这样长的合法串返回 false，每个分块都被判为「回调请求格式不合法」，plan Job 以 exit 失败。

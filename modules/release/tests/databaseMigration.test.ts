@@ -38,6 +38,24 @@ describe.skipIf(!available)('RFC-044 persisted migration',()=>{
   expect(op.freeze?.reference).toStartWith(`cs-freeze:${op.id}:4:`);expect(f.declared.at(-1)?.job).toMatchObject({activeDeadlineSeconds:3600,scratchSize:String(30*1024**3),resources:{cpu:'75m',memory:'256Mi'}});
   expect(await migrationEnvironment(f.deps,op,'database-migration-run')).toMatchObject({CS_DATABASE_MIGRATION_APPROVE:op.approval!.digest,CS_DATABASE_MIGRATION_FREEZE_REFERENCE:op.freeze!.reference});
  });
+ // RFC-044 T9 本机验收：迁移 Job 沿用服务套餐（250m/512Mi），AW 的 run Job 顶在 512Mi 里反复 GC、几乎没有进展。
+ // Manifest 可以为迁移单独声明套餐：迁移 Job 用它，候选槽仍用服务套餐；声明的套餐不存在时，构建阶段就停下。
+ test('migration Jobs use the plan declared for the migration while the candidate keeps the service plan; an unknown plan stops the build',async()=>{
+  for(const declared of ['present','missing'] as const){
+   f=await databaseMigrationFixture();
+   const servicePlan=f.target.manifest!.spec.service.servicePlanId,migrationPlan=Bun.randomUUIDv7(),read=f.deps.repo.readFile;
+   const plans:Record<string,{cpu:string;memory:string}>={[servicePlan]:{cpu:'75m',memory:'256Mi'},...(declared==='present'?{[migrationPlan]:{cpu:'1',memory:'3Gi'}}:{})};
+   f.deps.plans={...f.deps.plans,getServicePlan:async(id:string)=>plans[id]?{id,name:id,description:'',maxReplicas:1,...plans[id]!}:undefined} as typeof f.deps.plans;
+   f.deps.repo={...f.deps.repo,readFile:async(...args:Parameters<typeof read>)=>{const text=await read(...args);if(args[2]!=='crewstation.yaml'||!text)return text;const manifest=JSON.parse(text);manifest.spec.service.databaseMigration.servicePlanId=migrationPlan;return JSON.stringify(manifest);}} as typeof f.deps.repo;
+   if(declared==='missing'){
+    await f.api.createDatabaseMigration(f.actor,f.serviceId,f.input);await expect(f.until('planning')).rejects.toThrow('迁移套餐不可用');
+    expect(f.declared.some(j=>String(j.job?.purpose).startsWith('database-migration'))).toBe(false);await f.close();f=undefined;continue;
+   }
+   const op=await f.verified();
+   expect(f.declared.filter(j=>String(j.job?.purpose).startsWith('database-migration')).map(j=>j.job!.resources)).toEqual([{cpu:'1',memory:'3Gi'},{cpu:'1',memory:'3Gi'},{cpu:'1',memory:'3Gi'}]);
+   expect((await f.uow.read.slots.get(f.serviceId))?.[op.targetSlot].workload?.resources).toEqual({cpu:'75m',memory:'256Mi'});
+  }
+ });
  test('replan invalidates approval; a run PLAN awaits fresh approval while retaining its freeze, target and attempt history',async()=>{
   f=await databaseMigrationFixture();let op=await f.frozen();const freeze=op.freeze;
   await f.plan([{id:'blocked',block:{code:'v3-plan-blocked'},remediation:{message:'settle source'}}],true);op=await f.load();expect(op.stage).toBe('awaiting-reapproval');expect(op.approval).toBeNull();expect(migrationDto(op).actions).toEqual(['rollback']);expect(op.freeze).toEqual(freeze);expect(f.restoreState.maintenance).toBe(true);

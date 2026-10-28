@@ -27,7 +27,10 @@ databaseMigration:
   command: [agent-workflow, migrate]                      # plan / run / rollback / complete 共用，ACTION 由平台注入
   verifyCommand: [agent-workflow, verify-database-migration]
   sourceKeyConfig: AW_SECRET_KEY                          # 可选：原样转交为 CS_DATABASE_MIGRATION_SOURCE_KEY 的配置项名
+  servicePlanId: <服务套餐 ID>                             # 可选：迁移 Job 使用的套餐；缺省时用服务自己的套餐
 ```
+
+`servicePlanId` 是 T9 验收后的修订（2026-10-28，作者批准「迁移 Job 单独指定套餐」）。AW 的 run Job 按服务套餐（250m/512Mi）运行时，内存一直顶在上限，进程反复 GC，几乎没有进展。迁移是一次性的重负载，不应迫使服务本身长期使用大套餐。构建候选时平台就核对这个套餐，不可用时操作停在 building，报「迁移套餐不可用」。
 
 命令只能来自已构建镜像的 Manifest，发布时与其他字段一起校验。AW 的 `deploy/crewstation/crewstation.template.yaml` 随本 RFC 增加这一段（AW 侧改动在 AW 仓库提交）。
 
@@ -49,7 +52,7 @@ databaseMigration:
 
 ### 2.3 Job
 
-一次迁移最多运行这些 Job，全部使用候选镜像，资源取服务套餐，`activeDeadlineSeconds` 默认 3600：
+一次迁移最多运行这些 Job，全部使用候选镜像。资源取 `databaseMigration.servicePlanId` 指定的套餐，未指定时取服务套餐；候选槽本身始终用服务套餐。`activeDeadlineSeconds` 默认 3600：
 
 | Job | 命令 | `CS_DATABASE_MIGRATION_ACTION` | 额外输入 |
 |---|---|---|---|

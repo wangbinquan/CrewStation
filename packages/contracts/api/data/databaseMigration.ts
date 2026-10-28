@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { ProjectIdSchema, ReleaseIdSchema, ResourceIdSchema, UserIdSchema, ServiceIdSchema } from '../../ids';
 import { DatabaseRestoreJobReceiptSchema, ServiceDatabaseRestoreSchema } from './databaseRestore';
-export const ServiceDatabaseMigrationSchema = ServiceDatabaseRestoreSchema.extend({ sourceKeyConfig: z.string().regex(/^[A-Z][A-Z0-9_]*$/).optional() });
+/** `servicePlanId`: the plan the migration Jobs run with, when the conversion needs more than the service itself (RFC-044 T9); the service's plan otherwise. */
+export const ServiceDatabaseMigrationSchema = ServiceDatabaseRestoreSchema.extend({ sourceKeyConfig: z.string().regex(/^[A-Z][A-Z0-9_]*$/).optional(), servicePlanId: ResourceIdSchema.optional() });
 export const DatabaseMigrationDigestSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/);
 export const DatabaseMigrationOperationIdSchema = z.string().regex(/^dbm_e2_[A-Za-z0-9_-]{8,128}$/);
 export const DatabaseMigrationStageSchema = z.enum(['requested','provisioning','building','planning','awaiting-approval','approved','freezing','migrating','awaiting-reapproval','activating','verifying','ready-to-open','opening','completing','completed','rolling-back','rolled-back','abandoned']);
