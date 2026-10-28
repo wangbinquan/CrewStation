@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import type { ReleaseId } from '@crewstation/contracts';
-import { buildScript, jobOutcomeOf, releaseJobName } from './releaseJobs';
+import { buildScript, jobOutcomeOf, releaseImageReference, releaseJobName } from './releaseJobs';
 
 const id = '01a0bf5d-8f4b-7aea-8983-7b41e8b3a0e1' as ReleaseId;
 
@@ -27,4 +27,12 @@ test('Job 记录的结果：Finished 定成败；没建成是失败；其余（�
   expect(jobOutcomeOf({ conditions: [{ type: 'Finished', status: 'true', reason: 'failed' }] })).toEqual({ state: 'failed', message: 'Job 失败' });
   expect(jobOutcomeOf({ conditions: [{ type: 'Created', status: 'false', message: '构建 Job 没有建成：forbidden' }] })).toEqual({ state: 'failed', message: '构建 Job 没有建成：forbidden' });
   expect(jobOutcomeOf({ conditions: [{ type: 'Finished', status: 'false' }, { type: 'Created', status: 'false' }] })).toEqual({ state: 'failed', message: 'Job 没有建成' });
+});
+
+test('镜像引用：普通版本原样；派生候选版本号里的 + 换成 _，标签符合镜像语法', () => {
+  expect(releaseImageReference('registry', 'svc', 'v1.2.3')).toBe('registry/svc:v1.2.3');
+  // RFC-044 T9 本机验收：迁移候选版本号带 semver 构建元数据（v0.1.2+migrate.<操作>），原样当镜像标签，推送被仓库以 invalid reference format 拒绝。
+  const image = releaseImageReference('registry', 'svc', 'v0.1.2+migrate.01a182cb945873419ac818e36f790339');
+  expect(image).toBe('registry/svc:v0.1.2_migrate.01a182cb945873419ac818e36f790339');
+  expect(image.slice(image.lastIndexOf(':') + 1)).toMatch(/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/);
 });

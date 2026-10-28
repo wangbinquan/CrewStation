@@ -1,7 +1,7 @@
 import type { Manifest } from '@crewstation/contracts';
 import type { Release } from '../domain/release';
 import type { JobPurpose, JobRender } from '../domain/releaseJobs';
-import { BUILD_RESOURCES, JOB_TTL_SECONDS, MIGRATION_RESOURCES, buildScript, jobOutcomeOf, releaseJobName, releaseJobId } from '../domain/releaseJobs';
+import { BUILD_RESOURCES, JOB_TTL_SECONDS, MIGRATION_RESOURCES, buildScript, jobOutcomeOf, releaseImageReference, releaseJobName, releaseJobId } from '../domain/releaseJobs';
 import type { ReleaseUseCaseDeps } from './dependencies';
 import type { PipelineContext, ResolvedService, StepResult } from './pipelineContext';
 import { WAIT } from './pipelineContext';
@@ -51,7 +51,7 @@ export function ledgerJobSteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): 
   return {
     enabled: deps.creation === 'ledger' && !!deps.repo.buildSource && !!deps.repo.buildToken,
     startBuild: async (release, svc) => {
-      const image = `${settings.registryBase}/${svc.slug}:${release.tag}`, now = clock.now().toISOString();
+      const image = releaseImageReference(settings.registryBase, svc.slug, release.tag), now = clock.now().toISOString();
       const saved = await ctx.save(release, 'building', { image, pipeline: { ...release.pipeline, buildRef: releaseJobName(release, 'build'), jobs: 'ledger', buildStartedAt: now } });
       await declare(saved, svc, 'build');
       return WAIT;

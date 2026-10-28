@@ -3,6 +3,7 @@ import type { Manifest } from '@crewstation/contracts';
 import { isPlatformError, validation } from '@crewstation/kernel';
 import { assertMigrationAllowed } from '../domain/migrationPolicy';
 import type { Release } from '../domain/release';
+import { releaseImageReference } from '../domain/releaseJobs';
 import type { ReleaseUseCaseDeps } from './dependencies';
 import type { PipelineContext, ResolvedService, StepResult } from './pipelineContext';
 import { WAIT, DONE } from './pipelineContext';
@@ -70,7 +71,7 @@ export function buildSteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext, start
       catch (error) { return ctx.fail(await deps.uow.read.releases.getById(release.id) ?? release, isPlatformError(error) ? error.message : '固定 Manifest 或运行镜像失败'); }
       if (release.pipeline.runtimeImage) return afterBuild(release, svc);
       if (ledgerJobs.enabled) return ledgerJobs.startBuild(release, svc);
-      const image = `${deps.settings.registryBase}/${svc.slug}:${release.tag}`;
+      const image = releaseImageReference(deps.settings.registryBase, svc.slug, release.tag);
       const { httpUrl, credentialSecretName } = await deps.repo.repositoryUrl(release.serviceId);
       const { buildRef } = await deps.builder.start({ legacyResourceId: release.legacyResourceId, releaseId: release.id, namespace: svc.namespace, repoHttpUrl: httpUrl, credentialSecretName, ref: release.commitSha, image });
       await projectJob(release, svc, 'build-job', buildRef);

@@ -9,6 +9,14 @@ export function releaseJobName(release: Pick<Release, 'id' | 'legacyResourceId'>
 }
 
 /**
+ * 构建产物推到平台仓库的镜像引用。镜像标签只接受 `[A-Za-z0-9_.-]`：派生候选的版本号带 semver 构建元数据
+ * （迁移候选 `v0.1.2+migrate.<操作>`），其中的 `+` 等字符按 OCI 生态（Helm）惯例换成 `_`；普通发布的 `vX.Y.Z` 原样不变。
+ */
+export function releaseImageReference(registryBase: string, repository: string, tag: string): string {
+  return `${registryBase}/${repository}:${tag.replace(/[^A-Za-z0-9_.-]/g, '_')}`;
+}
+
+/**
  * 构建 Job 的脚本：检出固定提交的仓库，用 buildctl 向 buildkitd 提交 Dockerfile 构建并推送到平台注册表。令牌只在环境变量 GIT_TOKEN 里；
  * 刚签发的 GitLab 项目访问令牌偶尔还没在 Git HTTP 认证路径上生效，抓取会以 401 失败，退避重试三次。
  */
