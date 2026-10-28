@@ -61,7 +61,7 @@ export async function releaseRestoreHolds(deps:ReleaseUseCaseDeps,op:DatabaseRes
  * (`database_restore_active`), with or without project admission wiring; triggers no longer turn this into HTTP 500.
  */
 export function restoreGuardedReleaseApi(deps:ReleaseUseCaseDeps,api:ReleaseModuleApi):ReleaseModuleApi{
-  const coordination=deps.databaseRestore?.coordination;if(!coordination)return api;
+  const coordination=deps.databaseRestore?.coordination??deps.databaseMigration?.coordination;if(!coordination)return api;
   return {...api,
     publish:async(actor,id,input,source)=>{await coordination.assertAvailable(id);return api.publish(actor,id,input,source);},
     takeOffline:async(actor,id,input)=>{await coordination.assertAvailable(id);return api.takeOffline(actor,id,input);},

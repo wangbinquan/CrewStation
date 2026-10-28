@@ -17,7 +17,7 @@ import { historicalConversationsRoute } from '../../features/dev-session';
 import { eventsRoute } from '../../features/events';
 import { logsRoute } from '../../features/logs';
 import { selfProjectCreateRoute, selfProjectProvisioningRoute, projectListRoute, projectOverviewRoute } from '../../features/projects';
-import { databaseRestoresRoute,databaseRestoreRoute,releaseRoute, publishWizardRoute, releaseJourneyRoute, releaseVersionRoute } from '../../features/release';
+import { databaseMigrationsRoute,databaseMigrationRoute,databaseRestoresRoute,databaseRestoreRoute,releaseRoute, publishWizardRoute, releaseJourneyRoute, releaseVersionRoute } from '../../features/release';
 import { projectRoute } from './projectRoute';
 import { adminProjectRoutes } from './adminProjectRoutes';
 import { adminCapabilitiesRoute, adminRequestsRoute, adminIntegrationsLegacyRoute, adminCatalogLegacyRoute, adminEgressLegacyRoute, adminOverviewRoute, adminProjectCreateRoute, adminProjectProvisioningRoute } from './adminGlobalRoutes';
@@ -45,7 +45,7 @@ export const routeTree = rootRoute.addChildren([
       projectObjectStorageRoute,
       projectDevelopmentRoute,
       historicalConversationsRoute,
-      databaseRestoresRoute,databaseRestoreRoute,releaseRoute,
+      databaseMigrationsRoute,databaseMigrationRoute,databaseRestoresRoute,databaseRestoreRoute,releaseRoute,
       publishWizardRoute,
       releaseJourneyRoute,
       releaseVersionRoute,

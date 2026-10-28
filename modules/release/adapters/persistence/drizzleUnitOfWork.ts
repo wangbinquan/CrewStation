@@ -1,3 +1,4 @@
+import { databaseMigrationRepository } from './database-migration/repository';
 import { databaseRestoreRepository } from './databaseRestores';
 import { drizzleHandoffs } from './handoff/repository';
 import { drizzleJourneys } from './journey/repository';
@@ -23,6 +24,7 @@ export function scopeOver(executor: Executor, lockSlots = false, projection?: Sl
   const releases = drizzleReleaseRepository(executor), slots = drizzleSlotRepository(executor, lockSlots), offlinePolicy = drizzleOfflinePolicyRepository(executor);
   const sources = { releases, offlinePolicy };
   return {
+    databaseMigrations: databaseMigrationRepository(executor),
     databaseRestores: databaseRestoreRepository(executor),
     journeys: drizzleJourneys(executor),
     handoffs: drizzleHandoffs(executor),
@@ -48,6 +50,7 @@ export function drizzleUnitOfWork(db: Database, projection?: SlotProjectionDeps)
   const run: UnitOfWork['run'] = (fn) => db.transaction(async (tx) => fn(scopeOver(tx, true, projection))), read = scopeOver(db, false, projection);
   // These historical "read" repositories also expose writes. Route every write through a real UOW so admission identity reaches SQL.
   return { run, read: { ...read,
+    databaseMigrations: { ...read.databaseMigrations!, insert: op => run(s => s.databaseMigrations!.insert(op)), save: (op,next) => run(s => s.databaseMigrations!.save(op,next)), writeArtifact: (...args) => run(s=>s.databaseMigrations!.writeArtifact(...args)) },
     databaseRestores: { ...read.databaseRestores!, insert: op => run(s => s.databaseRestores!.insert(op)), save: (op,next) => run(s => s.databaseRestores!.save(op,next)) },
     journeys: { ...read.journeys, insert: (r) => run((s) => s.journeys.insert(r)), append: (id, event, patch) => run((s) => s.journeys.append(id, event, patch)) },
     releases: { ...read.releases, insert: (r) => run((s) => s.releases.insert(r)), update: (r) => run((s) => s.releases.update(r)), recordConfigVersion: (id, version) => run((s) => s.releases.recordConfigVersion(id, version)) },

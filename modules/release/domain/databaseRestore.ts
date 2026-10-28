@@ -4,6 +4,8 @@ import { conflict, jsonHash, precondition } from '@crewstation/kernel';
 import type { Release } from './release';
 
 export interface RestoreJobProof {
+  output?: {kind:'plan'|'receipt';text:string};
+  logTail?: string;
   receipt: DatabaseRestoreJobReceipt;
   secretUid: string;
   environmentDigest: string;

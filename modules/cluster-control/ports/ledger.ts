@@ -1,3 +1,4 @@
+import type { DatabaseMigrationJobPurpose } from '@crewstation/contracts';
 import type { ResourceChild } from '@crewstation/contracts';
 import type { TaskVolumeSafetyState, TaskVolumeTarget, TaskVolumeReclaimProof } from '@crewstation/contracts';
 import type { WorkloadAdmissionIdentity, WorkloadConsumer, WorkloadStartPermit, WorkloadStopProof } from '@crewstation/contracts';
@@ -123,7 +124,7 @@ export interface SlotOwners {
 export interface JobRef {
   readonly recordId: string;
   readonly releaseId: string;
-  readonly purpose: 'build' | 'migration' | 'database-restore' | 'database-verify';
+  readonly purpose: 'build' | 'migration' | 'database-restore' | 'database-verify' | DatabaseMigrationJobPurpose;
 }
 
 /**

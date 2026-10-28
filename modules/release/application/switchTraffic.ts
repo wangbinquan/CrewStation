@@ -10,7 +10,7 @@ import { switchToDto } from './toDto';
 import { journeyForLaunch, recordJourneyLaunch, replayJourneyLaunch } from './journey/launch';
 
 /** 晋级与回退都是负责人的一次切流（G15）；破坏性迁移之后禁止切回旧版本。 */
-export function switchTrafficUseCase(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'authorizer' | 'services' | 'clock' | 'maintenance' | 'executionHandoff'> & Partial<Pick<ReleaseUseCaseDeps, 'data' | 'databaseRestore'>>) {
+export function switchTrafficUseCase(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'authorizer' | 'services' | 'clock' | 'maintenance' | 'executionHandoff'> & Partial<Pick<ReleaseUseCaseDeps, 'data' | 'databaseRestore' | 'databaseMigration'>>) {
   const { uow, authorizer, services, clock, maintenance } = deps;
   return async (actor: Actor, serviceId: ServiceId, input: TrafficSwitchRequest): Promise<TrafficSwitchDto> => {
     const svc = await services.resolveServiceById(serviceId);
@@ -19,11 +19,12 @@ export function switchTrafficUseCase(deps: Pick<ReleaseUseCaseDeps, 'uow' | 'aut
     // 维护窗口在事务外读（跨模块查询）；目标版本在事务内锁槽之后再核对一次是否就是它。
     const windowOpen = await maintenance.open(serviceId);
     // RFC-042: the data binding is the only record of the active generation (no trigger on slots).
-    await deps.databaseRestore?.coordination.assertAvailable(serviceId);
+    await (deps.databaseRestore??deps.databaseMigration)?.coordination.assertAvailable(serviceId);
     const generation = await deps.data?.databaseGenerations?.active(serviceId, 'production').catch((error: unknown) => { if (isPlatformError(error) && error.kind === 'precondition') return undefined; throw error; });
     const now = clock.now();
     return uow.run(async (scope) => {
       const slots = await scope.slots.get(serviceId);
+      if(await scope.databaseMigrations?.active(serviceId))throw conflict('服务正在进行数据库迁移',{code:'database_migration_active'});
       const replay = await replayJourneyLaunch(scope, serviceId, input);
       if (replay) return replay;
       if (!slots) throw precheckFailed(precheckReason('no-deployment', '服务尚无任何部署', '先发布一个版本'));

@@ -3,8 +3,8 @@ import type { Release } from './release';
 export type JobPurpose = 'build' | 'migration';
 
 /** 构建、迁移 Job 的名字（与 release 自己建时相同）：RFC-013 之前的发布沿用旧 ID 的后 12 位，之后的用去掉连字符的发布 ID。 */
-export function releaseJobName(release: Pick<Release, 'id' | 'legacyResourceId'>, purpose: JobPurpose): string {
-  const suffix = release.legacyResourceId ? release.legacyResourceId.slice(-12) : release.id.replaceAll('-', '');
+export function releaseJobName(release: Pick<Release, 'id' | 'legacyResourceId'> & Partial<Pick<Release,'pipeline'>>, purpose: JobPurpose): string {
+  const suffix = release.legacyResourceId ? release.legacyResourceId.slice(-12) : (purpose==='build'?release.pipeline?.buildJobId??release.id:release.id).replaceAll('-', '');
   return `${purpose === 'build' ? 'build' : 'migrate'}-${suffix}`;
 }
 
@@ -77,3 +77,5 @@ export function jobOutcomeOf(record: ObservedJobRecord | undefined): JobOutcome 
   if (created?.status === 'false') return { state: 'failed', message: created.message ?? 'Job 没有建成' };
   return { state: 'running' };
 }
+
+export const releaseJobId=(release:Release,purpose:JobPurpose)=>purpose==='build'?release.pipeline.buildJobId??release.id:release.id;

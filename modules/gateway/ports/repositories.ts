@@ -74,7 +74,7 @@ export interface MaintenanceEventRecord {
 /** 正式版本维护：写入都带版本条件，两个人同时改只有一个成功。 */
 export interface MaintenanceRepository {
   restoreHeld?(serviceId: ServiceId): Promise<boolean>;
-  beginRestore?(input: { serviceId: ServiceId; projectId: ProjectId; operationId: string; actor: UserId; now: Date }): Promise<{revision:number;wasOpen:boolean}>;
+  beginRestore?(input: { kind?: 'restore'|'migration'; serviceId: ServiceId; projectId: ProjectId; operationId: string; actor: UserId; now: Date }): Promise<{revision:number;wasOpen:boolean}>;
   endRestore?(input: {serviceId: ServiceId;operationId:string;revision:number;actor:UserId;now:Date}): Promise<void>;
   get(serviceId: ServiceId): Promise<Maintenance | undefined>;
   listActive(): Promise<Maintenance[]>;

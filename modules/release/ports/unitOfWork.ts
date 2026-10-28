@@ -1,3 +1,4 @@
+import type { DatabaseMigrationRepository } from './databaseMigration';
 import type { DatabaseRestoreRepository } from './databaseRestore';
 import type { HandoffRepository } from './executionHandoff';
 import type { JourneyRepository } from './journey';
@@ -14,6 +15,7 @@ export interface DomainEventPublisher {
 }
 
 export interface RepositoryScope {
+  readonly databaseMigrations?: DatabaseMigrationRepository;
   readonly databaseRestores?: DatabaseRestoreRepository;
   readonly journeys: JourneyRepository;
   readonly handoffs: HandoffRepository;

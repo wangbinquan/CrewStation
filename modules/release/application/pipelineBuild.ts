@@ -5,7 +5,7 @@ import { assertMigrationAllowed } from '../domain/migrationPolicy';
 import type { Release } from '../domain/release';
 import type { ReleaseUseCaseDeps } from './dependencies';
 import type { PipelineContext, ResolvedService, StepResult } from './pipelineContext';
-import { WAIT } from './pipelineContext';
+import { WAIT, DONE } from './pipelineContext';
 import { renderSlotEnv } from './pipelineEnv';
 import { ledgerJobSteps } from './ledgerJobs';
 import { loadReleaseManifest, prepareReleaseImage } from './releaseImage';
@@ -33,11 +33,13 @@ export function buildSteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext, start
         release = { ...release, manifest, image: await deps.runtimeImages.pinBuiltImage(svc.slug, release.image) };
         await deps.uow.run((scope) => scope.releases.update(release));
       }
+      if (release.pipeline.databaseMigration) return DONE;
       // 项目收回规格后，迁移也不能先执行；迁移完成到部署之间还会重查一次。
       if (!await deps.plans.getServicePlan(manifest.spec.service.servicePlanId, release.projectId)) throw validation(`服务套餐 ${manifest.spec.service.servicePlanId} 不存在`);
       // 维护窗口＝项目处于维护中且三个开关都拦（RFC-021 M14、M17）；只在声明了破坏性迁移时才去问。
       assertMigrationAllowed(manifest.spec.release.migration, manifest.spec.release.migration.destructive && await deps.maintenance.open(release.serviceId));
     } catch (error) {
+      if(release.pipeline.databaseMigration&&(!isPlatformError(error)||!['conflict','precondition','forbidden','validation','not_found'].includes(error.kind)))throw error;
       return ctx.fail(release, isPlatformError(error) ? error.message : `Manifest 无效：${String(error)}`);
     }
     const command = manifest.spec.release.migrationCommand;
@@ -51,6 +53,7 @@ export function buildSteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext, start
     try {
       env = await renderSlotEnv(deps, { projectId: release.projectId, serviceId: release.serviceId, projectSlug: svc.slug, serviceName: svc.name, physical: release.targetSlot, manifest });
     } catch (error) {
+      if(release.pipeline.databaseMigration&&(!isPlatformError(error)||!['conflict','precondition','forbidden','validation','not_found'].includes(error.kind)))throw error;
       return ctx.fail(release, isPlatformError(error) ? error.message : String(error));
     }
     // 由资源中心建：这里的渲染只核对生产组配置齐全，环境在调和器建凭据 Secret 时再要一次。

@@ -1,3 +1,4 @@
+import { migrationJobLog } from './databaseMigrationLogs';
 import type { K8sClient, K8sObject } from '@crewstation/k8s';
 import { LABELS, Resources } from '@crewstation/k8s';
 import { DatabaseRestoreVerificationSchema } from '@crewstation/contracts';
@@ -93,6 +94,10 @@ export function kubernetesRestoreJobObserver(k8s: K8sClient):RestoreJobObserver 
     else if(state==='succeeded'&&input.purpose==='database-verify'){
       const receipt=await receiptLog(k8s,input.namespace,pod!.metadata.name,String(containerOf(pod!,false).name));
       proof=receipt==='receipt-invalid'?failedJobProof(proof,receipt):{...proof,verification:receipt};
+    }
+    if(ended&&pod&&input.purpose.startsWith('database-migration-')){
+      const log=await migrationJobLog(k8s,input.namespace,pod!.metadata.name,String(containerOf(pod!,false).name));
+      proof=failure?{...proof,logTail:log.logTail}:log.output?{...proof,output:log.output,logTail:log.logTail}:{...failedJobProof(proof,'receipt-invalid'),logTail:log.logTail};
     }
     const latest=await k8s.get(Resources.Job!,input.name,input.namespace);
     if(latest?.metadata.uid!==job.metadata.uid)throw conflict('记录回执时恢复 Job 已变化');

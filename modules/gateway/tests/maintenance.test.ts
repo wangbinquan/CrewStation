@@ -182,3 +182,16 @@ describe.skipIf(!available)('RFC-042 original restore maintenance hold',()=>{
   expect((await restarted.api.getMaintenance(admin,serviceId)).current).toMatchObject({reason:'original window',switches:before.switches,revision:held.revision+1});
  });
 });
+
+test.skipIf(!available)('RFC-044 migration hold retains its kind through restart and restores the original window only after explicit completion',async()=>{
+ const serviceId=Bun.randomUUIDv7() as ServiceId,projectId=Bun.randomUUIDv7() as ProjectId,operationId=Bun.randomUUIDv7();
+ services.push({...services[0]!,serviceId,projectId,projectSlug:'migration',serviceName:'migration',identity:'migration/migration'});
+ const held=await gateway.api.enterDatabaseRestoreMaintenance(admin,serviceId,operationId,'migration');
+ const restarted=newGateway();expect(await restarted.api.enterDatabaseRestoreMaintenance(admin,serviceId,operationId,'migration')).toEqual(held);
+ expect(await tdb.db.execute(sql`SELECT operation_kind FROM gateway.database_restore_maintenance WHERE operation_id=${operationId}`)).toMatchObject([{operation_kind:'migration'}]);
+ expect(await restarted.api.userEntry(admin.userId,'migration','prod')).toMatchObject({kind:'maintenance',reason:expect.stringContaining('迁移')});expect(await restarted.api.holdsEvents(serviceId)).toBe(true);
+ await expect(restarted.api.exitMaintenance(admin,serviceId,{expectedRevision:held.revision})).rejects.toBeDefined();
+ await restarted.api.exitDatabaseRestoreMaintenance(admin,serviceId,operationId,held.revision);await restarted.api.exitDatabaseRestoreMaintenance(admin,serviceId,operationId,held.revision);
+ expect((await restarted.api.getMaintenance(admin,serviceId)).current).toBeNull();expect(await restarted.api.holdsEvents(serviceId)).toBe(false);
+ expect(await tdb.db.execute(sql`SELECT body->>'reason' AS reason FROM gateway.maintenance_events WHERE service_id=${serviceId} AND kind='exited'`)).toMatchObject([{reason:'数据库迁移完成 '+operationId}]);
+});

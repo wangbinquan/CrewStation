@@ -18,6 +18,8 @@ async function check(deps: Deps, scope: RepositoryScope, actor: Actor, target: C
   const slots = await scope.slots.get(id); if (!slots) throw precondition('部署槽不存在');
   if (await scope.handoffs.active(id)) throw precondition('执行交接尚未完成，请先完成交接');
   // RFC-042: only the restore's reserved candidate slot is blocked; the live slot stays maintainable.
+  const migration=await scope.databaseMigrations?.active(id);
+  if(migration)throw precondition('数据库迁移进行中',{code:'database_migration_active'});
   const restore = await scope.databaseRestores?.active(id);
   if (restore && restore.targetSlot === physical) throw precondition('数据库恢复保留了该部署槽，请先完成或放弃原恢复操作', { code: 'database_restore_active', operationId: restore.id });
   const projection = (await scope.maintenance.projection(id)).find((s) => s.physical === physical);

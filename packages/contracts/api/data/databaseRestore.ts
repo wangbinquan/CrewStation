@@ -9,10 +9,11 @@ export const DatabasePhysicalIdentitySchema = z.strictObject({ serverId: z.strin
 export type DatabasePhysicalIdentity = z.infer<typeof DatabasePhysicalIdentitySchema>;
 export const DatabaseGenerationDtoSchema = z.strictObject({
   id: ResourceIdSchema, resourceId: ResourceIdSchema, projectId: ProjectIdSchema, serviceId: ServiceIdSchema,
-  env: z.enum(['production', 'development']), state: z.enum(['provisioning', 'ready', 'active', 'retained']), origin: z.enum(['existing', 'restore']),
+  env: z.enum(['production', 'development']), state: z.enum(['provisioning', 'ready', 'active', 'retained']), origin: z.enum(['existing', 'restore', 'migration', 'migration-scratch']),
+  migrationOperationId: ResourceIdSchema.nullable().optional(),
   restoreOperationId: ResourceIdSchema.nullable(), identity: DatabasePhysicalIdentitySchema.nullable(), createdAt: z.iso.datetime(),
 });
-export const DatabaseBindingDtoSchema = z.strictObject({ generationId: ResourceIdSchema, revision: z.number().int().positive(), restoreOperationId: ResourceIdSchema.nullable() });
+export const DatabaseBindingDtoSchema = z.strictObject({ generationId: ResourceIdSchema, revision: z.number().int().positive(), migrationOperationId: ResourceIdSchema.nullable().optional(), restoreOperationId: ResourceIdSchema.nullable() });
 export const DatabaseGenerationListSchema = z.strictObject({ active: DatabaseBindingDtoSchema, items: z.array(DatabaseGenerationDtoSchema) });
 /** `abandoned` ends a restore that never switched: reservations and holds are released, the target database is retained. */
 export const DatabaseRestoreStageSchema = z.enum(['requested', 'provisioning', 'restoring', 'verifying', 'ready-to-switch', 'freezing', 'deploying', 'switching', 'completed', 'abandoned']);

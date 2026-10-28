@@ -8,6 +8,7 @@ export interface ReleaseRepository {
   insert(release: Release): Promise<void>;
   update(release: Release): Promise<void>;
   getById(id: ReleaseId): Promise<Release | undefined>;
+  getByBuildJobId?(id: string): Promise<Release | undefined>;
   getByTag(serviceId: ServiceId, tag: string): Promise<Release | undefined>;
   listByService(serviceId: ServiceId, limit: number): Promise<Release[]>;
   findInProgress(serviceId: ServiceId): Promise<Release | undefined>;

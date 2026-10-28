@@ -11,7 +11,7 @@ import type { HandoffRequest } from '../../ports/executionHandoff';
 import { recordHandoffStage } from '../journey/handoff';
 import { releaseTargetRevision } from '../../domain/journey/journey';
 
-type HandoffDeps = Pick<ReleaseUseCaseDeps, 'uow' | 'services' | 'authorizer' | 'executionHandoff' | 'clock' | 'maintenance' | 'admission' | 'databaseRestore'>;
+type HandoffDeps = Pick<ReleaseUseCaseDeps, 'uow' | 'services' | 'authorizer' | 'executionHandoff' | 'clock' | 'maintenance' | 'admission' | 'databaseRestore' | 'databaseMigration'>;
 const requestOf = (op: ExecutionHandoffOperation): HandoffRequest => ({ operationId: op.id, expectedActiveReleaseId: op.expectedActiveReleaseId, targetReleaseId: op.targetReleaseId, targetSlot: op.targetSlot });
 export function releaseHandoffUseCases(deps: HandoffDeps) {
   return {
@@ -41,6 +41,8 @@ function handoffProgress(deps: HandoffDeps): () => Promise<number> {
         count += await releaseProjectWork(deps, candidate.serviceId, 'handoff', candidate.id, { original: candidate.id, revision: jsonHash(candidate) }, async () => {
           const service = await deps.services.resolveServiceById(candidate.serviceId);
           if (deps.admission && service?.projectId !== candidate.projectId) throw precondition('原执行交接项目与服务归属冲突');
+          const migration=await deps.uow.read.databaseMigrations?.get(candidate.id);
+          if(migration&&migration.stage!=='opening')return 0;
           const restore=await deps.uow.read.databaseRestores?.get(candidate.id);
           if(restore&&restore.stage!=='switching')return 0;
           const progress=async()=>{
@@ -49,6 +51,7 @@ function handoffProgress(deps: HandoffDeps): () => Promise<number> {
           catch (error) { await deps.uow.read.handoffs.settle(claimed, { stage: claimed.stage, message: error instanceof Error ? error.message : '交接状态暂不可确认' }); }
           return 1;
           };
+          if(migration&&deps.databaseMigration)return deps.databaseMigration.coordination.run(migration.id,progress);
           return restore&&deps.databaseRestore?deps.databaseRestore.coordination.run(restore.id,progress):progress();
         });
       } catch (error) { if (!deps.admission) throw error; }

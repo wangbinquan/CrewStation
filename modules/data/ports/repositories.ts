@@ -49,6 +49,11 @@ export interface DatabaseGenerations {
   active(serviceId: ServiceId, env: DataEnv): Promise<{ binding: DatabaseEnvironmentBinding; generation: DatabaseGeneration } | undefined>;
   get(id: string): Promise<DatabaseGeneration | undefined>;
   list(serviceId: ServiceId): Promise<DatabaseGeneration[]>;
+  reserveMigration(input: { id: string; scratchId: string; operationId: string; serviceId: ServiceId; expectedGenerationId: string; expectedRevision: number }): Promise<DatabaseGeneration>;
+  commitMigration(input: { operationId: string; serviceId: ServiceId; sourceGenerationId: string; targetGenerationId: string; expectedRevision: number }): Promise<DatabaseEnvironmentBinding>;
+  revertMigration(input: { operationId: string; serviceId: ServiceId; sourceGenerationId: string; targetGenerationId: string; expectedRevision: number }): Promise<DatabaseEnvironmentBinding>;
+  openMigration(serviceId: ServiceId, operationId: string): Promise<void>;
+  finishMigration(serviceId: ServiceId, operationId: string): Promise<void>;
   reserve(input: { id: string; operationId: string; serviceId: ServiceId; expectedGenerationId: string; expectedRevision: number }): Promise<DatabaseGeneration>;
   recordIdentity(id: string, identity: DatabasePhysicalIdentity, emptyProof?: NonNullable<DatabaseGeneration['emptyProof']>): Promise<void>;
   commit(input: { operationId: string; serviceId: ServiceId; sourceGenerationId: string; targetGenerationId: string; expectedRevision: number }): Promise<DatabaseEnvironmentBinding>;

@@ -20,6 +20,19 @@
         "sha256": "x-cs-object-sha256"
       },
       "PLATFORM_ENV": {
+        "databaseMigrationOperationId": "CS_DATABASE_MIGRATION_OPERATION_ID",
+        "databaseMigrationAction": "CS_DATABASE_MIGRATION_ACTION",
+        "databaseMigrationSourceGeneration": "CS_DATABASE_MIGRATION_SOURCE_GENERATION",
+        "databaseMigrationSourceUrl": "CS_DATABASE_MIGRATION_SOURCE_URL",
+        "databaseMigrationTargetUrl": "CS_DATABASE_MIGRATION_TARGET_URL",
+        "databaseMigrationScratchUrl": "CS_DATABASE_MIGRATION_SCRATCH_URL",
+        "databaseMigrationControlUrl": "CS_DATABASE_MIGRATION_CONTROL_URL",
+        "databaseMigrationSourceBornOnPostgresql": "CS_DATABASE_MIGRATION_SOURCE_BORN_ON_POSTGRESQL",
+        "databaseMigrationSourceKey": "CS_DATABASE_MIGRATION_SOURCE_KEY",
+        "databaseMigrationApprove": "CS_DATABASE_MIGRATION_APPROVE",
+        "databaseMigrationFreezeReference": "CS_DATABASE_MIGRATION_FREEZE_REFERENCE",
+        "databaseMigrationScratchRoot": "CS_DATABASE_MIGRATION_SCRATCH_ROOT",
+        "platformApiToken": "CS_PLATFORM_API_TOKEN",
         "project": "CS_PROJECT",
         "service": "CS_SERVICE",
         "slot": "CS_SLOT",
@@ -6064,6 +6077,40 @@
                           "minItems": 1,
                           "type": "array"
                         },
+                        "databaseMigration": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "command": {
+                              "items": {
+                                "maxLength": 4096,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "maxItems": 64,
+                              "minItems": 1,
+                              "type": "array"
+                            },
+                            "sourceKeyConfig": {
+                              "pattern": "^[A-Z][A-Z0-9_]*$",
+                              "type": "string"
+                            },
+                            "verifyCommand": {
+                              "items": {
+                                "maxLength": 4096,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "maxItems": 64,
+                              "minItems": 1,
+                              "type": "array"
+                            }
+                          },
+                          "required": [
+                            "command",
+                            "verifyCommand"
+                          ],
+                          "type": "object"
+                        },
                         "databaseRestore": {
                           "additionalProperties": false,
                           "properties": {
@@ -6759,6 +6806,40 @@
                           "minItems": 1,
                           "type": "array"
                         },
+                        "databaseMigration": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "command": {
+                              "items": {
+                                "maxLength": 4096,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "maxItems": 64,
+                              "minItems": 1,
+                              "type": "array"
+                            },
+                            "sourceKeyConfig": {
+                              "pattern": "^[A-Z][A-Z0-9_]*$",
+                              "type": "string"
+                            },
+                            "verifyCommand": {
+                              "items": {
+                                "maxLength": 4096,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "maxItems": 64,
+                              "minItems": 1,
+                              "type": "array"
+                            }
+                          },
+                          "required": [
+                            "command",
+                            "verifyCommand"
+                          ],
+                          "type": "object"
+                        },
                         "databaseRestore": {
                           "additionalProperties": false,
                           "properties": {
@@ -7163,6 +7244,40 @@
                           },
                           "minItems": 1,
                           "type": "array"
+                        },
+                        "databaseMigration": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "command": {
+                              "items": {
+                                "maxLength": 4096,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "maxItems": 64,
+                              "minItems": 1,
+                              "type": "array"
+                            },
+                            "sourceKeyConfig": {
+                              "pattern": "^[A-Z][A-Z0-9_]*$",
+                              "type": "string"
+                            },
+                            "verifyCommand": {
+                              "items": {
+                                "maxLength": 4096,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "maxItems": 64,
+                              "minItems": 1,
+                              "type": "array"
+                            }
+                          },
+                          "required": [
+                            "command",
+                            "verifyCommand"
+                          ],
+                          "type": "object"
                         },
                         "databaseRestore": {
                           "additionalProperties": false,

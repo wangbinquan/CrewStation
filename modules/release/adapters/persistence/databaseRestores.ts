@@ -36,6 +36,8 @@ export function databaseRestoreCoordination(db: Database): DatabaseRestoreCoordi
     const scope={db,id,active:true};
     try{return await current.run(scope,effect);}finally{scope.active=false;}
   });}, assertAvailable: async(serviceId: ServiceId,operationId?:string)=>{
+    const [migration]=await db.execute<{id:string}>(sql`SELECT id FROM release.database_migrations WHERE service_id=${serviceId} AND stage NOT IN ('completed','abandoned','rolled-back')`);
+    if(migration&&migration.id!==operationId)throw conflict('服务正在进行数据库迁移',{code:'database_migration_active',operationId:migration.id});
     const [row]=await db.execute<{id:string}>(sql`SELECT id FROM release.database_restores WHERE service_id=${serviceId} AND ${open}`);
     if(row&&row.id!==operationId)throw conflict('服务正在进行数据库恢复，请先完成或放弃原恢复操作',{code:'database_restore_active',operationId:row.id});
   } };

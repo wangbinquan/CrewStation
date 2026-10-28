@@ -39,7 +39,7 @@ export interface SlotOffline {
  */
 export interface SlotWorkload {
   readonly databaseGenerationId?: string;
-  readonly databaseRestoreOperationId?: string;
+  readonly databaseRestoreOperationId?: string; databaseMigrationOperationId?: string;
   readonly releaseId: ReleaseId;
   readonly revision: number;
   readonly image: string;

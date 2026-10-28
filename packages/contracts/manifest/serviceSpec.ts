@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ServiceDatabaseMigrationSchema } from '../api/data/databaseMigration';
 import { ServiceDatabaseRestoreSchema } from '../api/data/databaseRestore';
 import { ResourceIdSchema } from '../ids';
 import { ServiceProbesSchema } from './serviceProbes';
@@ -8,6 +9,7 @@ export const ManifestKindSchema = z.enum(['DigitalWorker', 'APIProxy', 'EventPro
 export const HttpMethodSchema = z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
 
 export const ServiceSpecSchema = z.object({
+  databaseMigration: ServiceDatabaseMigrationSchema.optional(),
   databaseRestore: ServiceDatabaseRestoreSchema.optional(),
   runtimeImageVersionId: ResourceIdSchema.optional(),
   command: z.array(z.string().min(1)).min(1),

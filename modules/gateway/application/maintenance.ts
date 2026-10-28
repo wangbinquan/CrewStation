@@ -87,10 +87,10 @@ function maintenanceCommands(deps: GatewayUseCaseDeps, cache: Cache) {
     return { current: current ? await toDto(current) : null, history: events.map(eventToDto) };
   };
   return {
-    enterDatabaseRestoreMaintenance: async (actor:Actor,serviceId:ServiceId,operationId:string) => {
+    enterDatabaseRestoreMaintenance: async (actor:Actor,serviceId:ServiceId,operationId:string,kind:'restore'|'migration'='restore') => {
       if(!actor.isAdmin)throw forbidden('只有管理员可以切换恢复数据库');
       const svc=await resolve(serviceId);await deps.access.authorize(actor,svc.projectId,'manage-maintenance');
-      const value=await uow.run(async scope=>{if(!scope.maintenance.beginRestore)throw precondition('恢复维护保留未配置');const receipt=await scope.maintenance.beginRestore({serviceId,projectId:svc.projectId,operationId,actor:actor.userId,now:deps.clock.now()});await scope.publish(DomainTopic.maintenanceChanged,{occurredAt:deps.clock.now().toISOString(),projectId:svc.projectId,serviceId,active:true,holdEvents:true});return receipt;});cache.invalidate();return value;
+      const value=await uow.run(async scope=>{if(!scope.maintenance.beginRestore)throw precondition('恢复维护保留未配置');const receipt=await scope.maintenance.beginRestore({kind,serviceId,projectId:svc.projectId,operationId,actor:actor.userId,now:deps.clock.now()});await scope.publish(DomainTopic.maintenanceChanged,{occurredAt:deps.clock.now().toISOString(),projectId:svc.projectId,serviceId,active:true,holdEvents:true});return receipt;});cache.invalidate();return value;
     },
     exitDatabaseRestoreMaintenance: async (actor:Actor,serviceId:ServiceId,operationId:string,revision:number) => {
       if(!actor.isAdmin)throw forbidden('只有管理员可以完成恢复维护');

@@ -8,7 +8,7 @@ import { z } from 'zod';
 
 interface CreationRecord { id: string; kind: string; projectId?: string; owner?: { module: string; ref: string }; spec: Readonly<Record<string, unknown>> }
 /** RFC-042 restore and verify Jobs are `migration-job` records owned by `<jobId>/migration`, like a release migration. */
-const releaseRef = z.object({ releaseId: ResourceIdSchema, serviceId: ResourceIdSchema.optional(), purpose: z.enum(['build', 'migration', 'database-restore', 'database-verify']).optional(), physical: z.enum(['blue', 'green']).optional() });
+const releaseRef = z.object({ releaseId: ResourceIdSchema, serviceId: ResourceIdSchema.optional(), purpose: z.enum(['build', 'migration', 'database-restore', 'database-verify', 'database-migration-plan', 'database-migration-run', 'database-migration-verify', 'database-migration-rollback', 'database-migration-complete']).optional(), physical: z.enum(['blue', 'green']).optional() });
 /** The actual owner records its callback through Secret and Job/Deployment
  * apply. Both owner and resource locks use one original PostgreSQL backend. */
 export function registryCreationAdmission(input: { db: Database; registry?: Parameters<typeof nativeRegistryWriterAdmission>[0];

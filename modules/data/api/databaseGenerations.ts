@@ -2,6 +2,11 @@ import type { Actor, DataEnv, DatabaseBindingDto, DatabaseGenerationDto, Databas
 export interface DatabaseGenerationApi {
   list(actor: Actor, serviceId: ServiceId): Promise<DatabaseGenerationList>;
   active(serviceId: ServiceId, env: DataEnv): Promise<DatabaseBindingDto>;
+  reserveMigration(input: { id: string; scratchId: string; operationId: string; serviceId: ServiceId; expectedGenerationId: string; expectedRevision: number }): Promise<DatabaseGenerationDto>;
+  commitMigration(input: { operationId: string; serviceId: ServiceId; sourceGenerationId: string; targetGenerationId: string; expectedRevision: number }): Promise<DatabaseBindingDto>;
+  revertMigration(input: { operationId: string; serviceId: ServiceId; sourceGenerationId: string; targetGenerationId: string; expectedRevision: number }): Promise<DatabaseBindingDto>;
+  openMigration(serviceId: ServiceId, operationId: string): Promise<void>;
+  finishMigration(serviceId: ServiceId, operationId: string): Promise<void>;
   reserve(input: { id: string; operationId: string; serviceId: ServiceId; expectedGenerationId: string; expectedRevision: number }): Promise<DatabaseGenerationDto>;
   prepare(serviceId: ServiceId, operationId: string, generationId: string): Promise<{ ready: boolean; identity: DatabasePhysicalIdentity | null }>;
   envFor(serviceId: ServiceId, generationId: string, operationId?: string): Promise<Record<string, string>>;

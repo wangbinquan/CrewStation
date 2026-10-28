@@ -1,3 +1,4 @@
+import type { DatabaseMigrationSupport } from '../ports/databaseMigration';
 import type { DatabaseRestoreSupport } from '../ports/databaseRestore';
 import type { ExecutionHandoff } from '../ports/executionHandoff';
 import type { ReleaseRuntimeImages } from '../ports/runtimeImages';
@@ -9,6 +10,7 @@ import type { UnitOfWork } from '../ports/unitOfWork';
 import type { ReleaseProjectAdmissions } from '../ports/unitOfWork';
 
 export interface ReleaseUseCaseDeps {
+  databaseMigration?: DatabaseMigrationSupport;
   databaseRestore?: DatabaseRestoreSupport;
   admission?: ReleaseProjectAdmissions;
   executionHandoff?: ExecutionHandoff;

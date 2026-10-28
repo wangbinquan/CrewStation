@@ -15,6 +15,7 @@ export function drizzleReleaseRepository(db: Executor): ReleaseRepository {
     insert: async (r) => { await db.insert(releases).values(toRow(r)); },
     update: async (r) => { await db.update(releases).set(toRow(r)).where(eq(releases.id, r.id)); },
     getById: (id) => db.select().from(releases).where(eq(releases.id, id)).then(first),
+    getByBuildJobId: id=>db.select().from(releases).where(sql`${releases.pipeline}->>'buildJobId'=${id}`).then(first),
     getByTag: (serviceId, tag) => db.select().from(releases).where(and(eq(releases.serviceId, serviceId), eq(releases.tag, tag))).then(first),
     listByService: async (serviceId, limit) => (await db.select().from(releases).where(eq(releases.serviceId, serviceId)).orderBy(desc(releases.createdAt)).limit(limit)).map(toRelease),
     findInProgress: (serviceId) => db.select().from(releases).where(and(eq(releases.serviceId, serviceId), inArray(releases.status, [...IN_PROGRESS]))).then(first),

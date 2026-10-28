@@ -1,3 +1,4 @@
+import { databaseMigrationMessages } from './database-migration/zh-CN';
 import { databaseRestoreMessages } from './database-restore/zh-CN';
 import type { Messages } from '../../../shared/lib/i18n';
 
@@ -38,6 +39,7 @@ export const messages = {
 
   ...journeyMessages,
   ...databaseRestoreMessages,
+  ...databaseMigrationMessages,
   'release.handoff.freezing': "正在冻结执行权，等待在途操作收敛。",
   'release.handoff.preparing': "等待目标应用完成准备与接管。",
   'release.handoff.routing': "准备已确认，正在切换生产路由。",

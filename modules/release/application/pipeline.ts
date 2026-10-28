@@ -16,7 +16,7 @@ export function pipelineStepUseCase(deps: ReleaseUseCaseDeps) {
   const build = buildSteps(deps, ctx, deploy.startDeploy);
   return async (releaseId: ReleaseId): Promise<StepResult> => {
     const release = await deps.uow.read.releases.getById(releaseId);
-    if (!release || !isInProgress(release)||release.pipeline.databaseRestore) return DONE;
+    if (!release || !isInProgress(release)||release.pipeline.databaseRestore||release.pipeline.databaseMigration) return DONE;
     await deps.databaseRestore?.coordination.assertAvailable(release.serviceId);
     const svc = await deps.services.resolveServiceById(release.serviceId);
     if (!svc) return ctx.fail(release, '服务不存在');

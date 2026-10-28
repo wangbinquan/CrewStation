@@ -154,6 +154,7 @@ function composeCore(deps: CompositionDeps, late: Late) {
     settings: { defaultTaskProfile: settings.defaultTaskProfile, secretKeyBase64: settings.secretKeyBase64, registry: { pullBase: settings.registryBase, pushHost: settings.registryPushHost, baseRepository: settings.baseImage.repository, runtimePrefix: 'runtime/', scheme: settings.registryScheme, baseTag: settings.baseImage.tag } },
   });
   const data = createDataModule({
+    assertDatabaseMigrationAvailable:async id=>{if(!late.release)throw precondition('发布 owner 尚未装配');await late.release.assertDatabaseMigrationAvailable(id);},
     deletion: { physics: deps.deletion?.objects ?? (settings.projectDeletionNative && settings.clusterMetrics && settings.clusterMetrics.probeToken.length >= 32 && settings.platformPodUid ? createDataObjectDeletionPhysics(db, nativeProjectObjectSources(deps.k8s, settings.systemNamespace, settings.clusterMetrics, createObjectDeletionTransport(db, settings.secretKeyBase64), createGarageDeletionTransport), project.api.assertProjectDeletionGrant) : undefined), sources: dataDeletionSources(project.api, () => { if (!late.taskRuntime || !late.businessTask) throw precondition('data 原任务 owner 尚未装配'); return { taskRuntime: late.taskRuntime, businessTask: late.businessTask }; }) },
     db, logger, isAdmin: (id) => isAdmin(id), authorizer: project.api, users: userDirectory,
     productionTasks: { get: async (id) => { const env = await late.taskRuntime?.getEnvironment(id); return env ? { taskId: id, projectId: env.projectId, serviceId: env.serviceId as ServiceId, kind: env.kind, state: env.state, podUid: (await late.taskRuntime!.resourceWorkload(SYSTEM_ACTOR, id)).podUid } : undefined; }, list: async (id) => { const env = await late.taskRuntime?.findDevSession(id); return env ? [env.id] : []; } },
@@ -183,6 +184,7 @@ function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeC
   const { db, k8s, settings, logger } = deps;
   const { project, config, data, scm, apiCatalog, hosts, isAdmin, resolveById } = core;
   const release = createReleaseModule({
+    databaseMigration:{secretKeyBase64:settings.secretKeyBase64,objectReadUrl:`http://cs-api.${settings.systemNamespace}.svc:8087/internal/database-restore-objects`,controlUrl:`http://cs-api.${settings.systemNamespace}.svc:8087/internal/database-migrations`},
     databaseRestore:{secretKeyBase64:settings.secretKeyBase64,objectReadUrl:`http://cs-api.${settings.systemNamespace}.svc:8087/internal/database-restore-objects`},
     ...(deps.deletion ? { deletion: { physics: deps.deletion.release, assertGrant: project.api.assertProjectDeletionGrant }, deletionIdentities: deps.identities } : {}),
     ...(settings.platformPodUid ? { projectAdmission: { protectCurrent: projectCallbackOwners(k8s, settings.systemNamespace, settings.platformPodUid, 'crewstation.io/release-project-stop').protectCurrentProcess, assertAvailable: (id: string) => project.api.assertProjectAvailable(id as ProjectId),
@@ -220,7 +222,7 @@ function composeDelivery(deps: CompositionDeps, core: ReturnType<typeof composeC
     },
     data: { databaseGenerations: data.api.databaseGenerations, envFor: data.api.envFor, ...(data.api.objectEnv ? { objectEnv: data.api.objectEnv } : {}) },
     // RFC-021：项目完整维护即破坏性迁移窗口（gateway 在 release 之后装配，故惰性取）；自动下线的提醒发给负责人。
-    maintenance: { enterRestore: (actor,id,op) => {if(!late.gateway)throw new Error('gateway 尚未装配');return late.gateway.enterDatabaseRestoreMaintenance(actor,id,op);}, exitRestore: (actor,id,op,revision) => {if(!late.gateway)throw new Error('gateway 尚未装配');return late.gateway.exitDatabaseRestoreMaintenance(actor,id,op,revision);}, open: (serviceId) => { if (!late.gateway) throw new Error('gateway 尚未装配'); return late.gateway.maintenanceWindowOpen(serviceId); } },
+    maintenance: { enterRestore: (actor,id,op,kind) => {if(!late.gateway)throw new Error('gateway 尚未装配');return late.gateway.enterDatabaseRestoreMaintenance(actor,id,op,kind);}, exitRestore: (actor,id,op,revision) => {if(!late.gateway)throw new Error('gateway 尚未装配');return late.gateway.exitDatabaseRestoreMaintenance(actor,id,op,revision);}, open: (serviceId) => { if (!late.gateway) throw new Error('gateway 尚未装配'); return late.gateway.maintenanceWindowOpen(serviceId); } },
     owners: { ownerOf: project.api.ownerOf },
     notifier: { notify: async (projectId, users, message) => { logger.warn('slot offline notice', { projectId, users, message }); } },
     settings: { userDomain: settings.userDomain, serviceDomain: settings.serviceDomain, registryBase: settings.registryBase, buildTimeoutSeconds: 1800, deployTimeoutSeconds: 600, builderImage: settings.builderImage, buildkitAddress: settings.buildkitAddress, workerOwner: `${deps.instance}.release` },
@@ -566,7 +568,7 @@ export function createPlatformModule(deps: PlatformModuleDeps): PlatformModule {
     initializePlatformRoles: () => m.identity.api.initializePlatformRoles(), bootstrapAdmin: (raw) => m.identity.api.bootstrapAdmin(raw),
     routers: {
       controller: [...m.cluster.internalHttp, ...m.data.internalHttp, ...projectDeletionGrantRoutes(deps.settings.projectDeletionNative, m.project.api.assertProjectDeletionGrant)],
-      transfers: [...m.identity.http.devSessionGate, ...m.data.transferHttp],
+      transfers: [...m.identity.http.devSessionGate, ...m.data.transferHttp, ...m.release.transferHttp],
       // devSessionGate 只挂中间件不占路径，必须排在最前：Hono 按注册顺序执行，晚于业务路由就来不及改判身份。
       api: [...m.identity.http.devSessionGate, ...m.project.http, ...m.identity.http.users, ...m.config.http, ...m.agentRuntime.http, ...m.runtimeEnvironment.http, ...m.data.http, ...m.scm.http, ...m.apiCatalog.http, ...m.release.http, ...m.gateway.http, ...m.taskRuntime.http, ...m.devSession.http, m.businessTask.http.service, m.businessTask.http.user, ...m.events.http.query, ...m.observability.http, ...m.cluster.http, ...m.capabilities.http, ...m.provisioning.http, ...m.clusterControl.http, ...m.resources.http, ...m.resourceAccess.http],
       auth: [...m.identity.http.auth, ...m.identity.http.forwardAuth, ...m.agentRuntime.forwardAuth],

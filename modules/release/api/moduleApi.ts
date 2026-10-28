@@ -1,3 +1,5 @@
+import type { DatabaseMigrationJobPurpose } from '@crewstation/contracts';
+import type { CreateDatabaseMigration, RetryDatabaseMigration, ApproveDatabaseMigration, SwitchDatabaseMigration, DatabaseMigrationDto } from '@crewstation/contracts';
 import type { AbandonDatabaseRestore, CreateDatabaseRestore, RetryDatabaseRestore, SwitchDatabaseRestore, DatabaseRestoreDto, DatabaseGenerationList } from '@crewstation/contracts';
 import type { RuntimeImageHistoryRead, RuntimeImageHistoryItem } from '@crewstation/contracts';
 import type { ReleaseJourneySource } from '@crewstation/contracts';
@@ -24,7 +26,7 @@ export interface SlotDeployRef {
 export interface JobRef {
   readonly recordId: string;
   readonly releaseId: string;
-  readonly purpose: 'build' | 'migration' | 'database-restore' | 'database-verify';
+  readonly purpose: 'build' | 'migration' | 'database-restore' | 'database-verify' | DatabaseMigrationJobPurpose;
 }
 
 export interface ActiveEndpoint {
@@ -48,6 +50,19 @@ export interface ReleaseProjectContent {
 
 /** release 模块对外能力：发布、切流、查询；流水线推进由工作器调用。 */
 export interface ReleaseModuleApi {
+  listDatabaseMigrations(actor:Actor,serviceId:ServiceId):Promise<{items:DatabaseMigrationDto[]}>;
+  getDatabaseMigration(actor:Actor,serviceId:ServiceId,id:string):Promise<DatabaseMigrationDto>;
+  createDatabaseMigration(actor:Actor,serviceId:ServiceId,input:CreateDatabaseMigration):Promise<DatabaseMigrationDto>;
+  replanDatabaseMigration(actor:Actor,serviceId:ServiceId,id:string,input:RetryDatabaseMigration):Promise<DatabaseMigrationDto>;
+  approveDatabaseMigration(actor:Actor,serviceId:ServiceId,id:string,input:ApproveDatabaseMigration):Promise<DatabaseMigrationDto>;
+  switchDatabaseMigration(actor:Actor,serviceId:ServiceId,id:string,input:SwitchDatabaseMigration):Promise<DatabaseMigrationDto>;
+  openDatabaseMigration(actor:Actor,serviceId:ServiceId,id:string,input:SwitchDatabaseMigration):Promise<DatabaseMigrationDto>;
+  rollbackDatabaseMigration(actor:Actor,serviceId:ServiceId,id:string,input:RetryDatabaseMigration):Promise<DatabaseMigrationDto>;
+  retryDatabaseMigration(actor:Actor,serviceId:ServiceId,id:string,input:RetryDatabaseMigration):Promise<DatabaseMigrationDto>;
+  abandonDatabaseMigration(actor:Actor,serviceId:ServiceId,id:string,input:RetryDatabaseMigration):Promise<DatabaseMigrationDto>;
+  assertDatabaseMigrationAvailable(serviceId: ServiceId): Promise<void>;
+  progressDatabaseMigrations():Promise<number>;
+  databaseMigrationPlanMarkdown(actor:Actor,serviceId:ServiceId,id:string):Promise<string>;
   databaseGenerations(actor:Actor,serviceId:ServiceId):Promise<DatabaseGenerationList>;
   listDatabaseRestores(actor:Actor,serviceId:ServiceId):Promise<{items:DatabaseRestoreDto[]}>;
   getDatabaseRestore(actor:Actor,serviceId:ServiceId,id:string):Promise<DatabaseRestoreDto>;

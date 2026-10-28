@@ -1,3 +1,4 @@
+import type { CreateDatabaseMigration, RetryDatabaseMigration, ApproveDatabaseMigration, SwitchDatabaseMigration, DatabaseMigrationDto } from '@crewstation/contracts';
 import type { AbandonDatabaseRestore, CreateDatabaseRestore, RetryDatabaseRestore, SwitchDatabaseRestore, DatabaseRestoreDto, DatabaseGenerationList } from '@crewstation/contracts';
 import type {
   BranchDto, ExitMaintenanceRequest, ListBranchesQuery, MaintenanceDto, ManifestUpgradePreview, PostponeOfflineRequest, RedeployPrecheckDto, RedeployRequest, ReleaseDto, RepositoryBindingDto,
@@ -11,6 +12,17 @@ import { segment } from '../requestUrl';
 
 /** 服务视角：仓库、分支与标签（scm）、Release、两个部署槽与切流（release）。 */
 export interface ServicesResource {
+  listDatabaseMigrations(serviceId:string):Promise<{items:DatabaseMigrationDto[]}>;
+  getDatabaseMigration(serviceId:string,id:string):Promise<DatabaseMigrationDto>;
+  createDatabaseMigration(serviceId:string,input:CreateDatabaseMigration):Promise<DatabaseMigrationDto>;
+  replanDatabaseMigration(serviceId:string,id:string,input:RetryDatabaseMigration):Promise<DatabaseMigrationDto>;
+  approveDatabaseMigration(serviceId:string,id:string,input:ApproveDatabaseMigration):Promise<DatabaseMigrationDto>;
+  switchDatabaseMigration(serviceId:string,id:string,input:SwitchDatabaseMigration):Promise<DatabaseMigrationDto>;
+  openDatabaseMigration(serviceId:string,id:string,input:SwitchDatabaseMigration):Promise<DatabaseMigrationDto>;
+  rollbackDatabaseMigration(serviceId:string,id:string,input:RetryDatabaseMigration):Promise<DatabaseMigrationDto>;
+  retryDatabaseMigration(serviceId:string,id:string,input:RetryDatabaseMigration):Promise<DatabaseMigrationDto>;
+  abandonDatabaseMigration(serviceId:string,id:string,input:RetryDatabaseMigration):Promise<DatabaseMigrationDto>;
+  databaseMigrationPlanMarkdown(serviceId:string,id:string):Promise<{markdown:string}>;
   databaseGenerations(serviceId:string):Promise<DatabaseGenerationList>;
   listDatabaseRestores(serviceId:string):Promise<{items:DatabaseRestoreDto[]}>;
   getDatabaseRestore(serviceId:string,id:string):Promise<DatabaseRestoreDto>;
@@ -66,6 +78,17 @@ export interface ServicesResource {
 export function servicesResource(transport: Transport): ServicesResource {
   const base = (serviceId: string) => `/v1/services/${segment(serviceId)}`;
   return {
+    listDatabaseMigrations:id=>transport.request('GET',`${base(id)}/database-migrations`),
+    getDatabaseMigration:(id,op)=>transport.request('GET',`${base(id)}/database-migrations/${segment(op)}`),
+    createDatabaseMigration:(id,input)=>transport.request('POST',`${base(id)}/database-migrations`,{body:input}),
+    databaseMigrationPlanMarkdown:(id,op)=>transport.request('GET',`${base(id)}/database-migrations/${segment(op)}/plan`),
+    replanDatabaseMigration:(id,op,input)=>transport.request('POST',`${base(id)}/database-migrations/${segment(op)}/replan`,{body:input}),
+    approveDatabaseMigration:(id,op,input)=>transport.request('POST',`${base(id)}/database-migrations/${segment(op)}/approve`,{body:input}),
+    switchDatabaseMigration:(id,op,input)=>transport.request('POST',`${base(id)}/database-migrations/${segment(op)}/switch`,{body:input}),
+    openDatabaseMigration:(id,op,input)=>transport.request('POST',`${base(id)}/database-migrations/${segment(op)}/open`,{body:input}),
+    rollbackDatabaseMigration:(id,op,input)=>transport.request('POST',`${base(id)}/database-migrations/${segment(op)}/rollback`,{body:input}),
+    retryDatabaseMigration:(id,op,input)=>transport.request('POST',`${base(id)}/database-migrations/${segment(op)}/retry`,{body:input}),
+    abandonDatabaseMigration:(id,op,input)=>transport.request('POST',`${base(id)}/database-migrations/${segment(op)}/abandon`,{body:input}),
     databaseGenerations:id=>transport.request('GET',`${base(id)}/database-generations`),
     listDatabaseRestores:id=>transport.request('GET',`${base(id)}/database-restores`),
     getDatabaseRestore:(id,op)=>transport.request('GET',`${base(id)}/database-restores/${segment(op)}`),

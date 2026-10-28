@@ -9,7 +9,7 @@ export interface ProjectAuthorizer {
 /** 由 gateway 模块经装配提供：项目处于维护中且三个开关都拦，即破坏性迁移的维护窗口（RFC-021 M14、M17）。直接读库，不走缓存。 */
 export interface MaintenanceWindow {
   open(serviceId: ServiceId): Promise<boolean>;
-  enterRestore?(actor: Actor, serviceId: ServiceId, operationId: string): Promise<{revision: number; wasOpen: boolean}>;
+  enterRestore?(actor: Actor, serviceId: ServiceId, operationId: string, kind?: 'restore'|'migration'): Promise<{revision: number; wasOpen: boolean}>;
   exitRestore?(actor: Actor, serviceId: ServiceId, operationId: string, revision: number): Promise<void>;
 }
 

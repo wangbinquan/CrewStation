@@ -17,6 +17,7 @@ function createRestore(deps:ReleaseUseCaseDeps,actor:Actor,serviceId:ServiceId,i
     return c.work(serviceId,input.requestId,{requestDigest},async()=>{
       const existing=await c.store.get(input.requestId);
       if(existing){if(existing.serviceId!==serviceId||existing.requestDigest!==requestDigest)throw conflict('恢复请求 ID 已用于不同输入');return restoreDto(existing);}
+      await c.support.coordination.assertAvailable(serviceId);
       const [source,restore,binding]=await Promise.all([deps.uow.read.releases.getById(input.expectedActiveReleaseId),deps.uow.read.releases.getById(input.restoreReleaseId),c.database.active(serviceId,'production')]);
       if(!source||source.serviceId!==serviceId||!restore||restore.serviceId!==serviceId)throw notFound('原服务发布');
       if(binding.restoreOperationId)throw conflict('服务已有未结束的数据库恢复',{code:'database_restore_active',operationId:binding.restoreOperationId});
@@ -29,6 +30,7 @@ function createRestore(deps:ReleaseUseCaseDeps,actor:Actor,serviceId:ServiceId,i
       if(!image||!/@sha256:[a-f0-9]{64}$/.test(image))throw precondition('恢复镜像无法固定到不可变摘要');
       return deps.uow.run(async scope=>{
         const slots=await scope.slots.get(serviceId);
+        await c.support.coordination.assertAvailable(serviceId);
         if(!slots||slots[slots.active].releaseId!==source.id||slots[slots.active].state!=='ready')throw conflict('当前正式版本已变化');
         if(await scope.releases.findInProgress(serviceId)||await scope.handoffs.active(serviceId))throw conflict('服务已有未结束发布或执行交接');
         const targetSlot=slots.active==='blue'?'green':'blue',now=deps.clock.now().toISOString();

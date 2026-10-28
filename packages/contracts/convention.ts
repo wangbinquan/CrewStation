@@ -37,6 +37,19 @@ export const IDENTITY_HEADERS = {
 
 /** 业务容器内可读的环境变量；值由平台在部署与开发会话启动时注入。 */
 export const PLATFORM_ENV = {
+  databaseMigrationOperationId: 'CS_DATABASE_MIGRATION_OPERATION_ID',
+  databaseMigrationAction: 'CS_DATABASE_MIGRATION_ACTION',
+  databaseMigrationSourceGeneration: 'CS_DATABASE_MIGRATION_SOURCE_GENERATION',
+  databaseMigrationSourceUrl: 'CS_DATABASE_MIGRATION_SOURCE_URL',
+  databaseMigrationTargetUrl: 'CS_DATABASE_MIGRATION_TARGET_URL',
+  databaseMigrationScratchUrl: 'CS_DATABASE_MIGRATION_SCRATCH_URL',
+  databaseMigrationControlUrl: 'CS_DATABASE_MIGRATION_CONTROL_URL',
+  databaseMigrationSourceBornOnPostgresql: 'CS_DATABASE_MIGRATION_SOURCE_BORN_ON_POSTGRESQL',
+  databaseMigrationSourceKey: 'CS_DATABASE_MIGRATION_SOURCE_KEY',
+  databaseMigrationApprove: 'CS_DATABASE_MIGRATION_APPROVE',
+  databaseMigrationFreezeReference: 'CS_DATABASE_MIGRATION_FREEZE_REFERENCE',
+  databaseMigrationScratchRoot: 'CS_DATABASE_MIGRATION_SCRATCH_ROOT',
+  platformApiToken: 'CS_PLATFORM_API_TOKEN',
   project: 'CS_PROJECT',
   service: 'CS_SERVICE',
   slot: 'CS_SLOT',

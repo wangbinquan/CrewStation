@@ -1,3 +1,10 @@
+import { databaseMigrationCommands } from './application/database-migration/commands';
+import { databaseMigrationProgress } from './application/database-migration/progress';
+import { databaseMigrationCallback } from './application/database-migration/callbacks';
+import { migrationContext } from './application/database-migration/context';
+import { migrationObjectSource } from './application/database-migration/owner';
+import { databaseMigrationRoutes } from './http/databaseMigrationRoutes';
+import { databaseMigrationCallbackRoutes } from './http/databaseMigrationCallbacks';
 import { releaseImageHistory } from './adapters/persistence/drizzleRepositories';
 export { releaseRegistryDeletionPhysics as createReleaseRegistryDeletionPhysics } from './adapters/registry/deletionPhysics';
 export { nativeReleaseWorkPhysics as createNativeReleaseWorkPhysics } from './adapters/native/projectWork';
@@ -16,7 +23,7 @@ import type { ReleaseId, UserId } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import type { K8sClient } from '@crewstation/k8s';
 import type { Clock, Logger } from '@crewstation/kernel';
-import { noopLogger, systemClock } from '@crewstation/kernel';
+import { conflict, precondition, noopLogger, systemClock } from '@crewstation/kernel';
 import type { Database, MigrationSet } from '@crewstation/persistence';
 import { readMigrationDir } from '@crewstation/persistence';
 import type { Worker } from '@crewstation/queue';
@@ -61,6 +68,7 @@ import { resyncSlotLedger } from './application/slotLedgerResync';
 import type { SlotLedger } from './ports/ledger';
 
 export interface ReleaseModuleDeps {
+  databaseMigration?: {secretKeyBase64:string;objectReadUrl:string;controlUrl:string};
   databaseRestore?: {secretKeyBase64:string;objectReadUrl:string};
   /** Only old retained identities use this directory; normal release commands keep their UUID boundary. */
   deletionIdentities?: ReleaseContentDirectory;
@@ -106,6 +114,7 @@ export interface ReleaseModule {
   withResourceCreationAdmission<T>(input: { releaseId: string; recordId: string; kind: 'slot' | 'pipeline'; serviceId?: string }, work: () => Promise<T>): Promise<T>;
   readonly api: ReleaseModuleApi;
   readonly http: Hono<AppEnv>[];
+  readonly transferHttp: Hono<AppEnv>[];
   readonly workers: Array<Worker | ReleaseTimer>;
   readonly migrations: MigrationSet;
 }
@@ -129,6 +138,17 @@ function releasePipelineJobs(deps: ReleaseModuleDeps, uow: ReturnType<typeof dri
   } : undefined);
 }
 
+function databaseOperationSupport(deps:ReleaseModuleDeps,effects:<T extends object>(source:T)=>T):Pick<ReleaseUseCaseDeps,'databaseRestore'|'databaseMigration'>{
+  return {
+    ...(deps.databaseRestore?{databaseRestore:{coordination:databaseRestoreCoordination(deps.db),jobs:effects(kubernetesRestoreJobObserver(deps.k8s)),objectReadUrl:deps.databaseRestore.objectReadUrl,isAdmin:deps.isAdmin,
+      encrypt:(plain:string)=>encryptString(deps.databaseRestore!.secretKeyBase64,plain),decrypt:(boxed:string)=>decryptString(deps.databaseRestore!.secretKeyBase64,boxed),
+      token:(jobId:string,digest:string)=>createHmac('sha256',Buffer.from(deps.databaseRestore!.secretKeyBase64,'base64')).update('database-restore-object-read\0'+jobId+'\0'+digest).digest('base64url')}}:{}),
+    ...(deps.databaseMigration?{databaseMigration:{coordination:databaseRestoreCoordination(deps.db),jobs:effects(kubernetesRestoreJobObserver(deps.k8s)),objectReadUrl:deps.databaseMigration.objectReadUrl,controlUrl:deps.databaseMigration.controlUrl,isAdmin:deps.isAdmin,
+      encrypt:(plain:string)=>encryptString(deps.databaseMigration!.secretKeyBase64,plain),decrypt:(boxed:string)=>decryptString(deps.databaseMigration!.secretKeyBase64,boxed),
+      token:(jobId:string,digest:string)=>createHmac('sha256',Buffer.from(deps.databaseMigration!.secretKeyBase64,'base64')).update('database-migration-control\0'+jobId+'\0'+digest).digest('base64url')}}:{}),
+  };
+}
+
 export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
   const logger = deps.logger ?? noopLogger;
   const admission = deps.projectAdmission ? releaseProjectAdmissions({ db: deps.db, ...deps.projectAdmission }) : undefined;
@@ -137,9 +157,7 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
   const jobs = releasePipelineJobs(deps, uow, admission);
   const useCaseDeps: ReleaseUseCaseDeps = {
     uow, admission,
-    ...(deps.databaseRestore?{databaseRestore:{coordination:databaseRestoreCoordination(deps.db),jobs:effects(kubernetesRestoreJobObserver(deps.k8s)),objectReadUrl:deps.databaseRestore.objectReadUrl,isAdmin:deps.isAdmin,
-      encrypt:(plain:string)=>encryptString(deps.databaseRestore!.secretKeyBase64,plain),decrypt:(boxed:string)=>decryptString(deps.databaseRestore!.secretKeyBase64,boxed),
-      token:(jobId:string,digest:string)=>createHmac('sha256',Buffer.from(deps.databaseRestore!.secretKeyBase64,'base64')).update('database-restore-object-read\0'+jobId+'\0'+digest).digest('base64url')}}:{}),
+    ...databaseOperationSupport(deps,effects),
     tagger: effects(deps.tagger),
     repo: effects(deps.repo), executionHandoff: deps.executionHandoff ? effects(deps.executionHandoff) : undefined,
     ...(deps.runtimeImages ? { runtimeImages: effects(deps.runtimeImages) } : {}),
@@ -162,9 +180,13 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
     ...(deps.ledger && deps.creation === 'ledger' ? { creation: 'ledger' as const } : {}), ...(deps.renderer ? { renderer: effects(deps.renderer) } : {}),
   };
   const implementation: ReleaseModuleApi = {
+    assertDatabaseMigrationAvailable:async serviceId=>{if(await useCaseDeps.uow.read.databaseMigrations!.active(serviceId))throw conflict('服务正在进行数据库迁移',{code:'database_migration_active'});},
+    ...databaseMigrationCommands(useCaseDeps),
+    progressDatabaseMigrations:databaseMigrationProgress(useCaseDeps),
+    databaseMigrationPlanMarkdown:async(actor,serviceId,id)=>{const c=migrationContext(useCaseDeps);await c.authorize(actor,serviceId,false);const op=await c.load(serviceId,id);const artifact=op.plan?await c.store.artifact(id,`plans/${op.plan.plan.digest}.md`):null;if(!artifact)throw precondition('迁移计划尚未生成');return Buffer.from(artifact.bytes,'base64').toString();},
     ...databaseRestoreCommands(useCaseDeps),
     progressDatabaseRestores:databaseRestoreProgress(useCaseDeps),
-    restoreObjectSource:restoreObjectSource(useCaseDeps),
+    restoreObjectSource:async(jobId,token)=>await restoreObjectSource(useCaseDeps)(jobId,token)??await migrationObjectSource(useCaseDeps,jobId,token),
     sharedAdmissionKeys: releaseAdmissionKeys,
     name: 'release',
     ...journeyQueries(useCaseDeps),
@@ -197,8 +219,9 @@ export function createReleaseModule(deps: ReleaseModuleDeps): ReleaseModule {
   return {
     api,
     withResourceCreationAdmission: (input, work) => releaseResourceCreationWork(useCaseDeps, input, work),
-    http: [databaseRestoreRoutes(api,deps.isAdmin),releaseRoutes(api, deps.isAdmin), journeyRoutes(api, deps.isAdmin)],
-    workers: [periodicJob(()=>api.progressDatabaseRestores().then(()=>undefined),(error)=>logger.warn('database restore progress failed',{error:String(error)}),3000),createWorker({ db: deps.db, kinds: [PIPELINE_JOB_KIND], owner: deps.settings.workerOwner, concurrency: 4, logger, handler: pipelineJobHandler(api, jobs) }), sweep, periodicJob(() => api.progressHandoffs().then(() => undefined), (error) => logger.warn('execution handoff progress failed', { error: String(error) }), 1000),
+    transferHttp: [databaseMigrationCallbackRoutes(request=>databaseMigrationCallback(useCaseDeps,request))],
+    http: [databaseMigrationRoutes(api,deps.isAdmin),databaseRestoreRoutes(api,deps.isAdmin),releaseRoutes(api, deps.isAdmin), journeyRoutes(api, deps.isAdmin)],
+    workers: [periodicJob(()=>api.progressDatabaseMigrations().then(()=>undefined),(error)=>logger.warn('database migration progress failed',{error:String(error)}),3000),periodicJob(()=>api.progressDatabaseRestores().then(()=>undefined),(error)=>logger.warn('database restore progress failed',{error:String(error)}),3000),createWorker({ db: deps.db, kinds: [PIPELINE_JOB_KIND], owner: deps.settings.workerOwner, concurrency: 4, logger, handler: pipelineJobHandler(api, jobs) }), sweep, periodicJob(() => api.progressHandoffs().then(() => undefined), (error) => logger.warn('execution handoff progress failed', { error: String(error) }), 1000),
       periodicJob(() => api.progressJourneys().then(() => undefined), (error) => logger.warn('release journey observation failed', { error: String(error) }), 3000),
       ...(deps.ledger ? [slotLedgerResyncWorker(() => resyncSlotLedger(useCaseDeps.uow, logger, useCaseDeps), logger)] : [])],
     migrations: releaseMigrations,

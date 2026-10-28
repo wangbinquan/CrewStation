@@ -1,3 +1,5 @@
+import { databaseMigrationJobEnvironment } from './database-migration/owner';
+import { migrationEnvironment } from './database-migration/environment';
 import { databaseRestoreJobEnvironment } from './database-restore/owner';
 import { restoreEnvironment } from './database-restore/jobs';
 import { migrationWriteBarrier } from './execution/migrationBarrier';
@@ -27,6 +29,11 @@ export function slotOwnerUseCases(deps: ReleaseUseCaseDeps) {
       if (!wants(slot, ref)) throw precondition('这一次部署已不再需要：槽上换了版本或已下线');
       const [release, svc] = await Promise.all([uow.read.releases.getById(ref.releaseId as ReleaseId), deps.services.resolveServiceById(ref.serviceId as ServiceId)]);
       if (!release?.manifest || !svc) throw notFound('发布', ref.releaseId);
+      if(slot.workload.databaseMigrationOperationId){
+        const op=await uow.read.databaseMigrations?.get(slot.workload.databaseMigrationOperationId);
+        if(!op||op.candidateReleaseId!==release.id||op.targetGenerationId!==slot.workload.databaseGenerationId)throw precondition('迁移槽原数据库绑定不匹配');
+        return migrationEnvironment(deps,op);
+      }
       if(slot.workload.databaseRestoreOperationId){
         const op=await uow.read.databaseRestores?.get(slot.workload.databaseRestoreOperationId);
         if(!op||op.candidateReleaseId!==release.id||op.targetGenerationId!==slot.workload.databaseGenerationId)throw precondition('恢复槽原数据库绑定不匹配');
@@ -43,10 +50,12 @@ export function slotOwnerUseCases(deps: ReleaseUseCaseDeps) {
      * 资源中心建的，拒绝——调和器不会为已放弃的发布建 Job。
      */
     jobEnvValues: async (ref: JobRef): Promise<Readonly<Record<string, string>>> => {
+      if(ref.purpose.startsWith('database-migration-'))return databaseMigrationJobEnvironment(deps,ref);
       if(ref.purpose==='database-restore'||ref.purpose==='database-verify')return databaseRestoreJobEnvironment(deps,ref);
-      const release = await uow.read.releases.getById(ref.releaseId as ReleaseId);
+      const release = await uow.read.releases.getById(ref.releaseId as ReleaseId)??await uow.read.releases.getByBuildJobId?.(ref.releaseId);
       const step = ref.purpose === 'build' ? ['pending', 'building'] : ['building', 'migrating'];
       if (!release || release.pipeline.jobs !== 'ledger' || !step.includes(release.status)) throw precondition('这次发布已不在这一步，不再建它的 Job');
+      if(ref.purpose==='build'&&(release.pipeline.buildJobId??release.id)!==ref.releaseId)throw precondition('构建尝试已变化');
       if (ref.purpose === 'build') return { GIT_TOKEN: (await deps.repo.buildToken!(release.serviceId)).token };
       const barrier = await migrationWriteBarrier(deps, release);
       if (!barrier.ready) throw precondition(barrier.message ?? '迁移停写尚未确认');

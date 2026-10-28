@@ -15,6 +15,11 @@ export function releaseJobObject(job: JobRender): K8sObject {
     activeDeadlineSeconds: job.activeDeadlineSeconds, ttlSecondsAfterFinished: job.ttlSecondsAfterFinished,
   });
   (object.spec as { template: { spec: { containers: Array<Record<string, unknown>> } } }).template.spec.containers[0]!.envFrom = [{ secretRef: { name: job.secret } }];
+  if(job.purpose.startsWith('database-migration-')){
+    const pod=(object.spec as {template:{spec:Record<string,unknown>&{containers:Array<Record<string,unknown>>}}}).template.spec;
+    pod.volumes=[{name:'migration-scratch',emptyDir:{sizeLimit:job.scratchSize??'20Gi'}}];
+    pod.containers[0]!.volumeMounts=[{name:'migration-scratch',mountPath:'/tmp/database-migration'}];
+  }
   return object;
 }
 

@@ -1,3 +1,4 @@
+import { generationReservationGuard } from './application/generations/admission';
 import { databaseGenerationRepository } from './adapters/persistence/databaseGenerations';
 import { databaseGenerationUseCases, projectGeneration } from './application/serviceData';
 import type { DatabaseGenerationPlane } from './ports/repositories';
@@ -8,7 +9,7 @@ import { restoreObjectOperations } from './application/objects/restore';
 import { objectRestoreRepository } from './adapters/persistence/objects/restore';
 import type { ObjectRestorePlane } from './ports/objectRestore';
 import { join } from 'node:path';
-import type { ProjectDeletionContext, ProjectId, UserId } from '@crewstation/contracts';
+import type { ProjectDeletionContext, ProjectId, UserId, ServiceId } from '@crewstation/contracts';
 import { ServiceIdSchema } from '@crewstation/contracts';
 import { DomainTopic } from '@crewstation/contracts';
 import type { EventConsumer } from '@crewstation/eventbus';
@@ -97,6 +98,7 @@ export function createDataObjectDeletionPhysics(db: Database, deps: Omit<GarageD
 }
 
 export interface DataModuleDeps {
+  assertDatabaseMigrationAvailable?:(serviceId:ServiceId)=>Promise<void>;
   databaseGenerationPlane?: DatabaseGenerationPlane;
   deletion?: DataProjectDeletion;
   productionTasks?: ProductionAccessTasks;
@@ -151,7 +153,7 @@ export const dataMigrations: MigrationSet = {
 export function createDataModule(deps: DataModuleDeps): DataModule {
   const logger = deps.logger ?? noopLogger;
   const byDataControl = Boolean(deps.ledger && deps.credentials);
-  const generationStore = databaseGenerationRepository(deps.db);
+  const generationStore = generationReservationGuard(databaseGenerationRepository(deps.db),deps.assertDatabaseMigrationAvailable);
   const projection = deps.ledger ? dataLedgerProjection(deps.ledger, logger, byDataControl, async id=>!!(await generationStore.get(id))?.identity) : undefined;
   const stored = { resources: drizzleDataResourceRepository(deps.db), bindings: drizzleTaskBindingRepository(deps.db) };
   const useCaseDeps: DataUseCaseDeps = {

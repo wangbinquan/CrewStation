@@ -49,4 +49,15 @@ describe.skipIf(!available)('RFC-027 release reverse handoff boundary', () => {
     expect(await f.module.api.releaseHandoff.freeze(f.serviceId, request)).toEqual(frozen);
     expect((await f.request('/v3/business-execution/control/claim', { instanceId: newResourceId() })).status).toBe(403);
   });
+  test('RFC-044 opening supersedes the retained migration freeze with a newer epoch and authenticates only the candidate',async()=>{
+    const f=await executionCommandFixture(tdb.db),releaseId=await target(f,['v1']),api=f.module.api.releaseHandoff,operationId=newResourceId();
+    const frozen=await api.migrationBarrier(f.serviceId,{operationId,expectedActiveReleaseId:f.releaseId,targetReleaseId:releaseId});
+    expect((await f.request(`/v3/business-execution/control/migrations/${operationId}/ready`,{operationId,expectedEpoch:frozen.epoch,preparationDigest:'b'.repeat(64)})).status).toBe(200);
+    f.env.state='paused';f.env.connected=false;
+    expect((await api.migrationBarrier(f.serviceId,{operationId,expectedActiveReleaseId:f.releaseId,targetReleaseId:releaseId})).ready).toBe(true);
+    const handoff=await f.make().module.api.releaseHandoff.freeze(f.serviceId,{operationId,expectedActiveReleaseId:f.releaseId,targetReleaseId:releaseId,targetSlot:'green'});expect(handoff.epoch).toBeGreaterThan(frozen.epoch);
+    const instanceId=newResourceId(),claimed=await(await f.request('/v3/business-execution/control/claim',{instanceId},'target')).json() as BusinessControlDto;
+    expect(claimed.epoch).toBeGreaterThan(frozen.epoch);expect((await f.request('/v3/business-execution/control/claim',{instanceId:newResourceId()})).status).toBe(403);
+  });
+
 });

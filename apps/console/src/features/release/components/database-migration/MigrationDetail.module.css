@@ -1,0 +1,8 @@
+.evidence {
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.identity {
+  overflow-wrap: anywhere;
+}

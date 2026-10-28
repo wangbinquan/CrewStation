@@ -169,3 +169,6 @@ export * from './api/business/startupInventory';
 export * from './taskrunner/bot/context';
 
 export * from './api/bot/conversation';
+
+export * from './api/data/databaseMigration';
+export * from './api/data/databaseMigrationCallbacks';

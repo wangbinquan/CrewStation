@@ -1,3 +1,5 @@
+import { DatabaseMigrationPage } from './pages/DatabaseMigrationPage';
+import { parseMigrationSearch } from './model/database-migration/view';
 import { DatabaseRestorePage } from './pages/DatabaseRestorePage';
 import { parseRestoreSearch } from './model/databaseRestore';
 import { createRoute } from '@tanstack/react-router';
@@ -16,3 +18,6 @@ export const releaseVersionRoute = createRoute({ getParentRoute: () => projectRo
 
 export const databaseRestoresRoute=createRoute({getParentRoute:()=>projectRoute,path:'database-restores',validateSearch:parseRestoreSearch,component:DatabaseRestorePage});
 export const databaseRestoreRoute=createRoute({getParentRoute:()=>projectRoute,path:'database-restores/$restoreId',validateSearch:parseRestoreSearch,component:DatabaseRestorePage});
+
+export const databaseMigrationsRoute=createRoute({getParentRoute:()=>projectRoute,path:'database-migrations',validateSearch:parseMigrationSearch,component:DatabaseMigrationPage});
+export const databaseMigrationRoute=createRoute({getParentRoute:()=>projectRoute,path:'database-migrations/$migrationId',validateSearch:parseMigrationSearch,component:DatabaseMigrationPage});

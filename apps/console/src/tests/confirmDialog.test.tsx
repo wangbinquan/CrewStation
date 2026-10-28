@@ -36,6 +36,8 @@ test('确认词不分大小写、忽略首尾空格，别的词不算', () => {
   expect(matchesConfirmWord('archiv', 'archive')).toBe(false);
   expect(matchesConfirmWord('delete', 'archive')).toBe(false);
   expect(matchesConfirmWord('', 'delete')).toBe(false);
+  expect(matchesConfirmWord(' ROLLBACK ', 'rollback')).toBe(true);
+  expect(matchesConfirmWord('abandon', 'rollback')).toBe(false);
 });
 
 test('以模态弹窗打开：标题、问句与后果都在弹窗里，焦点进输入框，输对确认词之前确认键不可点', async () => {

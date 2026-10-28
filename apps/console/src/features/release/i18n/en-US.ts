@@ -1,3 +1,4 @@
+import { databaseMigrationMessages } from './database-migration/en-US';
 import type { MessagesShapedLike } from '../../../shared/lib/i18n';
 import type { messages as zhCN } from './zh-CN';
 import { journeyMessages } from './journey/en-US';
@@ -38,6 +39,7 @@ export const messages: MessagesShapedLike<typeof zhCN> = {
 
   ...journeyMessages,
   ...databaseRestoreMessages,
+  ...databaseMigrationMessages,
   'release.handoff.freezing': 'Freezing execution authority and reconciling in-flight operations.',
   'release.handoff.preparing': 'Waiting for the target application to prepare and reconcile.',
   'release.handoff.routing': 'Preparation confirmed. Switching production routes.',

@@ -43,15 +43,15 @@ export function drizzleMaintenanceRepository(db: Executor): MaintenanceRepositor
       if(prior){if(prior.operation_id!==input.operationId||prior.service_id!==input.serviceId||prior.project_id!==input.projectId||prior.completed)throw conflict('维护窗口已归另一操作或原恢复已经结束');return {revision:prior.maintenance_revision,wasOpen:!!prior.original};}
       const [original]=await db.execute<Record<string,unknown>>(sql`SELECT * FROM gateway.service_maintenance WHERE service_id=${input.serviceId} FOR UPDATE`);
       const revision=Number(original?.revision??0)+1;
-      await db.execute(sql`INSERT INTO gateway.database_restore_maintenance(operation_id,service_id,project_id,original,maintenance_revision) VALUES(${input.operationId},${input.serviceId},${input.projectId},${original?JSON.stringify(original):null}::jsonb,${revision})`);
-      const body={switches:{users:true,services:true,events:true},allowUserIds:[],reason:'数据库恢复切换 '+input.operationId,startedBy:input.actor,startedAt:input.now.toISOString(),updatedBy:input.actor};
+      await db.execute(sql`INSERT INTO gateway.database_restore_maintenance(operation_id,service_id,project_id,original,maintenance_revision,operation_kind) VALUES(${input.operationId},${input.serviceId},${input.projectId},${original?JSON.stringify(original):null}::jsonb,${revision},${input.kind??'restore'})`);
+      const body={switches:{users:true,services:true,events:true},allowUserIds:[],reason:(input.kind==='migration'?'数据库迁移切换 ':'数据库恢复切换 ')+input.operationId,startedBy:input.actor,startedAt:input.now.toISOString(),updatedBy:input.actor};
       await db.execute(sql`INSERT INTO gateway.service_maintenance(service_id,project_id,body,revision,updated_at) VALUES(${input.serviceId},${input.projectId},${JSON.stringify(body)}::jsonb,${revision},${input.now.toISOString()}) ON CONFLICT(service_id) DO UPDATE SET body=excluded.body,revision=excluded.revision,updated_at=excluded.updated_at`);
       await db.insert(maintenanceEvents).values({id:newResourceId(),serviceId:input.serviceId,kind:original?'updated':'entered',actorUserId:input.actor,at:input.now,body:{switches:body.switches,allowUserIds:[],reason:body.reason}});
       return {revision,wasOpen:!!original};
     },
     endRestore: async (input) => {
       await db.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${'gateway.maintenance:'+input.serviceId},0))`);
-      const [hold]=await db.execute<{operation_id:string;service_id:string;original:Record<string,unknown>|null;maintenance_revision:number;completed:boolean}>(sql`SELECT * FROM gateway.database_restore_maintenance WHERE operation_id=${input.operationId} FOR UPDATE`);
+      const [hold]=await db.execute<{operation_id:string;service_id:string;operation_kind:'restore'|'migration';original:Record<string,unknown>|null;maintenance_revision:number;completed:boolean}>(sql`SELECT * FROM gateway.database_restore_maintenance WHERE operation_id=${input.operationId} FOR UPDATE`);
       if(!hold||hold.service_id!==input.serviceId||hold.maintenance_revision!==input.revision)throw conflict('原恢复维护保留不匹配');
       if(hold.completed)return;
       const [actual]=await db.execute<{revision:number}>(sql`SELECT revision FROM gateway.service_maintenance WHERE service_id=${input.serviceId} FOR UPDATE`);
@@ -59,7 +59,7 @@ export function drizzleMaintenanceRepository(db: Executor): MaintenanceRepositor
       if(hold.original)await db.execute(sql`UPDATE gateway.service_maintenance SET body=${JSON.stringify(hold.original.body)}::jsonb,revision=revision+1,updated_at=now() WHERE service_id=${input.serviceId}`);
       else await db.execute(sql`DELETE FROM gateway.service_maintenance WHERE service_id=${input.serviceId}`);
       const restored=hold.original?.body as MaintenanceBody|undefined;
-      await db.insert(maintenanceEvents).values({id:newResourceId(),serviceId:input.serviceId,kind:restored?'updated':'exited',actorUserId:input.actor,at:input.now,body:restored?{switches:restored.switches,allowUserIds:restored.allowUserIds,reason:restored.reason,...(restored.expectedEndAt?{expectedEndAt:restored.expectedEndAt}:{})}:{switches:{users:false,services:false,events:false},allowUserIds:[],reason:'数据库恢复完成 '+input.operationId}});
+      await db.insert(maintenanceEvents).values({id:newResourceId(),serviceId:input.serviceId,kind:restored?'updated':'exited',actorUserId:input.actor,at:input.now,body:restored?{switches:restored.switches,allowUserIds:restored.allowUserIds,reason:restored.reason,...(restored.expectedEndAt?{expectedEndAt:restored.expectedEndAt}:{})}:{switches:{users:false,services:false,events:false},allowUserIds:[],reason:(hold.operation_kind==='migration'?'数据库迁移完成 ':'数据库恢复完成 ')+input.operationId}});
       await db.execute(sql`UPDATE gateway.database_restore_maintenance SET completed=true WHERE operation_id=${input.operationId}`);
     },
     get: async (serviceId) => {

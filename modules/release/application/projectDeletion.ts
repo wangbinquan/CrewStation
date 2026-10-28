@@ -107,9 +107,11 @@ export async function releaseProjectWork<T>(deps: Pick<ReleaseUseCaseDeps, 'serv
 /** Retain the original native callback through the complete cluster apply,
  * including the interval after credential rendering has already returned. */
 export async function releaseResourceCreationWork<T>(deps: ReleaseUseCaseDeps, input: { releaseId: string; recordId: string; kind: 'slot' | 'pipeline'; serviceId?: string }, work: () => Promise<T>): Promise<T> {
-  const id = ResourceIdSchema.parse(input.releaseId) as ReleaseId, original = await deps.uow.read.releases.getById(id);
+  const id = ResourceIdSchema.parse(input.releaseId) as ReleaseId, original = await deps.uow.read.releases.getById(id)??await deps.uow.read.releases.getByBuildJobId?.(id);
   ResourceIdSchema.parse(input.recordId);
   if(!original){
+    const migration=await deps.uow.read.databaseMigrations?.forJob(id);
+    if(migration&&deps.databaseMigration)return releaseProjectWork(deps,migration.serviceId,input.kind,migration.id,input,()=>deps.databaseMigration!.coordination.run(migration.id,work));
     const op=await deps.uow.read.databaseRestores?.forJob(id);
     if(op&&deps.databaseRestore)return releaseProjectWork(deps,op.serviceId,input.kind,op.id,{...input,operationId:op.id},()=>deps.databaseRestore!.coordination.run(op.id,work));
   }
@@ -124,8 +126,8 @@ export function admittedReleaseApi(deps: ReleaseUseCaseDeps, api: ReleaseModuleA
   if (!deps.admission) return api;
   const service = <T>(id: ServiceId, input: unknown, work: () => Promise<T>, kind: 'publish' | 'slot' | 'maintenance' = 'slot', consumerId = newResourceId()) => releaseProjectWork(deps, id, kind, consumerId, input, work);
   const release = async <T>(id: ReleaseId, input: unknown, work: () => Promise<T>, kind: 'pipeline' | 'slot' = 'slot') => {
-    const original = await deps.uow.read.releases.getById(id);
-    if (!original){const op=await deps.uow.read.databaseRestores?.forJob(id);if(op&&deps.databaseRestore)return releaseProjectWork(deps,op.serviceId,kind,op.id,input,()=>deps.databaseRestore!.coordination.run(op.id,work));return work();}
+    const original = await deps.uow.read.releases.getById(id)??await deps.uow.read.releases.getByBuildJobId?.(id);
+    if (!original){const migration=await deps.uow.read.databaseMigrations?.forJob(id);if(migration&&deps.databaseMigration)return releaseProjectWork(deps,migration.serviceId,kind,migration.id,input,()=>deps.databaseMigration!.coordination.run(migration.id,work));const op=await deps.uow.read.databaseRestores?.forJob(id);if(op&&deps.databaseRestore)return releaseProjectWork(deps,op.serviceId,kind,op.id,input,()=>deps.databaseRestore!.coordination.run(op.id,work));return work();}
     return releaseProjectWork(deps, original.serviceId, kind, id, input, async () => {
       const actual = await deps.services.resolveServiceById(original.serviceId);
       if (actual?.projectId !== original.projectId) throw precondition('原发布项目与当前服务归属冲突');

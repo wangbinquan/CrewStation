@@ -1,7 +1,7 @@
 import type { Manifest } from '@crewstation/contracts';
 import type { Release } from '../domain/release';
 import type { JobPurpose, JobRender } from '../domain/releaseJobs';
-import { BUILD_RESOURCES, JOB_TTL_SECONDS, MIGRATION_RESOURCES, buildScript, jobOutcomeOf, releaseJobName } from '../domain/releaseJobs';
+import { BUILD_RESOURCES, JOB_TTL_SECONDS, MIGRATION_RESOURCES, buildScript, jobOutcomeOf, releaseJobName, releaseJobId } from '../domain/releaseJobs';
 import type { ReleaseUseCaseDeps } from './dependencies';
 import type { PipelineContext, ResolvedService, StepResult } from './pipelineContext';
 import { WAIT } from './pipelineContext';
@@ -35,17 +35,17 @@ export function ledgerJobSteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): 
     return plan ? { cpu: plan.cpu, memory: plan.memory } : { ...MIGRATION_RESOURCES };
   };
   const renderOf = async (release: Release, purpose: JobPurpose): Promise<JobRender> => {
-    const envSecret = `${releaseJobName(release, purpose)}-env`, base = { releaseId: release.id, purpose, activeDeadlineSeconds: settings.buildTimeoutSeconds, ttlSecondsAfterFinished: JOB_TTL_SECONDS, envSecret };
+    const envSecret = `${releaseJobName(release, purpose)}-env`, base = { releaseId: releaseJobId(release,purpose), purpose, activeDeadlineSeconds: settings.buildTimeoutSeconds, ttlSecondsAfterFinished: JOB_TTL_SECONDS, envSecret };
     if (purpose === 'migration') return { ...base, image: release.image ?? '', command: release.manifest?.spec.release.migrationCommand ?? [], env: {}, resources: await migrationResources(release) };
     const { httpUrl } = await deps.repo.buildSource!(release.serviceId);
     return { ...base, image: settings.builderImage, command: ['sh', '-c', buildScript(settings.buildkitAddress)], env: { REPO_URL: httpUrl, REF: release.commitSha, IMAGE: release.image ?? '' }, resources: { ...BUILD_RESOURCES } };
   };
   const declare = async (release: Release, svc: ResolvedService, purpose: JobPurpose): Promise<void> => {
     const job = await renderOf(release, purpose);
-    await deps.uow.run(async (scope) => { await scope.ledger?.job({ kind: KIND[purpose], releaseId: release.id, tag: release.tag, projectId: release.projectId, namespace: svc.namespace, jobName: releaseJobName(release, purpose), job: { ...job, command: [...job.command] } }); });
+    await deps.uow.run(async (scope) => { await scope.ledger?.job({ kind: KIND[purpose], releaseId: releaseJobId(release,purpose), tag: release.tag, projectId: release.projectId, namespace: svc.namespace, jobName: releaseJobName(release, purpose), job: { ...job, command: [...job.command] } }); });
   };
   const giveUp = async (release: Release, purpose: JobPurpose, message: string): Promise<StepResult> => {
-    await deps.uow.read.ledger?.failJob(release.id, KIND[purpose], message);
+    await deps.uow.read.ledger?.failJob(releaseJobId(release,purpose), KIND[purpose], message);
     return ctx.fail(release, message);
   };
   return {
@@ -62,7 +62,7 @@ export function ledgerJobSteps(deps: ReleaseUseCaseDeps, ctx: PipelineContext): 
       return WAIT;
     },
     poll: async (release, svc, purpose, next) => {
-      const record = await deps.uow.read.ledger?.jobRecord(release.id, KIND[purpose]);
+      const record = await deps.uow.read.ledger?.jobRecord(releaseJobId(release,purpose), KIND[purpose]);
       // 期望没写进台账（那一次投影失败只告警）：再写一次，下一轮接着判。
       if (!record?.spec.job) await declare(release, svc, purpose);
       const outcome = jobOutcomeOf(record?.spec.job ? record : undefined);
