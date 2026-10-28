@@ -1,7 +1,11 @@
 import { z } from 'zod';
 import { DatabaseMigrationDigestSchema as digest, DatabaseMigrationOperationIdSchema as operationId } from './databaseMigration';
 const name = z.string().min(1).max(2048);
-const bytes = z.string().regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/);
+// Canonical base64 via one character class and a round trip. A grouped pattern such as /^(?:[A-Za-z0-9+/]{4})*…$/
+// returns false on Bun 1.3.13 for valid strings past about 4 MB, which rejected every 4 MiB chunk AW writes (RFC-044 T9).
+const bytes = z.string().refine((value) => {
+  try { return value.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(value) && btoa(atob(value)) === value; } catch { return false; }
+}, '产物内容必须是规范 base64');
 const requestKey = z.string().min(1).max(4096);
 export const MigrationArtifactWriteSchema = z.strictObject({ operationId, name, digest, bytes, requestKey });
 export const MigrationArtifactQuerySchema = z.strictObject({ operationId, name });

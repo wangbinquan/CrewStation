@@ -27,4 +27,13 @@ describe('RFC-044 strict requests and DTOs',()=>{
   expect(C.CreateDatabaseMigrationSchema.safeParse({...create,command:['shell']}).success).toBe(false);expect(C.CreateDatabaseMigrationSchema.safeParse({...create,expectedCommitSha:'HEAD'}).success).toBe(false);
  });
  test('callback nullable missing artifacts and canonical digests are explicit',()=>{expect(B.MigrationArtifactSchema.parse(null)).toBeNull();expect(C.DatabaseMigrationDigestSchema.safeParse('a'.repeat(64)).success).toBe(false);expect(C.DatabaseMigrationOperationIdSchema.safeParse(id).success).toBe(false);expect(B.MigrationPreparedSchema.safeParse({operationId:op,generationId:id,receiptDigest:digest,location:{kind:'postgresql-target',profileRef:'env:TARGET'},requestKey:'x'}).success).toBe(false);});
+ // RFC-044 T9 本机验收：AW 把大产物按 4 MiB 分块写入，base64 约 559 万字符。原先的分组正则在 Bun 1.3.13（平台与 CI 所用版本）上
+ // 对这样长的合法串返回 false，每个分块都被判为「回调请求格式不合法」，plan Job 以 exit 失败。
+ test('artifact bytes accept a full 4 MiB chunk and still refuse non-canonical base64',()=>{
+  const chunk=new Uint8Array(4*1024*1024);for(let i=0;i<chunk.length;i++)chunk[i]=(i*31+7)&255;
+  const write={operationId:op,name:'.artifacts/source-catalogs/x.json.content/'+'c'.repeat(64)+'/0',digest,bytes:Buffer.from(chunk).toString('base64'),requestKey:'key'};
+  expect(B.MigrationArtifactWriteSchema.safeParse(write).success).toBe(true);expect(B.MigrationArtifactSchema.safeParse({bytes:write.bytes,digest}).success).toBe(true);
+  for(const bytes of ['abc','ab=c','a===','YQ','YQ=','YR==','Y Q==','====','e30=\n'])expect(B.MigrationArtifactWriteSchema.safeParse({...write,bytes}).success).toBe(false);
+  expect(B.MigrationArtifactWriteSchema.safeParse({...write,bytes:''}).success).toBe(true);
+ });
 });
