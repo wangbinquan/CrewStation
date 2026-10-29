@@ -58,6 +58,7 @@ export interface ReleaseModuleApi {
   switchDatabaseMigration(actor:Actor,serviceId:ServiceId,id:string,input:SwitchDatabaseMigration):Promise<DatabaseMigrationDto>;
   openDatabaseMigration(actor:Actor,serviceId:ServiceId,id:string,input:SwitchDatabaseMigration):Promise<DatabaseMigrationDto>;
   rollbackDatabaseMigration(actor:Actor,serviceId:ServiceId,id:string,input:RetryDatabaseMigration):Promise<DatabaseMigrationDto>;
+  cancelRollbackDatabaseMigration(actor:Actor,serviceId:ServiceId,id:string,input:RetryDatabaseMigration):Promise<DatabaseMigrationDto>;
   retryDatabaseMigration(actor:Actor,serviceId:ServiceId,id:string,input:RetryDatabaseMigration):Promise<DatabaseMigrationDto>;
   abandonDatabaseMigration(actor:Actor,serviceId:ServiceId,id:string,input:RetryDatabaseMigration):Promise<DatabaseMigrationDto>;
   assertDatabaseMigrationAvailable(serviceId: ServiceId): Promise<void>;

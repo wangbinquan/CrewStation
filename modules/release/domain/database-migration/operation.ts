@@ -26,7 +26,10 @@ export function migrationConfirmation(op:DatabaseMigrationOperation):string|null
 export function migrationActions(op:DatabaseMigrationOperation):DatabaseMigrationDto['actions']{
   if(migrationEnded(op)||op.abandonRequested)return [];
   const actions:DatabaseMigrationDto['actions']=[];
-  if(op.error)actions.push('retry');
+  if(op.error){
+    actions.push('retry');
+    if(op.stage==='rolling-back'&&op.currentAttempt?.purpose==='database-migration-rollback'&&op.currentAttempt.proof?.receipt.state==='failed'&&!op.receipts.rollback&&op.rollbackRequest===null&&op.receipts.verify)actions.push('cancel-rollback');
+  }
   else {
     if(['awaiting-approval','approved'].includes(op.stage))actions.push('replan');
     if(['awaiting-approval','awaiting-reapproval'].includes(op.stage)&&op.plan&&!op.plan.plan.payload.blocks.length)actions.push('approve');

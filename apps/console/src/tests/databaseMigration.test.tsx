@@ -28,6 +28,27 @@ test('members see evidence, generations and plan but no mutation; read errors re
 test('error exposes retry while a progressing stage has no retry button; attempts show failure and receipt digest',async()=>{
  const f=databaseMigrationFixture();f.op.stage='migrating';f.op.actions=['retry','rollback'];f.op.error='迁移 Job 失败';f.op.attempts=[{jobId:operationId,purpose:'database-migration-run',receipt:null,receiptDigest:'sha256:'+'c'.repeat(64),logTail:'original attempt log'}];page=await renderApp(detail);expect(page.text()).toContain('original attempt log');await page.click('重试当前阶段');expect(f.writes[0]?.body).toEqual({expectedRevision:5});f.op.actions=[];f.op.error=null;await page.reread();expect(button('重试当前阶段')).toBeUndefined();
 });
+test('cancel-rollback uses the shared confirmation, preserves retry and returns to a fresh open confirmation',async()=>{
+ const f=databaseMigrationFixture(),label='取消撤回，回到待开放',confirm='确认取消撤回';
+ f.op.stage='rolling-back';f.op.actions=['retry','cancel-rollback'];f.op.error='迁移 Job 失败（exit）';f.op.confirmationDigest=null;
+ f.op.attempts=[{jobId:operationId,purpose:'database-migration-rollback',receipt:null,receiptDigest:null,logTail:'reverse-migration-required'}];
+ page=await renderApp(detail);expect(button('重试当前阶段')?.disabled).toBe(false);expect(button('开放并完成')).toBeUndefined();
+ const trigger=button(label)!;trigger.focus();await page.click(label);
+ expect(document.querySelectorAll('dialog[role="alertdialog"]')).toHaveLength(1);expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('应用拒绝了撤回');expect(document.querySelectorAll('[role="alertdialog"] input')).toHaveLength(0);expect(f.writes).toHaveLength(0);
+  // renderApp.click 使用包含匹配；「确认取消撤回」也含「取消」，这里必须点精确的取消按钮。
+  await act(async()=>{button('取消')!.click();});await page.settle();expect(document.querySelectorAll('dialog')).toHaveLength(0);expect(document.activeElement===trigger).toBe(true);expect(page.path()).toBe(detail);expect(f.writes).toHaveLength(0);
+ await page.click(label);await act(async()=>{document.querySelector('[role="alertdialog"]')!.dispatchEvent(new Event('cancel',{cancelable:true}));});await page.settle();expect(document.querySelectorAll('dialog')).toHaveLength(0);expect(f.writes).toHaveLength(0);
+ await page.click(label);await page.click(confirm);
+ expect(f.writes).toEqual([{path:`/v1/services/${serviceId}/database-migrations/${operationId}/cancel-rollback`,body:{expectedRevision:5}}]);expect(document.querySelectorAll('dialog')).toHaveLength(0);expect(button(label)).toBeUndefined();expect(button('重试当前阶段')).toBeUndefined();expect(page.text()).toContain('reverse-migration-required');
+ await page.click('开放并完成');expect(document.querySelectorAll('dialog[role="alertdialog"]')).toHaveLength(1);expect(f.writes).toHaveLength(1);await page.click('确认开放并完成');
+ expect(f.writes[1]).toEqual({path:`/v1/services/${serviceId}/database-migrations/${operationId}/open`,body:{expectedRevision:6,confirmationDigest:'e'.repeat(64)}});
+});
+test('cancel-rollback confirmation becomes stale on a new revision or withdrawn action',async()=>{
+ const f=databaseMigrationFixture();f.op.stage='rolling-back';f.op.actions=['retry','cancel-rollback'];f.op.error='撤回失败';f.op.confirmationDigest=null;
+ page=await renderApp(detail);await page.click('取消撤回，回到待开放');expect(button('确认取消撤回')?.disabled).toBe(false);
+ f.op.revision++;await page.reread();expect(button('确认取消撤回')?.disabled).toBe(true);await page.click('重新核对');expect(button('确认取消撤回')?.disabled).toBe(false);
+ f.op.actions=['retry'];await page.reread();expect(button('确认取消撤回')?.disabled).toBe(true);await page.click('重新核对');expect(button('确认取消撤回')?.disabled).toBe(true);await act(async()=>{button('取消')!.click();});await page.settle();expect(document.querySelectorAll('dialog')).toHaveLength(0);expect(button('取消撤回，回到待开放')).toBeUndefined();expect(f.writes).toHaveLength(0);
+});
 test('lost create response retains exact input and UUID across remount; explicit replay clears intent only after matching receipt',async()=>{
  const f=databaseMigrationFixture(),key=migrationIntentKey(serviceId,userId),input={requestId:Bun.randomUUIDv7() as never,expectedActiveGenerationId:generationId as never,expectedActiveReleaseId:prodId as never,branch:'main',expectedCommitSha:'a'.repeat(40)};saveMigrationIntent(sessionStorage,key,input);f.state.loseResponse=true;page=await renderApp(list);expect(f.writes).toHaveLength(0);await page.click('创建迁移目标');expect(f.writes[0]?.body).toEqual(input);expect(readMigrationIntent(sessionStorage,key).intent).toEqual(input);page.unmount();page=await renderApp(list);expect(f.writes).toHaveLength(1);f.state.loseResponse=false;await page.click('创建迁移目标');expect(f.writes[1]?.body).toEqual(input);expect(readMigrationIntent(sessionStorage,key).intent).toBeNull();expect(page.path()).toBe(list+'/'+input.requestId);
 });

@@ -10,6 +10,7 @@ export function databaseMigrationFixture(){
   if(path.includes('/database-migrations')||path.endsWith('/database-generations')){
    if(method!=='GET'){const body=JSON.parse(String(init?.body??'{}')) as Record<string,unknown>;writes.push({path,body});if(state.loseResponse)throw new TypeError('response lost');
     if(path.endsWith('/database-migrations'))return Response.json({...op,...body,id:state.wrongResponse?Bun.randomUUIDv7():body.requestId,sourceGenerationId:body.expectedActiveGenerationId,sourceReleaseId:body.expectedActiveReleaseId,commitSha:body.expectedCommitSha,stage:'requested',actions:['abandon'],confirmationDigest:null,expectedActiveGenerationId:undefined,expectedActiveReleaseId:undefined,expectedCommitSha:undefined,requestId:undefined});
+    if(path.endsWith('/cancel-rollback')){Object.assign(op,{stage:'ready-to-open',revision:op.revision+1,error:null,observation:null,actions:['open','rollback'],confirmationDigest:'e'.repeat(64)});return Response.json(op);}
     return Response.json({...op,revision:op.revision+1,actions:[],confirmationDigest:null});}
    if(state.readError)return Response.json({error:'unavailable',message:'迁移读取失败'},{status:503});
    if(path.endsWith('/database-generations'))return Response.json({active:{generationId,revision:1,restoreOperationId:null,migrationOperationId:null},items:[]});

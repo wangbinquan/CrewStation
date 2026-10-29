@@ -11,6 +11,12 @@ import { switchTrafficUseCase } from '../application/switchTraffic';
 import type { ReleaseModuleApi } from '../api/moduleApi';
 const available=await testDatabaseAvailable();let f:DatabaseMigrationFixture|undefined;
 afterEach(async()=>{await f?.close();f=undefined;});
+async function failedRollback(f:DatabaseMigrationFixture){
+ const ready=await f.verified();await f.api.rollbackDatabaseMigration(f.actor,f.serviceId,ready.id,{expectedRevision:ready.revision});await f.tick();
+ const rolling=await f.load();f.restoreState.proofs.set(rolling.currentAttempt!.jobId,{...f.proof(rolling,undefined,'exit'),logTail:'reverse-migration-required'});await f.tick();
+ const failed=await f.load();expect(failed.stage).toBe('rolling-back');expect(failed.error).toContain('exit');expect(failed.currentAttempt?.proof?.receipt.state).toBe('failed');
+ return {ready,failed};
+}
 describe.skipIf(!available)('RFC-044 persisted migration',()=>{
  test('original request is idempotent; restore, publish, offline, redeploy and switch refuse an open migration',async()=>{
   f=await databaseMigrationFixture();const api=f.api,op=await api.createDatabaseMigration(f.actor,f.serviceId,f.input);
@@ -71,6 +77,35 @@ describe.skipIf(!available)('RFC-044 persisted migration',()=>{
  test('rollback waits for its own Job, retires candidate, reverts binding before barrier withdrawal and preserves source traffic',async()=>{
   f=await databaseMigrationFixture();const op=await f.verified();await f.api.rollbackDatabaseMigration(f.actor,f.serviceId,op.id,{expectedRevision:op.revision});await f.tick();const rolling=await f.load();expect(rolling.currentAttempt?.purpose).toBe('database-migration-rollback');await f.tick();expect((await f.load()).error).toBeNull();expect(f.state.binding.generationId).toBe(op.targetGenerationId);
   await f.receipt('rollback');await f.tick();expect((await f.load()).stage).toBe('rolled-back');expect(f.state.binding.generationId).toBe(op.sourceGenerationId);expect(f.state.removed).toContain(op.candidateReleaseId);expect(f.restoreState.withdrawn).toEqual([op.id]);expect(f.restoreState.maintenance).toBe(false);expect((await f.uow.read.slots.get(f.serviceId))?.active).toBe('blue');
+ });
+ test('cancel a refused rollback retains its failed attempt, then a fresh open confirmation completes the migration',async()=>{
+  f=await databaseMigrationFixture();const {ready,failed}=await failedRollback(f);
+  // RFC-044 T9：reverse-migration-required 的失败撤回没有回退平台绑定，必须能回到待开放继续完成。
+  expect(migrationDto(failed).actions).toEqual(['retry','cancel-rollback']);expect(failed.rollbackRequest).toBeNull();expect(failed.receipts.rollback).toBeUndefined();
+  await f.store.save(failed,{...failed,revision:failed.revision+1,observation:{message:'等待观察',at:failed.updatedAt,failures:1}});
+  const before=await f.load(),binding={...f.state.binding},slots=await f.uow.read.slots.get(f.serviceId),release=await f.uow.read.releases.getById(before.candidateReleaseId);
+  const dto=await f.api.cancelRollbackDatabaseMigration(f.actor,f.serviceId,before.id,{expectedRevision:before.revision}),cancelled=await f.load();
+  expect(dto).toMatchObject({stage:'ready-to-open',revision:before.revision+1,error:null,observation:null,actions:['open','rollback']});
+  expect(cancelled.currentAttempt).toBeNull();expect(cancelled.previousAttempts).toEqual([...before.previousAttempts,before.currentAttempt!]);
+  expect(dto.attempts.at(-1)).toMatchObject({jobId:before.currentAttempt!.jobId,receipt:{state:'failed',failure:'exit'},logTail:'reverse-migration-required'});
+  expect(cancelled).toMatchObject({receipts:before.receipts,freeze:before.freeze,approval:before.approval,candidateProof:before.candidateProof});
+  expect(f.state.binding).toEqual(binding);expect(await f.uow.read.slots.get(f.serviceId)).toEqual(slots);expect(await f.uow.read.releases.getById(before.candidateReleaseId)).toEqual(release);
+  expect(f.state.removed).toEqual([]);expect(f.restoreState.withdrawn).toEqual([]);expect(f.restoreState.maintenance).toBe(true);expect(f.state.opened).toBe(false);
+  expect(dto.confirmationDigest).toMatch(/^[a-f0-9]{64}$/);expect(dto.confirmationDigest).not.toBe(migrationDto(ready).confirmationDigest);
+  await expect(f.api.openDatabaseMigration(f.actor,f.serviceId,dto.id,{expectedRevision:dto.revision,confirmationDigest:migrationDto(ready).confirmationDigest!})).rejects.toMatchObject({details:{code:'database_migration_confirmation_mismatch'}});
+  await f.api.openDatabaseMigration(f.actor,f.serviceId,dto.id,{expectedRevision:dto.revision,confirmationDigest:dto.confirmationDigest!});await f.tick();await f.handoff();await f.until('completing');await f.tick();await f.receipt('complete');await f.tick();
+  const completed=await f.load();expect(completed.stage).toBe('completed');expect(completed.previousAttempts).toContainEqual(before.currentAttempt!);expect(f.state.finished).toBe(true);expect(f.restoreState.maintenance).toBe(false);expect(f.state.binding.generationId).toBe(ready.targetGenerationId);expect((await f.uow.read.slots.get(f.serviceId))?.active).toBe(ready.targetSlot);
+ });
+ for(const reason of ['binding-reverted','binding-owner-changed','candidate-replaced','rollback-requested','stale-revision'] as const)test(`cancel-rollback refuses ${reason} without changing the persisted operation`,async()=>{
+  f=await databaseMigrationFixture();const {failed}=await failedRollback(f);
+  if(reason==='binding-reverted')f.state.binding.generationId=failed.sourceGenerationId;
+  if(reason==='binding-owner-changed')f.state.binding.migrationOperationId=Bun.randomUUIDv7();
+  if(reason==='candidate-replaced')await f.uow.run(async scope=>{const slots=(await scope.slots.get(f!.serviceId))!;await scope.slots.save({...slots,[failed.targetSlot]:{...slots[failed.targetSlot],releaseId:f!.target.id}});});
+  if(reason==='rollback-requested')await f.store.save(failed,{...failed,revision:failed.revision+1,rollbackRequest:'application-rollback-request'});
+  const before=await f.load(),binding={...f.state.binding};
+  const expected=reason==='stale-revision'?{kind:'conflict',details:{code:'stale_revision'}}:reason==='rollback-requested'?{kind:'conflict',details:{code:'database_migration_invalid_stage'}}:{kind:'conflict',message:reason==='candidate-replaced'?'候选版本已不在目标部署槽，不能取消撤回':'生产数据库已不再绑定本次迁移的目标世代，不能取消撤回'};
+  await expect(f.api.cancelRollbackDatabaseMigration(f.actor,f.serviceId,before.id,{expectedRevision:before.revision-(reason==='stale-revision'?1:0)})).rejects.toMatchObject(expected);
+  expect(await f.load()).toEqual(before);expect(f.state.binding).toEqual(binding);expect(f.state.removed).toEqual([]);expect(f.restoreState.withdrawn).toEqual([]);expect(f.restoreState.maintenance).toBe(true);
  });
  test('abandon waits for any existing Job and frees its retained databases; transient observations cold-retry without changing immutable input',async()=>{
   f=await databaseMigrationFixture();await f.api.createDatabaseMigration(f.actor,f.serviceId,f.input);const reserve=f.deps.data.databaseGenerations!.reserveMigration!;let once=true;

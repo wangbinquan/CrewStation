@@ -10,7 +10,7 @@ const create={requestId:id,expectedActiveGenerationId:id,expectedActiveReleaseId
 const dto={id,projectId:id,serviceId:id,revision:1,stage:'planning',sourceGenerationId:id,targetGenerationId:id,scratchGenerationId:id,sourceReleaseId:id,candidateReleaseId:id,branch:'main',commitSha:'a'.repeat(40),candidateTag:'v1.0.1+migrate.x',image:null,plan:view,approval:null,confirmationDigest:null,actions:['abandon'],blockedReason:null,error:null,observation:null,attempts:[],createdBy:id,createdAt:'2026-10-28T00:00:00Z',updatedAt:'2026-10-28T00:00:00Z'};
 const shapes:Array<[z.ZodType,unknown]>=[
  [C.ServiceDatabaseMigrationSchema,{command:['app','migrate'],verifyCommand:['app','verify'],sourceKeyConfig:'AW_SECRET_KEY'}],
- [C.CreateDatabaseMigrationSchema,create],...[C.RetryDatabaseMigrationSchema,C.ReplanDatabaseMigrationSchema,C.AbandonDatabaseMigrationSchema,C.RollbackDatabaseMigrationSchema].map(s=>[s,{expectedRevision:1}] as [z.ZodType,unknown]),
+ [C.CreateDatabaseMigrationSchema,create],...[C.RetryDatabaseMigrationSchema,C.ReplanDatabaseMigrationSchema,C.AbandonDatabaseMigrationSchema,C.RollbackDatabaseMigrationSchema,C.CancelRollbackDatabaseMigrationSchema].map(s=>[s,{expectedRevision:1}] as [z.ZodType,unknown]),
  [C.ApproveDatabaseMigrationSchema,{expectedRevision:1,approvalDigest:digest}],[C.SwitchDatabaseMigrationSchema,{expectedRevision:1,confirmationDigest:'a'.repeat(64)}],[C.OpenDatabaseMigrationSchema,{expectedRevision:1,confirmationDigest:'a'.repeat(64)}],
  [C.DatabaseMigrationPlanSchema,plan],[C.DatabaseMigrationPlanViewSchema,view],[C.DatabaseMigrationApprovalRequestSchema,{operationId:op,runId:'run',planDigest:digest,approvalDigest:digest,planPath:null}],
  [C.DatabaseMigrationReceiptSchema,{payload:{operationId:op},digest}],[C.DatabaseMigrationAttemptSchema,{jobId:id,purpose:'database-migration-plan',receipt:null,logTail:'',receiptDigest:null}],[C.DatabaseMigrationDtoSchema,dto],[C.DatabaseMigrationListSchema,{items:[dto]}],
@@ -20,6 +20,11 @@ const shapes:Array<[z.ZodType,unknown]>=[
  [B.MigrationActivationQuerySchema,{operationId:op}],[B.MigrationActivationSchema,{pointsAt:'source',pointerDigest:null}],[B.MigrationRollbackSchema,{requestKey:'key'}],[B.MigrationBackupQuerySchema,{reference:'backup'}],[B.MigrationCallbackAckSchema,{}],[B.MigrationCallbackErrorSchema,{error:'unavailable',message:'retry',details:{}}],
 ];
 describe('RFC-044 strict requests and DTOs',()=>{
+ test('cancel-rollback is an additive action and requires a positive integer revision',()=>{
+  expect(C.DatabaseMigrationActionSchema.parse('cancel-rollback')).toBe('cancel-rollback');
+  expect(C.DatabaseMigrationDtoSchema.parse({...dto,stage:'rolling-back',actions:['retry','cancel-rollback']}).actions).toEqual(['retry','cancel-rollback']);
+  for(const input of [{},{expectedRevision:0},{expectedRevision:-1},{expectedRevision:1.5},{expectedRevision:'1'}])expect(C.CancelRollbackDatabaseMigrationSchema.safeParse(input).success).toBe(false);
+ });
  test('every new object contract accepts its wire shape and rejects unknown outer keys',()=>{for(const [schema,value] of shapes){expect(schema.safeParse(value).success).toBe(true);expect(schema.safeParse({...value as object,unexpected:true}).success).toBe(false);}});
  test('manifest optional migration keeps service defaults and refuses operator command overrides',()=>{
   const service=ServiceSpecSchema.parse({command:['app'],port:3000,servicePlanId:id,databaseMigration:{command:['app','migrate'],verifyCommand:['app','verify']}});expect(service.replicas).toBe(1);expect(service.databaseMigration?.sourceKeyConfig).toBeUndefined();

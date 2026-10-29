@@ -38,6 +38,12 @@ export function databaseMigrationCommands(deps:ReleaseUseCaseDeps){
    return migrationContext(deps).save(op,{stage:'opening',switchActor:actor});
   }),
   rollbackDatabaseMigration:(actor:Actor,s:ServiceId,id:string,input:RetryDatabaseMigration)=>change(actor,s,id,input,'rollback',op=>migrationContext(deps).save(op,{stage:'rolling-back',error:null,observation:null,switchActor:actor})),
+  cancelRollbackDatabaseMigration:(actor:Actor,s:ServiceId,id:string,input:RetryDatabaseMigration)=>change(actor,s,id,input,'cancel-rollback',async op=>{
+   const c=migrationContext(deps),binding=await c.database.active(s,'production'),slots=await deps.uow.read.slots.get(s);
+   if(binding.generationId!==op.targetGenerationId||binding.migrationOperationId!==op.id)throw conflict('生产数据库已不再绑定本次迁移的目标世代，不能取消撤回');
+   if(slots?.[op.targetSlot].releaseId!==op.candidateReleaseId)throw conflict('候选版本已不在目标部署槽，不能取消撤回');
+   return c.save(op,{stage:'ready-to-open',error:null,observation:null,previousAttempts:attempts(op),currentAttempt:null});
+  }),
   abandonDatabaseMigration:(actor:Actor,s:ServiceId,id:string,input:RetryDatabaseMigration)=>change(actor,s,id,input,'abandon',op=>migrationContext(deps).save(op,{abandonRequested:true,error:null,switchActor:actor})),
   retryDatabaseMigration:(actor:Actor,s:ServiceId,id:string,input:RetryDatabaseMigration)=>change(actor,s,id,input,'retry',async op=>{if(op.stage==='building')await retryMigrationBuild(deps,op);return migrationContext(deps).save(op,{error:null,observation:null,...(!['requested','provisioning','building','planning','awaiting-approval','approved'].includes(op.stage)?{switchActor:actor}:{}),...(op.currentAttempt?.proof?.receipt.state==='failed'?{previousAttempts:attempts(op),currentAttempt:{jobId:newResourceId(),purpose:op.currentAttempt.purpose,proof:null,receiptDigest:null}}:{})});}),
  };

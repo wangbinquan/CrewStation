@@ -20,6 +20,7 @@ export interface ServicesResource {
   switchDatabaseMigration(serviceId:string,id:string,input:SwitchDatabaseMigration):Promise<DatabaseMigrationDto>;
   openDatabaseMigration(serviceId:string,id:string,input:SwitchDatabaseMigration):Promise<DatabaseMigrationDto>;
   rollbackDatabaseMigration(serviceId:string,id:string,input:RetryDatabaseMigration):Promise<DatabaseMigrationDto>;
+  cancelRollbackDatabaseMigration(serviceId:string,id:string,input:RetryDatabaseMigration):Promise<DatabaseMigrationDto>;
   retryDatabaseMigration(serviceId:string,id:string,input:RetryDatabaseMigration):Promise<DatabaseMigrationDto>;
   abandonDatabaseMigration(serviceId:string,id:string,input:RetryDatabaseMigration):Promise<DatabaseMigrationDto>;
   databaseMigrationPlanMarkdown(serviceId:string,id:string):Promise<{markdown:string}>;
@@ -87,6 +88,7 @@ export function servicesResource(transport: Transport): ServicesResource {
     switchDatabaseMigration:(id,op,input)=>transport.request('POST',`${base(id)}/database-migrations/${segment(op)}/switch`,{body:input}),
     openDatabaseMigration:(id,op,input)=>transport.request('POST',`${base(id)}/database-migrations/${segment(op)}/open`,{body:input}),
     rollbackDatabaseMigration:(id,op,input)=>transport.request('POST',`${base(id)}/database-migrations/${segment(op)}/rollback`,{body:input}),
+    cancelRollbackDatabaseMigration:(id,op,input)=>transport.request('POST',`${base(id)}/database-migrations/${segment(op)}/cancel-rollback`,{body:input}),
     retryDatabaseMigration:(id,op,input)=>transport.request('POST',`${base(id)}/database-migrations/${segment(op)}/retry`,{body:input}),
     abandonDatabaseMigration:(id,op,input)=>transport.request('POST',`${base(id)}/database-migrations/${segment(op)}/abandon`,{body:input}),
     databaseGenerations:id=>transport.request('GET',`${base(id)}/database-generations`),

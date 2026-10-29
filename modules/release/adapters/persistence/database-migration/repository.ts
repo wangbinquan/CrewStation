@@ -18,7 +18,7 @@ export function databaseMigrationRepository(db:Executor):DatabaseMigrationReposi
   pending:(limit,afterId)=>many(sql`SELECT body FROM release.database_migrations WHERE ${open} AND (body->>'error' IS NULL OR body->>'abandonRequested'='true') ${afterId?sql`AND id>${afterId}`:sql``} ORDER BY id LIMIT ${limit}`),
   insert:async op=>{await db.execute(sql`INSERT INTO release.database_migrations(id,project_id,service_id,stage,revision,body,created_at,updated_at) VALUES(${op.id},${op.projectId},${op.serviceId},${op.stage},${op.revision},${JSON.stringify(op)}::jsonb,${op.createdAt},${op.updatedAt})`);},
   save:async(original,next)=>{
-   assertMigrationTransition(original.stage,next.stage);
+   assertMigrationTransition(original.stage,next.stage,original);
    if(next.revision!==original.revision+1||next.id!==original.id)throw conflict('迁移 revision 不合法',{code:'stale_revision'});
    const result=await db.execute(sql`UPDATE release.database_migrations SET body=${JSON.stringify(next)}::jsonb,stage=${next.stage},revision=${next.revision},updated_at=${next.updatedAt} WHERE id=${original.id} AND revision=${original.revision} RETURNING id`);
    if(result.length!==1)throw conflict('迁移操作已变化',{code:'stale_revision'});

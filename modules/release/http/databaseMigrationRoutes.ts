@@ -1,5 +1,5 @@
 import type { UserId } from '@crewstation/contracts';
-import { ApproveDatabaseMigrationSchema,ReplanDatabaseMigrationSchema,OpenDatabaseMigrationSchema,RollbackDatabaseMigrationSchema,AbandonDatabaseMigrationSchema,CreateDatabaseMigrationSchema,RetryDatabaseMigrationSchema,SwitchDatabaseMigrationSchema,ServiceIdSchema,ResourceIdSchema } from '@crewstation/contracts';
+import { ApproveDatabaseMigrationSchema,ReplanDatabaseMigrationSchema,OpenDatabaseMigrationSchema,RollbackDatabaseMigrationSchema,CancelRollbackDatabaseMigrationSchema,AbandonDatabaseMigrationSchema,CreateDatabaseMigrationSchema,RetryDatabaseMigrationSchema,SwitchDatabaseMigrationSchema,ServiceIdSchema,ResourceIdSchema } from '@crewstation/contracts';
 import type { AppEnv } from '@crewstation/http';
 import {parseBody,parseParams,requireUser} from '@crewstation/http';
 import {Hono} from 'hono';
@@ -22,5 +22,6 @@ export function databaseMigrationRoutes(api:ReleaseModuleApi,isAdmin:(id:UserId)
   r.post('/v1/services/:serviceId/database-migrations/:id/approve',async c=>{const p=ids(c);return c.json(await api.approveDatabaseMigration(await actor(c),p.serviceId,p.id,await parseBody(c,ApproveDatabaseMigrationSchema)),202);});
   r.post('/v1/services/:serviceId/database-migrations/:id/open',async c=>{const p=ids(c);return c.json(await api.openDatabaseMigration(await actor(c),p.serviceId,p.id,await parseBody(c,OpenDatabaseMigrationSchema)),202);});
   r.post('/v1/services/:serviceId/database-migrations/:id/rollback',async c=>{const p=ids(c);return c.json(await api.rollbackDatabaseMigration(await actor(c),p.serviceId,p.id,await parseBody(c,RollbackDatabaseMigrationSchema)),202);});
+  r.post('/v1/services/:serviceId/database-migrations/:id/cancel-rollback',async c=>{const p=ids(c);return c.json(await api.cancelRollbackDatabaseMigration(await actor(c),p.serviceId,p.id,await parseBody(c,CancelRollbackDatabaseMigrationSchema)),202);});
   return r;
 }

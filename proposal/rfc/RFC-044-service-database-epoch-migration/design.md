@@ -47,6 +47,7 @@ databaseMigration:
 | `POST …/:id/switch` | `expectedRevision, confirmationDigest` | 进入维护、冻结并开始迁移 |
 | `POST …/:id/open` | `expectedRevision, confirmationDigest` | 验证通过后开放准入、交接执行权并切流 |
 | `POST …/:id/rollback` | `expectedRevision` | 冻结之后、开放之前撤回到原世代与原版本 |
+| `POST …/:id/cancel-rollback` | `expectedRevision` | 撤回 Job 失败且平台尚未回退时，取消撤回，回到待开放 |
 | `POST …/:id/retry` | `expectedRevision` | 重试当前阶段失败的 Job 或平台步骤，输入不变 |
 | `POST …/:id/abandon` | `expectedRevision` | 冻结之前放弃；目标库与 scratch 库保留 |
 
@@ -185,6 +186,8 @@ requested → provisioning → building → planning → awaiting-approval → a
 5. 进入 `rolled-back`。
 
 数据库流量一直没有切过去，旧槽始终是正式槽，所以回退不涉及切流。冻结之前的放弃直接走 RFC-042 的放弃步骤，不需要 Job。
+
+T9 验收后补充 `rolling-back → cancel-rollback → ready-to-open`（2026-10-29，作者批准）。仅在未请求放弃、已有 verify 回执、当前 rollback 尝试的 Job 回执为 failed 且操作有 error、没有成功 rollback 回执也没有 `rollbackRequest` 时提供，retry 仍可用。受理时在操作锁内核对 revision、生产绑定仍指向本操作的目标世代、候选仍在目标槽，否则返回 409。平台只有收到成功撤回回执才会回退绑定、停止候选、撤回冻结和退出维护，因此失败的 Job 尚未改变这些状态。取消撤回只清空 error、observation，将失败尝试移入历史并清空当前尝试，回到待开放；管理员重新核对开放摘要后，沿原开放与完成流程继续。
 
 ### 4.7 开放与完成
 

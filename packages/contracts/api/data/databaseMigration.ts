@@ -6,7 +6,7 @@ export const ServiceDatabaseMigrationSchema = ServiceDatabaseRestoreSchema.exten
 export const DatabaseMigrationDigestSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/);
 export const DatabaseMigrationOperationIdSchema = z.string().regex(/^dbm_e2_[A-Za-z0-9_-]{8,128}$/);
 export const DatabaseMigrationStageSchema = z.enum(['requested','provisioning','building','planning','awaiting-approval','approved','freezing','migrating','awaiting-reapproval','activating','verifying','ready-to-open','opening','completing','completed','rolling-back','rolled-back','abandoned']);
-export const DatabaseMigrationActionSchema = z.enum(['replan','approve','switch','open','rollback','retry','abandon']);
+export const DatabaseMigrationActionSchema = z.enum(['replan','approve','switch','open','rollback','cancel-rollback','retry','abandon']);
 export const DatabaseMigrationJobPurposeSchema = z.enum(['database-migration-plan','database-migration-run','database-migration-verify','database-migration-rollback','database-migration-complete']);
 export const DATABASE_MIGRATION_ERRORS = {
   active: 'database_migration_active', unsupported: 'database_migration_unsupported', restoreUnsupported: 'database_migration_restore_unsupported',
@@ -19,6 +19,7 @@ export const RetryDatabaseMigrationSchema = z.strictObject({ expectedRevision: z
 export const ReplanDatabaseMigrationSchema = RetryDatabaseMigrationSchema;
 export const AbandonDatabaseMigrationSchema = RetryDatabaseMigrationSchema;
 export const RollbackDatabaseMigrationSchema = RetryDatabaseMigrationSchema;
+export const CancelRollbackDatabaseMigrationSchema = RetryDatabaseMigrationSchema;
 export const ApproveDatabaseMigrationSchema = RetryDatabaseMigrationSchema.extend({ approvalDigest: DatabaseMigrationDigestSchema });
 export const SwitchDatabaseMigrationSchema = RetryDatabaseMigrationSchema.extend({ confirmationDigest: z.string().regex(/^[a-f0-9]{64}$/) });
 export const OpenDatabaseMigrationSchema = SwitchDatabaseMigrationSchema;
