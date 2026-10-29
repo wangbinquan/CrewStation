@@ -19,6 +19,12 @@
 
 ## 工具链与依赖
 
+### 用例要用 CI 和平台镜像的 Bun 1.3.13 跑
+
+本机默认的 `bun` 是 1.3.13，与 CI（`.github/actions/setup-workspace/action.yml`）和控制面镜像一致；另一个仓库的工具链可能在 PATH 里放了更新的 Bun。
+RFC-044 联调（2026-10-28）实撞：产物 `bytes` 的 base64 分组正则在 1.3.13 上对约 4 MB 以上的合法字符串返回 false，1.4.3 上没有这个问题。本机用 1.4.3 跑全部通过，部署后的平台却拒绝了 AW 的每个 4 MiB 分块（F4，`dd02302e` 已改成单一字符类加规范往返校验）。
+跑用例前用 `bun --version` 确认是 1.3.13。
+
 ### typescript-eslint 不支持 TS 7.0，TypeScript 必须锁在 6
 
 `typescript-eslint@8.70` 遇到 TypeScript 7 直接报 `does not support TS 7.0` 并整轮 lint 红。

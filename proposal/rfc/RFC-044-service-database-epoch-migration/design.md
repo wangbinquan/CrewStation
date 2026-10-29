@@ -1,6 +1,6 @@
 # RFC-044 设计
 
-> Approved / In Progress · 2026-10-28，作者批准「按推荐实现」。复用 RFC-042 的世代、空目标供给、固定命令 Job、维护保留、执行冻结、候选槽与执行交接；新增的是迁移操作本身、Job 回调接口和首写前回退。AW 侧合同以 agent-workflow 仓库为准：`docs/crewstation-deployment.md`「epoch-2 发布的数据库切换」、`packages/backend/src/bootstrap/epochMigrationHosted.ts`、`packages/backend/src/bootstrap/epochMigrationHostedEntry.ts`。
+> Done · 2026-10-29（2026-10-28 作者批准「按推荐实现」）。复用 RFC-042 的世代、空目标供给、固定命令 Job、维护保留、执行冻结、候选槽与执行交接；新增的是迁移操作本身、Job 回调接口和首写前回退。AW 侧合同以 agent-workflow 仓库为准：`docs/crewstation-deployment.md`「epoch-2 发布的数据库切换」、`packages/backend/src/bootstrap/epochMigrationHosted.ts`、`packages/backend/src/bootstrap/epochMigrationHostedEntry.ts`。
 
 ## 1. 模块与所有权
 
